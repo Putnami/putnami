@@ -24,11 +24,14 @@ In a terminal, `init` asks the mode, with `import` preselected. Without a
 terminal, such as in CI or under an agent, it imports. `--mode import` or
 `--mode delegate` skips the question. `init` records the mode under
 `options["@putnami/rush"].mode` of `putnami.workspace.json`, declares the
-extensions of the mode, installs them, and runs `putnami projects sync`.
+extensions of the mode, installs them, and runs `putnami projects sync`. The
+sync reads that mode, `import` when it is absent.
 
 Run again in the adopted workspace, `putnami init --from rush` writes nothing:
-it prints the diff of each `putnami.json` the sync would change. `--apply`
-writes them.
+it prints the diff of each file the sync would change. `--apply` writes them.
+`putnami init --from rush --mode <mode> --apply` switches mode: the sync
+replaces the other mode's extension in each project's `putnami.json`, with the
+`test` and `lint` entries and the file patterns delegate mode wrote.
 
 Add `.putnami/` and `.gen/` to the repository's `.gitignore`: `init` writes
 one only when the repository has none.
@@ -46,7 +49,7 @@ on another when a dependency of its `package.json` names it with the
 |---|---|---|
 | `extensions` | `@putnami/rush` | `@putnami/typescript` |
 | `dependencies` | the project IDs of the Rush projects it depends on | the same |
-| `options["@putnami/rush"].filePatterns` | `rush.json` and `command-line.json` | none |
+| `options["@putnami/rush"].filePatterns` | `rush.json`, `command-line.json` and the Rush lockfile, so a lockfile change runs every project | none |
 | `disable.jobs` | `test` and `lint` when `command-line.json` declares no bulk or phased command of that name | none |
 
 It writes a file only when a member it owns changes, and keeps every other
@@ -123,15 +126,19 @@ no longer used.
 An import also adopts Putnami's TypeScript conventions (D-066), so each
 project builds and resolves its neighbours from their sources:
 
-- A `package.json` that declares no `exports`, whose `main` or `types` names a
-  file outside `src/` such as Rush's `lib/index.js`, and whose project holds
-  `src/index.ts`, gains `"exports": { ".": "./src/index.ts" }` after its
-  `main`. Every other byte stays.
+- A `package.json` that declares no `exports`, whose top-level `main` or
+  `types` names a file outside `src/` such as Rush's `lib/index.js`, and whose
+  project holds `src/index.ts`, gains `"exports": { ".": "./src/index.ts" }`
+  after that member. Every other byte stays. A project `rush.json` publishes,
+  with `shouldPublish` or a `versionPolicyName`, keeps its entry, since
+  `rush publish` ships it to consumers that read the build output; the sync
+  warns. So does a manifest it cannot edit line by line, such as one with CRLF
+  line ends: add the `exports` by hand.
 - A project without `tsconfig.json` gets one that extends the root's, which
   the TypeScript install writes.
 
-The sync lists each file it writes, and a rerun of `putnami init --from rush`
-shows their diffs.
+The sync warns about each file it writes, and a rerun of `putnami init --from
+rush` shows their diffs.
 
 `rush.sync_stale` does not apply: the projects belong to Putnami.
 

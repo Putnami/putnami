@@ -355,7 +355,7 @@
       }
     },
     "workspace-sync-exec": {
-      "description": "Write in each Rush project's putnami.json, from rush.json and its package.json, the extension of the mode and its dependencies as project IDs. In delegate mode it adds rush.json and command-line.json as filePatterns and disables test and lint without a command of that name. The mode parameter outranks the recorded mode, and with the dryRun parameter it writes nothing and reports each diff. In import mode it also adds the source exports and tsconfig.json an import needs. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "description": "Write in each Rush project's putnami.json, from rush.json and its package.json, the extension of the mode, in place of the other mode's, and its dependencies as project IDs. In delegate mode it adds rush.json, command-line.json and the Rush lockfile as filePatterns and disables test and lint without a command of that name. The mode parameter outranks the recorded mode, and with the dryRun parameter it writes nothing and reports each diff. In import mode it also adds the source exports and tsconfig.json an import needs. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

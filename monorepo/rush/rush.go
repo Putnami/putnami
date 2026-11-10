@@ -49,17 +49,16 @@ func Stack() (stacks.Stack, error) {
 }
 
 // Mode answers the adoption mode of the workspace at root: the mode
-// options.@putnami/rush.mode of putnami.workspace.json names, and delegate
-// without one, which keeps a workspace that declares the extension by hand
-// on Rush.
+// options.@putnami/rush.mode of putnami.workspace.json names, and import
+// without one, as putnami init --from imports without a terminal (D-064).
 func Mode(root string) string {
 	cfg := wsproto.Load(root)
 	if cfg != nil {
-		if mode, _ := cfg.Options[ExtensionName]["mode"].(string); mode == ModeImport {
-			return ModeImport
+		if mode, _ := cfg.Options[ExtensionName]["mode"].(string); mode == ModeDelegate {
+			return ModeDelegate
 		}
 	}
-	return ModeDelegate
+	return ModeImport
 }
 
 // Detect names the Rush projects among the candidate paths. In delegate mode

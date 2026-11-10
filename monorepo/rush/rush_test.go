@@ -208,7 +208,7 @@ func TestTheSyncWritesEachProjectPutnamiJSONFromRushJSON(t *testing.T) {
 		"extensions":   []any{ExtensionName},
 		"dependencies": []any{"/libs/pricing"},
 		"disable":      map[string]any{"jobs": []any{"lint"}},
-		"options":      map[string]any{ExtensionName: map[string]any{"filePatterns": []any{"../../rush.json", "../../" + CommandLineFile}}},
+		"options":      map[string]any{ExtensionName: map[string]any{"filePatterns": []any{"../../rush.json", "../../" + CommandLineFile, "../../common/config/rush/pnpm-lock.yaml"}}},
 	}; !reflect.DeepEqual(api, want) {
 		t.Errorf("apps/api = %v\nwant %v", api, want)
 	}
@@ -297,8 +297,14 @@ func TestTheSyncListsTheCommandsItDoesNotMap(t *testing.T) {
 		"not mapped: the start script of @demo/api, @demo/web has no Putnami job of that name; run it with rushx start",
 		"not mapped: the storybook script of @demo/web has no Putnami job of that name; run it with rushx storybook",
 	}
-	if !reflect.DeepEqual(result.Warnings, want) {
-		t.Errorf("notes =\n%s\nwant\n%s", strings.Join(result.Warnings, "\n"), strings.Join(want, "\n"))
+	var unmapped []string
+	for _, w := range result.Warnings {
+		if strings.HasPrefix(w, "not mapped:") {
+			unmapped = append(unmapped, w)
+		}
+	}
+	if !reflect.DeepEqual(unmapped, want) {
+		t.Errorf("unmapped =\n%s\nwant\n%s", strings.Join(unmapped, "\n"), strings.Join(want, "\n"))
 	}
 
 	// The sync job reports them.
@@ -536,12 +542,12 @@ func TestTheModeParamOutranksTheRecordedMode(t *testing.T) {
 
 func TestModeReadsTheWorkspaceOptions(t *testing.T) {
 	root := t.TempDir()
-	if got := Mode(root); got != ModeDelegate {
-		t.Errorf("no workspace config = %s, want delegate", got)
-	}
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "x", "options": {"@putnami/rush": {"mode": "import"}}}`)
 	if got := Mode(root); got != ModeImport {
-		t.Errorf("mode = %s, want import", got)
+		t.Errorf("no workspace config = %s, want import", got)
+	}
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "x", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
+	if got := Mode(root); got != ModeDelegate {
+		t.Errorf("mode = %s, want delegate", got)
 	}
 }
 
@@ -568,9 +574,14 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	var diffs []string
+	for _, diff := range dry.Diffs {
+		diffs = append(diffs, diff.File)
+	}
+	slices.Sort(diffs)
 	want := []string{"apps/api/putnami.json", "apps/api/tsconfig.json", "apps/web/putnami.json", "libs/pricing/package.json", "libs/pricing/putnami.json", "libs/pricing/tsconfig.json"}
-	if !reflect.DeepEqual(dry.Written, want) {
-		t.Errorf("dry written = %v, want %v", dry.Written, want)
+	if !reflect.DeepEqual(diffs, want) {
+		t.Errorf("dry diffs = %v, want %v", diffs, want)
 	}
 	var pricingDiff string
 	for _, diff := range dry.Diffs {
@@ -585,8 +596,14 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 		t.Errorf("a dry sync wrote a tsconfig: %v", err)
 	}
 
-	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+	wet, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
 		t.Fatal(err)
+	}
+	for _, file := range []string{"libs/pricing/package.json: exports", "apps/api/tsconfig.json: written"} {
+		if !slices.ContainsFunc(wet.Warnings, func(w string) bool { return strings.HasPrefix(w, file) }) {
+			t.Errorf("the sync lists no %q: %v", file, wet.Warnings)
+		}
 	}
 	pricing, err := os.ReadFile(filepath.Join(root, "libs/pricing/package.json"))
 	if err != nil {
@@ -606,8 +623,8 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 		t.Errorf("apps/web keeps its tsconfig: %s", config)
 	}
 	again, err := Stale(context.Background(), root, &bytes.Buffer{})
-	if err != nil || len(again.Written) != 0 {
-		t.Errorf("a second import writes %v, %v", again.Written, err)
+	if err != nil || len(again.Written) != 0 || len(again.Diffs) != 0 {
+		t.Errorf("a second import writes %v %v, %v", again.Written, again.Diffs, err)
 	}
 
 	// Delegate mode rewrites no package.json and writes no tsconfig.
@@ -628,20 +645,76 @@ func TestSourceExportsKeepAManifestTheyCannotEdit(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "src/index.ts", "export {}\n")
 	for name, manifest := range map[string]string{
-		"a main under src":    `{"name": "a", "main": "src/index.ts"}`,
-		"no main":             `{"name": "a"}`,
-		"exports":             `{"name": "a", "main": "lib/index.js", "exports": "./lib/index.js"}`,
-		"a one-line manifest": `{"name": "a", "main": "lib/index.js"}`,
+		"a main under src": `{"name": "a", "main": "src/index.ts"}`,
+		"no main":          `{"name": "a"}`,
+		"exports":          `{"name": "a", "main": "lib/index.js", "exports": "./lib/index.js"}`,
 	} {
-		if got, err := withSourceExports(dir, []byte(manifest)); err != nil || got != nil {
-			t.Errorf("%s: %s, %v", name, got, err)
+		if got, reason, err := withSourceExports(dir, []byte(manifest)); err != nil || got != nil || reason != "" {
+			t.Errorf("%s: %s %q, %v", name, got, reason, err)
 		}
 	}
-	got, err := withSourceExports(dir, []byte("{\n\t\"name\": \"a\",\n\t\"types\": \"dist/index.d.ts\"\n}\n"))
+	for name, c := range map[string]struct{ manifest, reason string }{
+		"one line": {`{"name": "a", "main": "lib/index.js"}`, "its entry is on its last line"},
+		"shared":   {"{\n  \"name\": \"a\", \"main\": \"lib/index.js\"\n}\n", "shares its line"},
+		"CRLF":     {"{\r\n  \"main\": \"lib/index.js\"\r\n}\r\n", "CRLF"},
+	} {
+		if got, reason, err := withSourceExports(dir, []byte(c.manifest)); err != nil || got != nil || !strings.Contains(reason, c.reason) {
+			t.Errorf("%s: %s %q, %v, want the reason %q", name, got, reason, err, c.reason)
+		}
+	}
+	got, _, err := withSourceExports(dir, []byte("{\n\t\"name\": \"a\",\n\t\"types\": \"dist/index.d.ts\"\n}\n"))
 	if err != nil || string(got) != "{\n\t\"name\": \"a\",\n\t\"types\": \"dist/index.d.ts\",\n\t\"exports\": {\n\t\t\".\": \"./src/index.ts\"\n\t}\n}\n" {
 		t.Errorf("a last types member: %q, %v", got, err)
 	}
-	if _, err := withSourceExports(dir, []byte("not json")); err == nil {
+	// A nested main before the top-level one stays as it is.
+	nested := "{\n  \"publishConfig\": {\n    \"main\": \"dist/index.js\"\n  },\n  \"main\": \"lib/index.js\",\n  \"name\": \"a\"\n}\n"
+	got, _, err = withSourceExports(dir, []byte(nested))
+	want := "{\n  \"publishConfig\": {\n    \"main\": \"dist/index.js\"\n  },\n  \"main\": \"lib/index.js\",\n  \"exports\": {\n    \".\": \"./src/index.ts\"\n  },\n  \"name\": \"a\"\n}\n"
+	if err != nil || string(got) != want {
+		t.Errorf("a nested main:\n%s\nwant\n%s (%v)", got, want, err)
+	}
+	if _, _, err := withSourceExports(dir, []byte("not json")); err == nil {
 		t.Error("a manifest that is no JSON passes")
+	}
+}
+
+func TestAnImportKeepsTheEntryOfAProjectRushPublishes(t *testing.T) {
+	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, false)
+	writeFile(t, root, "rush.json", strings.Replace(d["base"]["rush.json"], `"shouldPublish": false`, `"shouldPublish": true`, 1))
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "libs/pricing/package.json")); string(data) != d["base"]["libs/pricing/package.json"] {
+		t.Errorf("a published project's package.json changed:\n%s", data)
+	}
+	if !slices.ContainsFunc(result.Warnings, func(w string) bool { return strings.Contains(w, "rush.json publishes @demo/pricing") }) {
+		t.Errorf("warnings = %v, want the published project named", result.Warnings)
+	}
+}
+
+func TestASwitchOfModeDropsTheOtherModesExtension(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-from-rush-json")
+	d := readDemo(t)
+	root := repository(t, d, ModeDelegate, false)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "import"}}}`)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	api := readProjectFile(t, root, "apps/api")
+	if !reflect.DeepEqual(api["extensions"], []any{TypeScriptExtension}) || api["disable"] != nil || api["options"] != nil {
+		t.Errorf("after an import apps/api = %v, want the TypeScript extension alone", api)
+	}
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if api := readProjectFile(t, root, "apps/api"); !reflect.DeepEqual(api["extensions"], []any{ExtensionName}) {
+		t.Errorf("after a delegation apps/api extensions = %v, want the Rush extension alone", api["extensions"])
 	}
 }

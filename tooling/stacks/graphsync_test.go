@@ -344,3 +344,24 @@ func TestTheSyncJobReportsTheWarningsOfTheToolsSync(t *testing.T) {
 		t.Errorf("the sync job reports no warning:\n%s", events.String())
 	}
 }
+
+func TestTheGraphSyncReplacesTheExtensionOfAnotherMode(t *testing.T) {
+	root := t.TempDir()
+	writeTestFile(t, filepath.Join(root, "api", "putnami.json"), `{"extensions": ["@acme/other", "@acme/lint"], "disable": {"jobs": ["lint", "test", "serve"]}, "options": {"@acme/other": {"filePatterns": ["../rush.json"], "tasks": {}}}}`)
+	g := testGraphSync()
+	g.Replaces = []string{"@acme/other"}
+	g.ClearJobs = []string{"lint"}
+	if _, err := g.Apply(root, []GraphPackage{{Dir: "api", Tested: true}}, false); err != nil {
+		t.Fatal(err)
+	}
+	doc := readTestProject(t, root, "api")
+	if !reflect.DeepEqual(doc["extensions"], []any{"@acme/lint", testExtension}) {
+		t.Errorf("extensions = %v, want the other mode's gone", doc["extensions"])
+	}
+	if !reflect.DeepEqual(doc["disable"], map[string]any{"jobs": []any{"serve"}}) {
+		t.Errorf("disable = %v, want the cleared jobs gone", doc["disable"])
+	}
+	if !reflect.DeepEqual(doc["options"], map[string]any{"@acme/other": map[string]any{"tasks": map[string]any{}}}) {
+		t.Errorf("options = %v, want the other mode's file patterns gone and its other members kept", doc["options"])
+	}
+}

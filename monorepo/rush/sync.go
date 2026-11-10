@@ -90,7 +90,7 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 	for _, p := range detection.Projects {
 		pkg := stacks.GraphPackage{Dir: p.Folder, DependsOn: p.DependsOn, Tested: true}
 		if mode == ModeDelegate {
-			pkg.Inputs = delegateInputs(root, p.Folder)
+			pkg.Inputs = delegateInputs(root, p.Folder, detection.Lockfile)
 			for _, job := range []string{stacks.TaskTest, stacks.TaskLint} {
 				if _, ok := commands[job]; !ok {
 					pkg.Disabled = append(pkg.Disabled, job)
@@ -107,14 +107,14 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 	result.Export = detect.Config
 	result.Warnings = unmappedCommands(commands)
 	if mode == ModeImport {
-		writes, err := importConventions(root, detection.Projects)
+		writes, warnings, err := importConventions(root, detection.Projects)
 		if err != nil {
 			return SyncResult{}, err
 		}
 		if err := applyConventions(root, writes, &result, dry); err != nil {
 			return SyncResult{}, err
 		}
-		sort.Strings(result.Written)
+		result.Warnings = append(result.Warnings, warnings...)
 		result.Warnings = append(result.Warnings, unmappedScripts(root, detection.Projects)...)
 		return result, nil
 	}
@@ -139,22 +139,33 @@ func graphSync(detection detect.Detection, mode string) stacks.GraphSync {
 	}
 	isProject := func(_, dir string) bool { return folders[dir] }
 	if mode == ModeImport {
-		return stacks.GraphSync{Extension: TypeScriptExtension, HoldsBuildFile: isProject, KeepFormer: true}
+		return stacks.GraphSync{
+			Extension:      TypeScriptExtension,
+			HoldsBuildFile: isProject,
+			KeepFormer:     true,
+			Replaces:       []string{ExtensionName},
+			ClearJobs:      []string{stacks.TaskTest, stacks.TaskLint},
+		}
 	}
 	return stacks.GraphSync{
 		Extension:      ExtensionName,
 		HoldsBuildFile: isProject,
 		SkippedDirs:    []string{"common", "temp"},
 		OwnedJobs:      []string{stacks.TaskLint},
+		Replaces:       []string{TypeScriptExtension},
 	}
 }
 
 // delegateInputs are the file patterns of a delegated project, relative to
-// its directory: rush.json and command-line.json, which every task reads.
-func delegateInputs(root, folder string) []string {
+// its directory: rush.json, command-line.json and the Rush lockfile, which
+// every task reads, so a lockfile-only change selects every project.
+func delegateInputs(root, folder, lockfile string) []string {
 	up := strings.Repeat("../", strings.Count(folder, "/")+1)
 	var out []string
-	for _, f := range []string{detect.Config, CommandLineFile} {
+	for _, f := range []string{detect.Config, CommandLineFile, lockfile} {
+		if f == "" {
+			continue
+		}
 		if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(f))); err == nil && info.Mode().IsRegular() {
 			out = append(out, up+f)
 		}
