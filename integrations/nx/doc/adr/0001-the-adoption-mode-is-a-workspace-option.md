@@ -27,8 +27,10 @@ every later `putnami projects sync` rewrites the projects' `putnami.json`.
   dependencies, and in `disable.jobs` the build, test or lint task the
   project has no target for.
 - In import mode, `init` also declares `@putnami/typescript`, whose probe
-  claims each project with a `package.json`. For a TypeScript project, one
-  with `package.json` and a `tsconfig*.json` or a `.ts` source, the sync
+  claims each project with a `package.json` (corrected by ADR 0002: the
+  sync names it in each TypeScript project's `putnami.json`). For a
+  TypeScript project, one with `package.json` and a `tsconfig*.json` or a
+  `.ts` source, the sync
   disables the qualified job of the extension that does not run a target:
   `@putnami/nx:<task>` when the target's script already runs what the
   TypeScript extension runs (`bun build`, `bun test`, `biome`),

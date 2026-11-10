@@ -26,7 +26,7 @@
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its build, test and lint targets whose script already runs what @putnami/typescript runs (bun build, bun test, biome) run as its task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as jest, eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled, so no runner changes silently."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets whose script already runs bun build, bun test or biome run as that extension's task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as jest, eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled."
     },
     {
       "id": "delegate-imports-listed-projects",

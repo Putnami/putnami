@@ -25,6 +25,12 @@ mode per workspace, a team moves every project or none.
 - In delegate mode, the sync writes each project an entry selects as import
   mode writes it, and every other project as delegate mode writes it. Import
   mode reads no list: it already imports every TypeScript project.
+- An imported TypeScript project's `putnami.json` names
+  `@putnami/typescript` beside the tool's extension, and the sync owns that
+  entry: a `putnami.json` that names extensions is claimed by those alone,
+  so the TypeScript extension's probe does not claim a project the sync
+  wrote with the tool's extension only. This corrects ADR 0001, which
+  counted on that probe; the Turborepo sync already wrote both.
 - A sync job parameter `import` outranks the option, as `mode` does, so a
   rerun of `init` previews the list it would record without writing it.
 - An entry that selects no project is reported as `<tool>.import_unmatched`,
