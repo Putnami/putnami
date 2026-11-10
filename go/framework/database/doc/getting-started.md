@@ -479,7 +479,10 @@ datasource take turns: each holds the transaction until its result is closed
 (`Query` until its rows close or `Next` reports no further row, `QueryRow` for
 its `Scan`, `SendBatch` until its results close). A query waiting for its turn
 fails with a `db.transaction` error when its own context ends, so close or
-drain rows before you query the same pool again from the same goroutine. To
+drain rows before you query the same pool again from the same goroutine:
+otherwise that query waits for itself until the HTTP request deadline (nine
+tenths of the write timeout), and for good on a WebSocket, Server-Sent Events,
+gRPC or Connect request or a context with no deadline. To
 run independent reads in parallel, each on its own pooled connection, query
 through `database.Autocommit(ctx)`:
 

@@ -78,9 +78,8 @@ func (r *busyRows) Next() bool {
 	return false
 }
 
-// TestTxGate_ConcurrentQueriesTakeTurns is the issue's reproduction on the
-// request path: goroutines of one request send Exec, Query and QueryRow on the
-// same pool at once. Every query succeeds, none overlaps another on the
+// TestTxGate_ConcurrentQueriesTakeTurns proves goroutines of one request may
+// send Exec, Query and QueryRow on the same pool at once. Every query succeeds, none overlaps another on the
 // connection, the pool enrolls once, and the boundary commits.
 func TestTxGate_ConcurrentQueriesTakeTurns(t *testing.T) {
 	spectest.Proves(t, "go/persistence-transactions", "concurrent-request-queries", "concurrent-queries-take-turns-on-the-transaction")
@@ -188,7 +187,43 @@ func TestTxGate_ResultHoldsTheTransactionUntilClosed(t *testing.T) {
 	if _, err := tx.Exec(ctx, "update t set v = 2"); err != nil {
 		t.Fatalf("exec after drained rows: %v", err)
 	}
+
+	// pgx closes rows whose Scan or Values fails, so the turn comes back with
+	// the error and the next query runs without waiting for an explicit Close.
+	bounded, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	scanFails := &gatedTx{tx: &mockTx{mockQuerier: mockQuerier{queryFn: func(context.Context, string, ...any) (pgx.Rows, error) {
+		return &mockRows{items: []func(...any) error{func(...any) error { return stderrors.New("cannot scan") }}}, nil
+	}}}, gate: newTxGate("orders"), root: true}
+	failed, err := scanFails.Query(ctx, "select 1")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if !failed.Next() || failed.Scan() == nil {
+		t.Fatal("the mock row must fail its Scan")
+	}
+	if _, err := scanFails.Exec(bounded, "update t set v = 3"); err != nil {
+		t.Fatalf("exec after a failed Scan: %v", err)
+	}
+	valuesFail := &gatedTx{tx: &mockTx{mockQuerier: mockQuerier{queryFn: func(context.Context, string, ...any) (pgx.Rows, error) {
+		return &valuesErrRows{}, nil
+	}}}, gate: newTxGate("orders"), root: true}
+	failedValues, err := valuesFail.Query(ctx, "select 1")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if _, err := failedValues.Values(); err == nil {
+		t.Fatal("the mock rows must fail their Values")
+	}
+	if _, err := valuesFail.Exec(bounded, "update t set v = 4"); err != nil {
+		t.Fatalf("exec after failed Values: %v", err)
+	}
 }
+
+// valuesErrRows fails Values, as pgx rows do on an undecodable value.
+type valuesErrRows struct{ mockRows }
+
+func (r *valuesErrRows) Values() ([]any, error) { return nil, stderrors.New("cannot decode") }
 
 // TestTxGate_WaitingQueryEndsWithItsContext proves a query waiting for its turn
 // fails under its own context with a db.transaction error that still matches
@@ -260,6 +295,56 @@ func TestTxGate_BoundaryClosesAResultLeftOpen(t *testing.T) {
 	}
 	rows.Close()
 }
+
+// TestTxGate_BoundaryBoundsTheCloseOfAResultLeftOpen proves closing a result
+// the request left open runs under UnitOfWorkTimeout: when the close stalls,
+// the commit fails, the rollback runs and the boundary returns.
+func TestTxGate_BoundaryBoundsTheCloseOfAResultLeftOpen(t *testing.T) {
+	spectest.Proves(t, "go/persistence-transactions", "concurrent-request-queries", "the-boundary-rolls-back-when-it-cannot-wait")
+	var commits, rollbacks atomic.Int32
+	stalled := make(chan struct{})
+	inner := &mockTx{
+		mockQuerier: mockQuerier{queryFn: func(context.Context, string, ...any) (pgx.Rows, error) {
+			return &stallingRows{stalled: stalled}, nil
+		}},
+		commitFn:   func(context.Context) error { commits.Add(1); return nil },
+		rollbackFn: func(context.Context) error { rollbacks.Add(1); return nil },
+	}
+	pool := &Pool{beginTx: func(context.Context) (pgx.Tx, error) { return inner, nil }}
+	uow := newUnitOfWork(20 * time.Millisecond)
+	ctx := context.Background()
+	tx, err := uow.enroll(ctx, pool)
+	if err != nil {
+		t.Fatalf("enroll: %v", err)
+	}
+	if _, err := tx.Query(ctx, "select 1"); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+
+	done := make(chan error, 1)
+	go func() { done <- uow.FinalizeScope(ctx, nil) }()
+	select {
+	case err = <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("the boundary waited on a stalled close beyond UnitOfWorkTimeout")
+	}
+	close(stalled)
+	if !perrors.Is(err, CodeTransaction) || !stderrors.Is(err, context.DeadlineExceeded) {
+		t.Fatalf("finalize = %v, want a db.transaction error wrapping the deadline", err)
+	}
+	if commits.Load() != 0 || rollbacks.Load() != 1 {
+		t.Fatalf("commit=%d rollback=%d, want 0/1", commits.Load(), rollbacks.Load())
+	}
+}
+
+// stallingRows blocks in Close until stalled closes, like rows whose server
+// stops answering mid-result.
+type stallingRows struct {
+	mockRows
+	stalled chan struct{}
+}
+
+func (r *stallingRows) Close() { <-r.stalled }
 
 // TestTxGate_BoundaryRefusesLaterQueries proves a query after the boundary, or
 // one whose result arrives while the boundary runs, fails with a

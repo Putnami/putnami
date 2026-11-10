@@ -83,17 +83,18 @@ func (g *txGate) hold(closeResult func()) bool {
 }
 
 // finish ends the transaction with end. It refuses every later operation,
-// closes a result the request left open, and waits under ctx for an operation
-// still running. When ctx ends first, a commit fails without running end and
-// a rollback runs end anyway: pgx closes a connection whose rollback fails, so
-// the busy connection never stays checked out.
+// starts closing a result the request left open, and waits under ctx until
+// that close or an operation still running frees the connection. When ctx
+// ends first, a commit fails without running end and a rollback runs end
+// anyway: pgx closes a connection whose rollback fails, so the busy connection
+// never stays checked out.
 func (g *txGate) finish(ctx context.Context, rollback bool, end func(context.Context) error) error {
 	g.mu.Lock()
 	g.closed = true
 	open := g.open
 	g.mu.Unlock()
 	if open != nil {
-		open()
+		go open()
 	}
 	select {
 	case g.turn <- struct{}{}:
@@ -247,8 +248,9 @@ func (t *gatedTx) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
 // Conn reaches the connection directly, outside the gate.
 func (t *gatedTx) Conn() *pgx.Conn { return t.tx.Conn() }
 
-// gatedRows gives the turn back once, when the rows close: on Close, or when
-// Next reports no further row.
+// gatedRows gives the turn back once, when the rows close: on Close, when
+// Next reports no further row, or when Scan or Values fails, since pgx closes
+// rows on such an error.
 type gatedRows struct {
 	pgx.Rows
 	gate *txGate
@@ -268,6 +270,22 @@ func (r *gatedRows) Next() bool {
 	}
 	r.Close()
 	return false
+}
+
+func (r *gatedRows) Scan(dest ...any) error {
+	err := r.Rows.Scan(dest...)
+	if err != nil {
+		r.Close()
+	}
+	return err
+}
+
+func (r *gatedRows) Values() ([]any, error) {
+	values, err := r.Rows.Values()
+	if err != nil {
+		r.Close()
+	}
+	return values, err
 }
 
 // gatedRow runs a QueryRow statement once, at its first Scan. A later Scan

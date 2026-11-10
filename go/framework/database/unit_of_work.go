@@ -52,8 +52,10 @@ import (
 // until its results are closed. A query waiting for its turn waits under its
 // own context and fails with a db.transaction error when that context ends
 // first. A query sent while the same goroutine still holds open rows on the
-// same pool therefore waits until its context ends: close or drain the rows
-// first. Every query of the request sees the request's uncommitted writes;
+// same pool therefore waits until its context ends — under go.putnami.dev/http
+// the request deadline, nine tenths of the write timeout; on a WebSocket,
+// Server-Sent Events, gRPC or Connect request, or a context with no deadline,
+// for good while holding the connection: close or drain the rows first. Every query of the request sees the request's uncommitted writes;
 // reads that need their own connections, to run at once, use Autocommit.
 //
 // The boundary refuses every later query, closes a result the request left

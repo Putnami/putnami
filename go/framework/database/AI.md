@@ -514,7 +514,9 @@ closed (`Query` until its rows close or `Next` reports no further row,
 `QueryRow` for its `Scan`, `SendBatch` until its results close), and a query
 waiting for its turn fails with a `db.transaction` error when its own context
 ends. Close or drain rows before the next query on the same pool, or that query
-waits for them. For independent reads that should run in parallel, each on its
+waits for them: until the HTTP request deadline (nine tenths of the write
+timeout), and for good on a WebSocket, Server-Sent Events, gRPC or Connect
+request or a context with no deadline. For independent reads that should run in parallel, each on its
 own connection, use `database.Autocommit(ctx)`: its queries run outside the
 unit of work and any `WithTx` transaction, do not see the request's uncommitted
 writes, and commit on their own.
