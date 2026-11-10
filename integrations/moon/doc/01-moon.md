@@ -37,6 +37,17 @@ would write and changes nothing; `--apply` writes it.
 
 A project never runs both: no Putnami cache sits over moon's. Switching mode
 is a change to `options["@putnami/moon"].mode` and a `putnami projects sync`.
+A workspace that records no mode imports, as `init` does without a terminal;
+a value other than `import` or `delegate` fails the sync and the probe with
+`stacks.adoption_mode_invalid`.
+
+For each project moon runs, the sync also writes, as `filePatterns`, the root
+files every moon task reads: `.moon/workspace.yml`, `.moon/tasks.yml`,
+`.moon/tasks/**`, `.moon/toolchain.yml`, `.prototools` and the package
+manager's lockfile and `.npmrc`, those the root holds. A change to one of them
+selects every such project, as moon's own hashes do. Each edge the probe
+reports is attributed to moon's project graph (`build-graph`), so
+`workspace.declared_edge` does not warn about them.
 
 ## Projects and tasks
 

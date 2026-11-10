@@ -93,16 +93,12 @@ func synchronize(_ context.Context, root string, dry bool, given string) (SyncRe
 		return SyncResult{}, nil
 	}
 	detection := detect.Detect(root, detect.Options{})
-	mode := given
-	if mode == "" {
-		mode = recordedMode(root)
+	mode, err := Mode(root)
+	if given != "" {
+		mode, err = stacks.CheckAdoptionMode(given)
 	}
-	switch mode {
-	case "":
-		mode = ModeDelegate
-	case ModeImport, ModeDelegate:
-	default:
-		return SyncResult{}, fmt.Errorf("unknown mode %q: choose %s or %s", mode, ModeImport, ModeDelegate)
+	if err != nil {
+		return SyncResult{}, err
 	}
 	result := SyncResult{Mode: mode}
 	extensions := map[string]bool{}
@@ -133,13 +129,17 @@ func synchronize(_ context.Context, root string, dry bool, given string) (SyncRe
 		if !delegated {
 			extensions[extension] = true
 		}
-		packages = append(packages, stacks.GraphPackage{
+		pkg := stacks.GraphPackage{
 			Dir:       p.Dir,
 			DependsOn: p.DependsOn,
 			Extension: extension,
 			Disabled:  disabled,
 			Edit:      editSteps(mapped, delegated),
-		})
+		}
+		if delegated {
+			pkg.Inputs = rootInputs(root, p.Dir)
+		}
+		packages = append(packages, pkg)
 	}
 	sortUnmapped(result.Unmapped)
 	graph, err := graphSync.Apply(root, packages, dry)
@@ -604,4 +604,30 @@ func declaredNames(root string, declared []string) []string {
 		}
 	}
 	return names
+}
+
+// workspaceFiles are the files at the workspace root that every moon task
+// reads: the workspace and task configuration, the toolchain pins, and the
+// package manager's lockfile and configuration, which moon hashes into each
+// task.
+var workspaceFiles = []string{
+	".moon/workspace.yml", ".moon/tasks.yml", ".moon/toolchain.yml", ".prototools",
+	"package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", "bun.lock", "bun.lockb", ".npmrc",
+}
+
+// rootInputs are the workspace files the root holds, and the task files of
+// .moon/tasks/, as file patterns of the project at dir: a change to one
+// selects every project moon runs.
+func rootInputs(root, dir string) []string {
+	up := strings.Repeat("../", strings.Count(dir, "/")+1)
+	var out []string
+	for _, name := range workspaceFiles {
+		if info, err := os.Stat(filepath.Join(root, filepath.FromSlash(name))); err == nil && info.Mode().IsRegular() {
+			out = append(out, up+name)
+		}
+	}
+	if info, err := os.Stat(filepath.Join(root, ".moon", "tasks")); err == nil && info.IsDir() {
+		out = append(out, up+".moon/tasks/**")
+	}
+	return out
 }

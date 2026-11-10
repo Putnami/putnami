@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
 	"slices"
@@ -694,4 +695,41 @@ func (j GraphJobs) Summary(r GraphResult) string {
 		return fmt.Sprintf("no %s at the workspace root and no %s on PATH: the putnami.json files keep their edges; write the export with `%s`, then run putnami projects sync", j.GraphFile, j.Tool, j.ExportCommand)
 	}
 	return fmt.Sprintf("the package graph of %s: %d putnami.json written, %d current, %d former packages retracted", r.Export, len(r.Written), r.Unchanged, len(r.Retracted))
+}
+
+// ExportGraph runs program with args at the workspace root, under the lock of
+// the stack's root tasks, since a build tool such as Bazel or Pants serves one
+// command at a time per workspace, and writes its standard output to a file
+// named file in a temporary directory. It answers that file and the function
+// that removes the directory; its error output goes to stderr.
+func ExportGraph(ctx context.Context, root, stack, program string, args []string, file string, stderr io.Writer) (string, func(), error) {
+	lock, err := LockRoot(root, stack, wsproto.ProbeRootPath)
+	if err != nil {
+		return "", nil, err
+	}
+	defer func() { _ = lock.Release() }()
+	dir, err := os.MkdirTemp("", "putnami-"+stack+"-graph-")
+	if err != nil {
+		return "", nil, err
+	}
+	cleanup := func() { _ = os.RemoveAll(dir) }
+	path := filepath.Join(dir, file)
+	out, err := os.Create(path) //nolint:gosec // a file in a directory this call created
+	if err != nil {
+		cleanup()
+		return "", nil, err
+	}
+	cmd := exec.CommandContext(ctx, program, args...) //nolint:gosec // the stack's own build tool
+	cmd.Dir = root
+	cmd.Stdout = out
+	cmd.Stderr = stderr
+	runErr := cmd.Run()
+	if err := out.Close(); err != nil && runErr == nil {
+		runErr = err
+	}
+	if runErr != nil {
+		cleanup()
+		return "", nil, fmt.Errorf("%s %s: %w", program, strings.Join(args, " "), runErr)
+	}
+	return path, cleanup, nil
 }

@@ -64,7 +64,7 @@ func synchronize(ctx context.Context, root string, stderr io.Writer, dry bool) (
 		if _, err := exec.LookPath("pants"); err != nil {
 			return SyncResult{}, nil
 		}
-		file, cleanup, err := peek(ctx, root, stderr)
+		file, cleanup, err := stacks.ExportGraph(ctx, root, profileID, "pants", peekArgs, detect.DefaultGraphFile, stderr)
 		if err != nil {
 			return SyncResult{}, err
 		}
@@ -140,41 +140,6 @@ func requiredInputs(root, dir string, detection detect.Detection) []string {
 
 // profileID is the id of the Pants profile, which names its stack-root lock.
 const profileID = "pants"
-
-// peek runs pants peek :: in root and writes its output to a temporary file.
-func peek(ctx context.Context, root string, stderr io.Writer) (string, func(), error) {
-	// Pants serves one run at a time per repository, so peek waits for the
-	// tasks of the stack root, under the lock they hold.
-	lock, err := stacks.LockRoot(root, profileID, wsproto.ProbeRootPath)
-	if err != nil {
-		return "", nil, err
-	}
-	defer func() { _ = lock.Release() }()
-	dir, err := os.MkdirTemp("", "putnami-pants-peek-")
-	if err != nil {
-		return "", nil, err
-	}
-	cleanup := func() { _ = os.RemoveAll(dir) }
-	file := filepath.Join(dir, detect.DefaultGraphFile)
-	out, err := os.Create(file) //nolint:gosec // a file in a directory this call created
-	if err != nil {
-		cleanup()
-		return "", nil, err
-	}
-	cmd := exec.CommandContext(ctx, "pants", peekArgs...)
-	cmd.Dir = root
-	cmd.Stdout = out
-	cmd.Stderr = stderr
-	runErr := cmd.Run()
-	if err := out.Close(); err != nil && runErr == nil {
-		runErr = err
-	}
-	if runErr != nil {
-		cleanup()
-		return "", nil, fmt.Errorf("pants %s: %w", strings.Join(peekArgs, " "), runErr)
-	}
-	return file, cleanup, nil
-}
 
 // graphJobs are the workspace sync task and the validate task of the Pants
 // package graph.

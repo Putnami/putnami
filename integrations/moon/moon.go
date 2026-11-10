@@ -10,10 +10,7 @@ package moon
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -33,9 +30,9 @@ const profileID = "moon"
 const (
 	// ModeImport runs each project whose language has a Putnami extension
 	// through that extension, and delegates the others to moon.
-	ModeImport = "import"
+	ModeImport = stacks.AdoptionImport
 	// ModeDelegate runs every project through moon.
-	ModeDelegate = "delegate"
+	ModeDelegate = stacks.AdoptionDelegate
 )
 
 // Commands are the Putnami commands a moon task maps to, by its name or a
@@ -66,31 +63,11 @@ func Stack() (stacks.Stack, error) {
 }
 
 // Mode reads the adoption mode of the workspace at root, from its
-// options["@putnami/moon"].mode; a workspace that states none, or a value
-// that is no mode, delegates. The sync refuses a value that is no mode.
-func Mode(root string) string {
-	if recordedMode(root) == ModeImport {
-		return ModeImport
-	}
-	return ModeDelegate
-}
-
-// recordedMode is the mode the workspace config states, as it states it;
-// empty when it states none.
-func recordedMode(root string) string {
-	data, err := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename)) //nolint:gosec // the workspace config under the root
-	if err != nil {
-		return ""
-	}
-	var cfg struct {
-		Options map[string]struct {
-			Mode string `json:"mode"`
-		} `json:"options"`
-	}
-	if json.Unmarshal(data, &cfg) != nil {
-		return ""
-	}
-	return cfg.Options[ExtensionName].Mode
+// options["@putnami/moon"].mode: import when it states none, as putnami init
+// --from imports without a terminal (D-064), and an error for a value that is
+// no mode.
+func Mode(root string) (string, error) {
+	return stacks.AdoptionMode(root, ExtensionName)
 }
 
 // ExtensionFor is the extension a project runs in the mode: its language's in
@@ -114,7 +91,10 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		return nil, nil
 	}
 	detection := detect.Detect(root, detect.Options{})
-	mode := Mode(root)
+	mode, err := Mode(root)
+	if err != nil {
+		return nil, []diag.Diagnostic{diag.Errorf(stacks.CodeAdoptionModeInvalid, "", "%v", err)}
+	}
 	projects := make(map[string]detect.Project, len(detection.Projects))
 	for _, p := range detection.Projects {
 		projects[p.Dir] = p
@@ -137,6 +117,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			SourceFile:   p.SourceFile,
 			Root:         wsproto.ProbeRootPath,
 			Dependencies: deps,
+			EdgeSource:   wsproto.DependencySourceBuildGraph,
 		})
 	}
 	return out, detection.Diagnostics

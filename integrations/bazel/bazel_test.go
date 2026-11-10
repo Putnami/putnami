@@ -69,28 +69,17 @@ func readDemo(t *testing.T) demo {
 	return out
 }
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // repository writes the demo's base files and .bazelversion, and the export
 // when withExport.
 func repository(t *testing.T, d demo, withExport bool) string {
 	t.Helper()
 	root := t.TempDir()
 	for rel, content := range d["base"] {
-		writeFile(t, root, rel, content)
+		stackstest.WriteFile(t, root, rel, content)
 	}
-	writeFile(t, root, ".bazelversion", version+"\n")
+	stackstest.WriteFile(t, root, ".bazelversion", version+"\n")
 	if withExport {
-		writeFile(t, root, "bazel-graph.json", d["ci"]["bazel-graph.json"])
+		stackstest.WriteFile(t, root, "bazel-graph.json", d["ci"]["bazel-graph.json"])
 	}
 	return root
 }
@@ -115,7 +104,7 @@ func coverageOf(report, dir string) string {
 func stubBazel(t *testing.T, d demo) string {
 	t.Helper()
 	bin, ci, outBase := t.TempDir(), t.TempDir(), t.TempDir()
-	writeFile(t, ci, "bazel-graph.json", d["ci"]["bazel-graph.json"])
+	stackstest.WriteFile(t, ci, "bazel-graph.json", d["ci"]["bazel-graph.json"])
 	testlogs := filepath.Join(outBase, "execroot", "_main", "bazel-out", "darwin-fastbuild", "testlogs")
 	events := map[string][]string{}
 	for rel, content := range d["bazel"] {
@@ -125,8 +114,8 @@ func stubBazel(t *testing.T, d demo) string {
 		}
 		logDir := filepath.Dir(logRel)
 		pkg, target := filepath.Dir(logDir), filepath.Base(logDir)
-		writeFile(t, testlogs, logRel, content)
-		writeFile(t, testlogs, logDir+"/coverage.dat", coverageOf(d["bazel"]["out/_coverage/_coverage_report.dat"], pkg))
+		stackstest.WriteFile(t, testlogs, logRel, content)
+		stackstest.WriteFile(t, testlogs, logDir+"/coverage.dat", coverageOf(d["bazel"]["out/_coverage/_coverage_report.dat"], pkg))
 		uri := func(name string) string { return "file://" + filepath.ToSlash(filepath.Join(testlogs, logDir, name)) }
 		event, _ := json.Marshal(map[string]any{
 			"id": map[string]any{"testResult": map[string]any{"label": "//" + pkg + ":" + target, "run": 1, "shard": 1, "attempt": 1}},
@@ -139,7 +128,7 @@ func stubBazel(t *testing.T, d demo) string {
 		events[pkg] = append(events[pkg], string(event))
 	}
 	for pkg, lines := range events {
-		writeFile(t, ci, "events/"+strings.ReplaceAll(pkg, "/", "_")+".json", `{"id":{"started":{}},"started":{"command":"coverage"}}`+"\n"+strings.Join(lines, "\n")+"\n")
+		stackstest.WriteFile(t, ci, "events/"+strings.ReplaceAll(pkg, "/", "_")+".json", `{"id":{"started":{}},"started":{"command":"coverage"}}`+"\n"+strings.Join(lines, "\n")+"\n")
 	}
 	script := `#!/bin/sh
 set -e
@@ -156,7 +145,7 @@ case "$1" in
 esac
 exit 0
 `
-	writeFile(t, bin, "bazel", script)
+	stackstest.WriteFile(t, bin, "bazel", script)
 	if err := os.Chmod(filepath.Join(bin, "bazel"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -200,8 +189,8 @@ func TestThePackagesOfABazelWorkspaceBecomeProjects(t *testing.T) {
 	root := repository(t, d, true)
 	// The root package and a directory with a BUILD file but no rule of the
 	// export are bare.
-	writeFile(t, root, "BUILD.bazel", "exports_files([\"README.md\"])\n")
-	writeFile(t, root, "tools/BUILD", "")
+	stackstest.WriteFile(t, root, "BUILD.bazel", "exports_files([\"README.md\"])\n")
+	stackstest.WriteFile(t, root, "tools/BUILD", "")
 	result := probe(t, root)
 	if len(result.Diagnostics) != 0 {
 		t.Errorf("diagnostics = %v", result.Diagnostics)
@@ -237,7 +226,7 @@ func TestThePackagesOfABazelWorkspaceBecomeProjects(t *testing.T) {
 	// directory with one is bare, so a directory with no rule runs no task.
 	stubBazel(t, d)
 	root = repository(t, d, false)
-	writeFile(t, root, "tools/BUILD", "exports_files([\"lint.sh\"])\n")
+	stackstest.WriteFile(t, root, "tools/BUILD", "exports_files([\"lint.sh\"])\n")
 	result = probe(t, root)
 	if len(result.Projects) != 4 || len(result.Diagnostics) != 0 {
 		t.Errorf("without the export: projects %+v, diagnostics %v", result.Projects, result.Diagnostics)
@@ -326,7 +315,7 @@ func TestTheSyncWritesEachPackagePutnamiJSONFromTheExport(t *testing.T) {
 	// With the export: each package gets the extension, its edges and the
 	// module files.
 	root = repository(t, d, true)
-	writeFile(t, root, "web/putnami.json", `{"name": "storefront", "dependencies": ["/api", "@acme/design"], "disable": {"jobs": ["publish"]}}`+"\n")
+	stackstest.WriteFile(t, root, "web/putnami.json", `{"name": "storefront", "dependencies": ["/api", "@acme/design"], "disable": {"jobs": ["publish"]}}`+"\n")
 	result, err = Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
 		t.Fatal(err)
@@ -354,9 +343,9 @@ func TestTheSyncWritesEachPackagePutnamiJSONFromTheExport(t *testing.T) {
 
 	// A package that depends on a target of the root package reads the root
 	// BUILD file, and a nested package names the module files from its depth.
-	writeFile(t, root, "BUILD.bazel", "filegroup(name = \"config\")\n")
-	writeFile(t, root, "api/v2/BUILD.bazel", "go_library(name = \"v2\")\n")
-	writeFile(t, root, "bazel-graph.json", d["ci"]["bazel-graph.json"]+
+	stackstest.WriteFile(t, root, "BUILD.bazel", "filegroup(name = \"config\")\n")
+	stackstest.WriteFile(t, root, "api/v2/BUILD.bazel", "go_library(name = \"v2\")\n")
+	stackstest.WriteFile(t, root, "bazel-graph.json", d["ci"]["bazel-graph.json"]+
 		`{"type":"RULE","rule":{"name":"//:config","ruleClass":"filegroup"}}`+"\n"+
 		`{"type":"RULE","rule":{"name":"//api/v2:v2","ruleClass":"go_library","ruleInput":["//:config","//pricing"]}}`+"\n")
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
@@ -394,7 +383,7 @@ func TestTheSyncRunsBazelQueryWithoutAnExport(t *testing.T) {
 	if stale, err := Stale(context.Background(), root, &bytes.Buffer{}); err != nil || len(stale.Written) != 0 || len(stale.Retracted) != 0 {
 		t.Errorf("a current graph is not stale: %+v %v", stale, err)
 	}
-	writeFile(t, root, "api/putnami.json", `{"extensions": ["@putnami/bazel"]}`)
+	stackstest.WriteFile(t, root, "api/putnami.json", `{"extensions": ["@putnami/bazel"]}`)
 	stale, err := Stale(context.Background(), root, &bytes.Buffer{})
 	if err != nil || !reflect.DeepEqual(stale.Written, []string{"api/putnami.json"}) {
 		t.Errorf("a drifted package is stale: %+v %v", stale, err)
@@ -415,7 +404,7 @@ func TestTheSyncRunsBazelQueryWithoutAnExport(t *testing.T) {
 
 	// An export that is no export fails the sync and writes nothing.
 	root = repository(t, d, false)
-	writeFile(t, root, "bazel-graph.json", "not json")
+	stackstest.WriteFile(t, root, "bazel-graph.json", "not json")
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "cannot be read") {
 		t.Errorf("an unreadable export fails the sync: %v", err)
 	}
@@ -425,7 +414,7 @@ func TestTheSyncRunsBazelQueryWithoutAnExport(t *testing.T) {
 
 	// A query that fails fails the sync.
 	root = repository(t, d, false)
-	writeFile(t, filepath.Dir(os.Getenv("STUB_LOG")), "bin/bazel", "#!/bin/sh\nexit 7\n")
+	stackstest.WriteFile(t, filepath.Dir(os.Getenv("STUB_LOG")), "bin/bazel", "#!/bin/sh\nexit 7\n")
 	if err := os.Chmod(filepath.Join(filepath.Dir(os.Getenv("STUB_LOG")), "bin/bazel"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -532,7 +521,7 @@ func TestTheBazelReportsBecomeTheTestAndCoverageSummary(t *testing.T) {
 	setRuntime(t)
 	root := repository(t, d, true)
 	// A log a removed target left in the output tree is no run of this one.
-	writeFile(t, testlogs, "pricing/old_test/test.xml", `<testsuites><testsuite name="old" tests="1" failures="1"><testcase classname="old" name="TestGone"><failure message="gone"/></testcase></testsuite></testsuites>`)
+	stackstest.WriteFile(t, testlogs, "pricing/old_test/test.xml", `<testsuites><testsuite name="old" tests="1" failures="1"><testcase classname="old" name="TestGone"><failure message="gone"/></testcase></testsuite></testsuites>`)
 
 	status, data, events := runJob(t, root, "pricing", stacks.TaskTest)
 	if status != "OK" {
@@ -560,12 +549,12 @@ func TestCollectReportsReadsTheBuildEventFile(t *testing.T) {
 	spectest.Proves(t, feature, "reports-become-the-summary", "the-bazel-junit-and-coverage-become-the-test-and-coverage-summary")
 	root, into := t.TempDir(), t.TempDir()
 	// A run whose outputs are remote is read from bazel-testlogs.
-	writeFile(t, root, "bazel-testlogs/api/api_test/test.xml", "<testsuites/>")
-	writeFile(t, root, "bazel-testlogs/api/api_test/coverage.dat", "end_of_record\n")
+	stackstest.WriteFile(t, root, "bazel-testlogs/api/api_test/test.xml", "<testsuites/>")
+	stackstest.WriteFile(t, root, "bazel-testlogs/api/api_test/coverage.dat", "end_of_record\n")
 	outputs := t.TempDir()
-	writeFile(t, outputs, "testlogs/pricing/pricing_test/shard_1_of_2/test.xml", "<testsuites/>")
+	stackstest.WriteFile(t, outputs, "testlogs/pricing/pricing_test/shard_1_of_2/test.xml", "<testsuites/>")
 	events := filepath.Join(t.TempDir(), "build-events.json")
-	writeFile(t, filepath.Dir(events), "build-events.json", fmt.Sprintf(`{"id":{"started":{}}}
+	stackstest.WriteFile(t, filepath.Dir(events), "build-events.json", fmt.Sprintf(`{"id":{"started":{}}}
 {"id":{"testResult":{"label":"@@//api:api_test"}},"testResult":{"testActionOutput":[{"name":"test.xml","uri":"bytestream://cache/blobs/1"}]}}
 {"id":{"testResult":{"label":"//pricing:pricing_test","shard":1}},"testResult":{"testActionOutput":[{"name":"test.xml","uri":"file://%s/testlogs/pricing/pricing_test/shard_1_of_2/test.xml"},{"name":"test.log","uri":"file:///x/test.log"}]}}
 {"id":{"testResult":{"label":"@other//x:x_test"}}}
@@ -584,7 +573,7 @@ func TestCollectReportsReadsTheBuildEventFile(t *testing.T) {
 	if err := CollectReports([]string{"--events", filepath.Join(root, "none.json"), "--root", root, "--into", into}, nil, nil); err != nil {
 		t.Errorf("a missing build-event file: %v", err)
 	}
-	writeFile(t, root, "bad.json", "not json\n")
+	stackstest.WriteFile(t, root, "bad.json", "not json\n")
 	if err := CollectReports([]string{"--events", filepath.Join(root, "bad.json"), "--root", root, "--into", into}, nil, nil); err == nil {
 		t.Error("a malformed build-event file collects")
 	}
@@ -610,8 +599,8 @@ func TestTheSyncRetractsAFormerPackage(t *testing.T) {
 	d := readDemo(t)
 	t.Setenv("PATH", t.TempDir())
 	root := repository(t, d, true)
-	writeFile(t, root, "legacy/putnami.json", `{"name": "legacy", "extensions": ["@putnami/bazel", "@acme/lint"], "dependencies": ["/pricing", "@acme/design"]}`+"\n")
-	writeFile(t, root, "api/putnami.json", `{"extensions": ["@putnami/bazel"], "dependencies": ["/legacy", "/gone", "@acme/design"]}`+"\n")
+	stackstest.WriteFile(t, root, "legacy/putnami.json", `{"name": "legacy", "extensions": ["@putnami/bazel", "@acme/lint"], "dependencies": ["/pricing", "@acme/design"]}`+"\n")
+	stackstest.WriteFile(t, root, "api/putnami.json", `{"extensions": ["@putnami/bazel"], "dependencies": ["/legacy", "/gone", "@acme/design"]}`+"\n")
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
 		t.Fatal(err)

@@ -25,7 +25,10 @@ terminal, such as in CI or under an agent, it imports. `--mode import` or
 `--mode delegate` skips the question. `init` records the mode under
 `options["@putnami/rush"].mode` of `putnami.workspace.json`, declares the
 extensions of the mode, installs them, and runs `putnami projects sync`. The
-sync reads that mode, `import` when it is absent.
+sync reads that mode, `import` when it is absent. A value other than `import` or `delegate` fails the sync and the probe with
+`stacks.adoption_mode_invalid`. In delegate mode,
+each edge the probe reports is attributed to the project's `package.json`, so
+`workspace.declared_edge` does not warn about them.
 
 Run again in the adopted workspace, `putnami init --from rush` writes nothing:
 it prints the diff of each file the sync would change. `--apply` writes them.
