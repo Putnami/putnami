@@ -25,6 +25,7 @@
     "/monorepo/nx",
     "/monorepo/moon",
     "/monorepo/turbo",
+    "/monorepo/rush",
     "/dotnet/extension",
     "/tooling/scaffold",
     "/tooling/sdd-extension",

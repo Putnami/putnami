@@ -31,6 +31,8 @@ var uncachedByVerdict = map[string]string{
 	"monorepo/moon/putnami.extension.json:graph-run":                                 "it runs nothing, and a delegated stack's run stores no cache entry",
 	"monorepo/turbo/putnami.extension.json:turbo-graph-check-exec":                   "it compares tracked files with what the package manifests answer now, which it reads outside any cache key",
 	"monorepo/turbo/putnami.extension.json:graph-run":                                "it runs nothing, and a delegated stack's run stores no cache entry",
+	"monorepo/rush/putnami.extension.json:rush-graph-check-exec":                     "it compares tracked files with what rush.json and the project manifests state now",
+	"monorepo/rush/putnami.extension.json:graph-run":                                 "it runs nothing, and a delegated stack's run stores no cache entry",
 }
 
 // interactiveTasks returns the tasks of a manifest that run only as

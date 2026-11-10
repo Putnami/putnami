@@ -1,0 +1,134 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "monorepo",
+  "features": [
+    {
+      "id": "monorepo/rush-adoption",
+      "type": "feature",
+      "name": "Adopt a Rush repository, imported or delegated to Rush",
+      "outcome": "A team with a Rush repository reaches Putnami's runner and verdict in the mode it picks: its projects become TypeScript projects that Putnami builds, tests and caches, or each task runs rush on its project and Rush keeps its build cache",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "projects-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-rush-projects-become-projects-with-their-edges"
+            ]
+          }
+        },
+        {
+          "id": "sync-writes-the-project-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-writes-each-project-putnami-json-from-rush-json"
+            ]
+          }
+        },
+        {
+          "id": "validate-fails-on-a-stale-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-rush-graph-fails-validate"
+            ]
+          }
+        },
+        {
+          "id": "tasks-delegate-to-rush",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-runs-rush-on-its-project-and-records-the-delegation"
+            ]
+          }
+        },
+        {
+          "id": "reports-come-from-the-project-options",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-test-task-reads-the-reports-its-project-names"
+            ]
+          }
+        },
+        {
+          "id": "build-cache-warning",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "delegate-mode-warns-without-the-rush-build-cache"
+            ]
+          }
+        },
+        {
+          "id": "unmapped-commands-are-listed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-lists-the-commands-it-does-not-map"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        },
+        {
+          "id": "import-adopts-typescript-conventions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-adds-source-exports-and-a-tsconfig"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

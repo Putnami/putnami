@@ -397,6 +397,7 @@ putnami init --from bazel       # Turn a Bazel repository into a workspace
 putnami init --from nx          # Turn a Nx repository into a workspace, in the mode you pick
 putnami init --from moon        # Turn a moon repository into a workspace, in the mode you pick
 putnami init --from turbo       # Turn a Turborepo repository into a workspace, in the mode you pick
+putnami init --from rush        # Turn a Rush repository into a workspace, in the mode you pick
 putnami workspace describe      # Show workspace details
 ```
 
@@ -413,12 +414,13 @@ putnami workspace describe      # Show workspace details
 | `nx` | `nx.json` | `@putnami/nx`, and `@putnami/typescript` in import mode | Each project's edges, and which extension runs its build, test and lint, from the Nx graph export or configuration. See [Run a Nx repository with Putnami](../../../monorepo/nx/doc/01-nx.md) |
 | `moon` | `.moon/workspace.yml` | `@putnami/moon`, and in import mode the language extensions the sync declares | Each project's edges and the extension that runs it, from the moon project graph export or configuration. See [Run a moon workspace with Putnami](../../../monorepo/moon/doc/01-moon.md) |
 | `turbo` | `turbo.json` | `@putnami/turbo`, and `@putnami/typescript` in import mode | Each package's edges from its `package.json`; in import mode, a TypeScript package's task moves to `@putnami/typescript` when its script already runs `bun build`, `bun test` or `biome`, and every other task stays on Turborepo. See [Run a Turborepo repository with Putnami](../../../monorepo/turbo/doc/01-turbo.md) |
+| `rush` | `rush.json` | `@putnami/rush`, and `@putnami/typescript` in import mode | Each Rush project's edges from `rush.json` and its `package.json`; an import also adds the source `exports` and `tsconfig.json` a TypeScript project needs. See [Adopt a Rush repository](../../../monorepo/rush/doc/01-rush.md) |
 
-A tool whose extension offers two modes, Nx or moon, adopts in the one the team picks (D-064): `import`, where Putnami's runner and cache take over the targets it can map, or `delegate`, where the tool keeps running each target with its cache. In a terminal `init` asks, with `import` preselected; without one it imports. `--mode import|delegate` skips the question. `init` records the mode in the workspace options of the tool's extension, `options["@putnami/nx"].mode`, which its sync task reads. Bazel and Pants adopt in `delegate` alone. moon's import sync declares the language extensions its projects map to, and `init` installs them after the sync.
+A tool whose extension offers two modes, Nx, moon or Rush, adopts in the one the team picks (D-064): `import`, where Putnami's runner and cache take over the targets it can map, or `delegate`, where the tool keeps running each target with its cache. In a terminal `init` asks, with `import` preselected; without one it imports. `--mode import|delegate` skips the question. `init` records the mode in the workspace options of the tool's extension, `options["@putnami/nx"].mode`, which its sync task reads. Bazel and Pants adopt in `delegate` alone. moon's import sync declares the language extensions its projects map to, and `init` installs them after the sync.
 
 Rerun in a workspace that exists, `init --from <tool>` runs the workspace sync tasks as a dry run in the mode it resolves (`--mode`, else the recorded one), shows what each would change and the mode change, and writes nothing. `--apply` records the mode, declares and installs the extensions the mode needs, and runs `putnami projects sync`.
 
-`@putnami/pants`, `@putnami/bazel`, `@putnami/nx`, `@putnami/moon` and `@putnami/turbo` are not published yet: until their first release, `init --from <tool>` stops at the extension install, after it has written the workspace files.
+`@putnami/pants`, `@putnami/bazel`, `@putnami/nx`, `@putnami/moon`, `@putnami/rush` and `@putnami/turbo` are not published yet: until their first release, `init --from <tool>` stops at the extension install, after it has written the workspace files.
 
 ```bash
 putnami init --from pants
@@ -427,6 +429,7 @@ putnami init --from nx --mode delegate
 putnami init --from nx --mode import --apply
 putnami init --from moon --mode delegate
 putnami init --from turbo --mode delegate
+putnami init --from rush --mode delegate
 ```
 
 `init` resolves the extensions, the template and the starter's dependencies on one release channel. It takes the first of:

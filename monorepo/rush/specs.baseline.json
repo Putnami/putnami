@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "monorepo/rush-adoption#build-cache-warning",
+    "monorepo/rush-adoption#import-adopts-typescript-conventions",
+    "monorepo/rush-adoption#manifest-follows-the-profile",
+    "monorepo/rush-adoption#projects-become-projects",
+    "monorepo/rush-adoption#reports-come-from-the-project-options",
+    "monorepo/rush-adoption#sync-writes-the-project-graph",
+    "monorepo/rush-adoption#tasks-delegate-to-rush",
+    "monorepo/rush-adoption#unmapped-commands-are-listed",
+    "monorepo/rush-adoption#validate-fails-on-a-stale-graph"
+  ]
+}
