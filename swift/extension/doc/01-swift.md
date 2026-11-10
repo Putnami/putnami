@@ -152,7 +152,8 @@ Declare the channel in the project's `putnami.json`:
 ```
 
 `putnami package` assembles the image with no Docker daemon. `--docker-load`
-also loads it into the local Docker daemon. `putnami publish` pushes it to the
+also loads it into the local Docker daemon. The image name is the project name
+in lowercase. `putnami publish` pushes it to the
 registry that `registries.oci.publish` of `putnami.workspace.json` declares,
 through the shared publisher of the other stacks. `--docker-registry
 <registry>` overrides that registry for one push. A library or an Xcode
