@@ -5,6 +5,9 @@
   "extensionDependencies": {
     "@putnami/dev": ""
   },
+  "uses": [
+    "oci"
+  ],
   "runtime": {
     "executable": "compiled/putnami-dart",
     "toolchains": {
@@ -237,6 +240,95 @@
         {
           "id": "run",
           "task": "run-exec"
+        }
+      ]
+    },
+    "package": {
+      "description": "Assemble the image of a Dart server application, its entrypoint compiled ahead of time for Linux with dart compile exe, for the docker publish channel.",
+      "traits": {
+        "injectPublishChannels": true
+      },
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Assemble the image"
+        },
+        "entrypoint": {
+          "type": "string",
+          "description": "Dart entry point of the image, a file of the package or the name of a bin/ executable (defaults to bin/server.dart, else bin/<package>.dart, else the package's only bin/*.dart)"
+        },
+        "docker-tag": {
+          "type": "string",
+          "description": "Override the image tag"
+        },
+        "docker-base-image": {
+          "type": "string",
+          "description": "Replace the distroless cc base with a base pinned by digest (image@sha256:...)"
+        },
+        "docker-load": {
+          "type": "boolean",
+          "default": false,
+          "description": "Also load the assembled image into the local docker daemon"
+        },
+        "platform": {
+          "type": "string",
+          "default": "linux/amd64",
+          "description": "Target platform of the image: linux/amd64 or linux/arm64"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Plan the image without assembling it"
+        }
+      },
+      "run": [
+        {
+          "id": "install",
+          "task": "install-run",
+          "if": "params.docker"
+        },
+        {
+          "id": "docker",
+          "heavy": true,
+          "task": "package-docker",
+          "dependsOn": [
+            "install"
+          ],
+          "if": "params.docker"
+        }
+      ]
+    },
+    "publish": {
+      "dependsOn": [
+        "package"
+      ],
+      "traits": {
+        "injectPublishChannels": true,
+        "sideEffects": "registry"
+      },
+      "description": "Push the image of a Dart server application to its OCI registry. A library or a Flutter package publishes nothing.",
+      "flags": {
+        "docker": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push the image"
+        },
+        "docker-registry": {
+          "type": "string",
+          "description": "Registry to push the image to, above registries.oci.publish"
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "Push nothing; report what would be published"
+        }
+      },
+      "run": [
+        {
+          "id": "docker",
+          "task": "publish-docker",
+          "if": "params.docker"
         }
       ]
     }
@@ -556,6 +648,108 @@
           "network",
           "process",
           "toolchain-cache"
+        ]
+      }
+    },
+    "package-docker": {
+      "description": "Holding the lock of the stack root, check that the selected dart, the one build runs, is 3.8.0 or later, and compile the application's entrypoint with dart compile exe --target-os linux --target-arch <x64|arm64> into a directory of its own; then, with the lock released, assemble a local OCI image of the executable on a digest-pinned distroless cc base, which holds glibc. A library or a Flutter package packages nothing. Sole owner of <command-output>/docker.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-docker"
+      ],
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "dart:build"
+          ]
+        },
+        "localPackages": {
+          "from": "closure",
+          "files": [
+            "pubspec.yaml",
+            "pubspec_overrides.yaml",
+            "lib/**"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "analysis_options.yaml",
+            "pubspec.lock",
+            "pubspec.yaml"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        },
+        "entrypoint": {
+          "from": "params"
+        },
+        "platform": {
+          "from": "params"
+        },
+        "docker-base-image": {
+          "from": "params"
+        },
+        "docker-tag": {
+          "from": "params"
+        },
+        "docker-load": {
+          "from": "params"
+        },
+        "dry-run": {
+          "from": "params"
+        }
+      },
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "docker": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "docker",
+            "optionalEmpty": true,
+            "description": "Local OCI candidate layout, its manifest and the docker channel record."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "publish-docker": {
+      "description": "Push the packaged image to the container registry through the shared publisher.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "publish-docker"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 300000,
+      "cache": false,
+      "declares": {
+        "outputs": {
+          "published-image": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "docker/published-image.json",
+            "optionalEmpty": true,
+            "description": "Verified remote image record, written after the registry digest is read back."
+          }
+        },
+        "effects": [
+          "network",
+          "registry"
+        ],
+        "publishChannels": [
+          "docker"
         ]
       }
     }
