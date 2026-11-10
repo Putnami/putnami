@@ -441,8 +441,8 @@ func packageDocker(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 	return "OK", data, nil
 }
 
-// dryRunImage checks the image's platform and writes the channel record
-// publish --dry-run reads, and assembles nothing.
+// dryRunImage checks the image's platform and writes the channel record, and
+// assembles nothing.
 func dryRunImage(ctx *pctx.Context, emit *jsonl.Emitter) (string, map[string]any, error) {
 	version, err := releaseVersion(ctx)
 	if err != nil {
