@@ -492,7 +492,7 @@
               "the-runner-is-the-option-else-the-test-script-else-bun",
               "vitest-and-jest-run-from-node-modules-bin-with-node",
               "a-missing-node-fails-the-task-and-names-node",
-              "a-vitest-or-jest-project-type-checks-with-its-own-ambient-types"
+              "a-vitest-or-jest-project-type-checks-with-its-own-compiler-options"
             ]
           }
         },

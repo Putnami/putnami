@@ -30,7 +30,7 @@
     },
     {
       "id": "import-maps-vitest-and-jest-tests",
-      "text": "In import mode, the test target of a TypeScript project whose script runs vitest or jest, or whose Nx executor is @nx/vite:test or @nx/jest:jest, runs as @putnami/typescript:test, and the sync writes that runner in options[\"@putnami/typescript\"].test.runner of its putnami.json. The sync owns that member: it removes it from a project whose test target no longer maps to Vitest or Jest, and from a former project."
+      "text": "In import mode, the test target of a TypeScript project whose script runs vitest or jest, or whose Nx executor is @nx/vite:test or @nx/jest:jest, runs as @putnami/typescript:test, and the sync writes that runner in options[\"@putnami/typescript:test\"].runner of its putnami.json. The sync owns that member: it removes it from a project whose test target no longer maps to Vitest or Jest, and from a former project."
     },
     {
       "id": "delegate-imports-listed-projects",

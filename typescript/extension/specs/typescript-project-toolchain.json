@@ -133,11 +133,11 @@
     },
     {
       "id": "test-runner-choice",
-      "text": "A project's test runner is options[\"@putnami/typescript\"].test.runner in its putnami.json (bun, vitest or jest), else the runner its package.json test script runs, else Bun. Vitest and Jest run from the node_modules/.bin of the project or of the workspace with the node on PATH; with no node the task fails and names node. The test type check of a Vitest or Jest project loads the ambient types its tsconfig names, where the runner's globals are declared, instead of Bun's alone."
+      "text": "A project's test runner is the runner parameter of the test command (bun, vitest or jest), set by --runner or options[\"@putnami/typescript:test\"].runner, else the runner its package.json test script runs, else Bun. Vitest and Jest run the bin entry of their package in the node_modules of the project or the workspace with the node on PATH; with no node the task fails and names node. A Vitest or Jest project's tests are type-checked with its own tsconfig's compiler options."
     },
     {
       "id": "test-runner-reports",
-      "text": "Every test runner writes results.junit.xml and lcov.info into the task's output: Vitest through its junit reporter and lcov coverage reporter, Jest through its --json result converted to JUnit, so no reporter package is required, and its lcov coverage reporter. The test summary and --enforce-coverage read them as they read Bun's, and vitest.config.*, vite.config.* and jest.config.* are inputs of the task's cache key."
+      "text": "Every test runner writes results.junit.xml and lcov.info into the task's output: Vitest through its junit reporter and lcov coverage reporter, Jest through its --json result converted to JUnit, so no reporter package is required, and its lcov coverage reporter. The summary and --enforce-coverage read them as they read Bun's. The runner parameter, the runner's configuration and setup files and __tests__ directories are inputs of the task's cache key."
     },
     {
       "id": "structured-reports",
