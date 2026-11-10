@@ -45,6 +45,7 @@
         "../../protocols/ci/fixtures/impact-plan/**",
         "../../go/framework/config/*.go",
         "../../**/putnami.extension.json",
+        "../../*/templates/*/putnami.template.json",
         "../local-collaboration/**",
         "../../typescript/extension/cmd/**",
         "../../typescript/extension/internal/**",

@@ -5,6 +5,7 @@ import (
 	"slices"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gittest"
 )
 
@@ -94,5 +95,46 @@ func TestScanProjectPaths_ScopeOnlyConfigIgnoresPutnamiJSONMarker(t *testing.T) 
 	}
 	if want := []string{"manifest-scope", "scope/app"}; !slices.Equal(paths, want) {
 		t.Errorf("paths = %v, want %v", paths, want)
+	}
+}
+
+// DetectMarkers is the walk `putnami init` detects languages with: the root
+// counts, and the scan's exclusions hold. A marker under a gitignored
+// directory, under an excluded one or under .git is never reported.
+func TestDetectMarkersReadsNamesAndKeepsTheScanExclusions(t *testing.T) {
+	spectest.Proves(t, "cli/init-a-language", "detection-reads-names-only", "detection-skips-excluded-and-ignored-directories")
+	root := initScanRepo(t)
+	writeFile(t, filepath.Join(root, "package.json"), "{}")
+	writeFile(t, filepath.Join(root, ".gitignore"), "generated/\n")
+	writeFile(t, filepath.Join(root, "generated", "go.mod"), "module generated\n")
+	writeFile(t, filepath.Join(root, "node_modules", "dep", "Cargo.toml"), "")
+	writeFile(t, filepath.Join(root, ".git", "hooks", "pom.xml"), "")
+	writeFile(t, filepath.Join(root, "services", "api", "App.csproj"), "")
+	writeFile(t, filepath.Join(root, "services", "zz", "Other.csproj"), "")
+	// A directory named like a file marker marks nothing.
+	writeFile(t, filepath.Join(root, "a", "Fake.gemspec", "README"), "")
+	writeFile(t, filepath.Join(root, "apps", "ios", "App.xcodeproj", "project.pbxproj"), "")
+	scope := func(extension string, markers ...string) ProviderScope {
+		return ProviderScope{Extension: extension, Markers: markers, Inputs: markers}
+	}
+	scopes := []ProviderScope{
+		tsScanScope(),
+		scope("@putnami/go", "go.mod"),
+		scope("@putnami/rust", "Cargo.toml"),
+		scope("@putnami/java", "pom.xml"),
+		scope("@putnami/dotnet", "*.csproj"),
+		scope("@putnami/ruby", "*.gemspec"),
+		scope("@putnami/swift", "Package.swift", "*.xcodeproj/project.pbxproj"),
+	}
+	got := DetectMarkers(root, scopes)
+	want := []string{".", "", "", "", "services/api", "", "apps/ios"}
+	if !slices.Equal(got, want) {
+		t.Errorf("DetectMarkers = %q, want %q", got, want)
+	}
+	if got := DetectMarkers(root, nil); len(got) != 0 {
+		t.Errorf("DetectMarkers without scopes = %q, want nothing", got)
+	}
+	if got := DetectMarkers(t.TempDir(), scopes); !slices.Equal(got, make([]string, len(scopes))) {
+		t.Errorf("DetectMarkers in an empty directory = %q, want no match", got)
 	}
 }

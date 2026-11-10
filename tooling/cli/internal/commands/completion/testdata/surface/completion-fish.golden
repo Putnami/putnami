@@ -303,11 +303,11 @@ complete -c putnami -n '__putnami_seen_path impact-plan' -l 'base' -d 'Required 
 complete -c putnami -n '__putnami_seen_path impact-plan' -l 'head' -d 'Optional head commit or ref; it must resolve to the checked-out HEAD' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'apply' -d 'With --from in an existing workspace: record the mode and synchronize, instead of previewing'
 complete -c putnami -n '__putnami_seen_path init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -x
-complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -x
+complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Languages to declare, such as rust or rust,java (ts and py name typescript and python): each one\'s extension is installed, and its projects synchronized when the repository holds its markers' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'force' -d 'Reinitialize an existing workspace'
 complete -c putnami -n '__putnami_seen_path init' -l 'from' -d 'Turn the repository a monorepo tool describes into a workspace: declare the tool\'s extension and synchronize its packages as projects; rerun in the workspace to preview what would change' -a 'bazel moon nx pants rush turbo' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'mode' -d 'With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)' -a 'delegate import' -x
-complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an initial project' -x
+complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an initial project from the starter of the first --extension language' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
 complete -c putnami -n '__putnami_seen_path init' -l 'workspace' -d 'Workspace name override' -x
 complete -c putnami -n '__putnami_seen_path install' -l 'latest' -d 'Ignore the lock file and resolve the latest extension and template versions'
@@ -352,10 +352,10 @@ complete -c putnami -n '__putnami_seen_path upgrade' -l 'release' -d 'Use one im
 complete -c putnami -n '__putnami_seen_path upgrade' -l 'version' -d 'Use an exact Putnami release version' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'apply' -d 'With --from in an existing workspace: record the mode and synchronize, instead of previewing'
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'channel' -d 'Resolve the extensions, the template and the starter dependencies on one release channel (default: PUTNAMI_CHANNEL, then the channel the CLI was installed from, then latest)' -x
-complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Default extension to install' -a 'go py ts' -x
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Languages to declare, such as rust or rust,java (ts and py name typescript and python): each one\'s extension is installed, and its projects synchronized when the repository holds its markers' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'force' -d 'Reinitialize an existing workspace'
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'from' -d 'Turn the repository a monorepo tool describes into a workspace: declare the tool\'s extension and synchronize its packages as projects; rerun in the workspace to preview what would change' -a 'bazel moon nx pants rush turbo' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'mode' -d 'With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)' -a 'delegate import' -x
-complete -c putnami -n '__putnami_seen_path workspace init' -l 'project' -d 'Create an initial project' -x
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'project' -d 'Create an initial project from the starter of the first --extension language' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'workspace' -d 'Workspace name override' -x

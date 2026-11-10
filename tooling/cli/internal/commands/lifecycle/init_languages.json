@@ -1,0 +1,136 @@
+{
+  "$comment": "Generated from the workspace adapter of every extension the root putnami.workspace.json declares by path whose manifest declares workspace.language. Do not edit: PUTNAMI_UPDATE_INIT_LANGUAGES=1 ./putnamiw test --projects @putnami/cli --run InitLanguages --no-cache --no-enforce-coverage rewrites it.",
+  "languages": [
+    {
+      "language": "dart",
+      "extension": "@putnami/dart",
+      "markers": [
+        "pubspec.yaml"
+      ],
+      "excludes": [
+        "build",
+        ".dart_tool"
+      ]
+    },
+    {
+      "language": "dotnet",
+      "extension": "@putnami/dotnet",
+      "markers": [
+        "*.csproj",
+        "*.fsproj",
+        "*.vbproj"
+      ],
+      "excludes": [
+        "bin",
+        "obj",
+        "TestResults"
+      ]
+    },
+    {
+      "language": "go",
+      "extension": "@putnami/go",
+      "markers": [
+        "go.mod"
+      ],
+      "excludes": [
+        "testdata",
+        "vendor"
+      ]
+    },
+    {
+      "language": "java",
+      "extension": "@putnami/java",
+      "markers": [
+        "build.gradle.kts",
+        "build.gradle",
+        "pom.xml",
+        "settings.gradle.kts",
+        "settings.gradle"
+      ],
+      "excludes": [
+        "build",
+        "target",
+        ".gradle"
+      ]
+    },
+    {
+      "language": "php",
+      "extension": "@putnami/php",
+      "markers": [
+        "composer.json"
+      ],
+      "excludes": [
+        "vendor"
+      ]
+    },
+    {
+      "language": "python",
+      "extension": "@putnami/python",
+      "markers": [
+        "pyproject.toml"
+      ],
+      "excludes": [
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        "__pycache__",
+        "build",
+        "dist",
+        "venv"
+      ]
+    },
+    {
+      "language": "ruby",
+      "extension": "@putnami/ruby",
+      "markers": [
+        "Gemfile",
+        "package.yml",
+        "*.gemspec"
+      ],
+      "excludes": [
+        "vendor",
+        "node_modules",
+        "tmp",
+        "log",
+        "coverage"
+      ]
+    },
+    {
+      "language": "rust",
+      "extension": "@putnami/rust",
+      "markers": [
+        "Cargo.toml"
+      ],
+      "excludes": [
+        "target"
+      ]
+    },
+    {
+      "language": "swift",
+      "extension": "@putnami/swift",
+      "markers": [
+        "Package.swift",
+        "*.xcodeproj/project.pbxproj"
+      ],
+      "excludes": [
+        ".build",
+        "DerivedData",
+        "SourcePackages",
+        "Pods",
+        "Carthage",
+        "xcuserdata"
+      ]
+    },
+    {
+      "language": "typescript",
+      "extension": "@putnami/typescript",
+      "markers": [
+        "package.json"
+      ],
+      "excludes": [
+        "dist",
+        "node_modules"
+      ]
+    }
+  ]
+}

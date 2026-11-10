@@ -28,12 +28,17 @@ func TestParseInitFlags(t *testing.T) {
 		{
 			name: "defaults",
 			args: nil,
-			want: initFlags{extension: "ts"},
+			want: initFlags{},
 		},
 		{
 			name: "extension go",
 			args: []string{"--extension", "go"},
 			want: initFlags{extension: "go", extensionSet: true},
+		},
+		{
+			name: "a list of languages",
+			args: []string{"--extension", "rust,java"},
+			want: initFlags{extension: "rust,java", extensionSet: true},
 		},
 		{
 			name: "all flags",
@@ -43,17 +48,17 @@ func TestParseInitFlags(t *testing.T) {
 		{
 			name: "from flag",
 			args: []string{"--from", "pants"},
-			want: initFlags{extension: "ts", from: "pants", fromSet: true},
+			want: initFlags{from: "pants", fromSet: true},
 		},
 		{
 			name: "from flag with an equals sign",
 			args: []string{"--from=pants"},
-			want: initFlags{extension: "ts", from: "pants", fromSet: true},
+			want: initFlags{from: "pants", fromSet: true},
 		},
 		{
 			name: "workspace flag",
 			args: []string{"--workspace", "explicit"},
-			want: initFlags{workspace: "explicit", extension: "ts"},
+			want: initFlags{workspace: "explicit"},
 		},
 	}
 
@@ -427,7 +432,7 @@ func stubWorkspaceInitStages(t *testing.T, failingStage string, failingDependenc
 	// needs a registry. The starters opt into nothing here explicitly, so a
 	// stage test stays correct if the table changes; a test about agent
 	// content opts one in with starterOptsInto after this call.
-	for starter := range initExtensions {
+	for starter := range initStarters {
 		starterOptsInto(t, starter, "")
 	}
 	origExtension := installExtension
@@ -436,6 +441,7 @@ func stubWorkspaceInitStages(t *testing.T, failingStage string, failingDependenc
 	origProject := createInitProject
 	origPins := pinInitToolchains
 	origRefresh := refreshInitLockMetadata
+	origSync := syncInitProjects
 	t.Cleanup(func() {
 		installExtension = origExtension
 		installInitDependencies = origDependencies
@@ -443,9 +449,17 @@ func stubWorkspaceInitStages(t *testing.T, failingStage string, failingDependenc
 		createInitProject = origProject
 		pinInitToolchains = origPins
 		refreshInitLockMetadata = origRefresh
+		syncInitProjects = origSync
 	})
 
 	failure := errors.New(failingStage + " failed")
+	// A test about adoption replaces this with one that records the sync.
+	syncInitProjects = func(context.Context, string, *wsproto.Config, LifecycleEnv) error {
+		if failingStage == "sync" {
+			return failure
+		}
+		return nil
+	}
 	installExtension = func(context.Context, string, *wsproto.Config, []string, string) error {
 		if failingStage == "extension" {
 			return failure
@@ -684,20 +698,6 @@ func TestWorkspaceInitDefaultName(t *testing.T) {
 	expected := filepath.Base(dir)
 	if cfg.Name != expected {
 		t.Errorf("workspace name = %q, want %q", cfg.Name, expected)
-	}
-}
-
-func TestWorkspaceInitUnknownExtension(t *testing.T) {
-	dir := t.TempDir()
-
-	origDir, _ := os.Getwd()
-	os.Chdir(dir)
-	defer os.Chdir(origDir)
-
-	ctx := context.Background()
-	err := WorkspaceInit(ctx, "", []string{"--extension", "rust"}, LifecycleEnv{})
-	if err == nil {
-		t.Error("expected error for unknown extension")
 	}
 }
 

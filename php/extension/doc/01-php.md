@@ -8,13 +8,25 @@ needs neither PHP nor Composer.
 
 ## Adopt it
 
-1. Declare the extension in `putnami.workspace.json`:
+1. At the root of the repository, run:
+
+   ```bash
+   putnami init --extension php
+   ```
+
+   It writes `putnami.workspace.json` with `@putnami/php` declared, installs
+   the extension, and runs `putnami projects sync`, because the repository
+   holds a `composer.json`. A repository of several languages takes a list, such as
+   `--extension php,typescript`, and `putnami init` without `--extension`
+   proposes the languages it finds. In a workspace that already exists,
+   declare the extension in `putnami.workspace.json` and run
+   `putnami projects sync`:
 
    ```json
    { "extensions": ["@putnami/php"] }
    ```
 
-2. Run `putnami projects sync`. Each directory that holds a `composer.json`,
+2. Each directory that holds a `composer.json`,
    outside `vendor/`, joins the workspace's `includes`. No `putnami.json` is
    needed: the extension names the component by its package, adds an edge to
    each package it requires through a path repository, and tags it `php`. An

@@ -9,13 +9,25 @@ task installs that release under the Putnami home; it never installs Xcode.
 
 ## Adopt it
 
-1. Declare the extension in `putnami.workspace.json`:
+1. At the root of the repository, run:
+
+   ```bash
+   putnami init --extension swift
+   ```
+
+   It writes `putnami.workspace.json` with `@putnami/swift` declared, installs
+   the extension, and runs `putnami projects sync`, because the repository
+   holds a `Package.swift` or an Xcode project. A repository of several languages takes a list, such as
+   `--extension swift,typescript`, and `putnami init` without `--extension`
+   proposes the languages it finds. In a workspace that already exists,
+   declare the extension in `putnami.workspace.json` and run
+   `putnami projects sync`:
 
    ```json
    { "extensions": ["@putnami/swift"] }
    ```
 
-2. Run `putnami projects sync`. Each directory with a `Package.swift`, and each
+2. Each directory with a `Package.swift`, and each
    directory that holds an `.xcodeproj`, joins the workspace's `includes`. No
    `putnami.json` is needed: the extension names a package by its package
    name and an Xcode project by its first `.xcodeproj`, adds an edge to each

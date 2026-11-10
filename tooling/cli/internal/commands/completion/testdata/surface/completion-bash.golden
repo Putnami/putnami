@@ -484,7 +484,7 @@ _putnami_completions() {
             value_slot=1
             ;;
         'init --extension')
-            structured_values=(go py ts)
+            structured_values=()
             value_slot=1
             ;;
         'init --from')
@@ -576,7 +576,7 @@ _putnami_completions() {
             value_slot=1
             ;;
         'workspace init --extension')
-            structured_values=(go py ts)
+            structured_values=()
             value_slot=1
             ;;
         'workspace init --from')
