@@ -447,7 +447,10 @@ only the stacks that package an image import it.
 `LockedToolsHome`, `ExecutableSuffix`, `CompareVersions`, `Accepted` and
 `Choose` serve a stack that installs its toolchain, and
 `ServeToolchainResolve` one that pins it in the workspace lock. The test kit
-`stackstest` gives every stack extension `CheckManifest` and `WriteFile`, and
+`stackstest` gives every stack extension `CheckManifest`, `CheckSurface`, which
+holds a language stack's manifest to the command surface the stacks share
+([ADR 0015](adr/0015-the-stack-extensions-share-one-command-surface.md)), with
+a named exemption for each stated reason, and `WriteFile`, and
 its `imagetest` package `Registry`, an in-memory registry that serves a
 two-platform base image.
 

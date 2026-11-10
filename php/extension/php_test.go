@@ -464,6 +464,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	spectest.Proves(t, feature, "manifest-follows-the-profile", "the-manifest-conforms-to-the-stack-core")
 	stackstest.CheckManifest(t, "putnami.extension.json", stack(t))
+	stackstest.CheckSurface(t, "putnami.extension.json", stackstest.Exemption{Convention: stackstest.ConventionServeArgs, Reason: "the PHP built-in server takes no program arguments"})
 	if got := stack(t).Selectors(); !slices.Equal(got, []string{"php:lint", "php:test"}) {
 		t.Errorf("selectors = %v", got)
 	}

@@ -465,6 +465,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	spectest.Proves(t, feature, "manifest-follows-the-profile", "the-manifest-conforms-to-the-stack-core")
 	stackstest.CheckManifest(t, "putnami.extension.json", stack(t))
+	stackstest.CheckSurface(t, "putnami.extension.json")
 	s := stack(t)
 	if got := s.Selectors(); !slices.Equal(got, []string{"java:build", "java:lint", "java:test"}) {
 		t.Errorf("selectors = %v", got)

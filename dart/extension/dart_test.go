@@ -409,6 +409,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	spectest.Proves(t, feature, "manifest-follows-the-profile", "the-manifest-conforms-to-the-stack-core")
 	stackstest.CheckManifest(t, "putnami.extension.json", stack(t))
+	stackstest.CheckSurface(t, "putnami.extension.json", stackstest.Exemption{Convention: stackstest.ConventionTestFilter, Reason: "dart test fails a run whose filter selects no test, and the filter reaches the packages a selected one depends on"})
 	if got := stack(t).Selectors(); !slices.Equal(got, []string{"dart:build", "dart:lint", "dart:test"}) {
 		t.Errorf("selectors = %v", got)
 	}
