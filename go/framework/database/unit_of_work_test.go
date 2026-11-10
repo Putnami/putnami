@@ -364,8 +364,8 @@ func TestWithTx_JoinsAmbientUnitOfWork(t *testing.T) {
 			}
 
 			gotErr := WithTx(ctx, pool, func(txCtx context.Context) error {
-				if got := TxFromContext(txCtx, pool); got != ambientTx {
-					t.Errorf("WithTx callback transaction = %T, want ambient UnitOfWork transaction", got)
+				if got, ok := TxFromContext(txCtx, pool).(*gatedTx); !ok || got.tx != ambientTx {
+					t.Errorf("WithTx callback transaction = %T, want the ambient UnitOfWork transaction, gated", TxFromContext(txCtx, pool))
 				}
 				if _, err := pool.Exec(txCtx, "read request row and write related row"); err != nil {
 					return err

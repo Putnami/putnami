@@ -53,8 +53,9 @@ func contextWithTx(ctx context.Context, pool *Pool, tx pgx.Tx) context.Context {
 
 // WithTx runs fn within a database transaction on pool. It begins and owns a
 // transaction only when ctx has neither an explicit transaction on pool nor a
-// request-scoped UnitOfWork. A transaction owned by WithTx is committed if fn
-// returns nil and rolled back otherwise.
+// request-scoped UnitOfWork (a context marked Autocommit has neither). A
+// transaction owned by WithTx is committed if fn returns nil and rolled back
+// otherwise.
 //
 // Transaction reuse is bound to pool's identity:
 //
@@ -155,6 +156,38 @@ func WithTx(ctx context.Context, pool *Pool, fn func(ctx context.Context) error)
 	obs.Outcome = TxOutcomeCommitted
 
 	return nil
+}
+
+// autocommitKey marks a context whose queries run outside every transaction it
+// would otherwise carry (see Autocommit).
+type autocommitKey struct{}
+
+// Autocommit returns a copy of ctx whose queries run outside every
+// transaction: a query through a pool takes its own pooled connection and
+// commits on its own, outside the request's unit of work and outside every
+// WithTx transaction ctx carries. The other values of ctx, its DI scope
+// included, are kept.
+//
+// It lets the goroutines serving one request send independent reads at once,
+// each on its own connection, where queries on the request's unit of work take
+// turns on one. Such a read does not see the request's uncommitted writes, and
+// a write through it commits whatever the request's outcome. WithTx under an
+// Autocommit context begins and owns its own transaction, and the queries of
+// its callback join that transaction.
+//
+//	g, gctx := errgroup.WithContext(ctx)
+//	g.Go(func() error { return countOrders(database.Autocommit(gctx)) })
+//	g.Go(func() error { return countInvoices(database.Autocommit(gctx)) })
+func Autocommit(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, txContextKey{}, txSet(nil))
+	return context.WithValue(ctx, autocommitKey{}, struct{}{})
+}
+
+// isAutocommit reports whether ctx, or a context it derives from, was marked
+// by Autocommit.
+func isAutocommit(ctx context.Context) bool {
+	_, ok := ctx.Value(autocommitKey{}).(struct{})
+	return ok
 }
 
 // TxFromContext returns the transaction begun on pool within ctx, or nil when

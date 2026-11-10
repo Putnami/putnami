@@ -507,6 +507,32 @@ uncommitted request writes and request-wide rollback atomicity. Use
 `database.InUnitOfWork(ctx)` to detect the ambient unit without beginning a
 transaction.
 
+The goroutines of one request may query through its unit of work at once
+(`errgroup`, `go.putnami.dev/parallel`). Their queries on one datasource take
+turns on its transaction's connection: each holds it until its result is
+closed (`Query` until its rows close or `Next` reports no further row,
+`QueryRow` for its `Scan`, `SendBatch` until its results close), and a query
+waiting for its turn fails with a `db.transaction` error when its own context
+ends. Close or drain rows before the next query on the same pool, or that query
+waits for them. For independent reads that should run in parallel, each on its
+own connection, use `database.Autocommit(ctx)`: its queries run outside the
+unit of work and any `WithTx` transaction, do not see the request's uncommitted
+writes, and commit on their own.
+
+```go
+var openOrders, unpaid int64
+g, gctx := errgroup.WithContext(ctx)
+g.Go(func() (err error) {
+    openOrders, err = orders.Count(database.Autocommit(gctx), "status = $1", "open")
+    return err
+})
+g.Go(func() (err error) {
+    unpaid, err = invoices.Count(database.Autocommit(gctx), "paid = false")
+    return err
+})
+err := g.Wait()
+```
+
 ## Migrations
 
 Per-feature ownership. Each feature plugin embeds paired SQL files and
@@ -739,6 +765,8 @@ the same format and rule. Docker `mode: auto` is currently unsupported.
   rolls back without leaving a reusable half-finalized handle.
 - A unit of work makes one datasource atomic and does not promise distributed
   atomicity across datasource groups.
+- The queries of one request on one datasource run one at a time on its unit
+  of work transaction; `Autocommit` is the way to read on separate connections.
 - Telemetry identifies the datasource and operation without emitting DSNs,
   credentials, or bound values.
 
