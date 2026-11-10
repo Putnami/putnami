@@ -32,6 +32,11 @@ type Options struct {
 	Mode string
 	// DryRun computes the result and its diffs, and writes nothing.
 	DryRun bool
+	// Import lists, in delegate mode, the package paths and globs whose
+	// packages the sync writes as import mode does, in place of the
+	// workspace config when ImportGiven is set.
+	Import      []string
+	ImportGiven bool
 }
 
 // Unmapped is a turbo.json task no Putnami task maps.
@@ -64,6 +69,11 @@ type Result struct {
 	// Unreported are the directories of the delegated packages whose test
 	// task names no JUnit report, sorted: their result is the exit code.
 	Unreported []string
+	// Imported are the directories of the packages a delegated workspace's
+	// import list selects, sorted.
+	Imported []string
+	// Unmatched are the entries of the import list that select no package.
+	Unmatched []string
 }
 
 // Stale reports the files a sync would change.
@@ -105,6 +115,10 @@ func Sync(root string, opts Options) (Result, error) {
 		return Result{}, err
 	}
 	result.Mode = mode
+	imports, err := importList(root, mode, opts)
+	if err != nil {
+		return Result{}, err
+	}
 
 	rootTasks, err := readTasks(root)
 	if err != nil {
@@ -130,7 +144,12 @@ func Sync(root string, opts Options) (Result, error) {
 			return Result{}, err
 		}
 		m := member{dir: p.Path, extensions: []string{ExtensionName}}
-		imported := mode == ModeImport && isTypeScript(dir)
+		packageMode := mode
+		if imports.Selects(p.Path) {
+			packageMode = ModeImport
+			result.Imported = append(result.Imported, p.Path)
+		}
+		imported := packageMode == ModeImport && isTypeScript(dir)
 		if imported {
 			m.extensions = append(m.extensions, TypeScriptExtension)
 		}
@@ -163,6 +182,8 @@ func Sync(root string, opts Options) (Result, error) {
 		result.Unmapped = append(result.Unmapped, Unmapped{Task: task, Reason: reason})
 	}
 	sort.Slice(result.Unmapped, func(i, j int) bool { return result.Unmapped[i].Task < result.Unmapped[j].Task })
+	slices.Sort(result.Imported)
+	result.Unmatched = imports.Unmatched()
 
 	// The sync owns the edges between the packages it marks: the current
 	// members, and the former ones whose putnami.json still carries the tag.
@@ -225,6 +246,23 @@ func Sync(root string, opts Options) (Result, error) {
 		}
 	}
 	return result, nil
+}
+
+// importList is the import list of a delegated workspace: opts.Import when
+// given, else options["@putnami/turbo"].import. Import mode reads none.
+func importList(root, mode string, opts Options) (*stacks.ImportList, error) {
+	if mode != ModeDelegate {
+		return nil, nil
+	}
+	entries := opts.Import
+	if !opts.ImportGiven {
+		recorded, err := WorkspaceImport(root)
+		if err != nil {
+			return nil, err
+		}
+		entries = recorded
+	}
+	return stacks.NewImportList(entries)
 }
 
 // noteUnmapped records each task of tasks no Putnami task maps, with why.
