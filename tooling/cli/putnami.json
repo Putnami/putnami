@@ -76,7 +76,7 @@
         "../../monorepo/moon/**",
         "../../monorepo/turbo/**",
         "../../monorepo/rush/**",
-        "../../tooling/observe/internal/observe/testdata/demos/rush.txtar",
+        "../observe/internal/observe/testdata/demos/rush.txtar",
         "../../typescript/extension/putnami.extension.json",
         "../stacks/**",
         "../evidence-readers/**",
