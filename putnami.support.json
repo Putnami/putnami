@@ -19,6 +19,13 @@
       "status": "stable"
     },
     {
+      "id": "@putnami/bazel",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
       "id": "@putnami/cli",
       "kind": "package",
       "status": "stable"
@@ -60,6 +67,13 @@
       "parity": "unsupported"
     },
     {
+      "id": "@putnami/dart",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
       "id": "@putnami/database",
       "kind": "package",
       "status": "stable"
@@ -73,6 +87,13 @@
       "id": "@putnami/document",
       "kind": "package",
       "status": "stable"
+    },
+    {
+      "id": "@putnami/dotnet",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
     },
     {
       "id": "@putnami/events",
@@ -95,6 +116,13 @@
       "id": "@putnami/go",
       "kind": "package",
       "status": "stable"
+    },
+    {
+      "id": "@putnami/java",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
     },
     {
       "id": "@putnami/jira-collaboration",
@@ -126,7 +154,35 @@
       "status": "stable"
     },
     {
+      "id": "@putnami/moon",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/nx",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
       "id": "@putnami/observe",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/pants",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/php",
       "kind": "package",
       "status": "experimental",
       "default": false,
@@ -140,9 +196,30 @@
       "parity": "unsupported"
     },
     {
+      "id": "@putnami/ruby",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
       "id": "@putnami/runtime",
       "kind": "package",
       "status": "stable"
+    },
+    {
+      "id": "@putnami/rush",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/rust",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
     },
     {
       "id": "@putnami/scaffold",
@@ -165,6 +242,20 @@
       "id": "@putnami/storage",
       "kind": "package",
       "status": "stable"
+    },
+    {
+      "id": "@putnami/swift",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
+    },
+    {
+      "id": "@putnami/turbo",
+      "kind": "package",
+      "status": "experimental",
+      "default": false,
+      "parity": "unsupported"
     },
     {
       "id": "@putnami/typescript",

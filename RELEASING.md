@@ -142,9 +142,10 @@ private history and is never published.
 
 A version is derived from git, per **version line** — a scope whose
 `putnami.json` declares a `line` block with the pattern of its tags
-(`protocols/workspace` ADR 0002). This repository has eight:
+(`protocols/workspace` ADR 0002). This repository has sixteen:
 `typescript` (`ts/v{version}`), `go` (`go/v{version}`), `tooling`,
-`protocols`, `python`, `sites`, `cloud` and `intelligence` (each
+`protocols`, `python`, `sites`, `cloud`, `intelligence`, `integrations`,
+`rust`, `java`, `swift`, `dart`, `dotnet`, `ruby` and `php` (each
 `<scope>/v{version}`).
 
 ```sh
@@ -195,8 +196,9 @@ After the tagged publish succeeds, push the six tags by name. Never run
 git push origin ts/v0.2.0 go/v0.2.0 tooling/v0.2.0 protocols/v0.2.0 python/v0.2.0 sites/v0.2.0
 ```
 
-`cloud` and `intelligence` joined later. Each takes its first tag with the
-explicit form of `putnami version tag`.
+`cloud`, `intelligence`, `integrations` and the seven stack lines (`rust`,
+`java`, `swift`, `dart`, `dotnet`, `ruby`, `php`) joined later. Each takes its
+first tag with the explicit form of `putnami version tag`.
 
 ## Publication
 

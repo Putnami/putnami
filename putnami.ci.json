@@ -37,7 +37,14 @@
           "/intelligence/...",
           "/go/...",
           "/python/...",
-          "/typescript/..."
+          "/typescript/...",
+          "/rust/...",
+          "/java/...",
+          "/swift/...",
+          "/dart/...",
+          "/dotnet/...",
+          "/ruby/...",
+          "/php/..."
         ],
         "visibility": "public"
       },
@@ -45,7 +52,13 @@
         "select": [
           "/sites/...",
           "/go/samples/application",
-          "/python/samples/application"
+          "/python/samples/application",
+          "/rust/samples/...",
+          "/java/samples/...",
+          "/swift/samples/...",
+          "/dart/samples/...",
+          "/dotnet/samples/...",
+          "/php/samples/..."
         ],
         "visibility": "private"
       }
