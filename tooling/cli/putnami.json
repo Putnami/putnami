@@ -75,6 +75,7 @@
         "../../monorepo/nx/**",
         "../../monorepo/moon/**",
         "../../monorepo/turbo/**",
+        "../../monorepo/rush/**",
         "../stacks/**",
         "../evidence-readers/**",
         "../observe/go.mod",

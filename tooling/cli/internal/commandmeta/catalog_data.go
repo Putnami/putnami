@@ -322,11 +322,11 @@ var catalog = []Command{
 		Path:        "workspace init",
 		Kind:        KindStructured,
 		Description: "Initialize a new workspace",
-		Usage:       "putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|moon|nx|pants> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]",
+		Usage:       "putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|moon|nx|pants|rush|turbo> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]",
 		Flags: []Flag{
 			{Long: "--workspace", Type: FlagValue, ValueName: "<name>", Description: "Workspace name override"},
 			{Long: "--extension", Type: FlagValue, ValueName: "<ts|go|py>", Description: "Default extension to install", Values: []string{"ts", "go", "py"}},
-			{Long: "--from", Type: FlagValue, ValueName: "<bazel|moon|nx|pants|turbo>", Description: "Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change", Values: []string{"bazel", "moon", "nx", "pants", "turbo"}},
+			{Long: "--from", Type: FlagValue, ValueName: "<bazel|moon|nx|pants|rush|turbo>", Description: "Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change", Values: []string{"bazel", "moon", "nx", "pants", "rush", "turbo"}},
 			{Long: "--mode", Type: FlagValue, ValueName: "<import|delegate>", Description: "With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)", Values: []string{"import", "delegate"}},
 			{Long: "--apply", Description: "With --from in an existing workspace: record the mode and synchronize, instead of previewing"},
 			{Long: "--project", Type: FlagValue, ValueName: "<name>", Description: "Create an initial project"},
@@ -345,6 +345,7 @@ var catalog = []Command{
 			"putnami init --from nx --mode import --apply",
 			"putnami init --from moon --mode delegate",
 			"putnami init --from turbo --mode delegate",
+			"putnami init --from rush --mode delegate",
 		},
 		Related: []string{"extensions install", "deps install", "context generate"},
 		Workspace: WorkspaceNeed{

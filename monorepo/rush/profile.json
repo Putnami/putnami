@@ -1,0 +1,39 @@
+{
+  "id": "rush",
+  "delegated": true,
+  "markers": ["package.json"],
+  "toolchain": {
+    "command": ["rush", "--help"],
+    "pattern": "Rush Multi-Project Build Tool (?<version>[0-9]+\\.[0-9]+\\.[0-9]+\\S*)",
+    "files": [
+      { "path": "rush.json", "pattern": "\"rushVersion\"\\s*:\\s*\"(?<version>[^\"]+)\"" }
+    ]
+  },
+  "inputs": {
+    "sources": ["**"]
+  },
+  "excludes": ["node_modules", "lib", "dist", "temp"],
+  "tasks": {
+    "lint": {
+      "steps": [
+        ["rush", "lint", "--to", "{component}"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    },
+    "test": {
+      "steps": [
+        ["rush", "test", "--to", "{component}"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    },
+    "build": {
+      "steps": [
+        ["rush", "build", "--to", "{component}"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    }
+  }
+}

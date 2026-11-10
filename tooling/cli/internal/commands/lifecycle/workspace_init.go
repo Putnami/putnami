@@ -103,6 +103,12 @@ var initSources = map[string]initSource{
 		modes:            []string{initModeImport, initModeDelegate},
 		importExtensions: []string{"@putnami/typescript"},
 	},
+	"rush": {
+		starter:          initExtensionConfig{packageName: "@putnami/rush"},
+		markers:          []string{"rush.json"},
+		modes:            []string{initModeImport, initModeDelegate},
+		importExtensions: []string{"@putnami/typescript"},
+	},
 }
 
 // holdsAny reports whether dir holds one of the files.

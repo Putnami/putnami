@@ -488,7 +488,7 @@ _putnami_completions() {
             value_slot=1
             ;;
         'init --from')
-            structured_values=(bazel moon nx pants turbo)
+            structured_values=(bazel moon nx pants rush turbo)
             value_slot=1
             ;;
         'init --mode')
@@ -580,7 +580,7 @@ _putnami_completions() {
             value_slot=1
             ;;
         'workspace init --from')
-            structured_values=(bazel moon nx pants turbo)
+            structured_values=(bazel moon nx pants rush turbo)
             value_slot=1
             ;;
         'workspace init --mode')

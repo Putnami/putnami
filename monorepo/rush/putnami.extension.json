@@ -1,0 +1,385 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/rush",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-rush",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "rush:build",
+      "rush:test",
+      "rush:lint"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "package.json"
+    ],
+    "inputs": [
+      "rush.json",
+      "package.json",
+      "common/config/rush/command-line.json",
+      "common/config/rush/build-cache.json",
+      "putnami.json",
+      "putnami.workspace.json"
+    ],
+    "excludes": [
+      "node_modules",
+      "autoinstallers"
+    ],
+    "syncTask": "workspace-sync-exec"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint each Rush project with rush lint --to <package> at the workspace root; Rush keeps its own build cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "lint",
+          "heavy": true,
+          "task": "lint-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test each Rush project with rush test --to <package> at the workspace root, and read the JUnit and coverage reports the project's options name; Rush keeps its own build cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build each Rush project with rush build --to <package> at the workspace root; Rush keeps its own build cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "validate": {
+      "description": "In delegate mode, fail when a Rush project's putnami.json no longer matches rush.json and the project manifests, such as after a change that alters the edges between projects.",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "rush-graph-check",
+          "task": "rush-graph-check-exec"
+        }
+      ]
+    },
+    "workspace-sync": {
+      "description": "Write each Rush project's putnami.json from rush.json and its package.json, in the mode the workspace adopted: delegated to Rush, or imported as a TypeScript project.",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "workspace-sync",
+          "task": "workspace-sync-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "graph-run": {
+      "description": "Carry the package graph: each test and build step depends on the graph step of its own package, which alone depends on the graph step of each package upstream, so a change selects the packages that depend on it while a dependency runs no rush. Runs nothing and passes.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "graph"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 60000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "rush:build"
+          ]
+        }
+      },
+      "cache": {
+        "enabled": false
+      }
+    },
+    "lint-run": {
+      "description": "Run rush lint --to <package> at the workspace root for one project, after the Rush version check, when command-line.json declares a lint command; the sync disables lint otherwise. Putnami's cache is off.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "rush:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "rush.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo rush."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The task's command output, which a build task leaves empty."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run rush test --to <package> at the workspace root for one project, after the Rush version check; then read the JUnit and coverage reports the project's options.@putnami/rush.tasks.test.reports name. A step that exits non-zero, or a failed case, fails the task; without reports the result is the exit code. Putnami's cache is off: Rush's build cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "rush:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "rush.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo rush, and the test and coverage totals of a test task."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task read: each JUnit report and coverage file the project's options name."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run rush build --to <package> at the workspace root for one project, after the Rush version check. Putnami's cache is off: Rush's build cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "rush:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "rush.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo rush."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The task's command output, which a build task leaves empty."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-sync-exec": {
+      "description": "Write in each Rush project's putnami.json, from rush.json and its package.json, the extension of the mode and its dependencies as project IDs. In delegate mode it adds rush.json and command-line.json as filePatterns and disables test and lint without a command of that name. The mode parameter outranks the recorded mode, and with the dryRun parameter it writes nothing and reports each diff. In import mode it also adds the source exports and tsconfig.json an import needs. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000,
+      "declares": {
+        "effects": [
+          "workspace-files"
+        ]
+      }
+    },
+    "rush-graph-check-exec": {
+      "description": "In delegate mode, compare each Rush project's putnami.json with rush.json and the project manifests, and fail with rush.sync_stale when a sync would change one. Writes nothing; passes in import mode.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "rush-graph-check"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000
+    }
+  }
+}

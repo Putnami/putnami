@@ -100,6 +100,7 @@ use (
 	./protocols/workspace
 	./java/extension
 	./monorepo/nx
+	./monorepo/rush
 	./php/extension
 	./dotnet/extension
 	./python/extension

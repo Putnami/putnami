@@ -136,6 +136,7 @@ var excludedProjects = map[string]string{
 	"/monorepo/bazel":                                      reasonStackExtension,
 	"/monorepo/nx":                                         reasonStackExtension,
 	"/monorepo/moon":                                       reasonStackExtension,
+	"/monorepo/rush":                                       reasonStackExtension,
 	"/monorepo/pants":                                      reasonStackExtension,
 	"/monorepo/turbo":                                      reasonStackExtension,
 	"/dotnet/extension":                                    reasonStackExtension,
