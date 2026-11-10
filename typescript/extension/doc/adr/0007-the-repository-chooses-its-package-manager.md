@@ -41,14 +41,15 @@ workspace declares and reinstalls with the same manager.
   workspace-install installs frozen and offline from that cache.
 - workspace-fetch keeps repository code out by two means, each enough for
   the settings it covers. It starts every Yarn with `YARN_IGNORE_PATH=1` and
-  every pnpm with `npm_config_ignore_pnpmfile=true`, the cache probes in the
-  workspace root included, and the scratch install with no lifecycle script.
+  every pnpm with `npm_config_ignore_pnpmfile=true`, and every npm, pnpm and
+  Yarn with `COREPACK_ENV_FILE=0`, so a Corepack shim reads no `.corepack.env`
+  from the workspace, the cache probes in the workspace root included, and the
+  scratch install with no lifecycle script.
   It refuses, before any process starts, a Yarn workspace whose `.yarnrc.yml`
   or `.yarnrc`, at the root or in a directory above it other than the home,
   mentions `yarnPath`, `yarn-path` or `plugins` in any letter case or holds a
   backslash, and a pnpm workspace whose `pnpm-workspace.yaml` or `.npmrc`
-  mentions `configDependencies` or a pnpmfile, or whose `pnpm-workspace.yaml`
-  holds a backslash: a configuration dependency is fetched and loaded before
+  mentions `configDependencies` or a pnpmfile, or holds a backslash: a configuration dependency is fetched and loaded before
   any flag applies, and a Yarn plugin has no switch. The refusal reads text,
   not YAML, so a quoted, escaped or indented key cannot slip past it.
 
