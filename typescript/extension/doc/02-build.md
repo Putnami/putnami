@@ -343,6 +343,55 @@ output does not depend on the machine that built it:
 
 **External resolution**: dependencies and peerDependencies are marked as external unless `--bundle bundled` is set. Both graphs use the same external set, so consumers still resolve dependency conditions themselves.
 
+#### Node.js target
+
+Bun runs the code it builds for itself, so a build for Node.js is only correct
+when nothing it loads needs Bun. With `--target node`, the transpile phase
+reads the module graph of the server graph, the dependencies included, and
+fails with `typescript.bun_api_on_node` on every module that:
+
+- references the `Bun` global outside a `typeof Bun` guard, or
+- imports `bun` or a `bun:` module, such as `bun:sqlite`.
+
+Each diagnostic names the module, the positions of its `Bun` references, and
+the shortest import chain from an entrypoint that reaches it:
+
+```text
+../runtime/src/config/config-source.ts references the Bun global at 8:38, which Node.js
+does not provide; reached by src/index.ts -> src/registry.ts -> ../runtime/src/index.ts
+-> ../runtime/src/config/index.ts -> ../runtime/src/config/config-source.ts
+```
+
+A reference is guarded when it is the operand of `typeof`, when it lies in a
+branch of an `if`, a conditional or a logical expression that tests
+`typeof Bun`, or when it follows an `if` that tests `typeof Bun` and leaves the
+block. Reading the global through `globalThis.Bun?.` is not a reference to the
+`Bun` binding, which is how `@putnami/utils` falls back from `Bun.escapeHTML`.
+The check reads every module the graph imports, whether or not the bundler
+keeps its code, because an unbundled Node.js consumer loads each of them.
+
+The graph comes from a `bun build --target node --metafile` into a temporary
+directory, so it resolves the `node` export conditions, the tsconfig paths and
+the workspace links exactly as the build does. Each module is parsed with the
+`typescript` package the project resolves; without one, the check fails and
+asks for `putnami install`. A graph bun cannot bundle for Node.js fails the
+build too: the check never reports a graph it did not read as loadable.
+
+The `@putnami/*` framework packages whose server exports load on Node.js, the
+list a test computes with the same check:
+
+<!-- node-loadable:start -->
+- `@putnami/cli-protocol`
+- `@putnami/codehost-protocol`
+- `@putnami/ui`
+<!-- node-loadable:end -->
+
+Every other framework package reaches a Bun API from its server exports:
+`@putnami/runtime` parses configuration with `Bun.YAML`, `@putnami/utils/server`
+reads and writes files with `Bun.file` and `Bun.write`, `@putnami/application`
+imports `bun`, and `@putnami/spectest` imports `bun:test`. A node build that
+imports one of them fails.
+
 **TSConfig resolution** (in order):
 
 1. `tsconfig.app.json` in project
@@ -532,7 +581,7 @@ When no phase flag is set, generate + transpile + types run by default. Setting 
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--target` | `string` | `bun` | Build target platform: `bun`, `node`, or `browser` |
+| `--target` | `string` | `bun` | Build target platform: `bun`, `node`, or `browser`. A `node` build fails when its graph reaches a Bun API (see [Node.js target](#nodejs-target)) |
 | `--bundle` | `string` | `none` | Bundle mode. `none`: externalize deps. `bundled`: inline everything. `local`: externalize only non-workspace deps |
 | `--sourcemap` | `string` | `external` | Sourcemap generation: `external` (separate `.map` files), `inline` (embedded), or `none` |
 | `--minify` | `boolean` | `true` | Minify output JavaScript |
