@@ -1,6 +1,6 @@
 # Test
 
-The test command discovers and runs tests using Bun's built-in test runner. It produces JUnit XML reports and optional LCOV coverage output.
+The test command discovers and runs a project's tests with its test runner: Bun's built-in runner by default, or the project's Vitest or Jest. Every runner produces the same JUnit XML report and optional LCOV coverage output.
 
 ## Overview
 
@@ -64,6 +64,40 @@ putnami test . --rerun-each 3
 putnami test . --concurrent
 ```
 
+## Test runner
+
+A project keeps the runner it already uses. Its runner is, in order:
+
+1. `options["@putnami/typescript"].test.runner` in its `putnami.json`: `bun`, `vitest` or `jest`;
+2. the runner its `package.json` `test` script runs: `vitest`, `jest` or `bun test`, also after `npx`, `pnpm exec` or an environment assignment;
+3. Bun.
+
+```json
+{
+  "options": {
+    "@putnami/typescript": {
+      "test": { "runner": "vitest" }
+    }
+  }
+}
+```
+
+Vitest and Jest run from `node_modules/.bin` of the project, or of a directory above it up to the workspace root, with the `node` on `PATH`. Add the runner to the project's `devDependencies` and run `putnami install`. Without `node`, the test task fails and names it: install Node.js, or choose `bun`. A Bun project needs no `node`.
+
+The runner keeps reading its own configuration, `vitest.config.*`, `vite.config.*` or `jest.config.*`, and those files are inputs of the task's cache key. Putnami passes only the flags that place the reports and select what you asked for:
+
+| Runner | Command | Reports |
+|---|---|---|
+| Bun | `bun test` | `--reporter=junit`, and `--coverage-reporter=lcov` with coverage |
+| Vitest | `node <bin>/vitest run` | its `junit` reporter, and with coverage its `lcovonly` coverage reporter |
+| Jest | `node <bin>/jest --ci --json` | its JSON result, which the task converts to JUnit, so no reporter package is needed; with coverage its `lcovonly` coverage reporter |
+
+`--test`, `--bail`, `--update-snapshots` and `--pass-with-no-tests` reach every runner. The per-test `--timeout` reaches Bun alone: a Vitest or Jest project sets its `testTimeout` in its configuration. `--concurrent`, `--parallel`, `--only`, `--todo` and `--rerun-each` are Bun options.
+
+Vitest instruments coverage through a provider package: with coverage on and neither `@vitest/coverage-v8` nor `@vitest/coverage-istanbul` installed, the run reports no coverage and says so, and `--coverage-threshold` fails for lack of data. Jest needs no extra package.
+
+The summary, the test cases and `--enforce-coverage` read the reports the same way whatever the runner. The `types` step checks a Vitest or Jest project with the ambient types its tsconfig names, where the runner's globals are declared, instead of Bun's alone.
+
 ## Execution Flow
 
 ```text
@@ -73,7 +107,7 @@ generate ──→ discover ──→ run ──→ parse
 
 1. **Generate** — runs the build generate phase to ensure `.gen/` is current. It writes the same `.gen/` tree as the `generate` step of `build`, so in a run such as `putnami lint,test,build` the planner orders the two: one never starts while the other, or a step that reads its output, still runs
 2. **Discover** — scans the project for test files matching `**/*.{test,spec}.{ts,tsx,js,jsx}` (excludes `node_modules`, `.gen`, and `dist` directories)
-3. **Run** — executes `bun test` with discovered files and configured options
+3. **Run** — executes the project's [test runner](#test-runner) with the configured options
 4. **Parse** — reads JUnit XML and optional LCOV output, extracts failures and metrics
 
 If no test files are found, the command returns `SKIP` (exit 0) unless `--pass-with-no-tests` is `false`.
