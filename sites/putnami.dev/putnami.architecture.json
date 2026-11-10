@@ -126,6 +126,35 @@
       "justification": "The site publishes the spec-driven development method at public/docs/07-spec-driven-development by copying the /tooling/sdd-extension/doc tree verbatim at build time. The sdd domain owns the method's wording; the site owns only its placement in the published information architecture."
     },
     {
+      "id": "public-docs.monorepo-tool-documentation.v1",
+      "version": 1,
+      "from": {
+        "domain": "stacks",
+        "export": "stacks.monorepo-tool-documentation.v1"
+      },
+      "as": "public-docs.monorepo-tool-documentation",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "monorepo_tool_documentation"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.documentation-tree.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "tree_digest",
+        "idempotencyKey": "tree_digest",
+        "lateEvents": "ignore-older"
+      },
+      "justification": "The site publishes the reference page of each monorepo tool integration under public/docs/12-monorepo-tools by copying /integrations/<tool>/doc/01-<tool>.md verbatim at build time, one copy per integration, all governed by this one import. The stacks domain decides what each reference says about running a tool; the site decides only that they appear together, under one section. A missing reference fails the build rather than publishing a section with a tool missing."
+    },
+    {
       "id": "public-docs.observe-documentation.v1",
       "version": 1,
       "from": {
@@ -204,6 +233,35 @@
         "lateEvents": "ignore-older"
       },
       "justification": "The site publishes the Python surface reference at public/docs/09-frameworks/03-python by copying the /python/doc/framework tree verbatim at build time. The Python surface is the extension and its templates only, and the extension-providers domain decides what that reference claims; the site never promotes it to framework parity by where it places it."
+    },
+    {
+      "id": "public-docs.stack-documentation.v1",
+      "version": 1,
+      "from": {
+        "domain": "stacks",
+        "export": "stacks.stack-documentation.v1"
+      },
+      "as": "public-docs.stack-documentation",
+      "mode": "snapshot",
+      "status": "active",
+      "facts": [
+        "stack_extension_documentation"
+      ],
+      "transport": {
+        "kind": "file",
+        "contract": "putnami.documentation-tree.v1",
+        "availability": "active"
+      },
+      "consistency": {
+        "maxStaleness": "720h",
+        "onMissing": "fail-closed",
+        "onStale": "use-stale",
+        "ordering": "source-version",
+        "sourceVersion": "tree_digest",
+        "idempotencyKey": "tree_digest",
+        "lateEvents": "ignore-older"
+      },
+      "justification": "The site publishes the reference page of each stack extension under public/docs/11-languages by copying /<language>/extension/doc/01-<language>.md verbatim at build time, one copy per extension, all governed by this one import. The stacks domain decides what each reference says; the site decides only that they appear together, under one section, next to the frameworks. A missing reference fails the build rather than publishing a section with a language missing."
     },
     {
       "id": "public-docs.typescript-framework-documentation.v1",
