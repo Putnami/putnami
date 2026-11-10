@@ -6,7 +6,8 @@
     "A service persists and queries typed records through a pool-bound repository",
     "Related writes on one datasource commit together or roll back together",
     "A request-scoped unit of work transparently shares one transaction per participating datasource",
-    "Transaction telemetry explains the boundary without disclosing query parameters, row data, or panic values"
+    "Transaction telemetry explains the boundary without disclosing query parameters, row data, or panic values",
+    "The goroutines serving one request query through its unit of work at once without breaking its transaction, and can read in parallel outside it"
   ],
   "nonGoals": [
     "Providing distributed atomic commit across multiple datasources",
@@ -33,9 +34,18 @@
     {
       "id": "secret-safe-telemetry",
       "text": "Rollback telemetry uses only fixed outcome classifications and never emits raw error text, bound parameters, row data, or panic values."
+    },
+    {
+      "id": "concurrent-request-queries",
+      "text": "Queries that the goroutines of one request send on a unit-of-work transaction run one at a time on its connection: each holds the transaction until its result is closed, a query waiting for its turn ends with its own context, and the request boundary refuses later queries and closes a result the request left open before it finalizes the transaction."
+    },
+    {
+      "id": "autocommit-context",
+      "text": "A query on a context marked Autocommit runs on its own pooled connection, outside the request unit of work and every WithTx transaction the context carries; WithTx under such a context begins and owns its own transaction."
     }
   ],
   "decisions": [
-    "go/framework/database/doc/adr/0001-pool-scoped-transaction-boundaries.md"
+    "go/framework/database/doc/adr/0001-pool-scoped-transaction-boundaries.md",
+    "go/framework/database/doc/adr/0004-serialize-a-request-transaction.md"
   ]
 }
