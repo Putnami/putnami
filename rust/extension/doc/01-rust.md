@@ -35,7 +35,7 @@ when the machine lacks them.
 | Tool | When | From | Where |
 |---|---|---|---|
 | Rust, with rustfmt, clippy and llvm-tools | `rustc` is missing, or outside the version a `rust-toolchain` file states | A rustup pinned by SHA-256 | `<Putnami home>/tools/rust/rustup-home` |
-| cargo-nextest, cargo-llvm-cov | The `test` task, when `PATH` holds neither | Archives pinned by SHA-256 | `<Putnami home>/tools/rust` |
+| cargo-nextest, cargo-llvm-cov | The `test` task, or `putnami install` ahead of it, when `PATH` holds neither | Archives pinned by SHA-256 | `<Putnami home>/tools/rust` |
 
 A Rust on `PATH` that satisfies the statement always runs. With no statement,
 the extension installs its default release, 1.99.1. Your `~/.cargo` and
@@ -47,6 +47,63 @@ tools on Windows. A Rust with no llvm-tools, such as a Homebrew one, runs
 `cargo nextest run`: `test` warns with `stacks.coverage_unavailable` and reads no
 coverage report. Targets and components a `rust-toolchain` file lists beyond
 those three are not installed.
+
+## Install, fetch and upgrade the crates
+
+The crates live in cargo's home, `CARGO_HOME` when it is set, else
+`~/.cargo`, as with any cargo command. No job of the extension sets
+`CARGO_HOME`, so every job reads the same cargo home.
+
+| Command | What it runs |
+|---|---|
+| `putnami install` | `workspace-install`: `cargo fetch` at each stack root of the workspace's projects, except the projects `disable.tags` excludes, which writes a `Cargo.lock` a root lacks. A root where `cargo fetch --locked --offline` passes, whose crates cargo's home already holds, is current and skipped; `--force` fetches it again. It then installs cargo-nextest and cargo-llvm-cov when `PATH` holds neither, so the first test does not wait for them; a failed download is the warning `rust.test_tools_unavailable`. |
+| `putnami workspace-fetch` | `cargo fetch --locked` at each stack root that holds a `Cargo.lock`. A hosted run calls it with the network, before any repository process. |
+| `putnami deps-upgrade` | `cargo update` at each stack root, with the cargo the toolchain check selects. |
+
+`cargo fetch` downloads the crates and git dependencies that `Cargo.lock`
+names and runs none of their code: no build script and no procedural macro.
+`workspace-fetch` writes nothing in the repository, so a stack root with no
+`Cargo.lock` is left out with the warning `rust.lockfile_missing`, which names
+it: run `putnami install` and commit the lockfile. The fetch also runs with
+`RUSTC_WRAPPER` and `RUSTC_WORKSPACE_WRAPPER` empty and `RUSTC` set to the
+selected rustc, which cargo asks for the targets it knows, so no wrapper or
+compiler the repository's `.cargo/config.toml` names runs.
+
+A hosted run hands `workspace-fetch` a read credential on a descriptor. Its
+hosts are the Putnami registries, and none of them serves a Cargo registry:
+the job reads and closes the descriptor before it starts any process and gives
+cargo nothing. cargo authenticates to an alternative registry with its own
+credential providers, `CARGO_REGISTRIES_<NAME>_TOKEN` or the cargo home's
+`credentials.toml`.
+
+`cargo update` moves each locked version to the newest one its semver
+requirement in `Cargo.toml` accepts, as `bundle update`, `composer update`,
+`pub upgrade` and `swift package update` do. It bumps no major version:
+`cargo update --breaking` is unstable in the cargo of Rust 1.99.1, the release
+the extension installs by default. To move to a new major version, edit the
+requirement in `Cargo.toml`, then run `putnami install`.
+
+`Cargo.lock` at the workspace root is an install input of the workspace: when
+it changes, the next Putnami command installs again before it runs.
+
+## Offline runs
+
+When `PUTNAMI_OFFLINE_DEPENDENCIES` is `1`, as in every job of a hosted run
+but `workspace-fetch`, each job of the extension sets `CARGO_NET_OFFLINE=true`
+before it starts cargo. `lint`, `test`, `build`, `run`, `serve`, `package` and
+`workspace-install` then read only the crates `workspace-fetch` downloaded, and
+a crate cargo's home lacks fails the step rather than reaching the network.
+
+| Job | Offline |
+|---|---|
+| `workspace-install` | `cargo fetch --locked --offline` at each root that holds a `Cargo.lock`: it checks the lockfile against cargo's home and writes nothing. A root with no `Cargo.lock` is left out with `rust.lockfile_missing`. It installs no tool. |
+| `deps-upgrade` | Fails with `rust.cargo_update_failed`: `cargo update` needs the network. |
+| `publish --crates` | Keeps the network: `cargo publish` uploads to its registry. |
+
+An offline task installs no Rust and no test tool: a hosted run runs the
+`rustc`, cargo-nextest and cargo-llvm-cov on its runner's `PATH`. The choices
+behind these jobs are in
+[ADR 0001](adr/0001-cargo-runs-offline-from-the-fetched-home.md).
 
 ## Crates and stack roots
 
@@ -83,6 +140,12 @@ directory.
 | `lint` | `cargo fmt --package {component} --check`, then `cargo clippy --package {component} --all-targets -- -D warnings` |
 | `test` | `cargo llvm-cov nextest --package {component} --profile ci --lcov --output-path {output}/lcov.info` |
 | `build` | `cargo build --package {component} --locked` |
+
+`lint` also checks every relative link and anchor of the crate's `README.md`
+files and `doc/` tree, with the documentation link check every Putnami
+extension shares: a broken one fails lint, and `--docs-links=false` turns the
+check off. A crate below the project, marked by its `Cargo.toml`, answers for
+its own documents. The check needs no Rust.
 
 Before its steps, `build` removes `{root}/target/debug/{component}`, and after
 them copies the crate's binary from there into its output when cargo wrote
@@ -170,6 +233,23 @@ crate's.
 The cases and coverage files of another crate are left out of the summary:
 that crate's own task counts them. A failed case, a step that exits non-zero,
 or a missing report fails the task.
+
+## Filter the tests
+
+`putnami test --test <filter>`, or `-t <filter>`, runs the tests whose name
+contains the filter. The test step passes it to nextest as
+`-E 'test(~<filter>)'`, with the characters a nextest name matcher reads only
+escaped, so a filter such as `tests::lines` or `-x` is one name and never an
+option. The filter takes that form with coverage, where `cargo llvm-cov
+nextest` hands it to `cargo nextest run`, and on a Rust with no llvm-tools,
+where the step is `cargo nextest run` itself.
+
+Putnami passes the filter to the crates the selected ones depend on too, where
+it can select no test. The step adds `--no-tests=pass` when
+`cargo nextest run --help` lists `--no-tests`, as the pinned 0.9.151 does, so
+such a crate passes with no case. The filter is part of the task's key: a
+filtered result never answers an unfiltered run. A test step override that
+runs no nextest gets no filter.
 
 ## The toolchain check
 
@@ -266,10 +346,14 @@ design of the stack core is in
 ## The real-tool proof
 
 The extension's tests run its tasks with a stub cargo. One more test,
-`TestTheFixtureRepositoryPassesWithTheRealTools`, runs lint, test and build
-for every crate of the observe Cargo detector's fixture repository with the
-real cargo, cargo-nextest and cargo-llvm-cov, and checks that every case and
-coverage line is attributed. It skips when a tool is missing, unless
+`TestTheFixtureRepositoryPassesWithTheRealTools`, runs `workspace-fetch` into
+an empty cargo home on the observe Cargo detector's fixture repository, whose
+`pricing` crate depends on `itoa` from crates.io. It then runs lint, test and
+build for every crate offline, with the real cargo, cargo-nextest and
+cargo-llvm-cov, and checks that every case and coverage line is attributed.
+Last, it runs `test -t lines`, with and without coverage: the filter selects
+one case in `pricing` and in `api`, and `worker`, where it selects none,
+passes. It skips when a tool is missing, unless
 `PUTNAMI_RUST_REAL_TOOLS=1`; the workflow `.github/workflows/rust-stack.yml`
 installs the tools and runs it on each change to the Rust stack.
 
@@ -283,3 +367,7 @@ installs the tools and runs it on each change to the Rust stack.
 - The dry run of a crate with a path dependency outside its Cargo workspace
   checks the crate's file list only: cargo cannot build against a dependency
   that is not on the registry yet. The diagnostic names it.
+- `deps-upgrade` stays within each semver requirement: it bumps no major
+  version.
+- An offline task runs the Rust and the test tools on `PATH`, not the ones an
+  earlier run installed under the Putnami home.

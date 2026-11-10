@@ -5,6 +5,9 @@
 steps with Putnami's runner and cache, without changing the build.
 `putnami run` and `serve` start a binary crate, and `putnami package` and
 `publish` ship it as archives, an OCI image or a crate on a registry.
+`putnami install` fetches the crates each `Cargo.lock` names, a hosted run
+tests offline from what `workspace-fetch` downloaded, and `deps-upgrade`
+refreshes each `Cargo.lock`.
 
 It is the reference stack extension: a manifest, the Rust stack profile
 (`profile.json`) and the entrypoint of the stack core,

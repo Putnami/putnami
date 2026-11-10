@@ -172,6 +172,9 @@ func TestALibraryCompilesNothing(t *testing.T) {
 	jobs := Jobs(stack(t))
 	// In name order: package-crate stages what publish-crates sends.
 	for _, task := range slices.Sorted(maps.Keys(jobs)) {
+		if !strings.HasPrefix(task, "package-") && !strings.HasPrefix(task, "publish-") && task != RunJobName && task != ServeJobName {
+			continue
+		}
 		if status, _, err := jobs[task](ctx, jsonl.New(), nil); err != nil || status != "OK" {
 			t.Errorf("%s: status = %s, err = %v", task, status, err)
 		}

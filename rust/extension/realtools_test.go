@@ -1,12 +1,16 @@
 package rust
 
 import (
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/job"
+	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -64,9 +68,23 @@ func TestTheFixtureRepositoryPassesWithTheRealTools(t *testing.T) {
 	}
 	root := t.TempDir()
 	writeDemo(t, root)
+	crates := []string{"crates/pricing", "crates/api", "crates/worker"}
+
+	// workspace-fetch fills a cargo home of its own with the network; every
+	// task then runs offline and reads only that home.
+	t.Setenv("CARGO_HOME", t.TempDir())
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
+	var refs []job.ProjectRef
+	for _, crate := range crates {
+		refs = append(refs, crateRef(root, crate, `{}`))
+	}
+	if status, emitted, err := runWorkspaceJob(t, root, WorkspaceFetchJobName, nil, refs...); status != "OK" || err != nil {
+		t.Fatalf("workspace-fetch: %s %v\n%s", status, err, emitted)
+	}
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
 
 	tests := map[string]int{"crates/api": 2, "crates/pricing": 4, "crates/worker": 1}
-	for _, crate := range []string{"crates/pricing", "crates/api", "crates/worker"} {
+	for _, crate := range crates {
 		for _, task := range stacks.TaskNames {
 			status, data, _, emitted, err := runJobOutput(t, root, crate, task)
 			if status != "OK" || err != nil {
@@ -90,5 +108,34 @@ func TestTheFixtureRepositoryPassesWithTheRealTools(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "target", "nextest", "ci", "junit.xml")); err != nil {
 		t.Errorf("the nextest ci profile wrote its report under the stack root: %v", err)
+	}
+
+	// The filter selects the tests whose name holds it, and a crate where it
+	// selects none passes, with and without coverage.
+	filtered := map[string]int{"crates/api": 1, "crates/pricing": 1, "crates/worker": 0}
+	params := pctx.Params{testFilterFlag: json.RawMessage(`"lines"`)}
+	for _, coverage := range []bool{true, false} {
+		if !coverage {
+			// A cargo-llvm-cov that finds no llvm-tools fails the coverage
+			// probe, so the task runs cargo nextest run.
+			shim := t.TempDir()
+			writeFile(t, shim, "cargo-llvm-cov", "#!/bin/sh\nexit 1\n")
+			if err := os.Chmod(filepath.Join(shim, "cargo-llvm-cov"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("PATH", shim+string(os.PathListSeparator)+os.Getenv("PATH"))
+		}
+		for _, crate := range crates {
+			status, data, _, emitted, err := runJobParams(t, root, crate, stacks.TaskTest, params)
+			if status != "OK" || err != nil {
+				t.Fatalf("%s test -t lines, coverage %v: %s %v\n%s", crate, coverage, status, err, emitted)
+			}
+			if got := data["testSummary"].(map[string]any); got["total"] != filtered[crate] || got["failed"] != 0 {
+				t.Errorf("%s test -t lines, coverage %v: testSummary = %v, want %d cases", crate, coverage, got, filtered[crate])
+			}
+			if _, measured := data["coverageSummary"]; measured != coverage {
+				t.Errorf("%s test -t lines, coverage %v: coverageSummary = %v", crate, coverage, data["coverageSummary"])
+			}
+		}
 	}
 }

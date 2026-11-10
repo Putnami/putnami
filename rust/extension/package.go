@@ -51,18 +51,23 @@ var rustTargets = map[string]string{
 	"windows/amd64": "x86_64-pc-windows-gnu",
 }
 
-// Jobs are the job handlers @putnami/rust adds to the stack core's: run and
+// Jobs are the job handlers @putnami/rust adds to the stack core's, or puts in
+// their place: the test task with its filter, the dependency jobs, run and
 // serve, on the core's process helpers, and the package and publish steps.
 func Jobs(stack stacks.Stack) map[string]cli.JobFunc {
 	return map[string]cli.JobFunc{
-		RunJobName:         RunJob(stack),
-		ServeJobName:       ServeJob(stack),
-		"package-compile":  packageCompile(stack),
-		"package-archives": packageArchives,
-		"package-docker":   packageDocker,
-		"package-crate":    packageCrate(stack),
-		"publish-crates":   publishCrates(stack),
-		"publish-docker":   publishDocker,
+		stacks.TaskTest:         TestJob(stack),
+		WorkspaceFetchJobName:   WorkspaceFetchJob(stack),
+		WorkspaceInstallJobName: WorkspaceInstallJob(stack),
+		DepsUpgradeJobName:      DepsUpgradeJob(stack),
+		RunJobName:              RunJob(stack),
+		ServeJobName:            ServeJob(stack),
+		"package-compile":       packageCompile(stack),
+		"package-archives":      packageArchives,
+		"package-docker":        packageDocker,
+		"package-crate":         packageCrate(stack),
+		"publish-crates":        publishCrates(stack),
+		"publish-docker":        publishDocker,
 	}
 }
 

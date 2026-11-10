@@ -10,6 +10,7 @@ import (
 
 	rust "go.putnami.dev/rust/extension"
 	"go.putnami.dev/sdk/extension/cli"
+	"go.putnami.dev/sdk/extension/docslinks"
 )
 
 var runtimeVersion string
@@ -27,7 +28,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 	if err == nil {
 		err = stack.Entrypoint(args, stdin, stdout, runtimeVersion, func(jobs map[string]cli.JobFunc) {
 			maps.Copy(jobs, rust.Jobs(stack))
-			runJobs(jobs)
+			jobs["lint-docs"] = docslinks.Job("Cargo.toml")
+			runJobs(rust.OfflineCargo(jobs))
 		})
 	}
 	if err != nil {
