@@ -1,8 +1,9 @@
 # ADR 0004 — Serialize the queries of a request on its unit-of-work transaction
 
 - **Status**: accepted
-- **Scope**: `go.putnami.dev/database` (`go/framework/database`); amends the
-  unit-of-work part of [ADR 0001](0001-pool-scoped-transaction-boundaries.md)
+- **Scope**: `go.putnami.dev/database` (`go/framework/database`)
+- **Amends**: [ADR 0001](0001-pool-scoped-transaction-boundaries.md), its
+  unit-of-work part
 
 ## Context
 
@@ -30,10 +31,13 @@ operation at a time:
   ends first, the query fails with a `db.transaction` error that says another
   query of the request holds the transaction until its result is closed.
 - The request boundary closes the gate first, so a later query fails with a
-  `db.transaction` error. It closes a result the request left open, waits for
-  an operation still running under the boundary's own context, then commits or
-  rolls back. When that context ends first, commit fails and rollback runs
-  anyway, which closes the busy connection.
+  `db.transaction` error. It starts closing a result the request left open and
+  waits, under the boundary's own context, until that close or an operation
+  still running frees the connection, then commits or rolls back. When that
+  context ends first, commit fails and rollback runs anyway, which closes the
+  busy connection.
+- A result whose `Scan` or `Values` fails gives the transaction back with the
+  error, since pgx closes such rows.
 
 Queries of one request on one datasource therefore run one after the other
 and all see the request's uncommitted writes. `LargeObjects` and `Conn` reach
@@ -61,7 +65,10 @@ begins and owns its own transaction.
 
 - A query issued while the same goroutine still holds open rows on the same
   pool waits until its context ends, where it used to fail at once with
-  `conn busy`. Close or drain the rows first, or read the nested result
-  through `Autocommit`.
+  `conn busy`. Under `go.putnami.dev/http` that is the request deadline, nine
+  tenths of the write timeout; a WebSocket, Server-Sent Events, gRPC or Connect
+  request, or a context with no deadline, waits for good while holding the
+  connection. Close or drain the rows first, or read the nested result through
+  `Autocommit`.
 - Inside a unit of work, concurrent queries on one datasource take turns; only
   `Autocommit` reads, or queries on different datasources, run in parallel.
