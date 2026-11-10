@@ -169,7 +169,7 @@
           "path": "cloud/extension/internal/deliverycli/queue_rules.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "a38a90153f496c4eff8d8b9d945c0b891ce7dd04d64290eaa8cbfd379f48abe0"
+          "fingerprint": "337ac7697c09dd1eb3daede300be11214af1abbafc2829da1336bc481f5561d3"
         }
       ],
       "owner": "@putnami/cloud-extension",
