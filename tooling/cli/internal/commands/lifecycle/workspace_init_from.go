@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -54,8 +55,8 @@ var initPromptInput io.Reader = os.Stdin
 // previewInitSync runs the workspace sync tasks as a dry run with, as
 // parameters, the mode and the extensions --apply would declare. Swapped in
 // tests.
-var previewInitSync = func(ctx context.Context, root string, cfg *wsproto.Config, mode string, declares []string, env LifecycleEnv) error {
-	params := initPreviewParams(mode, declares)
+var previewInitSync = func(ctx context.Context, root string, cfg *wsproto.Config, mode string, declares, imports []string, env LifecycleEnv) error {
+	params := initPreviewParams(mode, declares, imports)
 	result, err := runWorkspaceJob(ctx, env, WorkspaceJobRequest{
 		WorkspaceRoot: root,
 		Config:        cfg,
@@ -77,14 +78,18 @@ var previewInitSync = func(ctx context.Context, root string, cfg *wsproto.Config
 }
 
 // initPreviewParams are the parameters of the preview's sync tasks: a dry
-// run, the mode, and the extensions --apply would declare.
-func initPreviewParams(mode string, declares []string) map[string]any {
+// run, the mode, the extensions --apply would declare and, when not nil, the
+// import list it would record.
+func initPreviewParams(mode string, declares, imports []string) map[string]any {
 	params := map[string]any{"dryRun": true}
 	if mode != "" {
 		params[initModeOption] = mode
 	}
 	if len(declares) > 0 {
 		params[initDeclaredParam] = slices.Clone(declares)
+	}
+	if imports != nil {
+		params[initImportOption] = slices.Clone(imports)
 	}
 	return params
 }
@@ -101,11 +106,110 @@ func (s initSource) offersBothModes() bool {
 }
 
 // extensionsFor are the extensions a workspace adopted in mode declares: the
-// tool's, then the ones its import mode hands targets to.
-func (s initSource) extensionsFor(mode string) []string {
+// tool's, then the ones its import mode hands targets to, which a delegated
+// workspace that imports some projects declares too.
+func (s initSource) extensionsFor(mode string, imports bool) []string {
 	out := []string{s.starter.packageName}
-	if mode == initModeImport {
+	if mode == initModeImport || imports {
 		out = append(out, s.importExtensions...)
+	}
+	return out
+}
+
+// initImportOption is the member of the extension's workspace options that
+// lists the projects a delegated workspace imports.
+const initImportOption = "import"
+
+// splitImportFlag reads one --import value: comma-separated project paths.
+// An empty item is kept, so the check names it.
+func splitImportFlag(value string) []string {
+	var out []string
+	for _, item := range strings.Split(value, ",") {
+		out = append(out, strings.TrimSpace(item))
+	}
+	return out
+}
+
+// importKey is the form two import entries are compared in: without the
+// leading / or ./, cleaned. ok is false for an entry that names no project
+// directory under the workspace root or is no valid pattern.
+func importKey(entry string) (string, bool) {
+	trimmed := strings.TrimSpace(entry)
+	key := path.Clean(strings.TrimPrefix(strings.TrimPrefix(trimmed, "/"), "./"))
+	if trimmed == "" || key == "." || key == ".." || strings.HasPrefix(key, "../") {
+		return "", false
+	}
+	if _, err := path.Match(key, ""); err != nil {
+		return "", false
+	}
+	return key, true
+}
+
+// validateInitImport checks --import against --from and --mode before
+// anything is written.
+func validateInitImport(flags initFlags, source initSource) error {
+	if !flags.importSet {
+		return nil
+	}
+	if !source.importList {
+		return cmderr.Usagef("--import: --from %s keeps no import list; it adopts in %s", flags.from, strings.Join(source.modes, " or "))
+	}
+	if len(flags.imports) == 0 {
+		return cmderr.Usagef("--import needs project paths, such as --import /packages/pricing,/packages/billing")
+	}
+	for _, entry := range flags.imports {
+		if _, ok := importKey(entry); !ok {
+			return cmderr.Usagef("--import %q names no project directory under the workspace root", entry)
+		}
+	}
+	if flags.modeSet && flags.mode != initModeDelegate {
+		return cmderr.Usagef("--import selects the projects a delegated workspace imports; in %s mode every TypeScript project is imported already: give --mode %s", flags.mode, initModeDelegate)
+	}
+	return nil
+}
+
+// initImportList is the import list a run records: the recorded entries,
+// then each --import entry they do not hold yet, which added lists. Without
+// --import it is the recorded list. --import in a mode other than delegate
+// is a usage error.
+func initImportList(flags initFlags, mode string, recorded []string) (list, added []string, err error) {
+	list = slices.Clone(recorded)
+	if !flags.importSet {
+		return list, nil, nil
+	}
+	if mode != initModeDelegate {
+		return nil, nil, cmderr.Usagef("--import selects the projects a delegated workspace imports, and this workspace adopts in %s mode, where every TypeScript project is imported already", mode)
+	}
+	held := map[string]bool{}
+	for _, entry := range recorded {
+		if key, ok := importKey(entry); ok {
+			held[key] = true
+		}
+	}
+	for _, entry := range flags.imports {
+		key, _ := importKey(entry)
+		if held[key] {
+			continue
+		}
+		held[key] = true
+		list = append(list, entry)
+		added = append(added, entry)
+	}
+	return list, added, nil
+}
+
+// recordedInitImport reads the import list the workspace config records for
+// the extension.
+func recordedInitImport(cfg *wsproto.Config, extension string) []string {
+	if cfg == nil {
+		return nil
+	}
+	items, _ := cfg.Options[extension][initImportOption].([]any)
+	var out []string
+	for _, item := range items {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
 	}
 	return out
 }
@@ -122,8 +226,9 @@ func validateInitMode(flags initFlags, source initSource) error {
 }
 
 // resolveInitMode is the mode of an init --from run: --mode, else the mode
-// the workspace records, else the answer to the question in a terminal, else
-// import. A tool that offers one mode adopts in it.
+// the workspace records, else delegate with --import, else the answer to the
+// question in a terminal, else import. A tool that offers one mode adopts in
+// it.
 func resolveInitMode(flags initFlags, source initSource, recorded string) (string, error) {
 	if flags.modeSet {
 		return flags.mode, nil
@@ -133,6 +238,9 @@ func resolveInitMode(flags initFlags, source initSource, recorded string) (strin
 	}
 	if recorded != "" {
 		return recorded, nil
+	}
+	if flags.importSet {
+		return initModeDelegate, nil
 	}
 	if !initIsTerminal() {
 		return initModeImport, nil
@@ -172,15 +280,18 @@ func askInitMode(tool string, in io.Reader, out io.Writer) (string, error) {
 type initToolOptions struct {
 	// Mode is the adoption mode the extension's sync task reads.
 	Mode string `json:"mode"`
+	// Import lists the projects a delegated workspace imports.
+	Import []string `json:"import,omitempty"`
 }
 
 // initOptions is the `options` of a new workspace adopted from a tool that
-// offers both modes: the mode, under the tool's extension.
-func initOptions(source initSource, mode string) map[string]initToolOptions {
+// offers both modes: the mode and the import list, under the tool's
+// extension.
+func initOptions(source initSource, mode string, imports []string) map[string]initToolOptions {
 	if !source.offersBothModes() {
 		return nil
 	}
-	return map[string]initToolOptions{source.starter.packageName: {Mode: mode}}
+	return map[string]initToolOptions{source.starter.packageName: {Mode: mode, Import: imports}}
 }
 
 // recordedInitMode reads the mode the workspace config records for the
@@ -205,9 +316,13 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 	if err != nil {
 		return err
 	}
+	imports, addedImports, err := initImportList(flags, mode, recordedInitImport(cfg, ext))
+	if err != nil {
+		return err
+	}
 	declared := initDeclaredNames(wsRoot, cfg)
 	var missing []string
-	for _, e := range source.extensionsFor(mode) {
+	for _, e := range source.extensionsFor(mode, mode == initModeDelegate && len(imports) > 0) {
 		if !slices.Contains(declared, e) {
 			missing = append(missing, e)
 		}
@@ -224,8 +339,17 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 		}
 		iox.Fprintf(os.Stdout, "  %s: options[%q].%s %s → %s\n", wsproto.WorkspaceConfigFilename, ext, initModeOption, from, mode)
 	}
+	for _, e := range addedImports {
+		iox.Fprintf(os.Stdout, "  %s: options[%q].%s + %s\n", wsproto.WorkspaceConfigFilename, ext, initImportOption, e)
+	}
 	for _, e := range missing {
 		iox.Fprintf(os.Stdout, "  %s: extensions + %s\n", wsproto.WorkspaceConfigFilename, e)
+	}
+	// The preview's sync reads the list --apply would record; without
+	// --import it reads the recorded one.
+	var previewImports []string
+	if flags.importSet {
+		previewImports = imports
 	}
 
 	if !flags.apply {
@@ -235,18 +359,26 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 		if slices.Contains(declared, ext) {
 			iox.Fprintln(os.Stdout)
 			iox.Fprintf(os.Stdout, "  → Previewing the %s sync (nothing is written)…\n", flags.from)
-			if err := previewInitSync(ctx, wsRoot, cfg, mode, missing, env); err != nil {
+			if err := previewInitSync(ctx, wsRoot, cfg, mode, missing, previewImports, env); err != nil {
 				return protocolcli.WithNext(fmt.Errorf("preview the %s sync: %w", flags.from, err), "putnami projects sync --dry-run")
 			}
 		}
 		iox.Fprintln(os.Stdout)
 		iox.Fprintln(os.Stdout, "  Nothing was written. To record the mode and synchronize:")
-		iox.Fprintf(os.Stdout, "    putnami init --from %s --mode %s --apply\n", flags.from, mode)
+		if flags.importSet {
+			iox.Fprintf(os.Stdout, "    putnami init --from %s --mode %s --import %s --apply\n", flags.from, mode, strings.Join(flags.imports, ","))
+		} else {
+			iox.Fprintf(os.Stdout, "    putnami init --from %s --mode %s --apply\n", flags.from, mode)
+		}
 		return nil
 	}
 
-	if modeChanges || len(missing) > 0 {
-		if err := recordInitAdoption(wsRoot, ext, mode, missing, source.offersBothModes()); err != nil {
+	if modeChanges || len(missing) > 0 || len(addedImports) > 0 {
+		var record []string
+		if len(addedImports) > 0 {
+			record = imports
+		}
+		if err := recordInitAdoption(wsRoot, ext, mode, missing, source.offersBothModes(), record); err != nil {
 			return fmt.Errorf("record the %s adoption in %s: %w", flags.from, wsproto.WorkspaceConfigFilename, err)
 		}
 		iox.Fprintf(os.Stdout, "  ✓ %s updated\n", wsproto.WorkspaceConfigFilename)
@@ -299,9 +431,10 @@ func initDeclaredNames(wsRoot string, cfg *wsproto.Config) []string {
 	return out
 }
 
-// recordInitAdoption writes the mode and the missing extensions into the
-// workspace config, keeping every other member and its order.
-func recordInitAdoption(wsRoot, ext, mode string, missing []string, recordMode bool) error {
+// recordInitAdoption writes the mode, the missing extensions and, when not
+// nil, the import list into the workspace config, keeping every other member
+// and its order.
+func recordInitAdoption(wsRoot, ext, mode string, missing []string, recordMode bool, imports []string) error {
 	path := wsproto.ResolveFile(wsRoot, wsproto.WorkspaceConfigFilename)
 	raw, err := jsonutil.ReadFile(path)
 	if err != nil {
@@ -336,6 +469,9 @@ func recordInitAdoption(wsRoot, ext, mode string, missing []string, recordMode b
 			options.Set(ext, layer)
 		}
 		layer.Set(initModeOption, mode)
+		if imports != nil {
+			layer.Set(initImportOption, stringsToAny(imports))
+		}
 	}
 	return jsonutil.WriteFile(path, raw)
 }

@@ -429,7 +429,7 @@ Initialize a new workspace, or adopt the repository it runs in: declare and inst
 **Usage**
 
 ```
-putnami init [--workspace <name>] [--extension <language>[,<language>...] | --from <bazel|moon|nx|pants|rush|turbo> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+putnami init [--workspace <name>] [--extension <language>[,<language>...] | --from <bazel|moon|nx|pants|rush|turbo> [--mode <import|delegate>] [--import <path>,<path>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 ```
 
 **Flags**
@@ -440,6 +440,7 @@ putnami init [--workspace <name>] [--extension <language>[,<language>...] | --fr
 | `--extension` <languages> | Languages to declare, such as rust or rust,java (ts and py name typescript and python): each one's extension is installed, and its projects synchronized when the repository holds its markers |
 | `--from` <bazel|moon|nx|pants|rush|turbo> | Turn the repository a monorepo tool describes into a workspace: declare the tool's extension and synchronize its packages as projects; rerun in the workspace to preview what would change |
 | `--mode` <import|delegate> | With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate) |
+| `--import` <path>,<path> | With --from nx or turbo in delegate mode: add project paths or globs to the projects the delegated workspace imports, and declare @putnami/typescript |
 | `--apply` | With --from in an existing workspace: record the mode and synchronize, instead of previewing |
 | `--project` <name> | Create an initial project from the starter of the first --extension language |
 | `--project-path` <path> | Workspace-relative path for the initial project |
@@ -461,6 +462,7 @@ putnami init [--workspace <name>] [--extension <language>[,<language>...] | --fr
 - `putnami init --from nx --mode import --apply`
 - `putnami init --from moon --mode delegate`
 - `putnami init --from turbo --mode delegate`
+- `putnami init --from nx --import /packages/pricing --apply`
 - `putnami init --from rush --mode delegate`
 
 ### `putnami workspace describe`

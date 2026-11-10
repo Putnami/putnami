@@ -306,6 +306,7 @@ complete -c putnami -n '__putnami_seen_path init' -l 'channel' -d 'Resolve the e
 complete -c putnami -n '__putnami_seen_path init' -l 'extension' -d 'Languages to declare, such as rust or rust,java (ts and py name typescript and python): each one\'s extension is installed, and its projects synchronized when the repository holds its markers' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'force' -d 'Reinitialize an existing workspace'
 complete -c putnami -n '__putnami_seen_path init' -l 'from' -d 'Turn the repository a monorepo tool describes into a workspace: declare the tool\'s extension and synchronize its packages as projects; rerun in the workspace to preview what would change' -a 'bazel moon nx pants rush turbo' -x
+complete -c putnami -n '__putnami_seen_path init' -l 'import' -d 'With --from nx or turbo in delegate mode: add project paths or globs to the projects the delegated workspace imports, and declare @putnami/typescript' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'mode' -d 'With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)' -a 'delegate import' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'project' -d 'Create an initial project from the starter of the first --extension language' -x
 complete -c putnami -n '__putnami_seen_path init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r
@@ -355,6 +356,7 @@ complete -c putnami -n '__putnami_seen_path workspace init' -l 'channel' -d 'Res
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'extension' -d 'Languages to declare, such as rust or rust,java (ts and py name typescript and python): each one\'s extension is installed, and its projects synchronized when the repository holds its markers' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'force' -d 'Reinitialize an existing workspace'
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'from' -d 'Turn the repository a monorepo tool describes into a workspace: declare the tool\'s extension and synchronize its packages as projects; rerun in the workspace to preview what would change' -a 'bazel moon nx pants rush turbo' -x
+complete -c putnami -n '__putnami_seen_path workspace init' -l 'import' -d 'With --from nx or turbo in delegate mode: add project paths or globs to the projects the delegated workspace imports, and declare @putnami/typescript' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'mode' -d 'With --from: import hands the targets Putnami can map to its runner and cache, delegate keeps the tool running each target with its cache (default: asked in a terminal, else import; Bazel and Pants delegate)' -a 'delegate import' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'project' -d 'Create an initial project from the starter of the first --extension language' -x
 complete -c putnami -n '__putnami_seen_path workspace init' -l 'project-path' -d 'Workspace-relative path for the initial project' -r

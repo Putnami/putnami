@@ -58,7 +58,7 @@ func TestParseInitFlagsReadsTheChannel(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := parseInitFlags(tt.args); got != tt.want {
+			if got := parseInitFlags(tt.args); !reflect.DeepEqual(got, tt.want) {
 				t.Fatalf("parseInitFlags(%v) = %+v, want %+v", tt.args, got, tt.want)
 			}
 		})
