@@ -56,7 +56,7 @@
     },
     {
       "id": "provides-the-sdk",
-      "text": "When no SDK on PATH satisfies global.json, a task uses one under <PutnamiHome>/tools/dotnet for its platform: the one the policy picks among those installed, with no network; else from the release metadata the stated SDK for disable, patch or none, the latest patch of the stated or next feature band for feature, minor and major, the highest for latest ones, the latest of 10.0 with no global.json, with the runtimes of every channel from 8.0 up to it, checked by SHA-512. Offline, none."
+      "text": "When no SDK on PATH satisfies global.json, a task uses one under <PutnamiHome>/tools/dotnet: the one the policy picks among those installed, with no network; else from the release metadata the extension pins the stated SDK for disable, patch or none, the latest patch of the stated or next feature band for feature, minor and major, the highest for latest ones, the latest of 10.0 with no global.json, with the runtimes of every channel from 8.0 up to it, each checked by its pinned SHA-512. Offline, none."
     },
     {
       "id": "serves-an-application",

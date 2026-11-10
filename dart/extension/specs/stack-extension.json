@@ -8,7 +8,7 @@
     "The test task reads the JUnit report tojunit writes and the package's LCOV report into the test and coverage summary",
     "lint reads the package's code, manifests and lockfiles and no test file, so a change under test/ reruns test alone",
     "A package overrides any value of the Dart profile in its putnami.json, and the override reaches the cache key",
-    "A task whose Dart or Flutter SDK is missing or outside the pubspec constraint installs the newest stable release in it under the Putnami home, and the test task installs tojunit and format_coverage, so a repository runs on a machine with no SDK",
+    "A task whose Dart or Flutter SDK is missing or outside the pubspec constraint installs the newest release the extension pins in it under the Putnami home, and the test task installs tojunit and format_coverage, so a repository runs on a machine with no SDK",
     "workspace-fetch, workspace-install, deps-upgrade, run and serve fetch, resolve, upgrade, run and serve the packages the way pub, dart and flutter do, and lint checks the documentation links",
     "putnami package and publish produce the image of a Dart server application: the executable serve starts, compiled ahead of time for Linux on a digest-pinned glibc distroless base, pushed to the workspace's OCI registry"
   ],
@@ -52,7 +52,7 @@
     },
     {
       "id": "installs-the-sdk",
-      "text": "When the dart or flutter on PATH is missing, or it or its bundled Dart is outside the pubspec constraints, a task that is not offline installs the newest stable release the constraints admit, Dart from the dart-archive and Flutter from its release manifest, each checked against the SHA-256 the publisher states, under the Putnami home, and runs it. An SDK on PATH that satisfies the constraints runs, and nothing is installed."
+      "text": "When the dart or flutter on PATH is missing, or it or its bundled Dart is outside the pubspec constraints, a task that is not offline installs the newest release the extension pins that the constraints admit, Dart from the dart-archive and Flutter from its publisher, each checked against the SHA-256 the extension pins, under the Putnami home, and runs it. An SDK on PATH that satisfies the constraints runs, and nothing is installed."
     },
     {
       "id": "installs-the-test-tools",
