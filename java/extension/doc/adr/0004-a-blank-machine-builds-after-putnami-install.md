@@ -4,6 +4,8 @@
 - **Date**: 2026-11-10
 - **Scope**: `@putnami/java`, its toolchain, its Gradle and Maven steps and
   its `workspace-install`
+- **Amended by**: [ADR 0005](0005-an-android-build-gets-the-sdk-the-workspace-accepts.md),
+  which installs the Android SDK once the workspace accepts its licenses
 
 ## Context
 
