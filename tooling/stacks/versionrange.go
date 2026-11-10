@@ -217,7 +217,7 @@ var (
 const pubSyntax = "pub-syntax"
 
 // parseStated reads a version a file states, in the dialect: Composer's
-// syntax, or pub's for a Dart or Flutter SDK constraint (ADR 0008).
+// syntax, or pub's for a Dart or Flutter SDK constraint (ADR 0013).
 func (t Toolchain) parseStated(version, dialect string) (versionRange, bool) {
 	if dialect != "" {
 		version = pubZeroCaret.ReplaceAllString(version, ">=0.0.$1 <0.1.0")

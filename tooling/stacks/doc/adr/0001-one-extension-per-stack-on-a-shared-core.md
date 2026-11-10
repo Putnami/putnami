@@ -52,6 +52,6 @@ reports. Its conformance kit holds each extension's manifest to its profile.
   freely.
 - A component whose stack root is neither the workspace root nor its own
   directory is left out with `stacks.stack_root_unsupported`. Amended by
-  [ADR 0002](0002-a-nested-stack-root-is-an-input-only-project.md): it now
+  [ADR 0012](0012-a-nested-stack-root-is-an-input-only-project.md): it now
   depends on the project at its stack root, and is left out only when no such
   project exists or the edge would close a cycle.

@@ -11,8 +11,12 @@ Putnami adopts a tool in one of two modes:
 - **Delegate**: a build system with its own hermetic cache keeps it. Putnami
   runs the tool on each affected package and reads its reports, and caches
   nothing for those tasks.
-- **Import**: a task runner's projects become Putnami projects, and Putnami's
-  runner and cache take over its tasks.
+- **Import**: Putnami's runner and cache take over the tasks a Putnami
+  extension can map, and every other task keeps running through the tool.
+  What an import maps depends on the tool: every Rush project, each moon
+  project whose language has a Putnami extension, and in Nx and Turborepo
+  only a TypeScript project's targets whose script already runs `bun build`,
+  `bun test` or Biome. Each tool's section below gives the exact scope.
 
 | Tool | Mode | Command |
 |---|---|---|
@@ -262,6 +266,11 @@ target: `@putnami/nx:test` when a `bun test` script moves to
 entries. The output lists each target Putnami does not run itself, such as
 `serve`, `e2e` or a `jest` test, with the reason.
 
+In import mode, `@putnami/typescript`'s workspace install writes the root
+`package.json` with the projects as `workspaces` and installs them with Bun,
+recorded in `bun.lock`: the repository's npm, pnpm or yarn lockfile and its
+install are no longer used.
+
 ### Switch mode, or see what a sync would change
 
 Rerun `init` in the workspace. It shows the diff of each `putnami.json` and
@@ -352,7 +361,10 @@ task, such as `api:dev`: it keeps running through moon.
 In import mode, `putnami init --from moon` writes `@putnami/typescript` in
 the `putnami.json` of a TypeScript project, declares the extension in the
 workspace and installs it; a project in a language with no Putnami extension
-stays on `@putnami/moon`.
+stays on `@putnami/moon`. `@putnami/typescript`'s workspace install then
+writes the root `package.json` with the projects as `workspaces` and installs
+them with Bun, recorded in `bun.lock`: the repository's npm, pnpm or yarn
+lockfile and its install are no longer used.
 
 Commit the files: they are the project graph Putnami selects on. Run
 `init --from moon` again later to see what the sync would change, and
@@ -429,9 +441,9 @@ putnami init --from turbo
 In a terminal, `init` asks the mode:
 
 ```text
-  How should Putnami adopt the turbo packages?
-    1) Import (preselected): Putnami's runner and cache take over the packages
-    2) Delegate: the tool keeps running each package, and keeps its cache
+  How should Putnami adopt this turbo repository?
+    1) import    Putnami's runner and cache take over the targets it can map (default)
+    2) delegate  turbo keeps running each target, with its cache
   Mode [1]:
 ```
 

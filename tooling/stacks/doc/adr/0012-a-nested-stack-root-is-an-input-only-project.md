@@ -1,4 +1,4 @@
-# ADR 0002 — A nested stack root is an input-only project
+# ADR 0012 — A nested stack root is an input-only project
 
 - **Status**: accepted
 - **Date**: 2026-11-08

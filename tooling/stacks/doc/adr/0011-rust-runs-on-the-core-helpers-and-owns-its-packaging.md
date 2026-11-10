@@ -40,8 +40,9 @@ and it refuses a path dependency with no version.
 - **A root step knows its component.** `RootStep` carries the component's name
   and the version its first toolchain check expects, so a job of the extension
   installs the same Rust the tasks select.
-- **Packaging stays in `@putnami/rust`.** The core gets no `package` or
-  `publish` until a second stack needs the same shape.
+- **Packaging stays in `@putnami/rust`**, as PHP's and Java's stay in their
+  extensions. The core gets no `package` or `publish` until a second stack
+  needs the same shape.
 - **`package` compiles with `cargo zigbuild`**, pinned by SHA-256 per platform
   with zig, and always with the Rust the extension installs, because adding a
   target needs rustup. A Linux target names glibc 2.36.
@@ -68,8 +69,10 @@ and it refuses a path dependency with no version.
   machine's glibc and needs a cross linker on macOS.
 - **`Cargo.toml` as the version source.** A publish would fail until someone
   edits the file for each release.
-- **`package` and `publish` in the core.** Rust is the first stack with them;
-  a shared shape would be guessed from one case.
+- **`package` and `publish` in the core.** PHP and Java shipped them first,
+  each in its own extension, with an application image through the shared
+  Docker publisher. Rust adds crates and release archives, which no other
+  stack ships: a shared shape would be guessed from one case.
 
 ## Consequences
 

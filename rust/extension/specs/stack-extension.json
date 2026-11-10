@@ -105,7 +105,7 @@
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
-    "tooling/stacks/doc/adr/0002-a-nested-stack-root-is-an-input-only-project.md",
+    "tooling/stacks/doc/adr/0012-a-nested-stack-root-is-an-input-only-project.md",
     "tooling/stacks/doc/adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md",
     "tooling/stacks/doc/adr/0011-rust-runs-on-the-core-helpers-and-owns-its-packaging.md"
   ]

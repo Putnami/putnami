@@ -97,9 +97,14 @@ These built-in commands manage workspace infrastructure:
 - `putnami workspace init` — Initialize a new workspace in the current directory
   - `--project <name>` — Scaffold an initial project
   - `--project-path <path>` — Custom path for the initial project
-  - `--channel <name>` — Resolve the extensions, the template and the starter's dependencies on one release channel (default: `PUTNAMI_CHANNEL`, then the channel the CLI was installed from, then `latest`). See [`workspace`](../cli/doc/03-commands.md#workspace)
+  - `--channel <name>` — Resolve the extensions, the template and the starter's dependencies on one release channel (default: `PUTNAMI_CHANNEL`, then the channel the CLI was installed from, then `latest`). See [`workspace`](https://github.com/Putnami/putnami/blob/main/tooling/cli/doc/03-commands.md#workspace)
 - `putnami workspace describe` — Show workspace configuration
 - `putnami init` — Alias for `workspace init`
+- `putnami init --from <tool>` — Turn a repository that Pants, Bazel, Nx, moon, Turborepo or Rush describes into a workspace: each of the tool's packages becomes a project
+  - `--mode import|delegate` — For Nx, moon, Turborepo and Rush: `import` lets Putnami's runner and cache take over the targets it can map, `delegate` keeps the tool running each target with its cache. Without it, a rerun keeps the recorded mode; a first run asks in a terminal, with `import` preselected, and imports otherwise
+  - `--apply` — Rerun in a workspace that exists, `init --from` prints what the sync and the mode change would write, and writes nothing; `--apply` records the mode, installs the extensions it needs and synchronizes the projects
+
+  See [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo) and the [`workspace` reference](https://github.com/Putnami/putnami/blob/main/tooling/cli/doc/03-commands.md#workspace)
 
 ### `putnami projects`
 

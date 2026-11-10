@@ -828,7 +828,7 @@ func (t Toolchain) CompareWith(expected Expected, machine string, matches func(e
 		return Verdict{Code: CodeToolchainUnpinned, Message: fmt.Sprintf("no toolchain file states the expected version (machine: %s): the cache key carries no toolchain version", machine)}
 	}
 	// A dialect reads a constraint a file states; toolchain.version, set by
-	// the profile or a project, reads plain (ADR 0008).
+	// the profile or a project, reads plain (ADR 0013).
 	dialect := t.Ranges
 	switch {
 	case expected.Source == "profile":
