@@ -17,9 +17,7 @@ import (
 	"strings"
 	"time"
 
-	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
-	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -37,8 +35,6 @@ const (
 	installedMarker = ".putnami-installed"
 	// sdkPrefix starts the folder of an installed SDK, then its version.
 	sdkPrefix = "sdk-"
-	// stagingPrefix starts a folder an installation works in.
-	stagingPrefix = "download-"
 	// minRuntimeChannel is the oldest channel whose runtime an installation
 	// adds: the oldest one the extension pins an image for.
 	minRuntimeChannel = "8.0"
@@ -166,12 +162,11 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 	if !ok {
 		return stacks.Provided{}, fmt.Errorf("the extension installs no .NET SDK on %s", hostPlatform)
 	}
-	base, release, err := lockedHome()
+	base, release, err := stacks.LockedToolsHome("dotnet")
 	if err != nil {
 		return stacks.Provided{}, err
 	}
 	defer release()
-	removeStaging(base)
 	if version, ok := installedSDK(base, expected, rid); ok {
 		return provided(filepath.Join(base, sdkFolder(version, rid))), nil
 	}
@@ -190,7 +185,7 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 // provided is the dotnet of the SDK installed at dir.
 func provided(dir string) stacks.Provided {
 	return stacks.Provided{
-		Executable: filepath.Join(dir, "dotnet"+executableSuffix()),
+		Executable: filepath.Join(dir, "dotnet"+stacks.ExecutableSuffix(hostPlatform)),
 		Env: []string{
 			"DOTNET_ROOT=" + dir,
 			"DOTNET_MULTILEVEL_LOOKUP=0",
@@ -460,7 +455,7 @@ func archiveFormat(name string) pinnedarchive.Format {
 // the shared frameworks of each runtime beside it, and moves the result to
 // dir, through a staging folder under base.
 func install(ctx context.Context, base string, plan installPlan, dir string) error {
-	staging, err := os.MkdirTemp(base, stagingPrefix+"*")
+	staging, err := os.MkdirTemp(base, "download-*")
 	if err != nil {
 		return err
 	}
@@ -523,20 +518,6 @@ func mergeShared(runtimeRoot, root string) error {
 		}
 	}
 	return nil
-}
-
-// removeStaging deletes the staging folders an interrupted installation left;
-// the caller holds the lock every installation takes.
-func removeStaging(base string) {
-	entries, err := os.ReadDir(base)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		if e.IsDir() && strings.HasPrefix(e.Name(), stagingPrefix) {
-			_ = os.RemoveAll(filepath.Join(base, e.Name()))
-		}
-	}
 }
 
 // download writes the body at url to path and checks its SHA-512.
@@ -608,30 +589,4 @@ func get(ctx context.Context, url string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("get %s: %s", url, resp.Status)
 	}
 	return resp.Body, nil
-}
-
-// lockedHome returns the extension's folder under the Putnami home, holding the
-// lock every install of the machine takes, and the function that releases it.
-func lockedHome() (string, func(), error) {
-	home := putnamihome.Resolve(os.Getenv)
-	if home == "" {
-		return "", nil, fmt.Errorf("no Putnami home: set %s", putnamihome.Env)
-	}
-	base := filepath.Join(home, "tools", "dotnet")
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		return "", nil, err
-	}
-	lock, err := filelock.Acquire(filepath.Join(base, ".lock"), true, false)
-	if err != nil {
-		return "", nil, fmt.Errorf("lock %s: %w", base, err)
-	}
-	return base, func() { _ = lock.Release() }, nil
-}
-
-// executableSuffix is the suffix of an executable on the host.
-func executableSuffix() string {
-	if strings.HasPrefix(hostPlatform, "windows/") {
-		return ".exe"
-	}
-	return ""
 }

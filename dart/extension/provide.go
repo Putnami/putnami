@@ -14,13 +14,10 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
-	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
-	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -69,7 +66,7 @@ func Provide(ctx context.Context, toolchain stacks.Toolchain, expected []stacks.
 	if len(expected) != len(checks) {
 		return stacks.Provided{}, fmt.Errorf("%d expected versions for %d toolchain checks", len(expected), len(checks))
 	}
-	base, release, err := lockedHome()
+	base, release, err := stacks.LockedToolsHome("dart")
 	if err != nil {
 		return stacks.Provided{}, err
 	}
@@ -97,7 +94,7 @@ func provideDart(ctx context.Context, base string, checks []stacks.Toolchain, ex
 	}
 	admitted := func(version string) bool { return admits(checks[0], expected[0], version) }
 	executable := func(dir string) string {
-		return filepath.Join(dir, "dart-sdk", "bin", "dart"+executableSuffix())
+		return filepath.Join(dir, "dart-sdk", "bin", "dart"+stacks.ExecutableSuffix(hostPlatform))
 	}
 	if dir, ok := installed(base, "dart-sdk-", "-"+platform, admitted); ok {
 		return stacks.Provided{Executable: executable(dir)}, nil
@@ -254,7 +251,7 @@ func provideFlutter(ctx context.Context, base string, checks []stacks.Toolchain,
 		if r.Channel != "stable" || arch != platform.arch || !stableVersion.MatchString(r.Version) || !admitted(r.Version, r.Dart) {
 			continue
 		}
-		if chosen == nil || compareVersions(r.Version, chosen.Version) > 0 {
+		if chosen == nil || stacks.CompareVersions(r.Version, chosen.Version) > 0 {
 			chosen = &manifest.Releases[i]
 		}
 	}
@@ -337,34 +334,13 @@ func installed(base, prefix, suffix string, pass func(version string) bool) (str
 // newest returns the highest version that passes.
 func newest(versions []string, pass func(string) bool) (string, bool) {
 	sorted := slices.Clone(versions)
-	slices.SortFunc(sorted, func(a, b string) int { return compareVersions(b, a) })
+	slices.SortFunc(sorted, func(a, b string) int { return stacks.CompareVersions(b, a) })
 	for _, v := range sorted {
 		if pass(v) {
 			return v, true
 		}
 	}
 	return "", false
-}
-
-// compareVersions compares two dotted numeric versions.
-func compareVersions(a, b string) int {
-	as, bs := strings.Split(a, "."), strings.Split(b, ".")
-	for i := 0; i < len(as) || i < len(bs); i++ {
-		var x, y int
-		if i < len(as) {
-			x, _ = strconv.Atoi(as[i])
-		}
-		if i < len(bs) {
-			y, _ = strconv.Atoi(bs[i])
-		}
-		if x != y {
-			if x < y {
-				return -1
-			}
-			return 1
-		}
-	}
-	return 0
 }
 
 func describe(expected ...stacks.Expected) string {
@@ -406,38 +382,6 @@ func getJSON(ctx context.Context, address string, v any) error {
 		return err
 	}
 	return json.Unmarshal(body, v)
-}
-
-// lockedHome returns the extension's folder under the Putnami home, holding the
-// lock every install of the machine takes, and the function that releases it.
-func lockedHome() (string, func(), error) {
-	home := putnamihome.Resolve(os.Getenv)
-	if home == "" {
-		return "", nil, fmt.Errorf("no Putnami home: set %s", putnamihome.Env)
-	}
-	base := filepath.Join(home, "tools", "dart")
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		return "", nil, err
-	}
-	lock, err := filelock.Acquire(filepath.Join(base, ".lock"), true, false)
-	if err != nil {
-		return "", nil, fmt.Errorf("lock %s: %w", base, err)
-	}
-	// Under the lock, a staging directory belongs to an install that stopped.
-	if stale, err := filepath.Glob(filepath.Join(base, "download-*")); err == nil {
-		for _, dir := range stale {
-			_ = os.RemoveAll(dir)
-		}
-	}
-	return base, func() { _ = lock.Release() }, nil
-}
-
-// executableSuffix is the suffix of an executable on the host.
-func executableSuffix() string {
-	if strings.HasPrefix(hostPlatform, "windows/") {
-		return ".exe"
-	}
-	return ""
 }
 
 // errNoDart is the error of the test tools without a dart to activate them.

@@ -474,7 +474,7 @@ func publishCrate(c context.Context, ctx *pctx.Context, root stacks.RootStep, em
 				return fmt.Errorf("install the Rust of the dry run: %w", err)
 			}
 			bin := filepath.Dir(provided.Executable)
-			cargo = filepath.Join(bin, "cargo"+executableSuffix())
+			cargo = filepath.Join(bin, "cargo"+stacks.ExecutableSuffix(hostPlatform))
 			env = prependPath(append(withoutRustupEnv(env), provided.Env...), bin)
 		}
 	}

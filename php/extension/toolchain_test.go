@@ -7,6 +7,7 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/stacks"
 )
 
 func resolved(t *testing.T, root, platform, committed string) *wsproto.LockToolchainEntry {
@@ -15,7 +16,7 @@ func resolved(t *testing.T, root, platform, committed string) *wsproto.LockToolc
 	if committed != "" {
 		request.Locked = map[string]wsproto.LockToolchainEntry{LockIdentity: {Version: committed}}
 	}
-	result := answerToolchainResolve(root, request, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(root, request, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if resolution, ok := result.Toolchains[LockIdentity]; ok {
 		return resolution.Pin
 	}
@@ -86,7 +87,7 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 		Locked:     map[string]wsproto.LockToolchainEntry{LockIdentity: *pin},
 		Platform:   "windows/arm64",
 	}
-	result := answerToolchainResolve(root, request, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(root, request, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if kept := result.Toolchains[LockIdentity].Pin; kept == nil || !reflect.DeepEqual(*kept, *pin) {
 		t.Errorf("a platform with no archive keeps the committed pin as committed: %+v", kept)
 	}
@@ -120,7 +121,7 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 }
 
 func TestToolchainResolveRefusesAnIdentityItDoesNotPin(t *testing.T) {
-	result := answerToolchainResolve(t.TempDir(), wsproto.ToolchainResolveRequest{Identities: []string{"go"}, Platform: "linux/amd64"}, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(t.TempDir(), wsproto.ToolchainResolveRequest{Identities: []string{"go"}, Platform: "linux/amd64"}, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if result.Toolchains["go"].Problem == nil {
 		t.Errorf("another identity is a problem: %+v", result)
 	}

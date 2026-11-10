@@ -11,13 +11,10 @@ import (
 	"regexp"
 	"runtime"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
-	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
-	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -99,7 +96,7 @@ func Provide(ctx context.Context, toolchain stacks.Toolchain, expected []stacks.
 	if !ok {
 		return stacks.Provided{}, fmt.Errorf("no Swift is installed on %s, only on %s: put swift on PATH", hostPlatform, strings.Join(supportedPlatforms(), ", "))
 	}
-	base, release, err := lockedHome()
+	base, release, err := stacks.LockedToolsHome("swift")
 	if err != nil {
 		return stacks.Provided{}, err
 	}
@@ -209,7 +206,7 @@ func (h swiftlyHome) newest(admitted func(string) bool, finished bool) (string, 
 		if _, err := os.Stat(h.marker(e.Name())); finished && err != nil {
 			continue
 		}
-		if best == "" || compareVersions(version, bestVersion) > 0 {
+		if best == "" || stacks.CompareVersions(version, bestVersion) > 0 {
 			best, bestVersion = e.Name(), version
 		}
 	}
@@ -265,48 +262,6 @@ func withoutSwiftlyEnv(env []string) []string {
 		}
 	}
 	return out
-}
-
-// compareVersions orders two dotted numeric versions.
-func compareVersions(a, b string) int {
-	as, bs := strings.Split(a, "."), strings.Split(b, ".")
-	for i := range max(len(as), len(bs)) {
-		var x, y int
-		if i < len(as) {
-			x, _ = strconv.Atoi(as[i])
-		}
-		if i < len(bs) {
-			y, _ = strconv.Atoi(bs[i])
-		}
-		if x != y {
-			return x - y
-		}
-	}
-	return 0
-}
-
-// lockedHome returns the extension's folder under the Putnami home, holding the
-// lock every install of the machine takes, and the function that releases it.
-func lockedHome() (string, func(), error) {
-	home := putnamihome.Resolve(os.Getenv)
-	if home == "" {
-		return "", nil, fmt.Errorf("no Putnami home: set %s", putnamihome.Env)
-	}
-	base := filepath.Join(home, "tools", "swift")
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		return "", nil, err
-	}
-	lock, err := filelock.Acquire(filepath.Join(base, ".lock"), true, false)
-	if err != nil {
-		return "", nil, fmt.Errorf("lock %s: %w", base, err)
-	}
-	// A download an interrupted install left behind.
-	if stale, err := filepath.Glob(filepath.Join(base, "download-*")); err == nil {
-		for _, dir := range stale {
-			_ = os.RemoveAll(dir)
-		}
-	}
-	return base, func() { _ = lock.Release() }, nil
 }
 
 // provideSwiftly returns the path of the pinned swiftly, downloading it when it

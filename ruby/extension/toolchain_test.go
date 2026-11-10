@@ -20,7 +20,7 @@ func resolved(t *testing.T, root, platform, committed string) *wsproto.LockToolc
 	if committed != "" {
 		request.Locked = map[string]wsproto.LockToolchainEntry{LockIdentity: {Version: committed}}
 	}
-	result := answerToolchainResolve(root, request, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(root, request, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if resolution, ok := result.Toolchains[LockIdentity]; ok {
 		return resolution.Pin
 	}
@@ -176,7 +176,7 @@ func olderThan(a, b string) bool {
 }
 
 func TestToolchainResolveRefusesAnIdentityItDoesNotPin(t *testing.T) {
-	result := answerToolchainResolve(t.TempDir(), wsproto.ToolchainResolveRequest{Identities: []string{"go"}, Platform: "linux/amd64"}, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(t.TempDir(), wsproto.ToolchainResolveRequest{Identities: []string{"go"}, Platform: "linux/amd64"}, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if result.Toolchains["go"].Problem == nil {
 		t.Errorf("another identity is a problem: %+v", result)
 	}

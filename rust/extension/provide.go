@@ -11,9 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
-	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -122,7 +120,7 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 	if err != nil {
 		return stacks.Provided{}, err
 	}
-	base, release, err := lockedHome()
+	base, release, err := stacks.LockedToolsHome("rust")
 	if err != nil {
 		return stacks.Provided{}, err
 	}
@@ -175,7 +173,7 @@ func toolchainPaths(base, channel, triple string) (string, string, stacks.Provid
 	name := channel + "-" + triple
 	toolchain := filepath.Join(rustupHome, "toolchains", name)
 	return rustupHome, toolchain, stacks.Provided{
-		Executable: filepath.Join(toolchain, "bin", "rustc"+executableSuffix()),
+		Executable: filepath.Join(toolchain, "bin", "rustc"+stacks.ExecutableSuffix(hostPlatform)),
 		// A cargo proxy of the machine's rustup, which cargo finds in
 		// ~/.cargo/bin before PATH, must answer with this toolchain too.
 		Env: []string{"RUSTUP_HOME=" + rustupHome, "RUSTUP_TOOLCHAIN=" + name},
@@ -190,7 +188,7 @@ func Tools(ctx context.Context, task string, _ stacks.Metadata, env []string, in
 	}
 	var missing []tool
 	for _, t := range testTools {
-		if !onPath(env, t.binary+executableSuffix()) {
+		if !onPath(env, t.binary+stacks.ExecutableSuffix(hostPlatform)) {
 			missing = append(missing, t)
 		}
 	}
@@ -201,7 +199,7 @@ func Tools(ctx context.Context, task string, _ stacks.Metadata, env []string, in
 	if !ok {
 		return nil, fmt.Errorf("the test tools are not installed on %s: put cargo-nextest and cargo-llvm-cov on PATH", hostPlatform)
 	}
-	base, release, err := lockedHome()
+	base, release, err := stacks.LockedToolsHome("rust")
 	if err != nil {
 		return nil, err
 	}
@@ -209,7 +207,7 @@ func Tools(ctx context.Context, task string, _ stacks.Metadata, env []string, in
 	dirs := make([]string, 0, len(missing))
 	for _, t := range missing {
 		dir := filepath.Join(base, t.binary+"-"+t.version)
-		binary := filepath.Join(dir, t.binary+executableSuffix())
+		binary := filepath.Join(dir, t.binary+stacks.ExecutableSuffix(hostPlatform))
 		pin := pinnedarchive.Pin{URL: t.url(triple), SHA256: t.digests[hostPlatform], Format: pinnedarchive.TarGz}
 		installed, err := pinnedarchive.Install(ctx, pin, dir, pinnedarchive.Options{Limits: pinnedarchive.DefaultLimits(), Complete: func(candidate string) bool {
 			_, statErr := os.Stat(filepath.Join(candidate, filepath.Base(binary)))
@@ -226,24 +224,6 @@ func Tools(ctx context.Context, task string, _ stacks.Metadata, env []string, in
 	return dirs, nil
 }
 
-// lockedHome returns the extension's folder under the Putnami home, holding the
-// lock every install of the machine takes, and the function that releases it.
-func lockedHome() (string, func(), error) {
-	home := putnamihome.Resolve(os.Getenv)
-	if home == "" {
-		return "", nil, fmt.Errorf("no Putnami home: set %s", putnamihome.Env)
-	}
-	base := filepath.Join(home, "tools", "rust")
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		return "", nil, err
-	}
-	lock, err := filelock.Acquire(filepath.Join(base, ".lock"), true, false)
-	if err != nil {
-		return "", nil, fmt.Errorf("lock %s: %w", base, err)
-	}
-	return base, func() { _ = lock.Release() }, nil
-}
-
 // provideRustup returns the path of the pinned rustup, downloading it when it
 // is missing. rustup-init is rustup under another name: it dispatches on the
 // name it runs as.
@@ -252,7 +232,7 @@ func provideRustup(ctx context.Context, base, triple string) (string, error) {
 	if !ok {
 		return "", fmt.Errorf("no rustup is pinned for %s", hostPlatform)
 	}
-	path := filepath.Join(base, "rustup-"+rustupVersion, "rustup"+executableSuffix())
+	path := filepath.Join(base, "rustup-"+rustupVersion, "rustup"+stacks.ExecutableSuffix(hostPlatform))
 	if _, err := os.Stat(path); err == nil {
 		return path, nil
 	}
@@ -269,7 +249,7 @@ func provideRustup(ctx context.Context, base, triple string) (string, error) {
 	defer cancel()
 	// pinnedarchive.Download does not open the file, so the format it
 	// requires says nothing of a binary.
-	pin := pinnedarchive.Pin{URL: rustupURL(triple, executableSuffix()), SHA256: digest, Format: pinnedarchive.TarGz}
+	pin := pinnedarchive.Pin{URL: rustupURL(triple, stacks.ExecutableSuffix(hostPlatform)), SHA256: digest, Format: pinnedarchive.TarGz}
 	if err := pinnedarchive.Download(ctx, pin, stage, pinnedarchive.Options{}); err != nil {
 		return "", fmt.Errorf("download rustup %s: %w", rustupVersion, err)
 	}
@@ -277,14 +257,6 @@ func provideRustup(ctx context.Context, base, triple string) (string, error) {
 		return "", err
 	}
 	return path, robustio.Rename(stage, path)
-}
-
-// executableSuffix is the suffix of an executable on the host.
-func executableSuffix() string {
-	if strings.HasPrefix(hostPlatform, "windows/") {
-		return ".exe"
-	}
-	return ""
 }
 
 // onPath reports whether a directory of the PATH of env holds name.
