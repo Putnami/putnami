@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"slices"
 	"strings"
 	"testing"
@@ -129,6 +130,8 @@ type initFromCalls struct {
 	installed []string
 	synced    *wsproto.Config
 	previewed []string
+	// declares are the extensions each preview was told --apply declares.
+	declares [][]string
 }
 
 func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
@@ -147,8 +150,9 @@ func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
 		calls.synced = cfg
 		return nil
 	}
-	previewInitSync = func(_ context.Context, _ string, _ *wsproto.Config, mode string, _ LifecycleEnv) error {
+	previewInitSync = func(_ context.Context, _ string, _ *wsproto.Config, mode string, declares []string, _ LifecycleEnv) error {
 		calls.previewed = append(calls.previewed, mode)
+		calls.declares = append(calls.declares, declares)
 		return nil
 	}
 	initIsTerminal = func() bool { return terminal }
@@ -363,6 +367,56 @@ func TestInitFromRerunPreviewsAndWritesOnlyWithApply(t *testing.T) {
 	}
 	if cfg := readInitConfig(t, dir); !slices.Equal(cfg.Extensions, []string{"@putnami/nx", "@putnami/typescript"}) || cfg.Options["@putnami/nx"].Mode != "import" {
 		t.Errorf("workspace config = %+v", cfg)
+	}
+}
+
+func TestInitFromPreviewReadsTheExtensionsApplyDeclaresAsDeclared(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-rerun-shows-a-diff", "init-from-rerun-previews-and-writes-only-with-apply")
+	dir := nxRepository(t)
+	delegateOnly := `{"name": "shop", "extensions": ["@putnami/nx"], "options": {"@putnami/nx": {"mode": "delegate"}}}`
+	if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(delegateOnly), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// A switch to import previews the sync with @putnami/typescript, which
+	// --apply declares before it syncs, and writes nothing.
+	calls := stubInitFrom(t, false, "")
+	out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--mode", "import"}, LifecycleEnv{})
+	})
+	if err != nil || !slices.Equal(calls.previewed, []string{"import"}) || len(calls.declares) != 1 || !slices.Equal(calls.declares[0], []string{"@putnami/typescript"}) {
+		t.Fatalf("err %v, previewed %v with %v\n%s", err, calls.previewed, calls.declares, out)
+	}
+	if !strings.Contains(out, "extensions + @putnami/typescript") {
+		t.Errorf("the preview names the extension --apply declares:\n%s", out)
+	}
+	if data, _ := os.ReadFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename)); string(data) != delegateOnly {
+		t.Errorf("a preview wrote %s", data)
+	}
+
+	// The preview's sync tasks receive them as a parameter beside the mode.
+	want := map[string]any{"dryRun": true, "mode": "import", "declaredExtensions": []string{"@putnami/typescript"}}
+	if got := initPreviewParams("import", calls.declares[0]); !reflect.DeepEqual(got, want) {
+		t.Errorf("preview params = %v, want %v", got, want)
+	}
+	if got := initPreviewParams("delegate", nil); !reflect.DeepEqual(got, map[string]any{"dryRun": true, "mode": "delegate"}) {
+		t.Errorf("a preview that declares nothing passes no extension: %v", got)
+	}
+
+	// --apply declares the extension the preview read as declared.
+	calls = stubInitFrom(t, false, "")
+	if out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--mode", "import", "--apply"}, LifecycleEnv{})
+	}); err != nil || calls.synced == nil || !slices.Contains(calls.synced.Extensions.Names(), "@putnami/typescript") {
+		t.Fatalf("err %v, synced %+v\n%s", err, calls.synced, out)
+	}
+
+	// Once the workspace declares it, the preview passes no extension.
+	calls = stubInitFrom(t, false, "")
+	if out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx"}, LifecycleEnv{})
+	}); err != nil || len(calls.declares) != 1 || len(calls.declares[0]) != 0 {
+		t.Fatalf("err %v, declares %v\n%s", err, calls.declares, out)
 	}
 }
 

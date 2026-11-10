@@ -36,7 +36,11 @@ every later `putnami projects sync` rewrites the projects' `putnami.json`.
   eslint or tsc target, or one an Nx executor runs, stays on Nx and is
   listed.
 - A rerun of `init` without `--apply` runs the workspace sync tasks with
-  `dryRun`, prints what they would change, and writes nothing.
+  `dryRun`, prints what they would change, and writes nothing. It passes the
+  extensions `--apply` would declare in a `declaredExtensions` parameter,
+  which the sync reads as declared beside the workspace's: a switch to
+  import mode, or a first import, previews the targets that move to
+  `@putnami/typescript` although the workspace does not declare it yet.
 
 ## Rejected alternatives
 

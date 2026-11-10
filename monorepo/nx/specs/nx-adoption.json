@@ -21,7 +21,7 @@
     },
     {
       "id": "sync-writes-the-project-graph",
-      "text": "The workspace sync task writes in each Nx project's putnami.json the extension, the project IDs it depends on, and in disable.jobs each of build, test and lint the project has no target for; it owns those entries and their @putnami/nx: and @putnami/typescript: forms. It reads the mode from options[\"@putnami/nx\"].mode, import by default, retracts a former project, rewrites a file only when a member it owns changes, and with dryRun writes nothing and reports each diff."
+      "text": "The workspace sync task writes in each Nx project's putnami.json the extension, the project IDs it depends on, and in disable.jobs each of build, test and lint the project has no target for, owning those entries and their @putnami/nx: and @putnami/typescript: forms. It reads the mode from options[\"@putnami/nx\"].mode, import by default, retracts a former project, rewrites a file only when a member it owns changes, and with dryRun writes nothing and reports each diff; it reads declaredExtensions as declared."
     },
     {
       "id": "import-maps-typescript-targets",

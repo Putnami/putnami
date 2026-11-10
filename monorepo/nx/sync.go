@@ -42,6 +42,12 @@ const (
 // records the mode putnami init picked.
 const ModeOption = "mode"
 
+// DeclaredParam is the parameter of the sync job that lists extensions to
+// read as declared beside the ones the workspace config lists: those a rerun
+// of putnami init --from would declare before its sync, so that its dry run
+// previews what the sync writes once they are.
+const DeclaredParam = "declaredExtensions"
+
 // Diagnostic codes of the sync.
 const (
 	// CodeSyncFailed is a sync that failed and wrote nothing.
@@ -67,6 +73,9 @@ type SyncOptions struct {
 	Mode string
 	// DryRun computes the changes and writes nothing.
 	DryRun bool
+	// Declared are extensions the sync reads as declared, beside the ones
+	// the workspace config lists.
+	Declared []string
 }
 
 // Unmapped is a target the sync does not hand to a Putnami task of its own.
@@ -158,7 +167,7 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	for _, dir := range former {
 		components[wsproto.ProjectIDFromPath(dir)] = true
 	}
-	typeScript := declaresExtension(root, TypeScriptExtension)
+	typeScript := slices.Contains(opts.Declared, TypeScriptExtension) || declaresExtension(root, TypeScriptExtension)
 	for _, p := range detection.Projects {
 		plan := planProject(root, p, mode, typeScript)
 		result.Unmapped = append(result.Unmapped, plan.unmapped...)
@@ -782,13 +791,19 @@ func exists(root, rel string) bool {
 }
 
 // RunSync is the job of the workspace sync task: Sync on the workspace root
-// in the mode of the mode parameter, else the recorded one. With the dryRun
+// in the mode of the mode parameter, else the recorded one, reading the
+// extensions of the declaredExtensions parameter as declared. With the dryRun
 // parameter it writes nothing and prints the diff of each file it would
 // change.
 func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	dry := ctx.Params.Bool("dryRun", false)
 	mode := ctx.Params.String(ModeOption)
-	result, err := Sync(context.Background(), ctx.WorkspaceRoot, SyncOptions{Mode: mode, DryRun: dry})
+	declared, err := stringsParam(ctx.Params, DeclaredParam)
+	if err != nil {
+		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
+		return "FAILED", nil, errors.New(CodeSyncFailed)
+	}
+	result, err := Sync(context.Background(), ctx.WorkspaceRoot, SyncOptions{Mode: mode, DryRun: dry, Declared: declared})
 	if err != nil {
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
@@ -799,6 +814,30 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 	}
 	report(emit, result, dry)
 	return "OK", map[string]any{"mode": result.Mode, "written": result.Written, "retracted": result.Retracted, "unmapped": result.Unmapped, "dryRun": dry}, nil
+}
+
+// stringsParam reads a parameter that is a list of strings: a JSON array, or
+// a comma-separated string, as a flag gives it. An absent parameter reads as
+// empty.
+func stringsParam(params pctx.Params, key string) ([]string, error) {
+	raw, ok := params[key]
+	if !ok {
+		return nil, nil
+	}
+	var list []string
+	if json.Unmarshal(raw, &list) == nil {
+		return list, nil
+	}
+	var text string
+	if json.Unmarshal(raw, &text) != nil {
+		return nil, fmt.Errorf("the %s parameter is %s, not a list of extension names", key, raw)
+	}
+	for _, name := range strings.Split(text, ",") {
+		if name = strings.TrimSpace(name); name != "" {
+			list = append(list, name)
+		}
+	}
+	return list, nil
 }
 
 // report prints the summary, each unmapped target as a warning and, in a dry

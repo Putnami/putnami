@@ -43,7 +43,7 @@
     },
     {
       "id": "init-rerun-shows-a-diff",
-      "text": "Rerun in a workspace that already exists, putnami init --from <tool> runs the workspace sync tasks as a dry run with the mode it resolves, prints what each would change and the mode change, and writes nothing. With --apply it records the mode and runs putnami projects sync."
+      "text": "Rerun in a workspace that already exists, putnami init --from <tool> runs the workspace sync tasks as a dry run with the mode it resolves and the extensions --apply would declare, which each reads as declared, so it prints what --apply would change and the mode change, and writes nothing. With --apply it records the mode and runs putnami projects sync."
     },
     {
       "id": "nx-impact-runs-through-nx",
