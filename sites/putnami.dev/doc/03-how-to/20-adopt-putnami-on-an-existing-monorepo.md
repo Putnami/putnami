@@ -634,17 +634,17 @@ the result.
 
 ## Next
 
-- [Run a Pants repository with Putnami](https://github.com/Putnami/putnami/blob/main/integrations/pants/doc/01-pants.md):
+- [Run a Pants repository with Putnami](/docs/monorepo-tools/pants):
   every command, the version check, what the sync owns.
-- [Run a Bazel workspace with Putnami](https://github.com/Putnami/putnami/blob/main/integrations/bazel/doc/01-bazel.md):
+- [Run a Bazel workspace with Putnami](/docs/monorepo-tools/bazel):
   every command, the version check, what the sync owns.
-- [Run a Nx repository with Putnami](https://github.com/Putnami/putnami/blob/main/integrations/nx/doc/01-nx.md):
+- [Run a Nx repository with Putnami](/docs/monorepo-tools/nx):
   both modes, what the sync owns, which targets import maps.
-- [Run a moon workspace with Putnami](https://github.com/Putnami/putnami/blob/main/integrations/moon/doc/01-moon.md):
+- [Run a moon workspace with Putnami](/docs/monorepo-tools/moon):
   the two modes, task matching, reports, what the sync owns.
-- [Run a Turborepo repository with Putnami](https://github.com/Putnami/putnami/blob/main/integrations/turbo/doc/01-turbo.md):
+- [Run a Turborepo repository with Putnami](/docs/monorepo-tools/turbo):
   the two modes, what the sync owns, the test reports.
-- [Adopt a Rush repository](https://github.com/Putnami/putnami/blob/main/integrations/rush/doc/01-rush.md):
+- [Adopt a Rush repository](/docs/monorepo-tools/rush):
   both modes, what the sync writes, the test reports.
 - [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci): the
   report on a pull request, before you adopt anything.

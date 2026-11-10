@@ -1,20 +1,21 @@
 /**
- * Publish the generated `/docs/support` page into the docs tree.
+ * Publish the pages generated from the reviewed catalog into the docs tree: the
+ * `/docs/support` page and the `/docs/languages` page.
  *
- * Idempotent by construction: the page is a pure function of the reviewed
+ * Idempotent by construction: each page is a pure function of the reviewed
  * `putnami.support.json`, so running this twice in one build writes identical
  * bytes. That matters because it IS run twice, for the same reason content
  * bundles are:
  *
  * - the web generate hook asks the docs page for its static paths BEFORE the
- *   application generate hook runs, so the page must already be on disk or a
- *   cold build would enumerate one page fewer than every later build and emit a
+ *   application generate hook runs, so the pages must already be on disk or a
+ *   cold build would enumerate fewer pages than every later build and emit a
  *   different `putnami.http-routes.v1` digest;
- * - the application generate hook then runs again to register the file as a
- *   build asset, because a file written into `.gen` and never registered is not
+ * - the application generate hook then runs again to register the files as
+ *   build assets, because a file written into `.gen` and never registered is not
  *   copied to `dist/` and 404s in the packaged image.
  *
- * The page is written ONLY under `.gen/public/docs`. Mirroring it into the
+ * The pages are written ONLY under `.gen/public/docs`. Mirroring one into the
  * source `public/docs` would make the staticFiles plugin declare a route the
  * public-surface plugin also declares, which fails the route inventory with
  * `http_routes.duplicate_route` (see `assertNoSourceMirror`). The docs nav and
@@ -27,6 +28,7 @@ import { dirname } from 'node:path';
 import { getProjectRoot, getWorkspaceRoot, joinPath } from '@putnami/utils';
 import { renderSupportPage } from './catalog';
 import { readSupportCatalog } from './catalog.server';
+import { renderLanguagesPage } from './languages';
 
 /**
  * Docs section hosting the generated page. The `NN-` prefix is what the docs
@@ -39,6 +41,16 @@ export const SUPPORT_SECTION = '10-support';
 /** Build-output-relative path of the generated page. */
 export const SUPPORT_PAGE_DIST_PATH = joinPath('public', 'docs', SUPPORT_SECTION, 'index.md');
 
+/**
+ * Docs section whose index is the generated languages page. The stack
+ * extension references are copied beside it by `generate.assets`; none of those
+ * copies targets the index.
+ */
+export const LANGUAGES_SECTION = '11-languages';
+
+/** Build-output-relative path of the generated languages page. */
+export const LANGUAGES_PAGE_DIST_PATH = joinPath('public', 'docs', LANGUAGES_SECTION, 'index.md');
+
 export interface PublishSupportPageOptions {
   projectRoot?: string;
   workspaceRoot?: string;
@@ -47,12 +59,13 @@ export interface PublishSupportPageOptions {
 export interface PublishedSupportPage {
   /** Generate assets to return from a plugin, keyed by dist-relative path. */
   assets: Record<string, string>;
-  /** Absolute path written under `.gen`. */
+  /** Absolute path of the support page written under `.gen`. */
   genPath: string;
 }
 
 /**
- * Render the reviewed catalog and write the page to both roots.
+ * Render the reviewed catalog into the support page and the languages page, and
+ * write both under `.gen`.
  *
  * An unreadable or invalid catalog throws, failing the build. Publishing a page
  * that silently omitted reviewed statuses would understate a public commitment,
@@ -61,11 +74,17 @@ export interface PublishedSupportPage {
 export function publishSupportPage(options: PublishSupportPageOptions = {}): PublishedSupportPage {
   const projectRoot = options.projectRoot ?? getProjectRoot();
   const workspaceRoot = options.workspaceRoot ?? getWorkspaceRoot();
-  const page = renderSupportPage(readSupportCatalog(workspaceRoot));
+  const catalog = readSupportCatalog(workspaceRoot);
 
-  const genPath = joinPath(projectRoot, '.gen', SUPPORT_PAGE_DIST_PATH);
+  const genPath = writeGenerated(projectRoot, SUPPORT_PAGE_DIST_PATH, renderSupportPage(catalog));
+  const languagesPath = writeGenerated(projectRoot, LANGUAGES_PAGE_DIST_PATH, renderLanguagesPage(catalog));
+
+  return { assets: { [SUPPORT_PAGE_DIST_PATH]: genPath, [LANGUAGES_PAGE_DIST_PATH]: languagesPath }, genPath };
+}
+
+function writeGenerated(projectRoot: string, distPath: string, page: string): string {
+  const genPath = joinPath(projectRoot, '.gen', distPath);
   mkdirSync(dirname(genPath), { recursive: true });
   writeFileSync(genPath, page);
-
-  return { assets: { [SUPPORT_PAGE_DIST_PATH]: genPath }, genPath };
+  return genPath;
 }

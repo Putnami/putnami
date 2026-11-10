@@ -49,6 +49,7 @@ var declaredDomains = []string{
 	"protocols",
 	"public-docs",
 	"sdd",
+	"stacks",
 	"typescript-framework",
 }
 
@@ -192,9 +193,11 @@ var expectedEvidenceRows = []evidenceRow{
 	{Project: "/sites/putnami.dev", Import: "public-docs.application-runtime.v1", Mode: "reference"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.go-framework-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.method-documentation.v1", Mode: "snapshot"},
+	{Project: "/sites/putnami.dev", Import: "public-docs.monorepo-tool-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.observe-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.protocol-contracts.v1", Mode: "reference"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.python-surface-documentation.v1", Mode: "snapshot"},
+	{Project: "/sites/putnami.dev", Import: "public-docs.stack-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.typescript-framework-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/putnami.dev", Import: "public-docs.workspace-documentation.v1", Mode: "snapshot"},
 	{Project: "/sites/telemetry.putnami.dev", Import: "observability.application-runtime.v1", Mode: "reference"},
@@ -368,7 +371,7 @@ func TestEvidenceBelongsToTheProjectThatClaimsIt(t *testing.T) {
 // already emits. Once a domain implements one import, every ACTIVE import it
 // declares is expected to be implemented too — partial adoption inside an
 // opted-in domain is exactly what that check catches. A domain that emits
-// nothing is honest and stays outside coverage, which is why eight of the ten
+// nothing is honest and stays outside coverage, which is why nine of the eleven
 // domains here are absent from this assertion rather than failing it.
 func TestEvidenceAdoptionIsAtomicPerDomain(t *testing.T) {
 	root := workspaceRoot(t)

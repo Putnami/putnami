@@ -9,6 +9,10 @@ machine has none.
 
 ## Adopt it
 
+`@putnami/dotnet` is not published yet: until its first release, `putnami init
+--extension dotnet` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
 1. At the root of the repository, run:
 
    ```bash
@@ -284,7 +288,7 @@ them, or the override also replaces `tasks.test.reports`. An override fails
 the task with `stacks.project_config_invalid` when it names an unknown member,
 changes `id` or `markers`, or adds a workspace-root input the extension does
 not declare. The design of the stack core is in
-[its design note](../../../tooling/stacks/doc/01-design.md).
+[its design note](https://github.com/Putnami/putnami/blob/main/tooling/stacks/doc/01-design.md).
 
 ## Limits
 

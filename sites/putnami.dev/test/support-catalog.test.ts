@@ -13,7 +13,8 @@ import {
   statusOf,
 } from '../src/lib/support/catalog';
 import { readSupportCatalog, SUPPORT_CATALOG_FILENAME } from '../src/lib/support/catalog.server';
-import { TOOL_ORDER, TOOLS, statusMeta } from '../src/lib/tools';
+import { renderLanguagesPage, UNCLASSIFIED_LABEL } from '../src/lib/support/languages';
+import { LANGUAGES, MONOREPO_TOOLS, type RunTarget, TOOL_ORDER, TOOLS, statusMeta } from '../src/lib/tools';
 
 /**
  * The reviewed catalog at the workspace root is the ONLY authority for a public
@@ -457,6 +458,111 @@ describe('support page rendering', () => {
         const ids = rows.filter((row) => row.kind === kind).map((row) => row.id);
         expect(ids).toEqual([...ids].sort((a, b) => a.localeCompare(b)));
       }
+    },
+  );
+});
+
+describe('languages page rendering', () => {
+  /** The row the page prints for one target: its link, its extension and its status cell. */
+  function languageRow(page: string, target: RunTarget): string | undefined {
+    return page
+      .split('\n')
+      .find((line) => line.startsWith(`| [${target.name}](${target.href}) | \`${target.extension}\` | `));
+  }
+
+  specTest(
+    'lists every language and monorepo tool once, linked to its reference',
+    {
+      feature: 'putnami-dev/public-documentation',
+      requirement: 'every-language-and-tool-is-published',
+      check: 'languages-page-lists-every-language-and-tool',
+    },
+    () => {
+      const page = renderLanguagesPage(reviewedCatalog());
+      // TypeScript, Go and Python, then the seven stack extensions; then the
+      // six monorepo tools.
+      expect(LANGUAGES.map((target) => target.extension)).toEqual([
+        '@putnami/typescript',
+        '@putnami/go',
+        '@putnami/python',
+        '@putnami/dart',
+        '@putnami/dotnet',
+        '@putnami/java',
+        '@putnami/php',
+        '@putnami/ruby',
+        '@putnami/rust',
+        '@putnami/swift',
+      ]);
+      expect(MONOREPO_TOOLS.map((target) => target.extension)).toEqual([
+        '@putnami/bazel',
+        '@putnami/moon',
+        '@putnami/nx',
+        '@putnami/pants',
+        '@putnami/rush',
+        '@putnami/turbo',
+      ]);
+      for (const target of [...LANGUAGES, ...MONOREPO_TOOLS]) {
+        const rows = page.split('\n').filter((line) => line.startsWith(`| [${target.name}](${target.href}) |`));
+        expect(rows).toHaveLength(1);
+      }
+      // TypeScript, Go and Python link the framework documentation the hub
+      // cards link; every other target links the reference this site copies.
+      for (const id of ['ts', 'go', 'py'] as const) {
+        expect(LANGUAGES.some((target) => target.href === TOOLS[id]?.href)).toBe(true);
+      }
+      expect(page).toContain('/docs/how-to/adopt-putnami-on-an-existing-monorepo');
+    },
+  );
+
+  specTest(
+    'reads each status from the reviewed catalog, through the subject tools.ts names',
+    {
+      feature: 'putnami-dev/published-support-catalog',
+      requirement: 'catalog-is-the-only-source',
+      check: 'languages-page-status-resolves-from-reviewed-catalog',
+    },
+    () => {
+      const catalog = reviewedCatalog();
+      const page = renderLanguagesPage(catalog);
+      for (const target of [...LANGUAGES, ...MONOREPO_TOOLS]) {
+        const status = statusOf(catalog, target.supportSubject);
+        expect(languageRow(page, target)).toEndWith(` ${status ? statusLabel(status) : UNCLASSIFIED_LABEL} |`);
+      }
+
+      // A reviewed entry reaches the page with no edit to the site: classify a
+      // subject in a copy of the catalog and the same render shows it.
+      const rust = LANGUAGES.find((target) => target.extension === '@putnami/rust') as RunTarget;
+      const reviewed: SupportCatalog = {
+        ...catalog,
+        entries: [
+          ...catalog.entries.filter((entry) => entry.id !== '@putnami/rust'),
+          { id: '@putnami/rust', kind: 'package', status: 'preview' },
+        ],
+      };
+      expect(languageRow(renderLanguagesPage(reviewed), rust)).toEndWith(' Preview |');
+      expect(renderLanguagesPage(catalog)).toBe(page);
+    },
+  );
+
+  specTest(
+    'shows no reviewed status for a language the catalog does not classify',
+    {
+      feature: 'putnami-dev/published-support-catalog',
+      requirement: 'unclassified-subject-shows-no-status',
+      check: 'unclassified-language-shows-no-reviewed-status',
+    },
+    () => {
+      const empty: SupportCatalog = { protocolVersion: 1, entries: [] };
+      const page = renderLanguagesPage(empty);
+      for (const target of [...LANGUAGES, ...MONOREPO_TOOLS]) {
+        expect(languageRow(page, target)).toEndWith(` ${UNCLASSIFIED_LABEL} |`);
+      }
+      // The page names no status of its own: every status word on it is a
+      // rendered cell, and the meaning of a missing one is on /docs/support.
+      for (const status of ['Stable', 'Preview', 'Experimental']) {
+        expect(page).not.toContain(status);
+      }
+      expect(page).toContain('[Support status](/docs/support)');
     },
   );
 });

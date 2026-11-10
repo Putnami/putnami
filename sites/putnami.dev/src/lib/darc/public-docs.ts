@@ -1,16 +1,18 @@
 /**
  * The runtime half of the `public-docs` domain's declared access.
  *
- * Each of the six repository-owned documentation sources becomes one
- * `Snapshot` from `@putnami/application`'s DARC runtime. The build OBSERVES a
- * source root — reads its markdown tree, digests it, and attaches that state
- * under its exact version — and then RESOLVES the section through
- * `Snapshot.latest()`. Everything the docs pipeline publishes for a section is
- * the file inventory `latest()` handed back, which is what makes the contract
- * enforcement rather than description:
+ * Each declared documentation import becomes one `Snapshot` from
+ * `@putnami/application`'s DARC runtime. The build OBSERVES the import's source
+ * roots — reads their markdown, digests it, and attaches that state under its
+ * exact version — and then RESOLVES each section through `Snapshot.latest()`.
+ * An import that governs several copies holds them as one set, attached only
+ * when every member was read. Everything the docs pipeline publishes for a
+ * section is the file inventory `latest()` handed back, which is what makes the
+ * contract enforcement rather than description:
  *
- * - a source that is gone is never attached, so `latest()` takes the declared
- *   `onMissing: fail-closed` and throws `DarcError('missing')`;
+ * - a source that is gone is never attached — nor is the set it belongs to — so
+ *   `latest()` takes the declared `onMissing: fail-closed` and throws
+ *   `DarcError('missing')`;
  * - a source whose bytes changed is a new version, and re-attaching an existing
  *   version with different content throws `DarcError('immutable')`;
  * - the record carries provenance (the producer export), the observation time,
@@ -27,9 +29,17 @@ import {
   APPLICATION_RUNTIME_FACT,
   APPLICATION_RUNTIME_IMPORT,
   DOCUMENTATION_SOURCES,
+  type DocumentationSourceContract,
   PROTOCOL_CONTRACTS_IMPORT,
 } from './documentation-contracts';
-import { type DocumentationTree, type DocumentationTreeReader, readDocumentationTree } from './documentation-tree';
+import {
+  composeDocumentationSet,
+  type DocumentationTree,
+  type DocumentationTreeReader,
+  documentationSetMember,
+  type ObservedDocumentationTree,
+  readDocumentationTree,
+} from './documentation-tree';
 
 /** Construction options. */
 export interface PublicDocumentationAccessOptions {
@@ -42,12 +52,14 @@ export interface PublicDocumentationAccessOptions {
 }
 
 /**
- * The `public-docs` domain's enforced contracts: six documentation snapshots,
- * one framework-runtime reference and one protocol-contract reference.
+ * The `public-docs` domain's enforced contracts: one snapshot per documentation
+ * import, one framework-runtime reference and one protocol-contract reference.
  */
 export class PublicDocumentationAccess {
+  /** One snapshot per documentation import, keyed by the import id. */
   private readonly snapshots = new Map<string, Snapshot<DocumentationTree>>();
-  private readonly declaredRoots = new Set<string>();
+  /** The import that governs each declared source root. */
+  private readonly governing = new Map<string, DocumentationSourceContract>();
   private readonly readTree: DocumentationTreeReader;
   /** The stable handle on the TypeScript framework runtime this site is built on. */
   readonly runtime: Reference;
@@ -57,8 +69,8 @@ export class PublicDocumentationAccess {
   constructor(options: PublicDocumentationAccessOptions = {}) {
     const clock = options.clock;
     for (const source of DOCUMENTATION_SOURCES) {
-      this.declaredRoots.add(source.sourceRoot);
-      this.snapshots.set(source.sourceRoot, new Snapshot<DocumentationTree>(source.contract, clock ? { clock } : {}));
+      this.snapshots.set(source.contract.id, new Snapshot<DocumentationTree>(source.contract, clock ? { clock } : {}));
+      for (const copy of source.copies) this.governing.set(copy.sourceRoot, source);
     }
     // Resolved on first read, not in the constructor: `getWorkspaceRoot()`
     // walks the filesystem, and a component built to inspect its contracts
@@ -71,30 +83,26 @@ export class PublicDocumentationAccess {
 
   /** Every component this domain enforces, snapshots first, in declaration order. */
   components(): DarcComponent[] {
-    return [
-      ...DOCUMENTATION_SOURCES.map((source) => this.snapshotFor(source.sourceRoot)),
-      this.runtime,
-      this.protocols,
-    ];
+    return [...DOCUMENTATION_SOURCES.map((source) => this.snapshotOf(source)), this.runtime, this.protocols];
   }
 
   /** Whether a `generate.assets` source root is governed by a declared import. */
   declares(sourceRoot: string): boolean {
-    return this.declaredRoots.has(sourceRoot);
+    return this.governing.has(sourceRoot);
   }
 
   /**
-   * Read one source root and attach what is there.
+   * Read every source root of the import that governs `sourceRoot`, and attach
+   * what is there.
    *
-   * A root the reader reports absent attaches nothing. That is the whole
+   * An import with one copy attaches that copy's tree. An import with several
+   * attaches their composed set, and only when the reader found every member. A
+   * root the reader reports absent therefore attaches nothing. That is the whole
    * mechanism: the refusal is produced by the declared contract at read time,
    * not by an `if` here.
    */
   observe(sourceRoot: string): void {
-    const snapshot = this.snapshotFor(sourceRoot);
-    const observed = this.readTree(sourceRoot);
-    if (!observed) return;
-    snapshot.attach(observed.version, observed.tree);
+    this.observeSource(this.sourceFor(sourceRoot));
   }
 
   /**
@@ -107,7 +115,7 @@ export class PublicDocumentationAccess {
    */
   observeAll(): void {
     for (const snapshot of this.snapshots.values()) snapshot.reset();
-    for (const source of DOCUMENTATION_SOURCES) this.observe(source.sourceRoot);
+    for (const source of DOCUMENTATION_SOURCES) this.observeSource(source);
   }
 
   /**
@@ -115,11 +123,12 @@ export class PublicDocumentationAccess {
    *
    * Throws `DarcError('missing')` when the source was never attached, because
    * the import declares `onMissing: fail-closed`. The record it returns carries
-   * the file inventory the docs pipeline publishes, plus the provenance,
-   * observation time and freshness verdict the contract requires.
+   * the file inventory the docs pipeline publishes for this one root, plus the
+   * provenance, observation time and freshness verdict the contract requires.
    */
   resolve(sourceRoot: string): DarcRecord<DocumentationTree> {
-    const record = this.snapshotFor(sourceRoot).latest();
+    const source = this.sourceFor(sourceRoot);
+    const record = this.snapshotOf(source).latest();
     if (!record) {
       // Unreachable while the contract declares fail-closed: latest() throws
       // before returning undefined. Stated rather than asserted so a future
@@ -129,7 +138,8 @@ export class PublicDocumentationAccess {
         `darc: documentation source ${sourceRoot} resolved to nothing; its import no longer declares onMissing fail-closed`,
       );
     }
-    return record;
+    if (source.copies.length === 1) return record;
+    return { ...record, value: documentationSetMember(record.value, sourceRoot) };
   }
 
   /** The framework runtime fact this site consumes, and the export that owns it. */
@@ -137,12 +147,28 @@ export class PublicDocumentationAccess {
     return this.runtime.fact(APPLICATION_RUNTIME_FACT);
   }
 
-  private snapshotFor(sourceRoot: string): Snapshot<DocumentationTree> {
-    const snapshot = this.snapshots.get(sourceRoot);
-    if (!snapshot) {
+  private observeSource(source: DocumentationSourceContract): void {
+    const members: ObservedDocumentationTree[] = [];
+    for (const copy of source.copies) {
+      const observed = this.readTree(copy.sourceRoot);
+      if (!observed) return;
+      members.push(observed);
+    }
+    const observed =
+      members.length === 1 ? (members[0] as ObservedDocumentationTree) : composeDocumentationSet(members);
+    this.snapshotOf(source).attach(observed.version, observed.tree);
+  }
+
+  private sourceFor(sourceRoot: string): DocumentationSourceContract {
+    const source = this.governing.get(sourceRoot);
+    if (!source) {
       throw new Error(`darc: ${sourceRoot} is not a declared public-docs documentation source`);
     }
-    return snapshot;
+    return source;
+  }
+
+  private snapshotOf(source: DocumentationSourceContract): Snapshot<DocumentationTree> {
+    return this.snapshots.get(source.contract.id) as Snapshot<DocumentationTree>;
   }
 }
 

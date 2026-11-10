@@ -4,7 +4,8 @@ Extensions teach the CLI new capabilities. Each extension provides commands — 
 
 ## Official extensions
 
-Putnami ships three language extensions:
+Three language extensions run projects with Putnami's own jobs and scaffold
+them from its templates:
 
 | Extension | Purpose | Commands | Details |
 |-----------|---------|----------|---------|
@@ -13,6 +14,25 @@ Putnami ships three language extensions:
 | `@putnami/python` | Python toolchain | test, lint, serve | [Python extension](/docs/frameworks/python/extension) |
 
 Each language extension page documents its commands, flags, caching behavior, and templates in full.
+
+Seven stack extensions run the other languages with the tools each repository
+already uses, and read the repository the way `putnami observe` does:
+
+| Extension | Runs | Reference |
+|-----------|------|-----------|
+| `@putnami/dart` | Dart and Flutter packages | [Dart and Flutter](/docs/languages/dart) |
+| `@putnami/dotnet` | C#, F# and Visual Basic projects | [.NET](/docs/languages/dotnet) |
+| `@putnami/java` | Gradle projects and Maven modules, in Java or Kotlin | [Java and Kotlin](/docs/languages/java) |
+| `@putnami/php` | Composer components, such as a Symfony application | [PHP](/docs/languages/php) |
+| `@putnami/ruby` | Rails applications, packwerk packs and local gems | [Ruby](/docs/languages/ruby) |
+| `@putnami/rust` | Cargo crates | [Rust](/docs/languages/rust) |
+| `@putnami/swift` | Swift packages and Xcode projects | [Swift](/docs/languages/swift) |
+
+Six more run a repository on the monorepo tool it already uses: `@putnami/bazel`,
+`@putnami/moon`, `@putnami/nx`, `@putnami/pants`, `@putnami/rush` and
+`@putnami/turbo`. See [Monorepo tools](/docs/monorepo-tools). Every language and
+tool, with the support status of its extension, is on
+[Languages and monorepo tools](/docs/languages).
 
 Beside them, three cross-language extensions serve every ecosystem:
 

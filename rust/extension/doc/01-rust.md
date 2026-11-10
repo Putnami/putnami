@@ -8,6 +8,10 @@ when the machine lacks them.
 
 ## Adopt it
 
+`@putnami/rust` is not published yet: until its first release, `putnami init
+--extension rust` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
 1. At the root of the repository, run:
 
    ```bash
@@ -115,7 +119,7 @@ a crate cargo's home lacks fails the step rather than reaching the network.
 An offline task installs no Rust and no test tool: a hosted run runs the
 `rustc`, cargo-nextest and cargo-llvm-cov on its runner's `PATH`. The choices
 behind these jobs are in
-[ADR 0001](adr/0001-cargo-runs-offline-from-the-fetched-home.md).
+[ADR 0001](https://github.com/Putnami/putnami/blob/main/rust/extension/doc/adr/0001-cargo-runs-offline-from-the-fetched-home.md).
 
 ## Crates and stack roots
 
@@ -354,7 +358,7 @@ the JUnit report and `{output}/lcov.info`, or the override also replaces
 `stacks.project_config_invalid` when it names an unknown member, changes `id`
 or `markers`, or adds a stack-root input the extension does not declare. The
 design of the stack core is in
-[its design note](../../../tooling/stacks/doc/01-design.md).
+[its design note](https://github.com/Putnami/putnami/blob/main/tooling/stacks/doc/01-design.md).
 
 ## The real-tool proof
 

@@ -1,12 +1,19 @@
 import { HttpResponse, endpoint } from '@putnami/application';
 import { type NavItem, toUrlPath } from '../../lib/docs/navigation';
 import { getNavTree } from '../../lib/docs/navigation.server';
+import { LANGUAGES, MONOREPO_TOOLS } from '../../lib/tools';
 
 const BASE_URL = 'https://putnami.dev';
 
+// The languages and tools come from the lists the languages page renders, so
+// this summary names exactly what that page lists.
 const SUMMARY =
   'Branch-native, local-first monorepo tooling. One workspace structure from laptop to preview to production, ' +
-  'documented as one site across Tooling, TypeScript, Go, the managed Platform surface, and Python. ' +
+  'documented as one site across Tooling, TypeScript, Go, the managed Platform surface, Python, and the other ' +
+  'languages and monorepo tools it runs. ' +
+  `Languages: ${LANGUAGES.map((target) => target.name).join(', ')}. ` +
+  `Monorepo tools: ${MONOREPO_TOOLS.map((target) => target.name).join(', ')}. ` +
+  `Each reference and the support status of its extension: ${BASE_URL}/docs/languages. ` +
   'Python is experimental, requires explicit opt-in, is never enabled by default, and carries no Go or TypeScript parity promise.';
 
 /** Flatten a nav subtree into `[title](absolute-url)` markdown bullets. */

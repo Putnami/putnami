@@ -114,6 +114,15 @@ TypeScript are the two full surfaces. Python is experimental: it requires an
 explicit workspace opt-in, is never enabled by default, and carries no Go or
 TypeScript parity promise.
 
+**The loop reaches repositories it did not create.** Stack extensions run Rust,
+Java and Kotlin, Swift, Dart, .NET, Ruby and PHP with the tools each repository
+already uses, and an integration puts a repository that Bazel, moon, Nx, Pants,
+Rush or Turborepo already describes under the same runner and verdict without
+rewriting its build. None of these extensions is published yet; each
+[reference](/docs/languages) says how a workspace loads it until its first
+release, and [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo)
+walks a repository through it.
+
 **The contracts are real and tested.** The protocol layer ships schemas,
 fixture corpora, and cross-language conformance — and the published
 [matrix](/docs/protocols) names, per contract, what is verified by test and what
@@ -135,3 +144,4 @@ as a reviewed catalog rendered on [Support status](/docs/support).
 - [Protocols](/docs/protocols) — how the constraints become checkable.
 - [Agents](/docs/agents) — what the contracts make possible.
 - [Getting started](/docs/getting-started) — the fastest way to disagree with any of this from experience.
+- [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo) — the same, on a repository you already have.
