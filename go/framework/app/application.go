@@ -62,10 +62,12 @@ type Application struct {
 //
 //	app := app.New("my-service")
 func New(name string) *Application {
-	return &Application{
+	a := &Application{
 		Module: NewModule(name),
 		log:    logger.Default().Named(name),
 	}
+	useDefaultPlugins(a.Module)
+	return a
 }
 
 // Run sets a custom runner function that executes after all plugins start.

@@ -19,6 +19,10 @@ PostConfigure -> Migrate -> Invoke -> Start -> OnStart**. On shutdown:
 **OnStop -> Stop -> DI close**. Describe mode has its own build-time contract and
 does not start runtime plugins.
 
+`RegisterDefaultPlugin` registers a factory whose plugin every `New` adds before
+the workload's own. A factory that returns nil adds nothing. See
+[Default Plugins](doc/getting-started.md#default-plugins).
+
 ## Modules
 
 Modules group plugins, DI providers, and sub-modules into a composable tree:

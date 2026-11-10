@@ -196,6 +196,37 @@ counter, _ := telemetry.Counter(meter, "http.requests_total",
 )
 ```
 
+## Default telemetry from the environment
+
+`FromEnvironment` returns the telemetry a service gets without wiring it. Register
+it once as a default plugin, and every `app.New` starts with it:
+
+```go
+func init() {
+    app.RegisterDefaultPlugin(func() app.Plugin {
+        return telemetry.FromEnvironment(telemetry.EnvironmentOptions{
+            BearerTokenSource: telemetry.NewGCPIDTokenSource, // optional
+        })
+    })
+}
+```
+
+It reads the standard OpenTelemetry variables:
+
+| Variable | Effect |
+|----------|--------|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector base URL. Without it, the factory returns nil and the application gets no plugin. |
+| `OTEL_SDK_DISABLED=true` | Turns the default telemetry off, whatever the endpoint says. |
+| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | Service identity on every metric and span. |
+
+The plugin adds `HTTPMiddleware` outermost on every HTTP server of the
+application, so a request that an inner middleware refuses is still counted. It
+builds the tracer and meter providers that push to the collector, unless the
+application installs its own `NewPlugin`: that plugin then owns the providers.
+A server that also adds `HTTPMiddleware` itself counts each request once. The
+plugin registers nothing in the DI container. See [ADR
+0003](adr/0003-telemetry-is-on-by-default-from-the-environment.md).
+
 ## HTTP Middleware
 
 The `HTTPMiddleware` function returns a middleware for `go.putnami.dev/http` that automatically traces every request and records two metrics:
@@ -245,7 +276,8 @@ This requires no manual instrumentation. Any code that creates errors via the `e
 
 See the [service telemetry specification](../specs/service-telemetry.json), the
 [push-transport ADR](adr/0001-push-otlp-json-without-an-exporter-sdk.md), the
-[span-ownership ADR](adr/0002-the-middleware-owns-the-span.md), and [support
+[span-ownership ADR](adr/0002-the-middleware-owns-the-span.md), the
+[default-telemetry ADR](adr/0003-telemetry-is-on-by-default-from-the-environment.md), and [support
 evidence](../README.md#support-and-contract). The package is stable and
 maintained, with the workspace's [pre-1.0 migration
 policy](../../../../RELEASE.md), not strict compatibility between every `0.x`

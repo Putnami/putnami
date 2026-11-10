@@ -31,6 +31,19 @@
           }
         },
         {
+          "id": "default-telemetry",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "activation-adds-the-telemetry-plugin-when-a-collector-is-set"
+            ]
+          }
+        },
+        {
           "id": "prepared-boot",
           "stage": "coded",
           "evidenceKinds": [

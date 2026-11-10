@@ -101,7 +101,8 @@
             "checks": [
               "middleware-is-composed-once-not-per-request",
               "middleware-runs-in-registration-order",
-              "middleware-that-skips-next-short-circuits"
+              "middleware-that-skips-next-short-circuits",
+              "an-outermost-middleware-sees-every-request-first"
             ]
           }
         },

@@ -4,6 +4,7 @@
   "executableRequirements": [
     "go/application-lifecycle#completed-startup-readiness",
     "go/application-lifecycle#darc-runtime-evidence",
+    "go/application-lifecycle#default-plugins",
     "go/application-lifecycle#describe",
     "go/application-lifecycle#no-source-claim",
     "go/application-lifecycle#phase-order",

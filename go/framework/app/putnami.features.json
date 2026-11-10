@@ -12,6 +12,20 @@
       "target": "modeled",
       "requirements": [
         {
+          "id": "default-plugins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "new-adds-each-default-plugin-before-the-workloads-own",
+              "a-factory-that-returns-nil-adds-nothing"
+            ]
+          }
+        },
+        {
           "id": "describe",
           "stage": "coded",
           "evidenceKinds": [

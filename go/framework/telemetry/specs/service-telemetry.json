@@ -58,6 +58,10 @@
     {
       "id": "lifecycle-purity",
       "text": "Reading the plugin's provider registrations has no side effect, configure installs the global providers exactly once per application lifetime, the plugin rebuilds cleanly after a stop, and the error-count bridge hook is removed on stop."
+    },
+    {
+      "id": "default-from-environment",
+      "text": "FromEnvironment returns no plugin unless OTEL_EXPORTER_OTLP_ENDPOINT is set and OTEL_SDK_DISABLED is not true. With only that environment, the HTTP server counts, times and traces every request and pushes them to the collector with the identity from OTEL_RESOURCE_ATTRIBUTES and the credential the options name. An explicit telemetry plugin owns the providers instead, and a request counts once even when the server also installs HTTPMiddleware."
     }
   ],
   "decisions": [

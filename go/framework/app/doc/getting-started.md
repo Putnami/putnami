@@ -131,6 +131,28 @@ a := app.New("my-service")
 a.Use(&MetricsPlugin{})
 ```
 
+### Default Plugins
+
+A package can register a plugin every application starts with. `New` calls each
+registered factory and adds the plugin it returns before the workload's own
+plugins. A factory that returns nil adds nothing, so it can check the
+environment first:
+
+```go
+func init() {
+    app.RegisterDefaultPlugin(func() app.Plugin {
+        if os.Getenv("FEATURE_ENDPOINT") == "" {
+            return nil
+        }
+        return &FeaturePlugin{}
+    })
+}
+```
+
+The registry is process-wide: register from `init()` of a package that the
+workload's main package imports, and keep each factory cheap, since it runs for
+every application.
+
 ## Modules
 
 Modules group plugins, DI providers, and sub-modules into composable units. They form a tree: each module may contain child modules and plugins.
