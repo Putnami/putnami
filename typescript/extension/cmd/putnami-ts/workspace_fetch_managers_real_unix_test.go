@@ -80,6 +80,9 @@ func TestEachRealManagerFetchesThenInstallsOffline(t *testing.T) {
 				manifest = `{"name":"fetch-fixture","private":true,"dependencies":{"@fake/marker":"1.0.0"}}`
 				writeProbeFile(t, filepath.Join(root, "pnpm-workspace.yaml"), "packages:\n  - pkgs/*\n")
 			}
+			// A pnpmfile the fetch must never load: it records that it ran.
+			writeProbeFile(t, filepath.Join(root, ".pnpmfile.cjs"),
+				"require('fs').writeFileSync(require('path').join(process.env.MARKER_WORKSPACE || __dirname, 'pnpmfile.marker'), 'ran')\nmodule.exports = { hooks: {} }\n")
 			writeProbeFile(t, filepath.Join(root, "package.json"), manifest)
 			writeProbeFile(t, filepath.Join(root, "pkgs", "a", "package.json"), `{"name":"a","version":"0.0.0","dependencies":{"@fake/plain":"2.0.0"}}`)
 			writeProbeFile(t, filepath.Join(root, ".npmrc"), "@fake:registry="+fakeRegistry.URL()+"\n")
@@ -94,7 +97,9 @@ func TestEachRealManagerFetchesThenInstallsOffline(t *testing.T) {
 			if out, err := author.CombinedOutput(); err != nil {
 				t.Fatalf("%s writes the lock: %v\n%s", tc.program, err, out)
 			}
-			for _, dir := range []string{"node_modules", "pkgs/a/node_modules"} {
+			// The author's own install loads the pnpmfile, as the repository's
+			// does; only the fetch must not.
+			for _, dir := range []string{"node_modules", "pkgs/a/node_modules", "pnpmfile.marker"} {
 				if err := os.RemoveAll(filepath.Join(root, dir)); err != nil {
 					t.Fatal(err)
 				}
@@ -132,7 +137,7 @@ func TestEachRealManagerFetchesThenInstallsOffline(t *testing.T) {
 			if served, refused := fakeRegistry.served.Load(), fakeRegistry.unauthorized.Load(); served == 0 || refused != 0 {
 				t.Fatalf("registry served %d and refused %d requests; want the handed bearer", served, refused)
 			}
-			for _, rel := range []string{"node_modules", "pkgs/a/node_modules", "postinstall.marker"} {
+			for _, rel := range []string{"node_modules", "pkgs/a/node_modules", "postinstall.marker", "pnpmfile.marker"} {
 				if _, err := os.Stat(filepath.Join(root, rel)); !os.IsNotExist(err) {
 					t.Errorf("workspace-fetch left %s in the workspace (%v)", rel, err)
 				}

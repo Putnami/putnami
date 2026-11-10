@@ -18,6 +18,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	distribution "go.putnami.dev/protocol/distribution"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/typescript/extension/internal/catalog"
 	"go.putnami.dev/typescript/extension/internal/pnpmworkspace"
@@ -61,7 +62,13 @@ func npmResolvedSource(setMode bool, target string) string {
 }
 
 func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
-	bunBin, err := resolveBunBin()
+	// The upgrade reinstalls with the package manager the workspace install
+	// runs (detectPackageManager), so it writes that manager's lockfile only.
+	manager, err := detectPackageManager(ctx.WorkspaceRoot)
+	if err != nil {
+		return "FAILED", nil, err
+	}
+	managerBin, err := resolveManagerBin(manager)
 	if err != nil {
 		return "FAILED", nil, err
 	}
@@ -71,7 +78,7 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 	dryRun := ctx.Params.Bool("dry-run", false, "dryRun")
 
 	// Everything below this line can reach the private registry: the dist-tag
-	// metadata request, then `bun install --force`. Refresh the credential once,
+	// metadata request, then the forced reinstall. Refresh the credential once,
 	// here, rather than at each of them.
 	refreshPutnamiNpmCredential(ctx, emit)
 
@@ -115,7 +122,7 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 	emit.PhaseStart("upgrade")
 	var transaction *npmUpgradeTransaction
 	if !dryRun {
-		transaction, err = beginNPMUpgradeTransaction(wsRoot)
+		transaction, err = beginNPMUpgradeTransaction(wsRoot, manager)
 		if err != nil {
 			emit.PhaseEnd("upgrade", "failed")
 			return "FAILED", nil, fmt.Errorf("snapshot npm metadata: %w", err)
@@ -132,7 +139,13 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 	emit.PhaseEnd("upgrade", "success")
 
 	emit.PhaseStart("install")
-	result, err := runBunWithTimeout("bun install", bunBin, []string{"install", "--force"}, wsRoot, bunNetworkTimeout)
+	install := workspaceInstallInvocation(manager, true, false)
+	label := manager.Name + " install"
+	var opts []exec.Option
+	if len(install.env) > 0 {
+		opts = append(opts, exec.Env(install.env))
+	}
+	result, err := runBunWithin(context.Background(), label, managerBin, install.args, wsRoot, bunNetworkTimeout, opts...)
 	if err != nil {
 		emit.PhaseEnd("install", "failed")
 		return "FAILED", nil, rollbackNPMUpgrade(transaction, err)
@@ -141,7 +154,7 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 	if !result.Success {
 		emit.PhaseEnd("install", "failed")
 		reportRegistryRefusal(emit, result.Stderr)
-		emit.Log("error", "bun install failed: "+result.Stderr)
+		emit.Log("error", label+" failed: "+result.Stderr)
 		if rollbackErr := rollbackNPMUpgrade(transaction, nil); rollbackErr != nil {
 			return "FAILED", nil, rollbackErr
 		}
@@ -215,17 +228,18 @@ type npmUpgradeFileSnapshot struct {
 	existed bool
 }
 
-// npmUpgradeTransaction closes the manifest and both Bun lockfile spellings as
-// one metadata unit. bun may create either lock format before failing, so an
-// absent pre-upgrade file is as important to remember as an existing one.
+// npmUpgradeTransaction closes the root manifest, pnpm-workspace.yaml and the
+// lockfiles of the workspace's package manager as one metadata unit. A manager
+// may create a lockfile before failing, so an absent pre-upgrade file is as
+// important to remember as an existing one.
 type npmUpgradeTransaction struct {
 	files  []npmUpgradeFileSnapshot
 	active bool
 }
 
-func beginNPMUpgradeTransaction(wsRoot string) (*npmUpgradeTransaction, error) {
+func beginNPMUpgradeTransaction(wsRoot string, manager packageManager) (*npmUpgradeTransaction, error) {
 	transaction := &npmUpgradeTransaction{active: true}
-	for _, name := range []string{"package.json", "bun.lock", "bun.lockb"} {
+	for _, name := range append([]string{"package.json", pnpmworkspace.File}, manager.lockfiles()...) {
 		path := filepath.Join(wsRoot, name)
 		info, err := os.Lstat(path)
 		switch {
@@ -622,7 +636,94 @@ func pinWorkspacePutnamiDepsWithVersions(wsRoot string, packages []string, versi
 	if cats := parseCatalogModel(pkg); cats.present() {
 		return pinViaCatalog(pkgPath, pkg, order, cats, packages, versions, dryRun, emit)
 	}
+	pnpmPath := pnpmWorkspaceFile(wsRoot)
+	if data, err := os.ReadFile(pnpmPath); err == nil {
+		pnpmCats, err := catalog.FromPNPMWorkspace(string(data))
+		if err != nil {
+			return err
+		}
+		if pnpmCats.Present() {
+			return pinViaPNPMCatalog(pkgPath, pkg, order, pnpmPath, string(data), pnpmCats, packages, versions, dryRun, emit)
+		}
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("read %s: %w", pnpmworkspace.File, err)
+	}
 	return pinViaDependencies(pkgPath, pkg, order, packages, versions, dryRun, emit)
+}
+
+// pinViaPNPMCatalog is pinViaCatalog for a pnpm workspace, whose catalogs
+// pnpm-workspace.yaml declares: each @putnami/* version is set in every
+// catalog that holds the package, in place, or added to the default catalog,
+// and the redundant root dependencies/overrides are removed. Every other line
+// of pnpm-workspace.yaml is kept.
+func pinViaPNPMCatalog(pkgPath string, pkg map[string]json.RawMessage, order []string, pnpmPath, text string, cats *catalog.Catalogs, packages []string, versions map[string]string, dryRun bool, emit *jsonl.Emitter) error {
+	changed := false
+	updated := text
+	var seeds []pnpmworkspace.Seed
+	for _, name := range packages {
+		version := versions[name]
+		selected := []string{}
+		if _, ok := cats.Default[name]; ok {
+			selected = append(selected, "")
+		}
+		named := make([]string, 0, len(cats.Named))
+		for catalogName, entries := range cats.Named {
+			if _, ok := entries[name]; ok {
+				named = append(named, catalogName)
+			}
+		}
+		sort.Strings(named)
+		selected = append(selected, named...)
+		if len(selected) == 0 {
+			changed = true
+			logVersionChange(emit, dryRun, "catalog", name, "", version)
+			seeds = append(seeds, pnpmworkspace.Seed{Name: name, Version: version})
+			continue
+		}
+		for _, catalogName := range selected {
+			current, _ := cats.LookupIn(catalogName, name)
+			if current == version {
+				continue
+			}
+			changed = true
+			logVersionChange(emit, dryRun, "catalog", name, current, version)
+			var err error
+			if updated, _, err = pnpmworkspace.SetCatalogEntry(updated, catalogName, name, version); err != nil {
+				return err
+			}
+		}
+	}
+	if len(seeds) > 0 {
+		var err error
+		if updated, err = pnpmworkspace.AddCatalogEntries(updated, seeds); err != nil {
+			return err
+		}
+	}
+
+	depsChanged, err := stripPutnamiEntries(pkg, "dependencies", dryRun, emit)
+	if err != nil {
+		return err
+	}
+	overridesChanged, err := stripPutnamiEntries(pkg, "overrides", dryRun, emit)
+	if err != nil {
+		return err
+	}
+	if !changed && !depsChanged && !overridesChanged {
+		emit.Log("info", pnpmworkspace.File+" catalog already pins @putnami/* dependencies")
+		return nil
+	}
+	if dryRun {
+		return nil
+	}
+	if changed {
+		if err := os.WriteFile(pnpmPath, []byte(updated), 0644); err != nil {
+			return fmt.Errorf("write %s: %w", pnpmworkspace.File, err)
+		}
+	}
+	if depsChanged || overridesChanged {
+		return writeRootManifest(pkgPath, pkg, order)
+	}
+	return nil
 }
 
 // pinViaCatalog updates @putnami/* versions inside the workspace catalog and
@@ -792,11 +893,32 @@ func scanCatalogPutnamiDeps(rootManifest string, seen map[string]bool) {
 		return
 	}
 	cats := parseCatalogModel(pkg)
-	if !cats.present() {
+	if cats.present() {
+		for _, name := range cats.scopedNames(putnamiScopePrefix) {
+			seen[name] = true
+		}
 		return
 	}
-	for _, name := range cats.scopedNames(putnamiScopePrefix) {
-		seen[name] = true
+	// A pnpm workspace declares its catalogs in pnpm-workspace.yaml.
+	data, err := os.ReadFile(pnpmWorkspaceFile(filepath.Dir(rootManifest)))
+	if err != nil {
+		return
+	}
+	pnpmCats, err := catalog.FromPNPMWorkspace(string(data))
+	if err != nil {
+		return
+	}
+	for name := range pnpmCats.Default {
+		if strings.HasPrefix(name, putnamiScopePrefix) {
+			seen[name] = true
+		}
+	}
+	for _, entries := range pnpmCats.Named {
+		for name := range entries {
+			if strings.HasPrefix(name, putnamiScopePrefix) {
+				seen[name] = true
+			}
+		}
 	}
 }
 
@@ -820,24 +942,25 @@ func collectWorkspacePackageNames(wsRoot string) map[string]bool {
 }
 
 // workspaceMemberDirs resolves the directories of the workspace members listed
-// in the root package.json "workspaces" field, or, when it lists none, in the
-// packages of pnpm-workspace.yaml. It accepts both package.json forms, the
-// array (["packages/*"]) and the object ({"packages": [...]}), and expands
-// glob patterns the way Bun does; a pnpm exclusion (a pattern starting with
-// "!") selects no directory.
+// in the packages of pnpm-workspace.yaml when it declares them, the list pnpm
+// reads, else in the root package.json "workspaces" field. It accepts both
+// package.json forms, the array (["packages/*"]) and the object ({"packages":
+// [...]}), and expands glob patterns the way Bun does; a pnpm exclusion (a
+// pattern starting with "!") selects no directory.
 func workspaceMemberDirs(wsRoot string) []string {
 	var patterns []string
-	if data, err := os.ReadFile(filepath.Join(wsRoot, "package.json")); err == nil {
-		var root struct {
-			Workspaces json.RawMessage `json:"workspaces"`
-		}
-		if json.Unmarshal(data, &root) == nil && len(root.Workspaces) > 0 {
-			patterns = parseWorkspacePatterns(root.Workspaces)
-		}
+	declared := false
+	if data, err := os.ReadFile(pnpmWorkspaceFile(wsRoot)); err == nil {
+		patterns, declared, _ = pnpmworkspace.Packages(string(data))
 	}
-	if len(patterns) == 0 {
-		if data, err := os.ReadFile(pnpmWorkspaceFile(wsRoot)); err == nil {
-			patterns, _, _ = pnpmworkspace.Packages(string(data))
+	if !declared {
+		if data, err := os.ReadFile(filepath.Join(wsRoot, "package.json")); err == nil {
+			var root struct {
+				Workspaces json.RawMessage `json:"workspaces"`
+			}
+			if json.Unmarshal(data, &root) == nil && len(root.Workspaces) > 0 {
+				patterns = parseWorkspacePatterns(root.Workspaces)
+			}
 		}
 	}
 

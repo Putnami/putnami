@@ -120,8 +120,10 @@ Each project becomes a `@putnami/typescript` project: `putnami build`, `test`
 and `lint` run Putnami's TypeScript tasks, which replace the `build`, `test`
 and `lint` scripts, and Putnami's cache stores their results. The TypeScript
 extension's install writes the root `package.json` with the projects as
-`workspaces` and installs them with Bun. Rush's lockfile and `rush install` are
-no longer used.
+`workspaces` and installs them with Bun, since a Rush root declares no package
+manager of its own: its lockfile lies under `common/config/rush`. Rush's
+lockfile and `rush install` are no longer used. A root `package.json` that
+declares `packageManager`, or a root lockfile, selects that manager instead.
 
 An import also adopts Putnami's TypeScript conventions (D-066), so each
 project builds and resolves its neighbours from their sources:

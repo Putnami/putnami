@@ -232,7 +232,11 @@ func syncPNPMWorkspacePackages(root string, members []typeScriptMember, dryRun b
 	if dryRun {
 		return change, nil
 	}
-	if err := os.WriteFile(path, []byte(pnpmworkspace.SetPackages(string(data), desired)), 0644); err != nil {
+	updated, err := pnpmworkspace.SetPackages(string(data), desired)
+	if err != nil {
+		return nil, err
+	}
+	if err := os.WriteFile(path, []byte(updated), 0644); err != nil {
 		return nil, fmt.Errorf("write %s: %w", pnpmworkspace.File, err)
 	}
 	return change, nil

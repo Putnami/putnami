@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -56,15 +57,22 @@ func noCommittedLock(m packageManager) error {
 var fetchInstallArgs = []string{"install", "--ignore-scripts", "--frozen-lockfile"}
 
 // managerFetchArgs is the scratch install of m: frozen to the committed lock,
-// with no lifecycle script, no pnpmfile and no Yarn build step. The cache the
+// with no lifecycle script and no Yarn build step; fetchProcessEnv keeps the
+// pnpmfile and a yarnPath out. The cache the
 // install writes to is added by managerCache.
 func managerFetchArgs(m packageManager) installInvocation {
 	switch m.Name {
 	case managerNPM:
 		return installInvocation{args: []string{"ci", "--ignore-scripts", "--no-audit", "--no-fund"}}
 	case managerPNPM:
-		return installInvocation{args: []string{"install", "--frozen-lockfile", "--ignore-scripts", "--ignore-pnpmfile"}}
+		// pnpm fetch downloads what the lock names and reads no manifest, so it
+		// does not compare the pnpmfile checksum the lock records, which a
+		// frozen install that ignores the pnpmfile refuses.
+		return installInvocation{args: []string{"fetch", "--ignore-scripts"}}
 	case managerYarn:
+		if m.Berry && yarnMajor(m) == 2 {
+			return installInvocation{args: []string{"install", "--immutable", "--skip-builds"}, env: map[string]string{"YARN_ENABLE_SCRIPTS": "0"}}
+		}
 		if m.Berry {
 			return installInvocation{args: []string{"install", "--immutable", "--mode=skip-build"}, env: map[string]string{"YARN_ENABLE_SCRIPTS": "0"}}
 		}
@@ -87,9 +95,9 @@ var npmrcBearer = regexp.MustCompile(`^[A-Za-z0-9._~+/-]+=*$`)
 // the hosted workspace-install does, and runs a frozen install with no
 // lifecycle script in a private scratch copy of the files that install reads:
 // `bun install --ignore-scripts --frozen-lockfile`, `npm ci --ignore-scripts`,
-// `pnpm install --frozen-lockfile --ignore-scripts --ignore-pnpmfile`, `yarn
-// install --frozen-lockfile --ignore-scripts` on Yarn 1, and `yarn install
-// --immutable --mode=skip-build` with scripts off on Yarn 2 and later. The
+// `pnpm fetch --ignore-scripts` with the pnpmfile ignored, `yarn install
+// --frozen-lockfile --ignore-scripts` on Yarn 1, and `yarn install --immutable`
+// with builds and scripts off on Yarn 2 and later. The
 // lock is never rewritten, and the workspace gets no node_modules. A handed
 // bearer is written only to the .npmrc, or for Yarn 2 and later the
 // .yarnrc.yml, of a private home that this one install reads; the home and the
@@ -171,49 +179,96 @@ func requireCommittedLock(root string, m packageManager) (string, error) {
 // yarnClassicConfig is the configuration file of Yarn 1.
 const yarnClassicConfig = ".yarnrc"
 
-// refuseRepositoryManagerCode fails when the package manager would run code
-// the repository holds: a Yarn release that yarnPath in .yarnrc.yml or
-// yarn-path in .yarnrc names, which Yarn 1 and Yarn 2 and later both run in
-// place of themselves, or a plugin .yarnrc.yml loads. pnpm runs no pnpmfile
-// (--ignore-pnpmfile) and no manager runs a lifecycle script, so only Yarn
-// needs the check.
+// repositoryCodeSettings are, by manager, the configuration files that can
+// make the manager run code the repository holds, and the words whose mention
+// in them, in any letter case, refuses the fetch: a Yarn release a yarnPath or
+// yarn-path names, which both Yarns run in place of themselves, a Yarn plugin,
+// a pnpm configuration dependency, which pnpm fetches and loads before any
+// flag applies, and a pnpmfile. backslash refuses an escape, by which a YAML
+// key spells one of the words without writing it. ancestors also reads the
+// files of each directory above the root, which Yarn reads too.
+var repositoryCodeSettings = map[string]struct {
+	files     []string
+	words     []string
+	backslash []string
+	ancestors bool
+}{
+	managerYarn: {
+		files:     []string{yarnBerryConfig, yarnClassicConfig},
+		words:     []string{"yarnpath", "yarn-path", "plugins"},
+		backslash: []string{yarnBerryConfig, yarnClassicConfig},
+		ancestors: true,
+	},
+	managerPNPM: {
+		files:     []string{pnpmworkspace.File, ".npmrc"},
+		words:     []string{"configdependencies", "config-dependencies", "pnpmfile"},
+		backslash: []string{pnpmworkspace.File},
+	},
+}
+
+// refuseRepositoryManagerCode fails, before any process starts, when a
+// configuration file of the workspace's manager mentions a setting that runs
+// code the repository holds (repositoryCodeSettings). It reads text, not YAML,
+// so a quoted, escaped, indented or flow-style key cannot slip past it; a
+// comment that names the setting is refused too. Every process the fetch
+// starts also runs with the switches that ignore a yarnPath and a pnpmfile
+// (fetchProcessEnv).
 func refuseRepositoryManagerCode(root string, m packageManager) error {
-	if m.Name != managerYarn {
+	settings, ok := repositoryCodeSettings[m.Name]
+	if !ok {
 		return nil
 	}
-	if data, err := os.ReadFile(filepath.Join(root, yarnBerryConfig)); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			key, value, ok := strings.Cut(strings.TrimRight(line, "\r"), ":")
-			if !ok || key != strings.TrimSpace(key) || strings.HasPrefix(key, "#") {
+	dirs := []string{root}
+	if settings.ancestors {
+		home, _ := os.UserHomeDir()
+		for dir := filepath.Dir(root); dir != filepath.Dir(dir); dir = filepath.Dir(dir) {
+			if home == "" || filepath.Clean(dir) != filepath.Clean(home) {
+				dirs = append(dirs, dir)
+			}
+		}
+	}
+	for _, dir := range dirs {
+		for _, name := range settings.files {
+			path := filepath.Join(dir, name)
+			data, err := os.ReadFile(path)
+			if os.IsNotExist(err) || (err == nil && len(data) == 0) {
 				continue
 			}
-			value = strings.TrimSpace(value)
-			switch key {
-			case "yarnPath":
-				return fmt.Errorf("workspace-fetch does not run the Yarn release %s names in yarnPath (%s): it is a file the repository commits; "+
-					"remove yarnPath and declare the release in package.json#packageManager, which Corepack provides", yarnBerryConfig, value)
-			case "plugins":
-				if value != "[]" {
-					return fmt.Errorf("workspace-fetch does not load the Yarn plugins %s names: they are code the repository commits", yarnBerryConfig)
+			if err != nil {
+				return fmt.Errorf("read %s: %w", path, err)
+			}
+			text := strings.ToLower(string(data))
+			for _, word := range settings.words {
+				if strings.Contains(text, word) {
+					return fmt.Errorf("workspace-fetch does not run %s: %s mentions %q, a setting that runs code the repository holds next to the registry credential; "+
+						"remove it (declare the Yarn release in package.json#packageManager, which Corepack provides)", m.Name, path, word)
 				}
 			}
-		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("read %s: %w", yarnBerryConfig, err)
-	}
-	if data, err := os.ReadFile(filepath.Join(root, yarnClassicConfig)); err == nil {
-		for _, line := range strings.Split(string(data), "\n") {
-			fields := strings.Fields(line)
-			if len(fields) > 0 && strings.Trim(fields[0], `"`) == "yarn-path" {
-				return fmt.Errorf("workspace-fetch does not run the Yarn release %s names in yarn-path: it is a file the repository commits; "+
-					"remove yarn-path and declare the release in package.json#packageManager, which Corepack provides", yarnClassicConfig)
+			if slices.Contains(settings.backslash, name) && strings.Contains(text, "\\") {
+				return fmt.Errorf("workspace-fetch does not run %s: %s holds a backslash, which can spell a setting that runs code the repository holds", m.Name, path)
 			}
 		}
-	} else if !os.IsNotExist(err) {
-		return fmt.Errorf("read %s: %w", yarnClassicConfig, err)
 	}
 	return nil
 }
+
+// fetchProcessEnv is the environment every process workspace-fetch starts
+// adds: a Yarn ignores the release yarnPath names and a pnpm ignores the
+// pnpmfile, the cache probes in the workspace root included.
+func fetchProcessEnv(m packageManager) map[string]string {
+	switch m.Name {
+	case managerYarn:
+		return map[string]string{"YARN_IGNORE_PATH": "1"}
+	case managerPNPM:
+		return map[string]string{"npm_config_ignore_pnpmfile": "true"}
+	}
+	return map[string]string{}
+}
+
+// fetchUnsetEnv are the inherited variables no process workspace-fetch starts
+// sees: Corepack runs only a published release of the manager the workspace
+// declares, never one from a URL.
+var fetchUnsetEnv = []string{"COREPACK_ENABLE_UNSAFE_CUSTOM_URLS"}
 
 // fetchWorkspaceDependencies runs the scratch install of m, from lock, into
 // the cache the hosted install reads, and removes the scratch copy and the
@@ -249,7 +304,7 @@ func fetchWorkspaceDependencies(parent context.Context, root string, m packageMa
 
 	install := managerFetchArgs(m)
 	args := append(append([]string(nil), install.args...), cache.args...)
-	env := map[string]string{}
+	env := fetchProcessEnv(m)
 	for name, value := range install.env {
 		env[name] = value
 	}
@@ -279,7 +334,7 @@ func fetchWorkspaceDependencies(parent context.Context, root string, m packageMa
 	}
 
 	label := m.Name + " " + strings.Join(install.args, " ")
-	result, err := runBunWithin(parent, m.Name+" install", managerBin, args, scratch, bunNetworkTimeout, exec.Env(env))
+	result, err := runBunWithin(parent, m.Name+" install", managerBin, args, scratch, bunNetworkTimeout, exec.Env(env), exec.UnsetEnv(fetchUnsetEnv...))
 	if err != nil {
 		return err
 	}
@@ -315,13 +370,13 @@ func managerCache(parent context.Context, m packageManager, managerBin, root str
 		}
 		return fetchCache{dir: dir, env: map[string]string{"BUN_INSTALL_CACHE_DIR": dir}}, nil
 	case managerPNPM:
-		dir, err := managerAnswer(parent, managerBin, root, true, "store", "path")
+		dir, err := managerAnswer(parent, m, managerBin, root, true, "store", "path")
 		if err != nil {
 			return fetchCache{}, err
 		}
 		return fetchCache{dir: dir, args: []string{"--store-dir", dir}}, nil
 	case managerNPM:
-		dir, err := managerAnswer(parent, managerBin, root, true, "config", "get", "cache")
+		dir, err := managerAnswer(parent, m, managerBin, root, true, "config", "get", "cache")
 		if err != nil {
 			return fetchCache{}, err
 		}
@@ -330,7 +385,7 @@ func managerCache(parent context.Context, m packageManager, managerBin, root str
 		if !m.Berry {
 			// Yarn 1 answers the versioned folder it keeps under the cache
 			// folder (.../yarn/v6); --cache-folder names the folder above it.
-			dir, err := managerAnswer(parent, managerBin, root, true, "cache", "dir")
+			dir, err := managerAnswer(parent, m, managerBin, root, true, "cache", "dir")
 			if err != nil {
 				return fetchCache{}, err
 			}
@@ -340,15 +395,15 @@ func managerCache(parent context.Context, m packageManager, managerBin, root str
 			}
 			return fetchCache{dir: dir, args: []string{"--cache-folder", folder}}, nil
 		}
-		dir, err := managerAnswer(parent, managerBin, root, true, "config", "get", "cacheFolder")
+		dir, err := managerAnswer(parent, m, managerBin, root, true, "config", "get", "cacheFolder")
 		if err != nil {
 			return fetchCache{}, err
 		}
-		global, err := managerAnswer(parent, managerBin, root, true, "config", "get", "globalFolder")
+		global, err := managerAnswer(parent, m, managerBin, root, true, "config", "get", "globalFolder")
 		if err != nil {
 			return fetchCache{}, err
 		}
-		enabled, err := managerAnswer(parent, managerBin, root, false, "config", "get", "enableGlobalCache")
+		enabled, err := managerAnswer(parent, m, managerBin, root, false, "config", "get", "enableGlobalCache")
 		if err != nil {
 			return fetchCache{}, err
 		}
@@ -364,11 +419,12 @@ func managerCache(parent context.Context, m packageManager, managerBin, root str
 	return fetchCache{}, fmt.Errorf("workspace-fetch knows no cache of %s", m.Name)
 }
 
-// managerAnswer runs the manager with args in root and returns the one line it
-// prints. With directory set, the answer must be an absolute path.
-func managerAnswer(parent context.Context, managerBin, root string, directory bool, args ...string) (string, error) {
+// managerAnswer runs the manager with args in root, with the fetch's process
+// environment, and returns the one line it prints. With directory set, the
+// answer must be an absolute path.
+func managerAnswer(parent context.Context, m packageManager, managerBin, root string, directory bool, args ...string) (string, error) {
 	label := filepath.Base(managerBin) + " " + strings.Join(args, " ")
-	result, err := runBunWithin(parent, label, managerBin, args, root, bunVersionTimeout)
+	result, err := runBunWithin(parent, label, managerBin, args, root, bunVersionTimeout, exec.Env(fetchProcessEnv(m)), exec.UnsetEnv(fetchUnsetEnv...))
 	if err != nil {
 		return "", err
 	}
@@ -930,16 +986,15 @@ func copyFetchInputs(root, scratch string, inputs []string, handed bool) error {
 	return nil
 }
 
-// stripYarnrcCredentials drops every .yarnrc.yml line whose key is
-// npmAuthToken or npmAuthIdent, at any depth, and keeps every other line
-// verbatim.
+// stripYarnrcCredentials drops every .yarnrc.yml line that mentions
+// npmAuthToken or npmAuthIdent, in any letter case and any style, a flow
+// mapping on one line included, and keeps every other line verbatim.
 func stripYarnrcCredentials(content []byte) []byte {
 	lines := strings.SplitAfter(string(content), "\n")
 	var out strings.Builder
 	for _, line := range lines {
-		key, _, _ := strings.Cut(strings.TrimSpace(line), ":")
-		key = strings.Trim(key, `"'`)
-		if key == "npmAuthToken" || key == "npmAuthIdent" {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "npmauthtoken") || strings.Contains(lower, "npmauthident") {
 			continue
 		}
 		out.WriteString(line)

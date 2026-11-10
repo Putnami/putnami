@@ -61,7 +61,7 @@ func runFetchWithMockedManager(t *testing.T, ctx *pctx.Context, program, bin str
 		if answer, ok := answers[joined]; ok {
 			return &exec.Result{Success: true, Stdout: answer + "\n"}, nil
 		}
-		if len(args) == 0 || (args[0] != "install" && args[0] != "ci") {
+		if len(args) == 0 || (args[0] != "install" && args[0] != "ci" && args[0] != "fetch") {
 			t.Errorf("%s %v is no probe this test answers", name, args)
 			return &exec.Result{Success: false, ExitCode: 1}, nil
 		}
@@ -133,7 +133,7 @@ func TestEachManagerFetchesItsCommittedLockfileIntoItsCache(t *testing.T) {
 				".pnpmfile.cjs":        "module.exports = {}",
 			},
 			answers: map[string]string{"store path": cache},
-			args:    []string{"install", "--frozen-lockfile", "--ignore-scripts", "--ignore-pnpmfile", "--store-dir", cache},
+			args:    []string{"fetch", "--ignore-scripts", "--store-dir", cache},
 			env:     map[string]string{"COREPACK_HOME": "/users/ci/corepack"},
 			scratch: []string{".npmrc", "deep/b/package.json", "package.json", "patches/marker.patch", "pkgs/a/package.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "vendor/local/package.json"},
 			home:    map[string]string{".npmrc": homeNpmrc},
@@ -273,10 +273,10 @@ func TestAManagerInsideTheWorkspaceAYarnPathOrPluginIsRefused(t *testing.T) {
 		want     string
 	}{
 		{"pnpm inside the workspace", "pnpm@10.26.1", map[string]string{"pnpm-lock.yaml": ""}, true, "inside the workspace"},
-		{"yarnPath", "yarn@4.5.0", map[string]string{"yarn.lock": "", ".yarnrc.yml": "yarnPath: .yarn/releases/yarn-4.5.0.cjs\n"}, false, "yarnPath"},
-		{"yarn 1 reading yarnPath", "yarn@1.22.22", map[string]string{"yarn.lock": "", ".yarnrc.yml": "yarnPath: .yarn/releases/yarn-4.5.0.cjs\n"}, false, "yarnPath"},
-		{"yarn-path", "yarn@1.22.22", map[string]string{"yarn.lock": "", ".yarnrc": "yarn-path \".yarn/releases/yarn-1.22.22.js\"\n"}, false, "yarn-path"},
-		{"plugins", "yarn@4.5.0", map[string]string{"yarn.lock": "", ".yarnrc.yml": "plugins:\n  - path: .yarn/plugins/x.cjs\n"}, false, "plugins"},
+		{"yarnPath", "yarn@4.5.0", map[string]string{"yarn.lock": "", ".yarnrc.yml": "yarnPath: .yarn/releases/yarn-4.5.0.cjs\n"}, false, `"yarnpath"`},
+		{"yarn 1 reading yarnPath", "yarn@1.22.22", map[string]string{"yarn.lock": "", ".yarnrc.yml": "yarnPath: .yarn/releases/yarn-4.5.0.cjs\n"}, false, `"yarnpath"`},
+		{"yarn-path", "yarn@1.22.22", map[string]string{"yarn.lock": "", ".yarnrc": "yarn-path \".yarn/releases/yarn-1.22.22.js\"\n"}, false, `"yarn-path"`},
+		{"plugins", "yarn@4.5.0", map[string]string{"yarn.lock": "", ".yarnrc.yml": "plugins:\n  - path: .yarn/plugins/x.cjs\n"}, false, `"plugins"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := managerFetchWorkspace(t, tc.declared, tc.files)
@@ -294,9 +294,144 @@ func TestAManagerInsideTheWorkspaceAYarnPathOrPluginIsRefused(t *testing.T) {
 			}
 		})
 	}
-	// An empty plugin list loads nothing.
-	if err := refuseRepositoryManagerCode(writeRoot(t, map[string]string{".yarnrc.yml": "plugins: []\nnodeLinker: node-modules\n"}), packageManager{Name: managerYarn, Berry: true}); err != nil {
-		t.Fatalf("an empty plugin list was refused: %v", err)
+}
+
+// The refusal reads the text of the configuration files, so no spelling of a
+// setting slips past it: a quoted, single-quoted, escaped, indented or
+// flow-style key, a setting in a directory above the workspace, a pnpm
+// configuration dependency or pnpmfile setting. A file that names none passes.
+func TestPNPMConfigDependenciesAndPnpmfileSettingsAreRefused(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hosted-install-fetches-first", "pnpm-config-dependencies-and-pnpmfile-settings-are-refused")
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hosted-install-fetches-first", "a-manager-inside-the-workspace-a-yarn-path-or-plugin-is-refused")
+	berry := packageManager{Name: managerYarn, Berry: true}
+	pnpm := packageManager{Name: managerPNPM}
+	for _, tc := range []struct {
+		name    string
+		manager packageManager
+		files   map[string]string
+	}{
+		{"double-quoted yarnPath", berry, map[string]string{".yarnrc.yml": "\"yarnPath\": .yarn/patches/evil.cjs\n"}},
+		{"single-quoted yarnPath", berry, map[string]string{".yarnrc.yml": "'yarnPath': ./evil.cjs\n"}},
+		{"escaped yarnPath", berry, map[string]string{".yarnrc.yml": "\"yarn\\u0050ath\": ./evil.cjs\n"}},
+		{"indented document", berry, map[string]string{".yarnrc.yml": "  nodeLinker: node-modules\n  yarnPath: ./evil.cjs\n"}},
+		{"flow document", berry, map[string]string{".yarnrc.yml": "{nodeLinker: node-modules, YarnPath: ./evil.cjs}\n"}},
+		{"quoted plugins", berry, map[string]string{".yarnrc.yml": "\"plugins\":\n  - ./evil.cjs\n"}},
+		{"empty plugin list", berry, map[string]string{".yarnrc.yml": "plugins: []\n"}},
+		{"yarnPath above the workspace", berry, map[string]string{"../.yarnrc.yml": "yarnPath: ./evil.cjs\n"}},
+		{"pnpm configDependencies", pnpm, map[string]string{"pnpm-workspace.yaml": "packages:\n  - apps/*\nconfigDependencies:\n  evil: 1.0.0+sha512-x\n"}},
+		{"pnpm pnpmfile setting", pnpm, map[string]string{"pnpm-workspace.yaml": "pnpmfile: ./hooks.cjs\n"}},
+		{"pnpm escaped key", pnpm, map[string]string{"pnpm-workspace.yaml": "\"config\\x44ependencies\": {}\n"}},
+		{"npmrc global-pnpmfile", pnpm, map[string]string{".npmrc": "global-pnpmfile=/tmp/hooks.cjs\n"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			parent := t.TempDir()
+			root := filepath.Join(parent, "ws")
+			for name, content := range tc.files {
+				writeProbeFile(t, filepath.Join(root, name), content)
+			}
+			if err := os.MkdirAll(root, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			err := refuseRepositoryManagerCode(root, tc.manager)
+			if err == nil || !strings.Contains(err.Error(), "runs code the repository holds") {
+				t.Fatalf("refuseRepositoryManagerCode = %v, want a refusal", err)
+			}
+		})
+	}
+	for _, tc := range []struct {
+		manager packageManager
+		files   map[string]string
+	}{
+		{berry, map[string]string{".yarnrc.yml": "nodeLinker: node-modules\nnpmScopes:\n  fake:\n    npmRegistryServer: https://npm.fake.test\n"}},
+		{packageManager{Name: managerYarn}, map[string]string{".yarnrc": "network-timeout 600000\n"}},
+		{pnpm, map[string]string{"pnpm-workspace.yaml": "packages:\n  - apps/*\ncatalog:\n  react: ^19\n", ".npmrc": "@fake:registry=https://npm.fake.test/\n"}},
+		{packageManager{Name: managerNPM}, map[string]string{".npmrc": "pnpmfile=./x.cjs\n"}},
+	} {
+		if err := refuseRepositoryManagerCode(writeRoot(t, tc.files), tc.manager); err != nil {
+			t.Errorf("%+v %v: refused: %v", tc.manager, tc.files, err)
+		}
+	}
+}
+
+// Every process workspace-fetch starts, the cache probes in the workspace
+// root and the scratch install, runs with the switches that ignore a yarnPath
+// release and a pnpmfile, and without the Corepack switch that runs a manager
+// from a URL.
+func TestNoFetchProcessLoadsAPnpmfileOrAYarnPath(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "hosted-install-fetches-first", "no-fetch-process-loads-a-pnpmfile-or-a-yarn-path")
+	t.Setenv("COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", "1")
+	for _, tc := range []struct {
+		declared string
+		files    map[string]string
+		answers  map[string]string
+		want     map[string]string
+	}{
+		{"pnpm@10.26.1", map[string]string{"pnpm-lock.yaml": "lockfileVersion: '9.0'\n"}, map[string]string{"store path": "/users/ci/store"}, map[string]string{"npm_config_ignore_pnpmfile": "true"}},
+		{"yarn@1.22.22", map[string]string{"yarn.lock": ""}, map[string]string{"cache dir": "/users/ci/yarn/v6"}, map[string]string{"YARN_IGNORE_PATH": "1"}},
+		{"yarn@4.5.0", map[string]string{"yarn.lock": ""}, map[string]string{"config get cacheFolder": "/repo/.yarn/cache", "config get globalFolder": "/users/ci/.yarn/berry", "config get enableGlobalCache": "true"}, map[string]string{"YARN_IGNORE_PATH": "1"}},
+	} {
+		t.Run(tc.declared, func(t *testing.T) {
+			ctx := managerFetchWorkspace(t, tc.declared, tc.files)
+			program, _, _ := strings.Cut(tc.declared, "@")
+			tmp := privateTempDir(t)
+			_ = tmp
+			var events []string
+			handCredential(t, unitCredential(), &events)
+			mockLookPath(t, map[string]string{program: "/usr/bin/" + program})
+			var envs []map[string]string
+			mockAllExec(t, func(_ string, args []string, opts ...exec.Option) (*exec.Result, error) {
+				probe, err := exec.Run("/bin/sh", []string{"-c", "env"}, opts...)
+				if err != nil || !probe.Success {
+					t.Fatalf("probe the options: %v", err)
+				}
+				env := map[string]string{}
+				for _, line := range strings.Split(probe.Stdout, "\n") {
+					if name, value, ok := strings.Cut(line, "="); ok {
+						env[name] = value
+					}
+				}
+				envs = append(envs, env)
+				if answer, ok := tc.answers[strings.Join(args, " ")]; ok {
+					return &exec.Result{Success: true, Stdout: answer + "\n"}, nil
+				}
+				return &exec.Result{Success: true}, nil
+			})
+			if status, _, err := runWorkspaceFetch(ctx, jsonl.New(), nil); err != nil || status != "OK" {
+				t.Fatalf("runWorkspaceFetch = %q, %v", status, err)
+			}
+			if len(envs) < 2 {
+				t.Fatalf("processes started = %d, want the probes and the scratch install", len(envs))
+			}
+			for i, env := range envs {
+				for name, value := range tc.want {
+					if env[name] != value {
+						t.Errorf("process %d ran with %s=%q, want %q", i, name, env[name], value)
+					}
+				}
+				if _, set := env["COREPACK_ENABLE_UNSAFE_CUSTOM_URLS"]; set {
+					t.Errorf("process %d inherited COREPACK_ENABLE_UNSAFE_CUSTOM_URLS", i)
+				}
+			}
+		})
+	}
+}
+
+func TestYarnTwoSkipsBuildsWithItsOwnFlag(t *testing.T) {
+	if got := managerFetchArgs(packageManager{Name: managerYarn, Berry: true, Version: "2.4.3"}).args; !slices.Equal(got, []string{"install", "--immutable", "--skip-builds"}) {
+		t.Fatalf("Yarn 2 fetch = %v", got)
+	}
+	for _, version := range []string{"3.8.0", "4.5.0", ""} {
+		if got := managerFetchArgs(packageManager{Name: managerYarn, Berry: true, Version: version}).args; !slices.Equal(got, []string{"install", "--immutable", "--mode=skip-build"}) {
+			t.Fatalf("Yarn %q fetch = %v", version, got)
+		}
+	}
+}
+
+func TestStripYarnrcCredentialsDropsEveryStyle(t *testing.T) {
+	in := "nodeLinker: node-modules\nnpmRegistries:\n  \"//npm.fake.test\":\n    npmAuthToken: x\n    \"npmAuthIdent\": y\nnpmScopes: { fake: { npmRegistryServer: \"https://npm.fake.test\", NPMAUTHTOKEN: z } }\n"
+	want := "nodeLinker: node-modules\nnpmRegistries:\n  \"//npm.fake.test\":\n"
+	if got := string(stripYarnrcCredentials([]byte(in))); got != want {
+		t.Fatalf("stripYarnrcCredentials =\n%s\nwant\n%s", got, want)
 	}
 }
 

@@ -47,7 +47,7 @@ func TestPackagesReportsAMissingKeyAndRefusesAnotherShape(t *testing.T) {
 
 func TestSetPackagesReplacesOnlyTheList(t *testing.T) {
 	text := "# the workspace\npackages:\n    - 'apps/*'\n    - packages/* # libs\n\n# settings\nonlyBuiltDependencies:\n  - esbuild\ncatalog:\n  react: ^19.0.0\n"
-	got := SetPackages(text, []string{"apps/api", "packages/pricing"})
+	got := mustSetPackages(t, text, []string{"apps/api", "packages/pricing"})
 	want := "# the workspace\npackages:\n    - apps/api\n    - packages/pricing\n\n# settings\nonlyBuiltDependencies:\n  - esbuild\ncatalog:\n  react: ^19.0.0\n"
 	if got != want {
 		t.Fatalf("SetPackages =\n%s\nwant\n%s", got, want)
@@ -58,24 +58,24 @@ func TestSetPackagesReplacesOnlyTheList(t *testing.T) {
 }
 
 func TestSetPackagesWritesAFlowListAsABlockAndAddsAMissingKey(t *testing.T) {
-	if got, want := SetPackages("packages: ['apps/*'] # members\nlinkWorkspacePackages: true\n", []string{"apps/api"}),
+	if got, want := mustSetPackages(t, "packages: ['apps/*'] # members\nlinkWorkspacePackages: true\n", []string{"apps/api"}),
 		"packages:\n  - apps/api\nlinkWorkspacePackages: true\n"; got != want {
 		t.Fatalf("flow list:\n%s\nwant\n%s", got, want)
 	}
-	if got, want := SetPackages("catalog:\n  react: ^19\n", []string{"apps/api", "@scope/odd dir"}),
+	if got, want := mustSetPackages(t, "catalog:\n  react: ^19\n", []string{"apps/api", "@scope/odd dir"}),
 		"packages:\n  - apps/api\n  - '@scope/odd dir'\ncatalog:\n  react: ^19\n"; got != want {
 		t.Fatalf("missing key:\n%s\nwant\n%s", got, want)
 	}
-	if got, want := SetPackages("", []string{"apps/api"}), "packages:\n  - apps/api\n"; got != want {
+	if got, want := mustSetPackages(t, "", []string{"apps/api"}), "packages:\n  - apps/api\n"; got != want {
 		t.Fatalf("empty file:\n%q\nwant\n%q", got, want)
 	}
-	if got, want := SetPackages("packages:\n  - apps/api\n", nil), "packages: []\n"; got != want {
+	if got, want := mustSetPackages(t, "packages:\n  - apps/api\n", nil), "packages: []\n"; got != want {
 		t.Fatalf("no member:\n%q\nwant\n%q", got, want)
 	}
 }
 
 func TestSetPackagesKeepsCRLFLineEndings(t *testing.T) {
-	got := SetPackages("packages:\r\n  - a\r\nx: 1\r\n", []string{"b"})
+	got := mustSetPackages(t, "packages:\r\n  - a\r\nx: 1\r\n", []string{"b"})
 	if want := "packages:\r\n  - b\r\nx: 1\r\n"; got != want {
 		t.Fatalf("SetPackages = %q, want %q", got, want)
 	}
@@ -169,5 +169,48 @@ func TestRenderScalarQuotesWhatYAMLWouldReadOtherwise(t *testing.T) {
 		if got := renderScalar(in); got != want {
 			t.Errorf("renderScalar(%q) = %s, want %s", in, got, want)
 		}
+	}
+}
+
+func mustSetPackages(t *testing.T, text string, desired []string) string {
+	t.Helper()
+	got, err := SetPackages(text, desired)
+	if err != nil {
+		t.Fatalf("SetPackages(%q): %v", text, err)
+	}
+	return got
+}
+
+func TestSetPackagesKeepsTheCommentsOfTheListAndRefusesAShapeItCannotRead(t *testing.T) {
+	got := mustSetPackages(t, "packages:\n  # apps\n  - apps/api\n  # libs\n  - packages/pricing\nonlyBuiltDependencies:\n  - esbuild\n", []string{"apps/api"})
+	if want := "packages:\n  # apps\n  # libs\n  - apps/api\nonlyBuiltDependencies:\n  - esbuild\n"; got != want {
+		t.Fatalf("SetPackages =\n%s\nwant\n%s", got, want)
+	}
+	for _, text := range []string{"packages: [\n  \"apps/*\",\n  \"packages/*\"\n]\ncatalog:\n  react: ^19\n", "packages: apps/*\n"} {
+		if _, err := SetPackages(text, []string{"apps/web"}); err == nil {
+			t.Errorf("SetPackages(%q) succeeded; want an error", text)
+		}
+	}
+}
+
+func TestSetCatalogEntryChangesTheVersionInPlace(t *testing.T) {
+	text := "catalog:\n  react: ^19.0.0\n  \"@putnami/web\": latest # seeded\ncatalogs:\n  framework:\n    '@putnami/application': 1.0.0\n"
+	got, found, err := SetCatalogEntry(text, "", "@putnami/web", "1.4.2")
+	if err != nil || !found {
+		t.Fatalf("SetCatalogEntry = %v, %v", found, err)
+	}
+	got, found, err = SetCatalogEntry(got, "framework", "@putnami/application", "1.4.2")
+	if err != nil || !found {
+		t.Fatalf("SetCatalogEntry named = %v, %v", found, err)
+	}
+	want := "catalog:\n  react: ^19.0.0\n  \"@putnami/web\": 1.4.2 # seeded\ncatalogs:\n  framework:\n    '@putnami/application': 1.4.2\n"
+	if got != want {
+		t.Fatalf("SetCatalogEntry =\n%s\nwant\n%s", got, want)
+	}
+	if same, found, err := SetCatalogEntry(got, "", "@putnami/missing", "1.0.0"); err != nil || found || same != got {
+		t.Fatalf("a missing entry: %v, %v", found, err)
+	}
+	if _, _, err := SetCatalogEntry("catalog: {react: ^19}\n", "", "react", "^20"); err == nil {
+		t.Fatal("a flow mapping was changed")
 	}
 }

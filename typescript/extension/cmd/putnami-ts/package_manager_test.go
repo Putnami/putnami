@@ -108,6 +108,7 @@ func TestARootLockfileNamesTheInstaller(t *testing.T) {
 		{map[string]string{"npm-shrinkwrap.json": "{}"}, packageManager{Name: managerNPM, Source: "npm-shrinkwrap.json"}},
 		// The order of rootLockfiles decides between two lockfiles.
 		{map[string]string{"pnpm-lock.yaml": "", "package-lock.json": "{}"}, packageManager{Name: managerPNPM, Source: "pnpm-lock.yaml"}},
+		{map[string]string{"pnpm-workspace.yaml": "packages:\n  - apps/*\n", "package-lock.json": "{}"}, packageManager{Name: managerPNPM, Source: "pnpm-workspace.yaml"}},
 	} {
 		dir := t.TempDir()
 		writeProbeFile(t, filepath.Join(dir, "package.json"), `{"name":"repo","private":true}`)
@@ -386,4 +387,97 @@ func readFile(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return string(data)
+}
+
+// A root pnpm-workspace.yaml names pnpm when no lockfile does, as it does for
+// the Node-workspace detector the monorepo probes read, and a Bun lock still
+// outranks it.
+func TestAPNPMWorkspaceFileNamesPNPM(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-keeps-the-package-manager", "a-pnpm-workspace-file-names-pnpm")
+	dir := t.TempDir()
+	writeProbeFile(t, filepath.Join(dir, "package.json"), `{"name":"repo","private":true}`)
+	writeProbeFile(t, filepath.Join(dir, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n")
+	if got, err := detectPackageManager(dir); err != nil || got != (packageManager{Name: managerPNPM, Source: "pnpm-workspace.yaml"}) {
+		t.Fatalf("detectPackageManager = %+v, %v; want pnpm from pnpm-workspace.yaml", got, err)
+	}
+	writeProbeFile(t, filepath.Join(dir, "bun.lock"), "{}")
+	if got, err := detectPackageManager(dir); err != nil || got.Name != managerBun {
+		t.Fatalf("detectPackageManager = %+v, %v; want the Bun lock first", got, err)
+	}
+}
+
+// pnpm reads its members from pnpm-workspace.yaml, whatever the root
+// package.json lists.
+func TestWorkspaceMemberDirsPrefersThePNPMWorkspaceFile(t *testing.T) {
+	dir := t.TempDir()
+	writeProbeFile(t, filepath.Join(dir, "package.json"), `{"name":"repo","private":true,"workspaces":["old"]}`)
+	writeProbeFile(t, filepath.Join(dir, "pnpm-workspace.yaml"), "packages:\n  - apps/*\n  - '!apps/skip'\n")
+	writeProbeFile(t, filepath.Join(dir, "apps", "web", "package.json"), `{"name":"web"}`)
+	got := workspaceMemberDirs(dir)
+	if len(got) != 1 || got[0] != filepath.Join(dir, "apps", "web") {
+		t.Fatalf("workspaceMemberDirs = %v, want apps/web from pnpm-workspace.yaml", got)
+	}
+}
+
+// putnami upgrade --deps in a pnpm workspace pins the catalog
+// pnpm-workspace.yaml declares, in place, removes the redundant root pins,
+// and reinstalls with pnpm's own forced install; it writes no bun.lock.
+func TestAPNPMUpgradePinsThePNPMWorkspaceCatalogAndInstallsWithPNPM(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "upgrade-installs-with-the-package-manager", "a-pnpm-upgrade-pins-the-pnpm-workspace-catalog-and-installs-with-pnpm")
+	ctx, dir := makeTestCtx(t)
+	ctx.Params["putnami-version"] = []byte(`"1.4.2"`)
+	writeProbeFile(t, filepath.Join(dir, "package.json"), "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"packageManager\": \"pnpm@10.26.1\",\n  \"dependencies\": {\n    \"@putnami/web\": \"1.0.0\"\n  }\n}\n")
+	writeProbeFile(t, filepath.Join(dir, "pnpm-workspace.yaml"), "packages:\n  - apps/web\n\ncatalog:\n  react: ^19.0.0\n  '@putnami/web': latest # seeded\n")
+	writeProbeFile(t, filepath.Join(dir, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\n")
+	writeProbeFile(t, filepath.Join(dir, "apps", "web", "package.json"), `{"name":"web","dependencies":{"@putnami/web":"catalog:","@putnami/runtime":"catalog:"}}`)
+	mockLookPath(t, map[string]string{"pnpm": "/usr/bin/pnpm"})
+	calls := recordCalls(t)
+
+	if status, _, err := runDepsUpgrade(ctx, jsonl.New(), nil); err != nil || status != "OK" {
+		t.Fatalf("runDepsUpgrade = %q, %v; want OK", status, err)
+	}
+	if len(*calls) != 1 || (*calls)[0].bin != "/usr/bin/pnpm" || !slices.Equal((*calls)[0].args, []string{"install", "--force"}) {
+		t.Fatalf("the upgrade ran %v, want only pnpm install --force", *calls)
+	}
+	if got, want := readFile(t, filepath.Join(dir, "pnpm-workspace.yaml")), "packages:\n  - apps/web\n\ncatalog:\n  react: ^19.0.0\n  '@putnami/web': 1.4.2 # seeded\n  '@putnami/runtime': 1.4.2\n"; got != want {
+		t.Fatalf("pnpm-workspace.yaml =\n%s\nwant\n%s", got, want)
+	}
+	if got, want := readFile(t, filepath.Join(dir, "package.json")), "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"packageManager\": \"pnpm@10.26.1\"\n}\n"; got != want {
+		t.Fatalf("package.json =\n%s\nwant\n%s", got, want)
+	}
+	for _, name := range []string{"bun.lock", "bun.lockb"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Fatalf("the upgrade wrote %s", name)
+		}
+	}
+}
+
+// A failed reinstall restores the root package.json, pnpm-workspace.yaml and
+// the manager's lockfile, and removes a lockfile the failed install created.
+func TestAFailedUpgradeRestoresTheManagersFiles(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "upgrade-installs-with-the-package-manager", "a-failed-upgrade-restores-the-managers-files")
+	ctx, dir := makeTestCtx(t)
+	ctx.Params["putnami-version"] = []byte(`"1.4.2"`)
+	files := map[string]string{
+		"package.json":        `{"name":"shop","private":true,"packageManager":"pnpm@10.26.1"}`,
+		"pnpm-workspace.yaml": "packages:\n  - apps/web\ncatalog:\n  '@putnami/web': latest\n",
+		"pnpm-lock.yaml":      "lockfileVersion: '9.0'\n",
+	}
+	for name, content := range files {
+		writeProbeFile(t, filepath.Join(dir, name), content)
+	}
+	writeProbeFile(t, filepath.Join(dir, "apps", "web", "package.json"), `{"name":"web","dependencies":{"@putnami/web":"catalog:"}}`)
+	mockLookPath(t, map[string]string{"pnpm": "/usr/bin/pnpm"})
+	mockAllExec(t, func(_ string, _ []string, _ ...exec.Option) (*exec.Result, error) {
+		writeProbeFile(t, filepath.Join(dir, "pnpm-lock.yaml"), "lockfileVersion: '9.0'\nbroken: true\n")
+		return &exec.Result{Success: false, ExitCode: 1, Stderr: "ERR_PNPM_FETCH_404"}, nil
+	})
+	if status, _, _ := runDepsUpgrade(ctx, jsonl.New(), nil); status != "FAILED" {
+		t.Fatalf("runDepsUpgrade = %q, want FAILED", status)
+	}
+	for name, content := range files {
+		if got := readFile(t, filepath.Join(dir, name)); got != content {
+			t.Errorf("%s = %q after the failed upgrade, want it restored", name, got)
+		}
+	}
 }

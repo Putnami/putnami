@@ -23,8 +23,11 @@ const (
 	managerYarn = "yarn"
 )
 
-// rootLockfiles are the lockfiles that name a workspace's package manager when
-// its root package.json declares none, in the order they are looked for.
+// rootLockfiles are the root files that name a workspace's package manager
+// when its root package.json declares none, in the order they are looked for:
+// the lockfiles, and pnpm-workspace.yaml, which only pnpm reads. The order
+// after the Bun locks is the one the Node-workspace detector of putnami observe
+// reads, so the monorepo probes and the install name the same manager.
 var rootLockfiles = []struct {
 	file    string
 	manager string
@@ -32,6 +35,7 @@ var rootLockfiles = []struct {
 	{"bun.lock", managerBun},
 	{"bun.lockb", managerBun},
 	{"pnpm-lock.yaml", managerPNPM},
+	{pnpmworkspace.File, managerPNPM},
 	{"yarn.lock", managerYarn},
 	{"package-lock.json", managerNPM},
 	{"npm-shrinkwrap.json", managerNPM},
@@ -97,7 +101,7 @@ var errUnknownPackageManager = errors.New("@putnami/typescript installs with bun
 
 // detectPackageManager returns the package manager the workspace at root
 // declares: the packageManager field of its root package.json, else the
-// manager whose lockfile lies at the root (rootLockfiles), else Bun. A
+// manager a root file names (rootLockfiles), else Bun. A
 // declaration of another manager returns that name and an error wrapping
 // errUnknownPackageManager; a root package.json it cannot read is an error.
 func detectPackageManager(root string) (packageManager, error) {
@@ -181,6 +185,17 @@ func yarnIsBerry(root, version string) bool {
 		}
 	}
 	return false
+}
+
+// yarnMajor returns the major version a Yarn declaration names, 0 when it
+// names none.
+func yarnMajor(m packageManager) int {
+	major, _, _ := strings.Cut(m.Version, ".")
+	n, err := strconv.Atoi(major)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // lookPath finds a package manager on PATH. Tests replace it.

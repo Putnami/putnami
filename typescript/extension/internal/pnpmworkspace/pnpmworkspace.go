@@ -331,10 +331,15 @@ func sequence(d document, b block) ([]string, error) {
 }
 
 // SetPackages returns text with its `packages` list replaced by desired, in
-// block form. A list in block form keeps the indentation of its first item. A
-// file without the key gains it as its first line; an empty desired list is
-// written `packages: []`. Every other line is kept.
-func SetPackages(text string, desired []string) string {
+// block form. A list in block form keeps the indentation of its first item,
+// and the comment lines inside it, ahead of the new items. A file without the
+// key gains it as its first line; an empty desired list is written
+// `packages: []`. Every other line is kept. A `packages` value Packages cannot
+// read is an error, and nothing is written.
+func SetPackages(text string, desired []string) (string, error) {
+	if _, _, err := Packages(text); err != nil {
+		return "", err
+	}
 	d := parseDocument(text)
 	itemPrefix := "  - "
 	var replaced []string
@@ -345,15 +350,17 @@ func SetPackages(text string, desired []string) string {
 	}
 	b, found := findTop(d, "packages")
 	if found {
+		prefixSet := false
 		for _, s := range d.lines[b.key+1 : b.end] {
-			if blank(s) {
+			trimmed := strings.TrimSpace(s)
+			if strings.HasPrefix(trimmed, "#") {
+				replaced = append(replaced, s)
 				continue
 			}
-			body := strings.TrimLeft(s, " ")
-			if strings.HasPrefix(body, "-") {
+			if !prefixSet && strings.HasPrefix(trimmed, "-") {
 				itemPrefix = s[:indentOf(s)] + "- "
+				prefixSet = true
 			}
-			break
 		}
 	}
 	for _, path := range desired {
@@ -362,14 +369,69 @@ func SetPackages(text string, desired []string) string {
 	if !found {
 		d.lines = append(replaced, d.lines...)
 		d.final = true
-		return d.String()
+		return d.String(), nil
 	}
 	lines := make([]string, 0, len(d.lines)-(b.end-b.key)+len(replaced))
 	lines = append(lines, d.lines[:b.key]...)
 	lines = append(lines, replaced...)
 	lines = append(lines, d.lines[b.end:]...)
 	d.lines = lines
-	return d.String()
+	return d.String(), nil
+}
+
+// SetCatalogEntry returns text with the version of the name entry of the
+// selected catalog, the default one for catalog "", set to version, in place:
+// the key keeps its spelling and the line its indentation and comment. found
+// is false, and text is returned unchanged, when the catalog holds no such
+// entry. A catalog written as a flow mapping is an error.
+func SetCatalogEntry(text, catalog, name, version string) (string, bool, error) {
+	d := parseDocument(text)
+	keyLine, end, value, label := -1, 0, "", "catalog"
+	if catalog == "" {
+		if b, ok := findTop(d, "catalog"); ok {
+			keyLine, end, value = b.key, b.end, b.value
+		}
+	} else if b, ok := findTop(d, "catalogs"); ok {
+		children, err := childBlocks(d, b)
+		if err == nil {
+			for _, c := range children {
+				if c.name == catalog {
+					keyLine, end, value, label = c.key, c.end, c.value, "catalogs."+c.name
+				}
+			}
+		}
+	}
+	if keyLine < 0 {
+		return text, false, nil
+	}
+	if inner, isFlow, _ := flowInner(value, '{', '}'); isFlow && strings.TrimSpace(inner) != "" {
+		return "", false, fmt.Errorf("%s %s is a flow mapping: write it as a block mapping so an entry can be changed", File, label)
+	}
+	entries, err := mapping(d, keyLine, end, value)
+	if err != nil {
+		return "", false, fmt.Errorf("%s %s: %w", File, label, err)
+	}
+	for _, e := range entries {
+		if e.key != name {
+			continue
+		}
+		line := d.lines[e.line]
+		_, rest, _ := mappingKey(line)
+		head := line[:len(line)-len(rest)]
+		comment := ""
+		if trimmed := strings.TrimSpace(rest); trimmed != "" && (trimmed[0] == '\'' || trimmed[0] == '"') {
+			if _, n, err := quoted(trimmed); err == nil {
+				if after := strings.TrimSpace(trimmed[n:]); after != "" {
+					comment = " " + after
+				}
+			}
+		} else if i := strings.Index(rest, " #"); i >= 0 {
+			comment = rest[i:]
+		}
+		d.lines[e.line] = head + " " + renderScalar(version) + comment
+		return d.String(), true, nil
+	}
+	return text, false, nil
 }
 
 // ReadCatalogs returns the `catalog` and `catalogs` entries of text.

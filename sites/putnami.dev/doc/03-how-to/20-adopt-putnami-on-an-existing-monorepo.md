@@ -276,7 +276,8 @@ repository's package manager: it lists the projects where that manager reads
 its members, `pnpm-workspace.yaml` for pnpm and the root `package.json`
 `workspaces` otherwise, and runs that manager's install, which keeps
 `pnpm-lock.yaml`, `yarn.lock` or `package-lock.json` as the repository's lock.
-It writes no `bun.lock`.
+It writes no `bun.lock`. The member list becomes the exact project paths, so
+every workspace package of the repository is a Putnami project.
 
 ### Switch mode, or see what a sync would change
 
@@ -593,7 +594,10 @@ depends on:
 
 In import mode the extension is `@putnami/typescript`, and the TypeScript
 install writes the root `package.json` with the projects as `workspaces` and
-installs them with Bun: Rush's lockfile and `rush install` are no longer used.
+installs them with Bun, since a Rush root declares no package manager of its
+own: Rush's lockfile and `rush install` are no longer used. A root
+`package.json` that declares `packageManager`, or a root lockfile, selects that
+manager instead.
 A project whose `main` names Rush's build output, such as `lib/index.js`,
 gains `"exports": { ".": "./src/index.ts" }` unless `rush.json` publishes it,
 and a project without `tsconfig.json` gets one that extends the root's, so
