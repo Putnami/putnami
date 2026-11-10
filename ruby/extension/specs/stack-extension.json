@@ -35,7 +35,7 @@
     },
     {
       "id": "reports-become-the-summary",
-      "text": "The test task reads its JUnit report and the SimpleCov Cobertura report at the stack root's coverage/coverage.xml through the evidence readers. The coverage summary counts only the files under the component's directory outside a nested component; a covered file in no component is the warning stacks.coverage_unmapped. A failed case fails the task with stacks.test_failed, and a missing report with stacks.report_missing."
+      "text": "The test task reads its JUnit report and the SimpleCov Cobertura report at the stack root's coverage/coverage.xml. The coverage summary counts only the files under the component's directory outside a nested component; a covered file in no component is the warning stacks.coverage_unmapped. A failed case fails the task with stacks.test_failed, a missing JUnit report with stacks.report_missing, and a bundle with no SimpleCov warns with stacks.coverage_unavailable."
     },
     {
       "id": "lint-reads-the-ruby-files",
@@ -83,7 +83,7 @@
     },
     {
       "id": "serves-an-application",
-      "text": "serve runs bundle exec rails server -b 0.0.0.0 when the application holds bin/rails, else bundle exec rackup -o 0.0.0.0, with the port flag, default 3000 and 0 for a free port, in the directory of an application after the toolchain check and the install step, with PORT set, and emits a ready event once the server accepts connections. An application is a component whose directory holds config.ru; a library is skipped."
+      "text": "serve runs bundle exec rails server -b 0.0.0.0 when the application holds bin/rails, else bundle exec rackup -o 0.0.0.0, with the words of --args and the port flag, default 3000 and 0 for a free port, in the directory of an application after the toolchain check and the install step, with PORT set, and emits a ready event once the server accepts connections. An application is a component whose directory holds config.ru; a library is skipped."
     },
     {
       "id": "runs-an-application-once",
@@ -91,7 +91,7 @@
     },
     {
       "id": "packages-an-application-image",
-      "text": "package assembles an OCI image of an application without Docker: its production bundle under /usr/local/bundle, its files under /app without tests, run output and secrets, and tmp/ and log/ owned by its non-root user, on the digest-pinned ruby:<version>-slim-trixie of the host Ruby's minor or a named base, which fails with ruby.base_not_pinned without a digest. It runs rails server or rackup on PORT 8080 in production. Two packagings of one tree on a machine give the same image. A library packages nothing."
+      "text": "package assembles an OCI image of an application without Docker: its production bundle under /usr/local/bundle, its files under /app without tests, run output or secrets, and tmp/ and log/ owned by its non-root user, on the digest-pinned ruby:<version>-slim-trixie of the host Ruby's minor or a named base, else ruby.base_not_pinned. It runs rails server or rackup in production on PORT, the port flag, 8080 by default. Packaging one tree twice gives the same image. A library packages nothing."
     },
     {
       "id": "refuses-a-foreign-packaging-host",

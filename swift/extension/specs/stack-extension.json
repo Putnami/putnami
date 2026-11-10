@@ -51,7 +51,7 @@
     },
     {
       "id": "applications-serve-and-run",
-      "text": "A package whose manifest declares an executable product, or with none an executable target, is an application, any other a library. serve runs swift run of it with the pinned versions and PORT, 3000 by default or a free port for 0, and reports ready once the port accepts a connection; run runs it once with --args and forwards its exit code. --entrypoint names it among several. An Xcode project is neither served nor run."
+      "text": "A package whose manifest declares an executable product, or with none an executable target, is an application, any other a library. serve runs swift run of it with the pinned versions, the words of --args and PORT, 3000 by default or a free port for 0, and reports ready once the port accepts a connection; run runs it once with --args and forwards its exit code. --entrypoint names it among several. An Xcode project is neither served nor run."
     },
     {
       "id": "test-filter",
@@ -71,7 +71,7 @@
     },
     {
       "id": "packages-an-application-image",
-      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: it installs the Static Linux SDK of the selected Swift with its pinned checksum when missing, builds the executable serve starts with swift build -c release --swift-sdk <bundle> --triple <arch>-swift-linux-musl, and copies it and its resource bundles onto distroless static:nonroot or a digest-pinned base the project names. It runs as non-root on PORT. A library or an Xcode project packages nothing."
+      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: it installs the selected Swift's Static Linux SDK, checksum pinned, when missing, builds the executable serve starts with swift build -c release --swift-sdk <bundle> --triple <arch>-swift-linux-musl, and copies it and its resource bundles onto distroless static:nonroot or a digest-pinned base. It runs as non-root with PORT set to the port flag, 8080 by default. A library or an Xcode project packages nothing."
     },
     {
       "id": "publishes-an-application-image",

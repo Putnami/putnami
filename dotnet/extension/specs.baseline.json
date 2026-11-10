@@ -5,6 +5,7 @@
     "dotnet/stack-extension#applications-are-told-apart",
     "dotnet/stack-extension#checks-documentation-links",
     "dotnet/stack-extension#fetch-reads-the-credential-first",
+    "dotnet/stack-extension#filters-the-tests",
     "dotnet/stack-extension#inputs-stay-narrow",
     "dotnet/stack-extension#manifest-follows-the-profile",
     "dotnet/stack-extension#only-test-projects-test",

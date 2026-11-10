@@ -68,11 +68,11 @@
     },
     {
       "id": "runs-and-serves",
-      "text": "run runs a Dart command-line package with dart run and its entrypoint and args, and answers its exit code; serve runs a Dart server with dart run and PORT set, or a Flutter app with web/ through flutter run -d web-server on that port, and reports ready once the port accepts connections."
+      "text": "run runs a Dart command-line package with dart run and its entrypoint and args, and answers its exit code; serve runs a Dart server with dart run, the words of --args and PORT set, or a Flutter app with web/ through flutter run -d web-server on that port, and reports ready once the port accepts connections."
     },
     {
       "id": "packages-an-application-image",
-      "text": "package with the docker channel assembles an OCI image of a pure Dart application with no Docker daemon: holding the lock of its stack root, it compiles the entrypoint with the selected dart, dart compile exe --target-os linux --target-arch x64 or arm64, and copies the executable onto distroless cc-debian12:nonroot pinned by digest, or a digest-pinned base the project names. The image runs it as the user 65532 with PORT=8080. A library or a Flutter package packages nothing."
+      "text": "package with the docker channel assembles an OCI image of a pure Dart application with no Docker daemon: holding the lock of its stack root, it compiles the entrypoint with the selected dart, dart compile exe --target-os linux --target-arch x64 or arm64, and copies the executable onto distroless cc-debian12:nonroot pinned by digest, or a digest-pinned base the project names. The image runs it as the user 65532 with PORT set to the port flag, 8080 by default. A library or a Flutter package packages nothing."
     },
     {
       "id": "refuses-what-it-cannot-cross-compile",

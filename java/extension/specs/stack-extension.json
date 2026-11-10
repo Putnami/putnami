@@ -79,7 +79,7 @@
     },
     {
       "id": "serve-runs-the-application",
-      "text": "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) under its stack root's lock, copies it aside, and runs the copy with PORT and SERVER_PORT set to the port flag, until the user stops it; it reports the server ready once the port accepts connections. A library runs nothing."
+      "text": "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) under its stack root's lock, copies it aside, and runs the copy with the words of --args as its arguments and PORT and SERVER_PORT set to the port flag, until the user stops it; it reports the server ready once the port accepts connections. A library runs nothing."
     },
     {
       "id": "run-runs-the-application-once",
@@ -87,7 +87,7 @@
     },
     {
       "id": "package-assembles-an-image",
-      "text": "putnami package --docker assembles, with no Docker daemon, the OCI image of an application: its runnable form on the Eclipse Temurin JRE of its Java major, pinned by digest, or on a base the project pins by digest, run as a non-root user with PORT and SERVER_PORT set to 8080. A library packages nothing."
+      "text": "putnami package --docker assembles, with no Docker daemon, the OCI image of an application: its runnable form on the Eclipse Temurin JRE of its Java major, pinned by digest, or on a base the project pins by digest, run as a non-root user with PORT and SERVER_PORT set to the port flag, 8080 by default. A library packages nothing."
     },
     {
       "id": "publish-pushes-the-image",

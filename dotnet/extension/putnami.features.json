@@ -235,6 +235,19 @@
               "lint-checks-the-documentation-links"
             ]
           }
+        },
+        {
+          "id": "filters-the-tests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "test-passes-the-filter-to-dotnet-test-and-keys-the-task-on-it"
+            ]
+          }
         }
       ]
     }

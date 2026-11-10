@@ -10,7 +10,8 @@
     "A project overrides any value of the .NET profile in its putnami.json",
     "On a machine with no .NET SDK, or none global.json accepts, putnami lint, test and build install an SDK global.json accepts, with the runtimes the projects target, and run",
     "serve and run start an application, and package and publish produce its OCI image, with no Docker daemon",
-    "putnami install restores every project's NuGet packages, and putnami upgrade moves their references to the newest versions"
+    "putnami install restores every project's NuGet packages, and putnami upgrade moves their references to the newest versions",
+    "putnami test --test runs the tests a filter names, and a test project in which it selects none passes"
   ],
   "nonGoals": [
     "Evaluating MSBuild: a reference, an assembly name or a test marker that holds a property or a condition is not read",
@@ -35,7 +36,7 @@
     },
     {
       "id": "reports-become-the-summary",
-      "text": "After its step, even one that exits non-zero, the test task reads every TRX report in its output directory and every coverage.cobertura.xml one directory below it through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed and names the case; no TRX report, or no Cobertura report, fails it with stacks.report_missing. The output directory is emptied before the step."
+      "text": "After its step, even one that exits non-zero, the test task reads every TRX report in its output directory and every coverage.cobertura.xml below it into the test and coverage summary. A failed case fails the task with stacks.test_failed and names the case; no TRX report fails it with stacks.report_missing, and one with no Coverlet collector, so no Cobertura report, warns with stacks.coverage_unavailable. The output directory is emptied before the step."
     },
     {
       "id": "sdk-roll-forward-is-honored",
@@ -59,7 +60,7 @@
     },
     {
       "id": "serves-an-application",
-      "text": "serve builds an application under the stack-root lock after the SDK check, then runs dotnet run --no-build --project <project file> --no-launch-profile in its directory with ASPNETCORE_URLS on 0.0.0.0 and PORT set to the port flag, default 3000 and 0 for a free port, and emits a ready event once the port accepts connections. It stops the process on interrupt and exits with its exit code."
+      "text": "serve builds an application under the stack-root lock after the SDK check, then runs dotnet run --no-build --project <project file> --no-launch-profile, with the words of --args after --, in its directory with ASPNETCORE_URLS on 0.0.0.0 and PORT set to the port flag, default 3000 and 0 for a free port, and emits a ready event once the port accepts connections. It stops the process on interrupt and exits with its exit code."
     },
     {
       "id": "runs-an-application-once",
@@ -67,7 +68,7 @@
     },
     {
       "id": "packages-an-application-image",
-      "text": "package with the docker channel runs, under the stack-root lock, dotnet publish -c Release for the target platform, framework-dependent, and assembles an OCI image with no Docker daemon: the published files under /app, run as dotnet <assembly>.dll by the app user, onto the official mcr.microsoft.com/dotnet/aspnet image when the published runtimeconfig needs ASP.NET Core, on port 8080, else runtime, pinned by digest, or a digest-pinned base the project names."
+      "text": "package with the docker channel runs, under the stack-root lock, dotnet publish -c Release for the target platform, framework-dependent, and assembles an OCI image with no Docker daemon: the published files under /app, run as dotnet <assembly>.dll by the app user, onto the official mcr.microsoft.com/dotnet/aspnet image when the published runtimeconfig needs ASP.NET Core, else runtime, pinned by digest, or a digest-pinned base the project names, listening on the port flag, 8080 by default."
     },
     {
       "id": "publishes-an-application-image",
@@ -88,6 +89,10 @@
     {
       "id": "checks-documentation-links",
       "text": "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the shared documentation link check, unless the docs-links flag is off."
+    },
+    {
+      "id": "filters-the-tests",
+      "text": "test with the test flag, short -t, passes its value to dotnet test as --filter <value>, whose bare form selects the tests whose fully qualified name contains it, so a test project in which it selects no test passes with no failed case."
     }
   ],
   "decisions": [
