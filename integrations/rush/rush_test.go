@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -159,9 +160,10 @@ func TestTheRushProjectsBecomeProjectsWithTheirEdges(t *testing.T) {
 		if !reflect.DeepEqual(deps, want.deps) {
 			t.Errorf("%s dependencies = %v, want %v", dir, p.Dependencies, want.deps)
 		}
-		// Each edge comes from the project's package.json, as Rush reads it.
+		// Each edge is one Rush's own project graph states (ADR 0007 of
+		// protocols/workspace).
 		for _, dep := range p.Dependencies {
-			if p.DependencySources[dep] != wsproto.DependencySourcePackageJSON {
+			if p.DependencySources[dep] != wsproto.DependencySourceBuildGraph {
 				t.Errorf("%s edge %s source = %q", dir, dep, p.DependencySources[dep])
 			}
 		}
@@ -554,6 +556,9 @@ func TestModeReadsTheWorkspaceOptions(t *testing.T) {
 	_, diags := Detect(root, wsproto.ProbeRequest{Paths: []string{"apps/api"}})
 	if len(diags) != 1 || diags[0].Code != stacks.CodeAdoptionModeInvalid {
 		t.Errorf("the probe of an unknown mode: %v", diags)
+	}
+	if _, err := Sync(context.Background(), root, io.Discard); err == nil || !strings.Contains(err.Error(), "delgate") {
+		t.Errorf("the sync of an unknown mode: %v", err)
 	}
 }
 

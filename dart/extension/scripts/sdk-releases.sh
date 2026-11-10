@@ -4,7 +4,7 @@
 # SHA-256 the dart-archive publishes for each platform's archive, and the
 # newest stable Flutter release of each minor from 3.10 on each platform, with
 # the SHA-256 its release manifest states. A pin moves only when a release of
-# the extension ships a regenerated file (ADR 0002 of @putnami/dart).
+# the extension ships a regenerated file (ADR 0003 of @putnami/dart).
 #
 #   dart/extension/scripts/sdk-releases.sh
 #
@@ -25,7 +25,7 @@ token=""
 : > "$tmp/versions"
 while :; do
   url="$list"
-  [ -n "$token" ] && url="$url&pageToken=$token"
+  [ -n "$token" ] && url="$url&pageToken=$(printf '%s' "$token" | jq -sRr @uri)"
   curl -fsSL "$url" > "$tmp/page"
   jq -r '.prefixes[] | rtrimstr("/") | split("/") | last | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' "$tmp/page" >> "$tmp/versions"
   token=$(jq -r '.nextPageToken // ""' "$tmp/page")
@@ -41,11 +41,17 @@ newest=$(jq -R -s -r '
 : > "$tmp/dart"
 for v in $newest; do
   for p in $platforms; do
-    if sum=$(curl -fsSL "$archive/$v/sdk/dartsdk-$p-release.zip.sha256sum" 2>/dev/null); then
-      digest=$(echo "$sum" | awk '{print $1}')
-      echo "$digest" | grep -Eq '^[0-9a-f]{64}$' || { echo "$v $p: $digest is no SHA-256" >&2; exit 1; }
-      printf '%s %s %s\n' "$v" "$p" "$digest" >> "$tmp/dart"
-    fi
+    # A platform the release does not publish answers 404; any other
+    # failure stops the script, so a table never drops a pin it should hold.
+    code=$(curl -sSL -o "$tmp/sum" -w '%{http_code}' "$archive/$v/sdk/dartsdk-$p-release.zip.sha256sum")
+    case "$code" in
+      200) ;;
+      404) continue ;;
+      *) echo "$v $p: HTTP $code" >&2; exit 1 ;;
+    esac
+    digest=$(awk '{print $1}' "$tmp/sum")
+    echo "$digest" | grep -Eq '^[0-9a-f]{64}$' || { echo "$v $p: $digest is no SHA-256" >&2; exit 1; }
+    printf '%s %s %s\n' "$v" "$p" "$digest" >> "$tmp/dart"
   done
 done
 

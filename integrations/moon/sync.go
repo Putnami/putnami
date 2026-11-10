@@ -608,11 +608,12 @@ func declaredNames(root string, declared []string) []string {
 
 // workspaceFiles are the files at the workspace root that every moon task
 // reads: the workspace and task configuration, the toolchain pins, and the
-// package manager's lockfile and configuration, which moon hashes into each
-// task.
+// root lockfile and configuration of each language moon runs, which moon
+// hashes into the tasks of that language.
 var workspaceFiles = []string{
 	".moon/workspace.yml", ".moon/tasks.yml", ".moon/toolchain.yml", ".prototools",
 	"package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock", "bun.lock", "bun.lockb", ".npmrc",
+	"Cargo.lock", "go.work", "go.work.sum", "uv.lock", "poetry.lock", "composer.lock", "Gemfile.lock",
 }
 
 // rootInputs are the workspace files the root holds, and the task files of

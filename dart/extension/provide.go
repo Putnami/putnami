@@ -44,7 +44,7 @@ var dartArchiveURL = "https://storage.googleapis.com/dart-archive/channels/stabl
 
 // sdkReleasesJSON is the table of SDK releases the extension installs, which
 // scripts/sdk-releases.sh writes: a pin moves only when a release of the
-// extension ships a regenerated table (ADR 0002).
+// extension ships a regenerated table (ADR 0003).
 //
 //go:embed sdkreleases.json
 var sdkReleasesJSON []byte
@@ -91,7 +91,7 @@ var stableVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 // for a dart command, the Flutter SDK for a flutter one. It picks the newest
 // release the extension pins that every check admits, an install of an
 // earlier task first, and checks the archive against the SHA-256 it pins
-// (ADR 0001, ADR 0002).
+// (ADR 0001, ADR 0003).
 func Provide(ctx context.Context, toolchain stacks.Toolchain, expected []stacks.Expected, info func(string)) (stacks.Provided, error) {
 	checks := toolchain.Checks()
 	if len(expected) != len(checks) {
@@ -191,13 +191,12 @@ func dartDigest(version, platform string) string {
 
 // flutterRelease is one release of a Flutter release manifest.
 type flutterRelease struct {
-	Channel  string `json:"channel"`
-	Version  string `json:"version"`
-	Dart     string `json:"dart_sdk_version"`
-	Arch     string `json:"dart_sdk_arch"`
-	Archive  string `json:"archive"`
-	SHA256   string `json:"sha256"`
-	Released string `json:"release_date"`
+	Channel string `json:"channel"`
+	Version string `json:"version"`
+	Dart    string `json:"dart_sdk_version"`
+	Arch    string `json:"dart_sdk_arch"`
+	Archive string `json:"archive"`
+	SHA256  string `json:"sha256"`
 }
 
 // flutterPlatforms are the manifest and architecture of each platform the

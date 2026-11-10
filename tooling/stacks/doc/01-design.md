@@ -161,7 +161,7 @@ The Rust reference profile:
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the directory `dir` names, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{manifest}` the absolute path of the manifest the detector read it from, `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
 | `tasks.<task>.reportSteps` | Steps that run after the task's steps whatever their outcome, such as a converter that writes the JUnit report a failing test runner leaves to it, so the failed cases name the failure. They name no `{target}`, and may name `{runtime}`. |
-| `tasks.<task>.reports` | The JUnit (`junit`) and TRX (`trx`) test reports and the coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
+| `tasks.<task>.reports` | The JUnit (`junit`) and TRX (`trx`) test reports and the coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when`, `optional` and `warnWhenMissing` say when a report is expected. |
 | `tasks.<task>.targets` | What a step that names `{target}` runs on, listed in the project directory when the task runs: a `name`, or one target per file an `each` pattern matches, named by its base name without extension; `when` lists paths that must all exist, `hosts` the systems (`linux`, `darwin`, `windows`) that build it. A step that names `{target}` runs once per target, and not at all when there is none; it needs the task to declare targets, and each target's paths are in the task's inputs. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
 | `variants.<name>` | A part of the profile one build runs, applied before the project's override. |
@@ -256,9 +256,10 @@ may be empty so the project keeps its directory's name.
 
 A task's `reports.when` names project files: when none exists, the task
 expects no report, so a module without tests passes. A coverage report marked
-`optional`, one the project's own setup produces such as Coverlet's or
-SimpleCov's, is read when it exists; when it does not, the task warns with
-`stacks.coverage_unavailable` and its summary carries no coverage
+`optional` is read when it exists and fails nothing when it does not, and the
+summary carries no coverage. One that only the project's own setup produces,
+such as Coverlet's or SimpleCov's, also declares `warnWhenMissing`, and its
+absence warns with `stacks.coverage_unavailable`
 ([ADR 0015](adr/0015-the-stack-extensions-share-one-command-surface.md)).
 
 ### Nested markers, excluded directories and runtime commands

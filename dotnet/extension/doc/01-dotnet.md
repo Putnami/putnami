@@ -176,8 +176,11 @@ newest ASP.NET Core runtime of every channel from 8.0. The same extension
 release installs the same SDK on every machine, and a pin moves with the next
 extension release
 ([ADR 0002](https://github.com/Putnami/putnami/blob/main/dotnet/extension/doc/adr/0002-the-extension-pins-the-sdk-and-runtime-releases-it-installs.md)).
-`rollForward: disable` on an SDK that is not the newest of its feature band,
-or on a prerelease, finds none to install: put that SDK on `PATH`.
+A `global.json` that admits only an SDK the extension does not pin finds none
+to install, and the task says to put that SDK on `PATH`: `rollForward:
+disable` on an SDK that is not the newest of its feature band, a prerelease,
+or a version newer than the newest pinned patch of its band, such as 8.0.429
+when the extension pins 8.0.428, until the next extension release.
 
 An offline run (`PUTNAMI_OFFLINE_DEPENDENCIES=1`) installs nothing, and
 reuses none either: it checks the SDK on `PATH` alone. Linux, including a

@@ -415,9 +415,9 @@ func chooseSDK(index releasesIndex, load func(version, url string) (channelRelea
 	}
 	if len(versions) == 0 {
 		if !stated {
-			return published{}, fmt.Errorf("the release metadata lists no SDK of the %s channel", defaultChannel)
+			return published{}, fmt.Errorf("the extension pins no SDK of the %s channel: put an SDK on PATH", defaultChannel)
 		}
-		return published{}, fmt.Errorf("the release metadata lists no SDK that %s accepts for version %s", expected.Source, expected.Version)
+		return published{}, fmt.Errorf("no SDK the extension pins is one %s accepts for version %s (it pins the newest SDK of each feature band): put that SDK on PATH", expected.Source, expected.Version)
 	}
 	return byVersion[pickSDK(versions, expected)], nil
 }

@@ -339,7 +339,11 @@ const ModeParam = "mode"
 // one, or with the dryRun param the diff it would write.
 func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	jobs := syncJobs
-	if mode := ctx.Params.String(ModeParam); mode == ModeImport || mode == ModeDelegate {
+	if given := ctx.Params.String(ModeParam); given != "" {
+		mode, err := stacks.CheckAdoptionMode(given)
+		if err != nil {
+			return "FAILED", nil, err
+		}
 		jobs.Sync = func(c context.Context, root string, stderr io.Writer, dry bool) (stacks.GraphResult, error) {
 			return synchronizeIn(c, root, stderr, mode, dry)
 		}

@@ -333,7 +333,10 @@ func TestTheShippedTablePinsEveryReleaseItLists(t *testing.T) {
 	if len(table.Dart) == 0 || len(table.Flutter["linux"].Releases) == 0 {
 		t.Fatalf("the shipped table pins nothing: %d Dart, %d Flutter", len(table.Dart), len(table.Flutter["linux"].Releases))
 	}
-	for _, r := range table.Dart {
+	for i, r := range table.Dart {
+		if i > 0 && len(r.Digests) < len(table.Dart[i-1].Digests) {
+			t.Errorf("Dart %s pins %d platforms, fewer than %s's %d: a read failed", r.Version, len(r.Digests), table.Dart[i-1].Version, len(table.Dart[i-1].Digests))
+		}
 		for platform, d := range r.Digests {
 			if !slices.Contains(slices.Collect(maps.Values(dartPlatforms)), platform) || len(d) != 64 {
 				t.Errorf("Dart %s %s: %q", r.Version, platform, d)

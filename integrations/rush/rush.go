@@ -95,7 +95,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			SourceFile:   path.Join(p.Folder, "package.json"),
 			Root:         wsproto.ProbeRootPath,
 			Dependencies: p.DependsOn,
-			EdgeSource:   wsproto.DependencySourcePackageJSON,
+			EdgeSource:   wsproto.DependencySourceBuildGraph,
 		})
 	}
 	return out, detection.Diagnostics

@@ -27,7 +27,7 @@ func AdoptionMode(root, extension string) (string, error) {
 		return AdoptionImport, nil
 	}
 	recorded, present := cfg.Options[extension]["mode"]
-	if !present || recorded == "" {
+	if !present || recorded == nil || recorded == "" {
 		return AdoptionImport, nil
 	}
 	return CheckAdoptionMode(recorded)

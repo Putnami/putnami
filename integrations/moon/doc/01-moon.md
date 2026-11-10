@@ -45,9 +45,12 @@ For each project moon runs, the sync also writes, as `filePatterns`, the root
 files every moon task reads: `.moon/workspace.yml`, `.moon/tasks.yml`,
 `.moon/tasks/**`, `.moon/toolchain.yml`, `.prototools` and the package
 manager's lockfile and `.npmrc`, those the root holds. A change to one of them
-selects every such project, as moon's own hashes do. Each edge the probe
-reports is attributed to moon's project graph (`build-graph`), so
-`workspace.declared_edge` does not warn about them.
+selects every such project, as moon's own hashes do. Each edge of a project
+moon runs is attributed to moon's project graph (`build-graph`), so
+`workspace.declared_edge` does not warn about it. A project imported into a
+language extension takes its edges' provenance from that extension: an edge
+moon states that its manifests do not, such as a TypeScript project's edge to
+a Rust one, is still reported as a declaration.
 
 ## Projects and tasks
 

@@ -404,7 +404,7 @@ func TestMuslIsTheCLibraryTheShellRunsOn(t *testing.T) {
 	}
 }
 
-func TestTheShippedMetadataPinsAnArchiveOfEveryPlatformForEveryRelease(t *testing.T) {
+func TestTheShippedMetadataPinsAnHTTPSArchiveAndASHA512ForEachFile(t *testing.T) {
 	table := mustDecodeReleases(sdkReleasesJSON)
 	if len(table.Channels) == 0 || len(table.releasesIndex.Channels) != len(table.Channels) {
 		t.Fatalf("index %d channels, metadata %d", len(table.releasesIndex.Channels), len(table.Channels))

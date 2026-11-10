@@ -26,14 +26,7 @@ for ch in $channels; do
   curl -fsSL "$url" > "$tmp/channel-$ch"
 done
 
-jq -n --argjson rids "$rids" --slurpfile index "$tmp/index" '
-def files($prefix):
-  [(.files // [])[]
-    | select(.rid as $r | $rids | index($r))
-    | select(.name == ($prefix + "-" + .rid + (if (.rid | startswith("win-")) then ".zip" else ".tar.gz" end)))
-    | {name, rid, url, hash}
-    | if (.hash | test("^[0-9a-f]{128}$")) then . else error("\(.name): \(.hash) is no SHA-512") end];
-def published($prefix): if . == null then null else {version, files: files($prefix)} end;
+jq -n --slurpfile index "$tmp/index" '
 {
   "releases-index": [$index[0]."releases-index"[]
     | select(."channel-version" | split(".") | map(tonumber) | .[0] >= 8)
@@ -47,11 +40,13 @@ def files($prefix):
   [(.files // [])[]
     | select(.rid as $r | $rids | index($r))
     | select(.name == ($prefix + "-" + .rid + (if (.rid | startswith("win-")) then ".zip" else ".tar.gz" end)))
-    | {name, rid, url, hash}];
+    | {name, rid, url, hash}
+    | if (.hash | test("^[0-9a-f]{128}$")) then . else error("\(.name): \(.hash) is no SHA-512") end];
 def published($prefix): {version, files: files($prefix)};
 def release($v): $v | split("-")[0] | split(".") | map(tonumber);
 ($c[0].releases | map(.sdk, (.sdks // [])[]) | map(select(. != null and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")))) | unique_by(.version)) as $sdks
-| ($c[0].releases | map(."aspnetcore-runtime" | select(. != null and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")))) | max_by(release(.version))) as $runtime
+| ($c[0].releases | map(."aspnetcore-runtime" | select(. != null and (.version | test("^[0-9]+\\.[0-9]+\\.[0-9]+$")))) | max_by(release(.version))
+    // error("channel \($ch) has no stable ASP.NET Core runtime")) as $runtime
 | .channels[$ch] = {releases: (
     [{"aspnetcore-runtime": ($runtime | published("aspnetcore-runtime")), sdks: []}]
     + [{sdks: [$sdks | group_by(release(.version) | .[2] / 100 | floor) | map(max_by(release(.version)))[] | published("dotnet-sdk")] | sort_by(release(.version)) | reverse}]
