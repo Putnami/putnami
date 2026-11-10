@@ -341,10 +341,14 @@ func declaresExtension(root, name string) bool {
 
 // projectPlan is what the sync writes for one project.
 type projectPlan struct {
-	deps     []string
-	disabled []string
-	reports  map[string]any
-	unmapped []Unmapped
+	// typeScript reports an imported TypeScript project, whose putnami.json
+	// names @putnami/typescript beside the extension: a putnami.json that
+	// names extensions is claimed by those alone.
+	typeScript bool
+	deps       []string
+	disabled   []string
+	reports    map[string]any
+	unmapped   []Unmapped
 }
 
 // planProject maps the targets of one project in the mode.
@@ -362,6 +366,7 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 		}
 	}
 	isTS := mode == ModeImport && typeScript && isTypeScriptProject(root, p.Path)
+	plan.typeScript = isTS
 	for _, task := range lifecycleTasks {
 		target, ok := targets[task]
 		switch {
@@ -603,9 +608,10 @@ func ownedJobs() []string {
 
 // writeProject merges the project's Nx facts into the putnami.json at the
 // workspace-relative file and writes it when a member the sync owns changes:
-// the extension, the dependencies on Nx projects, the entries of disable.jobs
-// it owns and options["@putnami/nx"].tasks.test.reports. Every other member
-// is kept as it is. It returns the change, or nil when the file is current.
+// the extension, @putnami/typescript for an imported TypeScript project, the
+// dependencies on Nx projects, the entries of disable.jobs it owns and
+// options["@putnami/nx"].tasks.test.reports. Every other member is kept as it
+// is. It returns the change, or nil when the file is current.
 func writeProject(root, file string, plan projectPlan, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)
@@ -620,6 +626,13 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	extensions := stringList(doc["extensions"])
 	if !slices.Contains(extensions, ExtensionName) {
 		extensions = append(extensions, ExtensionName)
+	}
+	hasTS := slices.Contains(extensions, TypeScriptExtension)
+	switch {
+	case plan.typeScript && !hasTS:
+		extensions = append(extensions, TypeScriptExtension)
+	case !plan.typeScript && hasTS:
+		extensions = slices.DeleteFunc(extensions, func(e string) bool { return e == TypeScriptExtension })
 	}
 	doc["extensions"] = extensions
 
@@ -636,7 +649,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 }
 
 // retractProject removes from the putnami.json of a former project the
-// extension, its Nx edges, the disable.jobs entries and the reports the sync
+// extension, @putnami/typescript, its Nx edges, the disable.jobs entries and the reports the sync
 // owns.
 func retractProject(root, file string, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
@@ -645,7 +658,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 		return nil, err
 	}
 	before := clone(doc)
-	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return e == ExtensionName }))
+	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return e == ExtensionName || e == TypeScriptExtension }))
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, components) }))
 	setDisabled(doc, nil)
 	setReports(doc, nil)

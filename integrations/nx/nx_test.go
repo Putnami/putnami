@@ -298,6 +298,13 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	if got, want := jobs("apps/api"), []any{"@putnami/typescript:build", "@putnami/typescript:lint", "@putnami/typescript:test"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("api jobs = %v, want %v", got, want)
 	}
+	// A putnami.json that names extensions is claimed by those alone: each
+	// TypeScript project names @putnami/typescript beside the extension.
+	for _, dir := range []string{"packages/pricing", "apps/api"} {
+		if got, want := readProjectFile(t, root, dir)["extensions"], []any{ExtensionName, TypeScriptExtension}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s extensions = %v, want %v", dir, got, want)
+		}
+	}
 	// A test the TypeScript extension runs carries no Nx reports; one that
 	// stays on Nx does.
 	if _, ok := readProjectFile(t, root, "packages/pricing")["options"]; ok {
@@ -313,6 +320,9 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	result = sync(t, root, SyncOptions{})
 	if got := jobs("packages/pricing"); !reflect.DeepEqual(got, []any{"lint"}) {
 		t.Errorf("jobs without the TypeScript extension = %v", got)
+	}
+	if got := readProjectFile(t, root, "packages/pricing")["extensions"]; !reflect.DeepEqual(got, []any{ExtensionName}) {
+		t.Errorf("extensions without the TypeScript extension = %v", got)
 	}
 	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool { return strings.Contains(u.Reason, "does not declare @putnami/typescript") }) {
 		t.Errorf("unmapped = %+v, want the undeclared extension named", result.Unmapped)
@@ -663,8 +673,14 @@ func TestDelegateModeImportsTheProjectsTheImportListSelects(t *testing.T) {
 	if got, want := jobs("packages/pricing"), []any{"@putnami/nx:build", "@putnami/nx:test", "lint"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("pricing jobs = %v, want %v", got, want)
 	}
+	if got, want := readProjectFile(t, root, "packages/pricing")["extensions"], []any{ExtensionName, TypeScriptExtension}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing extensions = %v, want %v", got, want)
+	}
+	if got, want := readProjectFile(t, root, "apps/api")["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+		t.Errorf("api extensions = %v, want %v", got, want)
+	}
 	// api stays delegated: every target runs through nx run, and the
-	// TypeScript extension that claims it too runs none.
+	// TypeScript extension runs none.
 	if got, want := jobs("apps/api"), []any{"@putnami/typescript:build", "@putnami/typescript:test", "lint"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("api jobs = %v, want %v", got, want)
 	}
@@ -707,6 +723,10 @@ func TestDelegateModeImportsTheProjectsTheImportListSelects(t *testing.T) {
 	sync(t, root, SyncOptions{})
 	if status, events := run(); status != "OK" {
 		t.Errorf("after the sync: %s %s", status, events)
+	}
+	// Delegated again, pricing no longer names @putnami/typescript.
+	if got, want := readProjectFile(t, root, "packages/pricing")["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+		t.Errorf("delegated pricing extensions = %v, want %v", got, want)
 	}
 
 	// A malformed entry fails the sync and writes nothing.
