@@ -241,7 +241,8 @@ func parseInitFlags(args []string) initFlags {
 			f.apply = true
 		case "--import":
 			f.importSet = true
-			if i+1 < len(args) {
+			// The next flag is no project path: --import then has none.
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				f.imports = append(f.imports, splitImportFlag(args[i+1])...)
 				i++
 			}

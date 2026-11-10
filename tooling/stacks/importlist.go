@@ -39,17 +39,14 @@ func NewImportList(entries []string) (*ImportList, error) {
 	return l, nil
 }
 
-// NormalizeImportEntry is the form an entry is matched in: without the
-// leading / and ./, cleaned. It reports an entry that names no project.
-func NormalizeImportEntry(entry string) (string, error) {
-	return importPattern(entry)
-}
-
 func importPattern(entry string) (string, error) {
 	trimmed := strings.TrimSpace(entry)
 	pattern := path.Clean(strings.TrimPrefix(strings.TrimPrefix(trimmed, "/"), "./"))
-	if trimmed == "" || pattern == "." || pattern == ".." || strings.HasPrefix(pattern, "../") {
+	if trimmed == "" || pattern == "." || pattern == ".." || strings.HasPrefix(pattern, "../") || strings.HasPrefix(pattern, "-") {
 		return "", fmt.Errorf("the import entry %q names no project directory under the workspace root", entry)
+	}
+	if strings.Contains(pattern, "**") {
+		return "", fmt.Errorf("the import entry %q uses **, which matches within one path segment only: list each level, such as packages/* or packages/*/*", entry)
 	}
 	if _, err := path.Match(pattern, ""); err != nil {
 		return "", fmt.Errorf("the import entry %q is no valid pattern: %w", entry, err)
@@ -58,12 +55,15 @@ func importPattern(entry string) (string, error) {
 }
 
 // Selects reports whether an entry matches the workspace-relative directory,
-// and records each entry that does.
+// and records each entry that does. The workspace root is never selected.
 func (l *ImportList) Selects(dir string) bool {
 	if l == nil {
 		return false
 	}
 	dir = path.Clean(strings.TrimPrefix(dir, "/"))
+	if dir == "." {
+		return false
+	}
 	selected := false
 	for i, pattern := range l.patterns {
 		if ok, _ := path.Match(pattern, dir); ok {

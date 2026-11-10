@@ -132,11 +132,13 @@ func splitImportFlag(value string) []string {
 
 // importKey is the form two import entries are compared in: without the
 // leading / or ./, cleaned. ok is false for an entry that names no project
-// directory under the workspace root or is no valid pattern.
+// directory under the workspace root or is no valid pattern. It mirrors the
+// check of go.putnami.dev/tooling/stacks.NewImportList, which the sync runs
+// and this module does not import.
 func importKey(entry string) (string, bool) {
 	trimmed := strings.TrimSpace(entry)
 	key := path.Clean(strings.TrimPrefix(strings.TrimPrefix(trimmed, "/"), "./"))
-	if trimmed == "" || key == "." || key == ".." || strings.HasPrefix(key, "../") {
+	if trimmed == "" || key == "." || key == ".." || strings.HasPrefix(key, "../") || strings.HasPrefix(key, "-") || strings.Contains(key, "**") {
 		return "", false
 	}
 	if _, err := path.Match(key, ""); err != nil {

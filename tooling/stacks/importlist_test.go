@@ -19,6 +19,8 @@ func TestImportListSelectsDirectoriesByPathAndGlob(t *testing.T) {
 		"apps/api/nested":   false,
 		"libs/a1":           true,
 		"libs/c1":           false,
+		".":                 false,
+		"":                  false,
 	} {
 		if got := list.Selects(dir); got != want {
 			t.Errorf("Selects(%q) = %v, want %v", dir, got, want)
@@ -33,13 +35,13 @@ func TestImportListSelectsDirectoriesByPathAndGlob(t *testing.T) {
 }
 
 func TestImportListRefusesAnEntryThatNamesNoProject(t *testing.T) {
-	for _, entry := range []string{"", " ", "/", ".", "..", "../outside", "packages/[", "./"} {
+	for _, entry := range []string{"", " ", "/", ".", "..", "../outside", "packages/[", "./", "--apply", "packages/**"} {
 		if _, err := NewImportList([]string{entry}); err == nil {
 			t.Errorf("NewImportList(%q) accepted an entry that names no project", entry)
 		}
 	}
-	if pattern, err := NormalizeImportEntry("/packages//pricing/"); err != nil || pattern != "packages/pricing" {
-		t.Errorf("NormalizeImportEntry = %q, %v", pattern, err)
+	if pattern, err := importPattern("/packages//pricing/"); err != nil || pattern != "packages/pricing" {
+		t.Errorf("importPattern = %q, %v", pattern, err)
 	}
 }
 

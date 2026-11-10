@@ -129,8 +129,11 @@ type SyncResult struct {
 	// EmptyGraph reports a graph that lists no project while projects are
 	// marked: the sync wrote nothing, so a filtered graph retracts none.
 	EmptyGraph bool
-	// Imported are the workspace-relative directories of the projects a
-	// delegated workspace's import list selects, sorted.
+	// Imported are the workspace-relative directories of the TypeScript
+	// projects a delegated workspace's import list moved to
+	// @putnami/typescript, sorted. A selected project that is no TypeScript
+	// project, or whose workspace does not declare the extension, stays on
+	// Nx and is listed among Unmapped.
 	Imported []string
 	// Unmatched are the entries of the import list that select no project.
 	Unmatched []string
@@ -190,9 +193,11 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 		projectMode := mode
 		if imports.Selects(p.Path) {
 			projectMode = ModeImport
-			result.Imported = append(result.Imported, p.Path)
 		}
 		plan := planProject(root, p, projectMode, typeScript)
+		if mode == ModeDelegate && plan.typeScript {
+			result.Imported = append(result.Imported, p.Path)
+		}
 		result.Unmapped = append(result.Unmapped, plan.unmapped...)
 		file := path.Join(p.Path, wsproto.ConfigFilename)
 		change, err := writeProject(root, file, plan, components, opts.DryRun)

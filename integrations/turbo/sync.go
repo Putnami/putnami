@@ -69,8 +69,8 @@ type Result struct {
 	// Unreported are the directories of the delegated packages whose test
 	// task names no JUnit report, sorted: their result is the exit code.
 	Unreported []string
-	// Imported are the directories of the packages a delegated workspace's
-	// import list selects, sorted.
+	// Imported are the directories of the TypeScript packages a delegated
+	// workspace's import list moved to @putnami/typescript, sorted.
 	Imported []string
 	// Unmatched are the entries of the import list that select no package.
 	Unmatched []string
@@ -147,9 +147,11 @@ func Sync(root string, opts Options) (Result, error) {
 		packageMode := mode
 		if imports.Selects(p.Path) {
 			packageMode = ModeImport
-			result.Imported = append(result.Imported, p.Path)
 		}
 		imported := packageMode == ModeImport && isTypeScript(dir)
+		if imported && mode == ModeDelegate {
+			result.Imported = append(result.Imported, p.Path)
+		}
 		if imported {
 			m.extensions = append(m.extensions, TypeScriptExtension)
 		}
