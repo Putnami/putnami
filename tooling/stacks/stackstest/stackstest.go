@@ -1,7 +1,8 @@
 // Package stackstest is the conformance kit of the stack core: every stack
 // extension runs CheckManifest on its manifest, so a manifest that drifts
 // from its profile or from the core's task shape fails the extension's own
-// gate.
+// gate. WriteFile writes the fixtures its tests build; the imagetest
+// sub-package serves the registry its image tests package onto.
 package stackstest
 
 import (

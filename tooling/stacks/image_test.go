@@ -1,10 +1,8 @@
 package stacks
 
 import (
-	"path/filepath"
 	"reflect"
 	"regexp"
-	"strings"
 	"testing"
 
 	"go.putnami.dev/sdk/extension/releaseset"
@@ -86,14 +84,5 @@ func TestImageMemberIsNoneWithoutAnImageToPublish(t *testing.T) {
 	// No registry names a namespace: the coordinate is the image name alone.
 	if got := ImageMember(root, "bare", "Bare"); len(got) != 1 || got[0].Coordinate != "bare" {
 		t.Errorf("ImageMember without a registry = %+v", got)
-	}
-}
-
-func TestLoadImageNeedsATagAndALayout(t *testing.T) {
-	if err := LoadImage(t.TempDir(), nil, nil); err == nil {
-		t.Error("no tag is an error")
-	}
-	if err := LoadImage(filepath.Join(t.TempDir(), "missing"), []string{"demo:c-1"}, nil); err == nil || !strings.Contains(err.Error(), "docker tarball") {
-		t.Errorf("a missing layout fails before docker runs: %v", err)
 	}
 }

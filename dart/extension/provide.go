@@ -269,7 +269,7 @@ func provideFlutter(ctx context.Context, base string, checks []stacks.Toolchain,
 // installFlutter downloads a Flutter archive, checks its SHA-256, unpacks it
 // with the host's tar beside dir, then moves it in place.
 func installFlutter(ctx context.Context, archive, digest, dir string, executable func(string) string) error {
-	staging, err := os.MkdirTemp(filepath.Dir(dir), "download-*")
+	staging, err := os.MkdirTemp(filepath.Dir(dir), stacks.StagingPattern)
 	if err != nil {
 		return err
 	}

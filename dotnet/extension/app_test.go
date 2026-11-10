@@ -23,6 +23,7 @@ import (
 	"go.putnami.dev/sdk/extension/releaseset"
 	"go.putnami.dev/tooling/stacks"
 	"go.putnami.dev/tooling/stacks/stackstest"
+	"go.putnami.dev/tooling/stacks/stackstest/imagetest"
 )
 
 const webProject = `<Project Sdk="Microsoft.NET.Sdk.Web">
@@ -190,7 +191,7 @@ func TestPackageAssemblesAnImageOfThePublishedApplication(t *testing.T) {
 	spectest.Proves(t, feature, "packages-an-application-image", "package-assembles-an-image-of-the-published-application")
 	root := appFixture(t)
 	log := stubApp(t, webProps)
-	host, base := stackstest.ImageRegistry(t)
+	host, base := imagetest.Registry(t)
 	status, _, err := runAppJob(t, root, "src/Api", PackageDockerJob(stack(t)), nil, "--docker-base-image", base, "--platform", "linux/arm64")
 	if status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)

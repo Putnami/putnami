@@ -23,6 +23,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks"
 	"go.putnami.dev/tooling/stacks/stackstest"
+	"go.putnami.dev/tooling/stacks/stackstest/imagetest"
 )
 
 // linuxHost makes the packaging host a Linux machine for the test.
@@ -97,7 +98,7 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionBundle(t *testing
 	log := rubyTools(t)
 	machineCache(t)
 	root := workspaceRoot(t)
-	host, base := stackstest.ImageRegistry(t)
+	host, base := imagetest.Registry(t)
 	shipped := imageApplication(t, root)
 
 	status, _, err := runProjectJob(t, root, "shop", PackageDockerJob(stack(t)), nil, "--docker-base-image", base)
@@ -197,7 +198,7 @@ func TestAStaticRubyBuildsExtensionsTheImagesRubyFinds(t *testing.T) {
 	rubyTools(t)
 	machineCache(t)
 	root := workspaceRoot(t)
-	host, base := stackstest.ImageRegistry(t)
+	host, base := imagetest.Registry(t)
 	rackApp(t, root, "shop")
 	t.Setenv("STUB_RUBY_HOST", `3.3.6\naarch64\nlinux\n\n3.3.0-static\n`)
 	t.Setenv("STUB_EXTENSION_API", "3.3.0-static")
@@ -233,7 +234,7 @@ func TestPackagingTheSameTreeTwiceGivesTheSameImage(t *testing.T) {
 	rubyTools(t)
 	machineCache(t)
 	root := workspaceRoot(t)
-	_, base := stackstest.ImageRegistry(t)
+	_, base := imagetest.Registry(t)
 	imageApplication(t, root)
 	digests := []string{}
 	for range 2 {
@@ -259,7 +260,7 @@ func TestPackageKeepsTheConfigureArgumentsOfTheEnvironment(t *testing.T) {
 	log := rubyTools(t)
 	machineCache(t)
 	root := workspaceRoot(t)
-	_, base := stackstest.ImageRegistry(t)
+	_, base := imagetest.Registry(t)
 	rackApp(t, root, "shop")
 	t.Setenv("CONFIGURE_ARGS", "--with-opt-dir=/opt")
 	status, _, err := runProjectJob(t, root, "shop", PackageDockerJob(stack(t)), nil, "--docker-base-image", base)

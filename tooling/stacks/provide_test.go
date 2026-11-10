@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -122,5 +123,13 @@ func TestAnswerToolchainResolvePinsItsIdentityOnly(t *testing.T) {
 	}
 	if empty := AnswerToolchainResolve("/elsewhere", wsproto.ToolchainResolveRequest{Identities: []string{"ruby"}}, "@putnami/ruby", "ruby", resolve); len(empty.Toolchains) != 0 {
 		t.Errorf("an identity it pins nothing for is omitted: %+v", empty.Toolchains)
+	}
+}
+
+func TestServeToolchainResolveAnswersOnlyItsControlCall(t *testing.T) {
+	var out strings.Builder
+	handled, err := ServeToolchainResolve([]string{"lint"}, strings.NewReader(""), &out, "@putnami/ruby", "ruby", nil)
+	if handled || err != nil || out.Len() != 0 {
+		t.Errorf("another command is not handled: %v %v %q", handled, err, out.String())
 	}
 }

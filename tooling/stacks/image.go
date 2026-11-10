@@ -1,21 +1,14 @@
 package stacks
 
 import (
-	"context"
 	"encoding/json"
-	"errors"
-	"fmt"
 	"os"
-	"os/exec"
 	"path"
 	"path/filepath"
 	"slices"
 	"strings"
-	"time"
 
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/jsonl"
-	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
@@ -111,43 +104,4 @@ func imageNamespace(root string, document imageDocument) string {
 	}
 	_, namespace, _ := strings.Cut(strings.Trim(strings.TrimSpace(registry.Publish), "/"), "/")
 	return namespace
-}
-
-// loadTimeout bounds each docker call of LoadImage.
-const loadTimeout = 5 * time.Minute
-
-// LoadImage loads the OCI layout into the local Docker daemon as tags[0], then
-// tags it with each other tag. Each docker call runs at most loadTimeout, and
-// its output goes to the job's log through emit, or to stderr when emit is nil.
-func LoadImage(layout string, tags []string, emit *jsonl.Emitter) error {
-	if len(tags) == 0 {
-		return errors.New("no tag to load the image as")
-	}
-	archive, err := os.CreateTemp("", "putnami-image-*.tar")
-	if err != nil {
-		return err
-	}
-	_ = archive.Close()
-	defer func() { _ = os.Remove(archive.Name()) }()
-	if err := oci.WriteDockerTarball(layout, tags[0], archive.Name()); err != nil {
-		return fmt.Errorf("write the docker tarball: %w", err)
-	}
-	docker := func(args ...string) error {
-		timed, cancel := context.WithTimeout(context.Background(), loadTimeout)
-		defer cancel()
-		cmd := exec.CommandContext(timed, "docker", args...) //nolint:gosec // fixed verbs with the task's own tags
-		if err := runAttached(cmd, emit); err != nil {
-			return fmt.Errorf("docker %s %s: %w", args[0], tags[0], err)
-		}
-		return nil
-	}
-	if err := docker("load", "-i", archive.Name()); err != nil {
-		return err
-	}
-	for _, alias := range tags[1:] {
-		if err := docker("tag", tags[0], alias); err != nil {
-			return err
-		}
-	}
-	return nil
 }

@@ -287,7 +287,7 @@ func provideSwiftly(ctx context.Context, base string, artifact swiftlyArtifact) 
 	if err := os.MkdirAll(base, 0o755); err != nil {
 		return "", err
 	}
-	staging, err := os.MkdirTemp(base, "download-*")
+	staging, err := os.MkdirTemp(base, stacks.StagingPattern)
 	if err != nil {
 		return "", err
 	}

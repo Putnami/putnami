@@ -13,9 +13,9 @@ import (
 	"go.putnami.dev/sdk/extension/putnamihome"
 )
 
-// stagingPattern names the directories an install downloads into before it
-// moves the result in place.
-const stagingPattern = "download-*"
+// StagingPattern names the directories an install downloads into, under its
+// tools home, before it moves the result in place.
+const StagingPattern = "download-*"
 
 // LockedToolsHome returns the folder of a stack's tools under the Putnami home,
 // <home>/tools/<stack>, holding the lock every install of that stack on the
@@ -34,7 +34,7 @@ func LockedToolsHome(stack string) (string, func(), error) {
 	if err != nil {
 		return "", nil, fmt.Errorf("lock %s: %w", base, err)
 	}
-	if stale, err := filepath.Glob(filepath.Join(base, stagingPattern)); err == nil {
+	if stale, err := filepath.Glob(filepath.Join(base, StagingPattern)); err == nil {
 		for _, dir := range stale {
 			_ = os.RemoveAll(dir)
 		}

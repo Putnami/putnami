@@ -460,7 +460,7 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 		tags = append(tags, image+":"+tag)
 	}
 	if ctx.Params.Bool("docker-load", false) {
-		if err := stacks.LoadImage(filepath.Join(dir, "oci"), tags, emit); err != nil {
+		if err := oci.LoadDocker(filepath.Join(dir, "oci"), tags, emit); err != nil {
 			return nil, err
 		}
 	}

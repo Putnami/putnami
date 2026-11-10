@@ -239,7 +239,7 @@ func provideRustup(ctx context.Context, base, triple string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return "", err
 	}
-	staging, err := os.MkdirTemp(filepath.Dir(path), "download-*")
+	staging, err := os.MkdirTemp(filepath.Dir(path), stacks.StagingPattern)
 	if err != nil {
 		return "", err
 	}

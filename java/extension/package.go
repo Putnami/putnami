@@ -128,7 +128,7 @@ func assembleImage(ctx *pctx.Context, stack stacks.Stack, flags map[string]strin
 		tags = append(tags, name+":"+tag)
 	}
 	if cli.FlagBool(flags, "docker-load", ctx.Params.Bool("docker-load", false, "dockerLoad")) {
-		if err := stacks.LoadImage(filepath.Join(output, "oci"), tags, emit); err != nil {
+		if err := oci.LoadDocker(filepath.Join(output, "oci"), tags, emit); err != nil {
 			return fail(CodeImageFailed, err)
 		}
 	}

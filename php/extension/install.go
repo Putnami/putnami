@@ -214,7 +214,7 @@ func provideComposer(ctx context.Context) (string, error) {
 func downloadComposer(ctx context.Context, path string) error {
 	ctx, cancel := context.WithTimeout(ctx, composerDownloadTimeout)
 	defer cancel()
-	staging, err := os.MkdirTemp(filepath.Dir(path), "download-*")
+	staging, err := os.MkdirTemp(filepath.Dir(path), stacks.StagingPattern)
 	if err != nil {
 		return err
 	}

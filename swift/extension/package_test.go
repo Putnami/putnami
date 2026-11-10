@@ -25,6 +25,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks/stackstest"
+	"go.putnami.dev/tooling/stacks/stackstest/imagetest"
 )
 
 // stubSwiftBuild puts first on PATH a swift that logs its arguments, prints
@@ -81,7 +82,7 @@ func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
 	log := stubSwiftBuild(t)
 	root := t.TempDir()
 	serverPackage(t, root)
-	host, base := stackstest.ImageRegistry(t)
+	host, base := imagetest.Registry(t)
 	// A bundle an earlier build of another product left in the bin path.
 	stackstest.WriteFile(t, root, "server/.build/out/Products/Release-staticlinux-x86_64/Server_Admin.resources/admin.css", "a {}\n")
 
@@ -153,7 +154,7 @@ func TestPackageBuildsForTheArm64Platform(t *testing.T) {
 	log := stubSwiftBuild(t)
 	root := t.TempDir()
 	serverPackage(t, root)
-	_, base := stackstest.ImageRegistry(t)
+	_, base := imagetest.Registry(t)
 	if status, _, err := runServerJob(t, root, PackageDockerJob(stack(t)), "--docker-base-image", base, "--platform", "linux/arm64"); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
 	}
@@ -281,7 +282,7 @@ func TestAJobThatWaitedForAnInstallInstallsNothing(t *testing.T) {
 	log := stubSwiftBuild(t)
 	root := t.TempDir()
 	serverPackage(t, root)
-	_, base := stackstest.ImageRegistry(t)
+	_, base := imagetest.Registry(t)
 	locks := filepath.Join(os.Getenv("PUTNAMI_HOME"), "locks")
 	if err := os.MkdirAll(locks, 0o755); err != nil {
 		t.Fatal(err)

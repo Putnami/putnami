@@ -455,7 +455,7 @@ func archiveFormat(name string) pinnedarchive.Format {
 // the shared frameworks of each runtime beside it, and moves the result to
 // dir, through a staging folder under base.
 func install(ctx context.Context, base string, plan installPlan, dir string) error {
-	staging, err := os.MkdirTemp(base, "download-*")
+	staging, err := os.MkdirTemp(base, stacks.StagingPattern)
 	if err != nil {
 		return err
 	}

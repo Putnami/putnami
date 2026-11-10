@@ -25,6 +25,7 @@ import (
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks/stackstest"
+	"go.putnami.dev/tooling/stacks/stackstest/imagetest"
 )
 
 // stubDartCompile puts first on PATH a dart that logs its arguments, prints
@@ -114,7 +115,7 @@ func TestPackageAssemblesTheImageOfAnAOTExecutable(t *testing.T) {
 	log := stubDartCompile(t)
 	root := tempDir(t)
 	serverPackage(t, root)
-	host, base := stackstest.ImageRegistry(t)
+	host, base := imagetest.Registry(t)
 
 	if status, err := runPackageJob(t, root, "server", PackageDockerJob(stack(t)), nil, "--docker-base-image", base); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
@@ -154,7 +155,7 @@ func TestPackageCompilesForTheArm64Platform(t *testing.T) {
 	log := stubDartCompile(t)
 	root := tempDir(t)
 	serverPackage(t, root)
-	host, base := stackstest.ImageRegistry(t)
+	host, base := imagetest.Registry(t)
 	if status, err := runPackageJob(t, root, "server", PackageDockerJob(stack(t)), job.Params{"platform": json.RawMessage(`"linux/arm64"`)}, "--docker-base-image", base); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
 	}
@@ -271,7 +272,7 @@ func TestPackageCompilesTheEntrypointServeStarts(t *testing.T) {
 	log := stubDartCompile(t)
 	root := tempDir(t)
 	serverPackage(t, root)
-	_, base := stackstest.ImageRegistry(t)
+	_, base := imagetest.Registry(t)
 	if status, err := runPackageJob(t, root, "server", PackageDockerJob(stack(t)), job.Params{"entrypoint": json.RawMessage(`"bin/migrate.dart"`)}, "--docker-base-image", base); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
 	}
@@ -293,7 +294,7 @@ func TestPackageRefusesAnOldSDKAPlatformAndAnUnpinnedBase(t *testing.T) {
 	log := stubDartCompile(t)
 	root := tempDir(t)
 	serverPackage(t, root)
-	_, base := stackstest.ImageRegistry(t)
+	_, base := imagetest.Registry(t)
 	for name, c := range map[string]struct {
 		version string
 		args    []string

@@ -24,6 +24,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks"
 	"go.putnami.dev/tooling/stacks/stackstest"
+	"go.putnami.dev/tooling/stacks/stackstest/imagetest"
 )
 
 // application writes a Composer application with a front controller.
@@ -38,7 +39,7 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionDependencies(t *t
 	spectest.Proves(t, feature, "packages-an-application-image", "package-assembles-an-image-of-an-application-and-its-production-dependencies")
 	log, _ := prepareComposer(t)
 	root := t.TempDir()
-	host, base := stackstest.ImageRegistry(t)
+	host, base := imagetest.Registry(t)
 	shipped := imageApplication(t, root)
 
 	status, _, err := runShopJob(t, root, PackageDockerJob(stack(t)), "--docker-base-image", base)
