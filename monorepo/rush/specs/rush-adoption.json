@@ -16,11 +16,11 @@
   "requirements": [
     {
       "id": "projects-become-projects",
-      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and as the name rush receives, the projects the putnami observe Rush detector says it depends on, the extension @putnami/rush, the tag rush and the workspace root as stack root. In import mode, set in options.@putnami/rush.mode of putnami.workspace.json, it answers no project, so the TypeScript extension runs them."
+      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and as the name rush receives, the projects the putnami observe Rush detector says it depends on, the extension @putnami/rush, the tag rush and the workspace root as stack root. In import mode, options.@putnami/rush.mode of putnami.workspace.json or its default, it answers no project, so the TypeScript extension runs them."
     },
     {
       "id": "sync-writes-the-project-graph",
-      "text": "The workspace sync task reads rush.json and each project's package.json and writes in each project's putnami.json the extension of the mode, @putnami/rush or @putnami/typescript, and the project IDs it depends on. In delegate mode it adds rush.json and common/config/rush/command-line.json as filePatterns, disables test and lint when command-line.json declares no bulk or phased command of that name, and retracts a former project. It rewrites a file only when a member it owns changes."
+      "text": "The sync task writes in each project's putnami.json the extension of the mode, the mode param or else the recorded mode, import by default, and the project IDs it depends on, and removes the other mode's extension. In delegate mode it adds rush.json, command-line.json and the Rush lockfile as filePatterns, disables test and lint without a bulk or phased command of that name, and retracts a former project. It rewrites a file only when a member it owns changes."
     },
     {
       "id": "validate-fails-on-a-stale-graph",
@@ -28,7 +28,7 @@
     },
     {
       "id": "tasks-delegate-to-rush",
-      "text": "Each task compares rush --version with the rushVersion of rush.json, then runs at the workspace root rush build --to <package>, or rush test or rush lint --to <package>. Each task depends only on its project's graph step, which runs no rush. Putnami's cache is off for every task, and the result records delegatedTo rush. A failing step fails with stacks.step_failed."
+      "text": "Each task compares the version the banner of rush --help states with the rushVersion of rush.json, then runs at the workspace root rush build --to <package>, or rush test or rush lint --to <package>. Each task depends only on its project's graph step, which runs no rush. Putnami's cache is off for every task, and the result records delegatedTo rush. A failing step fails with stacks.step_failed."
     },
     {
       "id": "reports-come-from-the-project-options",
@@ -48,7 +48,7 @@
     },
     {
       "id": "import-adopts-typescript-conventions",
-      "text": "In import mode, the sync adds exports {\".\": \"./src/index.ts\"} to a project's package.json that declares no exports, whose main or types names a file outside src/, and that holds src/index.ts, and writes tsconfig.json extending the workspace root's tsconfig.json where a project has none. It keeps every other byte of package.json, lists each file it writes, and a dry sync shows their diffs."
+      "text": "In import mode, the sync adds exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json that declares no exports, names a file outside src/ there, holds src/index.ts and that rush.json does not publish, and writes a tsconfig.json extending the root's where a project has none. It keeps every other byte, warns about each file it writes and each manifest it cannot edit, and a dry sync shows each diff."
     }
   ],
   "decisions": [

@@ -532,7 +532,7 @@
     },
     {
       "id": "D-066",
-      "statement": "an import adopts Putnami's TypeScript conventions: a project whose main names a build output gains exports ./src/index.ts, and a project without tsconfig.json gets one that extends the root; each rewrite is listed and shown in the rerun diff",
+      "statement": "an import adopts Putnami's TypeScript conventions: a project Rush does not publish whose main names a build output gains exports ./src/index.ts, a project without tsconfig.json gets one extending the root, and each rewrite is listed",
       "settled": "2026-11-09",
       "settledBy": "fdumay",
       "reviewOnly": true
