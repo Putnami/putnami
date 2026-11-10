@@ -61,6 +61,10 @@
     {
       "id": "python-is-browseable-not-anchored",
       "text": "Python is reachable from every published documentation listing but is not a first-level navigation anchor, because an anchor beside TypeScript and Go would imply a parity the workspace does not offer."
+    },
+    {
+      "id": "every-language-and-tool-is-published",
+      "text": "Every language Putnami runs and every monorepo tool it runs a repository on is listed on one published page that links to its reference; the reference of each stack extension and each tool integration is copied from the doc folder of the project that owns it, and a page copied on its own carries no relative link the site cannot serve."
     }
   ],
   "decisions": [

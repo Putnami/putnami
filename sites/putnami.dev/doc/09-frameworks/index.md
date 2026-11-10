@@ -17,6 +17,11 @@ framework package family ships today, it is never enabled by default, and it
 carries no parity promise with Go or TypeScript. The reviewed status of every
 package on this page is on [Support status](/docs/support).
 
+Rust, Java and Kotlin, Swift, Dart, .NET, Ruby and PHP have no Putnami
+framework: a stack extension runs each of them with the tools its repository
+already uses. [Languages and monorepo tools](/docs/languages) lists every
+language Putnami runs, each with its reference.
+
 Within the TypeScript framework, data is split by shape:
 
 - [Persistence](/docs/frameworks/typescript/persistence) for relational PostgreSQL data

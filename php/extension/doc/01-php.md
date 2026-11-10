@@ -8,6 +8,10 @@ needs neither PHP nor Composer.
 
 ## Adopt it
 
+`@putnami/php` is not published yet: until its first release, `putnami init
+--extension php` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
 1. At the root of the repository, run:
 
    ```bash
@@ -320,7 +324,7 @@ A steps override keeps the profile's reports: a test step must still write
 `stacks.project_config_invalid` when it names an unknown member, changes `id`
 or `markers`, or adds a stack-root input the extension does not declare. The
 design of the stack core is in
-[its design note](../../../tooling/stacks/doc/01-design.md).
+[its design note](https://github.com/Putnami/putnami/blob/main/tooling/stacks/doc/01-design.md).
 
 ## Limits
 

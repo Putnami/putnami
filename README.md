@@ -81,6 +81,13 @@ coding agent can act on.
   [extension SDK](tooling/extension-sdk), and every boundary is a
   language-neutral protocol. Go and TypeScript are supported today, and Python
   is experimental. A new language plugs into the same contracts.
+- **Runs the repository you already have.** Stack extensions run Rust, Java
+  and Kotlin, Swift, Dart, .NET, Ruby and PHP with the tools each repository
+  already uses, and an integration puts a repository that Bazel, moon, Nx,
+  Pants, Rush or Turborepo already builds under Putnami's runner and verdict,
+  without rewriting it. None of these extensions is published yet. See
+  [Languages and monorepo tools](https://putnami.dev/docs/languages) and
+  [Adopt Putnami on an existing monorepo](https://putnami.dev/docs/how-to/adopt-putnami-on-an-existing-monorepo).
 
 ### Designed to scale with teams and agents
 
@@ -91,8 +98,8 @@ tool that declares what it touches. Decisions live in versioned files that bind
 every contributor, human or agent, and `putnami validate` enforces the ones a
 machine can check.
 
-Putnami is built this way. This repository is one workspace of 155 projects in
-three languages, changed by people and coding agents through the same gates.
+Putnami is built this way. This repository is one workspace of 196 projects,
+changed by people and coding agents through the same gates.
 The repository of Putnami Cloud builds, tests, and deploys through Putnami on
 every merge to `main`.
 
@@ -101,10 +108,9 @@ every merge to `main`.
 - You only need build caching for an existing repository: use Nx, Turborepo,
   or moon. Putnami also provides application frameworks and conventions, which
   you do not need for that.
-- You have an existing repository: today Putnami starts new workspaces.
-  Migrating a repository, or running Putnami next to your current tooling, is
-  the next path we explore.
-  [Tell us your stack](https://github.com/putnami/putnami/issues/new?template=share-your-stack.md)
+- Your language or build tool is not one of
+  [those Putnami runs](https://putnami.dev/docs/languages):
+  [tell us your stack](https://github.com/putnami/putnami/issues/new?template=share-your-stack.md)
   so we build the path that helps you.
 - You ship one service and never plan to delegate its operation: the structure
   costs more than it returns. Reach for something lighter.
@@ -299,10 +305,11 @@ first public-release promise above.
   full system, isolated data, and automatic cleanup.
 - **Production deploy**: `putnami deploy` ships deterministic builds with
   zero-downtime rollout, fast rollback, and the same system you tested locally.
-- **More languages**: mobile (iOS and Android) and Rust, as language
-  extensions that implement the same protocols.
-- **Existing repositories**: migrating a repository to Putnami, and running
-  Putnami next to existing tooling.
+- **Stack extensions and monorepo tool integrations, released**: the
+  extensions that run Rust, Java and Kotlin, Swift, Dart, .NET, Ruby and PHP,
+  and the integrations with Bazel, moon, Nx, Pants, Rush and Turborepo, are
+  documented in this repository and not published yet. Their first release,
+  and a reviewed support status for each, come next.
 
 ## Telemetry
 

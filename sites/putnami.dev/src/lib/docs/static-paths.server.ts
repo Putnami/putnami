@@ -3,8 +3,8 @@
  *
  * The web generate hook asks the page for its static paths before the
  * application generate hook runs. Materialize the lock-pinned bundles and write
- * the generated support page here so a cold build sees the same docs tree as
- * every later build.
+ * the pages generated from the support catalog here so a cold build sees the
+ * same docs tree as every later build.
  */
 import { getProjectRoot, getWorkspaceRoot } from '@putnami/utils';
 import { materializeContentBundles } from '../content/materialize';

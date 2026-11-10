@@ -1,0 +1,64 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-architecture.json",
+  "protocolVersion": 1,
+  "domain": "stacks",
+  "owner": "tooling",
+  "projects": [],
+  "owns": [
+    {
+      "id": "stacks.stack-documentation",
+      "kind": "fact",
+      "description": "The authored reference page of each stack extension, /<language>/extension/doc/01-<language>.md for Dart, .NET, Java, PHP, Ruby, Rust and Swift: what the extension runs, what it installs, and its limits. This domain decides what each reference claims; a site that publishes them copies each page and never edits it."
+    },
+    {
+      "id": "stacks.monorepo-tool-documentation",
+      "kind": "fact",
+      "description": "The authored reference page of each monorepo tool integration, /integrations/<tool>/doc/01-<tool>.md for Bazel, moon, Nx, Pants, Rush and Turborepo: how a repository adopts Putnami on that tool, and who runs and caches its tasks. This domain decides what each reference claims; a site that publishes them copies each page and never edits it."
+    }
+  ],
+  "exports": [
+    {
+      "id": "stacks.monorepo-tool-documentation.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The authored reference page of each monorepo tool integration (/integrations/<tool>/doc/01-<tool>.md): the markdown a publisher copies verbatim, one page per integration, addressed together by a deterministic digest over the sorted (workspace path, content digest) pair of each page. The carrier contract is putnami.documentation-tree.v1. Publishing a reference does not classify the integration's support status.",
+      "facts": [
+        {
+          "name": "monorepo_tool_documentation",
+          "authority": "stacks",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "snapshot"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    },
+    {
+      "id": "stacks.stack-documentation.v1",
+      "version": 1,
+      "status": "active",
+      "description": "The authored reference page of each stack extension (/<language>/extension/doc/01-<language>.md): the markdown a publisher copies verbatim, one page per extension, addressed together by a deterministic digest over the sorted (workspace path, content digest) pair of each page. The carrier contract is putnami.documentation-tree.v1. Publishing a reference does not classify the extension's support status.",
+      "facts": [
+        {
+          "name": "stack_extension_documentation",
+          "authority": "stacks",
+          "classification": "public",
+          "personalData": "none"
+        }
+      ],
+      "modes": [
+        "snapshot"
+      ],
+      "compatibility": {
+        "strategy": "additive",
+        "minimumConsumerVersion": 1
+      }
+    }
+  ],
+  "imports": []
+}

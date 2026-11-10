@@ -7,8 +7,9 @@ import (
 	arch "go.putnami.dev/sdk/extension/architecture"
 )
 
-// Four more of this repository's architecture manifests, authored in Go:
-// `go-framework`, `typescript-framework`, `public-docs`, and `agent-workflows`.
+// Five more of this repository's architecture manifests, authored in Go:
+// `go-framework`, `typescript-framework`, `public-docs`, `agent-workflows`, and
+// `stacks`.
 //
 // The builder IS the author and each committed putnami.architecture.json is its
 // projection: a hand edit the program does not make fails here rather than
@@ -25,7 +26,7 @@ import (
 // create an import for the same reason; adding one here is a reviewed diff, and
 // that review IS the authorization.
 //
-// # Why all four are hosted here
+// # Why all five are hosted here
 //
 // A pin must not create a new observed dependency edge, and the authoring runs
 // through go.putnami.dev/sdk/extension/architecture. A pin inside
@@ -34,7 +35,8 @@ import (
 // one that would cost each framework module a set of cross-domain permissions
 // nothing else needs. `/sites/putnami.dev` is a deployed TypeScript application
 // and has no Go module at all. `/tooling/contributor`'s Go module holds only
-// the extension's runtime.
+// the extension's runtime. `stacks` maps no project, so it has no module to
+// host its own pin.
 //
 // This extension is where `putnami architecture validate` runs and it already
 // depends on both the protocol and the SDK, so hosting costs no new edge. The
@@ -43,10 +45,10 @@ import (
 //
 // # putnami.documentation-tree.v1
 //
-// Five of the imports below name that carrier contract. It is a CARRIER, not a
+// Eight of the imports below name that carrier contract. It is a CARRIER, not a
 // published wire schema: the markdown tree one `generate.assets` entry copies,
-// addressed by a deterministic digest over its sorted (relative path, content
-// digest) pairs. Two trees with the same digest are the same document, which is
+// or the set of pages several entries copy for one import, addressed by a
+// deterministic digest over its sorted (relative path, content digest) pairs. Two trees with the same digest are the same document, which is
 // what lets `tree_digest` serve as both the source version and the idempotency
 // key.
 
@@ -507,6 +509,21 @@ func authoredPublicDocsDomain() *arch.Builder {
 				}),
 				arch.Justification("The site publishes the spec-driven development method at public/docs/07-spec-driven-development by copying the /tooling/sdd-extension/doc tree verbatim at build time. The sdd domain owns the method's wording; the site owns only its placement in the published information architecture."),
 			),
+			arch.Snapshot("public-docs.monorepo-tool-documentation.v1", 1, arch.From("stacks", "stacks.monorepo-tool-documentation.v1"), arch.Carried(archproto.TransportFile, "putnami.documentation-tree.v1", archproto.StatusActive),
+				arch.As("public-docs.monorepo-tool-documentation"),
+				arch.Status(archproto.StatusActive),
+				arch.Facts("monorepo_tool_documentation"),
+				arch.Guarantees(archproto.Consistency{
+					MaxStaleness:   "720h",
+					OnMissing:      archproto.FailureFailClosed,
+					OnStale:        archproto.FailureUseStale,
+					Ordering:       archproto.OrderingSourceVersion,
+					SourceVersion:  "tree_digest",
+					IdempotencyKey: "tree_digest",
+					LateEvents:     archproto.LateEventIgnoreOlder,
+				}),
+				arch.Justification("The site publishes the reference page of each monorepo tool integration under public/docs/12-monorepo-tools by copying /integrations/<tool>/doc/01-<tool>.md verbatim at build time, one copy per integration, all governed by this one import. The stacks domain decides what each reference says about running a tool; the site decides only that they appear together, under one section. A missing reference fails the build rather than publishing a section with a tool missing."),
+			),
 			arch.Snapshot("public-docs.observe-documentation.v1", 1, arch.From("extension-providers", "extension-providers.observe-documentation.v1"), arch.Carried(archproto.TransportFile, "putnami.documentation-tree.v1", archproto.StatusActive),
 				arch.As("public-docs.observe-documentation"),
 				arch.Status(archproto.StatusActive),
@@ -543,6 +560,21 @@ func authoredPublicDocsDomain() *arch.Builder {
 					LateEvents:     archproto.LateEventIgnoreOlder,
 				}),
 				arch.Justification("The site publishes the Python surface reference at public/docs/09-frameworks/03-python by copying the /python/doc/framework tree verbatim at build time. The Python surface is the extension and its templates only, and the extension-providers domain decides what that reference claims; the site never promotes it to framework parity by where it places it."),
+			),
+			arch.Snapshot("public-docs.stack-documentation.v1", 1, arch.From("stacks", "stacks.stack-documentation.v1"), arch.Carried(archproto.TransportFile, "putnami.documentation-tree.v1", archproto.StatusActive),
+				arch.As("public-docs.stack-documentation"),
+				arch.Status(archproto.StatusActive),
+				arch.Facts("stack_extension_documentation"),
+				arch.Guarantees(archproto.Consistency{
+					MaxStaleness:   "720h",
+					OnMissing:      archproto.FailureFailClosed,
+					OnStale:        archproto.FailureUseStale,
+					Ordering:       archproto.OrderingSourceVersion,
+					SourceVersion:  "tree_digest",
+					IdempotencyKey: "tree_digest",
+					LateEvents:     archproto.LateEventIgnoreOlder,
+				}),
+				arch.Justification("The site publishes the reference page of each stack extension under public/docs/11-languages by copying /<language>/extension/doc/01-<language>.md verbatim at build time, one copy per extension, all governed by this one import. The stacks domain decides what each reference says; the site decides only that they appear together, under one section, next to the frameworks. A missing reference fails the build rather than publishing a section with a language missing."),
 			),
 			arch.Snapshot("public-docs.typescript-framework-documentation.v1", 1, arch.From("typescript-framework", "typescript-framework.api-documentation.v1"), arch.Carried(archproto.TransportFile, "putnami.documentation-tree.v1", archproto.StatusActive),
 				arch.As("public-docs.typescript-framework-documentation"),
@@ -642,6 +674,45 @@ func authoredAgentWorkflowsDomain() *arch.Builder {
 		)
 }
 
+// The stacks domain owns the reference page each stack extension and each
+// monorepo tool integration writes in its own doc/ folder. It maps no project:
+// no review has named the domain that owns running a stack, so the stack core
+// and its extensions stay excluded from the frontier, and what the domain holds
+// today is the documentation fact public-docs publishes. It imports nothing.
+func authoredStacksDomain() *arch.Builder {
+	return arch.NewDomain("stacks", "tooling").
+		Owns(
+			arch.Concept("stacks.stack-documentation", archproto.OwnershipFact,
+				"The authored reference page of each stack extension, /<language>/extension/doc/01-<language>.md for Dart, .NET, Java, PHP, Ruby, Rust and Swift: what the extension runs, what it installs, and its limits. This domain decides what each reference claims; a site that publishes them copies each page and never edits it."),
+			arch.Concept("stacks.monorepo-tool-documentation", archproto.OwnershipFact,
+				"The authored reference page of each monorepo tool integration, /integrations/<tool>/doc/01-<tool>.md for Bazel, moon, Nx, Pants, Rush and Turborepo: how a repository adopts Putnami on that tool, and who runs and caches its tasks. This domain decides what each reference claims; a site that publishes them copies each page and never edits it."),
+		).
+		Export(archproto.Export{
+			ID:          "stacks.monorepo-tool-documentation.v1",
+			Version:     1,
+			Status:      archproto.StatusActive,
+			Description: "The authored reference page of each monorepo tool integration (/integrations/<tool>/doc/01-<tool>.md): the markdown a publisher copies verbatim, one page per integration, addressed together by a deterministic digest over the sorted (workspace path, content digest) pair of each page. The carrier contract is putnami.documentation-tree.v1. Publishing a reference does not classify the integration's support status.",
+			Facts: []archproto.Fact{
+				arch.Fact("monorepo_tool_documentation", "stacks",
+					archproto.ClassificationPublic, archproto.PersonalDataNone),
+			},
+			Modes:         []archproto.AccessMode{archproto.ModeSnapshot},
+			Compatibility: arch.Compatible(archproto.CompatibilityAdditive, 1),
+		}).
+		Export(archproto.Export{
+			ID:          "stacks.stack-documentation.v1",
+			Version:     1,
+			Status:      archproto.StatusActive,
+			Description: "The authored reference page of each stack extension (/<language>/extension/doc/01-<language>.md): the markdown a publisher copies verbatim, one page per extension, addressed together by a deterministic digest over the sorted (workspace path, content digest) pair of each page. The carrier contract is putnami.documentation-tree.v1. Publishing a reference does not classify the extension's support status.",
+			Facts: []archproto.Fact{
+				arch.Fact("stack_extension_documentation", "stacks",
+					archproto.ClassificationPublic, archproto.PersonalDataNone),
+			},
+			Modes:         []archproto.AccessMode{archproto.ModeSnapshot},
+			Compatibility: arch.Compatible(archproto.CompatibilityAdditive, 1),
+		})
+}
+
 // TestCommittedGoFrameworkDomainManifestIsTheAuthoredOne holds the go-framework
 // domain's committed manifest to its authoring.
 func TestCommittedGoFrameworkDomainManifestIsTheAuthoredOne(t *testing.T) {
@@ -664,4 +735,10 @@ func TestCommittedPublicDocsDomainManifestIsTheAuthoredOne(t *testing.T) {
 // agent-workflows domain's committed manifest to its authoring.
 func TestCommittedAgentWorkflowsDomainManifestIsTheAuthoredOne(t *testing.T) {
 	arch.Pin(t, "../contributor/putnami.architecture.json", authoredAgentWorkflowsDomain)
+}
+
+// TestCommittedStacksDomainManifestIsTheAuthoredOne holds the stacks domain's
+// committed manifest to its authoring.
+func TestCommittedStacksDomainManifestIsTheAuthoredOne(t *testing.T) {
+	arch.Pin(t, "../stacks/putnami.architecture.json", authoredStacksDomain)
 }

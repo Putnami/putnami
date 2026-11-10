@@ -23,7 +23,7 @@ import { prerenderDocs, prerenderSourcesFor } from '../src/plugins/docs-prerende
  * The `public-docs` domain's runtime enforcement of its declared imports.
  *
  * A `generate.assets` entry whose source was deleted used to publish nothing and
- * keep the build green. Each of the six repository-owned sources is now a
+ * keep the build green. Each repository-owned source is now governed by a
  * `Snapshot` contract, and the docs pipeline reads the file inventory it
  * publishes out of `Snapshot.latest()` — so the declared `onMissing: fail-closed`
  * is what refuses, not an `if` in the plugin.
@@ -41,6 +41,11 @@ const HOUR = 3_600_000;
 
 const GO_DOCS = '/go/doc/framework';
 const TOOLING_DOCS = '/tooling/doc';
+const RUST_REFERENCE = '/rust/extension/doc/01-rust.md';
+const NX_REFERENCE = '/integrations/nx/doc/01-nx.md';
+
+/** Every declared copy, across every import. */
+const DECLARED_COPIES = DOCUMENTATION_SOURCES.flatMap((source) => source.copies);
 
 function file(path: string, content: string): DocumentationFile {
   return { path, digest: contentDigest(content) };
@@ -88,11 +93,11 @@ describe('documentation sources are version-addressed snapshots', () => {
 
       // Every other declared section still resolves, so one deleted source
       // fails the build rather than degrading the whole docs tree.
-      for (const source of DOCUMENTATION_SOURCES) {
-        if (source.sourceRoot === GO_DOCS) continue;
+      for (const copy of DECLARED_COPIES) {
+        if (copy.sourceRoot === GO_DOCS) continue;
         const files = prerenderSourcesFor(access, WORKSPACE_ROOT, {
-          from: source.sourceRoot,
-          to: source.section,
+          from: copy.sourceRoot,
+          to: copy.section,
         });
         expect(files.map((entry) => entry.relative)).toEqual(['index.md']);
       }
@@ -122,6 +127,61 @@ describe('documentation sources are version-addressed snapshots', () => {
       expect((refusal as DarcError).code).toBe('missing');
     },
   );
+
+  specTest(
+    'refuses a whole set of references when one member is gone',
+    {
+      feature: 'putnami-dev/public-documentation',
+      requirement: 'documentation-sources-are-version-addressed-snapshots',
+      check: 'missing-documentation-source-fails-closed',
+    },
+    () => {
+      // One import governs every stack extension reference. A set is attached
+      // only when every member was read, so one deleted reference refuses each
+      // section of the set — including the ones still on disk — through the
+      // same declared contract, not through an `if` here.
+      const access = accessWith([RUST_REFERENCE]);
+      access.observeAll();
+
+      const stacks = DOCUMENTATION_SOURCES.find(
+        (source) => source.contract.id === 'public-docs.stack-documentation.v1',
+      );
+      expect(stacks?.copies.length).toBe(7);
+      for (const copy of stacks?.copies ?? []) {
+        let refusal: unknown;
+        try {
+          access.resolve(copy.sourceRoot);
+        } catch (error) {
+          refusal = error;
+        }
+        expect(refusal).toBeInstanceOf(DarcError);
+        expect((refusal as DarcError).code).toBe('missing');
+        expect((refusal as DarcError).message).toContain('public-docs.stack-documentation.v1');
+      }
+
+      // The other set is untouched.
+      expect(access.resolve(NX_REFERENCE).value.files.map((entry) => entry.path)).toEqual(['index.md']);
+    },
+  );
+
+  it('publishes each member of a set from its own root, as a single file', () => {
+    // The real references: each member root names one markdown file, published
+    // as that file alone at the copy's target.
+    const access = new PublicDocumentationAccess({ workspaceRoot: WORKSPACE_ROOT, clock: () => OBSERVED_AT });
+    access.observeAll();
+    const files = prerenderSourcesFor(access, WORKSPACE_ROOT, {
+      from: RUST_REFERENCE,
+      to: 'public/docs/11-languages/rust.md',
+    });
+    expect(files).toEqual([{ source: joinPath(WORKSPACE_ROOT, RUST_REFERENCE), relative: '' }]);
+
+    // The set's version covers every member: a changed member is a new version
+    // of the whole set, and the record still resolves each member alone.
+    const record = access.resolve(NX_REFERENCE);
+    expect(record.value).toEqual({ root: NX_REFERENCE, files: [expect.objectContaining({ path: '' })] });
+    expect(record.provenance).toBe('stacks.monorepo-tool-documentation.v1');
+    expect(record.sourceVersion).toBe(access.resolve('/integrations/turbo/doc/01-turbo.md').sourceVersion);
+  });
 
   specTest(
     'addresses a documentation tree by the digest of its contents',
@@ -155,6 +215,12 @@ describe('documentation sources are version-addressed snapshots', () => {
 
       // An absent root is absent, not an empty observation.
       expect(readDocumentationTree(WORKSPACE_ROOT, '/tooling/doc-that-was-deleted')).toBeUndefined();
+
+      // A root may name one markdown file: its tree is that file, under the
+      // empty path, and a file that is not markdown is no tree at all.
+      const reference = readDocumentationTree(WORKSPACE_ROOT, RUST_REFERENCE);
+      expect(reference?.tree.files.map((entry) => entry.path)).toEqual(['']);
+      expect(readDocumentationTree(WORKSPACE_ROOT, '/rust/extension/putnami.json')).toBeUndefined();
     },
   );
 
@@ -247,7 +313,7 @@ describe('documentation sources are version-addressed snapshots', () => {
   );
 
   specTest(
-    'reports exactly the eight contracts it enforces, deterministically',
+    'reports exactly the ten contracts it enforces, deterministically',
     {
       feature: 'putnami-dev/public-documentation',
       requirement: 'documentation-sources-are-version-addressed-snapshots',
@@ -261,14 +327,16 @@ describe('documentation sources are version-addressed snapshots', () => {
         ['public-docs.application-runtime.v1', 'reference'],
         ['public-docs.go-framework-documentation.v1', 'snapshot'],
         ['public-docs.method-documentation.v1', 'snapshot'],
+        ['public-docs.monorepo-tool-documentation.v1', 'snapshot'],
         ['public-docs.observe-documentation.v1', 'snapshot'],
         ['public-docs.protocol-contracts.v1', 'reference'],
         ['public-docs.python-surface-documentation.v1', 'snapshot'],
+        ['public-docs.stack-documentation.v1', 'snapshot'],
         ['public-docs.typescript-framework-documentation.v1', 'snapshot'],
         ['public-docs.workspace-documentation.v1', 'snapshot'],
       ]);
 
-      // The domain opts into evidence with all eight rows or none: a partial set
+      // The domain opts into evidence with all ten rows or none: a partial set
       // makes `architecture validate` report declared_without_evidence for the
       // rest of the domain.
       expect(rows).toHaveLength(PUBLIC_DOCS_CONTRACTS.length);
@@ -355,8 +423,10 @@ describe('emitted domain-access evidence', () => {
       ['public-docs.protocol-contracts.v1', 'reference'],
       ['public-docs.go-framework-documentation.v1', 'snapshot'],
       ['public-docs.method-documentation.v1', 'snapshot'],
+      ['public-docs.monorepo-tool-documentation.v1', 'snapshot'],
       ['public-docs.observe-documentation.v1', 'snapshot'],
       ['public-docs.python-surface-documentation.v1', 'snapshot'],
+      ['public-docs.stack-documentation.v1', 'snapshot'],
       ['public-docs.typescript-framework-documentation.v1', 'snapshot'],
       ['public-docs.workspace-documentation.v1', 'snapshot'],
     ]);
@@ -410,9 +480,9 @@ describe('declared contracts match the reviewed manifest', () => {
       options?: { generate?: { assets?: { from: string; to: string }[] } };
     };
     const assets = config.options?.generate?.assets ?? [];
-    for (const source of DOCUMENTATION_SOURCES) {
-      expect(assets.filter((entry) => entry.from === source.sourceRoot)).toEqual([
-        { from: source.sourceRoot, to: source.section },
+    for (const copy of DECLARED_COPIES) {
+      expect(assets.filter((entry) => entry.from === copy.sourceRoot)).toEqual([
+        { from: copy.sourceRoot, to: copy.section },
       ]);
     }
     // The site's own documentation is copied but never imported: a domain does
