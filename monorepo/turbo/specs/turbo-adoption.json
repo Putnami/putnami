@@ -1,0 +1,53 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "monorepo/turbo-adoption",
+  "outcomes": [
+    "Each package of a Turborepo repository is a Putnami project, with an edge to each workspace package it depends on",
+    "In delegate mode, putnami lint, test and build run turbo run on each affected package, and Turborepo's cache, local and remote, decides what reruns",
+    "In import mode, a TypeScript package's task whose script already runs what @putnami/typescript runs moves to Putnami's runner and cache, and every other task keeps running through Turborepo"
+  ],
+  "nonGoals": [
+    "Caching a Turborepo result in Putnami's cache, or putting Putnami's cache over Turborepo's",
+    "Mapping a turbo.json task other than build, test and lint: it keeps running through Turborepo",
+    "Installing or switching a Turborepo version: turbo must be on PATH",
+    "Rewriting turbo.json or a package.json in the sync, or changing the tool that checks a task: a tsc, vitest, jest or eslint task stays on Turborepo"
+  ],
+  "requirements": [
+    {
+      "id": "packages-become-projects",
+      "text": "At a root that holds turbo.json, the probe answers each member of the npm, pnpm or yarn workspace among the candidate directories: its package name as source name, the members it depends on as edges, the extension @putnami/turbo and the tag turbo, unless the package's putnami.json names other extensions. The root and any other candidate are not answered."
+    },
+    {
+      "id": "sync-writes-the-package-graph",
+      "text": "The sync reads options[\"@putnami/turbo\"].mode, import by default, and writes in each member's putnami.json @putnami/turbo, its edges as project IDs, and in disable.jobs each of build, test and lint it has no script or turbo.json task for. In import mode a TypeScript package also declares @putnami/typescript, which runs a task whose script already runs bun build, bun test or biome; the other extension's job of each task is disabled. It retracts a former member and rewrites only a changed file."
+    },
+    {
+      "id": "sync-previews-a-diff",
+      "text": "With the dry-run parameter, and the mode parameter in place of the configured mode, the sync prints the unified diff of each putnami.json it would change, and writes nothing."
+    },
+    {
+      "id": "unmapped-tasks-are-listed",
+      "text": "The sync lists, with the reason, each turbo.json task other than build, test and lint, and in import mode each task of a TypeScript package whose script runs something other than what @putnami/typescript runs: both keep running through Turborepo. It also lists each package whose delegated test task names no JUnit report, whose result is then the exit code alone."
+    },
+    {
+      "id": "validate-fails-on-a-stale-graph",
+      "text": "putnami validate compares each member's putnami.json with what the sync would write, writes nothing, and fails with turbo.sync_stale when a sync would change one, such as after a package manifest gains or loses a workspace dependency."
+    },
+    {
+      "id": "tasks-delegate-to-turbo",
+      "text": "Each lint, test and build task of a @putnami/turbo package runs turbo run <task> --filter=<package name> at the workspace root, after the toolchain check of turbo --version. Turborepo's dependsOn runs the upstream tasks and its cache answers them. Each task depends only on its package's graph step, which runs nothing; Putnami's cache is off for every task, and the result records delegatedTo turbo."
+    },
+    {
+      "id": "reports-from-the-package-options",
+      "text": "The test task reads the JUnit and coverage reports that options[\"@putnami/turbo\"].tasks.test.reports of the package's putnami.json names into the test and coverage summary; a failed case fails the task with stacks.test_failed. Without them, the task's result is the exit code alone."
+    },
+    {
+      "id": "manifest-follows-the-profile",
+      "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the turbo:lint, turbo:test and turbo:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task sets cache.enabled to false."
+    }
+  ],
+  "decisions": [
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md"
+  ]
+}

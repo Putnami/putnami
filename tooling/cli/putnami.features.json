@@ -4547,6 +4547,39 @@
               "a-change-to-one-moon-project-runs-it-and-its-dependents-through-moon-uncached"
             ]
           }
+        },
+        {
+          "id": "init-from-turbo",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-turbo-declares-the-turbo-extension-and-records-the-mode"
+            ]
+          }
+        },
+        {
+          "id": "turbo-delegate-impact",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-change-to-one-turbo-package-runs-it-and-its-dependents-through-turbo-uncached"
+            ]
+          }
+        },
+        {
+          "id": "turbo-import-graph",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-imported-turborepo-maps-typescript-packages-and-lists-unmapped-tasks"
+            ]
+          }
         }
       ]
     }

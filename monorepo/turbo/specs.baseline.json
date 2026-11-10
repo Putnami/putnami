@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "monorepo/turbo-adoption#manifest-follows-the-profile",
+    "monorepo/turbo-adoption#packages-become-projects",
+    "monorepo/turbo-adoption#reports-from-the-package-options",
+    "monorepo/turbo-adoption#sync-previews-a-diff",
+    "monorepo/turbo-adoption#sync-writes-the-package-graph",
+    "monorepo/turbo-adoption#tasks-delegate-to-turbo",
+    "monorepo/turbo-adoption#unmapped-tasks-are-listed",
+    "monorepo/turbo-adoption#validate-fails-on-a-stale-graph"
+  ]
+}
