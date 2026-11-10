@@ -1,0 +1,34 @@
+{
+  "protocolVersion": 2,
+  "contracts": [
+    {
+      "authority": "Apache Maven distribution layout (maven.apache.org/wrapper, the distributionUrl of .mvn/wrapper/maven-wrapper.properties): an apache-maven-<version>-bin archive and the .sha512 or .sha256 checksum file its host publishes beside it",
+      "adapter": "java/extension/maven.go",
+      "callsites": [
+        {
+          "path": "java/extension/maven.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "46b1d56f5a0762d9db2f86e2339264c0c27400cc5acc541341717935037eeebb"
+        },
+        {
+          "path": "java/extension/maven.go",
+          "transport": "http",
+          "symbol": "http.Client",
+          "fingerprint": "4edc69f543fafe67b73c0d82b13ddb54579ccc93d7f4a6d39bf3dcbd064a7b76"
+        },
+        {
+          "path": "java/extension/maven.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "5ad5e1b0cac1fc4aa37af6dc5826707c52cacee458029c11bd08d2d346453cc7"
+        }
+      ],
+      "owner": "@putnami/java",
+      "tests": [
+        "java/extension/toolchain_test.go"
+      ],
+      "reason": "Installs the Maven release a build's Maven wrapper states: reads the checksum the archive's host publishes beside it, downloads the archive once and checks it, then hands the checked file to the pinned-archive installer through a transport that serves that one URL. The layout belongs to the Apache Maven release process and the wrapper's properties, so no Putnami provider declaration can generate this client."
+    }
+  ]
+}

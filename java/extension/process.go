@@ -101,7 +101,7 @@ type runnable struct {
 
 // buildRunnable builds the component's runnable form with its own build and
 // locates it. Its output goes to out.
-func buildRunnable(ctx context.Context, root stacks.RootStep, meta stacks.Metadata, kind runnableKind, out io.Writer) (runnable, error) {
+func buildRunnable(ctx context.Context, root stacks.RootStep, meta stacks.Metadata, kind runnableKind, out io.Writer, info func(string)) (runnable, error) {
 	var argv []string
 	switch kind {
 	case installDist:
@@ -109,7 +109,11 @@ func buildRunnable(ctx context.Context, root stacks.RootStep, meta stacks.Metada
 	case bootJar:
 		argv = []string{filepath.Join(root.Dir, "gradlew"), "--console=plain", meta.Component + "bootJar"}
 	case mavenBootJar:
-		argv = []string{root.Program("mvn"), "--batch-mode", "--file", filepath.Join(root.Dir, "pom.xml"), "--projects", meta.Component, "--also-make", "package", "-DskipTests"}
+		argv = []string{"mvn", "--batch-mode", "--file", filepath.Join(root.Dir, "pom.xml"), "--projects", meta.Component, "--also-make", "package", "-DskipTests"}
+	}
+	argv, err := Step(ctx, "", meta, root, argv, info)
+	if err != nil {
+		return runnable{}, err
 	}
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // the component's own build
 	cmd.Dir = root.Project
@@ -210,9 +214,9 @@ func application(ctx *pctx.Context, stack stacks.Stack, emit *jsonl.Emitter) (st
 	cleanup := func() { _ = os.RemoveAll(private) }
 	var root stacks.RootStep
 	var app runnable
-	err = stack.Locked(ctx, emit, func(run context.Context, r stacks.RootStep, _ *jsonl.Emitter) error {
+	err = stack.Locked(ctx, emit, func(run context.Context, r stacks.RootStep, emit *jsonl.Emitter) error {
 		root = r
-		built, err := buildRunnable(run, r, meta, kind, os.Stderr)
+		built, err := buildRunnable(run, r, meta, kind, os.Stderr, emit.Info)
 		if err != nil {
 			return fail(CodeRunFailed, err)
 		}

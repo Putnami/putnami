@@ -5,8 +5,11 @@
     "java/stack-extension#checks-documentation-links",
     "java/stack-extension#components-become-projects",
     "java/stack-extension#filters-the-tests",
+    "java/stack-extension#gradle-toolchains-are-provided",
+    "java/stack-extension#gradle-without-a-wrapper",
     "java/stack-extension#lint-skips-the-lockfiles",
     "java/stack-extension#manifest-follows-the-profile",
+    "java/stack-extension#maven-follows-its-wrapper",
     "java/stack-extension#nested-builds-are-stack-roots",
     "java/stack-extension#overrides-are-honored",
     "java/stack-extension#package-assembles-an-image",
@@ -16,6 +19,8 @@
     "java/stack-extension#serve-runs-the-application",
     "java/stack-extension#tasks-run-the-profile",
     "java/stack-extension#toolchain-is-provided",
-    "java/stack-extension#variants-follow-the-build"
+    "java/stack-extension#variants-follow-the-build",
+    "java/stack-extension#workspace-install-offline-installs-nothing",
+    "java/stack-extension#workspace-install-prepares-each-build"
   ]
 }

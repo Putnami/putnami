@@ -7,8 +7,10 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strconv"
 	"strings"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
 	"go.putnami.dev/sdk/extension/putnamihome"
@@ -33,8 +35,22 @@ type jdk struct {
 }
 
 // jdks lists the shipped Temurin releases, oldest first, with the SHA-256 the
-// Adoptium API publishes for each archive and the path of its javac.
+// Adoptium API publishes for each archive and the path of its javac. Java 8
+// keeps the version its javac prints; Adoptium publishes no current Java 8
+// release for macOS.
 var jdks = []jdk{
+	{"1.8.0_512", map[string]archive{
+		"linux/amd64":   {"https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u512-b09/OpenJDK8U-jdk_x64_linux_hotspot_8u512b09.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk8u512-b09/bin/javac", "fb3bfa869012419b562bb4235d0d83ec4f8c1dda62ae432ba20c6c3a7e43f7e4"},
+		"linux/arm64":   {"https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u512-b09/OpenJDK8U-jdk_aarch64_linux_hotspot_8u512b09.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk8u512-b09/bin/javac", "01263df22c4553f63146bbae807e70cd4628dd0d9ec7582f01cb2453f7c69aaa"},
+		"windows/amd64": {"https://github.com/adoptium/temurin8-binaries/releases/download/jdk8u512-b09/OpenJDK8U-jdk_x64_windows_hotspot_8u512b09.zip", wsproto.LockArchiveFormatZip, "jdk8u512-b09/bin/javac.exe", "20f248ddd600f900cd9b235d50d54cdb27e7b750f140d381176a7612c53663cd"},
+	}},
+	{"11.0.33", map[string]archive{
+		"darwin/amd64":  {"https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.33%2B10/OpenJDK11U-jdk_x64_mac_hotspot_11.0.33_10.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk-11.0.33+10/Contents/Home/bin/javac", "11e3e9de3ce65ff957aee9b4b76876553e9d328cab9aede47996463625c88887"},
+		"darwin/arm64":  {"https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.33%2B10/OpenJDK11U-jdk_aarch64_mac_hotspot_11.0.33_10.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk-11.0.33+10/Contents/Home/bin/javac", "6ef5b027206691439b2dcb2fc05adc13cc7f5b6e75a08fce8f75ee188adc7751"},
+		"linux/amd64":   {"https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.33%2B10/OpenJDK11U-jdk_x64_linux_hotspot_11.0.33_10.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk-11.0.33+10/bin/javac", "c4b8eaf56c93b95b689ffc08d155df1bcdbbffb666f8f71d21d97aedaea6f0ec"},
+		"linux/arm64":   {"https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.33%2B10/OpenJDK11U-jdk_aarch64_linux_hotspot_11.0.33_10.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk-11.0.33+10/bin/javac", "60b0fb79bb678b6fae3e499c7b0a353e68633ed0ab69d1a6bafe6092ed1e59e4"},
+		"windows/amd64": {"https://github.com/adoptium/temurin11-binaries/releases/download/jdk-11.0.33%2B10/OpenJDK11U-jdk_x64_windows_hotspot_11.0.33_10.zip", wsproto.LockArchiveFormatZip, "jdk-11.0.33+10/bin/javac.exe", "cff2e75657c96a718974732b4a7b2c81a245a0b2ea44e6d8ea08cd0248d8fa9d"},
+	}},
 	{"17.0.21", map[string]archive{
 		"darwin/amd64":  {"https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_x64_mac_hotspot_17.0.21_9.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk-17.0.21+9/Contents/Home/bin/javac", "868f5c672b3389fdbe48e44f94ae170f01668b1401360944fc7159d7cc9772cc"},
 		"darwin/arm64":  {"https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_aarch64_mac_hotspot_17.0.21_9.tar.gz", wsproto.LockArchiveFormatTarGz, "jdk-17.0.21+9/Contents/Home/bin/javac", "78b08c7f5a0598242d5719c022e19479cb4a3aa45c37c19726a757a469ed1c15"},
@@ -74,18 +90,23 @@ func Provide(ctx context.Context, toolchain stacks.Toolchain, expectedAll []stac
 	if !ok {
 		return stacks.Provided{}, fmt.Errorf("no Temurin JDK the extension pins (%s) satisfies %s %s", pinnedVersions(), expected.Source, expected.Version)
 	}
-	a, ok := chosen.archives[hostPlatform]
-	if !ok {
-		return stacks.Provided{}, fmt.Errorf("the extension pins no Temurin JDK %s for %s", chosen.version, hostPlatform)
+	javac, err := installJDK(ctx, chosen, info)
+	if err != nil {
+		return stacks.Provided{}, err
 	}
-	home := putnamihome.Resolve(os.Getenv)
-	if home == "" {
-		return stacks.Provided{}, fmt.Errorf("no Putnami home to install the JDK in: set %s", putnamihome.Env)
+	return stacks.Provided{Executable: javac}, nil
+}
+
+// installJDK installs the release under the Putnami home, unless an earlier
+// call did, and answers its javac.
+func installJDK(ctx context.Context, r jdk, info func(string)) (string, error) {
+	dir, a, err := jdkDir(r)
+	if err != nil {
+		return "", err
 	}
-	dir := filepath.Join(home, "toolchains", "java", "java-"+chosen.version)
 	executable := filepath.Join(dir, filepath.FromSlash(a.executable))
 	if _, err := os.Stat(executable); err != nil {
-		info("installing the Eclipse Temurin JDK " + chosen.version)
+		info("installing the Eclipse Temurin JDK " + r.version)
 	}
 	format := pinnedarchive.TarGz
 	if a.format == wsproto.LockArchiveFormatZip {
@@ -96,9 +117,40 @@ func Provide(ctx context.Context, toolchain stacks.Toolchain, expectedAll []stac
 		_, err := os.Stat(filepath.Join(candidate, filepath.FromSlash(a.executable)))
 		return err == nil
 	}}); err != nil {
-		return stacks.Provided{}, fmt.Errorf("install the Temurin JDK %s: %w", chosen.version, err)
+		return "", fmt.Errorf("install the Temurin JDK %s: %w", r.version, err)
 	}
-	return stacks.Provided{Executable: executable}, nil
+	return executable, nil
+}
+
+// installedJDK answers the javac of the release when an earlier call
+// installed it, with no network access.
+func installedJDK(r jdk) (string, bool) {
+	dir, a, err := jdkDir(r)
+	if err != nil {
+		return "", false
+	}
+	executable := filepath.Join(dir, filepath.FromSlash(a.executable))
+	_, err = os.Stat(executable)
+	return executable, err == nil
+}
+
+// jdkDir answers the directory the release installs into and its archive for
+// the host.
+func jdkDir(r jdk) (string, archive, error) {
+	a, ok := r.archives[hostPlatform]
+	if !ok {
+		return "", archive{}, fmt.Errorf("the extension pins no Temurin JDK %s for %s", r.version, hostPlatform)
+	}
+	home := putnamihome.Resolve(os.Getenv)
+	if home == "" {
+		return "", archive{}, fmt.Errorf("no Putnami home to install the JDK in: set %s", putnamihome.Env)
+	}
+	return filepath.Join(home, "toolchains", "java", "java-"+r.version), a, nil
+}
+
+// javaHome is the home of the JDK whose javac is executable.
+func javaHome(javac string) string {
+	return filepath.Dir(filepath.Dir(javac))
 }
 
 func pinnedVersions() string {
@@ -113,7 +165,7 @@ func pinnedVersions() string {
 // file states accepts every release.
 func acceptedBy(toolchain stacks.Toolchain, candidates []jdk, expected stacks.Expected) []jdk {
 	return slices.DeleteFunc(slices.Clone(candidates), func(r jdk) bool {
-		return toolchain.Compare(expected, r.version).Fail
+		return toolchain.CompareWith(expected, r.version, matchesJava).Fail
 	})
 }
 
@@ -129,64 +181,60 @@ func choose(accepted []jdk, committed string) (jdk, bool) {
 	return accepted[len(accepted)-1], true
 }
 
-// Maven is installed by the extension when the machine has none.
-const mavenVersion = "3.9.11"
+// jdkOfMajor answers the newest release the extension pins of a Java major.
+func jdkOfMajor(major int) (jdk, bool) {
+	for i := len(jdks) - 1; i >= 0; i-- {
+		if javaMajor(jdks[i].version) == major {
+			return jdks[i], true
+		}
+	}
+	return jdk{}, false
+}
 
-// mavenURL is where the Maven archive is published. Tests point it at a local
-// server.
-var mavenURL = "https://archive.apache.org/dist/maven/maven-3/" + mavenVersion + "/binaries/apache-maven-" + mavenVersion + "-bin.tar.gz"
+// MatchVersion is the Java rule for an exact expected version: Java 8 is
+// both 8 and 1.8, and its javac prints 1.8.0_512, so 8, 1.8, 1.8.0 and 8.0.512
+// accept it. Any other version matches as the core's rule says: equal, or a
+// release of a shorter version, such as 21.0.13 for 21.
+func MatchVersion(_ string, expected stacks.Expected, machine string) bool {
+	return matchesJava(expected.Version, machine)
+}
 
-// mavenSHA256 is the SHA-256 of the archive, whose SHA-512 Apache publishes.
-var mavenSHA256 = "4b7195b6a4f5c81af4c0212677a32ee8143643401bc6e1e8412e6b06ea82beac"
+func matchesJava(expected, machine string) bool {
+	e, m := plainJavaVersion(expected), plainJavaVersion(machine)
+	if e == m {
+		return true
+	}
+	rest, ok := strings.CutPrefix(m, e+".")
+	return ok && rest != "" && strings.Trim(rest, "0123456789.") == ""
+}
 
-// Tools installs Maven for the tasks of a Maven component when mvn is not on
-// the task's PATH, and answers its bin directory. A Gradle build runs its
-// wrapper and needs no tool.
-func Tools(ctx context.Context, _ string, meta stacks.Metadata, env []string, info func(string)) ([]string, error) {
-	if meta.Variant != VariantMaven || onPath(env, "mvn") {
-		return nil, nil
+// plainJavaVersion writes a Java version without the 1. of Java 8 and older
+// and with its update after a dot: 1.8.0_512 is 8.0.512, 1.8 is 8.
+func plainJavaVersion(version string) string {
+	v := strings.TrimPrefix(version, "v")
+	if rest, ok := strings.CutPrefix(v, "1."); ok && rest != "" && rest[0] >= '1' && rest[0] <= '9' {
+		v = rest
 	}
-	home := putnamihome.Resolve(os.Getenv)
-	if home == "" {
-		return nil, fmt.Errorf("no Putnami home to install Apache Maven in: set %s", putnamihome.Env)
+	return strings.ReplaceAll(v, "_", ".")
+}
+
+// javaMajor answers the major of a Java version, 8 for 1.8.0_512, or 0.
+func javaMajor(version string) int {
+	major, _, _ := strings.Cut(plainJavaVersion(version), ".")
+	n, err := strconv.Atoi(major)
+	if err != nil {
+		return 0
 	}
-	dir := filepath.Join(home, "toolchains", "maven", "maven-"+mavenVersion)
-	bin := filepath.Join(dir, "apache-maven-"+mavenVersion, "bin")
-	if _, err := os.Stat(filepath.Join(bin, "mvn")); err == nil {
-		return []string{bin}, nil
-	}
-	info("installing Apache Maven " + mavenVersion)
-	pin := pinnedarchive.Pin{URL: mavenURL, SHA256: mavenSHA256, Format: pinnedarchive.TarGz}
-	if _, err := pinnedarchive.Install(ctx, pin, dir, pinnedarchive.Options{Limits: pinnedarchive.DefaultLimits(), Complete: func(candidate string) bool {
-		_, err := os.Stat(filepath.Join(candidate, "apache-maven-"+mavenVersion, "bin", "mvn"))
-		return err == nil
-	}}); err != nil {
-		return nil, fmt.Errorf("install Apache Maven %s: %w", mavenVersion, err)
-	}
-	return []string{bin}, nil
+	return n
 }
 
 // onPath reports whether name resolves on the PATH of env.
 func onPath(env []string, name string) bool {
-	for _, entry := range env {
-		key, value, ok := strings.Cut(entry, "=")
-		if !ok || !strings.EqualFold(key, "PATH") {
-			continue
-		}
-		for _, dir := range filepath.SplitList(value) {
-			for _, candidate := range executableNames(name) {
-				if info, err := os.Stat(filepath.Join(dir, candidate)); err == nil && !info.IsDir() {
-					return true
-				}
-			}
-		}
-	}
-	return false
+	_, ok := stacks.LookPathIn(env, name)
+	return ok
 }
 
-func executableNames(name string) []string {
-	if runtime.GOOS == "windows" {
-		return []string{name + ".cmd", name + ".exe", name + ".bat"}
-	}
-	return []string{name}
+// offline reports a run with offline dependencies, which installs nothing.
+func offline() bool {
+	return os.Getenv(extensionproto.OfflineDependenciesEnv) == "1"
 }

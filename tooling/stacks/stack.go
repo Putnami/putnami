@@ -113,6 +113,15 @@ type Stack struct {
 	// of the component's. A tool already on the PATH of env needs no
 	// directory. Nil means the stack installs no tool.
 	Tools func(ctx context.Context, task string, meta Metadata, env []string, info func(string)) ([]string, error)
+	// Step adapts each step of a component's task before it runs, with its
+	// placeholders expanded and the task's toolchain selected: it answers the
+	// step to run, which may name another program, such as the release of a
+	// build tool the component's build states, and carry more arguments. root
+	// is the task's stack root with the selected environment. An offline run
+	// calls it too. Its error fails the task with stacks.toolchain_missing.
+	// RunWith and RunFiltered read the adapted last step. Nil runs each step
+	// as the profile states it.
+	Step func(ctx context.Context, task string, meta Metadata, root RootStep, step []string, info func(string)) ([]string, error)
 	// Commands are the extension's own runtime commands, by name: a step
 	// runs one as {runtime} <name> <args>. A name is neither a task nor a
 	// control call.

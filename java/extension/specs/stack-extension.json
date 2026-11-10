@@ -5,7 +5,7 @@
   "outcomes": [
     "Each Gradle project, Android included, and each Maven module that packages code is a Putnami project, with an edge to each component it depends on in the same build, whether the build sits at the workspace root or in a subdirectory",
     "putnami lint, test and build run the steps of the component's build, Gradle wrapper or Maven, in its directory, and a second run over an unchanged tree is a cache hit",
-    "A machine with no JDK or no Maven runs the tasks: the extension installs an Eclipse Temurin JDK and Apache Maven, each pinned by SHA-256",
+    "A machine with no JDK, Gradle or Maven builds right after git clone: putnami install installs the pinned Eclipse Temurin JDKs the build asks for, through .java-version and its Gradle toolchains, its Gradle or Maven, each checked by SHA-256, and its dependencies, and each task installs what it still lacks",
     "The test task reads the JUnit reports and the JaCoCo report the build writes into the test and coverage summary",
     "A change to a lockfile reruns test and build, never lint",
     "putnami test --test runs the tests a filter names, and a component in which it selects none passes; putnami lint also checks the documentation links",
@@ -18,7 +18,11 @@
     "Android product flavors: a flavored app overrides the test step",
     "Publishing a library to a Maven repository: Gradle or Maven publishes it",
     "An application image for a build other than the Gradle application plugin and Spring Boot",
-    "A workspace-fetch that fills a dependency cache ahead of a hosted run: resolving a Gradle build's dependencies evaluates its settings and build scripts, which run their plugins' code, through the repository's own wrapper jar, and Maven's dependency:go-offline loads the build's extensions and misses the dependencies a plugin resolves when it runs"
+    "A workspace-fetch that fills a dependency cache ahead of a hosted run without running repository code: resolving a Gradle build's dependencies evaluates its settings and build scripts, which run their plugins' code, through the repository's own wrapper jar, and Maven's dependency:go-offline loads the build's extensions and misses the dependencies a plugin resolves when it runs",
+    "Installing the Android SDK: it accepts the SDK's licenses on the team's behalf, which needs a decision of the workspace's owner",
+    "Credentials for a private Maven or Gradle repository: the build reads its own settings",
+    "A deps-upgrade: a Gradle or Maven build moves its versions with its own tools",
+    "Running the Maven wrapper script mvnw: the release its properties name runs instead"
   ],
   "requirements": [
     {
@@ -35,7 +39,27 @@
     },
     {
       "id": "toolchain-is-provided",
-      "text": "The toolchain check runs javac -version against .java-version. When javac is missing or outside it, the task installs under the Putnami home the Eclipse Temurin JDK it accepts (17, 21 or 25, 21 first), checked by SHA-256, and runs it first on PATH and as JAVA_HOME. A Maven component with no mvn on PATH gets Apache Maven 3.9.11 the same way. Offline, a task installs nothing."
+      "text": "The toolchain check runs javac -version against .java-version, read up to its first character that is neither a digit nor a dot. When javac is missing or outside it, the task installs under the Putnami home the Temurin JDK it accepts (8, 11, 17, 21 or 25, 21 first), checked by SHA-256, and runs it first on PATH and as JAVA_HOME. 8, 1.8 and 1.8.0 accept the 1.8.0_512 a Java 8 javac prints. Offline, a task installs nothing."
+    },
+    {
+      "id": "gradle-toolchains-are-provided",
+      "text": "Each Gradle step reads the Java majors the build's toolchains ask for: JavaLanguageVersion.of(N) and jvmToolchain(N), as a number, a string, a JavaVersion constant or a libs catalog version, in its build files, script plugins, buildSrc and build-logic, and the daemon JVM criteria. For each major but the one running Gradle, it installs the pinned JDK, unless offline, and appends -Porg.gradle.java.installations.paths=<homes>."
+    },
+    {
+      "id": "gradle-without-a-wrapper",
+      "text": "A step that names {root}/gradlew in a build that has no wrapper, or gradle when none is on PATH, runs a pinned Gradle distribution installed under the Putnami home and checked by the SHA-256 services.gradle.org publishes: 9.8.2 on JDK 17 to 25, 8.14.6 on an older JDK. Offline, a Gradle that is not installed fails the task. The test filter reaches it as it reaches gradlew."
+    },
+    {
+      "id": "maven-follows-its-wrapper",
+      "text": "A step that names mvn runs the release the distributionUrl of .mvn/wrapper/maven-wrapper.properties names, whatever mvn is on PATH, installed under the Putnami home and checked against the distributionSha256Sum it states, else the SHA-512, then the SHA-256, its host publishes. An archive with no checksum, another digest, or a URL that is not http or https or carries credentials is refused. Without the file, the mvn on PATH runs, else Maven 3.9.11."
+    },
+    {
+      "id": "workspace-install-prepares-each-build",
+      "text": "putnami install runs workspace-install at each stack root, in path order, except the projects disable.tags excludes: it installs the JDKs, then the build tool, then fills the dependency cache: an init script resolves every resolvable configuration of every Gradle project, one it cannot resolve whole being a warning and a build that does not configure an error, and Maven runs go-offline, best effort, with a warning that names what it misses. Force refreshes the dependencies."
+    },
+    {
+      "id": "workspace-install-offline-installs-nothing",
+      "text": "With offline dependencies, workspace-install installs no JDK, Gradle or Maven: a stack root whose JDK, Gradle wrapper distribution or Maven is missing is left out with a warning, and the dependency resolution runs with --offline, so it verifies what the caches hold."
     },
     {
       "id": "tasks-run-the-profile",
@@ -86,8 +110,10 @@
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
     "tooling/stacks/doc/adr/0006-a-pinned-toolchain-sets-its-home-and-tools-know-the-component.md",
+    "tooling/stacks/doc/adr/0014-a-stack-adapts-each-step-of-a-task.md",
     "java/extension/doc/adr/0001-the-extension-installs-a-pinned-jdk.md",
     "java/extension/doc/adr/0002-an-application-image-copies-onto-the-temurin-jre.md",
-    "java/extension/doc/adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md"
+    "java/extension/doc/adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md",
+    "java/extension/doc/adr/0004-a-blank-machine-builds-after-putnami-install.md"
   ]
 }

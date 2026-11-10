@@ -707,16 +707,27 @@ func (s Stack) run(ctx context.Context, in runInput, emit reporter) (string, map
 	// A test runner exits non-zero when a case fails: the steps stop there,
 	// and the reports it wrote are still read, so the failed cases name the
 	// failure.
+	stepRoot := RootStep{Dir: rootAbs, Project: in.projectAbs, Component: meta.Component, Env: env, Output: outDir, Program: func(name string) string { return selected.Program(profile.Toolchain, name) }}
+	argvs := make([][]string, len(t.Steps))
+	for n, step := range t.Steps {
+		argvs[n] = expandStep(step, vars)
+		if s.Step == nil {
+			continue
+		}
+		adapted, err := s.Step(ctx, in.task, meta, stepRoot, argvs[n], emit.Info)
+		if err != nil {
+			return statusFailed, nil, failWith(emit, CodeToolchainMissing, "%s: %v", strings.Join(argvs[n], " "), err)
+		}
+		argvs[n] = adapted
+	}
 	var stepErr error
 	var stepArgs []string
-	if in.stepArgs != nil && len(t.Steps) > 0 {
-		root := RootStep{Dir: rootAbs, Project: in.projectAbs, Env: env, Output: outDir, Program: func(name string) string { return selected.Program(profile.Toolchain, name) }}
-		stepArgs = in.stepArgs(root, expandStep(t.Steps[len(t.Steps)-1], vars))
+	if in.stepArgs != nil && len(argvs) > 0 {
+		stepArgs = in.stepArgs(stepRoot, argvs[len(argvs)-1])
 	}
 	filtered := in.filters && len(stepArgs) > 0
-	for n, step := range t.Steps {
-		argv := expandStep(step, vars)
-		if n == len(t.Steps)-1 {
+	for n, argv := range argvs {
+		if n == len(argvs)-1 {
 			argv = append(argv, stepArgs...)
 		}
 		emit.Info("$ " + strings.Join(argv, " "))

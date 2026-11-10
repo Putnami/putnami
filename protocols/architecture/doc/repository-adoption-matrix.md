@@ -1,11 +1,11 @@
 # Repository adoption matrix
 
-This repository maps **105 of its 193 projects** to **10 architecture domains**.
-The other **88 are excluded on purpose**: 43 samples, 7 templates, 2 template
+This repository maps **105 of its 196 projects** to **10 architecture domains**.
+The other **91 are excluded on purpose**: 46 samples, 7 templates, 2 template
 proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
 destinations, the Cloud CLI extension with its 14 generated clients, the new
 development verb vocabulary, the new evidence report readers, and the new
-stack core with its first thirteen stack extensions. Every one of the 193 appears
+stack core with its first thirteen stack extensions. Every one of the 196 appears
 in a table below, mapped or excluded, with a reason.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
@@ -386,7 +386,7 @@ detectors need; the next stack extensions join the same section until then.
 | `/swift/extension` | Stack extension | `tooling` |
 | `/tooling/stacks` | Stack core | `tooling` |
 
-### Samples — 42 projects
+### Samples — 46 projects
 
 **Why excluded:** a sample is a *proof*. It exists to demonstrate that the public
 API works and to fail loudly in the end-to-end suite when it stops working. It
@@ -414,6 +414,9 @@ reviewed permissions.
 | `/dotnet/samples/library` | .NET sample | `tooling` |
 | `/dotnet/samples/tests` | .NET sample | `tooling` |
 | `/java/samples/gradle` | Java sample | `tooling` |
+| `/java/samples/gradle-toolchains` | Java sample | `tooling` |
+| `/java/samples/gradle-toolchains/legacy` | Java sample | `tooling` |
+| `/java/samples/gradle-toolchains/report` | Java sample | `tooling` |
 | `/java/samples/gradle/application` | Java sample | `tooling` |
 | `/java/samples/gradle/library` | Java sample | `tooling` |
 | `/java/samples/maven` | Java sample | `tooling` |

@@ -754,6 +754,60 @@ func TestToolsReachThePathOfTheTask(t *testing.T) {
 	}
 }
 
+func TestStepAdaptsEachStepAndTheFilterReadsTheAdaptedOne(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.82.0", junitPass)
+	tools := t.TempDir()
+	writeFile(t, tools, "stated-cargo", "#!/bin/sh\necho \"stated $*\" >> \"$STUB_LOG\"\nexec cargo \"$@\"\n")
+	if err := os.Chmod(filepath.Join(tools, "stated-cargo"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	s := testProfileWithLcov(t)
+	task := s.Profile.Tasks[TaskTest]
+	task.Steps = append([][]string{{"cargo", "fetch"}}, task.Steps...)
+	s.Profile.Tasks[TaskTest] = task
+	var seen []string
+	s.Step = func(_ context.Context, name string, meta Metadata, root RootStep, step []string, _ func(string)) ([]string, error) {
+		seen = append(seen, name+" "+meta.Component+" "+root.Component+" "+strings.Join(step, " "))
+		if root.Program == nil || len(root.Env) == 0 {
+			t.Errorf("Step receives the selected root: %+v", root)
+		}
+		return append([]string{filepath.Join(tools, "stated-cargo")}, append(step[1:], "--locked")...), nil
+	}
+	meta, _ := json.Marshal(Metadata{Component: "api", Root: "."})
+	var lastStep []string
+	rec := &recorder{}
+	status, _, _ := s.run(context.Background(), runInput{
+		task: TaskTest, workspaceRoot: root, projectAbs: filepath.Join(root, "crates/api"), metadata: meta,
+		outputRoot: filepath.Join(root, ".putnami/out/api"), stdout: &bytes.Buffer{},
+		stepArgs: func(_ RootStep, step []string) []string { lastStep = step; return []string{"--filter", "x"} },
+	}, rec)
+	if status != statusOK {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if len(seen) != 2 || !strings.HasPrefix(seen[0], "test api api cargo fetch") || !strings.HasPrefix(seen[1], "test api api cargo test --package api") {
+		t.Errorf("Step adapts each expanded step: %q", seen)
+	}
+	if len(lastStep) == 0 || filepath.Base(lastStep[0]) != "stated-cargo" || lastStep[len(lastStep)-1] != "--locked" {
+		t.Errorf("the filter reads the adapted last step: %q", lastStep)
+	}
+	log, _ := os.ReadFile(filepath.Join(root, "log"))
+	if !strings.Contains(string(log), "stated fetch --locked\n") || !strings.Contains(string(log), "--locked --filter x\n") {
+		t.Errorf("each adapted step runs, the filter after the adapted arguments: %s", log)
+	}
+
+	s.Step = func(context.Context, string, Metadata, RootStep, []string, func(string)) ([]string, error) {
+		return nil, errors.New("no release to install")
+	}
+	if status, _, rec := runTask(t, s, root, TaskTest); status != statusFailed || rec.codes() != "error:"+CodeToolchainMissing || !strings.Contains(rec.diags[0], "no release to install") {
+		t.Errorf("a step that cannot be adapted fails the task: %s %v", status, rec.diags)
+	}
+}
+
 func TestProbeNamesABareDirectoryAndADelegatedStackServesTheGraphJob(t *testing.T) {
 	s := testStack(t)
 	s.Detect = func(string, wsproto.ProbeRequest) ([]Component, []diag.Diagnostic) {
