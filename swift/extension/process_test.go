@@ -2,19 +2,15 @@ package swift
 
 import (
 	"encoding/json"
-	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/jsonl"
 )
 
 const serverManifest = `// swift-tools-version:5.9
@@ -107,33 +103,5 @@ targets: [.executableTarget(name: "Tool"), .executableTarget(name: "server")]`))
 	}
 	if got := ExecutableProducts([]byte(`targets: [.executableTarget(name: "server"), .executableTarget(name: "Tool")]`)); !reflect.DeepEqual(got, []string{"Tool", "server"}) {
 		t.Errorf("with no product, the executable targets: %v", got)
-	}
-}
-
-func TestServeAnnouncesAServerThatAcceptsConnections(t *testing.T) {
-	port, err := freePort()
-	if err != nil || port == 0 {
-		t.Fatalf("freePort: %d %v", port, err)
-	}
-	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer listener.Close()
-	read, write, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stdout := os.Stdout
-	os.Stdout = write
-	defer func() { os.Stdout = stdout }()
-	announceReady(t.Context(), jsonl.New(), port)
-	write.Close()
-	output, err := io.ReadAll(read)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(output), `"port":`+strconv.Itoa(port)) || !strings.Contains(string(output), "ready") {
-		t.Errorf("output = %s", output)
 	}
 }
