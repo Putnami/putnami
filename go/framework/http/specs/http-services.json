@@ -31,7 +31,7 @@
     },
     {
       "id": "middleware-order",
-      "text": "Server middleware wraps every registered route in registration order, is composed once before the first request, and a middleware that does not call next short-circuits the chain."
+      "text": "Server middleware wraps every registered route in registration order, is composed once before the first request, and a middleware that does not call next short-circuits the chain. A middleware added with UseOutermost runs before every middleware added earlier, so it sees the requests an inner middleware refuses."
     },
     {
       "id": "request-scope",

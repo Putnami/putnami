@@ -267,3 +267,41 @@ func BenchmarkChain(b *testing.B) {
 		_ = composed(ctx)
 	}
 }
+
+func TestUseOutermostRunsBeforeEveryMiddlewareAddedEarlier(t *testing.T) {
+	spectest.Proves(t, "go/http-services", "middleware-order", "an-outermost-middleware-sees-every-request-first")
+	var order []string
+	mw := func(name string) Middleware {
+		return func(ctx *Context, next func() *Response) *Response {
+			order = append(order, "pre:"+name)
+			resp := next()
+			order = append(order, "post:"+name)
+			return resp
+		}
+	}
+	refuse := func(_ *Context, _ func() *Response) *Response {
+		order = append(order, "refused")
+		return Forbidden()
+	}
+
+	server := NewServerPlugin(ServerConfig{})
+	server.Use(mw("inner")).Use(refuse)
+	server.UseOutermost(mw("outer"))
+	server.GET("/", func(_ *Context) *Response { return JSON("ok") })
+
+	rec := httptest.NewRecorder()
+	server.Handler().ServeHTTP(rec, httptest.NewRequest("GET", "/", nil))
+
+	want := []string{"pre:outer", "pre:inner", "refused", "post:inner", "post:outer"}
+	if len(order) != len(want) {
+		t.Fatalf("order = %v, want %v", order, want)
+	}
+	for i := range want {
+		if order[i] != want[i] {
+			t.Fatalf("order = %v, want %v", order, want)
+		}
+	}
+	if rec.Code != 403 {
+		t.Fatalf("status = %d, want the inner refusal's 403", rec.Code)
+	}
+}

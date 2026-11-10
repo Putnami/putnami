@@ -308,6 +308,16 @@ func (p *ServerPlugin) Use(mw Middleware) *ServerPlugin {
 	return p
 }
 
+// UseOutermost adds a middleware in front of every middleware already added,
+// so it sees each request first and each response last, including the ones an
+// inner middleware refuses. A plugin that instruments every request calls it
+// while the application configures; the chain is composed once, before the
+// first request, so a later call has no effect.
+func (p *ServerPlugin) UseOutermost(mw Middleware) *ServerPlugin {
+	p.middlewares = append([]Middleware{mw}, p.middlewares...)
+	return p
+}
+
 // Configure implements the Configurer interface. Finalizes injected handlers
 // by resolving their DI dependencies from the container.
 func (p *ServerPlugin) Configure(_ context.Context, owner *app.Module) error {
