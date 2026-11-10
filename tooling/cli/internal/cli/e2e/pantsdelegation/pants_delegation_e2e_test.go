@@ -72,7 +72,7 @@ func buildRuntime(t *testing.T) string {
 	}
 	out := filepath.Join(t.TempDir(), "putnami-pants")
 	cmd := exec.Command(goBinary, "build", "-o", out, "./cmd/putnami-pants")
-	cmd.Dir = filepath.Join(repoRoot, "monorepo/pants")
+	cmd.Dir = filepath.Join(repoRoot, "integrations/pants")
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod", "CGO_ENABLED=0")
 	if data, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build the Pants runtime: %v\n%s", err, data)
@@ -92,7 +92,7 @@ func pantsWorkspace(t *testing.T, demo map[string]map[string]string, runtime str
 	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\ndist\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/pants-extension"], "includes": []}`)
 
-	data, err := os.ReadFile(filepath.Join(repoRoot, "monorepo/pants/putnami.extension.json"))
+	data, err := os.ReadFile(filepath.Join(repoRoot, "integrations/pants/putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

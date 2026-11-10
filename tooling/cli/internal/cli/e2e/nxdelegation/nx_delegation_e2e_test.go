@@ -72,7 +72,7 @@ func buildRuntime(t *testing.T) string {
 	}
 	out := filepath.Join(t.TempDir(), "putnami-nx")
 	cmd := exec.Command(goBinary, "build", "-o", out, "./cmd/putnami-nx")
-	cmd.Dir = filepath.Join(repoRoot, "monorepo/nx")
+	cmd.Dir = filepath.Join(repoRoot, "integrations/nx")
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod", "CGO_ENABLED=0")
 	if data, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build the Nx runtime: %v\n%s", err, data)
@@ -92,7 +92,7 @@ func nxWorkspace(t *testing.T, demo map[string]map[string]string, runtime string
 	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\ndist\nnode_modules\nreports\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/nx-extension"], "includes": []}`)
 
-	data, err := os.ReadFile(filepath.Join(repoRoot, "monorepo/nx/putnami.extension.json"))
+	data, err := os.ReadFile(filepath.Join(repoRoot, "integrations/nx/putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

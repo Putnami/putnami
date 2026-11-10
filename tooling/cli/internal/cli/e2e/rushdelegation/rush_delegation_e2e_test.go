@@ -80,7 +80,7 @@ func buildRuntime(t *testing.T) string {
 	}
 	out := filepath.Join(t.TempDir(), "putnami-rush")
 	cmd := exec.Command(goBinary, "build", "-o", out, "./cmd/putnami-rush")
-	cmd.Dir = filepath.Join(repoRoot, "monorepo/rush")
+	cmd.Dir = filepath.Join(repoRoot, "integrations/rush")
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod", "CGO_ENABLED=0")
 	if data, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build the Rush runtime: %v\n%s", err, data)
@@ -101,7 +101,7 @@ func rushWorkspace(t *testing.T, demo map[string]map[string]string, runtime stri
 	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), "common/temp\nnode_modules\n.putnami\n.gen\ndist\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/rush-extension"], "includes": [], "options": {"@putnami/rush": {"mode": "delegate"}}}`)
 
-	data, err := os.ReadFile(filepath.Join(repoRoot, "monorepo/rush/putnami.extension.json"))
+	data, err := os.ReadFile(filepath.Join(repoRoot, "integrations/rush/putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

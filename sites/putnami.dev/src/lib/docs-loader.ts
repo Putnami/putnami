@@ -12,7 +12,7 @@ export interface PackageInfo {
   hasDoc: boolean;
 }
 
-const PROJECT_ROOT_PATTERNS = ['tooling/*', 'monorepo/*', 'platform/*', 'typescript/framework/*', 'go/framework/*'];
+const PROJECT_ROOT_PATTERNS = ['tooling/*', 'integrations/*', 'platform/*', 'typescript/framework/*', 'go/framework/*'];
 
 const EXTENSION_ROOTS = {
   go: 'go/extension',

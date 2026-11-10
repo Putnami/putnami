@@ -73,7 +73,7 @@ func buildRuntime(t *testing.T) string {
 	}
 	out := filepath.Join(t.TempDir(), "putnami-turbo")
 	cmd := exec.Command(goBinary, "build", "-o", out, "./cmd/putnami-turbo")
-	cmd.Dir = filepath.Join(repoRoot, "monorepo/turbo")
+	cmd.Dir = filepath.Join(repoRoot, "integrations/turbo")
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod", "CGO_ENABLED=0")
 	if data, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build the Turborepo runtime: %v\n%s", err, data)
@@ -104,7 +104,7 @@ func turboWorkspace(t *testing.T, demo map[string]map[string]string, runtime, mo
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"),
 		`{"name": "shop", "extensions": ["/turbo-extension"], "includes": [], "options": {"@putnami/turbo": {"mode": "`+mode+`"}}}`)
 
-	data, err := os.ReadFile(filepath.Join(repoRoot, "monorepo/turbo/putnami.extension.json"))
+	data, err := os.ReadFile(filepath.Join(repoRoot, "integrations/turbo/putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

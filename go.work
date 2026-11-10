@@ -99,8 +99,8 @@ use (
 	./protocols/transaction
 	./protocols/workspace
 	./java/extension
-	./monorepo/nx
-	./monorepo/rush
+	./integrations/nx
+	./integrations/rush
 	./php/extension
 	./dotnet/extension
 	./python/extension
@@ -109,8 +109,8 @@ use (
 	./sites/telemetry.putnami.dev
 	./swift/extension
 	./intelligence/areas
-	./monorepo/bazel
-	./monorepo/moon
+	./integrations/bazel
+	./integrations/moon
 	./tooling/cli
 	./tooling/cli-documents
 	./tooling/cli-model
@@ -127,8 +127,8 @@ use (
 	./tooling/local-collaboration
 	./tooling/memory-store
 	./tooling/observe
-	./monorepo/pants
-	./monorepo/turbo
+	./integrations/pants
+	./integrations/turbo
 	./tooling/scaffold
 	./tooling/sdd-extension
 	./tooling/stacks

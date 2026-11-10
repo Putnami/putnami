@@ -373,13 +373,13 @@ detectors need; the next stack extensions join the same section until then.
 |---|---|---|
 | `/dart/extension` | Stack extension | `tooling` |
 | `/dotnet/extension` | Stack extension | `tooling` |
+| `/integrations/bazel` | Delegated stack extension | `tooling` |
+| `/integrations/moon` | Delegated stack extension | `tooling` |
+| `/integrations/nx` | Delegated stack extension | `tooling` |
+| `/integrations/pants` | Delegated stack extension | `tooling` |
+| `/integrations/rush` | Delegated stack extension | `tooling` |
+| `/integrations/turbo` | Delegated stack extension | `tooling` |
 | `/java/extension` | Stack extension | `tooling` |
-| `/monorepo/bazel` | Delegated stack extension | `tooling` |
-| `/monorepo/moon` | Delegated stack extension | `tooling` |
-| `/monorepo/nx` | Delegated stack extension | `tooling` |
-| `/monorepo/pants` | Delegated stack extension | `tooling` |
-| `/monorepo/rush` | Delegated stack extension | `tooling` |
-| `/monorepo/turbo` | Delegated stack extension | `tooling` |
 | `/php/extension` | Stack extension | `tooling` |
 | `/ruby/extension` | Stack extension | `tooling` |
 | `/rust/extension` | Stack extension | `tooling` |

@@ -511,10 +511,19 @@
     },
     {
       "id": "D-063",
-      "statement": "a monorepo tool integration, such as @putnami/bazel or @putnami/pants, lives in monorepo/<tool>, a top-level scope of its own, never under tooling/",
-      "settled": "2026-11-09",
+      "statement": "a monorepo tool integration such as @putnami/nx lives in integrations/<tool>, the top-level scope of third-party tool integrations, never under tooling/; language stack extensions stay in their language roots; no project outside integrations/ depends on it",
+      "settled": "2026-11-10",
       "settledBy": "fdumay",
-      "reviewOnly": true
+      "check": {
+        "kind": "json-value",
+        "files": [
+          "integrations/**/putnami.json"
+        ],
+        "pointer": "/visibility",
+        "rule": "notEquals",
+        "value": "public",
+        "whenMissing": "satisfied"
+      }
     },
     {
       "id": "D-064",
