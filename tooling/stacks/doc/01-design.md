@@ -528,6 +528,8 @@ affected component instead of importing its targets
   Bazel's test logs, keeps them, and the extension's runtime copies the run's
   reports into `{output}`, which the core never reads from another run.
 
+A delegated stack is an integration with a third-party tool, so it lives in
+`integrations/<tool>`, not in a language root (D-063).
 `@putnami/pants` and `@putnami/bazel` delegate alone. `@putnami/nx`,
 `@putnami/moon`, `@putnami/turbo` and `@putnami/rush` delegate too, and also
 offer import mode: each has a sync of its own that reads the adoption mode

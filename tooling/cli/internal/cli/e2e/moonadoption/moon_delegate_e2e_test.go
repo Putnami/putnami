@@ -72,7 +72,7 @@ func buildRuntime(t *testing.T) string {
 	}
 	out := filepath.Join(t.TempDir(), "putnami-moon")
 	cmd := exec.Command(goBinary, "build", "-o", out, "./cmd/putnami-moon")
-	cmd.Dir = filepath.Join(repoRoot, "monorepo/moon")
+	cmd.Dir = filepath.Join(repoRoot, "integrations/moon")
 	cmd.Env = append(os.Environ(), "GOWORK=off", "GOFLAGS=-mod=mod", "CGO_ENABLED=0")
 	if data, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("build the moon runtime: %v\n%s", err, data)
@@ -98,7 +98,7 @@ func moonWorkspace(t *testing.T, demo map[string]map[string]string, runtime, mod
 	}
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/moon-extension"]`+options+`, "includes": []}`)
 
-	data, err := os.ReadFile(filepath.Join(repoRoot, "monorepo/moon/putnami.extension.json"))
+	data, err := os.ReadFile(filepath.Join(repoRoot, "integrations/moon/putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

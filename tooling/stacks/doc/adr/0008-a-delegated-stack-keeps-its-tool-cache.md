@@ -2,10 +2,10 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-08
-- **Scope**: `tooling/stacks` (`@putnami/stacks`), `monorepo/pants`
-  (`@putnami/pants`), `monorepo/nx` (`@putnami/nx`), `monorepo/moon`
-  (`@putnami/moon`), `monorepo/turbo` (`@putnami/turbo`) and the delegated
-  stacks that follow it (Bazel, and Rush in delegate mode, `monorepo/rush`)
+- **Scope**: `tooling/stacks` (`@putnami/stacks`), `integrations/pants`
+  (`@putnami/pants`), `integrations/nx` (`@putnami/nx`), `integrations/moon`
+  (`@putnami/moon`), `integrations/turbo` (`@putnami/turbo`) and the delegated
+  stacks that follow it (Bazel, and Rush in delegate mode, `integrations/rush`)
 
 ## Context
 

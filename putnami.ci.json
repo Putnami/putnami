@@ -33,7 +33,7 @@
           "/cloud/...",
           "/protocols/...",
           "/tooling/...",
-          "/monorepo/...",
+          "/integrations/...",
           "/intelligence/...",
           "/go/...",
           "/python/...",

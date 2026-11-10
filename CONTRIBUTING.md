@@ -245,13 +245,14 @@ not.
 The repo is organized by ownership — each language ecosystem is self-contained:
 
 - `tooling/` — workspace-wide machinery: CLI, extension SDK, scaffold, client generator, tooling samples
-- `monorepo/` — monorepo tool integrations that delegate to the tool: `monorepo/bazel` (`@putnami/bazel`), `monorepo/moon` (`@putnami/moon`), `monorepo/pants` (`@putnami/pants`) and `monorepo/turbo` (`@putnami/turbo`)
+- `integrations/` — integrations with third-party tools; today the monorepo tool integrations that delegate to the tool: `integrations/bazel` (`@putnami/bazel`), `integrations/moon` (`@putnami/moon`), `integrations/nx` (`@putnami/nx`), `integrations/pants` (`@putnami/pants`), `integrations/rush` (`@putnami/rush`) and `integrations/turbo` (`@putnami/turbo`). No project outside `integrations/` depends on one inside it (D-063)
 - `intelligence/` — public Intelligence code: the area detector (`intelligence/areas`)
 - `cloud/` — public client code of the hosted platform, such as the Cloud runtime destination libraries
 - `protocols/` — cross-pillar wire contracts (schemas + fixtures) shared by frameworks, tooling, and platform
 - `typescript/` — TypeScript extension, frameworks, templates, samples
 - `go/` — Go extension, frameworks, templates, and samples (`go.putnami.dev/*`)
 - `python/` — Experimental Python extension, templates, and samples; no shipped Python framework
+- `rust/`, `java/`, `swift/`, `dart/`, `dotnet/`, `ruby/`, `php/` — language stack extensions on the shared stack core (`tooling/stacks`), with their samples
 - `sites/` — deployed sites: `putnami.dev` (documentation) and `telemetry.putnami.dev` (CLI-usage receiver)
 
 Each language directory follows the same shape: `extension/`, `framework/`, `templates/`, `samples/`.
