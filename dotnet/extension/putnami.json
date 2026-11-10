@@ -36,7 +36,8 @@
     "test": {
       "filePatterns": [
         "putnami.extension.json",
-        "profile.json"
+        "profile.json",
+        "sdkreleases.json"
       ]
     }
   }

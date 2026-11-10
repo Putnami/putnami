@@ -119,18 +119,23 @@ same task of the packages it depends on.
 
 When the `dart` or `flutter` on `PATH` is missing, or it or the Dart a Flutter
 SDK bundles is outside the constraints its package states, a task installs the
-newest stable release the constraints admit, under `tools/dart` of the Putnami
-home, and runs it
-([ADR 0001](adr/0001-the-sdk-installs-from-the-publishers-archives.md)):
+newest release the extension pins that the constraints admit, under
+`tools/dart` of the Putnami home, and runs it
+([ADR 0001](adr/0001-the-sdk-installs-from-the-publishers-archives.md),
+[ADR 0003](adr/0003-the-extension-pins-the-sdk-releases-it-installs.md)):
 
-| SDK | Release list | Checksum |
+| SDK | Pinned releases | Archive |
 |---|---|---|
-| Dart | The stable releases of the dart-archive on `storage.googleapis.com` | The `.sha256sum` beside each archive |
-| Flutter | The release manifest of the host system on `storage.googleapis.com`; the release must also bundle a Dart in `environment.sdk` | The SHA-256 the manifest names |
+| Dart | The newest patch of each stable minor from 2.19, with the SHA-256 of each platform's archive | The dart-archive on `storage.googleapis.com` |
+| Flutter | The newest stable release of each minor from 3.10 on each system; the release must also bundle a Dart in `environment.sdk` | The Flutter release bucket on `storage.googleapis.com` |
 
-The archive is checked before it is unpacked, and later tasks reuse the
-install. The checksum comes over HTTPS from the host that serves the archive:
-it detects a truncated or altered download, not a compromised publisher. An SDK on `PATH` that satisfies the constraint runs, and nothing is
+The pins live in `sdkreleases.json`, which `scripts/sdk-releases.sh` writes
+from the publishers' release lists, so the same extension release installs
+the same SDK on every machine; a pin moves with the next extension release.
+The archive is checked against the pinned SHA-256 before it is unpacked, and
+later tasks reuse the install. A constraint that admits only a patch the
+extension does not pin, such as `sdk: 3.4.0`, fails: put that SDK on `PATH`.
+An SDK on `PATH` that satisfies the constraint runs, and nothing is
 installed. An offline run installs nothing. A Flutter archive weighs 1.5 to
 2.5 GB and unpacks with the host's `tar`, which needs `xz` on Linux, without
 keeping the archive's owner; Flutter itself needs `git`. Flutter publishes no

@@ -2,7 +2,7 @@
   "protocolVersion": 2,
   "contracts": [
     {
-      "authority": "Dart SDK archive (storage.googleapis.com/dart-archive): the stable release list, each SDK archive and the .sha256sum beside it; Flutter SDK releases (storage.googleapis.com/flutter_infra_release/releases): the release manifest per host system and the archives it names",
+      "authority": "Dart SDK archive (storage.googleapis.com/dart-archive): the SDK archive of each release the extension pins; Flutter SDK releases (storage.googleapis.com/flutter_infra_release/releases): the archive of each release the extension pins",
       "adapter": "dart/extension/provide.go",
       "callsites": [
         {
@@ -16,25 +16,13 @@
           "transport": "http",
           "symbol": "http.Client",
           "fingerprint": "a578bc1670b42d917d13c5c4736cdd546c4c445aa02423122f457117642737b8"
-        },
-        {
-          "path": "dart/extension/provide.go",
-          "transport": "http",
-          "symbol": "http.DefaultClient.Do",
-          "fingerprint": "6c0e4f49da8d565aec20f3e28b0db81b3aab632668c144ab80f86488cd96b59b"
-        },
-        {
-          "path": "dart/extension/provide.go",
-          "transport": "http",
-          "symbol": "http.NewRequestWithContext",
-          "fingerprint": "d3276c2dcfc63b47a713383b84b19beb3d5a9eafe199d01bb3b9b6914e0db45f"
         }
       ],
       "owner": "@putnami/dart",
       "tests": [
         "dart/extension/provide_test.go"
       ],
-      "reason": "Installs the Dart or Flutter SDK a package's constraint admits when the machine has none: lists the publisher's stable releases, reads the SHA-256 it publishes, and downloads the archive it checks. The formats belong to the Dart and Flutter release processes, so no Putnami provider declaration can generate this client."
+      "reason": "Installs the Dart or Flutter SDK a package's constraint admits when the machine has none: downloads the archive of the release the extension pins and checks it against the pinned SHA-256. The formats belong to the Dart and Flutter release processes, so no Putnami provider declaration can generate this client."
     }
   ]
 }

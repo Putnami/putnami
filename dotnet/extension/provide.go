@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"debug/elf"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -38,8 +39,6 @@ const (
 	// minRuntimeChannel is the oldest channel whose runtime an installation
 	// adds: the oldest one the extension pins an image for.
 	minRuntimeChannel = "8.0"
-	// maxMetadataBytes bounds a release metadata document.
-	maxMetadataBytes = 32 << 20
 	// maxArchiveBytes bounds an archive.
 	maxArchiveBytes = 2 << 30
 )
@@ -102,9 +101,32 @@ func hostRuntimeIdentifier() (string, bool) {
 	return rid, ok
 }
 
-// metadataBase is where Microsoft publishes the release metadata of every
-// channel. Tests point it at a local server.
-var metadataBase = "https://builds.dotnet.microsoft.com/dotnet/release-metadata"
+// sdkReleasesJSON is the release metadata the extension pins, which
+// scripts/sdk-releases.sh writes from Microsoft's: the newest SDK of each
+// feature band and the newest ASP.NET Core runtime of every channel from 8.0,
+// with the SHA-512 of each platform's archive. A pin moves only when a release
+// of the extension ships a regenerated file (ADR 0002).
+//
+//go:embed sdkreleases.json
+var sdkReleasesJSON []byte
+
+// shippedReleases is the release metadata the extension pins: the channels of
+// the release index, and the releases of each channel by its version.
+type shippedReleases struct {
+	releasesIndex
+	Channels map[string]channelReleases `json:"channels"`
+}
+
+// shipped is the metadata this build of the extension pins. Tests replace it.
+var shipped = mustDecodeReleases(sdkReleasesJSON)
+
+func mustDecodeReleases(data []byte) shippedReleases {
+	var r shippedReleases
+	if err := json.Unmarshal(data, &r); err != nil {
+		panic(fmt.Sprintf("the shipped .NET release metadata does not decode: %v", err))
+	}
+	return r
+}
 
 // httpClient fetches the metadata and the archives, and follows no redirect
 // away from HTTPS.
@@ -170,7 +192,7 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 	if version, ok := installedSDK(base, expected, rid); ok {
 		return provided(filepath.Join(base, sdkFolder(version, rid))), nil
 	}
-	plan, err := planInstall(ctx, expected, rid)
+	plan, err := planInstall(expected, rid)
 	if err != nil {
 		return stacks.Provided{}, err
 	}
@@ -307,24 +329,16 @@ func (p installPlan) runtimeVersions() []string {
 	return out
 }
 
-// planInstall reads the release metadata and plans the SDK chooseSDK picks
-// and the latest ASP.NET Core runtime, which holds the .NET runtime, of every
-// channel from 8.0 up to the SDK's.
-func planInstall(ctx context.Context, expected stacks.Expected, rid string) (installPlan, error) {
-	var index releasesIndex
-	if err := fetchJSON(ctx, metadataBase+"/releases-index.json", &index); err != nil {
-		return installPlan{}, err
-	}
-	channels := map[string]channelReleases{}
-	load := func(version, url string) (channelReleases, error) {
-		if c, ok := channels[version]; ok {
-			return c, nil
+// planInstall reads the release metadata the extension pins and plans the
+// SDK chooseSDK picks and the latest ASP.NET Core runtime, which holds the
+// .NET runtime, of every channel from 8.0 up to the SDK's.
+func planInstall(expected stacks.Expected, rid string) (installPlan, error) {
+	index := shipped.releasesIndex
+	load := func(version, _ string) (channelReleases, error) {
+		c, ok := shipped.Channels[version]
+		if !ok {
+			return channelReleases{}, fmt.Errorf("the extension pins no release of the .NET %s channel", version)
 		}
-		var c channelReleases
-		if err := fetchJSON(ctx, url, &c); err != nil {
-			return channelReleases{}, err
-		}
-		channels[version] = c
 		return c, nil
 	}
 	chosen, err := chooseSDK(index, load, expected)
@@ -547,27 +561,6 @@ func download(ctx context.Context, url, path, want string) error {
 	}
 	if got := hex.EncodeToString(h.Sum(nil)); got != want {
 		return fmt.Errorf("download %s: SHA-512 %s, the release metadata states %s", url, got, want)
-	}
-	return nil
-}
-
-func fetchJSON(ctx context.Context, url string, v any) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-	body, err := get(ctx, url)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = body.Close() }()
-	data, err := io.ReadAll(io.LimitReader(body, maxMetadataBytes+1))
-	if err != nil {
-		return fmt.Errorf("read %s: %w", url, err)
-	}
-	if len(data) > maxMetadataBytes {
-		return fmt.Errorf("read %s: the document exceeds %d bytes", url, maxMetadataBytes)
-	}
-	if err := json.Unmarshal(data, v); err != nil {
-		return fmt.Errorf("read %s: %w", url, err)
 	}
 	return nil
 }

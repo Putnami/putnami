@@ -1,0 +1,631 @@
+{
+  "dart": [
+    {
+      "version": "2.19.6",
+      "digests": {
+        "linux-x64": "0fdff25e6acba3d6094155a7e341634f8de3477e86c2fda4ad47232c1adf704f",
+        "linux-arm64": "6913b7c0b3b78bc141d372cd473da21771e57372b1ab45c977ce1550c8ff0b9c",
+        "macos-x64": "999a66d6d67aef780a5cf455bdf551133587e79e7853a962412e4c79affa95da",
+        "macos-arm64": "3c6b54b6f44bca38bdc7858ea45734f297951eba5fb10c8fa7b86b4a3f43edb6",
+        "windows-x64": "45ce92693c6621664d13591f2c08a5acbc89622eed400e23b3ae2966acbde348"
+      }
+    },
+    {
+      "version": "3.0.7",
+      "digests": {
+        "linux-x64": "cccd5300faa5a9abce12a5f77586e26350028cea82bb4ff8eeb55641b58a2e1d",
+        "linux-arm64": "2c8eeaf0d3da60c4e14beec45ce3b39aca754f71b9fa3fb0c635ee28d6f44708",
+        "macos-x64": "cb8e8bd8dedef5308795cc3d4917a00dfbcc73742aafb0d95bbee909a3ef398e",
+        "macos-arm64": "bbb6625d89fbb910543f185cffed88aae1bdb8ab1e487496f3a5c3d18159f979",
+        "windows-x64": "b516bd59506a53c396ced984fddacdc81e55d88ec7ebb84f6c858df3c52ae215"
+      }
+    },
+    {
+      "version": "3.1.5",
+      "digests": {
+        "linux-x64": "4342ba274a4e9f8057079cf9de43b1c7bdb002016ad538313e8ebe942b61bba8",
+        "linux-arm64": "0f0e19c276c99fa3efd6428ea4bef1502f742f2a1f9772959637eec775c10ba0",
+        "macos-x64": "e2d4a5fb3d519b6c9aabd755643a7044f735654834eb1f74c5f0f6f92b7af6a4",
+        "macos-arm64": "68d7096db08e815f5c7fb1fa5f92c6b0b2f570cf52a9446e8c24a556ecb96702",
+        "windows-x64": "c8efb1f4c09b27f1be99b027fca89d31c1b96254e4d769adb9dd706abc5708b5"
+      }
+    },
+    {
+      "version": "3.2.6",
+      "digests": {
+        "linux-x64": "253390a14f6f5d764c82df4b2c2cf18a1c30a8e1fe0849448cc4fedabaaf1d48",
+        "linux-arm64": "9818a37dd39e8e91a0159bdd2522213f9d36bbd99b715465b4606190e6ae41c3",
+        "macos-x64": "97661f20230686381f4fc5b05a63c6b5d5abc9570bf93ad4e5fc09309cd98517",
+        "macos-arm64": "2e04c91039f9cc05b2e93ce788aa1ce08bc4df5b50c84d6b4e21ba2b2538adb6",
+        "windows-x64": "ee1b7c01516f04833f5a4eccfb609bb5e28fe11e6ebd436ee15840885916162c",
+        "windows-arm64": "e59d12e69dede4b3dbcef80887b11860c6ed3296bbd862eae678daafa74c5932"
+      }
+    },
+    {
+      "version": "3.3.4",
+      "digests": {
+        "linux-x64": "6773922a60ce6f3b259dc4877c15f1cd96f325ca48015120014f64171708a7b2",
+        "linux-arm64": "c3473f681de8717134212c4cabd98ef25ec45c0adddd34e3b0d99431a606bdc9",
+        "macos-x64": "62285d9156bf6fb4439420bc327ab772df3a248b5d2df978284f510edb5d2c4a",
+        "macos-arm64": "01c594a2a7dc1ad98d210a9751aaf0972c35b13992f0b1043e8bf93361d60b51",
+        "windows-x64": "fb65fbc4c7c001118264e79c3f7594c1086398b7c66b829a5edd96c210dd0b65",
+        "windows-arm64": "1e56a9765de500110c768e74687b41c69dc0a482ac5016a46a98c47dc80c29f2"
+      }
+    },
+    {
+      "version": "3.4.4",
+      "digests": {
+        "linux-x64": "1968cc9ee12802317f9a2320165f6966cf949dc3574cac1cb91a1bc7f0de67db",
+        "linux-arm64": "b4cee491863d2ca6c324fad2d8fe2dfa123f78164630d7ca5eee45b940f70346",
+        "macos-x64": "fda7beb096ef3a2311f4f11ab774146fc8352fc73f154132f7c76404a780f9c8",
+        "macos-arm64": "ca750214e3fe0f88c0fb07b22f523c53a307c184f2ed51c3d3dcd2cb9e7bc317",
+        "windows-x64": "81f8dae963aa13a97b0111e08bc5b2986de83e24d63094058ed5e2085f35d087",
+        "windows-arm64": "9e38e5803286fa0d38988e8a6695ca9105e70497b891f081c739d50bc1305faa"
+      }
+    },
+    {
+      "version": "3.5.4",
+      "digests": {
+        "linux-x64": "8d0c5e34f2a9d6b9f5ebf05252ae1703893f6087d547c631b390aef2d0cd6967",
+        "linux-arm64": "a91d64dd3173349cee58c82f5ebf18bb9670f65eecc26d5684124c3def3f83ec",
+        "macos-x64": "b06db3f3d0e92af0939ca467e87ecababa96da4f9fe5031a788304b5df949374",
+        "macos-arm64": "c045940e0f5d4caca74e6ebed5a3bf9953383e831bac138e568a60d8b5053c02",
+        "windows-x64": "f506de8f479a0da9fb6f5d3bc4c8daa5a850fc766d1919bd426feff1e1d5f245",
+        "windows-arm64": "8c3fe27043c907feef8ee5a2220629317870c441c5b5845a9663d32c47356107"
+      }
+    },
+    {
+      "version": "3.6.2",
+      "digests": {
+        "linux-x64": "5a2953ec76c8139cd73d0c0b482de26d0b86a5a7e37579167bbd33493063408d",
+        "linux-arm64": "f475db0944922d9925b4a4266c31f8fafd39b01a3cc130422e785c8276eb13e5",
+        "macos-x64": "8ac74b6f5e0524d767decbb7a04e93482be4a09d012cd577f29113893c19bed8",
+        "macos-arm64": "453bbfa3d73f28e090b644268e2c809b899d11a3a6507874715e1a4042166295",
+        "windows-x64": "9effb4316e77903b118de6784835c73eafbdb2e7c01c3ad000f24e06daa92254",
+        "windows-arm64": "63199aab0f8d2254b630194ee5767d0cbea6fc5b8874c0eed274f7e7f51d713e"
+      }
+    },
+    {
+      "version": "3.7.3",
+      "digests": {
+        "linux-x64": "b772a2807d2fcf08b4edcff998123b0e87391c12067ad0cf11f7c50ca31982b2",
+        "linux-arm64": "16546f4cd27fca883eee7f1e7597f409a67e0254174443aff6f62c35c9ff78ad",
+        "macos-x64": "98a83e7f279f13c0589403cc11cbd4b75b9fbad89ddb5c2bae7a259b63bbe809",
+        "macos-arm64": "eb6479d1880185b351d7fc1382a460417b140a9dd6437a67a969ef69d3fa648c",
+        "windows-x64": "c86059e09a17769a3ec1bb7af75a8a03928962bf7d77f66407fc1993615dc123",
+        "windows-arm64": "ee5b8a21001005c4e67feb798de87040799fa92a2beb6d316dc79827ebbabf7a"
+      }
+    },
+    {
+      "version": "3.8.3",
+      "digests": {
+        "linux-x64": "008cefb88505760ae514062d576255305c2bcba40b0f9b7c70fd524d786d122d",
+        "linux-arm64": "2396d820adbd3bd15f334cdb1aefbbc32f473d1fdf06315af122dcd7c7269671",
+        "macos-x64": "4ac0ea9c9e68c1ecdd1a0df9202a48b5e0a76105e0e8551fdfc60daa4d4b0174",
+        "macos-arm64": "74bd98cd8c4aaa049bb616886a18237b66663e045c3934a01d7ca04816c0733b",
+        "windows-x64": "533958288cbfae2668699348135c912891981f5c387ecac1704a02bc86932f33",
+        "windows-arm64": "92aab977f275cb2f843bd0328b6b54d696c52fc4418e7d5f5ff8b529700ce764"
+      }
+    },
+    {
+      "version": "3.9.4",
+      "digests": {
+        "linux-x64": "61b4b9488e1b4255b94be17ad48ae2ddb23c6fbe67824cf8103d0b28fa8ab816",
+        "linux-arm64": "21790958b6c65cb57a1a3c3fb508f44ddcfb77b822a090039ee47e583fcde0e8",
+        "macos-x64": "f27906d6150f9f4077af9c7106718c8e039aeba031dcb42056a331fb74e3dd2f",
+        "macos-arm64": "da0aa7f35e94b2ff25ebd42b7c9b21d430aee658e26da05f6509f84e15019480",
+        "windows-x64": "d93e23a5ee0d5d4422e38b2eac9078f42ab44ba89ee659bb0a454719b576b284",
+        "windows-arm64": "bd73aa110ae70f5cdae65f0578de41e21d4e4c016744ab722947aa064632006f"
+      }
+    },
+    {
+      "version": "3.10.9",
+      "digests": {
+        "linux-x64": "d43b9d3a21b82ef2a37d31945b99e6b88f5f8dc44ec191b473fd629d78d0b994",
+        "linux-arm64": "67c98f9e6a694ed3cb362634372d69473040b3712836d42cafcdb3c56c0a04eb",
+        "macos-x64": "a5ddfbbd60ce20a19d7a4fc2b94487eec57288aaa52ce5ba18b4f8224ce4c180",
+        "macos-arm64": "f7d80c86f93348999812c1ae0f79013757b797af395f2cba70d2027a00be564e",
+        "windows-x64": "f3a9bbcce80384ed431376262beade4c67d8cd1de232a6eef49817cad6cb3fa7",
+        "windows-arm64": "c1b05c18597fe6ca30f895d13a8aec33e837bcef66e9f05159767ab5b9aa36d5"
+      }
+    },
+    {
+      "version": "3.11.6",
+      "digests": {
+        "linux-x64": "ea0ff2396ea5af402ba3598a9139a0f4b1b3471d9d7e834882d1559622760add",
+        "linux-arm64": "3c1299f468eba0fd77cf9b82d7e768382c1e980837b60ca774a2ceb4f9d7db4b",
+        "macos-x64": "81c726df7c196a5b481a51cec04c6c102c51c8e14c796f85759beeecced8721c",
+        "macos-arm64": "d3d888758f313af0cba74dcca157d2841772c96e0d47c64dd52bd54dcf11af76",
+        "windows-x64": "cb080649faa30708c934890c60fcb065077bcc53c762383dc32666efe92bc276",
+        "windows-arm64": "c31cc88d136b78d81756c59d15fe43e786dbecd22e99c1a00a796ecef0c07db0"
+      }
+    },
+    {
+      "version": "3.12.2",
+      "digests": {
+        "linux-x64": "28e47b44cf075f36771046c068bb0d174201cf9c7608744aed1cc23204299c2d",
+        "linux-arm64": "f82c83ece7d168047550dfd4a664e4071ac7c488bddb72dc43102c22d7e0b518",
+        "macos-x64": "38199f56fe22f2235e76799191d5b9516e360369c61b6ba4411398d5d5920bab",
+        "macos-arm64": "cd8753928e77b6b665bd70dce0e64b4ec6d2e2fde141d6409bb716c8ac1f1c0a",
+        "windows-x64": "77fd96c823ed09a85e58209a2c5f16b0fc02e5ed4f3e3d46fddf4be763d498d6",
+        "windows-arm64": "ef0168b2bbceccda659e3d9a0f5ebebd5326ef84800ca6af7ccceeb1cfd3daf0"
+      }
+    },
+    {
+      "version": "3.13.7",
+      "digests": {
+        "linux-x64": "eb99aed266efbcb615c6ae21c12f52cfe935b9f208bccc5fea7f64c21e867229",
+        "linux-arm64": "887cbb763bc4a1d6f3d7c34a6ea08f0f05211807abf98c06d6e4263907ccac1a",
+        "macos-x64": "44caf063178ac7680060fe14c2247532c652874d38f1016bf45cf475c86e44b5",
+        "macos-arm64": "9f972ee1e1139cb4f845f35c7c77bef269dd2ec727b239fb17a2ebcb66d0fb2f",
+        "windows-x64": "3b31d9f90b27861f29842d378f39f98ce9e60910042334f950ef5702f174fb81",
+        "windows-arm64": "02d1dcf26438dfd65be6cc3075c3b7f23fdef84d2601b488e59aa8aa8cd742b5"
+      }
+    }
+  ],
+  "flutter": {
+    "linux": {
+      "base_url": "https://storage.googleapis.com/flutter_infra_release/releases",
+      "releases": [
+        {
+          "channel": "stable",
+          "version": "3.10.6",
+          "dart_sdk_version": "3.0.6",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.10.6-stable.tar.xz",
+          "sha256": "7048e51a89c99a5b6cac6d8ae416121264effa76da34dba5c0e7cf85519c8e98"
+        },
+        {
+          "channel": "stable",
+          "version": "3.13.9",
+          "dart_sdk_version": "3.1.5",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.13.9-stable.tar.xz",
+          "sha256": "b6bc6f93423488c67110e0fe56523cd2260f3a4c379ed015cd1c7fab66362739"
+        },
+        {
+          "channel": "stable",
+          "version": "3.16.9",
+          "dart_sdk_version": "3.2.6",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.16.9-stable.tar.xz",
+          "sha256": "8868138a6f339f90353baefef0d789e06c3299d5f94db653decefda6633a9a8e"
+        },
+        {
+          "channel": "stable",
+          "version": "3.19.6",
+          "dart_sdk_version": "3.3.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.19.6-stable.tar.xz",
+          "sha256": "db6742a20626d0d2a089eb41ad61b9b2138b996679911e9c8268c1f896191f97"
+        },
+        {
+          "channel": "stable",
+          "version": "3.22.3",
+          "dart_sdk_version": "3.4.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.22.3-stable.tar.xz",
+          "sha256": "9c5f70ba118b9163552144901a2efd91d40b22a68a04e67271d6a5ad936e8368"
+        },
+        {
+          "channel": "stable",
+          "version": "3.24.5",
+          "dart_sdk_version": "3.5.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.24.5-stable.tar.xz",
+          "sha256": "a7c82f551a9eae018e078f6bb186171e5a77920d35a3d75a61d9a593d0a9e4ae"
+        },
+        {
+          "channel": "stable",
+          "version": "3.27.4",
+          "dart_sdk_version": "3.6.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.27.4-stable.tar.xz",
+          "sha256": "64df4273de625433c7ba41967932b782f5f9abf3199db8330782d64508379344"
+        },
+        {
+          "channel": "stable",
+          "version": "3.29.3",
+          "dart_sdk_version": "3.7.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.29.3-stable.tar.xz",
+          "sha256": "8a908a5add53c1dfc2031da29e58daefd59a6d1d52fb5cb61f5ee52c73e36e15"
+        },
+        {
+          "channel": "stable",
+          "version": "3.32.8",
+          "dart_sdk_version": "3.8.1",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.32.8-stable.tar.xz",
+          "sha256": "c2c7d75f9be53f10f3fdba2f7e042b2ef0852cc088392b374bcec34c6204ed8c"
+        },
+        {
+          "channel": "stable",
+          "version": "3.35.7",
+          "dart_sdk_version": "3.9.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.35.7-stable.tar.xz",
+          "sha256": "146df531f9ac6a11a918013c1a70faafc053d4811c8cb69a413fd70748d51c3d"
+        },
+        {
+          "channel": "stable",
+          "version": "3.38.10",
+          "dart_sdk_version": "3.10.9",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.38.10-stable.tar.xz",
+          "sha256": "385e2629a0a585a835f351ca1605d2c7996377ce2fa16e68296e8fc9a78ccf7a"
+        },
+        {
+          "channel": "stable",
+          "version": "3.41.9",
+          "dart_sdk_version": "3.11.5",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.41.9-stable.tar.xz",
+          "sha256": "cf2631dde02570733921a530f47a96abe896b5e334682d2743c29530ea88bb2e"
+        },
+        {
+          "channel": "stable",
+          "version": "3.44.9",
+          "dart_sdk_version": "3.12.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.44.9-stable.tar.xz",
+          "sha256": "a9120fa4a01048bdef438ddc3a2d4b7389662ea98a95db86eeaf10382bc4efcb"
+        },
+        {
+          "channel": "stable",
+          "version": "3.47.9",
+          "dart_sdk_version": "3.13.7",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/linux/flutter_linux_3.47.9-stable.tar.xz",
+          "sha256": "25ed8c3c29d51a7353f2a944310b478af8214920639524b19c50a19e6c044c5a"
+        }
+      ]
+    },
+    "macos": {
+      "base_url": "https://storage.googleapis.com/flutter_infra_release/releases",
+      "releases": [
+        {
+          "channel": "stable",
+          "version": "3.10.6",
+          "dart_sdk_version": "3.0.6",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.10.6-stable.zip",
+          "sha256": "02ec7d7805b45e65bbc42b6b48bd22523e58d9d2fc36ab443c12ba8535802158"
+        },
+        {
+          "channel": "stable",
+          "version": "3.13.9",
+          "dart_sdk_version": "3.1.5",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.13.9-stable.zip",
+          "sha256": "374615f834f23cff70eaef3ef1c3ebd3f8246ebf4c7b7f100115c98bb32858bb"
+        },
+        {
+          "channel": "stable",
+          "version": "3.16.9",
+          "dart_sdk_version": "3.2.6",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.16.9-stable.zip",
+          "sha256": "e353ad2433e8e6022cee9e9c638d9956b504c06a6c7892bea414ecf6d5a83c83"
+        },
+        {
+          "channel": "stable",
+          "version": "3.19.6",
+          "dart_sdk_version": "3.3.4",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.19.6-stable.zip",
+          "sha256": "4e61140df49652bf8fc1e31752a6fa8518fa4f05bc6e4c6bcb01c8dff6d9bf8f"
+        },
+        {
+          "channel": "stable",
+          "version": "3.22.3",
+          "dart_sdk_version": "3.4.4",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.22.3-stable.zip",
+          "sha256": "130f14d063e7cbe3fb7e982f6726a9a4cfa19164850119fa6bdd2875589ba70e"
+        },
+        {
+          "channel": "stable",
+          "version": "3.24.5",
+          "dart_sdk_version": "3.5.4",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.24.5-stable.zip",
+          "sha256": "ca9624a6de7a1a8962f2f0a3e2a57b16434ca34f1137b8d9dc68c5ca1f187133"
+        },
+        {
+          "channel": "stable",
+          "version": "3.27.4",
+          "dart_sdk_version": "3.6.2",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.27.4-stable.zip",
+          "sha256": "cc4d6e6c5b1049e9ca8c7e6444430d916ef08eaf2fd8bca059fa79e424051990"
+        },
+        {
+          "channel": "stable",
+          "version": "3.29.3",
+          "dart_sdk_version": "3.7.2",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.29.3-stable.zip",
+          "sha256": "bc3ae28ac1ba131787f99dc40d3bf9362f43e411ce8aab48c7443bacdf03c4b4"
+        },
+        {
+          "channel": "stable",
+          "version": "3.32.8",
+          "dart_sdk_version": "3.8.1",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.32.8-stable.zip",
+          "sha256": "21ae58e8cf814b3d2f632f92b6ce03ead031823c944aa2f281e26e58d2122dc9"
+        },
+        {
+          "channel": "stable",
+          "version": "3.35.7",
+          "dart_sdk_version": "3.9.2",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.35.7-stable.zip",
+          "sha256": "4d7aaadc4893f9216d4e2ecbe0e8fb4213e9bd49d29fd5f441f34fcc05758e2b"
+        },
+        {
+          "channel": "stable",
+          "version": "3.38.10",
+          "dart_sdk_version": "3.10.9",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.38.10-stable.zip",
+          "sha256": "b3a8c004385273bfd9b9b901a72e3eb93ecaa65f4a7ca801ab22588aa05c490c"
+        },
+        {
+          "channel": "stable",
+          "version": "3.41.9",
+          "dart_sdk_version": "3.11.5",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.41.9-stable.zip",
+          "sha256": "d692b030a63466c44d6b2bc88583380371ecbe328f22cc4057835f59739821a1"
+        },
+        {
+          "channel": "stable",
+          "version": "3.44.9",
+          "dart_sdk_version": "3.12.2",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.44.9-stable.zip",
+          "sha256": "9b5849dec51d5f6f9ee55f5e8fb67d07236369e2f5ab4c834a9a81d96f826dc0"
+        },
+        {
+          "channel": "stable",
+          "version": "3.47.9",
+          "dart_sdk_version": "3.13.7",
+          "dart_sdk_arch": "arm64",
+          "archive": "stable/macos/flutter_macos_arm64_3.47.9-stable.zip",
+          "sha256": "6545b85938745dc5070e9faf2adf70233c1811009d87fe6d27bfcda5a04b7698"
+        },
+        {
+          "channel": "stable",
+          "version": "3.10.6",
+          "dart_sdk_version": "3.0.6",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.10.6-stable.zip",
+          "sha256": "64e6b722e9ebdf9ccc83ef9253f24a3c0519d103e622aeb0c0e7c7647636f1a5"
+        },
+        {
+          "channel": "stable",
+          "version": "3.13.9",
+          "dart_sdk_version": "3.1.5",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.13.9-stable.zip",
+          "sha256": "c14436a8b968d56616d8c99f646470160840f1047fd11e8124493c1c2706c4bf"
+        },
+        {
+          "channel": "stable",
+          "version": "3.16.9",
+          "dart_sdk_version": "3.2.6",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.16.9-stable.zip",
+          "sha256": "26b8db4cadb682cf5f535fb354e692517cf85ef6ccfd472f5686060386a89461"
+        },
+        {
+          "channel": "stable",
+          "version": "3.19.6",
+          "dart_sdk_version": "3.3.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.19.6-stable.zip",
+          "sha256": "383d018cac3decb07a314ccdc028e4f0e01d2d57ee6bee0f2469f9db73d5aa31"
+        },
+        {
+          "channel": "stable",
+          "version": "3.22.3",
+          "dart_sdk_version": "3.4.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.22.3-stable.zip",
+          "sha256": "b30b28ad6dd5ae1a6aefa23ff72d2418ef5e378a79bc55f7d8d5ba241416acbf"
+        },
+        {
+          "channel": "stable",
+          "version": "3.24.5",
+          "dart_sdk_version": "3.5.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.24.5-stable.zip",
+          "sha256": "30f337aeb2f7a0d324cfae9a3718c1caa8a5abcb19eff933b337332465f9cfe8"
+        },
+        {
+          "channel": "stable",
+          "version": "3.27.4",
+          "dart_sdk_version": "3.6.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.27.4-stable.zip",
+          "sha256": "4e10b748a01599a79ce414a6257e6465dc71befa128f3868d659d0fca983a485"
+        },
+        {
+          "channel": "stable",
+          "version": "3.29.3",
+          "dart_sdk_version": "3.7.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.29.3-stable.zip",
+          "sha256": "d9626a2920a6d6c08b02dbc362ad6dc20eabe477f06e8683242ba2e5b6a1ae72"
+        },
+        {
+          "channel": "stable",
+          "version": "3.32.8",
+          "dart_sdk_version": "3.8.1",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.32.8-stable.zip",
+          "sha256": "8bc345f85565346a02b2afa190a58bba5f1ee17aa64233f595c4e8e319efa23d"
+        },
+        {
+          "channel": "stable",
+          "version": "3.35.7",
+          "dart_sdk_version": "3.9.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.35.7-stable.zip",
+          "sha256": "1d9630be94c200877a3799d88db587e3575f88dd05c98bae733756bec0a8ec97"
+        },
+        {
+          "channel": "stable",
+          "version": "3.38.10",
+          "dart_sdk_version": "3.10.9",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.38.10-stable.zip",
+          "sha256": "b7056ba00082b9b814415e7516287bb94633c1108838bfe10f8f665307b99afa"
+        },
+        {
+          "channel": "stable",
+          "version": "3.41.9",
+          "dart_sdk_version": "3.11.5",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.41.9-stable.zip",
+          "sha256": "eaee3b6aa6da114eb0be843ac53f4f138d3d8827779ff1e4546b345c75b9cba1"
+        },
+        {
+          "channel": "stable",
+          "version": "3.44.9",
+          "dart_sdk_version": "3.12.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.44.9-stable.zip",
+          "sha256": "4ffed93b2059aa4cfa829723ce3a31c48988bbdbfc014af870c7dfe937ecc0fa"
+        },
+        {
+          "channel": "stable",
+          "version": "3.47.9",
+          "dart_sdk_version": "3.13.7",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/macos/flutter_macos_3.47.9-stable.zip",
+          "sha256": "0dc38b4038a0b002a6258696a5b327a58473c175c9e334b9f329ef7d79a4fdcd"
+        }
+      ]
+    },
+    "windows": {
+      "base_url": "https://storage.googleapis.com/flutter_infra_release/releases",
+      "releases": [
+        {
+          "channel": "stable",
+          "version": "3.10.6",
+          "dart_sdk_version": "3.0.6",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.10.6-stable.zip",
+          "sha256": "7e41b39982249b949ad61a150b37239cef5dcf0f7907312e97fa6d5523ad1fd4"
+        },
+        {
+          "channel": "stable",
+          "version": "3.13.9",
+          "dart_sdk_version": "3.1.5",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.13.9-stable.zip",
+          "sha256": "b397d686772e2e6ba55d916eaa509ea2639e5081d7c227b50f45913afdfc3bbb"
+        },
+        {
+          "channel": "stable",
+          "version": "3.16.9",
+          "dart_sdk_version": "3.2.6",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.16.9-stable.zip",
+          "sha256": "90bade92aae819ee8b8a9c718c280b221ff0b7935e9fa6a284e7035e54e9fa21"
+        },
+        {
+          "channel": "stable",
+          "version": "3.19.6",
+          "dart_sdk_version": "3.3.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.19.6-stable.zip",
+          "sha256": "16e7b4a7215b314faca8caa07165a6bf460bf433b44a248c363210b8cdf240e3"
+        },
+        {
+          "channel": "stable",
+          "version": "3.22.3",
+          "dart_sdk_version": "3.4.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.22.3-stable.zip",
+          "sha256": "fd7e3e4f4484a8608866bdb12d82051d34f525f80710e87ecae84f5104fc264d"
+        },
+        {
+          "channel": "stable",
+          "version": "3.24.5",
+          "dart_sdk_version": "3.5.4",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.24.5-stable.zip",
+          "sha256": "b8a7485acd3c6fb23a76b7ac09f89e8d93d62fbff7147c6f5f8c5686d949eeac"
+        },
+        {
+          "channel": "stable",
+          "version": "3.27.4",
+          "dart_sdk_version": "3.6.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.27.4-stable.zip",
+          "sha256": "1141d3edb64c454273feac88f31f84945a1f3309a72c58aa9a5f2bb2b0fc8db3"
+        },
+        {
+          "channel": "stable",
+          "version": "3.29.3",
+          "dart_sdk_version": "3.7.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.29.3-stable.zip",
+          "sha256": "5d5d6e78e234d9dc9fb8da7fb54b85b1a6b6be4174bd3d8873bf9b05a67c7894"
+        },
+        {
+          "channel": "stable",
+          "version": "3.32.8",
+          "dart_sdk_version": "3.8.1",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.32.8-stable.zip",
+          "sha256": "6d61d2fbb3afe68675864088937ad84b45920974b12cf71a12b4d18d02eb1186"
+        },
+        {
+          "channel": "stable",
+          "version": "3.35.7",
+          "dart_sdk_version": "3.9.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.35.7-stable.zip",
+          "sha256": "b804653bfd2ad27f8d376c62a608ea2c7cbd49ff2b85010af6f8a53aa352fd62"
+        },
+        {
+          "channel": "stable",
+          "version": "3.38.10",
+          "dart_sdk_version": "3.10.9",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.38.10-stable.zip",
+          "sha256": "97e560d028f1b0b414e5f19ac2c4ebf079c001e8a18563a0e940c4d84700d334"
+        },
+        {
+          "channel": "stable",
+          "version": "3.41.9",
+          "dart_sdk_version": "3.11.5",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.41.9-stable.zip",
+          "sha256": "03c3235aa9e4b6fffdbac2176f803731cf5a5c998a3a5e57f840b4b202afa4f6"
+        },
+        {
+          "channel": "stable",
+          "version": "3.44.9",
+          "dart_sdk_version": "3.12.2",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.44.9-stable.zip",
+          "sha256": "8ef1107d226654736755bc51b969d6bd46787ff0241650f942e774fb0ca7d0ac"
+        },
+        {
+          "channel": "stable",
+          "version": "3.47.9",
+          "dart_sdk_version": "3.13.7",
+          "dart_sdk_arch": "x64",
+          "archive": "stable/windows/flutter_windows_3.47.9-stable.zip",
+          "sha256": "d8e2b5977e09082c6440f89dc1aa887b94c8fbcc3b39222797046295a3f68a9e"
+        }
+      ]
+    }
+  }
+}

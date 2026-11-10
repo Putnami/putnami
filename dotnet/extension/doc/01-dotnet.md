@@ -155,20 +155,26 @@ satisfies `global.json`, the task runs its steps with one under
 
 1. an SDK an earlier task installed there for the same platform, the one the
    rules below pick among them; this needs no network;
-2. else it reads Microsoft's release metadata,
-   `builds.dotnet.microsoft.com/dotnet/release-metadata`, for the channels the
-   roll-forward policy reaches, and picks the SDK the .NET host would: the
-   stated one for `disable`, `patch` or no policy (for `patch` or none, the
-   latest of its feature band when the stated one is not published), the latest patch of
-   the stated feature band, else of the next one, for `feature`, `minor` and
-   `major`, the highest for the `latest*` policies, and with no `global.json`
-   the latest SDK of the 10.0 channel. A prerelease is picked only when
-   `global.json` states one;
+2. else it picks, in the release metadata the extension pins, the SDK the
+   .NET host would: the stated one for `disable`, `patch` or no policy (for
+   `patch` or none, the latest of its feature band when the stated one is not
+   pinned), the latest patch of the stated feature band, else of the next one,
+   for `feature`, `minor` and `major`, the highest for the `latest*` policies,
+   and with no `global.json` the latest SDK of the 10.0 channel;
 3. it installs, beside the SDK, the latest ASP.NET Core runtime, which holds
    the .NET runtime, of every channel from 8.0 up to the SDK's, whatever its
    support phase, since an SDK carries only its own runtime and a project may
-   target an older one. Each archive is checked
-   against the SHA-512 the metadata states.
+   target an older one. Each archive comes from `builds.dotnet.microsoft.com`
+   and is checked against the SHA-512 the extension pins.
+
+The pinned metadata is `sdkreleases.json`, which `scripts/sdk-releases.sh`
+writes from Microsoft's: the newest stable SDK of each feature band and the
+newest ASP.NET Core runtime of every channel from 8.0. The same extension
+release installs the same SDK on every machine, and a pin moves with the next
+extension release
+([ADR 0002](adr/0002-the-extension-pins-the-sdk-and-runtime-releases-it-installs.md)).
+`rollForward: disable` on an SDK that is not the newest of its feature band,
+or on a prerelease, finds none to install: put that SDK on `PATH`.
 
 An offline run (`PUTNAMI_OFFLINE_DEPENDENCIES=1`) installs nothing, and
 reuses none either: it checks the SDK on `PATH` alone. Linux, including a

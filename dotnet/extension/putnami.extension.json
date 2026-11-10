@@ -63,7 +63,8 @@
         "go.mod",
         "go.sum",
         "*.go",
-        "profile.json"
+        "profile.json",
+        "sdkreleases.json"
       ],
       "toolchains": [
         "runtimeCompiler"

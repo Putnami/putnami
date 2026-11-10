@@ -2,12 +2,11 @@ package dart
 
 import (
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -34,20 +33,51 @@ const (
 	// downloadTimeout bounds the download of one archive, a Flutter one of up
 	// to 2.5 GB, within the 30 minutes a task may run.
 	downloadTimeout = 25 * time.Minute
-	// manifestTimeout bounds the read of a release list or a checksum.
-	manifestTimeout = 2 * time.Minute
 )
 
 // hostPlatform is the platform the extension runs on. Tests name another.
 var hostPlatform = runtime.GOOS + "/" + runtime.GOARCH
 
-// Where the publishers list their stable releases. Tests point them at a
-// local server.
-var (
-	dartArchiveURL     = "https://storage.googleapis.com/dart-archive/channels/stable/release"
-	dartReleaseListURL = "https://storage.googleapis.com/storage/v1/b/dart-archive/o?prefix=channels/stable/release/&delimiter=/"
-	flutterReleasesURL = "https://storage.googleapis.com/flutter_infra_release/releases"
-)
+// dartArchiveURL is where the dart-archive serves the stable Dart SDKs. Tests
+// point it at a local server.
+var dartArchiveURL = "https://storage.googleapis.com/dart-archive/channels/stable/release"
+
+// sdkReleasesJSON is the table of SDK releases the extension installs, which
+// scripts/sdk-releases.sh writes: a pin moves only when a release of the
+// extension ships a regenerated table (ADR 0002).
+//
+//go:embed sdkreleases.json
+var sdkReleasesJSON []byte
+
+// sdkReleases is the table of the Dart SDK releases the extension pins, each
+// with the SHA-256 of its archive per dart-archive platform, and the Flutter
+// releases it pins, as the publisher's release manifest of each system names
+// them.
+type sdkReleases struct {
+	Dart []struct {
+		Version string            `json:"version"`
+		Digests map[string]string `json:"digests"`
+	} `json:"dart"`
+	Flutter map[string]flutterManifest `json:"flutter"`
+}
+
+// flutterManifest is the part of a Flutter release manifest the extension
+// pins: where its archives lie, and its releases.
+type flutterManifest struct {
+	BaseURL  string           `json:"base_url"`
+	Releases []flutterRelease `json:"releases"`
+}
+
+// shipped is the table this build of the extension pins. Tests replace it.
+var shipped = mustDecodeReleases(sdkReleasesJSON)
+
+func mustDecodeReleases(data []byte) sdkReleases {
+	var r sdkReleases
+	if err := json.Unmarshal(data, &r); err != nil {
+		panic(fmt.Sprintf("the shipped SDK release table does not decode: %v", err))
+	}
+	return r
+}
 
 // tarCommand unpacks a checked Flutter archive. A Linux archive is a .tar.xz,
 // which the extension SDK does not unpack; the host's tar reads every format
@@ -59,8 +89,9 @@ var stableVersion = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
 
 // Provide installs the SDK the toolchain of a package checks: the Dart SDK
 // for a dart command, the Flutter SDK for a flutter one. It picks the newest
-// stable release every check admits, an install of an earlier task first, and
-// checks the archive against the SHA-256 the publisher states (ADR 0001).
+// release the extension pins that every check admits, an install of an
+// earlier task first, and checks the archive against the SHA-256 it pins
+// (ADR 0001, ADR 0002).
 func Provide(ctx context.Context, toolchain stacks.Toolchain, expected []stacks.Expected, info func(string)) (stacks.Provided, error) {
 	checks := toolchain.Checks()
 	if len(expected) != len(checks) {
@@ -99,19 +130,12 @@ func provideDart(ctx context.Context, base string, checks []stacks.Toolchain, ex
 	if dir, ok := installed(base, "dart-sdk-", "-"+platform, admitted); ok {
 		return stacks.Provided{Executable: executable(dir)}, nil
 	}
-	versions, err := dartReleases(ctx)
-	if err != nil {
-		return stacks.Provided{}, err
-	}
-	version, ok := newest(versions, admitted)
+	version, ok := newest(dartReleases(platform), admitted)
 	if !ok {
-		return stacks.Provided{}, fmt.Errorf("no stable Dart SDK is in %s, which %s states", expected[0].Version, expected[0].Source)
+		return stacks.Provided{}, fmt.Errorf("no Dart SDK the extension pins for %s is in %s, which %s states: put dart on PATH", hostPlatform, expected[0].Version, expected[0].Source)
 	}
 	archive := dartArchiveURL + "/" + version + "/sdk/dartsdk-" + platform + "-release.zip"
-	digest, err := dartDigest(ctx, archive)
-	if err != nil {
-		return stacks.Provided{}, err
-	}
+	digest := dartDigest(version, platform)
 	dir := filepath.Join(base, "dart-sdk-"+version+"-"+platform)
 	info("installing the Dart SDK " + version + " under " + dir)
 	pin := pinnedarchive.Pin{URL: archive, SHA256: digest, Format: pinnedarchive.Zip}
@@ -142,45 +166,27 @@ var dartPlatforms = map[string]string{
 	"windows/arm64": "windows-arm64",
 }
 
-// dartReleases lists the stable releases of the dart-archive.
-func dartReleases(ctx context.Context) ([]string, error) {
+// dartReleases lists the Dart SDK releases the extension pins for a
+// dart-archive platform.
+func dartReleases(platform string) []string {
 	var versions []string
-	token := ""
-	for {
-		list := dartReleaseListURL
-		if token != "" {
-			list += "&pageToken=" + url.QueryEscape(token)
+	for _, r := range shipped.Dart {
+		if _, ok := r.Digests[platform]; ok {
+			versions = append(versions, r.Version)
 		}
-		var page struct {
-			Prefixes      []string `json:"prefixes"`
-			NextPageToken string   `json:"nextPageToken"`
-		}
-		if err := getJSON(ctx, list, &page); err != nil {
-			return nil, fmt.Errorf("list the Dart SDK releases: %w", err)
-		}
-		for _, prefix := range page.Prefixes {
-			if v := filepath.Base(strings.TrimSuffix(prefix, "/")); stableVersion.MatchString(v) {
-				versions = append(versions, v)
-			}
-		}
-		if page.NextPageToken == "" {
-			return versions, nil
-		}
-		token = page.NextPageToken
 	}
+	return versions
 }
 
-// dartDigest reads the SHA-256 the dart-archive publishes beside an archive.
-func dartDigest(ctx context.Context, archive string) (string, error) {
-	body, err := get(ctx, archive+".sha256sum")
-	if err != nil {
-		return "", fmt.Errorf("read the checksum of %s: %w", archive, err)
+// dartDigest is the SHA-256 the extension pins for a release's archive on a
+// dart-archive platform.
+func dartDigest(version, platform string) string {
+	for _, r := range shipped.Dart {
+		if r.Version == version {
+			return r.Digests[platform]
+		}
 	}
-	fields := strings.Fields(string(body))
-	if len(fields) == 0 {
-		return "", fmt.Errorf("the checksum of %s is empty", archive)
-	}
-	return fields[0], nil
+	return ""
 }
 
 // flutterRelease is one release of a Flutter release manifest.
@@ -235,13 +241,7 @@ func provideFlutter(ctx context.Context, base string, checks []stacks.Toolchain,
 	}); ok {
 		return stacks.Provided{Executable: executable(dir)}, nil
 	}
-	var manifest struct {
-		BaseURL  string           `json:"base_url"`
-		Releases []flutterRelease `json:"releases"`
-	}
-	if err := getJSON(ctx, flutterReleasesURL+"/releases_"+platform.manifest+".json", &manifest); err != nil {
-		return stacks.Provided{}, fmt.Errorf("read the Flutter releases: %w", err)
-	}
+	manifest := shipped.Flutter[platform.manifest]
 	var chosen *flutterRelease
 	for i, r := range manifest.Releases {
 		arch := r.Arch
@@ -256,7 +256,7 @@ func provideFlutter(ctx context.Context, base string, checks []stacks.Toolchain,
 		}
 	}
 	if chosen == nil {
-		return stacks.Provided{}, fmt.Errorf("no stable Flutter SDK is in %s with a Dart in %s", describe(expected[0]), describe(expected[1:]...))
+		return stacks.Provided{}, fmt.Errorf("no Flutter SDK the extension pins is in %s with a Dart in %s: put flutter on PATH", describe(expected[0]), describe(expected[1:]...))
 	}
 	dir := filepath.Join(base, "flutter-"+chosen.Version+suffix)
 	info("installing the Flutter SDK " + chosen.Version + " (Dart " + chosen.Dart + ") under " + dir)
@@ -356,32 +356,6 @@ func describe(expected ...stacks.Expected) string {
 		return "any version"
 	}
 	return strings.Join(parts, " and ")
-}
-
-func get(ctx context.Context, address string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(ctx, manifestTimeout)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("GET %s: HTTP %d", address, resp.StatusCode)
-	}
-	return io.ReadAll(io.LimitReader(resp.Body, 64<<20))
-}
-
-func getJSON(ctx context.Context, address string, v any) error {
-	body, err := get(ctx, address)
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(body, v)
 }
 
 // errNoDart is the error of the test tools without a dart to activate them.

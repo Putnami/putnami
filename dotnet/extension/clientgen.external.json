@@ -2,7 +2,7 @@
   "protocolVersion": 2,
   "contracts": [
     {
-      "authority": ".NET release metadata and SDK archives (github.com/dotnet/core/blob/main/release-notes/releases-index.json)",
+      "authority": ".NET SDK and ASP.NET Core runtime archives (builds.dotnet.microsoft.com), each named by the release metadata the extension pins",
       "adapter": "dotnet/extension/provide.go",
       "callsites": [
         {
@@ -22,7 +22,7 @@
       "tests": [
         "dotnet/extension/provide_test.go"
       ],
-      "reason": "Reads the release metadata Microsoft publishes and downloads the SDK archive it names over HTTPS, with no credential, and checks the archive against the SHA-512 the metadata states."
+      "reason": "Downloads over HTTPS, with no credential, the SDK and runtime archives the release metadata the extension pins names, and checks each against the pinned SHA-512."
     }
   ]
 }
