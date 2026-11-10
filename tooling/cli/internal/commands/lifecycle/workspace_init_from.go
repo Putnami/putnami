@@ -160,6 +160,9 @@ func validateInitImport(flags initFlags, source initSource) error {
 		return cmderr.Usagef("--import needs project paths, such as --import /packages/pricing,/packages/billing")
 	}
 	for _, entry := range flags.imports {
+		if strings.Contains(entry, "**") {
+			return cmderr.Usagef("--import %q uses **, which matches within one path segment only: list each level, such as packages/* or packages/*/*", entry)
+		}
 		if _, ok := importKey(entry); !ok {
 			return cmderr.Usagef("--import %q names no project directory under the workspace root", entry)
 		}

@@ -629,7 +629,7 @@ func TestInitFromImportAddsProjectsToTheListAndPreviewsWithoutApply(t *testing.T
 		"no path":             {[]string{"--from", "nx", "--import"}, "--import needs project paths"},
 		"a flag after it":     {[]string{"--from", "nx", "--import", "--apply"}, "--import needs project paths"},
 		"a flag as a path":    {[]string{"--from", "nx", "--import=--apply"}, `--import "--apply" names no project directory`},
-		"a double star":       {[]string{"--from", "nx", "--import", "packages/**"}, `--import "packages/**" names no project directory`},
+		"a double star":       {[]string{"--from", "nx", "--import", "packages/**"}, `--import "packages/**" uses **, which matches within one path segment only`},
 		"an empty path":       {[]string{"--from", "nx", "--import=/a,,/b"}, `--import "" names no project directory`},
 		"a path outside":      {[]string{"--from", "nx", "--import", "../elsewhere"}, `--import "../elsewhere" names no project directory`},
 		"a malformed glob":    {[]string{"--from", "nx", "--import", "packages/["}, `--import "packages/[" names no project directory`},
