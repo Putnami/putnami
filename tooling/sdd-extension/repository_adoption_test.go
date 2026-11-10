@@ -120,6 +120,7 @@ var excludedProjects = map[string]string{
 	"/rust/samples/application":                            reasonSample,
 	"/rust/samples/library":                                reasonSample,
 	"/swift/samples/application":                           reasonSample,
+	"/dart/samples/application":                            reasonSample,
 	"/python/samples/application":                          reasonSample,
 	"/python/samples/library":                              reasonSample,
 	"/python/templates/python-library":                     reasonTemplate,
