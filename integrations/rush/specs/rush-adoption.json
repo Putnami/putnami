@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "projects-become-projects",
-      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and as the name rush receives, the projects the putnami observe Rush detector says it depends on, the extension @putnami/rush, the tag rush and the workspace root as stack root. In import mode, options.@putnami/rush.mode of putnami.workspace.json or its default, it answers no project, so the TypeScript extension runs them."
+      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and as the name rush receives, the projects the putnami observe Rush detector says it depends on, each edge attributed to package-json, the extension @putnami/rush, the tag rush and the workspace root as stack root. In import mode, options.@putnami/rush.mode of putnami.workspace.json or its default, it answers no project, so the TypeScript extension runs them."
     },
     {
       "id": "sync-writes-the-project-graph",
