@@ -353,7 +353,10 @@ type projectPlan struct {
 	deps       []string
 	disabled   []string
 	reports    map[string]any
-	unmapped   []Unmapped
+	// runner is the test runner the sync records for @putnami/typescript:
+	// vitest or jest, or "" when it records none.
+	runner   string
+	unmapped []Unmapped
 }
 
 // planProject maps the targets of one project in the mode.
@@ -379,6 +382,9 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 			plan.disabled = append(plan.disabled, task)
 		case isTS && coveredByTypeScript(task, target):
 			plan.disabled = append(plan.disabled, ExtensionName+":"+task)
+			if task == "test" {
+				plan.runner = testRunner(target)
+			}
 		case typeScript && hasManifest(root, p.Path):
 			// The TypeScript extension claims the project too: the target
 			// runs through Nx alone.
@@ -436,22 +442,32 @@ func hasManifest(root, dir string) bool {
 
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs: a target whose script runs one keeps its runner when the
-// extension takes it over. A jest, eslint or tsc target, or one an Nx
+// extension takes it over. An eslint or tsc target, or one another Nx
 // executor runs, stays on Nx.
 var typeScriptCommands = map[string][]string{
 	"build": {"bun build"},
-	"test":  {"bun test"},
+	"test":  {"bun test", "vitest", "jest", "npx vitest", "npx jest"},
 	"lint":  {"biome", "bunx biome", "bunx @biomejs/biome"},
+}
+
+// testExecutors are the Nx executors of a test target the TypeScript
+// extension runs, with the runner each one starts.
+var testExecutors = map[string]string{
+	"@nx/vite:test":   "vitest",
+	"@nx/vitest:test": "vitest",
+	"@nrwl/vite:test": "vitest",
+	"@nx/jest:jest":   "jest",
+	"@nrwl/jest:jest": "jest",
 }
 
 // coveredByTypeScript reports whether the TypeScript extension's task runs
 // what a target runs: a script or a command whose program is the one that
-// task runs.
+// task runs, or a test executor of testExecutors.
 func coveredByTypeScript(task string, target detect.Target) bool {
 	switch target.Executor {
 	case "", "nx:run-script", "nx:run-commands":
 	default:
-		return false
+		return task == "test" && testExecutors[target.Executor] != ""
 	}
 	command := strings.TrimSpace(target.Command)
 	for _, program := range typeScriptCommands[task] {
@@ -460,6 +476,21 @@ func coveredByTypeScript(task string, target detect.Target) bool {
 		}
 	}
 	return false
+}
+
+// testRunner is the runner of a test target the TypeScript extension runs:
+// vitest or jest, or "" for bun test.
+func testRunner(target detect.Target) string {
+	if runner := testExecutors[target.Executor]; runner != "" {
+		return runner
+	}
+	command := strings.TrimPrefix(strings.TrimSpace(target.Command), "npx ")
+	for _, runner := range []string{"vitest", "jest"} {
+		if command == runner || strings.HasPrefix(command, runner+" ") {
+			return runner
+		}
+	}
+	return ""
 }
 
 // testConfigs are the test runner configuration files a project's reports
@@ -614,9 +645,10 @@ func ownedJobs() []string {
 // writeProject merges the project's Nx facts into the putnami.json at the
 // workspace-relative file and writes it when a member the sync owns changes:
 // the extension, @putnami/typescript for an imported TypeScript project, the
-// dependencies on Nx projects, the entries of disable.jobs it owns and
-// options["@putnami/nx"].tasks.test.reports. Every other member is kept as it
-// is. It returns the change, or nil when the file is current.
+// dependencies on Nx projects, the entries of disable.jobs it owns,
+// options["@putnami/nx"].tasks.test.reports and
+// options["@putnami/typescript"].test.runner. Every other member is kept as
+// it is. It returns the change, or nil when the file is current.
 func writeProject(root, file string, plan projectPlan, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)
@@ -646,6 +678,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 
 	setDisabled(doc, plan.disabled)
 	setReports(doc, plan.reports)
+	setRunner(doc, plan.runner)
 
 	if existing != nil && reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
@@ -654,8 +687,8 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 }
 
 // retractProject removes from the putnami.json of a former project the
-// extension, @putnami/typescript, its Nx edges, the disable.jobs entries and the reports the sync
-// owns.
+// extension, @putnami/typescript, its Nx edges, the disable.jobs entries, the
+// reports and the test runner the sync owns.
 func retractProject(root, file string, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)
@@ -667,6 +700,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, components) }))
 	setDisabled(doc, nil)
 	setReports(doc, nil)
+	setRunner(doc, "")
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
 	}
@@ -976,4 +1010,41 @@ func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		emit.DiagnosticWithCode("error", fmt.Sprintf("%s no longer matches the Nx project graph of %s: run putnami projects sync and commit the result", file, result.Source), file, 0, 0, CodeSyncStale)
 	}
 	return "FAILED", nil, errors.New(CodeSyncStale)
+}
+
+// setRunner sets options["@putnami/typescript"].test.runner to runner, or
+// removes it, and every object it empties, when runner is "".
+func setRunner(doc map[string]any, runner string) {
+	options, _ := doc["options"].(map[string]any)
+	layer, _ := options[TypeScriptExtension].(map[string]any)
+	test, _ := layer["test"].(map[string]any)
+	if runner != "" {
+		if options == nil {
+			options = map[string]any{}
+			doc["options"] = options
+		}
+		if layer == nil {
+			layer = map[string]any{}
+			options[TypeScriptExtension] = layer
+		}
+		if test == nil {
+			test = map[string]any{}
+			layer["test"] = test
+		}
+		test["runner"] = runner
+		return
+	}
+	if test == nil {
+		return
+	}
+	delete(test, "runner")
+	if len(test) == 0 {
+		delete(layer, "test")
+	}
+	if len(layer) == 0 {
+		delete(options, TypeScriptExtension)
+	}
+	if len(options) == 0 {
+		delete(doc, "options")
+	}
 }
