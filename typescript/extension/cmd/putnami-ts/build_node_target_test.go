@@ -164,6 +164,17 @@ func TestTheNodeCheckReportsEachUseWithItsFirstPosition(t *testing.T) {
 	}
 }
 
+func TestADependencyThatNeedsBunIsNamedInTheMessageOnly(t *testing.T) {
+	stubNodeCheck(t, func(string, string) ([]build.BunAPIUse, error) {
+		return []build.BunAPIUse{{Module: "../runtime/src/config.ts", Globals: []build.SourcePosition{{Line: 8, Column: 38}}, Chain: []string{"src/index.ts", "../runtime/src/config.ts"}}}, nil
+	})
+	diagnostics := checkBunAPIsOnNode("bun", t.TempDir(), build.TranspileParams{Target: "node"})
+	if len(diagnostics) != 1 || diagnostics[0].File != "" || diagnostics[0].Line != 0 ||
+		!strings.HasPrefix(diagnostics[0].Description, "../runtime/src/config.ts references the Bun global at 8:38") {
+		t.Fatalf("diagnostics = %#v", diagnostics)
+	}
+}
+
 func TestANodeCheckThatCannotReadTheGraphFailsTheBuild(t *testing.T) {
 	stubNodeCheck(t, func(string, string) ([]build.BunAPIUse, error) {
 		return nil, errors.New("node-target check: bun could not bundle the graph")

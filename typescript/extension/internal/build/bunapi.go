@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"slices"
 	"sort"
 	"strings"
@@ -23,15 +24,18 @@ import (
 // Node.js is only correct when nothing it loads needs Bun. The check reads the
 // module graph bun resolves for the node target, the dependencies included,
 // and fails on every module that imports `bun` or a `bun:` module, or that
-// references the Bun global outside a `typeof Bun` guard. It reports each such
-// module with the import chain from an entrypoint that reaches it.
+// references the Bun global, outside a `typeof Bun` guard. It reports each
+// such module with the import chain from an entrypoint that reaches it.
 //
 // The graph comes from a bundle bun writes into a temporary directory with
 // `--metafile`: bun resolves the node export conditions, the tsconfig paths and
 // the workspace links exactly as it does for the build, and records every
-// input module with its imports. `bun` and `bun:` imports stay external and
-// are recorded as such. The Bun references are found by bunglobal.mjs, which
-// parses each module with the TypeScript parser the project resolves.
+// input module with the imports that survive type elision. `bun` and `bun:`
+// imports stay external, so the metafile records them. A bare package that
+// does not resolve at build time stays external too, and is not read. The
+// uses and their guards are found by bunglobal.mjs, which parses each
+// JavaScript or TypeScript module with the TypeScript parser the project
+// resolves.
 
 //go:embed bunglobal.mjs
 var bunGlobalScript []byte
@@ -47,7 +51,8 @@ var ErrNoTypeScriptParser = errors.New("the node-target check needs the typescri
 type BunAPIUse struct {
 	// Module is the module's path relative to the project, slash-separated.
 	Module string
-	// Imports are the `bun` and `bun:` modules it imports, in byte order.
+	// Imports are the `bun` and `bun:` modules it imports outside a guard, in
+	// byte order.
 	Imports []string
 	// Globals are the positions of its unguarded references to the Bun
 	// global, in source order.
@@ -102,11 +107,11 @@ func CheckBunAPIsOnNode(bunBin, projectPath string) ([]BunAPIUse, error) {
 	if err != nil {
 		return nil, err
 	}
-	globals, err := scanBunGlobals(bunBin, typescript, projectPath, graph.modules())
+	scans, err := scanModules(bunBin, typescript, projectPath, graph.sourceModules())
 	if err != nil {
 		return nil, err
 	}
-	return graph.uses(plan.Server, globals), nil
+	return graph.uses(plan.Server, scans), nil
 }
 
 // nodeGraph is the module graph of a bun metafile: each input module, by its
@@ -120,8 +125,17 @@ type nodeGraph struct {
 	} `json:"inputs"`
 }
 
+// unresolvedPackage matches bun's report of an import it cannot resolve.
+var unresolvedPackage = regexp.MustCompile(`Could not resolve: "([^"]+)"`)
+
+// maxGraphReads bounds the bundles readNodeGraph runs: each one after the
+// first externalizes the bare packages the previous one could not resolve.
+const maxGraphReads = 3
+
 // readNodeGraph bundles the entrypoints for the node target into a temporary
-// directory and returns the module graph bun records.
+// directory and returns the module graph bun records. A bare package that
+// does not resolve, such as an optional peer that is not installed, is
+// externalized and the bundle runs again; an unresolved relative import fails.
 func readNodeGraph(bunBin, projectPath string, entrypoints []string) (*nodeGraph, error) {
 	dir, err := os.MkdirTemp("", "putnami-ts-node-graph-")
 	if err != nil {
@@ -129,21 +143,34 @@ func readNodeGraph(bunBin, projectPath string, entrypoints []string) (*nodeGraph
 	}
 	defer func() { _ = os.RemoveAll(dir) }()
 	metafile := filepath.Join(dir, "metafile.json")
-	// bun refuses a named import of `bun` for any target but bun; external,
-	// the import is recorded in the metafile like a `bun:` one.
-	args := []string{"build", "--target", "node", "--external", "bun", "--external", "bun:*", "--outdir", filepath.Join(dir, "out"), "--root", projectPath, "--env=disable", "--metafile=" + metafile}
-	if tsconfig := project.ResolveTsConfig(projectPath, filepath.Dir(projectPath)); tsconfig != "" {
-		args = append(args, "--tsconfig", tsconfig)
-	}
-	for _, entrypoint := range entrypoints {
-		args = append(args, filepath.Join(projectPath, entrypoint))
-	}
-	result, err := execRunFunc(bunBin, args, pexec.Dir(projectPath), pexec.Timeout(bunAPICheckTimeout))
-	if err != nil {
-		return nil, fmt.Errorf("node-target check: bundle the graph: %w", err)
-	}
-	if !result.Success {
-		return nil, fmt.Errorf("node-target check: bun could not bundle the graph for the node target: %s", strings.TrimSpace(result.Stderr))
+	tsconfig := project.ResolveTsConfig(projectPath, filepath.Dir(projectPath))
+	// `bun` and `bun:` imports stay external so the metafile records them;
+	// bun bundles a named import of `bun` for no other target than bun.
+	externals := []string{"bun", "bun:*"}
+	for read := 1; ; read++ {
+		args := []string{"build", "--target", "node", "--outdir", filepath.Join(dir, "out"), "--root", projectPath, "--env=disable", "--metafile=" + metafile}
+		for _, external := range externals {
+			args = append(args, "--external", external)
+		}
+		if tsconfig != "" {
+			args = append(args, "--tsconfig", tsconfig)
+		}
+		for _, entrypoint := range entrypoints {
+			args = append(args, filepath.Join(projectPath, entrypoint))
+		}
+		result, err := execRunFunc(bunBin, args, pexec.Dir(projectPath), pexec.Timeout(bunAPICheckTimeout))
+		if err != nil {
+			return nil, fmt.Errorf("node-target check: bundle the graph: %w", err)
+		}
+		if !result.Success {
+			unresolved := unresolvedPackages(result.Stderr)
+			if len(unresolved) == 0 || read == maxGraphReads {
+				return nil, fmt.Errorf("node-target check: bun could not bundle the graph for the node target: %s", strings.TrimSpace(result.Stderr))
+			}
+			externals = append(externals, unresolved...)
+			continue
+		}
+		break
 	}
 	data, err := os.ReadFile(metafile)
 	if err != nil {
@@ -156,6 +183,24 @@ func readNodeGraph(bunBin, projectPath string, entrypoints []string) (*nodeGraph
 	return &graph, nil
 }
 
+// unresolvedPackages returns the bare packages bun reports it could not
+// resolve, in byte order, each with its subpaths. It returns nothing when an
+// unresolved import is relative or absolute: that one is a build error.
+func unresolvedPackages(stderr string) []string {
+	var packages []string
+	for _, match := range unresolvedPackage.FindAllStringSubmatch(stderr, -1) {
+		specifier := match[1]
+		if strings.HasPrefix(specifier, ".") || strings.HasPrefix(specifier, "/") {
+			return nil
+		}
+		if !slices.Contains(packages, specifier) {
+			packages = append(packages, specifier)
+		}
+	}
+	sort.Strings(packages)
+	return packages
+}
+
 // modules returns the graph's input modules in byte order.
 func (g *nodeGraph) modules() []string {
 	modules := make([]string, 0, len(g.Inputs))
@@ -163,6 +208,25 @@ func (g *nodeGraph) modules() []string {
 		modules = append(modules, module)
 	}
 	sort.Strings(modules)
+	return modules
+}
+
+// sourceExtensions are the module extensions the scanner parses. Any other
+// input, such as a text or JSON file a loader imports, holds no code.
+var sourceExtensions = map[string]bool{
+	".js": true, ".mjs": true, ".cjs": true, ".jsx": true,
+	".ts": true, ".mts": true, ".cts": true, ".tsx": true,
+}
+
+// sourceModules returns the graph's JavaScript and TypeScript modules in byte
+// order.
+func (g *nodeGraph) sourceModules() []string {
+	var modules []string
+	for _, module := range g.modules() {
+		if sourceExtensions[strings.ToLower(filepath.Ext(module))] {
+			modules = append(modules, module)
+		}
+	}
 	return modules
 }
 
@@ -176,7 +240,7 @@ func isBunModule(specifier string) bool {
 // shortest import chain that reaches it from an entrypoint; between two
 // chains of the same length, the one from the earlier entrypoint in plan
 // order.
-func (g *nodeGraph) uses(entrypoints []string, globals map[string][]SourcePosition) []BunAPIUse {
+func (g *nodeGraph) uses(entrypoints []string, scans map[string]moduleScan) []BunAPIUse {
 	parents := make(map[string]string)
 	reached := make(map[string]bool)
 	var queue []string
@@ -209,14 +273,17 @@ func (g *nodeGraph) uses(entrypoints []string, globals map[string][]SourcePositi
 		if !reached[module] {
 			continue
 		}
+		// An import counts when bun kept it after type elision and the
+		// scanner found it outside a guard.
+		scan := scans[module]
 		var imports []string
 		for _, imported := range g.Inputs[module].Imports {
-			if imported.External && isBunModule(imported.Path) && !slices.Contains(imports, imported.Path) {
+			if imported.External && isBunModule(imported.Path) && slices.Contains(scan.Imports, imported.Path) && !slices.Contains(imports, imported.Path) {
 				imports = append(imports, imported.Path)
 			}
 		}
 		sort.Strings(imports)
-		if len(imports) == 0 && len(globals[module]) == 0 {
+		if len(imports) == 0 && len(scan.Uses) == 0 {
 			continue
 		}
 		var chain []string
@@ -228,14 +295,22 @@ func (g *nodeGraph) uses(entrypoints []string, globals map[string][]SourcePositi
 			}
 			current = parent
 		}
-		uses = append(uses, BunAPIUse{Module: module, Imports: imports, Globals: globals[module], Chain: chain})
+		uses = append(uses, BunAPIUse{Module: module, Imports: imports, Globals: scan.Uses, Chain: chain})
 	}
 	return uses
 }
 
-// scanBunGlobals returns, per module, the unguarded references to the Bun
-// global that bunglobal.mjs finds.
-func scanBunGlobals(bunBin, typescript, projectPath string, modules []string) (map[string][]SourcePosition, error) {
+// moduleScan is what bunglobal.mjs finds in one module outside a guard: the
+// positions of its uses of the Bun global and the `bun` and `bun:` modules it
+// imports.
+type moduleScan struct {
+	Uses    []SourcePosition `json:"uses"`
+	Imports []string         `json:"imports"`
+}
+
+// scanModules returns, per module, what bunglobal.mjs finds in it. A module
+// with nothing to report is absent.
+func scanModules(bunBin, typescript, projectPath string, modules []string) (map[string]moduleScan, error) {
 	payload, err := json.Marshal(map[string]any{"typescript": typescript, "root": projectPath, "files": modules})
 	if err != nil {
 		return nil, fmt.Errorf("node-target check: %w", err)
@@ -266,8 +341,8 @@ func scanBunGlobals(bunBin, typescript, projectPath string, modules []string) (m
 	}
 	var answer struct {
 		Files []struct {
-			Path string           `json:"path"`
-			Uses []SourcePosition `json:"uses"`
+			Path string `json:"path"`
+			moduleScan
 		} `json:"files"`
 		Errors []struct {
 			Path    string `json:"path"`
@@ -280,11 +355,18 @@ func scanBunGlobals(bunBin, typescript, projectPath string, modules []string) (m
 	if len(answer.Errors) > 0 {
 		return nil, fmt.Errorf("node-target check: read %s: %s", answer.Errors[0].Path, answer.Errors[0].Message)
 	}
-	globals := make(map[string][]SourcePosition, len(answer.Files))
+	scans := make(map[string]moduleScan, len(answer.Files))
 	for _, file := range answer.Files {
-		globals[file.Path] = file.Uses
+		scan := file.moduleScan
+		if len(scan.Uses) == 0 {
+			scan.Uses = nil
+		}
+		if len(scan.Imports) == 0 {
+			scan.Imports = nil
+		}
+		scans[file.Path] = scan
 	}
-	return globals, nil
+	return scans, nil
 }
 
 // resolveTypeScriptPackage returns the directory of the typescript package

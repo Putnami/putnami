@@ -348,13 +348,18 @@ output does not depend on the machine that built it:
 Bun runs the code it builds for itself, so a build for Node.js is only correct
 when nothing it loads needs Bun. With `--target node`, the transpile phase
 reads the module graph of the server graph, the dependencies included, and
-fails with `typescript.bun_api_on_node` on every module that:
+fails with `typescript.bun_api_on_node` on every module that, outside a
+`typeof Bun` guard:
 
-- references the `Bun` global outside a `typeof Bun` guard, or
-- imports `bun` or a `bun:` module, such as `bun:sqlite`.
+- references the `Bun` global, or reads a member of `globalThis.Bun` without
+  optional chaining, or
+- imports `bun` or a `bun:` module, such as `bun:sqlite`, statically or
+  through `import()` or `require()`.
 
 Each diagnostic names the module, the positions of its `Bun` references, and
-the shortest import chain from an entrypoint that reaches it:
+the shortest import chain from an entrypoint that reaches it. A module of the
+project carries its file and position; a dependency is named in the message,
+by its path from the project:
 
 ```text
 ../runtime/src/config/config-source.ts references the Bun global at 8:38, which Node.js
@@ -362,20 +367,31 @@ does not provide; reached by src/index.ts -> src/registry.ts -> ../runtime/src/i
 -> ../runtime/src/config/index.ts -> ../runtime/src/config/config-source.ts
 ```
 
-A reference is guarded when it is the operand of `typeof`, when it lies in a
-branch of an `if`, a conditional or a logical expression that tests
-`typeof Bun`, or when it follows an `if` that tests `typeof Bun` and leaves the
-block. Reading the global through `globalThis.Bun?.` is not a reference to the
-`Bun` binding, which is how `@putnami/utils` falls back from `Bun.escapeHTML`.
+A guard is a `typeof Bun` test that shows Bun present where the code runs:
+`typeof Bun` compared with `'undefined'` (absent) or another type name
+(present), its negation, and the `&&` and `||` of such tests. The operand of
+`typeof` itself, the branch of an `if`, a conditional or a logical expression
+that the test selects when Bun is present, and the statements after an
+`if (typeof Bun === 'undefined')` whose branch leaves the block are guarded. A
+reference in the branch where Bun is absent is not. `globalThis.Bun?.` reads
+the global without needing it, which is how `@putnami/utils` falls back from
+`Bun.escapeHTML`. A binding named `Bun` that the module declares, other than
+an ambient `declare`, shadows the global.
+
 The check reads every module the graph imports, whether or not the bundler
 keeps its code, because an unbundled Node.js consumer loads each of them.
+`import type` and type-only exports are not imports. A value import from `bun`
+counts even when only its types are used: write it `import type`.
 
 The graph comes from a `bun build --target node --metafile` into a temporary
 directory, so it resolves the `node` export conditions, the tsconfig paths and
-the workspace links exactly as the build does. Each module is parsed with the
-`typescript` package the project resolves; without one, the check fails and
-asks for `putnami install`. A graph bun cannot bundle for Node.js fails the
-build too: the check never reports a graph it did not read as loadable.
+the workspace links exactly as the build does. A bare package that does not
+resolve at build time, such as an optional peer that is not installed, stays
+external and is not read: the consumer that installs it loads it. Each
+JavaScript or TypeScript module is parsed with the `typescript` package the
+project resolves; without one, the check fails and asks for `putnami install`.
+Any other failure to read the graph, such as an unresolved relative import,
+fails the build: the check never reports a graph it did not read as loadable.
 
 The `@putnami/*` framework packages whose server exports load on Node.js, the
 list a test computes with the same check:
@@ -387,8 +403,8 @@ list a test computes with the same check:
 <!-- node-loadable:end -->
 
 Every other framework package reaches a Bun API from its server exports:
-`@putnami/runtime` parses configuration with `Bun.YAML`, `@putnami/utils/server`
-reads and writes files with `Bun.file` and `Bun.write`, `@putnami/application`
+`@putnami/runtime` parses configuration with `Bun.YAML`, the server entry of
+`@putnami/utils` reads and writes files with `Bun.file` and `Bun.write`, `@putnami/application`
 imports `bun`, and `@putnami/spectest` imports `bun:test`. A node build that
 imports one of them fails.
 

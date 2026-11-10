@@ -1,6 +1,8 @@
 package main
 
 import (
+	"strings"
+
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/typescript/extension/internal/build"
@@ -31,10 +33,14 @@ func checkBunAPIsOnNode(bunBin, projectPath string, params build.TranspileParams
 			Category:    errs.CodeBunAPIOnNode.String(),
 			Severity:    "error",
 			Description: use.Message(),
-			File:        use.Module,
 		}
-		if len(use.Globals) > 0 {
-			diagnostic.Line, diagnostic.Column = use.Globals[0].Line, use.Globals[0].Column
+		// A module of the project is located in the project; a dependency is
+		// named, with its path from the project, in the message only.
+		if !strings.HasPrefix(use.Module, "../") {
+			diagnostic.File = use.Module
+			if len(use.Globals) > 0 {
+				diagnostic.Line, diagnostic.Column = use.Globals[0].Line, use.Globals[0].Column
+			}
 		}
 		diagnostics = append(diagnostics, diagnostic)
 	}

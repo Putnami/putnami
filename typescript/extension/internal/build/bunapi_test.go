@@ -1,6 +1,7 @@
 package build
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
@@ -92,14 +93,18 @@ func TestNodeGraphUsesNameTheShortestChainFromAnEntrypoint(t *testing.T) {
 	add("src/b.ts", "src/c.ts")
 	add("src/c.ts", "src/deep.ts", "src/far.ts")
 	add("src/deep.ts", "bun:sqlite", "node:fs", "bun")
-	add("src/other.ts", "src/b.ts", "src/far.ts")
+	add("src/other.ts", "src/b.ts", "src/far.ts", "src/guarded.ts")
 	add("src/far.ts")
+	// guarded.ts imports bun:ffi only under a typeof Bun guard: bun records
+	// the import, the scanner does not.
+	add("src/guarded.ts", "bun:ffi")
 	add("src/unreached.ts", "bun:ffi")
 
-	uses := graph.uses([]string{"./src/index.ts", "src/other.ts"}, map[string][]SourcePosition{
-		"src/b.ts":         {{Line: 3, Column: 7}},
-		"src/far.ts":       {{Line: 2, Column: 1}},
-		"src/unreached.ts": {{Line: 1, Column: 1}},
+	uses := graph.uses([]string{"./src/index.ts", "src/other.ts"}, map[string]moduleScan{
+		"src/b.ts":         {Uses: []SourcePosition{{Line: 3, Column: 7}}},
+		"src/deep.ts":      {Imports: []string{"bun", "bun:sqlite"}},
+		"src/far.ts":       {Uses: []SourcePosition{{Line: 2, Column: 1}}},
+		"src/unreached.ts": {Uses: []SourcePosition{{Line: 1, Column: 1}}, Imports: []string{"bun:ffi"}},
 	})
 	want := []BunAPIUse{
 		// Both entrypoints import b.ts directly: the earlier one names it.
@@ -116,10 +121,11 @@ func TestNodeGraphUsesNameTheShortestChainFromAnEntrypoint(t *testing.T) {
 	}
 }
 
-// TestScanBunGlobalsKeepsOnlyUnguardedReferences pins what counts as a use of
-// the Bun global: a value reference no scope declares, outside a typeof Bun
-// guard.
-func TestScanBunGlobalsKeepsOnlyUnguardedReferences(t *testing.T) {
+// TestScanModulesKeepsOnlyUnguardedUses pins what counts as a use of Bun: a
+// value reference to the Bun global no scope binds, a non-optional member
+// access on globalThis.Bun, or a run-time import of a bun module, each
+// outside a typeof Bun test that shows Bun present.
+func TestScanModulesKeepsOnlyUnguardedUses(t *testing.T) {
 	bun := bunAndTypeScript(t)
 	dir := t.TempDir()
 	writeFiles(t, dir, map[string]string{
@@ -135,7 +141,15 @@ func TestScanBunGlobalsKeepsOnlyUnguardedReferences(t *testing.T) {
 			"  if (typeof Bun === 'undefined') return;",
 			"  Bun.sleepSync(1);",
 			"}",
-			"export { a, b, escape, shadow, holder };",
+			"const c = typeof Bun === 'undefined' ? 'node' : Bun.version;",
+			"if (!(typeof Bun === 'undefined')) { Bun.gc(); }",
+			"const d = typeof Bun === 'undefined' || Bun.version;",
+			"export const Named = class Bun { static v() { return Bun.name; } };",
+			"export const open = async () => (typeof Bun !== 'undefined' ? await import('bun:sqlite') : null);",
+			"import type { Subprocess } from 'bun';",
+			"export type { Server } from 'bun';",
+			"export let sub: Subprocess | null = null;",
+			"export { a, b, c, d, escape, shadow, holder };",
 			"export type { Runtime };",
 		}, "\n"),
 		"unguarded.ts": strings.Join([]string{
@@ -143,17 +157,63 @@ func TestScanBunGlobalsKeepsOnlyUnguardedReferences(t *testing.T) {
 			"export function read(path: string) {",
 			"  return Bun.file(path).text();",
 			"}",
+			"if (typeof Bun === 'undefined') { Bun.version; }",
+			"const e = typeof Bun === 'undefined' ? Bun.version : 'bun';",
+			"if (flag() || typeof Bun !== 'undefined') { Bun.gc(); }",
+			"globalThis.Bun.write('a', 'b');",
+			"(globalThis as any)['Bun'].version;",
+			"declare const flag: () => boolean;",
+			"export { e };",
+		}, "\n"),
+		"ambient.ts": strings.Join([]string{
+			"declare const Bun: { file(path: string): { text(): Promise<string> } };",
+			"export const read = (path: string) => Bun.file(path).text();",
+		}, "\n"),
+		"imports.ts": strings.Join([]string{
+			"import { Database } from 'bun:sqlite';",
+			"export { $ } from 'bun';",
+			"export const ffi = () => require('bun:ffi');",
+			"export const open = () => new Database(':memory:');",
 		}, "\n"),
 		"plain.js": "export const x = 1;\n",
 	})
 	typescript, _ := resolveTypeScriptPackage(repositoryRoot(t))
-	globals, err := scanBunGlobals(bun, typescript, dir, []string{"guarded.ts", "plain.js", "unguarded.ts"})
+	scans, err := scanModules(bun, typescript, dir, []string{"ambient.ts", "guarded.ts", "imports.ts", "plain.js", "unguarded.ts"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := map[string][]SourcePosition{"unguarded.ts": {{Line: 1, Column: 41}, {Line: 3, Column: 10}}}
-	if !reflect.DeepEqual(globals, want) {
-		t.Fatalf("globals = %#v, want %#v", globals, want)
+	want := map[string]moduleScan{
+		"ambient.ts": {Uses: []SourcePosition{{Line: 2, Column: 39}}},
+		"imports.ts": {Imports: []string{"bun", "bun:ffi", "bun:sqlite"}},
+		"unguarded.ts": {Uses: []SourcePosition{
+			{Line: 1, Column: 41}, {Line: 3, Column: 10}, {Line: 5, Column: 35},
+			{Line: 6, Column: 40}, {Line: 7, Column: 45}, {Line: 8, Column: 1}, {Line: 9, Column: 1},
+		}},
+	}
+	if !reflect.DeepEqual(scans, want) {
+		t.Fatalf("scans = %#v, want %#v", scans, want)
+	}
+}
+
+func TestSourceModulesSkipNonCodeInputs(t *testing.T) {
+	var graph nodeGraph
+	if err := json.Unmarshal([]byte(`{"inputs":{"src/index.ts":{},"src/notes.txt":{},"src/data.json":{},"lib/x.mjs":{},"src/view.TSX":{}}}`), &graph); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := graph.sourceModules(), []string{"lib/x.mjs", "src/index.ts", "src/view.TSX"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("source modules = %v, want %v", got, want)
+	}
+}
+
+func TestUnresolvedPackagesAreTheBareSpecifiersBunCannotResolve(t *testing.T) {
+	stderr := `error: Could not resolve: "optional-peer". Maybe you need to "bun install"?
+error: Could not resolve: "other/sub". Maybe you need to "bun install"?
+error: Could not resolve: "optional-peer". Maybe you need to "bun install"?`
+	if got, want := unresolvedPackages(stderr), []string{"optional-peer", "other/sub"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unresolved = %v, want %v", got, want)
+	}
+	if got := unresolvedPackages(stderr + "\nerror: Could not resolve: \"./missing\""); got != nil {
+		t.Fatalf("an unresolved relative import externalized %v", got)
 	}
 }
 
@@ -187,8 +247,8 @@ func TestCheckBunAPIsOnNodeReportsABunModuleImport(t *testing.T) {
 		"package.json": `{"name":"node-app","exports":{".":"./src/index.ts"}}`,
 		"src/index.ts": "export { open } from './store';\nexport { read } from './files';\n",
 		"src/store.ts": "import { Database } from 'bun:sqlite';\nexport const open = () => new Database(':memory:');\n",
-		// bun refuses to bundle a named import of `bun` for the node target;
-		// the check still reads the graph and reports it.
+		// A named import of `bun` stays external and is reported like a
+		// `bun:` one.
 		"src/files.ts": "import { file } from 'bun';\nexport const read = (path: string) => file(path).text();\n",
 	})
 	linkTypeScript(t, dir)
@@ -202,6 +262,33 @@ func TestCheckBunAPIsOnNodeReportsABunModuleImport(t *testing.T) {
 	}
 	if !reflect.DeepEqual(uses, want) {
 		t.Fatalf("uses = %#v, want %#v", uses, want)
+	}
+}
+
+// TestCheckBunAPIsOnNodeReadsAGraphWithAMissingPackageAndANonCodeInput reads a
+// graph that imports an optional package that is not installed, a text file
+// whose words name Bun, and a bun module behind a guard: none of them needs
+// Bun on Node.js.
+func TestCheckBunAPIsOnNodeReadsAGraphWithAMissingPackageAndANonCodeInput(t *testing.T) {
+	bun := bunAndTypeScript(t)
+	dir := t.TempDir()
+	writeFiles(t, dir, map[string]string{
+		"package.json": `{"name":"node-app","exports":{".":"./src/index.ts"},"peerDependencies":{"optional-peer":"*"},"peerDependenciesMeta":{"optional-peer":{"optional":true}}}`,
+		"src/index.ts": strings.Join([]string{
+			"import notes from './notes.txt';",
+			"export { notes };",
+			"export const peer = async () => import('optional-peer');",
+			"export const store = async () => (typeof Bun !== 'undefined' ? import('bun:sqlite') : null);",
+		}, "\n"),
+		"src/notes.txt": "Bun runs this project in development.\n",
+	})
+	linkTypeScript(t, dir)
+	uses, err := CheckBunAPIsOnNode(bun, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(uses) != 0 {
+		t.Fatalf("uses = %#v, want none", uses)
 	}
 }
 
