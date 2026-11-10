@@ -259,8 +259,8 @@ the extension, the projects it depends on, and the jobs it disables:
 ```
 
 A project with no `lint` target has `lint` disabled. In import mode a
-project's `disable.jobs` also names the extension that does not run each
-target: `@putnami/nx:test` when a `bun test` script moves to
+TypeScript project's `extensions` also names `@putnami/typescript`, and its
+`disable.jobs` names the extension that does not run each target: `@putnami/nx:test` when a `bun test` script moves to
 `@putnami/typescript`, `@putnami/typescript:build` when a
 `@nx/webpack:webpack` build keeps running through Nx. The sync owns these
 entries. The output lists each target Putnami does not run itself, such as
@@ -286,6 +286,42 @@ it, and synchronizes:
 ```bash
 putnami init --from nx --mode import --apply
 ```
+
+### Move one project at a time
+
+A large repository can stay in delegate mode and import its TypeScript
+projects one at a time. First make the project's scripts run what
+`@putnami/typescript` runs, `bun build` and `bun test` for example, then add
+it to the import list:
+
+```bash
+putnami init --from nx --import /packages/pricing
+```
+
+`init` prints the entry it adds to `options["@putnami/nx"].import`, declares
+`@putnami/typescript` if the workspace does not, and shows the diff of each
+`putnami.json`, writing nothing. `--apply` records the list and synchronizes:
+
+```bash
+putnami init --from nx --import /packages/pricing --apply
+```
+
+```json
+{
+  "options": {
+    "@putnami/nx": { "mode": "delegate", "import": ["/packages/pricing"] }
+  }
+}
+```
+
+`pricing` now runs on `@putnami/typescript` with Putnami's cache, as import
+mode runs it; `api` still runs `nx run`, and its results record
+`delegatedTo: nx`. An entry is a project path or a glob, such as
+`/packages/*`, matched within each path segment. `init` only adds entries:
+to move a project back to Nx, remove its entry from the list and run
+`putnami projects sync`. An entry that selects no project is reported as
+`nx.import_unmatched`, and `putnami validate` fails with `nx.sync_stale`
+until the `putnami.json` files match the list.
 
 ### Run what a change affects
 
@@ -531,6 +567,35 @@ putnami init --from turbo --mode delegate
 
 Add `--apply` to write it, install an extension the mode needs, and
 synchronize the projects.
+
+### Move one project at a time
+
+A delegated repository can import its TypeScript packages one at a time.
+Make the package's scripts run what `@putnami/typescript` runs, `bun build`
+and `bun test` for example, then add it to the import list:
+
+```bash
+putnami init --from turbo --import /packages/pricing
+```
+
+`init` prints the entry it adds to `options["@putnami/turbo"].import`,
+declares `@putnami/typescript` if the workspace does not, and shows the diff
+of each `putnami.json`, writing nothing. `--apply` records the list and
+synchronizes:
+
+```bash
+putnami init --from turbo --import /packages/pricing --apply
+```
+
+`pricing`'s `putnami.json` then names `@putnami/turbo` and
+`@putnami/typescript`, and its tasks run with Putnami's cache, as import mode
+runs them. Every other package still runs `turbo run`, with
+`delegatedTo: turbo`. An entry is a package path or a glob, such as
+`/packages/*`. `init` only adds entries: to move a package back to
+Turborepo, remove its entry from the list and run `putnami projects sync`.
+An entry that selects no package is reported as `turbo.import_unmatched`,
+and `putnami validate` fails with `turbo.sync_stale` until the
+`putnami.json` files match the list.
 
 ## Rush
 

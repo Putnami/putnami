@@ -399,6 +399,7 @@ putnami init --from bazel       # Turn a Bazel repository into a workspace
 putnami init --from nx          # Turn a Nx repository into a workspace, in the mode you pick
 putnami init --from moon        # Turn a moon repository into a workspace, in the mode you pick
 putnami init --from turbo       # Turn a Turborepo repository into a workspace, in the mode you pick
+putnami init --from nx --import /packages/pricing --apply  # Import one project of a delegated workspace
 putnami init --from rush        # Turn a Rush repository into a workspace, in the mode you pick
 putnami workspace describe      # Show workspace details
 ```
@@ -441,6 +442,8 @@ putnami init --extension typescript,rust --project web  # A TypeScript web start
 A tool whose extension offers two modes, Nx, moon, Turborepo or Rush, adopts in the one the team picks (D-064): `import`, where Putnami's runner and cache take over the targets it can map, or `delegate`, where the tool keeps running each target with its cache. In a terminal `init` asks, with `import` preselected; without one it imports. `--mode import|delegate` skips the question. `init` records the mode in the workspace options of the tool's extension, `options["@putnami/nx"].mode`, which its sync task reads. Bazel and Pants adopt in `delegate` alone. moon's import sync declares the language extensions its projects map to, and `init` installs them after the sync.
 
 Rerun in a workspace that exists, `init --from <tool>` runs the workspace sync tasks as a dry run in the mode it resolves (`--mode`, else the recorded one), with the extensions `--apply` would declare in their `declaredExtensions` parameter, shows what each would change and the mode change, and writes nothing. A sync task that reads what the workspace declares, such as Nx's, reads those extensions as declared, so the preview shows what `--apply` writes. `--apply` records the mode, declares and installs the extensions the mode needs, and runs `putnami projects sync`.
+
+`--import <path>,<path>`, with `--from nx` or `--from turbo`, adds project paths or globs to `options["@putnami/<tool>"].import`, the projects a workspace in delegate mode imports as import mode does while the others stay delegated. It declares `@putnami/typescript`, skips an entry the list holds already, and on a workspace that exists previews the sync with the new list, writing only with `--apply`. Without `--mode` and with no recorded mode, `--import` adopts in delegate mode; in import mode it is a usage error.
 
 `@putnami/pants`, `@putnami/bazel`, `@putnami/nx`, `@putnami/moon`, `@putnami/rush` and `@putnami/turbo` are not published yet: until their first release, `init --from <tool>` stops at the extension install, after it has written the workspace files.
 
