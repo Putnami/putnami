@@ -99,7 +99,7 @@ func runProjectTestSuite(
 
 	// Each member runs its own runner: the batch shares parameters, not the
 	// runner a project chose.
-	command, err := resolveTestCommand(projectPath, ctx.WorkspaceRoot)
+	command, err := resolveTestCommand(projectPath, ctx.WorkspaceRoot, params.Runner)
 	if err != nil {
 		return failTestBatchProject(result, proj.Name, "Test runner unavailable", err, errs.CodeTestsFailed.String())
 	}

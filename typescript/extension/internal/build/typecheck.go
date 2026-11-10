@@ -43,9 +43,10 @@ type TypeCheckResult struct {
 // the scratch tsconfig and tsc's incremental build info, so a later run
 // re-checks only what changed.
 //
-// projectTypes leaves the ambient type packages to the project: tsc reads the
-// types of its tsconfig, else every visible @types package, so the globals of
-// a Vitest or Jest suite resolve. Without it the check loads Bun's types only.
+// projectTypes checks with the project's own compiler options: tsc reads its
+// tsconfig, strictness, module system and types included, so the globals of a
+// Vitest or Jest suite resolve and the check judges the code as the project's
+// own tsc does. Without it the check applies the types phase's Bun defaults.
 func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool) (*TypeCheckResult, error) {
 	scope, err := typeCheckScope(projectPath)
 	if err != nil {
@@ -80,7 +81,7 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool) (
 	fsRoot := filepath.VolumeName(absProject) + string(filepath.Separator)
 	flags := tscCompilerFlags(typeScriptIgnoreDeprecations(projectPath))
 	if projectTypes {
-		flags = withoutFlag(flags, "--types")
+		flags = projectCompilerFlags(typeScriptIgnoreDeprecations(projectPath))
 	}
 	args := append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, flags...)
 	if buildInfoDir != "" {
@@ -203,15 +204,12 @@ func isTypeScriptFile(name string) bool {
 	return false
 }
 
-// withoutFlag returns flags without name and the value that follows it.
-func withoutFlag(flags []string, name string) []string {
-	out := make([]string, 0, len(flags))
-	for i := 0; i < len(flags); i++ {
-		if flags[i] == name {
-			i++
-			continue
-		}
-		out = append(out, flags[i])
+// projectCompilerFlags are the flags of a check that keeps the project's own
+// compiler options: it skips declaration files and prints plain diagnostics.
+func projectCompilerFlags(ignoreDeprecations string) []string {
+	flags := []string{"--skipLibCheck", "true"}
+	if ignoreDeprecations != "" {
+		flags = append(flags, "--ignoreDeprecations", ignoreDeprecations)
 	}
-	return out
+	return append(flags, "--pretty", "false")
 }

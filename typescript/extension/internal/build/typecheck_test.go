@@ -189,8 +189,8 @@ func TestIsTypeCheckFile(t *testing.T) {
 	}
 }
 
-func TestRunTypeCheck_ProjectTypesLeaveTheAmbientTypesToTheProject(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-runner-choice", "a-vitest-or-jest-project-type-checks-with-its-own-ambient-types")
+func TestRunTypeCheck_ProjectTypesKeepTheProjectsCompilerOptions(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-runner-choice", "a-vitest-or-jest-project-type-checks-with-its-own-compiler-options")
 	dir := t.TempDir()
 	writeProjectFiles(t, dir, "tsconfig.json", "src/sum.test.ts")
 	var args []string
@@ -202,11 +202,15 @@ func TestRunTypeCheck_ProjectTypesLeaveTheAmbientTypesToTheProject(t *testing.T)
 		if _, err := RunTypeCheck("bun", dir, "", projectTypes); err != nil {
 			t.Fatal(err)
 		}
-		if got := slices.Contains(args, "--types"); got == projectTypes {
-			t.Errorf("projectTypes %v: args %v, --types present = %v", projectTypes, args, got)
+		for _, flag := range []string{"--types", "--strict", "--module", "--moduleResolution", "--lib"} {
+			if got := slices.Contains(args, flag); got == projectTypes {
+				t.Errorf("projectTypes %v: args %v, %s present = %v", projectTypes, args, flag, got)
+			}
 		}
-		if !slices.Contains(args, "--strict") {
-			t.Errorf("projectTypes %v dropped another compiler flag: %v", projectTypes, args)
+		for _, flag := range []string{"--noEmit", "--skipLibCheck", "--pretty"} {
+			if !slices.Contains(args, flag) {
+				t.Errorf("projectTypes %v: args %v lack %s", projectTypes, args, flag)
+			}
 		}
 	}
 }

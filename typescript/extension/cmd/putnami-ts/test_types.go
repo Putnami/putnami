@@ -13,8 +13,8 @@ import (
 // included, without emitting. Bun strips types when it runs a test and the
 // types phase reads only src, bin and .gen, so this step is the one that
 // fails on a type error, or an unused @ts-expect-error, in a test. A project
-// whose test runner is Vitest or Jest is checked with the ambient types its
-// tsconfig names, where the runner's globals are declared.
+// whose test runner is Vitest or Jest is checked with its own tsconfig's
+// compiler options, where the runner's globals are declared.
 func runTestTypes(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
 	bunBin, err := resolveBunBin()
@@ -22,7 +22,7 @@ func runTestTypes(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string
 		return "FAILED", nil, err
 	}
 
-	runner, err := testjob.ResolveRunner(projectPath)
+	runner, err := testjob.ResolveRunner(projectPath, ctx.Params.String("runner"))
 	if err != nil {
 		return "FAILED", nil, err
 	}

@@ -35,6 +35,10 @@ func TestMatchTestFile(t *testing.T) {
 		{"test/helper.ts", false},
 		{"test/setup.ts", false},
 		{"test/foo.test.ts.bak", false},
+		{"__tests__/sum.ts", true},
+		{"src/__tests__/sum.tsx", true},
+		{"src/my__tests__/sum.ts", false},
+		{"__tests__/data.json", false},
 	}
 
 	for _, tt := range tests {

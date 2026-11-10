@@ -27,33 +27,35 @@ func writeFile(t *testing.T, path, content string) {
 	}
 }
 
-func TestResolveRunnerIsTheOptionElseTheTestScriptElseBun(t *testing.T) {
+func TestResolveRunnerIsTheParameterElseTheTestScriptElseBun(t *testing.T) {
 	spectest.Proves(t, toolchainFeature, "test-runner-choice", "the-runner-is-the-option-else-the-test-script-else-bun")
 	cases := []struct {
-		name, putnamiJSON, packageJSON string
-		want                           Runner
+		name, param, packageJSON string
+		want                     Runner
 	}{
 		{"nothing", "", "", RunnerBun},
-		{"option wins over the script", `{"options":{"@putnami/typescript":{"test":{"runner":"jest"}}}}`, `{"scripts":{"test":"vitest run"}}`, RunnerJest},
-		{"option bun wins over the script", `{"options":{"@putnami/typescript":{"test":{"runner":"bun"}}}}`, `{"scripts":{"test":"vitest"}}`, RunnerBun},
-		{"vitest script", `{"options":{"@putnami/go":{}}}`, `{"scripts":{"test":"vitest run --coverage"}}`, RunnerVitest},
+		{"the parameter wins over the script", "jest", `{"scripts":{"test":"vitest run"}}`, RunnerJest},
+		{"bun wins over the script", "bun", `{"scripts":{"test":"vitest"}}`, RunnerBun},
+		{"vitest script", "", `{"scripts":{"test":"vitest run --coverage"}}`, RunnerVitest},
 		{"jest script", "", `{"scripts":{"test":"jest"}}`, RunnerJest},
 		{"npx jest after an assignment", "", `{"scripts":{"test":"NODE_OPTIONS=--experimental-vm-modules npx jest --ci"}}`, RunnerJest},
 		{"pnpm exec vitest", "", `{"scripts":{"test":"pnpm exec vitest run && echo done"}}`, RunnerVitest},
+		{"vitest after another command", "", `{"scripts":{"test":"tsc && vitest run"}}`, RunnerVitest},
+		{"node runs the jest entry", "", `{"scripts":{"test":"node --experimental-vm-modules node_modules/jest/bin/jest.js"}}`, RunnerJest},
+		{"npm run follows the script", "", `{"scripts":{"test":"npm run test:unit","test:unit":"vitest run"}}`, RunnerVitest},
+		{"bun run a binary", "", `{"scripts":{"test":"bun run vitest"}}`, RunnerVitest},
+		{"dotenv with options", "", `{"scripts":{"test":"dotenv -e .env -- jest"}}`, RunnerJest},
 		{"bun test script", "", `{"scripts":{"test":"bun test"}}`, RunnerBun},
+		{"a script loop ends", "", `{"scripts":{"test":"npm run test","a":"b"}}`, RunnerBun},
 		{"another runner falls back to bun", "", `{"scripts":{"test":"mocha"}}`, RunnerBun},
-		{"vitest after another command is not read", "", `{"scripts":{"test":"tsc && vitest"}}`, RunnerBun},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
-			if tc.putnamiJSON != "" {
-				writeFile(t, filepath.Join(dir, "putnami.json"), tc.putnamiJSON)
-			}
 			if tc.packageJSON != "" {
 				writeFile(t, filepath.Join(dir, "package.json"), tc.packageJSON)
 			}
-			got, err := ResolveRunner(dir)
+			got, err := ResolveRunner(dir, tc.param)
 			if err != nil || got != tc.want {
 				t.Fatalf("ResolveRunner = %q, %v; want %q", got, err, tc.want)
 			}
@@ -62,9 +64,7 @@ func TestResolveRunnerIsTheOptionElseTheTestScriptElseBun(t *testing.T) {
 }
 
 func TestResolveRunnerRefusesAnUnknownRunner(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, filepath.Join(dir, "putnami.json"), `{"options":{"@putnami/typescript":{"test":{"runner":"mocha"}}}}`)
-	_, err := ResolveRunner(dir)
+	_, err := ResolveRunner(t.TempDir(), "mocha")
 	if err == nil || !strings.Contains(err.Error(), "choose bun, vitest or jest") {
 		t.Fatalf("ResolveRunner error = %v, want the runners named", err)
 	}
@@ -87,8 +87,8 @@ func TestResolveCommandRunsTheBinOfTheProjectOrWorkspaceWithNode(t *testing.T) {
 	})
 	root := t.TempDir()
 	project := filepath.Join(root, "packages", "app")
-	writeFile(t, filepath.Join(root, "node_modules", ".bin", "jest"), "")
-	writeFile(t, filepath.Join(project, "node_modules", ".bin", "vitest"), "")
+	writeFile(t, filepath.Join(root, "node_modules", "jest", "package.json"), `{"bin":"./bin/jest.js"}`)
+	writeFile(t, filepath.Join(project, "node_modules", "vitest", "package.json"), `{"bin":{"vitest":"./vitest.mjs"}}`)
 	writeFile(t, filepath.Join(root, "node_modules", "@vitest", "coverage-v8", "package.json"), "{}")
 	noBun := func() (string, error) { return "", errors.New("bun must not be resolved") }
 
@@ -96,21 +96,25 @@ func TestResolveCommandRunsTheBinOfTheProjectOrWorkspaceWithNode(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if vitest.Program != "/usr/bin/node" || vitest.Script != filepath.Join(project, "node_modules", ".bin", "vitest") || vitest.CoverageUnavailable != "" {
+	if vitest.Program != "/usr/bin/node" || vitest.Script != filepath.Join(project, "node_modules", "vitest", "vitest.mjs") || vitest.CoverageUnavailable != "" {
 		t.Fatalf("vitest command = %+v", vitest)
 	}
 	jest, err := ResolveCommand(RunnerJest, noBun, project, root)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if jest.Program != "/usr/bin/node" || jest.Script != filepath.Join(root, "node_modules", ".bin", "jest") {
+	if jest.Program != "/usr/bin/node" || jest.Script != filepath.Join(root, "node_modules", "jest", "bin", "jest.js") {
 		t.Fatalf("jest command = %+v", jest)
 	}
 
 	// A runner installed above the workspace root is not the workspace's.
 	outside := filepath.Join(root, "ws")
-	if _, err := ResolveCommand(RunnerJest, noBun, filepath.Join(outside, "pkg"), outside); err == nil || !strings.Contains(err.Error(), "node_modules/.bin/jest") {
-		t.Fatalf("ResolveCommand above the workspace = %v, want the missing bin named", err)
+	if _, err := ResolveCommand(RunnerJest, noBun, filepath.Join(outside, "pkg"), outside); err == nil || !strings.Contains(err.Error(), "no jest package is installed") {
+		t.Fatalf("ResolveCommand above the workspace = %v, want the missing package named", err)
+	}
+	writeFile(t, filepath.Join(outside, "node_modules", "jest", "package.json"), `{"bin":{"other":"x.js"}}`)
+	if _, err := ResolveCommand(RunnerJest, noBun, outside, outside); err == nil || !strings.Contains(err.Error(), "declares no jest bin entry") {
+		t.Fatalf("ResolveCommand without a bin entry = %v", err)
 	}
 
 	bun, err := ResolveCommand(RunnerBun, func() (string, error) { return "/bun", nil }, project, root)
@@ -123,7 +127,7 @@ func TestResolveCommandWithoutNodeFailsAndNamesNode(t *testing.T) {
 	spectest.Proves(t, toolchainFeature, "test-runner-choice", "a-missing-node-fails-the-task-and-names-node")
 	stubLookPath(t, func(string) (string, error) { return "", errors.New("not found") })
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "node_modules", ".bin", "vitest"), "")
+	writeFile(t, filepath.Join(root, "node_modules", "vitest", "package.json"), `{"bin":"vitest.mjs"}`)
 	_, err := ResolveCommand(RunnerVitest, nil, root, root)
 	if err == nil || !strings.Contains(err.Error(), "no node is on PATH") {
 		t.Fatalf("ResolveCommand error = %v, want node named", err)
@@ -133,7 +137,7 @@ func TestResolveCommandWithoutNodeFailsAndNamesNode(t *testing.T) {
 func TestResolveCommandWithoutVitestCoverageProviderRunsWithoutCoverage(t *testing.T) {
 	stubLookPath(t, func(string) (string, error) { return "/usr/bin/node", nil })
 	root := t.TempDir()
-	writeFile(t, filepath.Join(root, "node_modules", ".bin", "vitest"), "")
+	writeFile(t, filepath.Join(root, "node_modules", "vitest", "package.json"), `{"bin":"vitest.mjs"}`)
 	command, err := ResolveCommand(RunnerVitest, nil, root, root)
 	if err != nil || !strings.Contains(command.CoverageUnavailable, "@vitest/coverage-v8") {
 		t.Fatalf("command = %+v, %v; want the missing provider named", command, err)
@@ -302,7 +306,7 @@ func TestRunSuiteJestConvertsItsResultAndCoverage(t *testing.T) {
 	if _, _, err := RunSuite(command, project, output, TestParams{Coverage: true}); err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"--json", "--ci", "--coverage", "--coverageReporters=lcovonly"} {
+	for _, want := range []string{"--json", "--testLocationInResults", "--coverage", "--coverageReporters=lcovonly"} {
 		if !slices.Contains(got, want) {
 			t.Errorf("args %v lack %s", got, want)
 		}
@@ -314,8 +318,11 @@ func TestRunSuiteJestConvertsItsResultAndCoverage(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(output, JUnitFile)); err != nil {
 		t.Fatal(err)
 	}
+	if slices.Contains(got, "--ci") {
+		t.Errorf("args %v force CI mode, which the project's configuration owns", got)
+	}
 	snapshot := jestArgs("r", "c", false, TestParams{UpdateSnapshots: true})
-	if slices.Contains(snapshot, "--ci") || !slices.Contains(snapshot, "--updateSnapshot") {
+	if !slices.Contains(snapshot, "--updateSnapshot") {
 		t.Fatalf("snapshot update args = %v", snapshot)
 	}
 }
@@ -338,6 +345,9 @@ func TestRunnerConfigurationFilesAreCacheInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	var manifest struct {
+		Commands map[string]struct {
+			Flags map[string]any `json:"flags"`
+		} `json:"commands"`
 		Tasks map[string]struct {
 			Inputs map[string]struct {
 				From  string   `json:"from"`
@@ -354,9 +364,17 @@ func TestRunnerConfigurationFilesAreCacheInputs(t *testing.T) {
 			declared = append(declared, input.Files...)
 		}
 	}
-	for _, file := range RunnerConfigFiles {
+	for _, file := range append(RunnerConfigFiles, "**/__tests__/**/*.ts") {
 		if !slices.Contains(declared, file) {
 			t.Errorf("test-run inputs %v lack %s", declared, file)
+		}
+	}
+	if _, ok := manifest.Commands["test"].Flags["runner"]; !ok {
+		t.Error("the test command declares no runner flag")
+	}
+	for _, task := range []string{"test-run", "test-types"} {
+		if input, ok := manifest.Tasks[task].Inputs["runner"]; !ok || input.From != "params" {
+			t.Errorf("%s does not key on the runner parameter: %+v", task, input)
 		}
 	}
 }

@@ -51,7 +51,7 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	emit.Log("info", "Test files found")
 	emit.PhaseEnd("discover", "success")
 
-	command, err := resolveTestCommand(projectPath, ctx.WorkspaceRoot)
+	command, err := resolveTestCommand(projectPath, ctx.WorkspaceRoot, params.Runner)
 	if err != nil {
 		return "FAILED", nil, err
 	}
@@ -214,10 +214,10 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	return "OK", resultData, nil
 }
 
-// resolveTestCommand resolves the runner of the project at projectPath and the
-// programs that start it.
-func resolveTestCommand(projectPath, workspaceRoot string) (testjob.Command, error) {
-	runner, err := testjob.ResolveRunner(projectPath)
+// resolveTestCommand resolves the runner of the project at projectPath, from
+// the runner parameter or its test script, and the programs that start it.
+func resolveTestCommand(projectPath, workspaceRoot, runnerParam string) (testjob.Command, error) {
+	runner, err := testjob.ResolveRunner(projectPath, runnerParam)
 	if err != nil {
 		return testjob.Command{}, err
 	}
@@ -261,6 +261,7 @@ func testParamsFromContext(ctx *pctx.Context) testjob.TestParams {
 		Concurrent:        ctx.Params.String("concurrent"),
 		Parallel:          ctx.Params.String("parallel"),
 		PassWithNoTests:   ctx.Params.Bool("pass-with-no-tests", true, "passWithNoTests"),
+		Runner:            ctx.Params.String("runner"),
 		Verbose:           ctx.Params.Bool("test-verbose", false, "testVerbose"),
 		DatabaseBinding:   provisionedDatabaseBinding(ctx),
 	}

@@ -115,14 +115,11 @@ func vitestArgs(junitPath, coverageDir string, coverage bool, params TestParams)
 	return args
 }
 
-// jestArgs are the arguments of jest: its JSON result into resultPath and,
-// with coverage, the lcovonly reporter into coverageDir. Everything else comes
-// from the project's configuration.
+// jestArgs are the arguments of jest: its JSON result, with each test's
+// location, into resultPath and, with coverage, the lcovonly reporter into
+// coverageDir. Everything else comes from the project's configuration.
 func jestArgs(resultPath, coverageDir string, coverage bool, params TestParams) []string {
-	args := []string{"--json", "--outputFile=" + resultPath}
-	if !params.UpdateSnapshots {
-		args = append(args, "--ci")
-	}
+	args := []string{"--json", "--testLocationInResults", "--outputFile=" + resultPath}
 	if coverage {
 		args = append(args, "--coverage", "--coverageReporters=lcovonly", "--coverageDirectory="+coverageDir)
 	}

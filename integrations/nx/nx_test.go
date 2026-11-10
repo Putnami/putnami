@@ -310,7 +310,7 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	if _, ok := readProjectFile(t, root, "packages/pricing")["options"]; ok {
 		t.Errorf("an imported bun test carries no options")
 	}
-	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension: map[string]any{"test": map[string]any{"runner": "jest"}}}; !reflect.DeepEqual(got, want) {
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": "jest"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("api options = %v, want %v", got, want)
 	}
 
@@ -355,7 +355,7 @@ func TestImportMapsVitestAndJestTestTargetsToTheTypeScriptTest(t *testing.T) {
 			if !slices.Contains(jobs, any("@putnami/nx:test")) || slices.Contains(jobs, any("@putnami/typescript:test")) {
 				t.Errorf("jobs = %v, want the test on @putnami/typescript", jobs)
 			}
-			if got, want := api["options"], map[string]any{TypeScriptExtension: map[string]any{"test": map[string]any{"runner": tc.runner}}}; !reflect.DeepEqual(got, want) {
+			if got, want := api["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": tc.runner}}; !reflect.DeepEqual(got, want) {
 				t.Errorf("options = %v, want %v", got, want)
 			}
 			if slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool { return u.Project == "@demo/api" && u.Target == "test" }) {
@@ -369,15 +369,15 @@ func TestTheSyncOwnsTheTestRunnerOption(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-vitest-and-jest-tests", "the-sync-owns-the-test-runner-option")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, TypeScriptExtension)
-	writeFile(t, root, "apps/api/putnami.json", `{"options": {"@putnami/typescript": {"test": {"timeout": 9000}}}}`)
+	writeFile(t, root, "apps/api/putnami.json", `{"options": {"@putnami/typescript:test": {"timeout": 9000}}}`)
 	sync(t, root, SyncOptions{})
-	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension: map[string]any{"test": map[string]any{"runner": "jest", "timeout": float64(9000)}}}; !reflect.DeepEqual(got, want) {
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": "jest", "timeout": float64(9000)}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("options = %v, want the runner beside the kept member", got)
 	}
 	// The test no longer runs jest: the runner goes, the other member stays.
 	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "scripts": {"test": "bun test"}}`)
 	sync(t, root, SyncOptions{})
-	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension: map[string]any{"test": map[string]any{"timeout": float64(9000)}}}; !reflect.DeepEqual(got, want) {
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"timeout": float64(9000)}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("options = %v, want the runner removed", got)
 	}
 	// A former project loses the runner it was given.
@@ -389,7 +389,7 @@ func TestTheSyncOwnsTheTestRunnerOption(t *testing.T) {
 	if result := sync(t, root, SyncOptions{}); !slices.Contains(result.Retracted, "old-api/putnami.json") {
 		t.Fatalf("retracted = %v, want the former project", result.Retracted)
 	}
-	if got := readProjectFile(t, root, "old-api")["options"]; !reflect.DeepEqual(got, map[string]any{TypeScriptExtension: map[string]any{"test": map[string]any{"timeout": float64(9000)}}}) {
+	if got := readProjectFile(t, root, "old-api")["options"]; !reflect.DeepEqual(got, map[string]any{TypeScriptExtension + ":test": map[string]any{"timeout": float64(9000)}}) {
 		t.Fatalf("former project options = %v, want the runner retracted", got)
 	}
 }

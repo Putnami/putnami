@@ -272,7 +272,7 @@ TypeScript project's `extensions` also names `@putnami/typescript`, and its
 `@putnami/nx:test` when a `bun test`, `vitest` or `jest` test moves to
 `@putnami/typescript`, `@putnami/typescript:build` when a
 `@nx/webpack:webpack` build keeps running through Nx. A Vitest or Jest test
-also records its runner in `options["@putnami/typescript"].test.runner`. The
+also records its runner in `options["@putnami/typescript:test"].runner`. The
 sync owns these entries. The output lists each target Putnami does not run
 itself, such as `serve`, `e2e` or a `mocha` test, with the reason.
 
@@ -512,7 +512,8 @@ In a terminal, `init` asks the mode:
 records the mode in `putnami.workspace.json`, installs the extensions and
 synchronizes the projects. The sync reads the package manifests and
 `turbo.json`, and writes in each package's `putnami.json` the extension that
-runs it and the packages it depends on:
+runs it and the packages it depends on. In delegate mode, a package of the
+demo reads:
 
 ```json
 {
@@ -526,11 +527,11 @@ runs it and the packages it depends on:
 
 A package with no `build`, `lint` or `test` task, that is no script of that
 name or no task of that name in `turbo.json`, has it disabled. The sync then
-lists what it does not map, which keeps running through Turborepo:
+lists what it does not map, which keeps running through Turborepo; in delegate
+mode:
 
 ```text
 Not mapped, kept on Turborepo:
-  @demo/api#build: @putnami/typescript runs bun build, not "tsc -p tsconfig.json": it keeps running through Turborepo, with turbo run build
   dev: no Putnami task maps it: it keeps running through Turborepo, with turbo run dev
 Test result from the exit code alone, no JUnit report named: apps/api, packages/pricing
 ```

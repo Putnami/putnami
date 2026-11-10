@@ -647,7 +647,7 @@ func ownedJobs() []string {
 // the extension, @putnami/typescript for an imported TypeScript project, the
 // dependencies on Nx projects, the entries of disable.jobs it owns,
 // options["@putnami/nx"].tasks.test.reports and
-// options["@putnami/typescript"].test.runner. Every other member is kept as
+// options["@putnami/typescript:test"].runner. Every other member is kept as
 // it is. It returns the change, or nil when the file is current.
 func writeProject(root, file string, plan projectPlan, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
@@ -1012,12 +1012,15 @@ func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 	return "FAILED", nil, errors.New(CodeSyncStale)
 }
 
-// setRunner sets options["@putnami/typescript"].test.runner to runner, or
+// runnerLayer is the option layer of the TypeScript extension's test command,
+// whose runner member the sync writes.
+const runnerLayer = TypeScriptExtension + ":test"
+
+// setRunner sets options["@putnami/typescript:test"].runner to runner, or
 // removes it, and every object it empties, when runner is "".
 func setRunner(doc map[string]any, runner string) {
 	options, _ := doc["options"].(map[string]any)
-	layer, _ := options[TypeScriptExtension].(map[string]any)
-	test, _ := layer["test"].(map[string]any)
+	layer, _ := options[runnerLayer].(map[string]any)
 	if runner != "" {
 		if options == nil {
 			options = map[string]any{}
@@ -1025,24 +1028,17 @@ func setRunner(doc map[string]any, runner string) {
 		}
 		if layer == nil {
 			layer = map[string]any{}
-			options[TypeScriptExtension] = layer
+			options[runnerLayer] = layer
 		}
-		if test == nil {
-			test = map[string]any{}
-			layer["test"] = test
-		}
-		test["runner"] = runner
+		layer["runner"] = runner
 		return
 	}
-	if test == nil {
+	if layer == nil {
 		return
 	}
-	delete(test, "runner")
-	if len(test) == 0 {
-		delete(layer, "test")
-	}
+	delete(layer, "runner")
 	if len(layer) == 0 {
-		delete(options, TypeScriptExtension)
+		delete(options, runnerLayer)
 	}
 	if len(options) == 0 {
 		delete(doc, "options")
