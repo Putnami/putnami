@@ -361,7 +361,7 @@
       }
     },
     "test-run": {
-      "description": "Run the test steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check (for Maven, clean of the module, then verify); then copy its JUnit and JaCoCo reports into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task.",
+      "description": "Run the test steps of the component's variant on one Gradle project or Maven module in its directory, after the Java toolchain check (for Maven, clean of the module, then verify); with the test flag passed to Gradle or Maven as its test filter; then copy its JUnit and JaCoCo reports into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task, except in a filtered run that selects no test, which reads zero tests.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

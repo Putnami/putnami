@@ -167,7 +167,9 @@ and coverage summary.
 A component with no file under `src/test` (or `src/testDebug` for Android)
 expects no report, so a module without tests passes. Otherwise a failed case,
 a step that exits non-zero, or a JUnit report that is missing fails the task,
-and so does a missing JaCoCo report for `android-coverage`. The reports are removed before the steps, so a report an
+and so does a missing JaCoCo report for `android-coverage`, except in a run
+the test filter selects no test in, which reads zero tests and no coverage.
+The reports are removed before the steps, so a report an
 earlier run left is never read as this run's.
 
 ## The toolchain check

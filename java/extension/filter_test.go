@@ -47,9 +47,9 @@ func TestTheTestFilterReachesEachGradleVariantAndMaven(t *testing.T) {
 			t.Fatalf("%s is variant %s, want %s", rel, got, variant)
 		}
 	}
-	// The init script and the property are global options, after the last
-	// task the step names: a task option such as --tests there would apply
-	// to the report task of gradle-jacoco and android-coverage.
+	// The init script and the property are global options, appended after
+	// the last task the step names, so they reach the test task of a step
+	// that ends with its report task.
 	for rel, tasks := range map[string]string{
 		"plain": ":plain:test",
 		"api":   ":api:test :api:jacocoTestReport",
