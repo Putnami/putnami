@@ -104,6 +104,10 @@ type GraphResult struct {
 	// Retracted holds and would hold, in the same order: Written's, then
 	// Retracted's.
 	Changes []FileChange
+	// Warnings are what the tool's sync reports beside its summary, as
+	// warnings so that a sync that passes still shows them, such as a
+	// command it does not map or a cache the tool keeps off.
+	Warnings []string
 }
 
 // FileChange is a file a sync changes: its workspace-relative path, its
@@ -633,6 +637,9 @@ func (j GraphJobs) RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (
 		emit.DiagnosticWithCode("warning", j.Summary(result), "", 0, 0, j.Tool+SyncNoExportSuffix)
 	} else {
 		emit.Info(j.Summary(result))
+	}
+	for _, warning := range result.Warnings {
+		emit.Diagnostic("warning", warning, "", 0)
 	}
 	if dry {
 		EmitPreview(emit, j.Tool, result)

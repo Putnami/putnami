@@ -325,3 +325,22 @@ func TestATagAloneMarksNoPackage(t *testing.T) {
 		t.Errorf("a project the team tagged was rewritten: %s", data)
 	}
 }
+
+func TestTheSyncJobReportsTheWarningsOfTheToolsSync(t *testing.T) {
+	root := t.TempDir()
+	jobs := GraphJobs{
+		Tool: "tool",
+		Sync: func(context.Context, string, io.Writer, bool) (GraphResult, error) {
+			return GraphResult{Export: "tool-graph.json", Warnings: []string{"not mapped: deploy"}}, nil
+		},
+	}
+	var events strings.Builder
+	emit := jsonl.New()
+	emit.Observe(func(message string) { events.WriteString(message + "\n") })
+	if status, _, err := jobs.RunSync(&pctx.Context{WorkspaceRoot: root}, emit, nil); status != statusOK || err != nil {
+		t.Fatalf("sync = %s, %v", status, err)
+	}
+	if !strings.Contains(events.String(), "not mapped: deploy") {
+		t.Errorf("the sync job reports no warning:\n%s", events.String())
+	}
+}
