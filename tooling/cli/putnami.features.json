@@ -4621,6 +4621,113 @@
           }
         }
       ]
+    },
+    {
+      "id": "cli/init-a-language",
+      "type": "feature",
+      "name": "Initialize a workspace for the languages a repository holds",
+      "outcome": "A team turns a repository of any language Putnami runs, or of several, into a workspace with one command, and putnami init without a flag proposes the languages it finds",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "every-language",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "extension-takes-every-language-and-a-list",
+              "an-unknown-language-is-refused-before-anything-is-written"
+            ]
+          }
+        },
+        {
+          "id": "languages-come-from-the-extensions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-language-index-follows-the-extension-manifests",
+              "each-starter-template-names-its-extension"
+            ]
+          }
+        },
+        {
+          "id": "init-adopts-what-it-finds",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-language-whose-markers-the-directory-holds-is-synchronized",
+              "a-language-without-markers-is-installed-and-not-synchronized"
+            ]
+          }
+        },
+        {
+          "id": "project-needs-a-starter",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-takes-the-starter-of-the-first-language",
+              "a-language-without-a-starter-refuses-a-project"
+            ]
+          }
+        },
+        {
+          "id": "init-proposes-what-it-detects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-terminal-asks-with-every-detected-language-preselected",
+              "without-a-terminal-init-writes-nothing-and-names-the-command",
+              "a-directory-without-a-marker-declares-typescript"
+            ]
+          }
+        },
+        {
+          "id": "monorepo-tool-hint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-monorepo-tool-marker-names-init-from-and-writes-nothing"
+            ]
+          }
+        },
+        {
+          "id": "detection-reads-names-only",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "detection-skips-excluded-and-ignored-directories"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
