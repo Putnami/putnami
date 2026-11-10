@@ -25,6 +25,7 @@
     "typescript/typescript-project-toolchain#managed-publication-retries-transient-failures",
     "typescript/typescript-project-toolchain#member-event-per-publication",
     "typescript/typescript-project-toolchain#no-node-on-the-host",
+    "typescript/typescript-project-toolchain#node-target-refuses-bun-apis",
     "typescript/typescript-project-toolchain#npm-agent-content",
     "typescript/typescript-project-toolchain#npm-ecosystem-profile",
     "typescript/typescript-project-toolchain#package-channel-index",

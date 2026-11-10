@@ -52,6 +52,10 @@
       "text": "A staged npm package loads under the loader rules of the CLI contract it claims, and a stale lower claim is ratcheted to the earned one."
     },
     {
+      "id": "node-target-refuses-bun-apis",
+      "text": "A build graph built with the node target fails with typescript.bun_api_on_node when a module it reaches, its dependencies included, references the Bun global or imports bun or a bun: module outside a typeof Bun guard, and the diagnostic names each such module and the import chain from the entrypoint that reaches it. The build documentation lists the @putnami/* packages whose server exports load on Node, and that list is the one the same check computes."
+    },
+    {
       "id": "npm-agent-content",
       "text": "An npm package whose extension manifest declares agent content carries the tree built from its authored source under the package's name and version, bound by the digest the packaged manifest declares and stamped with the agent-content contract; a manifest without agent content keeps the base contract. A files allowlist that would drop the content, content the policy forbids, and a content path the package already holds fail packaging."
     },
