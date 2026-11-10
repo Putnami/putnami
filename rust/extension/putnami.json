@@ -9,15 +9,26 @@
     "/go/extension",
     "/tooling/sdd-extension"
   ],
+  "publish": [
+    "archives"
+  ],
   "disable": {
     "jobs": [
-      "serve"
+      "serve",
+      "@putnami/rust:package",
+      "@putnami/rust:publish"
     ]
   },
   "options": {
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-rust",
       "version-var": "main.runtimeVersion"
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
     },
     "sdd": {
       "verification": {

@@ -9,6 +9,9 @@
     "/go/extension",
     "/tooling/sdd-extension"
   ],
+  "publish": [
+    "archives"
+  ],
   "disable": {
     "jobs": [
       "serve"
@@ -18,6 +21,12 @@
     "@putnami/go": {
       "entrypoint": "./cmd/putnami-dotnet",
       "version-var": "main.runtimeVersion"
+    },
+    "package": {
+      "archives": true
+    },
+    "publish": {
+      "archives": true
     },
     "sdd": {
       "verification": {

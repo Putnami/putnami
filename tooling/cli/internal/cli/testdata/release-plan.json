@@ -180,14 +180,37 @@
       ],
       "artifacts": [
         "@putnami/clientgen",
+        "@putnami/dart",
+        "@putnami/dotnet",
         "@putnami/go",
+        "@putnami/java",
+        "@putnami/php",
         "@putnami/python",
+        "@putnami/ruby",
+        "@putnami/rust",
         "@putnami/scaffold",
         "@putnami/sdd",
+        "@putnami/swift",
         "@putnami/typescript"
       ],
       "rollbackPoint": "the previous extension archive channel pointer",
       "reversal": "Repoint the extension archive channel at the previous version. Installed workspaces are unaffected because the lock pins a resolved version, so the rollback only changes what a new resolve returns."
+    },
+    {
+      "id": "integration-extensions",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/bazel",
+        "@putnami/moon",
+        "@putnami/nx",
+        "@putnami/pants",
+        "@putnami/rush",
+        "@putnami/turbo"
+      ],
+      "rollbackPoint": "the previous monorepo tool integration archive channel pointers",
+      "reversal": "Repoint the integration archive channels at the previous version. A workspace that adopted a tool keeps its pinned version and archive digest, so the rollback only changes what a fresh putnami init --from resolves. The integrations publish after @putnami/dev, which each names as an extension dependency, and before the CLI, which resolves them."
     },
     {
       "id": "cloud-extensions",
