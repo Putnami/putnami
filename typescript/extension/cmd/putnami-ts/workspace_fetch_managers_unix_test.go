@@ -322,6 +322,7 @@ func TestPNPMConfigDependenciesAndPnpmfileSettingsAreRefused(t *testing.T) {
 		{"pnpm pnpmfile setting", pnpm, map[string]string{"pnpm-workspace.yaml": "pnpmfile: ./hooks.cjs\n"}},
 		{"pnpm escaped key", pnpm, map[string]string{"pnpm-workspace.yaml": "\"config\\x44ependencies\": {}\n"}},
 		{"npmrc global-pnpmfile", pnpm, map[string]string{".npmrc": "global-pnpmfile=/tmp/hooks.cjs\n"}},
+		{"npmrc escaped key", pnpm, map[string]string{".npmrc": "\"global-pnpm\\u0066ile\"=/tmp/hooks.cjs\n"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			parent := t.TempDir()
@@ -366,9 +367,10 @@ func TestNoFetchProcessLoadsAPnpmfileOrAYarnPath(t *testing.T) {
 		answers  map[string]string
 		want     map[string]string
 	}{
-		{"pnpm@10.26.1", map[string]string{"pnpm-lock.yaml": "lockfileVersion: '9.0'\n"}, map[string]string{"store path": "/users/ci/store"}, map[string]string{"npm_config_ignore_pnpmfile": "true"}},
-		{"yarn@1.22.22", map[string]string{"yarn.lock": ""}, map[string]string{"cache dir": "/users/ci/yarn/v6"}, map[string]string{"YARN_IGNORE_PATH": "1"}},
-		{"yarn@4.5.0", map[string]string{"yarn.lock": ""}, map[string]string{"config get cacheFolder": "/repo/.yarn/cache", "config get globalFolder": "/users/ci/.yarn/berry", "config get enableGlobalCache": "true"}, map[string]string{"YARN_IGNORE_PATH": "1"}},
+		{"pnpm@10.26.1", map[string]string{"pnpm-lock.yaml": "lockfileVersion: '9.0'\n"}, map[string]string{"store path": "/users/ci/store"}, map[string]string{"npm_config_ignore_pnpmfile": "true", "COREPACK_ENV_FILE": "0"}},
+		{"yarn@1.22.22", map[string]string{"yarn.lock": ""}, map[string]string{"cache dir": "/users/ci/yarn/v6"}, map[string]string{"YARN_IGNORE_PATH": "1", "COREPACK_ENV_FILE": "0"}},
+		{"yarn@4.5.0", map[string]string{"yarn.lock": ""}, map[string]string{"config get cacheFolder": "/repo/.yarn/cache", "config get globalFolder": "/users/ci/.yarn/berry", "config get enableGlobalCache": "true"}, map[string]string{"YARN_IGNORE_PATH": "1", "COREPACK_ENV_FILE": "0"}},
+		{"npm@10.9.0", map[string]string{"package-lock.json": "{}"}, map[string]string{"config get cache": "/users/ci/npm"}, map[string]string{"COREPACK_ENV_FILE": "0"}},
 	} {
 		t.Run(tc.declared, func(t *testing.T) {
 			ctx := managerFetchWorkspace(t, tc.declared, tc.files)

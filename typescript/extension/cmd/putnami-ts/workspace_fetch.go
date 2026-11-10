@@ -202,7 +202,7 @@ var repositoryCodeSettings = map[string]struct {
 	managerPNPM: {
 		files:     []string{pnpmworkspace.File, ".npmrc"},
 		words:     []string{"configdependencies", "config-dependencies", "pnpmfile"},
-		backslash: []string{pnpmworkspace.File},
+		backslash: []string{pnpmworkspace.File, ".npmrc"},
 	},
 }
 
@@ -253,14 +253,17 @@ func refuseRepositoryManagerCode(root string, m packageManager) error {
 }
 
 // fetchProcessEnv is the environment every process workspace-fetch starts
-// adds: a Yarn ignores the release yarnPath names and a pnpm ignores the
-// pnpmfile, the cache probes in the workspace root included.
+// adds, the cache probes in the workspace root included: a Corepack shim reads
+// no .corepack.env, which could name a registry or allow a manager from a URL;
+// a Yarn ignores the release yarnPath names; a pnpm ignores the pnpmfile.
 func fetchProcessEnv(m packageManager) map[string]string {
 	switch m.Name {
 	case managerYarn:
-		return map[string]string{"YARN_IGNORE_PATH": "1"}
+		return map[string]string{"COREPACK_ENV_FILE": "0", "YARN_IGNORE_PATH": "1"}
 	case managerPNPM:
-		return map[string]string{"npm_config_ignore_pnpmfile": "true"}
+		return map[string]string{"COREPACK_ENV_FILE": "0", "npm_config_ignore_pnpmfile": "true"}
+	case managerNPM:
+		return map[string]string{"COREPACK_ENV_FILE": "0"}
 	}
 	return map[string]string{}
 }

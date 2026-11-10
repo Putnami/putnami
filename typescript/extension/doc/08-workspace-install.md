@@ -202,12 +202,12 @@ locally and commit the result.
    (the home excepted) that mentions `yarnPath`, `yarn-path` or `plugins`, in
    any letter case and even in a comment, or holds a backslash; and, for pnpm,
    a `pnpm-workspace.yaml` or `.npmrc` that mentions `configDependencies` or a
-   pnpmfile, or a `pnpm-workspace.yaml` that holds a backslash. The check reads
-   the text, so no quoted, escaped or indented spelling of a key slips past it.
-   Every process the fetch starts, its cache probes in the workspace root
-   included, also runs with `YARN_IGNORE_PATH=1` or
-   `npm_config_ignore_pnpmfile=true`, and without
-   `COREPACK_ENABLE_UNSAFE_CUSTOM_URLS`. Declare the Yarn release in
+   pnpmfile, or holds a backslash. The check reads the text, so no quoted,
+   escaped or indented spelling of a key slips past it. Every process the
+   fetch starts, its cache probes in the workspace root included, also runs
+   with `YARN_IGNORE_PATH=1` or `npm_config_ignore_pnpmfile=true`, with
+   `COREPACK_ENV_FILE=0`, so a Corepack shim reads no `.corepack.env` from the
+   workspace, and without `COREPACK_ENABLE_UNSAFE_CUSTOM_URLS`. Declare the Yarn release in
    `packageManager` instead of `yarnPath`; Corepack provides it.
 3. It requires the committed lockfile of the package manager: `bun.lock` for
    Bun, `pnpm-lock.yaml`, `yarn.lock`, or `package-lock.json` or

@@ -942,26 +942,42 @@ func collectWorkspacePackageNames(wsRoot string) map[string]bool {
 }
 
 // workspaceMemberDirs resolves the directories of the workspace members listed
-// in the packages of pnpm-workspace.yaml when it declares them, the list pnpm
-// reads, else in the root package.json "workspaces" field. It accepts both
+// where the workspace's package manager reads them: the packages of
+// pnpm-workspace.yaml for pnpm, the root package.json "workspaces" field
+// otherwise, and the other list when that one declares none. It accepts both
 // package.json forms, the array (["packages/*"]) and the object ({"packages":
 // [...]}), and expands glob patterns the way Bun does; a pnpm exclusion (a
 // pattern starting with "!") selects no directory.
 func workspaceMemberDirs(wsRoot string) []string {
-	var patterns []string
-	declared := false
-	if data, err := os.ReadFile(pnpmWorkspaceFile(wsRoot)); err == nil {
-		patterns, declared, _ = pnpmworkspace.Packages(string(data))
-	}
-	if !declared {
-		if data, err := os.ReadFile(filepath.Join(wsRoot, "package.json")); err == nil {
-			var root struct {
-				Workspaces json.RawMessage `json:"workspaces"`
-			}
-			if json.Unmarshal(data, &root) == nil && len(root.Workspaces) > 0 {
-				patterns = parseWorkspacePatterns(root.Workspaces)
-			}
+	fromPNPM := func() ([]string, bool) {
+		data, err := os.ReadFile(pnpmWorkspaceFile(wsRoot))
+		if err != nil {
+			return nil, false
 		}
+		patterns, declared, _ := pnpmworkspace.Packages(string(data))
+		return patterns, declared && len(patterns) > 0
+	}
+	fromManifest := func() ([]string, bool) {
+		data, err := os.ReadFile(filepath.Join(wsRoot, "package.json"))
+		if err != nil {
+			return nil, false
+		}
+		var root struct {
+			Workspaces json.RawMessage `json:"workspaces"`
+		}
+		if json.Unmarshal(data, &root) != nil || len(root.Workspaces) == 0 {
+			return nil, false
+		}
+		patterns := parseWorkspacePatterns(root.Workspaces)
+		return patterns, len(patterns) > 0
+	}
+	first, second := fromManifest, fromPNPM
+	if manager, _ := detectPackageManager(wsRoot); manager.listsMembersInPNPMWorkspace() {
+		first, second = fromPNPM, fromManifest
+	}
+	patterns, ok := first()
+	if !ok {
+		patterns, _ = second()
 	}
 
 	var dirs []string

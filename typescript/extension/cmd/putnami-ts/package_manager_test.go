@@ -481,3 +481,17 @@ func TestAFailedUpgradeRestoresTheManagersFiles(t *testing.T) {
 		}
 	}
 }
+
+// A Bun or npm workspace reads its members from the root package.json, a
+// stale pnpm-workspace.yaml notwithstanding.
+func TestWorkspaceMemberDirsOfAnotherManagerReadsThePackageJSON(t *testing.T) {
+	dir := t.TempDir()
+	writeProbeFile(t, filepath.Join(dir, "package.json"), `{"name":"repo","private":true,"packageManager":"bun@1.4.0","workspaces":["apps/*"]}`)
+	writeProbeFile(t, filepath.Join(dir, "pnpm-workspace.yaml"), "packages:\n  - stale/*\n")
+	writeProbeFile(t, filepath.Join(dir, "apps", "web", "package.json"), `{"name":"web"}`)
+	writeProbeFile(t, filepath.Join(dir, "stale", "old", "package.json"), `{"name":"old"}`)
+	got := workspaceMemberDirs(dir)
+	if len(got) != 1 || got[0] != filepath.Join(dir, "apps", "web") {
+		t.Fatalf("workspaceMemberDirs = %v, want apps/web from package.json", got)
+	}
+}
