@@ -1,6 +1,7 @@
 # ADR 0001 — The adoption mode is a workspace option the sync reads
 
-- **Status**: accepted
+- **Status**: accepted; amended by
+  [ADR 0002](0002-a-delegated-workspace-imports-the-projects-a-list-names.md)
 - **Date**: 2026-11-09
 - **Scope**: `integrations/nx` (`@putnami/nx`) and `tooling/cli`
   (`putnami init --from`); builds on

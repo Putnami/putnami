@@ -51,6 +51,19 @@
           }
         },
         {
+          "id": "delegate-imports-listed-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "delegate-mode-imports-the-projects-the-import-list-selects"
+            ]
+          }
+        },
+        {
           "id": "unmapped-targets-are-listed",
           "stage": "coded",
           "evidenceKinds": [
