@@ -25,6 +25,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/imageload"
 )
 
 const (
@@ -244,7 +245,7 @@ func assembleImage(ctx *pctx.Context, flags map[string]string, staging, product,
 		tags = append(tags, name+":"+tag)
 	}
 	if cli.FlagBool(flags, "docker-load", ctx.Params.Bool("docker-load", false, "dockerLoad")) {
-		if err := oci.LoadDocker(filepath.Join(output, "oci"), tags, emit); err != nil {
+		if err := imageload.Load(filepath.Join(output, "oci"), tags, emit); err != nil {
 			return fail(emit, CodeImageFailed, err)
 		}
 	}

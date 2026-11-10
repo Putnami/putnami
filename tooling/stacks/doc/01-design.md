@@ -438,9 +438,9 @@ last step
 an image: the image is the project's name as one lowercase path segment, the
 name the shared Docker publisher expects, so a project named `userService`
 packages `userservice`; `ImageMember` declares that image as a release-set
-member when the project's `putnami.json` publishes it. The SDK's
-`oci.LoadDocker` loads the image into the local Docker daemon under each of
-its tags.
+member when the project's `putnami.json` publishes it. Its `imageload`
+package loads the image into the local Docker daemon under each of its tags;
+only the stacks that package an image import it.
 `LockedToolsHome`, `ExecutableSuffix`, `CompareVersions`, `Accepted` and
 `Choose` serve a stack that installs its toolchain, and
 `ServeToolchainResolve` one that pins it in the workspace lock. The test kit

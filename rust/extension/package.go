@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/imageload"
 )
 
 // The channels of package, as params and the publish field of a project name
@@ -460,7 +461,7 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 		tags = append(tags, image+":"+tag)
 	}
 	if ctx.Params.Bool("docker-load", false) {
-		if err := oci.LoadDocker(filepath.Join(dir, "oci"), tags, emit); err != nil {
+		if err := imageload.Load(filepath.Join(dir, "oci"), tags, emit); err != nil {
 			return nil, err
 		}
 	}
