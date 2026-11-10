@@ -22,6 +22,6 @@
     "rust/stack-extension#reports-become-the-summary",
     "rust/stack-extension#run-forwards-the-exit-code",
     "rust/stack-extension#serve-sets-the-port",
-        "rust/stack-extension#tasks-run-the-profile"
+    "rust/stack-extension#tasks-run-the-profile"
   ]
 }
