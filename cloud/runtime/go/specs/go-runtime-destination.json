@@ -5,7 +5,8 @@
   "outcomes": [
     "A Go workload on Putnami Cloud receives remote configuration and secrets through the go.putnami.dev/config loader once its main package imports the activate package",
     "Each request carries the workload identity of the process, or no credential at all when the contract allows it",
-    "A required source stops startup on failure, while an optional source leaves local configuration in place"
+    "A required source stops startup on failure, while an optional source leaves local configuration in place",
+    "A Go workload on Putnami Cloud exports request metrics and traces to the platform collector once its main package imports the activate package"
   ],
   "nonGoals": [
     "Serving or storing configuration, which the platform's configuration service owns",
@@ -15,6 +16,10 @@
     {
       "id": "cancellation",
       "text": "Every remote source stops its requests, its retry waits and its snapshot fallback when the load context ends, and returns an error that wraps the context error. A caller that waits on a load already in flight honors its own context. A canceled snapshot read logs no outage."
+    },
+    {
+      "id": "default-telemetry",
+      "text": "Importing the activate package registers a default plugin, so every application starts with the telemetry plugin from the environment when OTEL_EXPORTER_OTLP_ENDPOINT is set. Its pushes carry a GCP ID token whose audience is the collector URL. Without the endpoint, or with OTEL_SDK_DISABLED=true, an application starts without it."
     },
     {
       "id": "prepared-boot",

@@ -4,7 +4,8 @@
 to the platform's configuration service. It adds remote config and secrets
 sources to the [`go.putnami.dev/config`](../../../go/framework/config/README.md)
 loader, and signs their requests with the workload identity that the GCP
-metadata server issues.
+metadata server issues. It also turns on request metrics and traces for every
+application when the platform names a collector.
 
 | Package | Import path |
 |---|---|
@@ -20,7 +21,8 @@ metadata server issues.
   Stable support requires a version gate on the public surface and shared
   fixtures that prove parity with the TypeScript runtime destination.
 - **Evidence**: the package tests, which cover discovery, the three sources,
-  retries, cancellation, the snapshot fallback and the token sources.
+  retries, cancellation, the snapshot fallback, the token sources and the default
+  telemetry.
 
 ## Activation
 
@@ -46,6 +48,15 @@ The import registers three source discoverers with
 `config.Load`. Without it, `config.Load` reads only local YAML, `CONFIG_DATA` and
 `env` tags. Importing the root package alone, for its types or constructors,
 registers nothing.
+
+The import also registers a default plugin with `app.RegisterDefaultPlugin`.
+When `OTEL_EXPORTER_OTLP_ENDPOINT` is set, every `app.New` starts with the
+plugin from
+[`telemetry.FromEnvironment`](../../../go/framework/telemetry/README.md#default-telemetry-from-the-environment):
+each HTTP request is counted, timed and traced, and each push to the collector
+carries a GCP ID token whose audience is the collector URL. Without the
+endpoint, or with `OTEL_SDK_DISABLED=true`, the application gets no telemetry
+plugin.
 
 ## Sources
 

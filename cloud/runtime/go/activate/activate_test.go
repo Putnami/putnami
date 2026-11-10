@@ -3,6 +3,7 @@ package activate_test
 import (
 	"testing"
 
+	"go.putnami.dev/app"
 	config "go.putnami.dev/config"
 
 	// Blank-import under test: its init() must register the config-server
@@ -39,6 +40,38 @@ func TestActivationInertWithoutConfigServerURL(t *testing.T) {
 func hasSourceNamed(sources []config.Source, name string) bool {
 	for _, s := range sources {
 		if s != nil && s.Name() == name {
+			return true
+		}
+	}
+	return false
+}
+
+// TestActivationStartsEveryApplicationWithTelemetry proves the blank-import
+// registers the default telemetry plugin: with a collector endpoint, a new
+// application starts with it; without one, or with the opt-out, it does not.
+func TestActivationStartsEveryApplicationWithTelemetry(t *testing.T) {
+	spectest.Proves(t, "cloud/go-runtime-destination", "default-telemetry", "activation-adds-the-telemetry-plugin-when-a-collector-is-set")
+	t.Setenv("OTEL_SDK_DISABLED", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://collector.example.test")
+	if !hasPluginNamed(app.New("svc"), "telemetry-environment") {
+		t.Fatalf("an application started with a collector endpoint has no telemetry plugin")
+	}
+
+	t.Setenv("OTEL_SDK_DISABLED", "true")
+	if hasPluginNamed(app.New("svc"), "telemetry-environment") {
+		t.Fatalf("OTEL_SDK_DISABLED=true must leave the application without the telemetry plugin")
+	}
+
+	t.Setenv("OTEL_SDK_DISABLED", "")
+	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+	if hasPluginNamed(app.New("svc"), "telemetry-environment") {
+		t.Fatalf("an application without a collector endpoint must not get the telemetry plugin")
+	}
+}
+
+func hasPluginNamed(a *app.Application, name string) bool {
+	for _, po := range a.CollectPlugins() {
+		if po.Plugin.Name() == name {
 			return true
 		}
 	}

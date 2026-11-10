@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "cloud/go-runtime-destination#cancellation",
+    "cloud/go-runtime-destination#default-telemetry",
     "cloud/go-runtime-destination#prepared-boot",
     "cloud/go-runtime-destination#requests-without-credentials",
     "cloud/go-runtime-destination#resolve-requests",

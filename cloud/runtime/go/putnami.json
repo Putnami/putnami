@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "go.putnami.dev/cloud/runtime",
   "visibility": "public",
-  "description": "Putnami Cloud runtime destination for Go: remote config and secrets sources and GCP workload identity for the go.putnami.dev/config loader.",
+  "description": "Putnami Cloud runtime destination for Go: remote config and secrets sources, GCP workload identity for the go.putnami.dev/config loader, and default telemetry to the platform collector.",
   "tags": [
     "go"
   ],
@@ -11,7 +11,9 @@
     "/tooling/sdd-extension"
   ],
   "dependencies": [
-    "/go/framework/config"
+    "/go/framework/app",
+    "/go/framework/config",
+    "/go/framework/telemetry"
   ],
   "publish": [
     "go"
