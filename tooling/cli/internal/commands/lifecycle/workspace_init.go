@@ -85,6 +85,14 @@ var initSources = map[string]initSource{
 		modes:            []string{initModeImport, initModeDelegate},
 		importExtensions: []string{"@putnami/typescript"},
 	},
+	// moon's import mode maps each project to its language's extension: the
+	// sync declares the ones the projects need, and init installs them after
+	// it.
+	"moon": {
+		starter: initExtensionConfig{packageName: "@putnami/moon"},
+		markers: []string{".moon/workspace.yml"},
+		modes:   []string{initModeImport, initModeDelegate},
+	},
 	"pants": {starter: initExtensionConfig{packageName: "@putnami/pants"}, markers: []string{"pants.toml"}, modes: []string{initModeDelegate}},
 }
 
@@ -536,8 +544,12 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	if flags.from != "" {
 		iox.Fprintln(os.Stdout)
 		iox.Fprintf(os.Stdout, "  → Synchronizing the %s packages…\n", flags.from)
+		before := initDeclaredNames(cwd, wsproto.Load(cwd))
 		if err := syncInitProjects(ctx, cwd, wsproto.Load(cwd), env); err != nil {
 			return protocolcli.WithNext(fmt.Errorf("synchronize the %s packages: %w", flags.from, err), "putnami projects sync")
+		}
+		if err := installSyncDeclaredExtensions(ctx, cwd, before, env); err != nil {
+			return err
 		}
 	}
 

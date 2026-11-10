@@ -1,0 +1,38 @@
+{
+  "id": "moon",
+  "delegated": true,
+  "markers": ["moon.yml", "package.json", "tsconfig.json", "deno.json", "go.mod", "Cargo.toml", "pyproject.toml", "requirements.txt", "composer.json", "Gemfile"],
+  "toolchain": {
+    "command": ["moon", "--version"],
+    "pattern": "(?m)^moon (?<version>[0-9]+\\.[0-9]+\\.[0-9]+\\S*)\\s*$",
+    "files": [
+      { "path": ".prototools", "key": "moon" }
+    ]
+  },
+  "inputs": {
+    "sources": ["**"]
+  },
+  "tasks": {
+    "lint": {
+      "steps": [
+        ["moon", "run", "{component}:lint"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    },
+    "test": {
+      "steps": [
+        ["moon", "run", "{component}:test"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    },
+    "build": {
+      "steps": [
+        ["moon", "run", "{component}:build"]
+      ],
+      "inputs": ["sources"],
+      "dir": "root"
+    }
+  }
+}

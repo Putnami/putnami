@@ -1,0 +1,108 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "monorepo",
+  "features": [
+    {
+      "id": "monorepo/moon-adoption",
+      "type": "feature",
+      "name": "Adopt a moon repository by import or by delegation",
+      "outcome": "A team with a moon repository reaches Putnami's runner and verdict in the mode it picks: its moon projects become Putnami projects with their edges, and each task runs either the Putnami extension of the project's language or moon itself, which then keeps its own cache",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "projects-and-tasks-are-read",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-moon-projects-and-their-inherited-tasks-are-read"
+            ]
+          }
+        },
+        {
+          "id": "sync-writes-each-project",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-writes-each-moon-project-putnami-json"
+            ]
+          }
+        },
+        {
+          "id": "import-maps-to-language-extensions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "import-mode-maps-a-project-to-its-language-extension"
+            ]
+          }
+        },
+        {
+          "id": "tasks-delegate-to-moon",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-runs-moon-on-its-project-and-records-the-delegation"
+            ]
+          }
+        },
+        {
+          "id": "reports-from-options",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-test-task-reads-the-reports-the-project-options-name"
+            ]
+          }
+        },
+        {
+          "id": "validate-fails-on-a-stale-graph",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-stale-moon-graph-fails-validate"
+            ]
+          }
+        },
+        {
+          "id": "manifest-follows-the-profile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-moon-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

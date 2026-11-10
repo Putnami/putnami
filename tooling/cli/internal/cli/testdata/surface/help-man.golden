@@ -398,7 +398,7 @@ Initialize a new workspace.
 .PP
 .B Usage:
 .br
-putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|nx|pants> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
+putnami init [--workspace <name>] [--extension <ts|go|py> | --from <bazel|moon|nx|pants> [--mode <import|delegate>] [--apply]] [--project <name>] [--project-path <path>] [--channel <channel>] [--force]
 .TP
 .B --workspace
 Workspace name override.

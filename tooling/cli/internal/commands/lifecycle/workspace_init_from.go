@@ -242,8 +242,12 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 	}
 	iox.Fprintln(os.Stdout)
 	iox.Fprintf(os.Stdout, "  → Synchronizing the %s projects…\n", flags.from)
+	before := initDeclaredNames(wsRoot, cfg)
 	if err := syncInitProjects(ctx, wsRoot, cfg, env); err != nil {
 		return protocolcli.WithNext(fmt.Errorf("synchronize the %s projects: %w", flags.from, err), "putnami projects sync")
+	}
+	if err := installSyncDeclaredExtensions(ctx, wsRoot, before, env); err != nil {
+		return err
 	}
 	iox.Fprintln(os.Stdout)
 	iox.Fprintf(os.Stdout, "  ✓ Adopted in %s mode\n", mode)
@@ -324,4 +328,37 @@ func stringsToAny(list []string) []any {
 		out[i] = s
 	}
 	return out
+}
+
+// installSyncDeclaredExtensions installs the extensions the workspace config
+// declares after a tool's sync and did not declare before it, such as the
+// language extensions moon's import mode maps projects to, then pins their
+// toolchains, runs their installers and synchronizes the projects again, so
+// their probes answer.
+func installSyncDeclaredExtensions(ctx context.Context, root string, before []string, env LifecycleEnv) error {
+	cfg := wsproto.Load(root)
+	var added []string
+	for _, name := range initDeclaredNames(root, cfg) {
+		if !slices.Contains(before, name) && !slices.Contains(added, name) {
+			added = append(added, name)
+		}
+	}
+	if len(added) == 0 {
+		return nil
+	}
+	iox.Fprintln(os.Stdout)
+	iox.Fprintf(os.Stdout, "  → Adding the extensions the sync declared: %s…\n", strings.Join(added, ", "))
+	for _, name := range added {
+		if err := installExtension(ctx, root, cfg, []string{shared.ChannelArtifact(name, env.channel)}, ""); err != nil {
+			return protocolcli.WithNext(fmt.Errorf("install extension %s: %w", name, err), "putnami install")
+		}
+		cfg = wsproto.Load(root)
+	}
+	if err := installInitWorkspace(ctx, root, cfg, env); err != nil {
+		return err
+	}
+	if err := syncInitProjects(ctx, root, wsproto.Load(root), env); err != nil {
+		return protocolcli.WithNext(fmt.Errorf("synchronize the projects: %w", err), "putnami projects sync")
+	}
+	return nil
 }

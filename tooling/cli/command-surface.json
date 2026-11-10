@@ -533,6 +533,7 @@
           "type": "value",
           "values": [
             "bazel",
+            "moon",
             "nx",
             "pants"
           ]
@@ -1044,6 +1045,7 @@
           "type": "value",
           "values": [
             "bazel",
+            "moon",
             "nx",
             "pants"
           ]

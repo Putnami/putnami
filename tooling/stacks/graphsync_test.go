@@ -209,3 +209,119 @@ func TestTheGraphJobsReportTheSyncAndAStaleGraph(t *testing.T) {
 		t.Errorf("a failed check = %v", err)
 	}
 }
+
+func TestTheGraphSyncWritesAnotherExtensionTheTagAndTheOwnedJobs(t *testing.T) {
+	root := t.TempDir()
+	g := testGraphSync()
+	g.Extensions = []string{"@acme/lang"}
+	g.Tag = "tool"
+	g.Marked = true
+	g.Jobs = []string{"build", "lint", "test"}
+	g.Retract = func(doc map[string]any) { delete(doc, "owned") }
+	writeTestFile(t, filepath.Join(root, "web", "BUILD"), "")
+	writeTestFile(t, filepath.Join(root, "api", "putnami.json"), `{"extensions": ["@acme/tool", "@acme/other"], "disable": {"jobs": ["serve", "lint"]}}`)
+	packages := []GraphPackage{
+		{Dir: "api", Extension: "@acme/lang", Disabled: []string{"build"}, Edit: func(doc map[string]any) { doc["owned"] = true }},
+		{Dir: "web", Disabled: []string{"lint", "test"}},
+	}
+	if _, err := g.Apply(root, packages, false); err != nil {
+		t.Fatal(err)
+	}
+	api := readTestProject(t, root, "api")
+	if got := api["extensions"]; !reflect.DeepEqual(got, []any{"@acme/other", "@acme/lang"}) {
+		t.Fatalf("api extensions %v", got)
+	}
+	if got := api["disable"]; !reflect.DeepEqual(got, map[string]any{"jobs": []any{"serve", "build"}}) {
+		t.Fatalf("api disable %v", got)
+	}
+	if api["owned"] != true || !reflect.DeepEqual(api["tags"], []any{"tool"}) || !reflect.DeepEqual(api["options"], map[string]any{testExtension: map[string]any{MarkMember: true}}) {
+		t.Fatalf("api %v", api)
+	}
+	web := readTestProject(t, root, "web")
+	if got := web["disable"]; !reflect.DeepEqual(got, map[string]any{"jobs": []any{"lint", "test"}}) {
+		t.Fatalf("web disable %v", got)
+	}
+
+	// api is no package any more: the mark names it the sync's, so the sync
+	// retracts what it wrote, and keeps the language extension it runs.
+	result, err := g.Apply(root, packages[1:], false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(result.Retracted, []string{"api/putnami.json"}) {
+		t.Fatalf("retracted %v", result.Retracted)
+	}
+	api = readTestProject(t, root, "api")
+	want := map[string]any{"extensions": []any{"@acme/other", "@acme/lang"}, "disable": map[string]any{"jobs": []any{"serve"}}, "$schema": ProjectSchema}
+	delete(api, "$schema")
+	delete(want, "$schema")
+	if !reflect.DeepEqual(api, want) {
+		t.Fatalf("retracted api %v", api)
+	}
+}
+
+func TestADryGraphSyncAnswersEachChangeWithItsContent(t *testing.T) {
+	root := t.TempDir()
+	g := testGraphSync()
+	for _, dir := range []string{"api", "pricing"} {
+		writeTestFile(t, filepath.Join(root, dir, "BUILD"), "")
+	}
+	writeTestFile(t, filepath.Join(root, "old", "putnami.json"), `{"extensions": ["@acme/tool"]}`)
+	existing := "{\n  \"name\": \"api\"\n}\n"
+	writeTestFile(t, filepath.Join(root, "api", "putnami.json"), existing)
+	result, err := g.Apply(root, []GraphPackage{{Dir: "api", DependsOn: []string{"pricing"}, Tested: true}, {Dir: "pricing", Tested: true}}, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var files []string
+	for _, c := range result.Changes {
+		files = append(files, c.File)
+	}
+	if !reflect.DeepEqual(files, []string{"api/putnami.json", "pricing/putnami.json", "old/putnami.json"}) {
+		t.Fatalf("changes %v", files)
+	}
+	api := result.Changes[0]
+	if string(api.Before) != existing || !strings.Contains(string(api.After), `"/pricing"`) || result.Changes[1].Before != nil {
+		t.Errorf("api change %q → %q", api.Before, api.After)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "api", "putnami.json")); string(data) != existing {
+		t.Errorf("a dry run wrote %s", data)
+	}
+	if _, err := os.Stat(filepath.Join(root, "pricing", "putnami.json")); !os.IsNotExist(err) {
+		t.Errorf("a dry run created a file: %v", err)
+	}
+	// The preview prints each change with its diff.
+	var events strings.Builder
+	emit := jsonl.New()
+	emit.Observe(func(message string) { events.WriteString(message + "\n") })
+	EmitPreview(emit, "tool", result)
+	if !strings.Contains(events.String(), "--- /dev/null") || !strings.Contains(events.String(), "+    \"/pricing\"") {
+		t.Errorf("preview:\n%s", events.String())
+	}
+}
+
+func TestDiffAlignsTheLinesOfAFile(t *testing.T) {
+	got := Diff("f", []byte("a\nb\nc\n"), []byte("a\nx\nc\nd\n"))
+	if want := "--- a/f\n+++ b/f\n a\n-b\n+x\n c\n+d\n"; got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
+	}
+	if got := Diff("f", nil, []byte("a\n")); got != "--- /dev/null\n+++ b/f\n+a\n" {
+		t.Errorf("a new file:\n%s", got)
+	}
+}
+
+func TestATagAloneMarksNoPackage(t *testing.T) {
+	root := t.TempDir()
+	g := testGraphSync()
+	g.Tag, g.Marked = "tool", true
+	writeTestFile(t, filepath.Join(root, "api", "BUILD"), "")
+	own := `{"name": "scripts", "tags": ["tool"], "extensions": ["@acme/lang"], "dependencies": ["/api"]}`
+	writeTestFile(t, filepath.Join(root, "scripts", "putnami.json"), own)
+	result, err := g.Apply(root, []GraphPackage{{Dir: "api", Tested: true}}, false)
+	if err != nil || len(result.Retracted) != 0 {
+		t.Fatalf("retracted %v (%v)", result.Retracted, err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "scripts", "putnami.json")); string(data) != own {
+		t.Errorf("a project the team tagged was rewritten: %s", data)
+	}
+}

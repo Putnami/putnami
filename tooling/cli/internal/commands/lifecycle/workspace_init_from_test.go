@@ -14,6 +14,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/jsonutil"
 )
 
 const initFromFeature = "cli/init-from-a-monorepo-tool"
@@ -97,9 +98,9 @@ func TestInitFromRefusesWhatItCannotAdopt(t *testing.T) {
 	}{
 		"no pants.toml":   {[]string{"--from", "pants"}, false, "holds no pants.toml"},
 		"no Bazel root":   {[]string{"--from", "bazel"}, true, "holds no MODULE.bazel, WORKSPACE, WORKSPACE.bazel"},
-		"no tool":         {[]string{"--from"}, true, "--from needs a tool (choose: bazel, nx, pants)"},
-		"an empty tool":   {[]string{"--from="}, true, "--from needs a tool (choose: bazel, nx, pants)"},
-		"an unknown tool": {[]string{"--from", "gradle"}, true, `unknown --from tool "gradle" (choose: bazel, nx, pants)`},
+		"no tool":         {[]string{"--from"}, true, "--from needs a tool (choose: bazel, moon, nx, pants)"},
+		"an empty tool":   {[]string{"--from="}, true, "--from needs a tool (choose: bazel, moon, nx, pants)"},
+		"an unknown tool": {[]string{"--from", "gradle"}, true, `unknown --from tool "gradle" (choose: bazel, moon, nx, pants)`},
 		"a project":       {[]string{"--from", "pants", "--project", "web"}, true, "does not combine with --project"},
 		"an extension":    {[]string{"--from", "pants", "--extension", "go"}, true, "does not combine with --project, --project-path or --extension"},
 	} {
@@ -387,5 +388,78 @@ func TestInitFromApplyKeepsTheObjectFormOfExtensions(t *testing.T) {
 	}
 	if want := map[string]string{"@putnami/nx": "^0.4.0", "@putnami/go": "", "@putnami/typescript": ""}; !maps.Equal(doc.Extensions, want) {
 		t.Errorf("extensions = %v, want %v", doc.Extensions, want)
+	}
+}
+
+// declareTypeScript stands for moon's import sync: it declares the language
+// extension it maps a project to, keeping the config's order.
+func declareTypeScript(t *testing.T, root string) {
+	t.Helper()
+	file := filepath.Join(root, wsproto.WorkspaceConfigFilename)
+	doc, err := jsonutil.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, _ := doc.Get("extensions")
+	extensions, _ := value.([]any)
+	if !slices.Contains(extensions, any("@putnami/typescript")) {
+		doc.Set("extensions", append(extensions, "@putnami/typescript"))
+	}
+	if err := jsonutil.WriteFile(file, doc); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInitFromMoonDeclaresTheMoonExtensionAndSyncsTheProjects(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-from-moon", "init-from-moon-declares-the-moon-extension-and-syncs-the-projects")
+	for mode, want := range map[string][]string{
+		// The import sync declares the language extension the projects
+		// need, and init installs it after the sync.
+		"import":   {"@putnami/moon", "@putnami/typescript"},
+		"delegate": {"@putnami/moon"},
+	} {
+		t.Run(mode, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			if err := os.MkdirAll(filepath.Join(dir, ".moon"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(filepath.Join(dir, ".moon/workspace.yml"), []byte("projects: ['apps/*']\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			calls := stubInitFrom(t, false, "")
+			syncs := 0
+			syncInitProjects = func(_ context.Context, root string, cfg *wsproto.Config, _ LifecycleEnv) error {
+				syncs++
+				calls.synced = cfg
+				if readInitConfig(t, root).Options["@putnami/moon"].Mode == "import" {
+					declareTypeScript(t, root)
+				}
+				return nil
+			}
+			out, err := captureStdout(t, func() error {
+				return WorkspaceInit(context.Background(), "", []string{"--from", "moon", "--mode", mode, "--workspace", "shop"}, LifecycleEnv{})
+			})
+			if err != nil {
+				t.Fatalf("WorkspaceInit: %v\n%s", err, out)
+			}
+			cfg := readInitConfig(t, dir)
+			if !slices.Equal(cfg.Extensions, want) || cfg.Options["@putnami/moon"].Mode != mode {
+				t.Errorf("workspace config = %+v, want %v and the mode %s", cfg, want, mode)
+			}
+			if !slices.Equal(calls.installed, want) {
+				t.Errorf("installed = %v, want %v", calls.installed, want)
+			}
+			// A second sync lets the new extension's probe answer.
+			if wantSyncs := len(want); syncs != wantSyncs {
+				t.Errorf("projects sync ran %d times, want %d\n%s", syncs, wantSyncs, out)
+			}
+		})
+	}
+
+	// Without .moon/workspace.yml, init refuses.
+	t.Chdir(t.TempDir())
+	if err := WorkspaceInit(context.Background(), "", []string{"--from", "moon"}, LifecycleEnv{}); err == nil || !strings.Contains(err.Error(), "holds no .moon/workspace.yml") || !errors.Is(err, protocolcli.ErrUsage) {
+		t.Errorf("err = %v, want a usage error naming .moon/workspace.yml", err)
 	}
 }

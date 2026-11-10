@@ -4508,6 +4508,45 @@
               "a-change-to-one-nx-project-runs-it-and-its-dependents-through-nx-uncached"
             ]
           }
+        },
+        {
+          "id": "init-from-moon",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-moon-declares-the-moon-extension-and-syncs-the-projects"
+            ]
+          }
+        },
+        {
+          "id": "moon-import-runs-the-language-extensions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "init-from-moon-in-import-mode-maps-the-projects-and-passes-lint-test-build"
+            ]
+          }
+        },
+        {
+          "id": "moon-delegate-runs-through-moon",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-change-to-one-moon-project-runs-it-and-its-dependents-through-moon-uncached"
+            ]
+          }
         }
       ]
     }

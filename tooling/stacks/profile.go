@@ -765,6 +765,8 @@ func (p Profile) merge(override json.RawMessage, kind string) (Profile, error) {
 	// filePatterns is the workspace's own member of an extension's option
 	// layer: it says which files select the project, and no profile has it.
 	delete(over, "filePatterns")
+	// The graph sync's mark is its own member of the layer too.
+	delete(over, MarkMember)
 	for _, fixed := range []string{"id", "markers", "variants", "delegated"} {
 		if _, ok := over[fixed]; ok {
 			return Profile{}, fmt.Errorf("%s: the %s cannot change the profile's %s", fixed, kind, fixed)

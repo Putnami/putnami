@@ -1,0 +1,52 @@
+The moon demo: a moon workspace where the TypeScript api depends on the Rust pricing library, which has no package.json, and the JavaScript web front end stands alone. apps/* is globbed and pricing is mapped by name. Every JavaScript and TypeScript project inherits lint from .moon/tasks/node.yml; api names build and test and has a dev task no Putnami command runs; pricing tags its unit task test. The change edits pricing. ci/moon-graph.json is what moon project-graph --json writes for the base.
+-- base/.moon/workspace.yml --
+projects:
+  globs: ['apps/*']
+  sources:
+    pricing: 'packages/pricing'
+-- base/.moon/tasks/node.yml --
+tasks:
+  lint:
+    command: 'eslint .'
+-- base/package.json --
+{"name": "demo-observe-moon", "private": true, "workspaces": ["apps/*"]}
+-- base/apps/api/moon.yml --
+language: 'typescript'
+dependsOn: ['pricing']
+tasks:
+  build:
+    command: 'tsc -b'
+  test:
+    command: 'vitest run'
+  dev:
+    command: 'vite'
+-- base/apps/api/package.json --
+{"name": "@demo/api"}
+-- base/apps/api/src/index.ts --
+export const api = 1;
+-- base/apps/web/package.json --
+{"name": "@demo/web"}
+-- base/apps/web/src/main.ts --
+export const web = 1;
+-- base/packages/pricing/moon.yml --
+language: 'rust'
+tasks:
+  build:
+    command: 'cargo build'
+  unit:
+    command: 'cargo test'
+    tags: ['test']
+-- base/packages/pricing/Cargo.toml --
+[package]
+name = "pricing"
+version = "0.1.0"
+-- base/packages/pricing/src/lib.rs --
+pub fn price() -> u32 { 1 }
+-- head/packages/pricing/src/lib.rs --
+pub fn price() -> u32 { 2 }
+-- ci/moon-graph.json --
+{"graph": {"nodes": [
+  {"id": "api", "source": "apps/api", "alias": "@demo/api"},
+  {"id": "pricing", "source": "packages/pricing"},
+  {"id": "web", "source": "apps/web", "alias": "@demo/web"}
+], "node_holes": [], "edge_property": "directed", "edges": [[0, 1, "production"]]}}

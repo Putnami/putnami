@@ -12,12 +12,12 @@ import (
 	"go.putnami.dev/tooling/observe/detect/dotnet"
 	"go.putnami.dev/tooling/observe/detect/gradle"
 	"go.putnami.dev/tooling/observe/detect/maven"
+	"go.putnami.dev/tooling/observe/detect/moon"
 	"go.putnami.dev/tooling/observe/detect/nx"
 	"go.putnami.dev/tooling/observe/detect/pants"
 	"go.putnami.dev/tooling/observe/detect/python"
 	"go.putnami.dev/tooling/observe/detect/ruby"
 	"go.putnami.dev/tooling/observe/detect/swift"
-	"go.putnami.dev/tooling/observe/internal/detectors/moon"
 	"go.putnami.dev/tooling/observe/internal/lockdiff"
 )
 
