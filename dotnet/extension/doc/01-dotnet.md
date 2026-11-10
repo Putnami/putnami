@@ -84,6 +84,17 @@ machine has no SDK `global.json` accepts, the command installs one as a task
 does; offline, it leaves the workspace out with a `stacks.toolchain_missing`
 warning.
 
+On a hosted run, the engine hands `workspace-fetch` a read credential on an
+inherited descriptor. The job reads that descriptor and closes it before it
+starts any process, the SDK check included, so no `dotnet` inherits it or
+finds the credential in its environment. The job then uses nothing the
+descriptor held: the credential's hosts are the Putnami registries, which
+serve no NuGet package, so no NuGet source can use it. `dotnet restore`
+reaches nuget.org, which needs no credential to download, and the sources a
+`NuGet.config` names with the credentials that file or a NuGet credential
+provider holds on the machine. A descriptor the job cannot read fails it with
+`dotnet.restore_failed` before any process starts.
+
 ## The SDK check
 
 Before its step, each task runs `dotnet --version` in the project's

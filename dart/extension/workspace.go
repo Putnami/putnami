@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/registrycred"
 	"go.putnami.dev/tooling/observe/detect/dart"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -70,18 +71,37 @@ func InstallJob(stack stacks.Stack) cli.JobFunc {
 	}
 }
 
+// readJobCredential reads the credential descriptor the engine hands
+// workspace-fetch, closes it and removes its variable from the environment.
+// Tests replace it.
+var readJobCredential = registrycred.ReadJobCredential
+
 // WorkspaceFetchJob runs pub get --enforce-lockfile at each stack root, which
 // downloads the locked packages into the pub cache and runs none of their
 // code. A hosted run calls it before any repository process, with the network:
 // a root with no pubspec.lock fails it, as it fails a task.
+//
+// A hosted run's engine may hand this job a credential descriptor. The hosts
+// of that credential are the Putnami registries, which serve no pub package,
+// so the job reads and closes the descriptor before it starts any process, the
+// SDK check included, and uses nothing it held. A descriptor it cannot read
+// fails the job with dart.pub_get_failed before any process starts.
 func WorkspaceFetchJob(stack stacks.Stack) cli.JobFunc {
-	return stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
+	fetch := stack.WorkspaceRootJob(stacks.WarnOnMissingToolchain, func(ctx context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
 		if err := runPub(ctx, root, emit, "pub", "get", "--enforce-lockfile"); err != nil {
 			emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodePubGetFailed)
 			return fmt.Errorf("%s: %w", CodePubGetFailed, err)
 		}
 		return nil
 	})
+	return func(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+		if _, err := readJobCredential(); err != nil {
+			err = fmt.Errorf("cannot read the registry credential the engine handed workspace-fetch: %w", err)
+			emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodePubGetFailed)
+			return "FAILED", nil, fmt.Errorf("%s: %w", CodePubGetFailed, err)
+		}
+		return fetch(ctx, emit, args)
+	}
 }
 
 // WorkspaceInstallJob runs pub get at each stack root of the workspace, which

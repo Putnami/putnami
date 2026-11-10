@@ -130,13 +130,16 @@ func TestThePackagesOfAPubWorkspaceBecomeProjects(t *testing.T) {
 
 // stubTools puts first on PATH a dart and a flutter that print their
 // version, log their arguments, and write the reports dart test, flutter
-// test, format_coverage and tojunit write. The real SDKs are the stack's own
-// build: the stubs stand at that boundary.
+// test, format_coverage and tojunit write. Every invocation, a --version
+// included, also records its arguments, its environment and whether it
+// inherited descriptor credentialFD (started). The real SDKs are the stack's
+// own build: the stubs stand at that boundary.
 func stubTools(t *testing.T, flutterVersion, dartVersion, junit string) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "tools.log")
 	writeFile(t, bin, "junit.xml", junit)
+	record := startedRecord(log)
 	common := `echo "$PWD: $tool $*" >> "` + log + `"
 if [ "$1 $2" = "pub get" ]; then
   case " $* " in
@@ -160,7 +163,7 @@ done
 `
 	writeFile(t, bin, "flutter", `#!/bin/sh
 tool=flutter
-if [ "$1" = --version ]; then printf 'Flutter `+flutterVersion+` • channel stable • https://github.com/flutter/flutter.git\nTools • Dart `+dartVersion+`\n'; exit 0; fi
+`+record+`if [ "$1" = --version ]; then printf 'Flutter `+flutterVersion+` • channel stable • https://github.com/flutter/flutter.git\nTools • Dart `+dartVersion+`\n'; exit 0; fi
 `+common+`
 if [ "$1" = test ]; then mkdir -p coverage; printf 'SF:lib/src/price.dart\nDA:3,1\nDA:6,1\nDA:9,0\nend_of_record\n' > coverage/lcov.info; fi
 echo "PORT=$PORT" >> "`+log+`.env"
@@ -168,13 +171,13 @@ exit ${STUB_EXIT:-0}
 `)
 	writeFile(t, bin, "dart", `#!/bin/sh
 tool=dart
-if [ "$1" = --version ]; then echo 'Dart SDK version: `+dartVersion+` (stable) (Wed Feb 5 2025) on "linux_x64"'; exit 0; fi
+`+record+`if [ "$1" = --version ]; then echo 'Dart SDK version: `+dartVersion+` (stable) (Wed Feb 5 2025) on "linux_x64"'; exit 0; fi
 `+common+`
 echo "PORT=$PORT" >> "`+log+`.env"
 exit ${STUB_EXIT:-0}
 `)
 	for _, tool := range []string{"tojunit", "format_coverage"} {
-		writeFile(t, bin, tool, "#!/bin/sh\ntool="+tool+"\n"+common)
+		writeFile(t, bin, tool, "#!/bin/sh\ntool="+tool+"\n"+record+common)
 	}
 	for _, f := range []string{"dart", "flutter", "tojunit", "format_coverage"} {
 		if err := os.Chmod(filepath.Join(bin, f), 0o755); err != nil {
