@@ -308,6 +308,78 @@ func TestRunWithAppendsTheArgumentsToTheLastStepOnly(t *testing.T) {
 	}
 }
 
+func TestRunFilteredReadsZeroTestsWhenTheFilterSelectsNone(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	// A runner whose filter selects no test writes no report, and exits
+	// non-zero when told to fail.
+	bin := t.TempDir()
+	writeFile(t, bin, "rustc", "#!/bin/sh\necho 'rustc 1.82.0 (stub)'\n")
+	writeFile(t, bin, "cargo", "#!/bin/sh\necho \"cargo $*\" >> \"$STUB_LOG\"\ncase \"$*\" in *fail*) exit 1;; esac\n")
+	for _, f := range []string{"rustc", "cargo"} {
+		if err := os.Chmod(filepath.Join(bin, f), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	s := testProfileWithLcov(t)
+	meta, _ := json.Marshal(Metadata{Component: "api", Root: "."})
+	run := func(filters bool, args ...string) (string, map[string]any, *recorder) {
+		t.Helper()
+		rec := &recorder{}
+		status, data, _ := s.run(context.Background(), runInput{
+			task: TaskTest, workspaceRoot: root, projectAbs: filepath.Join(root, "crates/api"), metadata: meta,
+			outputRoot: filepath.Join(root, ".putnami/out/api"), stdout: &bytes.Buffer{}, filters: filters,
+			stepArgs: func(RootStep, []string) []string { return args },
+		}, rec)
+		return status, data, rec
+	}
+
+	status, data, rec := run(true, "--filter", "nothing")
+	if status != statusOK || len(rec.diags) != 0 {
+		t.Errorf("a filter that selects no test passes: %s %v", status, rec.diags)
+	}
+	if got := data["testSummary"].(map[string]any); got["total"] != 0 || got["passed"] != 0 || got["failed"] != 0 || data["coverageSummary"] != nil {
+		t.Errorf("it reads zero tests and no coverage: %v", data)
+	}
+	if !slices.ContainsFunc(rec.infos, func(m string) bool { return strings.Contains(m, "selects no test of api") }) {
+		t.Errorf("the run says the filter selected no test: %v", rec.infos)
+	}
+	if status, _, rec := run(true); status != statusFailed || !strings.Contains(rec.codes(), "error:"+CodeReportMissing) {
+		t.Errorf("an unfiltered run that writes no report fails: %s %v", status, rec.diags)
+	}
+	if status, _, rec := run(false, "--filter", "nothing"); status != statusFailed || !strings.Contains(rec.codes(), "error:"+CodeReportMissing) {
+		t.Errorf("arguments that are no filter keep the missing report an error: %s %v", status, rec.diags)
+	}
+	if status, _, rec := run(true, "--filter", "fail"); status != statusFailed || rec.codes() != "error:"+CodeStepFailed {
+		t.Errorf("a filtered step that fails fails the task: %s %v", status, rec.diags)
+	}
+
+	// The job hands the filter the task's output directory, emptied before
+	// the steps.
+	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{FullPath: filepath.Join(root, "crates/api"), Metadata: map[string]json.RawMessage{s.Extension: meta}}}
+	out := filepath.Join(root, "out")
+	writeFile(t, out, "test/stale", "")
+	var output string
+	job := s.RunFiltered(TaskTest, func(_ *pctx.Context, root RootStep, _ []string) []string {
+		output = root.Output
+		entries, _ := os.ReadDir(root.Output)
+		if len(entries) != 0 {
+			t.Errorf("the output directory holds %v before the steps", entries)
+		}
+		return []string{"--filter", "nothing"}
+	})
+	if status, data, err := job(ctx, jsonl.New(), []string{"--report-dir", out}); status != statusOK || err != nil || data["testSummary"].(map[string]any)["total"] != 0 {
+		t.Errorf("RunFiltered: %s %v %v", status, err, data)
+	}
+	if output != filepath.Join(out, TaskTest) {
+		t.Errorf("the filter received the output %q", output)
+	}
+}
+
 func TestRunFailsOnAFailedTestAMismatchAndAMissingReport(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")

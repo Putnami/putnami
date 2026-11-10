@@ -110,6 +110,47 @@ runs `verify`, so the JaCoCo report a POM binds to `verify` is written. With
 its `test`; a repository that installs its modules into the local repository
 can drop the flag with an override.
 
+## Test filter and documentation links
+
+`putnami test --test <filter>`, short `-t`, runs the tests the filter names.
+The filter also reaches the components the selected ones depend on, where it
+may select no test: such a component passes, with zero tests and no coverage.
+The filter is part of the task's key, so a filtered result never answers an
+unfiltered run.
+
+| Build | The filter |
+|---|---|
+| Gradle | Each test task runs it as `--tests <filter>` would, such as `com.acme.QuotesTest` or `*QuotesTest.labels`: the tests both the task's own filter and this one select. A task in which it selects no test passes |
+| Maven | `-Dtest=<filter> -Dsurefire.failIfNoSpecifiedTests=false -DskipITs` on the `verify` step: Surefire runs the tests it names, such as `QuotesTest#labels`, a module in which it selects none passes, and Failsafe runs no integration test |
+
+`--tests` is an option of the task right before it, and the `gradle-jacoco`
+and `android-coverage` steps end with their report task. So the extension
+writes an init script, `putnami-test-filter.gradle`, into the task's output
+directory, and appends `--init-script <script> -Dputnami.testFilter=<filter>`:
+global options, which Gradle reads wherever they stand. The script gives every
+test task the filter and turns off `failOnNoMatchingTests`. It reads the
+property through the provider API, so a build with the configuration cache on
+reuses its entry for the same filter and configures again for another one.
+
+Failsafe gets no filter: `-Dit.test` replaces its own includes, so it would
+run again, in Failsafe, each unit test the filter names, and the summary,
+which reads both report directories, would count it twice. A filtered run
+skips Failsafe instead, so the filter narrows the run as on Gradle, whose test
+step runs no integration test task. A filter that names an integration test
+runs it in Surefire's test phase, without Failsafe's pre- and
+post-integration-test phases. The choices are in
+[ADR 0003](adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md).
+
+A step override keeps the filter when its last step runs `gradlew`, `gradle`,
+`mvn`, `mvnw` or `mvnd`; a last step that runs any other program gets none.
+
+`putnami lint` also checks every relative link and anchor of the component's
+`README.md` files and `doc/` trees, and a broken one fails it. A directory
+below the component that holds a build file (`build.gradle.kts`,
+`build.gradle`, `pom.xml`, `settings.gradle.kts` or `settings.gradle`) is a
+component or a build of its own, which answers for its own documents.
+`--docs-links=false` turns the check off. The check needs no JDK.
+
 ## Reports
 
 The test task reads the JUnit reports and the JaCoCo XML report into the test
@@ -126,7 +167,9 @@ and coverage summary.
 A component with no file under `src/test` (or `src/testDebug` for Android)
 expects no report, so a module without tests passes. Otherwise a failed case,
 a step that exits non-zero, or a JUnit report that is missing fails the task,
-and so does a missing JaCoCo report for `android-coverage`. The reports are removed before the steps, so a report an
+and so does a missing JaCoCo report for `android-coverage`, except in a run
+the test filter selects no test in, which reads zero tests and no coverage.
+The reports are removed before the steps, so a report an
 earlier run left is never read as this run's.
 
 ## The toolchain check
@@ -320,3 +363,10 @@ declare. The design of the stack core is in
 - A JDK found only through `JAVA_HOME`, with no `javac` on `PATH`, is not
   seen: the task installs one.
 - A library is published by its own build, not by `putnami publish`.
+- There is no `workspace-fetch`, the job that fills a dependency cache ahead
+  of a hosted run without running repository code: resolving a Gradle build's
+  dependencies evaluates its settings and build scripts, which run the code of
+  their plugins, through the wrapper jar the repository holds, and Maven's
+  `dependency:go-offline` loads the build's extensions and misses the
+  dependencies a plugin resolves only when it runs. Gradle and Maven download
+  what the build needs when its tasks run, over the network the runner allows.
