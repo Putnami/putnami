@@ -297,7 +297,8 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 		serving, done := context.WithCancel(context.Background())
 		defer done()
 		go stacks.AnnounceReady(serving, emit, port)
-		code, stopped, err := stacks.RunForeground(root, app.command[0], env, emit, app.command[1:]...)
+		argv := append(slices.Clone(app.command), strings.Fields(ctx.Params.String("args"))...)
+		code, stopped, err := stacks.RunForeground(root, argv[0], env, emit, argv[1:]...)
 		if err != nil {
 			emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeRunFailed)
 			return "FAILED", nil, fmt.Errorf("%s: %w", CodeRunFailed, err)

@@ -103,6 +103,7 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 		} else if _, err := os.Stat(filepath.Join(root.Project, filepath.FromSlash(serverEntrypoint))); err == nil {
 			serveArgs = append(serveArgs, serverEntrypoint)
 		}
+		serveArgs = append(serveArgs, strings.Fields(ctx.Params.String("args"))...)
 		emit.Info("serving " + root.Project + " on http://" + net.JoinHostPort("localhost", strconv.Itoa(port)))
 		env := append(slices.Clip(root.Env), "PORT="+strconv.Itoa(port))
 		serving, done := context.WithCancel(context.Background())

@@ -148,13 +148,13 @@ func TestServeRunsRailsServerOrRackupOnAnApplication(t *testing.T) {
 		t.Fatalf("serve: %s %v", status, err)
 	}
 	stackstest.WriteFile(t, root, "shop/bin/rails", "#!/usr/bin/env ruby\n")
-	status, _, err = runProjectJob(t, root, "shop", ServeJob(stack(t)), job.Params{"port": json.RawMessage(`8081`)})
+	status, _, err = runProjectJob(t, root, "shop", ServeJob(stack(t)), job.Params{"port": json.RawMessage(`8081`), "args": json.RawMessage(`"--verbose"`)})
 	if status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
 	shop := filepath.Join(root, "shop")
 	lines := readLines(t, log)
-	if len(lines) != 2 || lines[0] != shop+": bundle exec rackup -o 0.0.0.0 -p 3000" || lines[1] != shop+": bundle exec rails server -b 0.0.0.0 -p 8081" {
+	if len(lines) != 2 || lines[0] != shop+": bundle exec rackup -o 0.0.0.0 -p 3000" || lines[1] != shop+": bundle exec rails server -b 0.0.0.0 -p 8081 --verbose" {
 		t.Errorf("bundle ran with %q", lines)
 	}
 	if env := readLines(t, log+".env"); len(env) != 2 || !strings.Contains(env[0], "PORT=3000") || !strings.Contains(env[1], "PORT=8081") {

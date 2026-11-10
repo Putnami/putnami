@@ -48,10 +48,9 @@ const (
 )
 
 const (
-	dockerChannel    = "docker"
-	imageAppDir      = "/app"
-	defaultImagePort = "8080"
-	defaultPlatform  = "linux/amd64"
+	dockerChannel   = "docker"
+	imageAppDir     = "/app"
+	defaultPlatform = "linux/amd64"
 	// imageUser is the nonroot user of distroless, by number, so that any base
 	// runs the executable as a non-root user.
 	imageUser = "65532:65532"
@@ -267,7 +266,7 @@ func compileExecutable(run context.Context, root stacks.RootStep, dart, entrypoi
 // assembleImage assembles the compiled executable into the OCI layout of
 // output, records it, and loads it into Docker when asked.
 func assembleImage(ctx *pctx.Context, flags map[string]string, executable, base, platform, output, name, version string, record func() error, emit *jsonl.Emitter) error {
-	plan, err := oci.NewImagePlan(imageSpec(executable, base, platform, defaultImagePort), oci.PlanOptions{})
+	plan, err := oci.NewImagePlan(imageSpec(executable, base, platform, stacks.ImagePort(ctx, flags)), oci.PlanOptions{})
 	if err != nil {
 		return fail(emit, CodeImageFailed, fmt.Errorf("plan the image: %w", err))
 	}

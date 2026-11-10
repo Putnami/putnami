@@ -67,7 +67,11 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 		serving, done := context.WithCancel(context.Background())
 		defer done()
 		go stacks.AnnounceReady(serving, emit, port)
-		code, stopped, err := stacks.RunForeground(root, root.Program("dotnet"), env, emit, "run", "--no-build", "--project", manifest, "--no-launch-profile")
+		argv := []string{"run", "--no-build", "--project", manifest, "--no-launch-profile"}
+		if words := strings.Fields(ctx.Params.String("args")); len(words) > 0 {
+			argv = append(append(argv, "--"), words...)
+		}
+		code, stopped, err := stacks.RunForeground(root, root.Program("dotnet"), env, emit, argv...)
 		if err != nil {
 			return "FAILED", nil, runFailed(emit, err)
 		}

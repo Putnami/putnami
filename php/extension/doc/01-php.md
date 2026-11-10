@@ -156,7 +156,8 @@ through the shared publisher of the Go and TypeScript extensions.
 | Files | The stack root, without `vendor`, `var`, `tests`, generated files and the files that hold secrets: `auth.json`, `.env.local`, `.env.*.local`, `.env.local.php` and `*.decrypt.private.php`. Composer still reads `auth.json` while it installs. |
 | Apache | The port and a site whose document root is `public/`, which falls back to `public/index.php` |
 
-The image listens on `PORT`, 8080 by default, and runs as `www-data`. The
+The image listens on `PORT`, `--port`, 8080 by default, and runs as
+`www-data`. The
 application directory is read-only for that user, so the image sets
 `APP_CACHE_DIR` and `APP_LOG_DIR` under `/tmp/app`.
 

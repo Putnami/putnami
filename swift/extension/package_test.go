@@ -142,10 +142,10 @@ func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if config.Config.User != imageUser || !slices.Equal(config.Config.Entrypoint, []string{"/app/Server"}) || !slices.Contains(config.Config.Env, "PORT="+defaultImagePort) {
+	if config.Config.User != imageUser || !slices.Equal(config.Config.Entrypoint, []string{"/app/Server"}) || !slices.Contains(config.Config.Env, "PORT="+"8080") {
 		t.Errorf("config = %+v", config.Config)
 	}
-	if _, ok := config.Config.ExposedPorts[defaultImagePort+"/tcp"]; !ok {
+	if _, ok := config.Config.ExposedPorts["8080"+"/tcp"]; !ok {
 		t.Errorf("the image exposes %v", config.Config.ExposedPorts)
 	}
 }

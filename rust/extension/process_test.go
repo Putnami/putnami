@@ -71,6 +71,15 @@ func TestRunForwardsTheExitCodeOfTheProgram(t *testing.T) {
 			t.Errorf("the log misses %q:\n%s", want, logged)
 		}
 	}
+
+	// --entrypoint names one binary of the crate.
+	t.Setenv("STUB_RUN_EXIT", "0")
+	if status, _, _, _, err := runJobParams(t, root, "tools/gen", RunJobName, rawParams(t, map[string]any{"entrypoint": "gen-admin"})); err != nil || status != "OK" {
+		t.Fatalf("status = %s, err = %v", status, err)
+	}
+	if logged, _ := os.ReadFile(log); !strings.Contains(string(logged), "cargo run --package gen --locked --bin gen-admin --") { //nolint:gosec // the test's own log
+		t.Errorf("the log misses the binary:\n%s", logged)
+	}
 }
 
 func TestServeRunsTheCrateWithPortSet(t *testing.T) {

@@ -148,7 +148,7 @@ func TestServeRunsDotnetRunOnThePort(t *testing.T) {
 	spectest.Proves(t, feature, "serves-an-application", "serve-runs-dotnet-run-on-the-port")
 	root := appFixture(t)
 	log := stubApp(t, webProps)
-	for _, params := range []job.Params{nil, {"port": json.RawMessage(`8081`)}} {
+	for _, params := range []job.Params{nil, {"port": json.RawMessage(`8081`), "args": json.RawMessage(`"--verbose"`)}} {
 		if status, _, err := runAppJob(t, root, "src/Api", ServeJob(stack(t)), params); status != "OK" || err != nil {
 			t.Fatalf("serve: %s %v", status, err)
 		}
@@ -157,7 +157,7 @@ func TestServeRunsDotnetRunOnThePort(t *testing.T) {
 	lines := readLines(t, log)
 	want := api + ": dotnet run --no-build --project " + filepath.Join(api, "Api.csproj") + " --no-launch-profile PORT="
 	build := api + ": dotnet build " + filepath.Join(api, "Api.csproj")
-	if len(lines) != 4 || !strings.HasPrefix(lines[0], build) || !strings.HasPrefix(lines[1], want+"3000 URLS=http://0.0.0.0:3000") || !strings.HasPrefix(lines[3], want+"8081 URLS=http://0.0.0.0:8081") {
+	if len(lines) != 4 || !strings.HasPrefix(lines[0], build) || !strings.HasPrefix(lines[1], want+"3000 URLS=http://0.0.0.0:3000") || !strings.HasPrefix(lines[3], strings.Replace(want, "--no-launch-profile", "--no-launch-profile -- --verbose", 1)+"8081 URLS=http://0.0.0.0:8081") {
 		t.Errorf("dotnet ran with %q", lines)
 	}
 	t.Setenv("STUB_EXIT", "5")

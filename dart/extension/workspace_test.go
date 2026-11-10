@@ -208,10 +208,10 @@ func TestRunForwardsTheExitCodeAndServeReportsReady(t *testing.T) {
 	}
 
 	stackstest.WriteFile(t, root, "tools/gen/bin/server.dart", "void main() {}\n")
-	if status, _, err := runProjectJob(t, root, "tools/gen", ServeJob(stack(t)), job.Params{"port": json.RawMessage(`8081`)}); status != "OK" || err != nil {
+	if status, _, err := runProjectJob(t, root, "tools/gen", ServeJob(stack(t)), job.Params{"port": json.RawMessage(`8081`), "args": json.RawMessage(`"--verbose"`)}); status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
-	if got := ran(t, log); got != gen+": dart run bin/server.dart\n" {
+	if got := ran(t, log); got != gen+": dart run bin/server.dart --verbose\n" {
 		t.Errorf("serve ran %q", got)
 	}
 	if env, _ := os.ReadFile(log + ".env"); !strings.Contains(string(env), "PORT=8081") {

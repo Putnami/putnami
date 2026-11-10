@@ -176,7 +176,7 @@ other project is a library, which has no `serve`, `run`, `package` or
 
 | Command | Runs |
 |---|---|
-| `putnami serve` | `dotnet build <project file>` under the stack-root lock, then `dotnet run --no-build --project <project file> --no-launch-profile`, with `ASPNETCORE_URLS=http://0.0.0.0:<port>` and `PORT=<port>`; `--port` defaults to 3000, and 0 picks a free port. The application is ready once its port accepts connections. |
+| `putnami serve` | `dotnet build <project file>` under the stack-root lock, then `dotnet run --no-build --project <project file> --no-launch-profile`, with `-- <args>` from `--args`, with `ASPNETCORE_URLS=http://0.0.0.0:<port>` and `PORT=<port>`; `--port` defaults to 3000, and 0 picks a free port. The application is ready once its port accepts connections. |
 | `putnami run` | `dotnet build`, then `dotnet run --no-build --project <project file> --no-launch-profile -- <args>`, with the words of `--args`, and exits with the application's exit code. |
 
 `putnami qualify <project> --target local` serves an application and
@@ -204,8 +204,8 @@ The publish runs under the stack-root lock, since it restores and builds the
 referenced projects in place. The image leaves out the `putnami.json`,
 `global.json` and `schema/http-routes.json` the SDK copies into its output.
 It runs `dotnet /app/<AssemblyName>.dll` as the non-root `app` user in
-`/app`; an ASP.NET Core application listens on 8080 (`ASPNETCORE_HTTP_PORTS` and
-`PORT`). A project that targets several frameworks names one with
+`/app`; an ASP.NET Core application listens on `--port`, 8080 by default
+(`ASPNETCORE_HTTP_PORTS` and `PORT`). A project that targets several frameworks names one with
 `--framework`. `--docker-load` also loads the image into the local Docker
 daemon, and `--docker-tag` adds a tag. The image name is the project name in
 lowercase.

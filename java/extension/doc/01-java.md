@@ -346,8 +346,9 @@ task's JDK:
 `serve` sets `PORT` and `SERVER_PORT`, which Spring Boot reads, to its
 `--port` flag, 3000 by default, and reports the server ready once the port
 accepts connections, so `putnami qualify` requests the routes that
-`schema/http-routes.json` lists. It runs until the user stops it. `run` runs
-the application once with `--args` and answers its exit code.
+`schema/http-routes.json` lists. The words of `--args` reach the application.
+It runs until the user stops it. `run` runs the application once with
+`--args` and answers its exit code.
 
 ## Package and publish an image
 
@@ -355,7 +356,7 @@ the application once with `--args` and answers its exit code.
 assembler of the extension SDK, with no Docker daemon: its runnable form under
 `/app`, on the Eclipse Temurin JRE of the task's Java major
 (`eclipse-temurin:<release>-jre`, pinned by digest for 17, 21 and 25), run as
-user 1000 with `PORT` and `SERVER_PORT` set to 8080. The image name is the
+user 1000 with `PORT` and `SERVER_PORT` set to `--port`, 8080 by default. The image name is the
 project name in lowercase.
 
 ```bash

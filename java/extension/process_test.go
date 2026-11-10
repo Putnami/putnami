@@ -92,7 +92,7 @@ func TestServeRunsTheApplicationItsBuildProduces(t *testing.T) {
 	}{
 		{"g/app", "8081", []string{
 			filepath.Join(root, "g/app") + ": gradlew --console=plain :app:installDist",
-			filepath.Join(root, "g/app") + ": app  PORT=8081 SERVER_PORT=8081",
+			filepath.Join(root, "g/app") + ": app --verbose PORT=8081 SERVER_PORT=8081",
 		}},
 		{"g/boot", "3000", []string{
 			filepath.Join(root, "g/boot") + ": gradlew --console=plain :boot:bootJar",
@@ -105,7 +105,7 @@ func TestServeRunsTheApplicationItsBuildProduces(t *testing.T) {
 	} {
 		var params job.Params
 		if c.port != "3000" {
-			params = job.Params{"port": json.RawMessage(c.port)}
+			params = job.Params{"port": json.RawMessage(c.port), "args": json.RawMessage(`"--verbose"`)}
 		}
 		if status, _, err := runProjectJob(t, root, c.rel, ServeJob(s), params); status != "OK" || err != nil {
 			t.Fatalf("%s serve: %s %v\n%s", c.rel, status, err, ran(t, log))
@@ -170,7 +170,7 @@ func TestPackageAssemblesTheImageOfAnApplication(t *testing.T) {
 	if err != nil || base != jreBases["21"] {
 		t.Fatalf("the base follows the selected Java major: %s %v", base, err)
 	}
-	spec, err := imageSpec(app, base, defaultPlatform, defaultImagePort)
+	spec, err := imageSpec(app, base, defaultPlatform, "8080")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,7 +184,7 @@ func TestPackageAssemblesTheImageOfAnApplication(t *testing.T) {
 	if strings.Join(paths, ",") != "/app/bin/app,/app/lib/app.jar" || strings.Join(spec.Entrypoint, " ") != "/app/bin/app" || spec.User != imageUser || strings.Join(spec.Env, ",") != "PORT=8080,SERVER_PORT=8080" {
 		t.Errorf("installDist image = %+v %v", spec, paths)
 	}
-	boot, err := imageSpec(runnable{kind: bootJar, path: "/x/boot.jar", command: []string{"java", "-jar", "/x/boot.jar"}}, base, defaultPlatform, defaultImagePort)
+	boot, err := imageSpec(runnable{kind: bootJar, path: "/x/boot.jar", command: []string{"java", "-jar", "/x/boot.jar"}}, base, defaultPlatform, "8080")
 	if err != nil || strings.Join(boot.Entrypoint, " ") != "java -jar /app/app.jar" || boot.Layers[0].Files[0].Path != "/app/app.jar" {
 		t.Errorf("boot jar image = %+v %v", boot, err)
 	}

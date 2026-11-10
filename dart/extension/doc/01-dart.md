@@ -245,7 +245,7 @@ the host system. The design of the stack core is in
 | `putnami workspace-install` | `pub get --enforce-lockfile` at each stack root, with `flutter` when the root holds a Flutter package, `--offline` in an offline run. A root the selected SDK resolved last, with the same pubspecs, `pubspec.lock` and `package_config.json`, is current and skipped; `--force` resolves it anyway. A root with no `pubspec.lock` yet resolves one. A root whose SDK the machine lacks in an offline run is left out with a warning. |
 | `putnami deps-upgrade` | `pub upgrade` at each stack root. It needs the network. |
 | `putnami run` | `dart run` in a Dart command-line package, with `--entrypoint` and `--args`, and forwards its exit code. A Flutter app runs on a device with `flutter run`, outside Putnami. |
-| `putnami serve` | A Dart server: `dart run` on `bin/server.dart`, or `--entrypoint`, or the package's executable, with `PORT` set. A Flutter app with `web/`: `flutter run -d web-server --web-port <port> --web-hostname 0.0.0.0`. It reports ready once the port accepts connections; `--port 0` picks a free one. |
+| `putnami serve` | A Dart server: `dart run` on `bin/server.dart`, or `--entrypoint`, followed by the words of `--args`, or the package's executable, with `PORT` set. A Flutter app with `web/`: `flutter run -d web-server --web-port <port> --web-hostname 0.0.0.0`. It reports ready once the port accepts connections; `--port 0` picks a free one. |
 | `putnami lint --docs-links` | Checks every relative link and anchor of the package's `README.md` and `doc/`, on by default. |
 
 On a hosted run, the engine hands `workspace-fetch` a read credential on an
@@ -309,8 +309,8 @@ machine ([ADR 0002](adr/0002-an-application-image-holds-an-aot-executable-on-a-g
 The executable links the C library dynamically, so the base is
 `gcr.io/distroless/cc-debian12:nonroot` pinned by digest, which holds glibc,
 CA certificates and time zones and no shell. The image runs as the user
-`65532`, the `nonroot` user of distroless, in `/app`, with `PORT=8080` set and
-exposed: the server reads `PORT` to listen, as it does under `serve`. A
+`65532`, the `nonroot` user of distroless, in `/app`, with `PORT` set and
+exposed from `--port`, 8080 by default: the server reads `PORT` to listen, as it does under `serve`. A
 project names another base with `--docker-base-image image@sha256:<digest>`; a
 base with no digest fails with `dart.base_not_pinned`. The cache key of
 `package` covers the package's build inputs, the `lib/` and `pubspec.yaml` of

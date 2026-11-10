@@ -6,15 +6,29 @@ import (
 	"path"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/cli"
+	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
 // imageEcosystem is the release-set ecosystem of a container image, and the
 // registries entry that names where it publishes.
 const imageEcosystem = "oci"
+
+// DefaultImagePort is the port an application image listens on and sets as
+// PORT, unless the package command's port flag names another.
+const DefaultImagePort = 8080
+
+// ImagePort is the port the package command's port flag, among flags as
+// cli.ParseFlags reads them, or its port parameter, names: DefaultImagePort
+// when neither does.
+func ImagePort(ctx *pctx.Context, flags map[string]string) string {
+	return strconv.Itoa(cli.FlagInt(flags, "port", ctx.Params.Int("port", DefaultImagePort)))
+}
 
 // imageChannel is the channel, and the package and publish step, that ships an
 // image.

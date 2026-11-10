@@ -48,12 +48,12 @@ func TestAnExecutablePackageServesAndRuns(t *testing.T) {
 	if status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
-	status, _, _, err = runJobWith(t, root, "Packages/Server", "serve", ServeJob(st), job.Params{"port": json.RawMessage(`8081`)})
+	status, _, _, err = runJobWith(t, root, "Packages/Server", "serve", ServeJob(st), job.Params{"port": json.RawMessage(`8081`), "args": json.RawMessage(`"--verbose"`)})
 	if status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
 	ports, _ := os.ReadFile(filepath.Join(s.dir, "run.log"))
-	if string(ports) != "PORT=3000\nPORT=8081\n" || !strings.Contains(s.ran(t), server+": swift run --force-resolved-versions Server\n") {
+	if string(ports) != "PORT=3000\nPORT=8081\n" || !strings.Contains(s.ran(t), server+": swift run --force-resolved-versions Server\n") || !strings.Contains(s.ran(t), server+": swift run --force-resolved-versions Server -- --verbose\n") {
 		t.Errorf("serve ran %q, %s", ports, s.ran(t))
 	}
 

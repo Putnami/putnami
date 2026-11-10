@@ -36,12 +36,11 @@ const (
 )
 
 const (
-	dockerChannel    = "docker"
-	imageAppDir      = "/var/www/html"
-	imageUser        = "www-data"
-	defaultImagePort = "8080"
-	defaultPlatform  = "linux/amd64"
-	vendorDir        = "vendor"
+	dockerChannel   = "docker"
+	imageAppDir     = "/var/www/html"
+	imageUser       = "www-data"
+	defaultPlatform = "linux/amd64"
+	vendorDir       = "vendor"
 )
 
 // apacheBases are the official PHP Apache images, pinned by digest, by PHP
@@ -160,7 +159,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 	if platform == "" {
 		platform = defaultPlatform
 	}
-	spec, err := imageSpec(staged, workspace, base, platform, defaultImagePort)
+	spec, err := imageSpec(staged, workspace, base, platform, stacks.ImagePort(ctx, flags))
 	if err != nil {
 		return fail(CodeImageFailed, err)
 	}

@@ -39,11 +39,10 @@ const (
 )
 
 const (
-	dockerChannel    = "docker"
-	imageAppDir      = "/app"
-	imageUser        = "app"
-	defaultImagePort = "8080"
-	defaultPlatform  = "linux/amd64"
+	dockerChannel   = "docker"
+	imageAppDir     = "/app"
+	imageUser       = "app"
+	defaultPlatform = "linux/amd64"
 )
 
 // runtimeBases are the official .NET images, pinned by digest, by runtime
@@ -170,7 +169,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 	if base, err = baseImage(props.Web, framework, named); err != nil {
 		return fail(CodeBaseNotPinned, err)
 	}
-	spec, err := imageSpec(published, props, base, platform)
+	spec, err := imageSpec(published, props, base, platform, stacks.ImagePort(ctx, flags))
 	if err != nil {
 		return fail(CodeImageFailed, err)
 	}
@@ -331,7 +330,7 @@ func baseImage(web bool, framework, named string) (string, error) {
 
 // imageSpec describes the application's image: the published files of its
 // dependencies, then its own, under /app.
-func imageSpec(published string, p projectProperties, base, platform string) (oci.Spec, error) {
+func imageSpec(published string, p projectProperties, base, platform, port string) (oci.Spec, error) {
 	own := func(rel string) bool {
 		name := filepath.Base(rel)
 		return strings.HasPrefix(name, p.AssemblyName+".") || strings.HasPrefix(name, "appsettings") ||
@@ -366,8 +365,8 @@ func imageSpec(published string, p projectProperties, base, platform string) (oc
 		User:       imageUser,
 	}
 	if p.Web {
-		spec.Env = []string{"ASPNETCORE_HTTP_PORTS=" + defaultImagePort, "PORT=" + defaultImagePort}
-		spec.ExposedPorts = []string{defaultImagePort + "/tcp"}
+		spec.Env = []string{"ASPNETCORE_HTTP_PORTS=" + port, "PORT=" + port}
+		spec.ExposedPorts = []string{port + "/tcp"}
 	}
 	return spec, nil
 }

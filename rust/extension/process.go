@@ -30,10 +30,14 @@ const (
 	exitCodeKey = "exit-code"
 )
 
-// cargoRun is the cargo run of a crate's binary, with the program's own
-// arguments after "--".
-func cargoRun(component string, args []string) []string {
-	return append([]string{"run", "--package", component, "--locked", "--"}, args...)
+// cargoRun is the cargo run of a crate's binary, the one bin names when it is
+// not empty, with the program's own arguments after "--".
+func cargoRun(component, bin string, args []string) []string {
+	argv := []string{"run", "--package", component, "--locked"}
+	if bin != "" {
+		argv = append(argv, "--bin", bin)
+	}
+	return append(append(argv, "--"), args...)
 }
 
 // RunJob builds a binary crate for the host with cargo run, runs it once with
@@ -53,7 +57,7 @@ func RunJob(stack stacks.Stack) cli.JobFunc {
 		if port := ctx.Params.Int("port", 0); port > 0 {
 			env = append(slices.Clip(env), "PORT="+strconv.Itoa(port))
 		}
-		code, _, err := stacks.RunForeground(root, root.Program("cargo"), env, nil, cargoRun(root.Component, strings.Fields(ctx.Params.String("args")))...)
+		code, _, err := stacks.RunForeground(root, root.Program("cargo"), env, nil, cargoRun(root.Component, ctx.Params.String("entrypoint"), strings.Fields(ctx.Params.String("args")))...)
 		if err != nil {
 			return failRun(emit, err)
 		}
@@ -92,7 +96,7 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 		serving, done := context.WithCancel(context.Background())
 		defer done()
 		go stacks.AnnounceReady(serving, emit, port)
-		code, stopped, err := stacks.RunForeground(root, root.Program("cargo"), env, emit, cargoRun(root.Component, strings.Fields(ctx.Params.String("args")))...)
+		code, stopped, err := stacks.RunForeground(root, root.Program("cargo"), env, emit, cargoRun(root.Component, ctx.Params.String("entrypoint"), strings.Fields(ctx.Params.String("args")))...)
 		if err != nil {
 			return failRun(emit, err)
 		}

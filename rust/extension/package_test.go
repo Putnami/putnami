@@ -32,6 +32,7 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
@@ -201,7 +202,8 @@ func TestPackageRefusesWhatItCannotCompile(t *testing.T) {
 		"unknown platform": {map[string]any{"archives": true, "platforms": "plan9/amd64"}, "", "does not know the platform"},
 		"not linux":        {map[string]any{"docker": true, "platform": "darwin/arm64"}, "", "an image runs on Linux"},
 		"unknown image":    {map[string]any{"docker": true, "platform": "plan9/amd64"}, "", "does not know the platform"},
-		"two binaries":     {map[string]any{"docker": true}, two, "state package.default-run"},
+		"two binaries":     {map[string]any{"docker": true}, two, "name one with --entrypoint or state package.default-run"},
+		"unknown binary":   {map[string]any{"docker": true, "entrypoint": "gone"}, two, "has no binary gone"},
 		"no binary":        {map[string]any{"docker": true}, `{"packages":[{"name":"gen","targets":[{"name":"gen","kind":["lib"]}]}]}`, "no binary target"},
 		"no package":       {map[string]any{"docker": true}, `{"packages":[]}`, "names no package"},
 		"not json":         {map[string]any{"docker": true}, "nope", "cargo metadata"},
@@ -223,6 +225,13 @@ func TestPackageChoosesTheDefaultRunOfSeveralBinaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	if logged, _ := os.ReadFile(log); !strings.Contains(string(logged), "--bin b ") { //nolint:gosec // the test's own log
+		t.Errorf("zigbuild ran %s", logged)
+	}
+	// --entrypoint names another binary than the default-run one.
+	if _, err := runCompile(t, root, packageContext(t, root, rawParams(t, map[string]any{"docker": true, "entrypoint": "a"}))); err != nil {
+		t.Fatal(err)
+	}
+	if logged, _ := os.ReadFile(log); !strings.Contains(string(logged), "--bin a ") { //nolint:gosec // the test's own log
 		t.Errorf("zigbuild ran %s", logged)
 	}
 }
@@ -573,5 +582,20 @@ func TestPackageDockerFailsWithAnUnknownPlatformOrNoBinary(t *testing.T) {
 	ctx.Version = nil
 	if _, _, err := packageDocker(ctx, jsonl.New(), nil); err == nil {
 		t.Error("no version was accepted")
+	}
+}
+
+func TestADryRunPackageWritesNoImageAndNoArchive(t *testing.T) {
+	root := fixture(t)
+	ctx := packageContext(t, root, rawParams(t, map[string]any{"docker": true, "archives": true, "dry-run": true}))
+	for name, job := range map[string]cli.JobFunc{"docker": packageDocker, "archives": packageArchives} {
+		if status, _, err := job(ctx, jsonl.New(), nil); status != "OK" || err != nil {
+			t.Errorf("%s: %s %v", name, status, err)
+		}
+	}
+	for _, channel := range []string{channelDocker, channelArchives} {
+		if entries, _ := os.ReadDir(pkgmeta.PackageOutputDir(root, "tools/gen", channel)); len(entries) != 0 {
+			t.Errorf("a dry run wrote %s: %v", channel, entries)
+		}
 	}
 }

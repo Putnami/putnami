@@ -1,10 +1,14 @@
 package stacks
 
 import (
+	"encoding/json"
 	"reflect"
 	"regexp"
 	"testing"
 
+	"go.putnami.dev/protocol/job"
+	"go.putnami.dev/sdk/extension/cli"
+	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/releaseset"
 )
 
@@ -84,5 +88,18 @@ func TestImageMemberIsNoneWithoutAnImageToPublish(t *testing.T) {
 	// No registry names a namespace: the coordinate is the image name alone.
 	if got := ImageMember(root, "bare", "Bare"); len(got) != 1 || got[0].Coordinate != "bare" {
 		t.Errorf("ImageMember without a registry = %+v", got)
+	}
+}
+
+func TestImagePortReadsTheFlagThenTheParameter(t *testing.T) {
+	ctx := &pctx.Context{Params: job.Params{"port": json.RawMessage(`9090`)}}
+	if got := ImagePort(&pctx.Context{}, nil); got != "8080" {
+		t.Errorf("default = %s", got)
+	}
+	if got := ImagePort(ctx, nil); got != "9090" {
+		t.Errorf("parameter = %s", got)
+	}
+	if got := ImagePort(ctx, cli.ParseFlags([]string{"--port", "7070"})); got != "7070" {
+		t.Errorf("flag = %s", got)
 	}
 }

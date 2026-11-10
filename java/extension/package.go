@@ -38,11 +38,10 @@ const (
 )
 
 const (
-	dockerChannel    = "docker"
-	imageAppDir      = "/app"
-	imageUser        = "1000:1000"
-	defaultImagePort = "8080"
-	defaultPlatform  = "linux/amd64"
+	dockerChannel   = "docker"
+	imageAppDir     = "/app"
+	imageUser       = "1000:1000"
+	defaultPlatform = "linux/amd64"
 )
 
 // jreBases are the Eclipse Temurin JRE images of the JDKs the extension pins,
@@ -108,7 +107,7 @@ func assembleImage(ctx *pctx.Context, stack stacks.Stack, flags map[string]strin
 	if platform == "" {
 		platform = defaultPlatform
 	}
-	spec, err := imageSpec(app, base, platform, defaultImagePort)
+	spec, err := imageSpec(app, base, platform, stacks.ImagePort(ctx, flags))
 	if err != nil {
 		return fail(CodeImageFailed, err)
 	}

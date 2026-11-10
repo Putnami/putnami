@@ -194,10 +194,10 @@ func assertImageLayout(t *testing.T, image v1.Image, executable, arch string) {
 		t.Errorf("platform = %s/%s, want linux/%s", config.OS, config.Architecture, arch)
 	}
 	c := config.Config
-	if c.User != imageUser || c.WorkingDir != imageAppDir || !slices.Equal(c.Entrypoint, []string{"/app/" + executable}) || !slices.Contains(c.Env, "PORT="+defaultImagePort) {
+	if c.User != imageUser || c.WorkingDir != imageAppDir || !slices.Equal(c.Entrypoint, []string{"/app/" + executable}) || !slices.Contains(c.Env, "PORT="+"8080") {
 		t.Errorf("config = %+v", c)
 	}
-	if _, ok := c.ExposedPorts[defaultImagePort+"/tcp"]; !ok {
+	if _, ok := c.ExposedPorts["8080"+"/tcp"]; !ok {
 		t.Errorf("the image exposes %v", c.ExposedPorts)
 	}
 }

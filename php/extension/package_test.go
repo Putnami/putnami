@@ -168,14 +168,14 @@ func TestAnImageSplitsDependenciesFilesAndConfigurationIntoLayers(t *testing.T) 
 	}
 	stackstest.WriteFile(t, staged, frontController, "<?php\n")
 	base := "php:8.4.23-apache@sha256:abc"
-	spec, err := imageSpec(staged, t.TempDir(), base, "linux/arm64", defaultImagePort)
+	spec, err := imageSpec(staged, t.TempDir(), base, "linux/arm64", "8080")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if spec.BaseRef != base || spec.Platform != "linux/arm64" || spec.User != imageUser || spec.WorkingDir != imageAppDir || len(spec.Layers) != 3 {
 		t.Fatalf("spec = %+v", spec)
 	}
-	if !slices.Contains(spec.Env, "PORT="+defaultImagePort) || !slices.Contains(spec.ExposedPorts, defaultImagePort+"/tcp") {
+	if !slices.Contains(spec.Env, "PORT="+"8080") || !slices.Contains(spec.ExposedPorts, "8080"+"/tcp") {
 		t.Errorf("spec = %+v", spec)
 	}
 	want := map[string]int64{imageAppDir + "/vendor/autoload.php": 0o644}

@@ -211,6 +211,10 @@
         "entrypoint": {
           "type": "string",
           "description": "Dart entry point to serve (defaults to bin/server.dart, else the package's executable)"
+        },
+        "args": {
+          "type": "string",
+          "description": "Arguments passed to the server program"
         }
       },
       "run": [
@@ -280,6 +284,11 @@
           "type": "boolean",
           "default": false,
           "description": "Plan the image without assembling it"
+        },
+        "port": {
+          "type": "number",
+          "default": 8080,
+          "description": "Port the image exposes and sets as PORT"
         }
       },
       "run": [
@@ -366,7 +375,7 @@
       },
       "outputs": {
         "data": {
-          "description": "The task result: the test and coverage totals of a test task."
+          "description": "The task result: the lint findings of the component."
         }
       },
       "cache": {
@@ -477,7 +486,7 @@
       },
       "outputs": {
         "data": {
-          "description": "The task result: the test and coverage totals of a test task."
+          "description": "The task result: the outcome of the component's build."
         }
       },
       "cache": {

@@ -45,14 +45,13 @@ const (
 )
 
 const (
-	dockerChannel    = "docker"
-	imageAppDir      = "/app"
-	imageBundlePath  = "/usr/local/bundle"
-	imageUser        = "65534:65534"
-	imageUID         = 65534
-	defaultImagePort = "8080"
-	defaultPlatform  = "linux/amd64"
-	bundleWithout    = "development:test"
+	dockerChannel   = "docker"
+	imageAppDir     = "/app"
+	imageBundlePath = "/usr/local/bundle"
+	imageUser       = "65534:65534"
+	imageUID        = 65534
+	defaultPlatform = "linux/amd64"
+	bundleWithout   = "development:test"
 )
 
 // slimBases are the official Ruby slim images on Debian trixie, pinned by the
@@ -203,7 +202,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 	if err := writeWritableDirs(writable); err != nil {
 		return fail(CodeImageFailed, err)
 	}
-	spec, err := imageSpec(staged, bundle, writable, base, platform, defaultImagePort)
+	spec, err := imageSpec(staged, bundle, writable, base, platform, stacks.ImagePort(ctx, flags))
 	if err != nil {
 		return fail(CodeImageFailed, err)
 	}

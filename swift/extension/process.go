@@ -58,7 +58,11 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 		serving, done := context.WithCancel(context.Background())
 		defer done()
 		go stacks.AnnounceReady(serving, emit, port)
-		code, stopped, err := stacks.RunForeground(root, root.Program("swift"), env, emit, "run", "--force-resolved-versions", product)
+		argv := []string{"run", "--force-resolved-versions", product}
+		if extra := strings.Fields(ctx.Params.String("args")); len(extra) > 0 {
+			argv = append(append(argv, "--"), extra...)
+		}
+		code, stopped, err := stacks.RunForeground(root, root.Program("swift"), env, emit, argv...)
 		if err != nil {
 			return "FAILED", nil, fail(emit, CodeRunFailed, err)
 		}
