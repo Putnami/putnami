@@ -12,7 +12,7 @@
     "Caching a Turborepo result in Putnami's cache, or putting Putnami's cache over Turborepo's",
     "Mapping a turbo.json task other than build, test and lint: it keeps running through Turborepo",
     "Installing or switching a Turborepo version: turbo must be on PATH",
-    "Rewriting turbo.json or a package.json in the sync, or changing the tool that checks a task: a tsc, vitest, jest or eslint task stays on Turborepo"
+    "Rewriting turbo.json or a package.json in the sync, or changing the tool that checks a task: a tsc or eslint task stays on Turborepo"
   ],
   "requirements": [
     {
@@ -21,7 +21,7 @@
     },
     {
       "id": "sync-writes-the-package-graph",
-      "text": "The sync reads options[\"@putnami/turbo\"].mode, import by default, and writes in each member's putnami.json @putnami/turbo, its edges as project IDs, and in disable.jobs each of build, test and lint it has no script or turbo.json task for. In import mode a TypeScript package also declares @putnami/typescript, which runs a task whose script already runs bun build, bun test or biome; the other extension's job of each task is disabled. It retracts a former member and rewrites only a changed file."
+      "text": "The sync reads options[\"@putnami/turbo\"].mode, import by default, and writes in each member's putnami.json @putnami/turbo, its edges as project IDs, and in disable.jobs each of build, test and lint it has no script or turbo.json task for. In import mode a TypeScript package also declares @putnami/typescript, which runs a task whose script already runs bun build, bun test, vitest, jest or biome; the other extension's job of each task is disabled. It retracts a former member and rewrites only a changed file."
     },
     {
       "id": "delegate-imports-listed-packages",

@@ -9,7 +9,7 @@
     "An npm tarball or Docker image loads under the same loader rules the workspace used, so a packaged project does not fail at import time in a consumer's runtime"
   ],
   "nonGoals": [
-    "Replacing Bun as the task runtime or Biome with a configurable toolchain choice, or exposing their configuration surface as Putnami configuration; the installer is the package manager the repository declares, never a Putnami option",
+    "Replacing Bun as the task runtime or Biome with a configurable toolchain choice, or exposing the configuration surface of Bun, Biome, Vitest or Jest as Putnami configuration: a project chooses its test runner, which keeps reading its own configuration files, and the installer is the package manager the repository declares, never a Putnami option",
     "Owning application framework behaviour — routing, rendering, persistence and DI belong to the @putnami/* packages this extension builds",
     "Publishing to a registry: package prepares the tarball or image and records channels, publish uploads them",
     "Promising compatibility across every pre-1.0 minor release, which RELEASE.md governs"
@@ -73,7 +73,7 @@
     },
     {
       "id": "no-node-on-the-host",
-      "text": "Lint, test, build and serve need Bun and no node program on the host. Lint starts the native Biome executable of the platform package installed for the host, @biomejs/cli-<os>-<arch> and its -musl variant on a musl host, on every operating system and in a hoisted or an isolated install. When no platform package is installed for the host, lint starts Biome's JavaScript launcher with the task's Bun, never with a node from PATH."
+      "text": "Lint, build and serve, and the test of a project whose test runner is Bun, need Bun and no node program on the host. Lint starts the native Biome executable of the platform package installed for the host, @biomejs/cli-<os>-<arch> and its -musl variant on a musl host, on every operating system and in a hoisted or an isolated install. When no platform package is installed for the host, lint starts Biome's JavaScript launcher with the task's Bun, never with a node from PATH."
     },
     {
       "id": "workspace-biome-default",
@@ -130,6 +130,14 @@
     {
       "id": "test-rerun-each",
       "text": "putnami test --rerun-each N, under its flag or its rerunEach option, passes --rerun-each=N to bun test, so each test file of the project runs N times; without it each file runs once."
+    },
+    {
+      "id": "test-runner-choice",
+      "text": "A project's test runner is options[\"@putnami/typescript\"].test.runner in its putnami.json (bun, vitest or jest), else the runner its package.json test script runs, else Bun. Vitest and Jest run from the node_modules/.bin of the project or of the workspace with the node on PATH; with no node the task fails and names node."
+    },
+    {
+      "id": "test-runner-reports",
+      "text": "Every test runner writes results.junit.xml and lcov.info into the task's output: Vitest through its junit reporter and lcov coverage reporter, Jest through its --json result converted to JUnit, so no reporter package is required, and its lcov coverage reporter. The test summary and --enforce-coverage read them as they read Bun's, and vitest.config.*, vite.config.* and jest.config.* are inputs of the task's cache key."
     },
     {
       "id": "structured-reports",
@@ -216,6 +224,7 @@
     "typescript/extension/doc/adr/0005-a-hook-certifies-its-route-evaluation-before-facts-are-committed.md",
     "typescript/extension/doc/adr/0006-a-node-build-reads-its-whole-graph-for-bun-apis.md",
     "typescript/extension/doc/adr/0007-the-repository-chooses-its-package-manager.md",
+    "typescript/extension/doc/adr/0008-a-project-keeps-its-test-runner.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",

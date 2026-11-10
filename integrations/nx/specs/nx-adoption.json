@@ -26,7 +26,11 @@
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets whose script already runs bun build, bun test or biome run as that extension's task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as jest, eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets whose script already runs what that extension runs (bun build; bun test, vitest or jest; biome) run as its task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is off."
+    },
+    {
+      "id": "import-maps-vitest-and-jest-tests",
+      "text": "In import mode, the test target of a TypeScript project whose script runs vitest or jest, or whose Nx executor is @nx/vite:test or @nx/jest:jest, runs as @putnami/typescript:test, and the sync writes that runner in options[\"@putnami/typescript\"].test.runner of its putnami.json. The sync owns that member: it removes it from a project whose test target no longer maps to Vitest or Jest, and from a former project."
     },
     {
       "id": "delegate-imports-listed-projects",
