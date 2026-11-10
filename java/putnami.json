@@ -4,6 +4,9 @@
   "includes": [
     "extension",
     "samples/gradle",
+    "samples/gradle-toolchains",
+    "samples/gradle-toolchains/legacy",
+    "samples/gradle-toolchains/report",
     "samples/gradle/application",
     "samples/gradle/library",
     "samples/maven",

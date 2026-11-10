@@ -159,6 +159,23 @@
         }
       ]
     },
+    "workspace-install": {
+      "description": "Prepare each Gradle and Maven build of the workspace: its JDKs, its Gradle or Maven, and its dependencies.",
+      "quiet": true,
+      "flags": {
+        "force": {
+          "type": "boolean",
+          "default": false,
+          "description": "Refresh the dependencies: Gradle's --refresh-dependencies, Maven's --update-snapshots"
+        }
+      },
+      "run": [
+        {
+          "id": "workspace-install",
+          "task": "workspace-install-exec"
+        }
+      ]
+    },
     "serve": {
       "description": "Serve a Java application: build its runnable form with its own build, then run it on the port.",
       "traits": {
@@ -306,6 +323,7 @@
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
+            ".mvn/wrapper/maven-wrapper.properties",
             "build-logic/**/build.gradle",
             "build-logic/**/build.gradle.kts",
             "build-logic/**/src/**",
@@ -326,6 +344,7 @@
             "gradle/*.gradle",
             "gradle/*.gradle.kts",
             "gradle/*.versions.toml",
+            "gradle/gradle-daemon-jvm.properties",
             "gradle/wrapper/gradle-wrapper.properties",
             "pom.xml",
             "settings.gradle",
@@ -389,6 +408,7 @@
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
+            ".mvn/wrapper/maven-wrapper.properties",
             "build-logic/**/build.gradle",
             "build-logic/**/build.gradle.kts",
             "build-logic/**/src/**",
@@ -406,6 +426,7 @@
             "gradle/*.gradle",
             "gradle/*.gradle.kts",
             "gradle/*.versions.toml",
+            "gradle/gradle-daemon-jvm.properties",
             "gradle/wrapper/gradle-wrapper.properties",
             "pom.xml",
             "settings-gradle.lockfile",
@@ -473,6 +494,7 @@
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
+            ".mvn/wrapper/maven-wrapper.properties",
             "build-logic/**/build.gradle",
             "build-logic/**/build.gradle.kts",
             "build-logic/**/src/**",
@@ -490,6 +512,7 @@
             "gradle/*.gradle",
             "gradle/*.gradle.kts",
             "gradle/*.versions.toml",
+            "gradle/gradle-daemon-jvm.properties",
             "gradle/wrapper/gradle-wrapper.properties",
             "pom.xml",
             "settings-gradle.lockfile",
@@ -564,6 +587,25 @@
         "enabled": true
       },
       "declares": {}
+    },
+    "workspace-install-exec": {
+      "description": "At each stack root of the workspace's Gradle and Maven builds, except the projects disable.tags excludes: install the Temurin JDK .java-version accepts and the pinned JDKs the build's Gradle toolchains ask for; install its Gradle, the wrapper's distribution through gradlew --version or the pinned Gradle of a build without a wrapper, or its Maven, the release its Maven wrapper states, else the mvn on PATH, else the pinned Maven; then fill the dependency cache: Gradle with an init script that resolves every resolvable configuration of every project, a configuration it cannot resolve whole being a warning, and Maven with dependency:go-offline, best effort, with a warning that names what it misses. The force flag refreshes the dependencies. With offline dependencies it installs nothing: a stack root whose JDK, Gradle or Maven is missing is left out with a warning, and the resolution runs offline.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-install"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 3600000,
+      "declares": {
+        "effects": [
+          "network",
+          "process",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
     },
     "serve-run": {
       "description": "Build the application's runnable form (installDist, or the Spring Boot jar) and run it with PORT and SERVER_PORT set, until the user stops it; ready once the port accepts connections.",
@@ -654,6 +696,7 @@
             ".mvn/extensions.xml",
             ".mvn/jvm.config",
             ".mvn/maven.config",
+            ".mvn/wrapper/maven-wrapper.properties",
             "build-logic/**/build.gradle",
             "build-logic/**/build.gradle.kts",
             "build-logic/**/src/**",
@@ -671,6 +714,7 @@
             "gradle/*.gradle",
             "gradle/*.gradle.kts",
             "gradle/*.versions.toml",
+            "gradle/gradle-daemon-jvm.properties",
             "gradle/wrapper/gradle-wrapper.properties",
             "pom.xml",
             "settings-gradle.lockfile",

@@ -15,7 +15,8 @@
     "pattern": "javac (?<version>[0-9][^\\s\"]*)",
     "files": [
       {
-        "path": ".java-version"
+        "path": ".java-version",
+        "pattern": "(?m)^\\s*(?<version>[0-9]+(?:\\.[0-9]+)*)"
       }
     ],
     "provisioned": "PUTNAMI_JAVA_EXECUTABLE",
@@ -53,6 +54,7 @@
       "{root}/gradle/*.gradle",
       "{root}/gradle/*.gradle.kts",
       "{root}/gradle/wrapper/gradle-wrapper.properties",
+      "{root}/gradle/gradle-daemon-jvm.properties",
       "{root}/buildSrc/build.gradle.kts",
       "{root}/buildSrc/build.gradle",
       "{root}/buildSrc/settings.gradle.kts",
@@ -78,7 +80,8 @@
       "{root}/*/*/*/*/pom.xml",
       "{root}/.mvn/maven.config",
       "{root}/.mvn/jvm.config",
-      "{root}/.mvn/extensions.xml"
+      "{root}/.mvn/extensions.xml",
+      "{root}/.mvn/wrapper/maven-wrapper.properties"
     ]
   },
   "variants": {

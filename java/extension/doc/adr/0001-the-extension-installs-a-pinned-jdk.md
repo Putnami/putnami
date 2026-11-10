@@ -1,6 +1,7 @@
 # ADR 0001 — The extension installs a pinned JDK
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0004](0004-a-blank-machine-builds-after-putnami-install.md)
 - **Date**: 2026-11-08
 - **Scope**: `@putnami/java`, its toolchain check and its Maven steps
 
@@ -23,7 +24,8 @@ under `legal/`.
 - Otherwise the task installs the Eclipse Temurin JDK `.java-version`
   accepts, through the stack core's `Provide` (ADR 0004 of the stack core):
   17.0.21, 21.0.13 or 25.0.5, 21 first, for Linux and macOS on x64 and
-  arm64 and Windows on x64. Each archive is pinned by the SHA-256 the
+  arm64 and Windows on x64; ADR 0004 adds 11.0.33, and 1.8.0_512 where
+  Adoptium publishes it. Each archive is pinned by the SHA-256 the
   Adoptium API publishes, installed under `toolchains/java` of the Putnami
   home and reused by every later task. It runs first on `PATH` and as
   `JAVA_HOME`, which Gradle and Maven read before `PATH` (ADR 0006 of the
@@ -31,7 +33,8 @@ under `legal/`.
 - `pinnedarchive` gains `SkipLinks`: a link entry is skipped and nothing is
   created for it. `bin/javac` and `bin/java` read no link.
 - A Maven component whose `PATH` holds no `mvn` gets Apache Maven 3.9.11, from
-  the Apache archive, pinned by SHA-256, the same way.
+  the Apache archive, pinned by SHA-256, the same way. ADR 0004 runs the
+  release a build's Maven wrapper states first.
 
 ## Rejected alternatives
 
@@ -51,5 +54,8 @@ under `legal/`.
 - An installed JDK has no license links under `legal/`; its license files
   remain under `java.base`.
 - Offline, a task installs nothing and fails when the machine has no JDK.
-- A build that uses Gradle toolchains (`jvmToolchain(17)`) still finds or
-  downloads its own JDK; the installed one only starts Gradle.
+- A build that uses Gradle toolchains (`jvmToolchain(17)`) finds that JDK
+  only among the ones Gradle detects on the machine, or downloads one through
+  a toolchain resolver plugin the build applies, such as foojay; the
+  installed JDK only starts Gradle. ADR 0004 installs the pinned JDKs the
+  toolchains ask for and passes their homes to Gradle.

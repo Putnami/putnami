@@ -426,7 +426,13 @@ toolchain.
 A step's program is the pinned toolchain or a program beside it, then a
 program beside the toolchain on the task's `PATH`, such as a Flutter SDK's
 `dart`, then the first of that name on the task's `PATH`, where the
-directories of `Tools` are. `Stack.Selected`,
+directories of `Tools` are. `Stack.Step` adapts each step of a task before it
+runs, with its placeholders expanded and the toolchain selected, offline too:
+it may name another program, such as the release of a build tool the build
+states, and add arguments; its error fails the task with
+`stacks.toolchain_missing`, and `RunWith` and `RunFiltered` read the adapted
+last step
+([ADR 0014](adr/0014-a-stack-adapts-each-step-of-a-task.md)). `Stack.Selected`,
 `RunForeground`, `AnnounceReady` and `FreePort` serve a stack's `run` and
 `serve` commands. `ImageName` and `ImageMember` serve a stack that packages an
 image: the image is the project's name as one lowercase path segment, the name

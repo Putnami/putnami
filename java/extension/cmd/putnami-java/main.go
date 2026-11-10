@@ -35,6 +35,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer, runJobs func(
 			jobs[java.RunJobName] = java.RunJob(stack)
 			jobs[java.PackageDockerJobName] = java.PackageDockerJob(stack)
 			jobs[java.PublishDockerJobName] = java.PublishDockerJob()
+			jobs[java.WorkspaceInstallJobName] = java.WorkspaceInstallJob(stack)
 			runJobs(jobs)
 		})
 	}

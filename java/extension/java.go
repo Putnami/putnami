@@ -6,6 +6,7 @@
 package java
 
 import (
+	"context"
 	_ "embed"
 	"encoding/xml"
 	"fmt"
@@ -49,7 +50,25 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Provide: Provide, Tools: Tools}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Provide: Provide, Step: Step, MatchVersion: MatchVersion}, nil
+}
+
+// Step adapts a step of a component's task to its build: a Gradle step runs
+// the build's wrapper, else the pinned Gradle that runs on its JDK, with the
+// homes of the JDKs its toolchains ask for, and a step that names mvn runs the
+// Maven release the build's wrapper states, else the mvn on PATH, else the
+// pinned Maven. Any other step runs as it is.
+func Step(ctx context.Context, _ string, _ stacks.Metadata, root stacks.RootStep, step []string, info func(string)) ([]string, error) {
+	if len(step) == 0 {
+		return step, nil
+	}
+	switch programName(step[0]) {
+	case "gradlew", "gradle":
+		return adaptGradle(ctx, root, step, info)
+	case "mvn":
+		return adaptMaven(ctx, root, step, info)
+	}
+	return step, nil
 }
 
 // Detect names the Gradle projects and the Maven modules among the candidate

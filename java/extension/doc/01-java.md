@@ -3,11 +3,13 @@
 `@putnami/java` turns each Gradle project, Android included, and each Maven
 module of a Java or Kotlin repository into a Putnami project, and runs its
 lint, test and build with the build the team already uses. It reads the
-repository the way `putnami observe` does. A machine with no JDK and no Maven
-runs it: the extension installs a pinned Eclipse Temurin JDK and Apache Maven
-when the machine has none. An application also serves, runs, and ships as an
-image. The samples in [`java/samples`](../../samples/README.md) show both
-builds.
+repository the way `putnami observe` does. A machine with no JDK, no Gradle
+and no Maven builds it right after `git clone`: `putnami install` installs the
+pinned Eclipse Temurin JDKs the build asks for, its Gradle or Maven, and its
+dependencies, and each task installs what it still lacks. An application also
+serves, runs, and ships as an image. The samples in
+[`java/samples`](../../samples/README.md) show a Gradle build with and
+without a wrapper and a Maven build.
 
 ## Adopt it
 
@@ -34,7 +36,9 @@ builds.
    it has a `src/` directory, and each module a `pom.xml` lists, with any
    packaging but `pom`, joins the workspace's `includes`. No `putnami.json` is
    needed.
-3. Run `putnami lint,test,build`.
+3. Run `putnami install` to prepare the machine
+   ([Prepare a machine](#prepare-a-machine)), then
+   `putnami lint,test,build`.
 
 | Component | Project name | `{component}`, the build's reference |
 |---|---|---|
@@ -91,8 +95,11 @@ part of the profile with that build's steps and reports.
 
 Each task runs in the component's directory, with no shell. Gradle runs
 through the wrapper at the build root, `{root}/gradlew`, with the component's
-task path; Maven runs `mvn` with `--also-make`, so the modules a component
-depends on are built in the same reactor.
+task path, or through a pinned Gradle when the build has no wrapper; Maven runs
+`mvn` with `--also-make`, so the modules a component depends on are built in
+the same reactor. The `mvn` is the release the build's Maven wrapper states,
+else the one on `PATH`, else a pinned Maven
+([A machine with no JDK, Gradle or Maven](#a-machine-with-no-jdk-gradle-or-maven)).
 
 | Variant | `lint` | `test` | `build` |
 |---|---|---|---|
@@ -188,34 +195,117 @@ earlier run left is never read as this run's.
 
 Before its steps, each task compares the version `javac -version` prints with
 the one `.java-version` states, in the component's directory, then at the
-stack root. It checks `javac`, so a JRE alone is no JDK.
+stack root. It checks `javac`, so a JRE alone is no JDK. `.java-version` is
+read up to its first character that is neither a digit nor a dot:
+`21.0.13+9` states `21.0.13`.
 
 | Case | Result |
 |---|---|
 | The versions match | The task runs; `21` matches every 21 release, such as 21.0.4, and keys the major line |
 | `javac` is missing, or differs | The task installs the JDK `.java-version` accepts, below, and runs it |
-| No pinned JDK matches, such as `.java-version` 11 | The task fails with `stacks.toolchain_mismatch` or `stacks.toolchain_missing`; set `toolchain.check` to `warn` to run the machine's anyway |
+| No pinned JDK matches, such as `.java-version` 23 | The task fails with `stacks.toolchain_mismatch` or `stacks.toolchain_missing`; set `toolchain.check` to `warn` to run the machine's anyway |
 | No `.java-version` | The warning `stacks.toolchain_unpinned`: the cache key carries no Java version |
 
-### A machine with no JDK or no Maven
+Java 8 is both 8 and 1.8: its `javac` prints `1.8.0_512`, which `8`, `1.8`,
+`1.8.0` and `8.0.512` accept. `.java-version` `1.8.0_512` states `1.8.0`, so
+its update number is not compared.
 
-The extension pins three Eclipse Temurin JDKs, 17.0.21, 21.0.13 and 25.0.5,
-for Linux and macOS on x64 and arm64 and Windows on x64, each by the SHA-256
-the Adoptium API publishes. When `javac` is missing or outside
-`.java-version`, the task installs the one `.java-version` accepts, 21 first,
-under `toolchains/java` of the Putnami home, and runs it first on `PATH` and
-as `JAVA_HOME`, which Gradle and Maven read. Every later task reuses it. The
-archive's links, license notices under `legal/`, are not installed.
+### A machine with no JDK, Gradle or Maven
 
-A Maven component with no `mvn` on `PATH` gets Apache Maven 3.9.11 the same
-way, under `toolchains/maven`. A Gradle build runs its wrapper, which
-downloads the Gradle version `gradle/wrapper/gradle-wrapper.properties` names;
-that file is an input of every Gradle task, so a wrapper upgrade reruns them.
-Offline, a task installs nothing.
+The extension pins five Eclipse Temurin JDKs, each by the SHA-256 the
+Adoptium API publishes:
 
-A build that uses Gradle toolchains (`jvmToolchain(21)`) compiles with the
-JDK it names, whatever runs Gradle. Java 8's `1.8.0_392` form matches only an
-exact `.java-version`.
+| JDK | Platforms |
+|---|---|
+| 1.8.0_512 (8u512) | Linux on x64 and arm64, Windows on x64: Adoptium publishes no current Java 8 for macOS |
+| 11.0.33, 17.0.21, 21.0.13, 25.0.5 | Linux and macOS on x64 and arm64, Windows on x64 |
+
+When `javac` is missing or outside `.java-version`, the task installs the one
+`.java-version` accepts, 21 first, under `toolchains/java` of the Putnami
+home, and runs it first on `PATH` and as `JAVA_HOME`, which Gradle and Maven
+read. Every later task reuses it. The archive's links, license notices under
+`legal/`, are not installed.
+
+A build that uses Gradle toolchains compiles and tests with the JDK each one
+asks for, whatever JDK runs Gradle. Gradle finds such a JDK among the ones it
+detects on the machine, or downloads one through a toolchain resolver plugin
+the build applies, such as foojay. So each Gradle step reads the Java versions
+the build asks for and passes the pinned JDK of each to Gradle as
+`-Porg.gradle.java.installations.paths=<homes>`, installing it first:
+
+- `JavaLanguageVersion.of(17)` and `jvmToolchain(17)`, in the build files of
+  the build's projects and root, in its script plugins under `gradle/`, and in
+  the build files and sources of `buildSrc` and of every project of
+  `build-logic`, convention plugins included;
+- the version written as a number, a string, a `JavaVersion` constant such as
+  `JavaVersion.VERSION_17`, or a version of the `libs` catalog,
+  `libs.versions.jdk.get()`, read from `gradle/libs.versions.toml`;
+- the daemon JVM criteria, `toolchainVersion` in
+  `gradle/gradle-daemon-jvm.properties`.
+
+The major of the JDK that runs Gradle needs no home: Gradle uses its own JVM.
+A major the extension pins no JDK of is left to Gradle, with a message. Gradle
+reads the property from 6.7 on; the extension's checks ran it on Gradle 7.6,
+8.0, 8.14 and 9.8. Every Gradle step of a build gets the JDKs of the whole
+build, since a task of one project compiles the projects it depends on.
+
+A Gradle build with a wrapper runs it, and the wrapper downloads the Gradle
+version `gradle/wrapper/gradle-wrapper.properties` names; that file is an input
+of every Gradle task, so a wrapper upgrade reruns them. A build without a
+wrapper, whose steps name `{root}/gradlew`, and a step that names `gradle` when
+no `gradle` is on `PATH`, run a pinned Gradle distribution, checked against the
+SHA-256 services.gradle.org publishes and installed under `toolchains/gradle`:
+
+| JDK that runs Gradle | Gradle |
+|---|---|
+| 17 to 25 | 9.8.2 |
+| 8 to 16 | 8.14.6 |
+
+A Maven step runs the release the build's
+`.mvn/wrapper/maven-wrapper.properties` names in its `distributionUrl`,
+whatever `mvn` the machine has, installed under `toolchains/maven`. The archive
+is checked against the `distributionSha256Sum` the file states, else against
+the SHA-512, then the SHA-256, its host publishes beside it, such as
+`apache-maven-3.9.16-bin.zip.sha512` on Maven Central; an archive whose host
+publishes neither is refused. The extension never runs the `mvnw` script. A
+build without the file runs the `mvn` on `PATH`, else Apache Maven 3.9.11,
+installed the same way.
+
+Offline, a task installs nothing: it runs what an earlier task or
+`putnami install` installed, leaves out a toolchain JDK that is not installed,
+and fails when the JDK, Gradle or Maven it runs is missing.
+[ADR 0004](adr/0004-a-blank-machine-builds-after-putnami-install.md) records
+these choices.
+
+## Prepare a machine
+
+`putnami install` runs the extension's `workspace-install` once per stack root
+of the workspace's Gradle and Maven builds, in path order, and leaves out the
+projects whose tags `disable.tags` names:
+
+1. The JDK `.java-version` accepts, as a task installs it, and the pinned JDKs
+   the build's Gradle toolchains ask for.
+2. The build tool: a Gradle build runs `gradlew --version`, so the wrapper
+   downloads its distribution, or installs the pinned Gradle; a Maven build
+   installs the Maven its wrapper states, or Maven 3.9.11 when the machine
+   has no `mvn`.
+3. The dependencies. A Gradle build runs its Gradle with an init script that
+   gives every project a task resolving each of its resolvable
+   configurations; a configuration it cannot resolve whole is a warning,
+   `java.dependencies_incomplete`, and a build that does not configure fails
+   the install with `java.install_failed`. A Maven build runs
+   `maven-dependency-plugin:3.11.0:go-offline`, best effort: it downloads the
+   dependencies and plugins the POMs declare, not the artifacts a plugin
+   resolves only when it runs, such as Surefire's test framework provider,
+   which the warning `java.dependencies_incomplete` names; a run that fails is
+   that warning too.
+
+`putnami install --force` passes `--refresh-dependencies` to Gradle and
+`--update-snapshots` to Maven. With offline dependencies the install verifies
+and installs nothing: a root whose JDK, Gradle wrapper distribution or Maven
+is missing is left out with a warning, and the resolution runs with
+`--offline`. The tasks install what the install did not, so a run that skips
+it still builds.
 
 ## What reaches the cache key
 
@@ -227,9 +317,9 @@ version, and the key of the same task of each component it depends on.
 |---|---|
 | `sources` | `src/main/**`; for Android also `src/debug/**`, `src/release/**`, `proguard-rules.pro`, `consumer-rules.pro` |
 | `tests` | `src/test/**`, `src/testFixtures/**`; for Android also `src/testDebug/**` |
-| `gradle` | the build file and `gradle.properties` of the project; at the root the settings and build files, `gradle.properties`, the catalogs and script plugins under `gradle/`, each project's own `*.versions.toml` and `gradle/*.versions.toml`, the wrapper properties, the build files and `src/**` of `buildSrc`, and the build files and `src/**` of every project of `build-logic` |
+| `gradle` | the build file and `gradle.properties` of the project; at the root the settings and build files, `gradle.properties`, the catalogs and script plugins under `gradle/`, each project's own `*.versions.toml` and `gradle/*.versions.toml`, the wrapper properties, `gradle/gradle-daemon-jvm.properties`, the build files and `src/**` of `buildSrc`, and the build files and `src/**` of every project of `build-logic` |
 | `gradleLocks` | `gradle.lockfile`; at the root `settings-gradle.lockfile` and `gradle.lockfile` |
-| `maven` | `pom.xml`; every `pom.xml` of the build up to four directories below its root, parents included, and `.mvn/maven.config`, `.mvn/jvm.config`, `.mvn/extensions.xml` at the root. The copy a jar build writes under `target/classes/META-INF/maven` lies deeper and reaches no key |
+| `maven` | `pom.xml`; every `pom.xml` of the build up to four directories below its root, parents included, and `.mvn/maven.config`, `.mvn/jvm.config`, `.mvn/extensions.xml` and `.mvn/wrapper/maven-wrapper.properties` at the root. The copy a jar build writes under `target/classes/META-INF/maven` lies deeper and reaches no key |
 | `lintConfig` | `lint.xml`, `detekt.yml`; at the root `.editorconfig` and `config/checkstyle/**`, `config/detekt/**`, `config/pmd/**`, `config/spotbugs/**` |
 
 `lint` reads `sources`, `tests`, the build set and `lintConfig`: Gradle's
@@ -314,7 +404,8 @@ An Android app with product flavors runs the unit tests of one flavor:
 }
 ```
 
-A Maven repository with the Maven wrapper runs it instead of `mvn`:
+A Maven repository whose wrapper script does more than name its release runs
+the script instead of `mvn`:
 
 ```json
 {
@@ -354,7 +445,11 @@ declare. The design of the stack core is in
 - A plugin applied from a convention plugin or from the root build file, such
   as `subprojects { apply(plugin = "jacoco") }`, picks no variant: the
   project overrides its test task.
-- Gradle builds without a wrapper: override the steps to run `gradle`.
+- A Gradle toolchain version the build computes another way, such as from
+  `gradle.properties` or a variable, is not read, and neither is a
+  toolchain's vendor: Gradle finds or provisions such a JDK itself, and a
+  toolchain that asks for a vendor other than Adoptium or Eclipse does not
+  match the pinned JDKs.
 - The build file of an intermediate Gradle project that configures its
   children, such as `libs/build.gradle.kts` for `:libs:core` with a
   `subprojects { }` block, is not in the children's keys: after a change to
@@ -363,7 +458,8 @@ declare. The design of the stack core is in
   or run the children's tasks with `--no-cache` after such a change.
 - A Maven module is named by its artifactId: two modules with the same
   artifactId in different groups need a `name` in their `putnami.json`.
-- The Maven wrapper `mvnw` is not used unless a project overrides its steps.
+- The Maven wrapper `mvnw` is not used unless a project overrides its steps:
+  the release its properties name runs instead.
 - An application built another way, such as a fat jar from the Shadow plugin or
   a Maven module with no Spring Boot, is a library to `serve`, `run` and
   `package`.
@@ -381,5 +477,15 @@ declare. The design of the stack core is in
   dependencies evaluates its settings and build scripts, which run the code of
   their plugins, through the wrapper jar the repository holds, and Maven's
   `dependency:go-offline` loads the build's extensions and misses the
-  dependencies a plugin resolves only when it runs. Gradle and Maven download
-  what the build needs when its tasks run, over the network the runner allows.
+  dependencies a plugin resolves only when it runs. `putnami install` runs
+  that code on the machine it prepares, and Gradle and Maven download what
+  the build needs when its tasks run, over the network the runner allows.
+- The Android SDK is not installed: installing it accepts its licenses on the
+  team's behalf, which needs a decision of the workspace's owner. An Android
+  build needs `ANDROID_HOME` or `sdk.dir` in `local.properties`.
+- Credentials for a private Maven or Gradle repository are the build's own:
+  `~/.m2/settings.xml`, `~/.gradle/gradle.properties` or the environment the
+  build reads. The extension passes none.
+- There is no `deps-upgrade`: a Gradle or Maven build moves its versions with
+  its own tools, such as a version catalog update plugin or the versions
+  plugin of Maven.

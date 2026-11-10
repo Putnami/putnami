@@ -7,7 +7,7 @@
       "id": "java/stack-extension",
       "type": "feature",
       "name": "Run the Gradle projects and Maven modules of a Java or Kotlin build as Putnami tasks",
-      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build over its components with Putnami's runner and cache, without rewriting its build or a JDK on the machine: each component is a project with its edges, each task runs the steps of its build, test reads the JUnit and JaCoCo reports and runs the tests a filter names, lint checks documentation links, an application serves, runs and ships an image, and a component overrides any profile value",
+      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build with Putnami's runner and cache, without rewriting its build, on a machine with no JDK, Gradle or Maven once putnami install prepared it: each component is a project, each task runs its build's steps, test reads JUnit and JaCoCo reports and filters tests, lint checks doc links, an application serves, runs and ships an image",
       "owner": "java",
       "target": "coded",
       "requirements": [
@@ -61,7 +61,75 @@
             "checks": [
               "a-task-installs-the-jdk-its-build-states",
               "a-pinned-jdk-runs-when-the-machine-has-none",
-              "a-maven-component-gets-maven-when-the-machine-has-none"
+              "a-maven-component-gets-maven-when-the-machine-has-none",
+              "java-8-matches-its-1-8-form"
+            ]
+          }
+        },
+        {
+          "id": "gradle-toolchains-are-provided",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-toolchain-versions-of-the-build-are-read",
+              "each-gradle-step-gets-the-jdks-the-toolchains-ask-for"
+            ]
+          }
+        },
+        {
+          "id": "gradle-without-a-wrapper",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-build-without-a-wrapper-runs-the-pinned-gradle"
+            ]
+          }
+        },
+        {
+          "id": "maven-follows-its-wrapper",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-maven-build-runs-the-release-its-wrapper-states"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-prepares-each-build",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-installs-the-jdks-the-build-tool-and-the-dependencies",
+              "workspace-install-is-best-effort-for-maven-and-fails-on-a-gradle-build-that-does-not-resolve"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-offline-installs-nothing",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-offline-workspace-install-verifies-and-installs-nothing"
             ]
           }
         },

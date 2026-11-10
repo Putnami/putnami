@@ -1,0 +1,117 @@
+# Java stack on a blank machine — the leg that builds the Java samples on a
+# machine with no JDK, no Gradle, no Maven and empty caches.
+#
+# The workspace gate runs @putnami/java against a stub gradlew and mvn. This
+# job runs in an Ubuntu container that holds none of the Java tools: after
+# `git clone`, `putnami install` installs the pinned Temurin JDKs, the Gradle
+# and the Maven the samples need, and fills their dependency caches. Then
+# lint, test and build run every Java sample with --no-cache, so no result
+# that a machine with the tools stored stands in for this run:
+#
+#   - java/samples/gradle, a Gradle build with its wrapper;
+#   - java/samples/maven, a Maven build whose wrapper properties name Maven
+#     3.9.16, which runs instead of the pinned 3.9.11;
+#   - java/samples/gradle-toolchains, a Gradle build with no wrapper, so the
+#     pinned Gradle runs it, whose toolchains ask for Java 17, in a buildSrc
+#     convention plugin, and Java 11, while Java 21 runs Gradle. Each test
+#     asserts the Java version it runs on.
+#
+# The samples carry the e2e tag, which the workspace's disable.tags names so
+# that the default gate skips them. The job takes that tag off the Java
+# samples alone, so that `putnami install` prepares them as it prepares any
+# project of a repository.
+#
+# Like the credential-free gate, the job reads no secret.
+name: Java stack on a blank machine
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - java/**
+      - tooling/stacks/**
+      - tooling/observe/detect/gradle/**
+      - tooling/observe/detect/maven/**
+      - tooling/extension-sdk/pinnedarchive/**
+      - .github/workflows/java-stack.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: java-stack-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  blank-machine:
+    name: '@putnami/java samples with no JDK, Gradle or Maven'
+    if: github.event_name != 'pull_request' || !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # Docker Hub's official Ubuntu image, served by its Amazon ECR Public
+    # mirror: it holds no JDK, Gradle or Maven.
+    container:
+      image: public.ecr.aws/docker/library/ubuntu:24.04
+    env:
+      PUTNAMI_CLOUD_TOKEN: ''
+      PUTNAMI_CACHE_URL: ''
+      PUTNAMI_CACHE_TOKEN: ''
+      PUTNAMI_TOKEN: ''
+      DO_NOT_TRACK: '1'
+    steps:
+      # A checkout without Git has no work tree, which the documentation link
+      # check reads.
+      - name: Install Git and the CA certificates
+        run: |
+          apt-get update
+          apt-get install --yes --no-install-recommends ca-certificates curl git
+
+      - uses: actions/checkout@v5
+
+      - name: Trust the checkout
+        run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+
+      # Gradle and Maven keep their caches under the JVM's user.home, the home
+      # the passwd entry names, which in a job container is not $HOME.
+      - name: Check that the machine has no JDK, Gradle, Maven or cache
+        run: |
+          for tool in java javac gradle mvn; do
+            if command -v "$tool"; then
+              echo "::error::$tool is on PATH"
+              exit 1
+            fi
+          done
+          test -z "${JAVA_HOME:-}"
+          home="$(getent passwd "$(id -un)" | cut -d: -f6)"
+          test ! -e "$home/.m2"
+          test ! -e "$home/.gradle"
+          echo "JVM_USER_HOME=$home" >> "$GITHUB_ENV"
+
+      - name: Take the e2e tag off the Java samples
+        run: |
+          find java/samples -name putnami.json -exec perl -pi -e 's/,\s*"e2e"//' {} +
+          if grep -rl --include=putnami.json '"e2e"' java/samples; then
+            exit 1
+          fi
+
+      - name: Install the workspace
+        run: ./putnamiw install
+
+      - name: Check what the install put on the machine
+        run: |
+          toolchains="$HOME/.putnami/toolchains"
+          for dir in java/java-21.0.13 java/java-17.0.21 java/java-11.0.33 gradle/gradle-9.8.2 maven/maven-3.9.16; do
+            test -d "$toolchains/$dir" || { echo "::error::the install did not install $dir"; exit 1; }
+          done
+          test -d "$JVM_USER_HOME/.gradle/wrapper/dists/gradle-8.14.3-bin"
+          test -d "$JVM_USER_HOME/.m2/repository/org/springframework/boot"
+
+      - name: Turn the remote cache off
+        run: |
+          echo '{"enabled": false}' > .putnami/cache.json
+
+      - name: Lint, test and build the samples
+        run: >-
+          ./putnamiw lint,test,build --no-cache --projects
+          /java/samples/gradle,/java/samples/gradle/library,/java/samples/gradle/application,/java/samples/maven,/java/samples/maven/library,/java/samples/maven/application,/java/samples/gradle-toolchains,/java/samples/gradle-toolchains/legacy,/java/samples/gradle-toolchains/report
