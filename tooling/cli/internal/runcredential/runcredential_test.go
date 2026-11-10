@@ -231,6 +231,13 @@ func TestSetForTestHoldsAndRestores(t *testing.T) {
 }
 
 func TestDropCredentialVariables(t *testing.T) {
+	// Clear the ambient credentials (a cloud container exports
+	// PUTNAMI_CLOUD_TOKEN), so only the variable under test is present.
+	// t.Setenv first, so cleanup restores the original values.
+	for _, name := range credentialVariables {
+		t.Setenv(name, "")
+		_ = os.Unsetenv(name)
+	}
 	for _, name := range credentialVariables {
 		const value = "credential-value-91c2"
 		t.Setenv(name, value)
