@@ -7,7 +7,7 @@
       "id": "dart/stack-extension",
       "type": "feature",
       "name": "Run the packages of a Dart or Flutter repository as Putnami tasks",
-      "outcome": "A team with a Dart or Flutter repository adds @putnami/dart and runs putnami lint, test and build over its packages with Putnami's runner and cache, without rewriting its build, on a machine with or without an SDK: each package is a project with its edges, each task checks the SDK against pubspec.yaml and installs the one it needs, the test task reads JUnit and LCOV, the workspace commands resolve, upgrade, run and serve, and a package overrides any profile value",
+      "outcome": "A team with a Dart or Flutter repository adds @putnami/dart and runs putnami lint, test and build over its packages with Putnami's runner and cache, without rewriting its build, on a machine with or without an SDK: each package is a project with its edges, each task checks the SDK against pubspec.yaml and installs the one it needs, the test task reads JUnit and LCOV, the workspace commands resolve, upgrade, run and serve, a package overrides any profile value, and package and publish ship a server's image",
       "owner": "dart",
       "target": "coded",
       "requirements": [
@@ -165,6 +165,58 @@
             "kind": "acceptance",
             "checks": [
               "run-forwards-the-exit-code-and-serve-reports-ready"
+            ]
+          }
+        },
+        {
+          "id": "packages-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-assembles-the-image-of-an-aot-executable"
+            ]
+          }
+        },
+        {
+          "id": "refuses-what-it-cannot-cross-compile",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-refuses-an-old-sdk-a-platform-and-an-unpinned-base"
+            ]
+          }
+        },
+        {
+          "id": "chooses-the-entrypoint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-compiles-the-entrypoint-serve-starts"
+            ]
+          }
+        },
+        {
+          "id": "publishes-an-application-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "publish-pushes-the-application-image"
             ]
           }
         }
