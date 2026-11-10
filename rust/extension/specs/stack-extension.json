@@ -99,6 +99,10 @@
       "text": "package --docker assembles a reproducible OCI layout for one Linux platform with no docker daemon: the binary --entrypoint names, else the crate's default-run or only binary, on a digest-pinned cc-debian12 base, PORT set from --port, 8080 by default, and the manifest the shared Docker publisher reads."
     },
     {
+      "id": "package-dry-run-builds-nothing",
+      "text": "package --dry-run checks the platform and the binary its flags name, compiles nothing, writes no archive and no image layout, and writes the channel record publish --dry-run reads; package --crates still stages the crate, which cargo publish --dry-run checks."
+    },
+    {
       "id": "publish-sends-the-staged-crate",
       "text": "package --crates copies the stack root without its build output and writes the release version into each manifest and each normal path dependency, leaving the checkout untouched. publish --crates runs cargo publish from that copy, dependencies first; a version the registry already holds is reused, and --dry-run uploads nothing."
     },

@@ -26,17 +26,24 @@ differ:
 - .NET had tests and no `--test` filter.
 - Four extensions with a `workspace-install` declared no install inputs, so a
   lockfile change never made their install stale.
+- Rust's `package` took no `--dry-run`, where the six others did.
 
 ## Decision
 
-- **Coverage.** A coverage report the project's own configuration produces is
-  optional: when the test task writes none, the core reports the warning
-  `stacks.coverage_unavailable` and the summary carries no coverage.
-  `--enforce-coverage` still fails such a task. A coverage report the
+- **Coverage.** A coverage report that only the project's own setup produces,
+  Coverlet's in .NET or SimpleCov's in Ruby, is optional and declares
+  `warnWhenMissing`: when the test task writes none, the core reports the
+  warning `stacks.coverage_unavailable` and the summary carries no coverage.
+  A report that is optional for another reason, such as a Gradle build's
+  JaCoCo report or a Bazel coverage file, stays silent. A coverage report the
   toolchain produces stays required; a toolchain that may lack coverage
   support declares `withoutCoverage`, as Rust and PHP do.
 - **Image port.** `package --docker` takes `--port`, 8080 by default, in every
   stack, and the image sets `PORT` from it.
+- **Dry run.** `package` and `publish` take `--dry-run` in every stack:
+  `package` checks its flags, writes the channel record and builds nothing,
+  as Java's did; Rust still stages a crate, which `cargo publish --dry-run`
+  checks.
 - **Run and serve.** `serve` takes `--port`, 3000 by default and 0 for a free
   port. `run` and `serve` take `--args`, the words passed to the program,
   except PHP's `serve`, whose built-in server takes no program arguments.
