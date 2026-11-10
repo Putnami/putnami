@@ -1,6 +1,8 @@
 # ADR 0001 — Scope transactions to pools and finalize them at one boundary
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0004](0004-serialize-a-request-transaction.md) (the queries of a request
+  take turns on its unit-of-work transaction)
 - **Scope**: `go.putnami.dev/database` (`go/framework/database`)
 
 ## Context

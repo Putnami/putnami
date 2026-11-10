@@ -41,7 +41,27 @@ import (
 // enrolls and joins the unit's transaction without finalizing it. Both directions
 // use join-outer semantics with no savepoints.
 //
-// A UnitOfWork is safe for concurrent use by the goroutines serving one request.
+// # Concurrent queries
+//
+// A UnitOfWork is safe for concurrent use by the goroutines serving one
+// request. Each transaction it begins holds one connection, and a connection
+// serves one query at a time, so the queries those goroutines send on one
+// datasource take turns: each holds the transaction from the moment it is sent
+// until the connection is free again — Exec for its call, Query until its rows
+// are closed or Next reports no further row, QueryRow for its Scan, SendBatch
+// until its results are closed. A query waiting for its turn waits under its
+// own context and fails with a db.transaction error when that context ends
+// first. A query sent while the same goroutine still holds open rows on the
+// same pool therefore waits until its context ends — under go.putnami.dev/http
+// the request deadline, nine tenths of the write timeout; on a WebSocket,
+// Server-Sent Events, gRPC or Connect request, or a context with no deadline,
+// for good while holding the connection: close or drain the rows first. Every query of the request sees the request's uncommitted writes;
+// reads that need their own connections, to run at once, use Autocommit.
+//
+// The boundary refuses every later query, closes a result the request left
+// open, and waits for an operation still running before it commits or rolls
+// back. A transaction the unit joins rather than begins (an outer WithTx) is
+// not gated.
 type UnitOfWork struct {
 	mu    sync.Mutex
 	txs   map[*Pool]pgx.Tx // open transactions this unit owns, keyed by pool
@@ -73,20 +93,28 @@ func newUnitOfWork(timeout time.Duration) *UnitOfWork {
 }
 
 // InUnitOfWork reports whether ctx has an active DI scope with a UnitOfWork
-// provider. It does not materialize the coordinator, enroll a pool, begin a
-// transaction, or acquire a connection.
+// provider and is not marked Autocommit, that is whether queries on ctx join a
+// request unit of work. It does not materialize the coordinator, enroll a pool,
+// begin a transaction, or acquire a connection.
 func InUnitOfWork(ctx context.Context) bool {
+	if isAutocommit(ctx) {
+		return false
+	}
 	scope := inject.ScopeFrom(ctx)
 	return scope != nil && scope.Has(inject.TokenOf[*UnitOfWork]())
 }
 
 // unitOfWorkFromContext returns the request-scoped UnitOfWork bound in ctx's DI
-// scope, or nil when no scope is active or none is registered. Resolving it
+// scope, or nil when no scope is active, none is registered, or ctx is marked
+// Autocommit. Resolving it
 // through the scope materializes exactly one UnitOfWork per request (cached in
 // the scope container), shared by every repository query in that request. It
 // never begins a transaction — that happens lazily on enroll — so a request that
 // never touches a repository resolves the unit but opens no connection.
 func unitOfWorkFromContext(ctx context.Context) *UnitOfWork {
+	if isAutocommit(ctx) {
+		return nil
+	}
 	scope := inject.ScopeFrom(ctx)
 	if scope == nil {
 		return nil
@@ -107,7 +135,9 @@ func unitOfWorkFromContext(ctx context.Context) *UnitOfWork {
 }
 
 // enroll returns the transaction this unit of work holds on pool, beginning one
-// on first use and reusing it thereafter (idempotent per pool). An explicit
+// on first use and reusing it thereafter (idempotent per pool). A transaction
+// the unit begins is handed out gated (see gatedTx), so the goroutines of the
+// request take turns on its connection. An explicit
 // WithTx transaction already open on pool in ctx wins: the unit joins it without
 // beginning or owning a new transaction, so a unit of work nested inside an outer
 // WithTx for the same pool shares the enclosing transaction (no savepoints).
@@ -136,9 +166,10 @@ func (u *UnitOfWork) enroll(ctx context.Context, pool *Pool) (pgx.Tx, error) {
 	if u.startedAt.IsZero() {
 		u.startedAt = time.Now()
 	}
-	u.txs[pool] = tx
+	gated := newGatedTx(tx, pool.cfg.databaseName())
+	u.txs[pool] = gated
 	u.order = append(u.order, pool)
-	return tx, nil
+	return gated, nil
 }
 
 // SetRollbackOnly marks the unit of work so the request boundary rolls back

@@ -473,6 +473,38 @@ call `SetRollbackOnly()` explicitly.
 `database.InUnitOfWork(ctx)` reports whether the context has an ambient
 request unit. It does not enroll a pool or begin a transaction.
 
+A handler may fan its queries out to several goroutines on the request context.
+The unit of work's transaction holds one connection, so the queries on one
+datasource take turns: each holds the transaction until its result is closed
+(`Query` until its rows close or `Next` reports no further row, `QueryRow` for
+its `Scan`, `SendBatch` until its results close). A query waiting for its turn
+fails with a `db.transaction` error when its own context ends, so close or
+drain rows before you query the same pool again from the same goroutine:
+otherwise that query waits for itself until the HTTP request deadline (nine
+tenths of the write timeout), and for good on a WebSocket, Server-Sent Events,
+gRPC or Connect request or a context with no deadline. To
+run independent reads in parallel, each on its own pooled connection, query
+through `database.Autocommit(ctx)`:
+
+```go
+g, gctx := errgroup.WithContext(ctx)
+var orders, invoices int
+g.Go(func() error {
+    return pool.QueryRow(database.Autocommit(gctx), "SELECT count(*) FROM orders").Scan(&orders)
+})
+g.Go(func() error {
+    return pool.QueryRow(database.Autocommit(gctx), "SELECT count(*) FROM invoices").Scan(&invoices)
+})
+if err := g.Wait(); err != nil {
+    return err
+}
+```
+
+An `Autocommit` query runs outside the unit of work and outside any `WithTx`
+transaction of the context: it does not see the request's uncommitted writes,
+and a write through it commits whatever the request's outcome. `WithTx` under
+an `Autocommit` context begins and owns its own transaction.
+
 ### Consume-once and rotation (typed Outcome)
 
 The optimistic-concurrency helpers on `Repository[T]` return a typed, closed

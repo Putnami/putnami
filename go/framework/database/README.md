@@ -90,6 +90,21 @@ callback result; the request boundary remains the finalization owner. Use
 `InUnitOfWork(ctx)` to detect whether a context has a request unit without
 beginning a transaction.
 
+**Concurrent queries take turns.** The goroutines serving one request may query
+through its unit of work at once. A transaction holds one connection, so their
+queries on one datasource run one after the other, each holding the
+transaction until its result is closed, and all see the request's uncommitted
+writes. A query waiting for its turn fails with a `db.transaction` error when
+its own context ends, so a goroutine that queries a pool while it still holds
+open rows on it waits for itself until then: the HTTP request deadline (nine
+tenths of the write timeout), or for good on a WebSocket, Server-Sent Events,
+gRPC or Connect request or a context with no deadline. Close or drain rows
+before the next query on the same pool. The boundary refuses queries that outlive the request and closes a
+result the request left open. For independent reads that should run in
+parallel on their own connections, query through `database.Autocommit(ctx)`:
+it runs outside the unit of work and any `WithTx` transaction, so it does not
+see uncommitted request writes, and a write through it commits on its own.
+
 ## Repository Pattern
 
 `Repository[T]` provides generic CRUD operations. Supply a scan function to map rows to your entity type:

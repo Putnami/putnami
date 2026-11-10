@@ -673,7 +673,9 @@ func (p *Pool) Querier(ctx context.Context) Querier {
 //  2. Otherwise, a request-scoped UnitOfWork bound in ctx's DI scope: the pool is
 //     enrolled (its transaction begun lazily on first use) so every repository on
 //     this pool within the request shares one transaction.
-//  3. Otherwise the datasource-bound pool view (autocommit).
+//  3. Otherwise the datasource-bound pool view (autocommit). A context marked
+//     Autocommit always lands here unless a WithTx under it opened a
+//     transaction on this pool.
 //
 // It returns an error when enrolling the pool in an active UnitOfWork fails to
 // begin its transaction, and a db.connection error when the pool is closed or

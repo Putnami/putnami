@@ -12,6 +12,39 @@
       "target": "modeled",
       "requirements": [
         {
+          "id": "autocommit-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "autocommit-query-skips-a-withtx-transaction",
+              "autocommit-query-skips-the-unit-of-work",
+              "withtx-under-autocommit-owns-its-transaction"
+            ]
+          }
+        },
+        {
+          "id": "concurrent-request-queries",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-result-holds-the-transaction-until-closed",
+              "a-waiting-query-ends-with-its-context",
+              "concurrent-queries-take-turns-on-the-transaction",
+              "the-boundary-closes-a-result-left-open",
+              "the-boundary-refuses-later-queries",
+              "the-boundary-rolls-back-when-it-cannot-wait"
+            ]
+          }
+        },
+        {
           "id": "multi-datasource-boundary",
           "stage": "coded",
           "evidenceKinds": [
