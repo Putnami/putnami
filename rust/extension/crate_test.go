@@ -489,3 +489,38 @@ func TestPublishPushesTheImageThroughTheSharedPublisher(t *testing.T) {
 		t.Errorf("index = %+v, %v", index, err)
 	}
 }
+
+func TestAProjectNamedWithUppercaseLettersPublishesALowercaseImage(t *testing.T) {
+	root := fixture(t)
+	writeBinaries(t, root, "linux-x64")
+	base, host := baseImage(t)
+	ctx := packageContext(t, root, rawParams(t, map[string]any{"docker": true, "archives": true, "platforms": "linux/amd64", "docker-base-image": base}))
+	ctx.Project.Name = "@Acme/Gen"
+	if _, _, err := packageDocker(ctx, jsonl.New(), nil); err != nil {
+		t.Fatal(err)
+	}
+	manifest, err := pkgmeta.ReadDockerManifest(root, "tools/gen")
+	if err != nil || manifest.Image != "acme-gen" || !strings.HasPrefix(manifest.Tags[0], "acme-gen:") {
+		t.Fatalf("manifest = %+v, %v", manifest, err)
+	}
+	// The shared publisher builds the image's reference from the packaged name:
+	// an uppercase letter would make it invalid.
+	status, _, err := publishDocker(ctx, jsonl.New(), []string{"--docker-registry", host + "/team"})
+	if err != nil || status != "OK" {
+		t.Fatalf("status = %s, err = %v", status, err)
+	}
+	repo, err := name.NewRepository(host + "/team/acme-gen")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tags, err := remote.List(repo); err != nil || len(tags) == 0 {
+		t.Fatalf("tags = %v, err = %v", tags, err)
+	}
+	// An archive is a file name, not a reference: it keeps the project's case.
+	if _, _, err := packageArchives(ctx, jsonl.New(), nil); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(pkgmeta.PackageOutputDir(root, "tools/gen", channelArchives), "Acme-Gen-linux-x64.tar.gz")); err != nil {
+		t.Errorf("archive: %v", err)
+	}
+}

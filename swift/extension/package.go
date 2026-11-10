@@ -156,7 +156,7 @@ func packageImage(stack stacks.Stack, ctx *pctx.Context, flags map[string]string
 	}
 
 	output := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", ctx.Project.Path, "package", dockerChannel)
-	name := imageName(ctx.Project.Name)
+	name := stacks.ImageName(ctx.Project.Name)
 	version := "0.0.0"
 	if ctx.Version != nil && ctx.Version.Full != "" {
 		version = ctx.Version.Full
@@ -515,12 +515,6 @@ func resourceBundles(staged string) ([]oci.File, error) {
 		}
 	}
 	return files, nil
-}
-
-// imageName derives an image name from a project name: an image name is one
-// lowercase path segment.
-func imageName(project string) string {
-	return strings.ToLower(strings.ReplaceAll(strings.TrimPrefix(project, "@"), "/", "-"))
 }
 
 // loadImage loads the assembled image into the local Docker daemon under its

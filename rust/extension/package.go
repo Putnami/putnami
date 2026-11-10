@@ -312,7 +312,8 @@ func copyExecutable(from, to string) (err error) {
 	return err
 }
 
-// artifactName is a project name in the form of an archive or image name.
+// artifactName is a project name in the form of an archive name. The image
+// name is stacks.ImageName, which is also lowercase.
 func artifactName(project string) string {
 	return strings.ReplaceAll(strings.TrimPrefix(project, "@"), "/", "-")
 }
@@ -447,7 +448,7 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 	if err != nil {
 		return nil, fmt.Errorf("assemble the image: %w", err)
 	}
-	image := artifactName(ctx.Project.Name)
+	image := stacks.ImageName(ctx.Project.Name)
 	content := image + ":c-" + contentHash
 	tags := []string{content}
 	if tag := ctx.Params.String("docker-tag"); tag != "" {

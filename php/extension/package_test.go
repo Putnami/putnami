@@ -412,6 +412,45 @@ func TestAnApplicationThatPublishesAnImageIsAReleaseSetMember(t *testing.T) {
 	}
 }
 
+func TestAProjectNamedWithUppercaseLettersPackagesALowercaseImage(t *testing.T) {
+	prepareComposer(t)
+	root := t.TempDir()
+	application(t, filepath.Join(root, "Shop"))
+	writeFile(t, root, "Shop/putnami.json", `{"publish": ["docker"]}`)
+	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
+	s := stack(t)
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"Shop"}})
+	if err != nil || len(result.Projects) != 1 {
+		t.Fatalf("probe: %v %+v", err, result)
+	}
+	// The shared publisher finds the release-set member of the packaged image
+	// by its name.
+	meta := metadata(t, result.Projects[0])
+	if meta.ReleaseSet == nil || len(meta.ReleaseSet.Ecosystems) != 1 || meta.ReleaseSet.Ecosystems[0].Coordinate != "acme/shop" {
+		t.Fatalf("release set = %+v", meta.ReleaseSet)
+	}
+	ctx := &pctx.Context{WorkspaceRoot: root, Params: job.Params{"dry-run": json.RawMessage(`true`)}, Project: pctx.Project{
+		Name: "Shop", Path: "Shop", FullPath: filepath.Join(root, "Shop"),
+		Metadata: map[string]json.RawMessage{ExtensionName: result.Projects[0].Metadata},
+	}}
+	devnull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer devnull.Close()
+	stdout := os.Stdout
+	os.Stdout = devnull
+	status, _, err := PackageDockerJob(s)(ctx, jsonl.New(), nil)
+	os.Stdout = stdout
+	if status != "OK" || err != nil {
+		t.Fatalf("package: %s %v", status, err)
+	}
+	index, err := pkgmeta.ReadChannelIndex(root, "Shop")
+	if err != nil || index.Records[dockerChannel].Artifact != "shop" {
+		t.Errorf("channel records = %+v, %v", index, err)
+	}
+}
+
 func TestAComposerPackageWithoutTheProjectTypeIsALibraryAndPublishesNoImage(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "lib/composer.json", `{"name": "acme/lib", "require": {"php": ">=8.4"}}`)

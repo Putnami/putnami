@@ -76,7 +76,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		}
 		var members []releaseset.MemberDeclaration
 		if kind == "application" {
-			members = imageMember(root, p.Dir, p.Name)
+			members = stacks.ImageMember(root, p.Dir, p.Name)
 		}
 		out = append(out, stacks.Component{
 			Path:           p.Dir,

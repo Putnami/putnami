@@ -15,6 +15,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/sdk/extension/pkgmeta"
 )
 
 // appFixture writes a nested Gradle build whose app applies the application
@@ -212,6 +213,43 @@ func TestAnApplicationThatPublishesAnImageIsAReleaseMember(t *testing.T) {
 	}
 	if strings.Contains(string(got["g/lib"].Metadata), "releaseSet") {
 		t.Errorf("a library publishes no image: %s", got["g/lib"].Metadata)
+	}
+}
+
+func TestAProjectNamedWithUppercaseLettersPackagesALowercaseImage(t *testing.T) {
+	root, _ := appFixture(t)
+	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme"}}}`)
+	writeFile(t, root, "g/app/putnami.json", `{"name": "userService", "publish": ["docker"]}`)
+	p := probe(t, root, "g", "g/app")["g/app"]
+	// The shared publisher finds the release-set member of the packaged image
+	// by its name.
+	var meta struct {
+		ReleaseSet struct {
+			Ecosystems []struct{ Coordinate string } `json:"ecosystems"`
+		} `json:"releaseSet"`
+	}
+	if err := json.Unmarshal(p.Metadata, &meta); err != nil || len(meta.ReleaseSet.Ecosystems) != 1 || meta.ReleaseSet.Ecosystems[0].Coordinate != "acme/userservice" {
+		t.Fatalf("release set = %s", p.Metadata)
+	}
+	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{
+		Name: "userService", Path: "g/app", FullPath: filepath.Join(root, "g/app"), Type: p.Type,
+		Metadata: map[string]json.RawMessage{ExtensionName: p.Metadata},
+	}}
+	devnull, err := os.Open(os.DevNull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer devnull.Close()
+	stdout := os.Stdout
+	os.Stdout = devnull
+	status, _, err := PackageDockerJob(stack(t))(ctx, jsonl.New(), []string{"--dry-run"})
+	os.Stdout = stdout
+	if status != "OK" || err != nil {
+		t.Fatalf("dry run: %s %v", status, err)
+	}
+	index, err := pkgmeta.ReadChannelIndex(root, "g/app")
+	if err != nil || index.Records[dockerChannel].Artifact != "userservice" {
+		t.Errorf("channel records = %+v, %v", index, err)
 	}
 }
 
