@@ -183,7 +183,8 @@
             "paths": [
               "{root}/coverage/coverage.xml"
             ],
-            "optional": true
+            "optional": true,
+            "warnWhenMissing": true
           }
         ]
       }

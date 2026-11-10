@@ -216,8 +216,9 @@ The image holds the binary at `/app` on a digest-pinned `cc-debian12` base, with
 no docker daemon. `--port` sets `PORT` and the exposed port, 8080 by default,
 `--entrypoint` names the binary among several, `--docker-tag` adds a tag,
 `--docker-base-image` replaces the base and `--docker-load` loads the image
-into the local daemon. `--dry-run` plans the archives and the image and builds
-neither; a crate is still staged. Every flag of `package` and `publish` is
+into the local daemon. `--dry-run` checks the platforms and writes the channel
+record `publish --dry-run` reads, and builds no archive and no image; a crate
+is still staged, for `cargo publish --dry-run` to check. Every flag of `package` and `publish` is
 also read in its camelCase form, such as `dockerTag`, in `putnami.json`. The image name is the project name in lowercase;
 an archive keeps the project name as it is written.
 

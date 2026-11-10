@@ -237,9 +237,13 @@ type Coverage struct {
 	Format string `json:"format"`
 	// Paths are the report patterns.
 	Paths []string `json:"paths"`
-	// Optional says a missing report is not read and fails nothing: a build
-	// that writes coverage only when it is configured to.
+	// Optional says a missing report fails nothing and the summary carries
+	// no coverage: a build that writes coverage only when it is configured to.
 	Optional bool `json:"optional,omitempty"`
+	// WarnWhenMissing makes a missing optional report the warning
+	// stacks.coverage_unavailable: a report only the project's own setup
+	// produces, such as a Coverlet or a SimpleCov one (ADR 0015).
+	WarnWhenMissing bool `json:"warnWhenMissing,omitempty"`
 }
 
 // Decode reads a profile with a strict decoder: an unknown member, a repeated

@@ -165,7 +165,7 @@ func ReadReports(r *Reports, paths func(pattern string) ([]string, error), proje
 		switch {
 		case len(files) == 0 && !c.Optional:
 			diags = append(diags, diag.Errorf(CodeReportMissing, "", "the test task wrote no %s coverage report matching %s", c.Format, strings.Join(c.Paths, ", ")))
-		case len(files) == 0:
+		case len(files) == 0 && c.WarnWhenMissing:
 			diags = append(diags, diag.Warningf(CodeCoverageUnavailable, "", "the test task wrote no %s coverage report matching %s: the project sets up no coverage, so the summary carries none", c.Format, strings.Join(c.Paths, ", ")))
 		}
 		for _, f := range files {

@@ -437,11 +437,12 @@ states, and add arguments; its error fails the task with
 last step
 ([ADR 0014](adr/0014-a-stack-adapts-each-step-of-a-task.md)). `Stack.Selected`,
 `RunForeground`, `AnnounceReady` and `FreePort` serve a stack's `run` and
-`serve` commands. `ImageName` and `ImageMember` serve a stack that packages
-an image: the image is the project's name as one lowercase path segment, the
+`serve` commands. `ImageName`, `ImageMember` and `ImagePort` serve a stack
+that packages an image: the image is the project's name as one lowercase path segment, the
 name the shared Docker publisher expects, so a project named `userService`
 packages `userservice`; `ImageMember` declares that image as a release-set
-member when the project's `putnami.json` publishes it. Its `imageload`
+member when the project's `putnami.json` publishes it; `ImagePort` reads the
+port its image listens on, 8080 by default. Its `imageload`
 package loads the image into the local Docker daemon under each of its tags;
 only the stacks that package an image import it.
 `LockedToolsHome`, `ExecutableSuffix`, `CompareVersions`, `Accepted` and

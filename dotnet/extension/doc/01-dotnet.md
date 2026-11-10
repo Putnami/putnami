@@ -73,8 +73,7 @@ project writes it. A failed case fails the task with `stacks.test_failed`,
 which names it; a step that exits non-zero with no failed case, or a missing
 TRX report, fails it too. A test project with no Coverlet collector writes no
 Cobertura report: the task passes with the warning
-`stacks.coverage_unavailable` and no coverage, and `--enforce-coverage` fails
-it. The output directory is emptied before the step.
+`stacks.coverage_unavailable` and no coverage. The output directory is emptied before the step.
 
 `putnami test --test <filter>`, short `-t`, passes the filter to `dotnet test`
 as `--filter <filter>`: a bare value selects the tests whose fully qualified

@@ -205,6 +205,9 @@ func packageCompile(stack stacks.Stack) cli.JobFunc {
 			return "OK", nil, nil
 		}
 		if dryRun(ctx) {
+			if _, err := compilePlatforms(ctx); err != nil {
+				return "FAILED", nil, err
+			}
 			emit.Info("dry run: would compile " + ctx.Project.Name + " for each platform it packages")
 			return "OK", nil, nil
 		}
@@ -353,6 +356,12 @@ func packageArchives(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string
 	dir := pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, channelArchives)
 	if dryRun(ctx) {
 		emit.Info(fmt.Sprintf("dry run: would write %d archives of %s", len(platforms), artifact))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "FAILED", nil, err
+		}
+		if err := pkgmeta.WriteChannelRecord(dir, pkgmeta.ChannelRecord{Version: version, Artifact: artifact, Channels: []string{channelArchives}}); err != nil {
+			return "FAILED", nil, err
+		}
 		return "OK", nil, nil
 	}
 	if err := os.RemoveAll(dir); err != nil {
@@ -423,14 +432,35 @@ func packageDocker(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 		return "OK", nil, nil
 	}
 	if dryRun(ctx) {
-		emit.Info("dry run: would assemble an image of " + stacks.ImageName(ctx.Project.Name))
-		return "OK", nil, nil
+		return dryRunImage(ctx, emit)
 	}
 	data, err := assembleImage(ctx, emit)
 	if err != nil {
 		return "FAILED", nil, err
 	}
 	return "OK", data, nil
+}
+
+// dryRunImage checks the image's platform and writes the channel record
+// publish --dry-run reads, and assembles nothing.
+func dryRunImage(ctx *pctx.Context, emit *jsonl.Emitter) (string, map[string]any, error) {
+	version, err := releaseVersion(ctx)
+	if err != nil {
+		return "FAILED", nil, err
+	}
+	if _, err := dockerPlatform(ctx); err != nil {
+		return "FAILED", nil, err
+	}
+	image := stacks.ImageName(ctx.Project.Name)
+	emit.Info("dry run: would assemble an image of " + image)
+	dir := pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, channelDocker)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "FAILED", nil, err
+	}
+	if err := pkgmeta.WriteChannelRecord(dir, pkgmeta.ChannelRecord{Version: version, Artifact: image, Channels: []string{channelDocker}}); err != nil {
+		return "FAILED", nil, err
+	}
+	return "OK", nil, nil
 }
 
 func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, error) {
@@ -450,7 +480,10 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 	if base == "" {
 		base = imageBase
 	}
-	port := ctx.Params.Int("port", stacks.DefaultImagePort)
+	port, err := strconv.Atoi(stacks.ImagePort(ctx, nil))
+	if err != nil {
+		return nil, err
+	}
 	plan, err := oci.NewImagePlan(oci.Spec{
 		BaseRef:      base,
 		Platform:     platformName(platform),

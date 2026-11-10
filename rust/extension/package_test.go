@@ -585,7 +585,8 @@ func TestPackageDockerFailsWithAnUnknownPlatformOrNoBinary(t *testing.T) {
 	}
 }
 
-func TestADryRunPackageWritesNoImageAndNoArchive(t *testing.T) {
+func TestADryRunPackageWritesTheChannelRecordAndBuildsNothing(t *testing.T) {
+	spectest.Proves(t, feature, "package-dry-run-builds-nothing", "a-dry-run-package-writes-the-channel-record-and-builds-nothing")
 	root := fixture(t)
 	ctx := packageContext(t, root, rawParams(t, map[string]any{"docker": true, "archives": true, "dry-run": true}))
 	for name, job := range map[string]cli.JobFunc{"docker": packageDocker, "archives": packageArchives} {
@@ -594,8 +595,21 @@ func TestADryRunPackageWritesNoImageAndNoArchive(t *testing.T) {
 		}
 	}
 	for _, channel := range []string{channelDocker, channelArchives} {
-		if entries, _ := os.ReadDir(pkgmeta.PackageOutputDir(root, "tools/gen", channel)); len(entries) != 0 {
-			t.Errorf("a dry run wrote %s: %v", channel, entries)
+		entries, _ := os.ReadDir(pkgmeta.PackageOutputDir(root, "tools/gen", channel))
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
 		}
+		if len(names) != 1 {
+			t.Errorf("a dry run of %s wrote %v, want the channel record alone", channel, names)
+		}
+	}
+	// The flags are checked: a platform the image cannot run on fails.
+	bad := packageContext(t, root, rawParams(t, map[string]any{"docker": true, "platform": "darwin/arm64", "dry-run": true}))
+	if status, _, err := packageDocker(bad, jsonl.New(), nil); status != "FAILED" || err == nil {
+		t.Errorf("a dry run on a foreign platform: %s %v", status, err)
+	}
+	if status, _, err := packageCompile(stack(t))(packageContext(t, root, rawParams(t, map[string]any{"archives": true, "platforms": "plan9/amd64", "dry-run": true})), jsonl.New(), nil); status != "FAILED" || err == nil {
+		t.Errorf("a dry run compile of an unknown platform: %s %v", status, err)
 	}
 }

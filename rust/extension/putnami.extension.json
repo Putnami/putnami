@@ -208,7 +208,7 @@
         "dry-run": {
           "type": "boolean",
           "default": false,
-          "description": "Plan the archives and the image without building them; the crate is still staged"
+          "description": "Check the platforms and write the channel record, without building the archives or the image; the crate is still staged"
         },
         "docker-tag": {
           "type": "string",

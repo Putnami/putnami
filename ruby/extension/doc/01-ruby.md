@@ -102,8 +102,7 @@ The test task reads the JUnit report and `coverage/coverage.xml` at the stack
 root into the test and coverage summary. A failed case, a step that exits
 non-zero, or a missing JUnit report fails the task. A bundle that does not set
 up SimpleCov writes no coverage report: the task passes with the warning
-`stacks.coverage_unavailable` and no coverage, and `--enforce-coverage` fails
-it. The coverage summary counts
+`stacks.coverage_unavailable` and no coverage. The coverage summary counts
 only the component's own files: those under its directory, outside a nested
 pack or gem. A covered file in no component is left out with the warning
 `stacks.coverage_unmapped`. The tasks of the components of one stack root
