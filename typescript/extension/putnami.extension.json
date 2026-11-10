@@ -838,7 +838,7 @@
       ]
     },
     "workspace-fetch": {
-      "description": "Download the packages the committed bun.lock names into bun's cache, running none of their code.",
+      "description": "Download the packages the committed lockfile names into the cache of the workspace's package manager, running none of their code.",
       "quiet": true,
       "run": [
         {

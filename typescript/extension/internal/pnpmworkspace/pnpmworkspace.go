@@ -682,3 +682,22 @@ func plainSafe(s string) bool {
 	}
 	return true
 }
+
+// Mapping returns the flat mapping of strings the top-level key holds, such as
+// patchedDependencies, and nil when the file declares no such key.
+func Mapping(text, key string) (map[string]string, error) {
+	d := parseDocument(text)
+	b, found := findTop(d, key)
+	if !found {
+		return nil, nil
+	}
+	entries, err := mapping(d, b.key, b.end, b.value)
+	if err != nil {
+		return nil, fmt.Errorf("%s %s: %w", File, key, err)
+	}
+	out := make(map[string]string, len(entries))
+	for _, e := range entries {
+		out[e.key] = e.value
+	}
+	return out, nil
+}
