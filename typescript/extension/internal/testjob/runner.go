@@ -70,6 +70,9 @@ func packageScripts(path string) map[string]string {
 // script: the runner is the program after them.
 var scriptLaunchers = map[string]bool{"npx": true, "bunx": true, "cross-env": true, "dotenv": true, "--": true, "exec": true}
 
+// nodeValueOptions are the node options whose value is the next word.
+var nodeValueOptions = map[string]bool{"-r": true, "--require": true, "--import": true, "--loader": true, "--experimental-loader": true}
+
 // scriptRunDepth bounds how many `run <script>` hops scriptRunner follows.
 const scriptRunDepth = 3
 
@@ -124,7 +127,12 @@ func commandRunner(scripts map[string]string, words []string, depth int) Runner 
 			return runScript(scripts, rest, depth)
 		case "node":
 			// node [options] <entry>: the entry names the runner.
-			for _, arg := range rest {
+			for j := 0; j < len(rest); j++ {
+				arg := rest[j]
+				if nodeValueOptions[arg] {
+					j++
+					continue
+				}
 				if strings.HasPrefix(arg, "-") {
 					continue
 				}
@@ -148,9 +156,19 @@ func runScript(scripts map[string]string, args []string, depth int) Runner {
 	if depth >= scriptRunDepth || len(args) == 0 {
 		return ""
 	}
+	for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+		// An option of the package manager, such as --silent or --bun.
+		args = args[1:]
+	}
+	if len(args) == 0 {
+		return ""
+	}
 	switch args[0] {
 	case "run", "run-script":
 		args = args[1:]
+		for len(args) > 0 && strings.HasPrefix(args[0], "-") {
+			args = args[1:]
+		}
 	case "exec", "dlx", "x":
 		return commandRunner(scripts, args[1:], depth)
 	}

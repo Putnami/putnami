@@ -79,9 +79,10 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool) (
 		return nil, err
 	}
 	fsRoot := filepath.VolumeName(absProject) + string(filepath.Separator)
-	flags := tscCompilerFlags(typeScriptIgnoreDeprecations(projectPath))
+	ignoreDeprecations := typeScriptIgnoreDeprecations(projectPath)
+	flags := tscCompilerFlags(ignoreDeprecations)
 	if projectTypes {
-		flags = projectCompilerFlags(typeScriptIgnoreDeprecations(projectPath))
+		flags = projectCompilerFlags(ignoreDeprecations)
 	}
 	args := append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, flags...)
 	if buildInfoDir != "" {

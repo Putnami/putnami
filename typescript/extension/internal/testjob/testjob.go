@@ -76,8 +76,8 @@ func HasTests(projectPath string) (bool, error) {
 
 var testFileRe = regexp.MustCompile(`\.(test|spec)\.(ts|tsx|js|jsx)$`)
 
-// testsDirRe matches a file under a __tests__ directory, which Jest and Vitest
-// treat as a test whatever its name.
+// testsDirRe matches a file under a __tests__ directory, which Jest's default
+// testMatch treats as a test whatever its name.
 var testsDirRe = regexp.MustCompile(`(^|/)__tests__/.+\.(ts|tsx|js|jsx)$`)
 
 func matchTestFile(path string) bool {

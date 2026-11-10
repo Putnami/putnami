@@ -55,9 +55,7 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	if err != nil {
 		return "FAILED", nil, err
 	}
-	if command.Runner != testjob.RunnerBun {
-		emit.Log("info", "Test runner: "+string(command.Runner))
-	}
+	emit.Log("info", "Test runner: "+string(command.Runner))
 	if params.Coverage && command.CoverageUnavailable != "" {
 		emit.Log("warn", command.CoverageUnavailable)
 	}
