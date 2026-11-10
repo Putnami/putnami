@@ -2,6 +2,7 @@ package rust
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -133,6 +134,13 @@ XML
     fi
     prev="$a"
   done;;
+publish*)
+  if [ -n "$STUB_PUBLISH_ERROR" ]; then echo "$STUB_PUBLISH_ERROR" >&2; exit 101; fi;;
+metadata*)
+  cat "$PWD/.stub-metadata.json";;
+run*)
+  echo "PORT=$PORT" >> "`+log+`"
+  exit "${STUB_RUN_EXIT:-0}";;
 build*)
   prev=""
   for a in "$@"; do
@@ -172,6 +180,12 @@ func runJob(t *testing.T, root, rel, task string) (string, map[string]any, strin
 // runJobOutput is runJob, with what the job emitted.
 func runJobOutput(t *testing.T, root, rel, task string) (string, map[string]any, string, string, error) {
 	t.Helper()
+	return runJobParams(t, root, rel, task, nil)
+}
+
+// runJobParams is runJobOutput, with the command's parameters.
+func runJobParams(t *testing.T, root, rel, task string, params pctx.Params) (string, map[string]any, string, string, error) {
+	t.Helper()
 	s := stack(t)
 	result := probe(t, root)
 	var meta json.RawMessage
@@ -183,9 +197,11 @@ func runJobOutput(t *testing.T, root, rel, task string) (string, map[string]any,
 	ctx := &pctx.Context{WorkspaceRoot: root, Project: pctx.Project{
 		Name: rel, Path: rel, FullPath: filepath.Join(root, rel),
 		Metadata: map[string]json.RawMessage{ExtensionName: meta},
-	}}
+	}, Params: params}
 	out := filepath.Join(root, ".putnami/out", strings.ReplaceAll(rel, "/", "_"), task)
-	job := s.Jobs()[task]
+	jobs := s.Jobs()
+	maps.Copy(jobs, Jobs(s))
+	job := jobs[task]
 	emitted, err := os.CreateTemp(t.TempDir(), "emitted")
 	if err != nil {
 		t.Fatal(err)
@@ -294,10 +310,37 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	}
 }
 
+// A dependency's compile is an edge however the dependent asks for artifacts:
+// a project option sets docker on the application alone, so a condition on
+// params would drop the edge to its library.
+func TestThePackageCompileAlwaysFollowsItsDependencies(t *testing.T) {
+	var manifest struct {
+		Commands map[string]struct {
+			Run []struct {
+				ID        string   `json:"id"`
+				DependsOn []string `json:"dependsOn"`
+				If        string   `json:"if"`
+			} `json:"run"`
+		} `json:"commands"`
+	}
+	data, err := os.ReadFile("putnami.extension.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for _, step := range manifest.Commands["package"].Run {
+		if step.ID == "compile" && (step.If != "" || !slices.Equal(step.DependsOn, []string{"^compile"})) {
+			t.Errorf("compile step = %+v", step)
+		}
+	}
+}
+
 func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	spectest.Proves(t, feature, "manifest-follows-the-profile", "the-manifest-conforms-to-the-stack-core")
 	stackstest.CheckManifest(t, "putnami.extension.json", stack(t))
-	if got := stack(t).Selectors(); !slices.Equal(got, []string{"rust:build", "rust:lint", "rust:test"}) {
+	if got := stack(t).Selectors(); !slices.Equal(got, []string{"rust:build", "rust:lint", "rust:package", "rust:test"}) {
 		t.Errorf("selectors = %v", got)
 	}
 }

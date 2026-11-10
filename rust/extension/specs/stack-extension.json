@@ -9,12 +9,13 @@
     "Each task reads only the inputs it needs: lint does not rerun on a lockfile or nextest configuration change, and build does not rerun on a test change",
     "A crate overrides any value of the Rust profile in its putnami.json, and the override reaches the cache key",
     "On the Cargo detector's fixture repository, with the real cargo, cargo-nextest and cargo-llvm-cov, lint, test and build pass with no putnami.json override and every case and coverage line attributed; a CI leg that installs those tools proves it, since the workspace gate has none",
-    "On a machine with no Rust, cargo-nextest or cargo-llvm-cov, putnami lint, test and build install what is missing and pass on a Cargo repository; a machine that holds a Rust satisfying the repository's statement keeps it"
+    "On a machine with no Rust, cargo-nextest or cargo-llvm-cov, putnami lint, test and build install what is missing and pass on a Cargo repository; a machine that holds a Rust satisfying the repository's statement keeps it",
+    "putnami run and serve start a binary crate, and putnami package and publish ship it as archives, an OCI image built from any host with no docker daemon, or a crate on a registry at the Putnami release version"
   ],
   "nonGoals": [
     "A C linker, which rustc needs and the machine must hold, and the targets and components a rust-toolchain file lists beyond rustfmt, clippy and llvm-tools",
-    "Publishing a crate to a registry",
-    "A member of a nested Cargo workspace whose root package depends on that member: the edge to its root would close a cycle"
+    "A member of a nested Cargo workspace whose root package depends on that member: the edge to its root would close a cycle",
+    "A release-set member: publish --channel does not carry a crate, an image or an archive of a Rust project"
   ],
   "requirements": [
     {
@@ -64,11 +65,48 @@
     {
       "id": "coverage-is-optional",
       "text": "A test task on a Rust with no llvm-tools runs cargo nextest with its JUnit report only, reads no LCOV report, and reports the warning stacks.coverage_unavailable."
+    },
+    {
+      "id": "crate-kind-is-detected",
+      "text": "A crate with src/main.rs, a src/bin target or a [[bin]] table is a project of type application; any other crate is a library, and run and serve skip a library."
+    },
+    {
+      "id": "run-forwards-the-exit-code",
+      "text": "putnami run runs cargo run --package <crate> --locked once after the toolchain check, with no cache and no stack-root lock. The words of --args reach the program, --port sets PORT, and the task returns the program's exit code as its exit-code result; a non-zero exit fails the task."
+    },
+    {
+      "id": "serve-sets-the-port",
+      "text": "putnami serve runs the same command until the user stops it, with no stack-root lock, PORT set from --port, 3000 by default and a free port for 0, and announces the server ready once the port accepts connections. A program that exits on its own fails the task with its exit code."
+    },
+    {
+      "id": "package-builds-each-platform",
+      "text": "package compiles the crate's binary in release mode with cargo zigbuild for the platforms its channels need: --platform for docker, linux/amd64 by default, and --platforms for archives, the five archive platforms by default. A Linux binary links against glibc 2.36, the libc of the image base, and a library crate compiles nothing."
+    },
+    {
+      "id": "package-provides-its-cross-tools",
+      "text": "The compile step uses the Rust the extension installs, adds each rustup target it needs, and installs cargo-zigbuild and zig under the Putnami home, whatever the PATH holds, each pinned by version and SHA-256 per platform. An offline run installs nothing and fails naming what is missing."
+    },
+    {
+      "id": "package-writes-archives",
+      "text": "package --archives writes <artifact>-<platform>.tar.gz per platform with the binary at the archive root, and the publication manifest @putnami/cloud uploads from."
+    },
+    {
+      "id": "package-assembles-an-image",
+      "text": "package --docker assembles a reproducible OCI layout for one Linux platform with no docker daemon: the binary on a digest-pinned cc-debian12 base, PORT set from --port, and the manifest the shared Docker publisher reads."
+    },
+    {
+      "id": "publish-sends-the-staged-crate",
+      "text": "package --crates copies the stack root without its build output and writes the release version into each manifest and each normal path dependency, leaving the checkout untouched. publish --crates runs cargo publish from that copy, dependencies first; a version the registry already holds is reused, and --dry-run uploads nothing."
+    },
+    {
+      "id": "publish-pushes-the-image",
+      "text": "publish --docker pushes the assembled image through the shared Docker publisher, and the crates and docker publish tasks each declare their channel with the registry effect."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0002-a-nested-stack-root-is-an-input-only-project.md",
-    "tooling/stacks/doc/adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md"
+    "tooling/stacks/doc/adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md",
+    "tooling/stacks/doc/adr/0011-rust-runs-on-the-core-helpers-and-owns-its-packaging.md"
   ]
 }

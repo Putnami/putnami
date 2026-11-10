@@ -91,6 +91,70 @@ library crate, or a target directory moved by `CARGO_TARGET_DIR` or
 `build.target-dir`, copies nothing. The copy is a debug binary, stored in the
 cache with each build result.
 
+## Run and serve a crate
+
+Both run `cargo run --package <crate> --locked -- <args>` in the crate's
+directory, after the toolchain check, with no cache and no stack-root lock:
+cargo locks its own build directory. They are jobs of `@putnami/rust`, not
+profile tasks, so a crate's `putnami.json` does not override them.
+
+`putnami run` starts a binary crate once. `--args` reaches the program,
+`--port` sets `PORT`, and the command exits with the exit code of the program.
+`putnami serve` starts it with `PORT` set from `--port`, 3000 by default and a
+free port for 0, and runs it until you stop it. It announces the server ready
+once the port accepts connections. A program that exits on its own fails the
+serve with its exit code. `serve` does not restart the program when a source
+changes.
+
+A crate is an application when it has a `[[bin]]` table, a `src/main.rs` or a
+target under `src/bin`, unless `package.autobins` is false. `run` and `serve`
+skip a library.
+
+## Package a crate
+
+`putnami package` runs on an application and compiles nothing for a library.
+Each channel has a flag, and the project's `publish` field adds to them.
+
+| Flag | Output, under `.putnami/out/<project>/package` |
+|---|---|
+| `--archives` | `archives/<artifact>-<platform>.tar.gz`, the binary at the root, and `metadata.json` |
+| `--docker` | `docker/oci`, an OCI layout, and `docker/manifest.json` |
+| `--crates` | `crates/workspace`, a copy at the release version |
+
+The compile step runs `cargo zigbuild --release` for each platform the channels
+need: `--platform` for the image, `linux/amd64` by default, and `--platforms`
+for archives, the five archive platforms by default. A Linux binary links
+against glibc 2.36, the libc of the image base. A crate with several binaries
+states `package.default-run`.
+
+The first `package` of a machine installs the pinned zig, about 100 MB, and
+`cargo-zigbuild` under the Putnami home, with the Rust the project states and
+the targets it needs. An offline run fails and names what is missing.
+
+The image holds the binary at `/app` on a digest-pinned `cc-debian12` base, with
+no docker daemon. `--port` sets `PORT` and the exposed port, `--docker-tag` adds
+a tag, `--docker-base-image` replaces the base and `--docker-load` loads the
+image into the local daemon.
+
+`--crates` copies the stack root without `target`, `.git`, `.putnami` and
+`node_modules`, with each path dependency outside it. It writes the release
+version into each manifest and an exact version on each normal path dependency.
+The checkout does not change.
+
+## Publish a crate
+
+`putnami publish` runs `package` first.
+
+| Flag | Effect |
+|---|---|
+| `--crates` | `cargo publish` from the copy, dependencies first. A version the registry already holds is reused. `--crates-registry` names a registry of the Cargo configuration |
+| `--docker` | Pushes the image through the shared Docker publisher. `--docker-registry` names the registry |
+
+`--dry-run` uploads nothing. It names the crate and its path dependencies in one
+`cargo publish --dry-run`, with the Rust the extension pins, because cargo takes
+several crates from 1.90. Cargo reads the token from `CARGO_REGISTRY_TOKEN` or
+its own configuration.
+
 ## What the test task reads
 
 The test task reads `{root}/target/nextest/ci/junit.xml` and its LCOV report
@@ -135,6 +199,12 @@ key of the same task of each crate it depends on. A pattern that starts with
 | `lintConfig` | `rustfmt.toml`, `.rustfmt.toml`, `clippy.toml`, `.clippy.toml`, in the crate and at the stack root |
 | `testConfig` | `{root}/.config/nextest.toml` |
 | `lockfiles` | `Cargo.lock`, in the crate and at the stack root |
+| `package` | `**/*`, less `target/` and every `.gen/version.json` stamp |
+
+The compile step of `package` reads the `package` set as the `rust:package`
+selector: a released binary may embed any file of the crate. The CLI rewrites
+the `.gen/version.json` stamp in every planned project, so its build time would
+move the key on every run.
 
 | Task | Reads | Does not rerun on |
 |---|---|---|
@@ -208,4 +278,8 @@ installs the tools and runs it on each change to the Rust stack.
 - A member of a nested Cargo workspace whose root package depends on it is
   left out.
 - `build` copies the debug binary only, from the stack root's `target/`.
-- No publish: a crate reaches its registry through cargo.
+- A Rust project is no release-set member: `publish --channel` carries neither
+  its crate, nor its image, nor its archives.
+- The dry run of a crate with a path dependency outside its Cargo workspace
+  checks the crate's file list only: cargo cannot build against a dependency
+  that is not on the registry yet. The diagnostic names it.

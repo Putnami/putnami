@@ -280,6 +280,11 @@ type RootStep struct {
 	Dir string
 	// Project is the component's absolute path.
 	Project string
+	// Component is the name of the component the step runs for; empty at a
+	// stack root that holds no component.
+	Component string
+	// Expected is the version the component's first toolchain check expects.
+	Expected Expected
 	// Env is the environment of the step.
 	Env []string
 	// Program returns the program to run for a command name: the pinned
@@ -331,9 +336,19 @@ func (s Stack) rootStep(ctx context.Context, in runInput, emit *jsonl.Emitter) (
 	if meta.Manifest != "" {
 		manifests = []string{filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Manifest))}
 	}
+	projectRel, err := filepath.Rel(in.workspaceRoot, in.projectAbs)
+	if err != nil {
+		return RootStep{}, Metadata{}, Profile{}, failWith(emit, CodeNotAComponent, "%v", err)
+	}
+	expected, err := profile.Toolchain.ExpectedVersion(in.workspaceRoot, filepath.ToSlash(projectRel), meta.Root)
+	if err != nil {
+		return RootStep{}, Metadata{}, Profile{}, failWith(emit, CodeProjectConfigInvalid, "the expected toolchain version cannot be read: %v", err)
+	}
 	return RootStep{
 		Dir:       filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root)),
 		Project:   in.projectAbs,
+		Component: meta.Component,
+		Expected:  expected,
 		Env:       selected.Env,
 		Program:   func(name string) string { return selected.Program(profile.Toolchain, name) },
 		Manifests: manifests,

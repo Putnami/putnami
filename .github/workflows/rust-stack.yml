@@ -72,3 +72,17 @@ jobs:
         env:
           PUTNAMI_RUST_REAL_TOOLS: '1'
         run: ./putnamiw test --projects @putnami/rust --run TestTheFixtureRepositoryPassesWithTheRealTools --no-enforce-coverage --no-cache
+
+      - name: Run the sample application
+        run: ./putnamiw run --projects /rust/samples/application
+
+      - name: Package the sample application with the real cross tools
+        run: ./putnamiw package --projects /rust/samples/application --archives --platforms linux/amd64,darwin/arm64,windows/amd64 --docker --docker-load --no-cache
+
+      - name: Start the sample image
+        run: |
+          image="$(python3 -I -c "import json; print(json.load(open('.putnami/out/rust/samples/application/package/docker/manifest.json'))['tags'][0])")"
+          test "$(docker run --rm "$image")" = 1350
+
+      - name: Dry-run the publication of the sample crates
+        run: ./putnamiw publish --crates --dry-run --projects /rust/samples/application,/rust/samples/library

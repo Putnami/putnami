@@ -118,31 +118,16 @@ var testTools = []tool{
 // of its own under the Putnami home. rustup checks each component against the
 // channel manifest. The rustup of the machine and its toolchains stay untouched.
 func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (stacks.Provided, error) {
-	channel := expected.Version
-	if channel == "" {
-		channel = defaultChannel
-	}
-	if !channelPattern.MatchString(channel) {
-		return stacks.Provided{}, fmt.Errorf("%s states %q, which is no rustup channel", expected.Source, channel)
-	}
-	triple, ok := hostTriples[hostPlatform]
-	if !ok {
-		return stacks.Provided{}, fmt.Errorf("no Rust is installed on %s: put rustc on PATH", hostPlatform)
+	channel, triple, err := resolveChannel(expected)
+	if err != nil {
+		return stacks.Provided{}, err
 	}
 	base, release, err := lockedHome()
 	if err != nil {
 		return stacks.Provided{}, err
 	}
 	defer release()
-	rustupHome := filepath.Join(base, "rustup-home")
-	name := channel + "-" + triple
-	toolchain := filepath.Join(rustupHome, "toolchains", name)
-	provided := stacks.Provided{
-		Executable: filepath.Join(toolchain, "bin", "rustc"+executableSuffix()),
-		// A cargo proxy of the machine's rustup, which cargo finds in
-		// ~/.cargo/bin before PATH, must answer with this toolchain too.
-		Env: []string{"RUSTUP_HOME=" + rustupHome, "RUSTUP_TOOLCHAIN=" + name},
-	}
+	rustupHome, toolchain, provided := toolchainPaths(base, channel, triple)
 	if _, err := os.Stat(filepath.Join(toolchain, installedMarker)); err == nil {
 		return provided, nil
 	}
@@ -164,6 +149,37 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 		return stacks.Provided{}, err
 	}
 	return provided, nil
+}
+
+// resolveChannel is the rustup channel a project expects and the Rust name of
+// the host.
+func resolveChannel(expected stacks.Expected) (channel, triple string, err error) {
+	channel = expected.Version
+	if channel == "" {
+		channel = defaultChannel
+	}
+	if !channelPattern.MatchString(channel) {
+		return "", "", fmt.Errorf("%s states %q, which is no rustup channel", expected.Source, channel)
+	}
+	triple, ok := hostTriples[hostPlatform]
+	if !ok {
+		return "", "", fmt.Errorf("no Rust is installed on %s: put rustc on PATH", hostPlatform)
+	}
+	return channel, triple, nil
+}
+
+// toolchainPaths are the rustup home under base, the directory of a channel's
+// toolchain there, and what a task needs to run it.
+func toolchainPaths(base, channel, triple string) (string, string, stacks.Provided) {
+	rustupHome := filepath.Join(base, "rustup-home")
+	name := channel + "-" + triple
+	toolchain := filepath.Join(rustupHome, "toolchains", name)
+	return rustupHome, toolchain, stacks.Provided{
+		Executable: filepath.Join(toolchain, "bin", "rustc"+executableSuffix()),
+		// A cargo proxy of the machine's rustup, which cargo finds in
+		// ~/.cargo/bin before PATH, must answer with this toolchain too.
+		Env: []string{"RUSTUP_HOME=" + rustupHome, "RUSTUP_TOOLCHAIN=" + name},
+	}
 }
 
 // Tools makes cargo-nextest and cargo-llvm-cov available to the test task,

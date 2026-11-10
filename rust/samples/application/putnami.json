@@ -3,5 +3,6 @@
   "name": "rust-example-application",
   "tags": ["sample", "rust", "e2e"],
   "extensions": ["/rust/extension"],
-  "featureAuthority": { "owner": "rust/stack-extension" }
+  "featureAuthority": { "owner": "rust/stack-extension" },
+  "options": { "package": { "docker": true } }
 }

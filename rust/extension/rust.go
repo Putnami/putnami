@@ -36,7 +36,8 @@ func Stack() (stacks.Stack, error) {
 		Provide: func(ctx context.Context, _ stacks.Toolchain, expected []stacks.Expected, info func(string)) (stacks.Provided, error) {
 			return Provide(ctx, expected[0], info)
 		},
-		Tools: Tools,
+		Tools:        Tools,
+		SelectorSets: []string{"package"},
 	}, nil
 }
 
@@ -47,6 +48,21 @@ func CaseComponent(classname, suite string) (string, bool) {
 		return pkg, true
 	}
 	return cargo.BinaryPackage(suite)
+}
+
+// The project types the probe answers.
+const (
+	typeApplication = "application"
+	typeLibrary     = "library"
+)
+
+// crateType is the project type of the crate at dir: run and serve skip a
+// library, which has no program to start.
+func crateType(root, dir string) string {
+	if cargo.HasBinaryTarget(root, dir) {
+		return typeApplication
+	}
+	return typeLibrary
 }
 
 // Detect names the crates among the candidate paths with the Cargo detector,
@@ -72,6 +88,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		out = append(out, stacks.Component{
 			Path:         p.Path,
 			Name:         p.SourceName,
+			Type:         crateType(root, p.Path),
 			SourceFile:   p.SourceFile,
 			Root:         stackRoot,
 			Dependencies: p.Dependencies,
@@ -83,7 +100,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			continue
 		}
 		answered[dir] = true
-		out = append(out, stacks.Component{Path: dir, SourceFile: path.Join(dir, cargo.Marker), Root: dir, InputOnly: true})
+		out = append(out, stacks.Component{Path: dir, SourceFile: path.Join(dir, cargo.Marker), Root: dir, InputOnly: true, Type: typeLibrary})
 	}
 	return out, diags
 }

@@ -327,9 +327,15 @@ func relabel(d []diag.Diagnostic, name string) []diag.Diagnostic {
 }
 
 // globFiles returns the regular files a slash pattern matches under base,
-// with "**" for any number of directories, sorted. A "**" walk never enters a
-// directory named in excludes.
-func globFiles(base, pattern string, excludes ...string) ([]string, error) {
+// with "**" for any number of directories, sorted.
+func globFiles(base, pattern string) ([]string, error) {
+	return globFilesSkipping(base, pattern, nil, nil)
+}
+
+// globFilesSkipping is globFiles whose "**" walk never enters a directory
+// named in excludes, nor the directories at the slash paths of skipped,
+// relative to base.
+func globFilesSkipping(base, pattern string, excludes, skipped []string) ([]string, error) {
 	if !strings.Contains(pattern, "**") {
 		matches, err := filepath.Glob(filepath.Join(base, filepath.FromSlash(pattern)))
 		if err != nil {
@@ -359,6 +365,9 @@ func globFiles(base, pattern string, excludes ...string) ([]string, error) {
 			if p != start && (entry.Name() == ".git" || entry.Name() == ".putnami" || slices.Contains(excludes, entry.Name())) {
 				return filepath.SkipDir
 			}
+			if rel, err := filepath.Rel(base, p); err == nil && len(skipped) > 0 && slices.Contains(skipped, filepath.ToSlash(rel)) {
+				return filepath.SkipDir
+			}
 			return nil
 		}
 		rel, err := filepath.Rel(base, p)
@@ -370,8 +379,9 @@ func globFiles(base, pattern string, excludes ...string) ([]string, error) {
 		}
 		return nil
 	})
-	slices.Sort(out)
-	return out, err
+	// A walk lists a symbolic link as an entry: keep it only when it reaches
+	// a regular file, as a pattern with no "**" does.
+	return regularFiles(out), err
 }
 
 func regularFiles(matches []string) []string {

@@ -128,6 +128,11 @@ type Stack struct {
 	// MatchVersion, when set, replaces the core's rule for an exact expected
 	// version: equal, or a stable release of a shorter expected version.
 	MatchVersion VersionMatcher
+	// SelectorSets are input sets of the profile that a manifest reads
+	// directly, as the selector "<stack id>:<set>": the files of a task the
+	// extension runs itself, such as a package step that reads the whole
+	// component.
+	SelectorSets []string
 }
 
 // Command is a runtime command of a stack extension. It runs in the step's
@@ -457,6 +462,9 @@ func (s Stack) Selectors() []string {
 			out = append(out, s.Selector(task))
 		}
 	}
+	for _, set := range s.SelectorSets {
+		out = append(out, s.Selector(set))
+	}
 	slices.Sort(out)
 	return out
 }
@@ -483,7 +491,7 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 		return wsproto.InputResolveAnswer{Project: q.Project, Selector: q.Selector, Error: msg}
 	}
 	task, ok := strings.CutPrefix(q.Selector, s.Profile.ID+":")
-	if !ok || !slices.Contains(TaskNames, task) {
+	if !ok || !slices.Contains(TaskNames, task) && !slices.Contains(s.SelectorSets, task) {
 		return fail("%s answers no selector %s", s.Extension, q.Selector)
 	}
 	projectAbs := filepath.Join(root, filepath.FromSlash(q.Project))
@@ -494,7 +502,7 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 	if err != nil {
 		return fail("%v", err)
 	}
-	projectPatterns, rootPatterns := p.TaskPatterns(task)
+	projectPatterns, rootPatterns := p.SelectorPatterns(task)
 	patterns := slices.Clone(projectPatterns)
 	// A stack root that holds no component reads its root files alone.
 	if c.rootOnly {
@@ -504,7 +512,7 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 	// own directory; for one under the workspace root's build they are the
 	// manifest's workspace input, and for one under a nested root the edge
 	// to that root's project carries them.
-	excludes, kept := p.TaskExcludes(task), p.KeptInputs()
+	excludes, kept := p.SelectorExcludes(task), p.KeptInputs()
 	if c.ownRoot {
 		for _, r := range rootPatterns {
 			if excluded, ok := strings.CutPrefix(r, "!"); ok {
@@ -515,9 +523,19 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 		}
 	}
 	patterns = appendNew(patterns, ProjectConfigFile)
+	// A walk does not enter a directory an exclusion leaves out whole, such
+	// as a build directory under a component its inputs read entirely, unless
+	// it holds a file no exclusion leaves out.
+	var skipped []string
+	for _, e := range excludes {
+		dir, ok := strings.CutSuffix(e, "/**")
+		if ok && !strings.ContainsAny(dir, "*?[") && !slices.ContainsFunc(kept, func(k string) bool { return strings.HasPrefix(k, dir+"/") }) {
+			skipped = append(skipped, dir)
+		}
+	}
 	var files []string
 	for _, pattern := range patterns {
-		matches, err := globFiles(projectAbs, pattern, p.Excludes...)
+		matches, err := globFilesSkipping(projectAbs, pattern, p.Excludes, skipped)
 		if err != nil {
 			return fail("%v", err)
 		}
