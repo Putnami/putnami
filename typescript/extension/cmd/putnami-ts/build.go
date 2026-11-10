@@ -52,14 +52,8 @@ func runBuild(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 	if flags.RunTranspile {
 		emit.PhaseStart("transpile")
 		libOutput := filepath.Join(ctx.OutputPath, "lib")
-		files, errors, err := build.RunTranspile(bunBin, projectPath, libOutput, build.TranspileParams{
-			Target:    ctx.Params.String("target", "bun"),
-			Bundle:    ctx.Params.String("bundle", "none"),
-			Sourcemap: ctx.Params.String("sourcemap", "external"),
-			Minify:    ctx.Params.Bool("minify", true),
-			Splitting: ctx.Params.Bool("splitting", true),
-			Metafile:  ctx.Params.Bool("metafile", false),
-		})
+		params := transpileParams(ctx)
+		files, errors, err := build.RunTranspile(bunBin, projectPath, libOutput, params)
 		if err != nil {
 			emit.PhaseEnd("transpile", "failed")
 			return "FAILED", nil, err
@@ -69,6 +63,10 @@ func runBuild(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 			for _, e := range errors {
 				emit.DiagnosticWithCode("error", e, "", 0, 0, errs.CodeTranspileError.String())
 			}
+			return "FAILED", nil, nil
+		}
+		if emitDiagnostics(emit, checkBunAPIsOnNode(bunBin, projectPath, params)) {
+			emit.PhaseEnd("transpile", "failed")
 			return "FAILED", nil, nil
 		}
 		emit.Metric("transpiled-files", len(files), "count")
@@ -148,14 +146,8 @@ func runBuildTranspile(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (s
 
 	emit.PhaseStart("transpile")
 	libOutput := filepath.Join(ctx.OutputPath, "lib")
-	files, errors, err := build.RunTranspile(bunBin, projectPath, libOutput, build.TranspileParams{
-		Target:    ctx.Params.String("target", "bun"),
-		Bundle:    ctx.Params.String("bundle", "none"),
-		Sourcemap: ctx.Params.String("sourcemap", "external"),
-		Minify:    ctx.Params.Bool("minify", true),
-		Splitting: ctx.Params.Bool("splitting", true),
-		Metafile:  ctx.Params.Bool("metafile", false),
-	})
+	params := transpileParams(ctx)
+	files, errors, err := build.RunTranspile(bunBin, projectPath, libOutput, params)
 	if err != nil {
 		emit.PhaseEnd("transpile", "failed")
 		return "FAILED", nil, err
@@ -164,6 +156,10 @@ func runBuildTranspile(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (s
 		for _, e := range errors {
 			emit.DiagnosticWithCode("error", e, "", 0, 0, errs.CodeTranspileError.String())
 		}
+		emit.PhaseEnd("transpile", "failed")
+		return "FAILED", nil, nil
+	}
+	if emitDiagnostics(emit, checkBunAPIsOnNode(bunBin, projectPath, params)) {
 		emit.PhaseEnd("transpile", "failed")
 		return "FAILED", nil, nil
 	}

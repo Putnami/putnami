@@ -31,6 +31,12 @@ const (
 	CodeTranspileError Code = "TRANSPILE_ERROR"
 	CodeCompileError   Code = "COMPILE_ERROR"
 
+	// CodeBunAPIOnNode fails a build graph built with the node target when a
+	// module it reaches needs Bun: it references the Bun global outside a
+	// `typeof Bun` guard, or imports `bun` or a `bun:` module. Its namespaced
+	// form is the one the node-target requirement of the toolchain spec names.
+	CodeBunAPIOnNode Code = "typescript.bun_api_on_node"
+
 	// CodeHTTPRoutesUnavailable is the failure of a generate that cannot tell
 	// which routes the project serves: hook discovery could not read a
 	// manifest, or a preBuild hook did not report a complete data.httpRoutes

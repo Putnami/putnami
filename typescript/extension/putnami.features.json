@@ -152,6 +152,21 @@
           }
         },
         {
+          "id": "node-target-refuses-bun-apis",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-node-build-fails-on-a-bun-api-and-names-the-chain",
+              "a-node-build-passes-without-a-bun-api",
+              "the-node-loadable-package-list-matches-the-check"
+            ]
+          }
+        },
+        {
           "id": "npm-agent-content",
           "stage": "coded",
           "evidenceKinds": [

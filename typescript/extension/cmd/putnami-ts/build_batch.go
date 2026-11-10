@@ -99,14 +99,7 @@ func runBuildTranspileBatch(ctx *pctx.Context) (string, map[string]any, error) {
 	if err != nil {
 		return "FAILED", nil, err
 	}
-	params := build.TranspileParams{
-		Target:    ctx.Params.String("target", "bun"),
-		Bundle:    ctx.Params.String("bundle", "none"),
-		Sourcemap: ctx.Params.String("sourcemap", "external"),
-		Minify:    ctx.Params.Bool("minify", true),
-		Splitting: ctx.Params.Bool("splitting", true),
-		Metafile:  ctx.Params.Bool("metafile", false),
-	}
+	params := transpileParams(ctx)
 
 	results := make([]buildBatchProjectResult, 0, len(projects))
 	for _, proj := range projects {
@@ -131,6 +124,12 @@ func runBuildTranspileBatch(ctx *pctx.Context) (string, map[string]any, error) {
 					Description: e,
 				})
 			}
+			results = append(results, res)
+			continue
+		}
+		if diagnostics := checkBunAPIsOnNode(bunBin, projectPath, params); len(diagnostics) > 0 {
+			res.Status = "FAILED"
+			res.Diagnostics = append(res.Diagnostics, diagnostics...)
 			results = append(results, res)
 			continue
 		}
