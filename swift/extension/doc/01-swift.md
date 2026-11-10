@@ -9,6 +9,10 @@ task installs that release under the Putnami home; it never installs Xcode.
 
 ## Adopt it
 
+`@putnami/swift` is not published yet: until its first release, `putnami init
+--extension swift` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
 1. At the root of the repository, run:
 
    ```bash
@@ -176,7 +180,7 @@ project packages and publishes nothing.
 The image holds a static binary, built with the
 [Static Linux SDK](https://www.swift.org/documentation/articles/static-linux-getting-started.html)
 of the selected Swift, so the same command packages from macOS and from Linux
-([ADR 0001](adr/0001-an-application-image-holds-a-static-binary.md)):
+([ADR 0001](https://github.com/Putnami/putnami/blob/main/swift/extension/doc/adr/0001-an-application-image-holds-a-static-binary.md)):
 
 1. `swift --version` names the swift.org release, such as `6.4.2`. The
    extension pins the checksum of the SDK of each release from 6.4.0 to

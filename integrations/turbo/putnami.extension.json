@@ -361,7 +361,7 @@
       }
     },
     "workspace-sync-exec": {
-      "description": "Write in each Turborepo package's putnami.json the extension it runs in the recorded mode, its dependencies as the project IDs of the workspace packages it depends on, the turbo tag, and each of build, lint and test it has no task for in disable.jobs. The dry-run parameter prints the diffs and writes nothing. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "description": "Write in each Turborepo package's putnami.json the extension it runs in the recorded mode, or the mode parameter, importing in delegate mode the packages options import, or the import parameter, selects, its dependencies as the project IDs of the workspace packages it depends on, the turbo tag, and each of build, lint and test it has no task for in disable.jobs. The dry-run parameter prints the diffs and writes nothing. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

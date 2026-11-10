@@ -46,16 +46,21 @@ there:
 
 | Published under | Source of truth | Mechanism |
 |---|---|---|
-| `/docs/00-…06-` | `sites/putnami.dev/doc/` | `putnami.json` `generate.assets` copy |
-| `/docs/07-tooling-&-workspace` | `tooling/doc/` | `putnami.json` `generate.assets` copy |
-| `/docs/08-frameworks/0{1,2,3}-*` | `{typescript,go,python}/doc/framework/` | `putnami.json` `generate.assets` copy |
-| `/docs/08-support` | `putnami.support.json` (workspace root) | `src/plugins/support-catalog.plugin.ts` |
+| `/docs/00-…06-`, `/docs/adr`, `/docs/09-frameworks/index.md`, `/docs/12-monorepo-tools/index.md` | `sites/putnami.dev/doc/` | `putnami.json` `generate.assets` copy |
+| `/docs/07-spec-driven-development` | `tooling/sdd-extension/doc/` | `putnami.json` `generate.assets` copy |
+| `/docs/08-tooling-&-workspace` | `tooling/doc/` | `putnami.json` `generate.assets` copy |
+| `/docs/08-tooling-&-workspace/08-observe` | `tooling/observe/doc/` | `putnami.json` `generate.assets` copy |
+| `/docs/09-frameworks/0{1,2,3}-*` | `{typescript,go,python}/doc/framework/` | `putnami.json` `generate.assets` copy |
+| `/docs/10-support` | `putnami.support.json` (workspace root) | `src/plugins/support-catalog.plugin.ts` |
+| `/docs/11-languages/index.md` | `putnami.support.json` (workspace root), through the lists in `src/lib/tools.ts` | `src/plugins/support-catalog.plugin.ts` |
+| `/docs/11-languages/<language>.md` | `<language>/extension/doc/01-<language>.md`, one page per stack extension | `putnami.json` `generate.assets` copy |
+| `/docs/12-monorepo-tools/<tool>.md` | `integrations/<tool>/doc/01-<tool>.md`, one page per monorepo tool integration | `putnami.json` `generate.assets` copy |
 | `/docs/platform` | `cloud/doc-contents-platform` bundle (published by the Cloud workspace), pinned by `content.lock.json` | `src/plugins/content-bundle.plugin.ts` |
 | `/schemas/…` | `protocols/*/schemas/*.json` | `src/plugins/schemas.plugin.ts` |
 | `/install.sh`, `/install-commands.txt`, `/install.ps1`, `/LICENSE.md` | `tooling/cli/scripts/install.sh`, `tooling/cli/scripts/install-commands.txt`, `tooling/cli/scripts/install.ps1`, `LICENSE.md` | `putnami.json` `generate.assets` copy |
 
 A `generate.assets` source that no longer exists is not silently dropped. The
-six sources another domain owns are declared imports of the `public-docs`
+nineteen sources another domain owns are declared imports of the `public-docs`
 domain (`putnami.architecture.json`), and the build enforces them as DARC
 snapshots — see [Documentation sources are contracts](#documentation-sources-are-contracts)
 below. The copies the site itself owns (`sites/putnami.dev/doc/`) and the four
@@ -67,7 +72,15 @@ on it.
 The support page is written from the reviewed catalog on every build, so a
 package or protocol status can only change by changing `putnami.support.json`.
 The site keeps no second list; `src/lib/tools.ts` names the catalog subject for
-each documented surface and never restates its status.
+each documented surface, each language and each monorepo tool, and never
+restates its status. The languages page is written the same way: a language
+whose extension the catalog does not classify shows no reviewed status, and a
+reviewed entry shows up on the next build.
+
+A stack or tool reference is copied as one file, without the files beside it in
+its repository, so it links a published page by its `/docs/…` route and
+anything else by its full URL; `test/docs-links.test.ts` fails on a relative
+link in a page copied that way.
 
 Generated output lands only in `.gen/public/…`. Mirroring a docs section into
 the source `public/docs` makes the static-files plugin and the public-surface plugin
@@ -75,9 +88,10 @@ declare the same route and fails the build with `http_routes.duplicate_route`.
 
 ### Documentation sources are contracts
 
-Six of the copies above publish documentation another domain owns. Each one is
-a declared import of the `public-docs` domain in `putnami.architecture.json`, and
-`src/lib/darc/` turns that declaration into the build's configuration:
+Nineteen of the copies above publish documentation another domain owns. Each
+one is governed by a declared import of the `public-docs` domain in
+`putnami.architecture.json`, and `src/lib/darc/` turns that declaration into the
+build's configuration:
 
 | Import | Source root | Section |
 |---|---|---|
@@ -87,15 +101,18 @@ a declared import of the `public-docs` domain in `putnami.architecture.json`, an
 | `public-docs.typescript-framework-documentation.v1` | `/typescript/doc/framework` | `09-frameworks/01-typescript` |
 | `public-docs.go-framework-documentation.v1` | `/go/doc/framework` | `09-frameworks/02-go` |
 | `public-docs.python-surface-documentation.v1` | `/python/doc/framework` | `09-frameworks/03-python` |
+| `public-docs.stack-documentation.v1` | `/<language>/extension/doc/01-<language>.md`, for `dart`, `dotnet`, `java`, `php`, `ruby`, `rust` and `swift` | `11-languages/<language>.md` |
+| `public-docs.monorepo-tool-documentation.v1` | `/integrations/<tool>/doc/01-<tool>.md`, for `bazel`, `moon`, `nx`, `pants`, `rush` and `turbo` | `12-monorepo-tools/<tool>.md` |
 
 Each is a `snapshot`: `src/plugins/docs-prerender.plugin.ts` observes the source
-tree into the section's `Snapshot`, then publishes the file inventory
+into the import's `Snapshot`, then publishes the file inventory
 `Snapshot.latest()` hands back. Because the import declares
 `onMissing: fail-closed`, a source that is gone was never attached and `latest()`
 throws `DarcError('missing')` — the build fails instead of the section quietly
 disappearing.
 
-A version is the tree's identity: a SHA-256 over the carrier name
+A source root names a directory or one markdown file. A version is the tree's
+identity: a SHA-256 over the carrier name
 (`putnami.documentation-tree.v1`) followed by the sorted `(relative path,
 SHA-256 of contents)` pairs of its markdown files. Same tree in, same version
 out, cold build or warm. Re-attaching a version with different content is
@@ -103,17 +120,28 @@ refused (`DarcError('immutable')`). `maxStaleness: 720h` with
 `onStale: use-stale` is the deployment half: a container serving a month-old
 copy keeps serving it and stamps the record `stale` rather than refusing.
 
-The seventh contract, `public-docs.application-runtime.v1`, is a `reference` on the
+The stack and monorepo tool references are one import per section rather than
+one per extension, because one producer export covers each set: the `stacks`
+domain (`tooling/stacks/putnami.architecture.json`) owns the reference page of
+every stack extension and every tool integration, and maps no project yet. The
+import's snapshot holds its copies as one set, whose paths are relative to the
+workspace root, so each member's root is part of the version. The set is
+attached only when every member was read: one deleted reference fails every
+section of the set with `DarcError('missing')`, as a deleted tree does. A new
+stack extension or tool integration joins its set by a `generate.assets` copy
+and a name in `src/lib/darc/documentation-contracts.ts`, with no new contract.
+
+The ninth contract, `public-docs.application-runtime.v1`, is a `reference` on the
 TypeScript framework runtime the site is built on. Nothing is copied, so the only
 promise is minimization: the import names one fact, and asking for another throws
 `DarcError('fact-not-imported')`.
 
-The eighth contract, `public-docs.protocol-contracts.v1`, is a `reference` on the
+The tenth contract, `public-docs.protocol-contracts.v1`, is a `reference` on the
 `site-content-bundle/v1` contract that `/protocols/sitecontent` owns. The site
 implements that contract in `src/lib/content/`, and its tests prove the
 protocol's requirements. It names one fact, `wire_contract_definitions`.
 
-`src/main.ts` registers all eight through `DarcPlugin`, which contributes one
+`src/main.ts` registers all ten through `DarcPlugin`, which contributes one
 `domainAccess` row per contract to the capability manifest.
 `putnami architecture validate` joins those rows to the declarations. A row is
 evidence, never authority — emitting one cannot create a cross-domain permission.

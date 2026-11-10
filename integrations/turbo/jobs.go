@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"strings"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks"
 )
 
 // Job names of the workspace tasks.
@@ -29,13 +31,23 @@ const (
 	// CodeReportsUnnamed is a delegated package whose test task names no
 	// JUnit report.
 	CodeReportsUnnamed = "turbo.reports_unnamed"
+	// CodeImportUnmatched is an entry of options["@putnami/turbo"].import
+	// that selects no package.
+	CodeImportUnmatched = "turbo.import_unmatched"
 )
 
 // RunSync is the job of the workspace sync task. The dry-run parameter
-// prints the diff of each file and writes nothing; the mode parameter stands
-// for the mode the workspace config records.
+// prints the diff of each file and writes nothing; the mode and import
+// parameters stand for the mode and the import list the workspace config
+// records.
 func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	opts := Options{Mode: ctx.Params.String("mode"), DryRun: ctx.Params.Bool("dry-run", false, "dryRun")}
+	imports, importGiven, err := stacks.ImportParam(ctx.Params[stacks.ImportOption])
+	if err != nil {
+		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
+		return "FAILED", nil, errors.New(CodeSyncFailed)
+	}
+	opts.Import, opts.ImportGiven = imports, importGiven
 	result, err := Sync(ctx.WorkspaceRoot, opts)
 	if err != nil {
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
@@ -50,10 +62,19 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 	for _, dir := range result.Unreported {
 		emit.DiagnosticWithCode("info", fmt.Sprintf("%s names no JUnit report: its test result is the exit code of turbo run test alone; name its reports in options[%q].tasks.test.reports of its putnami.json", dir, ExtensionName), dir+"/putnami.json", 0, 0, CodeReportsUnnamed)
 	}
+	reportUnmatched(emit, result)
 	return "OK", map[string]any{
 		"mode": result.Mode, "dryRun": opts.DryRun, "written": result.Written, "retracted": result.Retracted,
-		"unmapped": result.Unmapped, "unreported": result.Unreported,
+		"unmapped": result.Unmapped, "unreported": result.Unreported, "imported": result.Imported,
 	}, nil
+}
+
+// reportUnmatched warns of each entry of the import list that selects no
+// package: a typo, or a package not created yet.
+func reportUnmatched(emit *jsonl.Emitter, result Result) {
+	for _, entry := range result.Unmatched {
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("options[%q].%s lists %q, which selects no package of the workspace", ExtensionName, stacks.ImportOption, entry), wsproto.WorkspaceConfigFilename, 0, 0, CodeImportUnmatched)
+	}
 }
 
 // Report is the human summary of a sync: what it wrote, or with dryRun would
@@ -67,7 +88,11 @@ func Report(r Result, dryRun bool) []string {
 	if dryRun {
 		verb = "to write"
 	}
-	lines := []string{fmt.Sprintf("Turborepo packages in %s mode: %d putnami.json %s, %d current, %d former packages retracted", r.Mode, len(r.Written), verb, r.Unchanged, len(r.Retracted))}
+	mode := r.Mode + " mode"
+	if len(r.Imported) > 0 {
+		mode += fmt.Sprintf(" with %d imported (%s)", len(r.Imported), strings.Join(r.Imported, ", "))
+	}
+	lines := []string{fmt.Sprintf("Turborepo packages in %s: %d putnami.json %s, %d current, %d former packages retracted", mode, len(r.Written), verb, r.Unchanged, len(r.Retracted))}
 	if dryRun {
 		for _, d := range r.Diffs {
 			lines = append(lines, strings.TrimSuffix(d, "\n"))
@@ -95,6 +120,7 @@ func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
 	}
+	reportUnmatched(emit, result)
 	stale := result.Stale()
 	if len(stale) == 0 {
 		return "OK", nil, nil

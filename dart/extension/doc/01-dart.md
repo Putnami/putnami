@@ -8,6 +8,10 @@ none.
 
 ## Adopt it
 
+`@putnami/dart` is not published yet: until its first release, `putnami init
+--extension dart` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
 1. At the root of the repository, run:
 
    ```bash
@@ -121,8 +125,8 @@ When the `dart` or `flutter` on `PATH` is missing, or it or the Dart a Flutter
 SDK bundles is outside the constraints its package states, a task installs the
 newest release the extension pins that the constraints admit, under
 `tools/dart` of the Putnami home, and runs it
-([ADR 0001](adr/0001-the-sdk-installs-from-the-publishers-archives.md),
-[ADR 0003](adr/0003-the-extension-pins-the-sdk-releases-it-installs.md)):
+([ADR 0001](https://github.com/Putnami/putnami/blob/main/dart/extension/doc/adr/0001-the-sdk-installs-from-the-publishers-archives.md),
+[ADR 0003](https://github.com/Putnami/putnami/blob/main/dart/extension/doc/adr/0003-the-extension-pins-the-sdk-releases-it-installs.md)):
 
 | SDK | Pinned releases | Archive |
 |---|---|---|
@@ -240,7 +244,7 @@ member, changes `id`, `markers` or `variants`, adds a workspace-root input the
 extension does not declare, names a target whose paths are in none of the
 task's inputs, or adds `hosts` to a task other than build, which alone keys
 the host system. The design of the stack core is in
-[its design note](../../../tooling/stacks/doc/01-design.md).
+[its design note](https://github.com/Putnami/putnami/blob/main/tooling/stacks/doc/01-design.md).
 
 ## Workspace commands
 
@@ -287,7 +291,7 @@ that registry for one push. A library and a Flutter package package and
 publish nothing: a Flutter app ships through a store.
 
 The image holds one executable, compiled ahead of time for Linux from any
-machine ([ADR 0002](adr/0002-an-application-image-holds-an-aot-executable-on-a-glibc-base.md)):
+machine ([ADR 0002](https://github.com/Putnami/putnami/blob/main/dart/extension/doc/adr/0002-an-application-image-holds-an-aot-executable-on-a-glibc-base.md)):
 
 1. The entrypoint is the one `options.package.entrypoint` or `--entrypoint`
    names, a Dart file of the package such as `bin/api.dart`, or the name of a

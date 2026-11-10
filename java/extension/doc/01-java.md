@@ -8,10 +8,14 @@ and no Maven builds it right after `git clone`: `putnami install` installs the
 pinned Eclipse Temurin JDKs the build asks for, its Gradle or Maven, and its
 dependencies, and each task installs what it still lacks. An application also
 serves, runs, and ships as an image. The samples in
-[`java/samples`](../../samples/README.md) show a Gradle build with and
-without a wrapper and a Maven build.
+[`java/samples`](https://github.com/Putnami/putnami/blob/main/java/samples/README.md)
+show a Gradle build with and without a wrapper and a Maven build.
 
 ## Adopt it
+
+`@putnami/java` is not published yet: until its first release, `putnami init
+--extension java` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
 
 1. At the root of the repository, run:
 
@@ -158,7 +162,7 @@ skips Failsafe instead, so the filter narrows the run as on Gradle, whose test
 step runs no integration test task. A filter that names an integration test
 runs it in Surefire's test phase, without Failsafe's pre- and
 post-integration-test phases. The choices are in
-[ADR 0003](adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md).
+[ADR 0003](https://github.com/Putnami/putnami/blob/main/java/extension/doc/adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md).
 
 A step override keeps the filter when its last step runs `gradlew`, `gradle`,
 `mvn`, `mvnw` or `mvnd`; a last step that runs any other program gets none.
@@ -274,7 +278,7 @@ installed the same way.
 Offline, a task installs nothing: it runs what an earlier task or
 `putnami install` installed, leaves out a toolchain JDK that is not installed,
 and fails when the JDK, Gradle or Maven it runs is missing.
-[ADR 0004](adr/0004-a-blank-machine-builds-after-putnami-install.md) records
+[ADR 0004](https://github.com/Putnami/putnami/blob/main/java/extension/doc/adr/0004-a-blank-machine-builds-after-putnami-install.md) records
 these choices.
 
 ## Prepare a machine
@@ -437,7 +441,7 @@ them where the variant reads them, or the override also replaces
 `stacks.project_config_invalid` when it names an unknown member, changes `id`,
 `markers` or `variants`, or adds a build-root input the extension does not
 declare. The design of the stack core is in
-[its design note](../../../tooling/stacks/doc/01-design.md).
+[its design note](https://github.com/Putnami/putnami/blob/main/tooling/stacks/doc/01-design.md).
 
 ## Limits
 

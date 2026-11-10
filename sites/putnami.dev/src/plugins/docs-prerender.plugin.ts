@@ -17,9 +17,9 @@
  * published section. A component that existed only to emit an evidence row
  * would attest to nothing.
  *
- * So for the six REPOSITORY-OWNED sources (the ones another domain writes),
- * this plugin observes the source tree into its declared `Snapshot` and then
- * asks `latest()` for the file inventory it publishes. A source that is gone was
+ * So for every REPOSITORY-OWNED source (one another domain writes), this
+ * plugin observes the source into its declared `Snapshot` and then asks
+ * `latest()` for the file inventory it publishes. A source that is gone was
  * never attached, `latest()` applies the declared `onMissing: fail-closed`, and
  * the build fails with `DarcError('missing')` instead of the extension's
  * `generate asset source not found, skipping` warning and a section that
@@ -106,7 +106,7 @@ export function prerenderSourcesFor(
   const record = access.resolve(entry.from);
   const sourcePath = joinPath(workspaceRoot, entry.from);
   return record.value.files.map((file) => ({
-    source: joinPath(sourcePath, file.path),
+    source: file.path ? joinPath(sourcePath, file.path) : sourcePath,
     relative: file.path,
   }));
 }

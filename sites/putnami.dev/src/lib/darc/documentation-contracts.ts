@@ -1,11 +1,11 @@
 /**
  * The `public-docs` domain's declared cross-domain access, as code.
  *
- * The site publishes six documentation trees that five other domains own. Until now that was a
- * build-time file copy with no contract: the TypeScript extension logs
- * `generate asset source not found, skipping` for a source that disappeared, the
- * section vanishes, and the build stays green. The declarations below are the
- * same six copies stated as Domain Access & Replication Contracts, plus the
+ * The site publishes documentation that other domains own. A build-time file
+ * copy alone carries no contract: the TypeScript extension logs
+ * `generate asset source not found, skipping` for a source that disappeared,
+ * the section vanishes, and the build stays green. The declarations below are
+ * those copies stated as Domain Access & Replication Contracts, plus the
  * reference to the TypeScript framework runtime the site itself consumes and
  * the reference to the content-bundle protocol the site implements.
  *
@@ -22,7 +22,7 @@ import type { ArchitectureImport, Consistency, Transport } from '@putnami/applic
 import { DOCUMENTATION_TREE_CONTRACT } from './documentation-tree';
 
 /**
- * The carrier the six documentation snapshots share: the markdown tree one
+ * The carrier every documentation snapshot shares: the markdown one
  * `generate.assets` entry copies out of the producing domain's repository root.
  */
 const DOCUMENTATION_TRANSPORT: Transport = {
@@ -32,7 +32,7 @@ const DOCUMENTATION_TRANSPORT: Transport = {
 };
 
 /**
- * The freshness, ordering and failure promise the six snapshots share.
+ * The freshness, ordering and failure promise every documentation snapshot shares.
  *
  * `onMissing: fail-closed` is the whole contract: a source that is not there
  * fails the build instead of publishing an empty section. `onStale: use-stale`
@@ -50,14 +50,30 @@ const DOCUMENTATION_CONSISTENCY: Consistency = {
   lateEvents: 'ignore-older',
 };
 
-/** One published section: the declared import, the source root, and where it lands. */
-export interface DocumentationSourceContract {
-  /** The declared import this section is governed by. */
-  readonly contract: ArchitectureImport;
-  /** The workspace-relative source root, exactly as `generate.assets.from` names it. */
+/** One `generate.assets` copy: where the documentation is read, and where it lands. */
+export interface DocumentationCopy {
+  /**
+   * The workspace-relative source root, exactly as `generate.assets.from`
+   * names it: a directory, or one markdown file.
+   */
   readonly sourceRoot: string;
   /** The published target, exactly as `generate.assets.to` names it. */
   readonly section: string;
+}
+
+/**
+ * One declared import and every copy it governs.
+ *
+ * Most imports govern one tree. An import may govern several copies when one
+ * producer export covers them all — the reference of each stack extension, say
+ * — and the snapshot then holds them as one set: a missing member is a missing
+ * set, so the build fails exactly as it would for a missing tree.
+ */
+export interface DocumentationSourceContract {
+  /** The declared import these copies are governed by. */
+  readonly contract: ArchitectureImport;
+  /** Every copy the import governs, in the order `putnami.json` declares them. */
+  readonly copies: readonly DocumentationCopy[];
 }
 
 function documentationImport(input: {
@@ -82,8 +98,14 @@ function documentationImport(input: {
   };
 }
 
+/** The reference page of each stack extension, published under the languages section. */
+const STACK_REFERENCES = ['dart', 'dotnet', 'java', 'php', 'ruby', 'rust', 'swift'] as const;
+
+/** The reference page of each monorepo tool integration, published under the monorepo tools section. */
+const MONOREPO_TOOL_REFERENCES = ['bazel', 'moon', 'nx', 'pants', 'rush', 'turbo'] as const;
+
 /**
- * The six repository-owned documentation sources, in the order
+ * The repository-owned documentation sources, in the order
  * `sites/putnami.dev/putnami.json` declares their `generate.assets` copies.
  *
  * The site's own `/sites/putnami.dev/doc` is absent on purpose: it is this
@@ -104,8 +126,7 @@ export const DOCUMENTATION_SOURCES: readonly DocumentationSourceContract[] = [
       justification:
         'The site publishes the workspace and CLI reference at public/docs/08-tooling-&-workspace by copying the /tooling/doc tree verbatim at build time. The cli domain decides what that reference says; the site owns only its section number and its position in the navigation.',
     }),
-    sourceRoot: '/tooling/doc',
-    section: 'public/docs/08-tooling-&-workspace',
+    copies: [{ sourceRoot: '/tooling/doc', section: 'public/docs/08-tooling-&-workspace' }],
   },
   {
     contract: documentationImport({
@@ -117,8 +138,7 @@ export const DOCUMENTATION_SOURCES: readonly DocumentationSourceContract[] = [
       justification:
         'The site publishes the observe reference at public/docs/08-tooling-&-workspace/08-observe by copying the /tooling/observe/doc tree verbatim at build time. The extension-providers domain decides what that reference says about what observe reads; the site decides only where it appears.',
     }),
-    sourceRoot: '/tooling/observe/doc',
-    section: 'public/docs/08-tooling-&-workspace/08-observe',
+    copies: [{ sourceRoot: '/tooling/observe/doc', section: 'public/docs/08-tooling-&-workspace/08-observe' }],
   },
   {
     contract: documentationImport({
@@ -130,8 +150,7 @@ export const DOCUMENTATION_SOURCES: readonly DocumentationSourceContract[] = [
       justification:
         "The site publishes the spec-driven development method at public/docs/07-spec-driven-development by copying the /tooling/sdd-extension/doc tree verbatim at build time. The sdd domain owns the method's wording; the site owns only its placement in the published information architecture.",
     }),
-    sourceRoot: '/tooling/sdd-extension/doc',
-    section: 'public/docs/07-spec-driven-development',
+    copies: [{ sourceRoot: '/tooling/sdd-extension/doc', section: 'public/docs/07-spec-driven-development' }],
   },
   {
     contract: documentationImport({
@@ -143,8 +162,7 @@ export const DOCUMENTATION_SOURCES: readonly DocumentationSourceContract[] = [
       justification:
         "The site publishes the TypeScript framework reference at public/docs/09-frameworks/01-typescript by copying the /typescript/doc/framework tree verbatim at build time. The typescript-framework domain decides what that reference says; the site decides only where it appears. This is a separate contract from the site's runtime dependency on the same domain: one is a copied document, the other is a linked API.",
     }),
-    sourceRoot: '/typescript/doc/framework',
-    section: 'public/docs/09-frameworks/01-typescript',
+    copies: [{ sourceRoot: '/typescript/doc/framework', section: 'public/docs/09-frameworks/01-typescript' }],
   },
   {
     contract: documentationImport({
@@ -156,8 +174,7 @@ export const DOCUMENTATION_SOURCES: readonly DocumentationSourceContract[] = [
       justification:
         'The site publishes the Go framework reference at public/docs/09-frameworks/02-go by copying the /go/doc/framework tree verbatim at build time. The go-framework domain decides what that reference says; the site decides only where it appears and in what order. A missing tree fails the build rather than publishing a gap, and a tree older than the freshness bound is still published because stale documentation beats no documentation.',
     }),
-    sourceRoot: '/go/doc/framework',
-    section: 'public/docs/09-frameworks/02-go',
+    copies: [{ sourceRoot: '/go/doc/framework', section: 'public/docs/09-frameworks/02-go' }],
   },
   {
     contract: documentationImport({
@@ -169,8 +186,37 @@ export const DOCUMENTATION_SOURCES: readonly DocumentationSourceContract[] = [
       justification:
         'The site publishes the Python surface reference at public/docs/09-frameworks/03-python by copying the /python/doc/framework tree verbatim at build time. The Python surface is the extension and its templates only, and the extension-providers domain decides what that reference claims; the site never promotes it to framework parity by where it places it.',
     }),
-    sourceRoot: '/python/doc/framework',
-    section: 'public/docs/09-frameworks/03-python',
+    copies: [{ sourceRoot: '/python/doc/framework', section: 'public/docs/09-frameworks/03-python' }],
+  },
+  {
+    contract: documentationImport({
+      id: 'public-docs.stack-documentation.v1',
+      as: 'public-docs.stack-documentation',
+      domain: 'stacks',
+      exportId: 'stacks.stack-documentation.v1',
+      fact: 'stack_extension_documentation',
+      justification:
+        'The site publishes the reference page of each stack extension under public/docs/11-languages by copying /<language>/extension/doc/01-<language>.md verbatim at build time, one copy per extension, all governed by this one import. The stacks domain decides what each reference says; the site decides only that they appear together, under one section, next to the frameworks. A missing reference fails the build rather than publishing a section with a language missing.',
+    }),
+    copies: STACK_REFERENCES.map((language) => ({
+      sourceRoot: `/${language}/extension/doc/01-${language}.md`,
+      section: `public/docs/11-languages/${language}.md`,
+    })),
+  },
+  {
+    contract: documentationImport({
+      id: 'public-docs.monorepo-tool-documentation.v1',
+      as: 'public-docs.monorepo-tool-documentation',
+      domain: 'stacks',
+      exportId: 'stacks.monorepo-tool-documentation.v1',
+      fact: 'monorepo_tool_documentation',
+      justification:
+        'The site publishes the reference page of each monorepo tool integration under public/docs/12-monorepo-tools by copying /integrations/<tool>/doc/01-<tool>.md verbatim at build time, one copy per integration, all governed by this one import. The stacks domain decides what each reference says about running a tool; the site decides only that they appear together, under one section. A missing reference fails the build rather than publishing a section with a tool missing.',
+    }),
+    copies: MONOREPO_TOOL_REFERENCES.map((tool) => ({
+      sourceRoot: `/integrations/${tool}/doc/01-${tool}.md`,
+      section: `public/docs/12-monorepo-tools/${tool}.md`,
+    })),
   },
 ];
 

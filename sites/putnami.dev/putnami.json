@@ -69,6 +69,58 @@
           "to": "public/docs/09-frameworks/03-python"
         },
         {
+          "from": "/dart/extension/doc/01-dart.md",
+          "to": "public/docs/11-languages/dart.md"
+        },
+        {
+          "from": "/dotnet/extension/doc/01-dotnet.md",
+          "to": "public/docs/11-languages/dotnet.md"
+        },
+        {
+          "from": "/java/extension/doc/01-java.md",
+          "to": "public/docs/11-languages/java.md"
+        },
+        {
+          "from": "/php/extension/doc/01-php.md",
+          "to": "public/docs/11-languages/php.md"
+        },
+        {
+          "from": "/ruby/extension/doc/01-ruby.md",
+          "to": "public/docs/11-languages/ruby.md"
+        },
+        {
+          "from": "/rust/extension/doc/01-rust.md",
+          "to": "public/docs/11-languages/rust.md"
+        },
+        {
+          "from": "/swift/extension/doc/01-swift.md",
+          "to": "public/docs/11-languages/swift.md"
+        },
+        {
+          "from": "/integrations/bazel/doc/01-bazel.md",
+          "to": "public/docs/12-monorepo-tools/bazel.md"
+        },
+        {
+          "from": "/integrations/moon/doc/01-moon.md",
+          "to": "public/docs/12-monorepo-tools/moon.md"
+        },
+        {
+          "from": "/integrations/nx/doc/01-nx.md",
+          "to": "public/docs/12-monorepo-tools/nx.md"
+        },
+        {
+          "from": "/integrations/pants/doc/01-pants.md",
+          "to": "public/docs/12-monorepo-tools/pants.md"
+        },
+        {
+          "from": "/integrations/rush/doc/01-rush.md",
+          "to": "public/docs/12-monorepo-tools/rush.md"
+        },
+        {
+          "from": "/integrations/turbo/doc/01-turbo.md",
+          "to": "public/docs/12-monorepo-tools/turbo.md"
+        },
+        {
           "from": "/LICENSE.md",
           "to": "public/LICENSE.md"
         }

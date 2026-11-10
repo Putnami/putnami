@@ -500,3 +500,91 @@ func TestTheManifestConformsToTheStackCore(t *testing.T) {
 		t.Errorf("modes = %v, import first", Modes)
 	}
 }
+
+func TestDelegateModeImportsThePackagesTheImportListSelects(t *testing.T) {
+	spectest.Proves(t, feature, "delegate-imports-listed-packages", "delegate-mode-imports-the-packages-the-import-list-selects")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "bun build src/index.ts --outdir dist", "test": "bun test"}, "dependencies": {"zod": "3.23.8"}}`)
+	workspace := func(entries ...string) {
+		data, _ := json.Marshal(map[string]any{"name": "demo", "options": map[string]any{ExtensionName: map[string]any{"mode": ModeDelegate, "import": entries}}})
+		writeFile(t, root, wsproto.WorkspaceConfigFilename, string(data))
+	}
+	workspace("/packages/pricing", "libs/*")
+	result, err := Sync(root, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Mode != ModeDelegate || !slices.Equal(result.Imported, []string{"packages/pricing"}) || !slices.Equal(result.Unmatched, []string{"libs/*"}) {
+		t.Fatalf("result = %+v", result)
+	}
+	// pricing is imported: both extensions, and the TypeScript extension
+	// runs its build and test.
+	pricing := readProjectFile(t, root, "packages/pricing")
+	if got, want := pricing["extensions"], []any{ExtensionName, TypeScriptExtension}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing extensions = %v, want %v", got, want)
+	}
+	if got, want := pricing["disable"], map[string]any{"jobs": []any{"lint", "@putnami/turbo:test", "@putnami/turbo:build"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing disable = %v, want %v", got, want)
+	}
+	// api stays delegated: Turborepo alone runs it.
+	api := readProjectFile(t, root, "apps/api")
+	if got, want := api["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+		t.Errorf("api extensions = %v, want %v", got, want)
+	}
+	if got, want := api["dependencies"], []any{"/packages/pricing"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("api dependencies = %v, want %v", got, want)
+	}
+	if report := strings.Join(Report(result, false), "\n"); !strings.Contains(report, "delegate mode with 1 imported (packages/pricing)") {
+		t.Errorf("the report names no import:\n%s", report)
+	}
+
+	// The import parameter outranks the config: an empty list delegates
+	// pricing again, and import mode reads no list.
+	preview, err := Sync(root, Options{DryRun: true, Import: []string{}, ImportGiven: true})
+	if err != nil || len(preview.Imported) != 0 || !slices.Equal(preview.Written, []string{"packages/pricing/putnami.json"}) {
+		t.Errorf("the empty import parameter: %+v %v", preview, err)
+	}
+	if r, err := Sync(root, Options{Mode: ModeImport, DryRun: true}); err != nil || r.Imported != nil || r.Unmatched != nil {
+		t.Errorf("import mode read the list: %+v %v", r, err)
+	}
+
+	check := func() (string, string) {
+		var events strings.Builder
+		emit := jsonl.New()
+		emit.Observe(func(message string) { events.WriteString(message + "\n") })
+		status, _, err := RunCheck(&pctx.Context{WorkspaceRoot: root}, emit, nil)
+		if err != nil {
+			events.WriteString(err.Error())
+		}
+		return status, events.String()
+	}
+	if status, events := check(); status != "OK" || !strings.Contains(events, `lists "libs/*", which selects no package`) {
+		t.Errorf("a current list: %s %s", status, events)
+	}
+	// pricing leaves the list with no sync: validate fails.
+	workspace()
+	if status, events := check(); status != "FAILED" || !strings.Contains(events, CodeSyncStale) || !strings.Contains(events, "packages/pricing/putnami.json") {
+		t.Errorf("a list the putnami.json files do not match: %s %s", status, events)
+	}
+
+	// The sync job reads the import parameter, and fails on one that is no
+	// list.
+	var events strings.Builder
+	emit := jsonl.New()
+	emit.Observe(func(message string) { events.WriteString(message + "\n") })
+	ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{"dryRun": json.RawMessage(`true`), "import": json.RawMessage(`["packages/*"]`)}}
+	status, data, err := RunSync(ctx, emit, nil)
+	if err != nil || status != "OK" || !reflect.DeepEqual(data["imported"], []string{"packages/pricing"}) {
+		t.Errorf("status %s, data %v, err %v\n%s", status, data, err, events.String())
+	}
+	ctx.Params["import"] = json.RawMessage(`{}`)
+	if status, _, _ := RunSync(ctx, emit, nil); status != "FAILED" {
+		t.Errorf("an import parameter that is no list: %s", status)
+	}
+	// A malformed entry fails the sync.
+	workspace("packages/[")
+	if _, err := Sync(root, Options{}); err == nil {
+		t.Error("a malformed entry passed")
+	}
+}

@@ -3,7 +3,11 @@
 Putnami is a workspace framework for building full-stack applications.
 One CLI orchestrates TypeScript and Go projects, plus explicitly opted-in
 experimental Python projects. Python does not carry a production, default, or
-parity promise.
+parity promise. The same CLI runs Rust, Java and Kotlin, Swift, Dart, .NET,
+Ruby and PHP projects through stack extensions, which keep the tools each
+repository already uses, and runs a repository built with Bazel, moon, Nx,
+Pants, Rush or Turborepo through that tool's integration.
+[Languages and monorepo tools](/docs/languages) lists every one.
 
 This page is the mental map. Not the command surface. Just the layers that make the system legible.
 

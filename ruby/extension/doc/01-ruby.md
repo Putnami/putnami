@@ -9,6 +9,10 @@ that fits.
 
 ## Adopt it
 
+`@putnami/ruby` is not published yet: until its first release, `putnami init
+--extension ruby` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
 1. At the root of the repository, run:
 
    ```bash
@@ -37,7 +41,7 @@ that fits.
    Ruby, then installs the bundle of each stack root whose `bundle check`
    fails.
 
-The [Ruby detector](../../../tooling/observe/doc/16-ruby.md) says which
+The [Ruby detector](/docs/tooling-&-workspace/observe/ruby) says which
 directories are components and how their edges are read.
 
 ## What each task runs
@@ -220,7 +224,7 @@ the target, `linux/amd64` by default. Any other machine, such as a Mac, fails
 with `ruby.package_host_mismatch`, which names the machine and the target:
 package on a Linux runner of the target architecture. A CI runner such as
 `ubuntu-latest` with the application's Ruby is one.
-[ADR 0001](adr/0001-an-application-image-copies-onto-the-official-ruby-image.md)
+[ADR 0001](https://github.com/Putnami/putnami/blob/main/ruby/extension/doc/adr/0001-an-application-image-copies-onto-the-official-ruby-image.md)
 records why.
 
 Packaging the same tree twice on the same machine gives the same image
@@ -330,7 +334,7 @@ profile's reports: a test step must still write `{output}/junit.xml` and
 `markers` or `variants`, or adds a stack-root input the extension does not
 declare. The
 design of the stack core is in
-[its design note](../../../tooling/stacks/doc/01-design.md).
+[its design note](https://github.com/Putnami/putnami/blob/main/tooling/stacks/doc/01-design.md).
 
 ## Limits
 

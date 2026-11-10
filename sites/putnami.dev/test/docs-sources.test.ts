@@ -2,7 +2,8 @@ import { describe, expect, it } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { specTest } from '@putnami/spectest';
 import { fileExists, joinPath } from '@putnami/utils';
-import { SUPPORT_SECTION } from '../src/lib/support/publish';
+import { LANGUAGES_PAGE_DIST_PATH, SUPPORT_SECTION } from '../src/lib/support/publish';
+import { LANGUAGES, MONOREPO_TOOLS } from '../src/lib/tools';
 
 /**
  * Every published documentation section must be traceable to one source that
@@ -69,6 +70,50 @@ describe('published documentation sources', () => {
       }
     },
   );
+
+  specTest(
+    'publishes each stack and tool reference from the doc folder of the project that owns it',
+    {
+      feature: 'putnami-dev/public-documentation',
+      requirement: 'every-language-and-tool-is-published',
+      check: 'stack-and-tool-references-use-owning-sources',
+    },
+    () => {
+      // Each stack extension and each tool integration writes its reference
+      // next to its code; the site copies that one page and holds no second
+      // edited copy. The page a listing links to is the page the copy serves.
+      const assets = generateAssets();
+      const owners = [
+        ...LANGUAGES.filter((target) => target.href.startsWith('/docs/languages/')).map((target) => {
+          const name = target.href.slice('/docs/languages/'.length);
+          return {
+            href: target.href,
+            from: `/${name}/extension/doc/01-${name}.md`,
+            to: `public/docs/11-languages/${name}.md`,
+          };
+        }),
+        ...MONOREPO_TOOLS.map((target) => {
+          const name = target.href.slice('/docs/monorepo-tools/'.length);
+          return {
+            href: target.href,
+            from: `/integrations/${name}/doc/01-${name}.md`,
+            to: `public/docs/12-monorepo-tools/${name}.md`,
+          };
+        }),
+      ];
+      expect(owners.length).toBe(13);
+      for (const owner of owners) {
+        expect(assets.filter((entry) => entry.to === owner.to)).toEqual([{ from: owner.from, to: owner.to }]);
+      }
+    },
+  );
+
+  it('does not copy any asset onto the generated languages page', () => {
+    // The languages index has one producer: the support-catalog plugin. The
+    // references copied beside it never target it.
+    const target = LANGUAGES_PAGE_DIST_PATH.replaceAll('\\', '/');
+    expect(generateAssets().filter((entry) => entry.to === target)).toEqual([]);
+  });
 
   specTest(
     'does not copy any asset into the generated support section',

@@ -9,6 +9,8 @@ Use this page to get the CLI and workspace in place. If you already know the lan
 | React SSR, API routes, or a TypeScript library | [TypeScript getting started](/docs/frameworks/typescript/getting-started) |
 | A Go service or Go library | [Go getting started](/docs/frameworks/go/getting-started) |
 | An experimental Python service, library, or data workload | [Python getting started](/docs/frameworks/python/getting-started) |
+| Putnami on a Rust, Java or Kotlin, Swift, Dart, .NET, Ruby or PHP repository you already have | Its reference, from [Languages and monorepo tools](/docs/languages) |
+| Putnami on a repository Bazel, moon, Nx, Pants, Rush or Turborepo already builds | [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo) |
 
 ## Run the verified first-use path
 
@@ -171,5 +173,7 @@ Choose the path closest to your first project:
 - [TypeScript getting started](/docs/frameworks/typescript/getting-started) - full-stack web apps, API services, and TypeScript packages
 - [Go getting started](/docs/frameworks/go/getting-started) - compiled services, workers, and Go packages
 - [Python getting started](/docs/frameworks/python/getting-started) - Experimental, explicit opt-in FastAPI services, libraries, and data workloads
+- [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo) - keep the build tool a repository already uses, and put Putnami's runner and verdict on it
+- [Languages and monorepo tools](/docs/languages) - every language and tool Putnami runs, each with its reference
 - [Develop with AI assistants](/docs/how-to/develop-with-ai) - keep the same structure readable by humans and agents
 - [Support status](/docs/support) - what each package and protocol commits to before you depend on it

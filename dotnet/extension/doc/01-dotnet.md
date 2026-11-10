@@ -9,6 +9,10 @@ machine has none.
 
 ## Adopt it
 
+`@putnami/dotnet` is not published yet: until its first release, `putnami init
+--extension dotnet` stops at the extension install, after it has written the
+workspace files, and a workspace loads the extension from a source checkout.
+
 1. At the root of the repository, run:
 
    ```bash
@@ -172,7 +176,7 @@ writes from Microsoft's: the newest stable SDK of each feature band and the
 newest ASP.NET Core runtime of every channel from 8.0. The same extension
 release installs the same SDK on every machine, and a pin moves with the next
 extension release
-([ADR 0002](adr/0002-the-extension-pins-the-sdk-and-runtime-releases-it-installs.md)).
+([ADR 0002](https://github.com/Putnami/putnami/blob/main/dotnet/extension/doc/adr/0002-the-extension-pins-the-sdk-and-runtime-releases-it-installs.md)).
 `rollForward: disable` on an SDK that is not the newest of its feature band,
 or on a prerelease, finds none to install: put that SDK on `PATH`.
 
@@ -304,7 +308,7 @@ them, or the override also replaces `tasks.test.reports`. An override fails
 the task with `stacks.project_config_invalid` when it names an unknown member,
 changes `id` or `markers`, or adds a workspace-root input the extension does
 not declare. The design of the stack core is in
-[its design note](../../../tooling/stacks/doc/01-design.md).
+[its design note](https://github.com/Putnami/putnami/blob/main/tooling/stacks/doc/01-design.md).
 
 ## Limits
 

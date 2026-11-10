@@ -168,7 +168,7 @@ _putnami_flags_for() {
         'extensions remove') _putnami_words=(--user) ;;
         'help') _putnami_words=(--man --markdown) ;;
         'impact-plan') _putnami_words=(--base --head) ;;
-        'init') _putnami_words=(--apply --channel --extension --force --from --mode --project --project-path --workspace) ;;
+        'init') _putnami_words=(--apply --channel --extension --force --from --import --mode --project --project-path --workspace) ;;
         'install') _putnami_words=(--latest) ;;
         'migrate vnext') _putnami_words=(--apply --check) ;;
         'pin') _putnami_words=(--remove) ;;
@@ -186,7 +186,7 @@ _putnami_flags_for() {
         'templates package') _putnami_words=(--stable --version) ;;
         'templates test') _putnami_words=(--channel --keep --skip-build) ;;
         'upgrade') _putnami_words=(--channel --cli --continue-on-error --deps --dry-run --extensions --from-source --global --namespace --release --version) ;;
-        'workspace init') _putnami_words=(--apply --channel --extension --force --from --mode --project --project-path --workspace) ;;
+        'workspace init') _putnami_words=(--apply --channel --extension --force --from --import --mode --project --project-path --workspace) ;;
     esac
 }
 
@@ -491,6 +491,10 @@ _putnami_completions() {
             structured_values=(bazel moon nx pants rush turbo)
             value_slot=1
             ;;
+        'init --import')
+            structured_values=()
+            value_slot=1
+            ;;
         'init --mode')
             structured_values=(delegate import)
             value_slot=1
@@ -581,6 +585,10 @@ _putnami_completions() {
             ;;
         'workspace init --from')
             structured_values=(bazel moon nx pants rush turbo)
+            value_slot=1
+            ;;
+        'workspace init --import')
+            structured_values=()
             value_slot=1
             ;;
         'workspace init --mode')

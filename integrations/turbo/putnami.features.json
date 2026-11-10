@@ -38,6 +38,19 @@
           }
         },
         {
+          "id": "delegate-imports-listed-packages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "delegate-mode-imports-the-packages-the-import-list-selects"
+            ]
+          }
+        },
+        {
           "id": "sync-previews-a-diff",
           "stage": "coded",
           "evidenceKinds": [
