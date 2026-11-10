@@ -62,7 +62,7 @@ func importConventions(root string, projects []detect.Project) ([]conventionWrit
 			case err != nil:
 				return nil, nil, fmt.Errorf("%s: %w", manifest, err)
 			case after != nil && published[p.Folder]:
-				warnings = append(warnings, fmt.Sprintf("%s keeps its entry: rush.json publishes %s, so its main stays the build output its consumers read; its dependents resolve it once it is built", manifest, p.Name))
+				warnings = append(warnings, fmt.Sprintf("%s keeps its entry: rush.json publishes %s, so its main stays the build output its consumers read, which Putnami's TypeScript build does not write, and the projects that depend on it cannot resolve it; add \"exports\": {\".\": %q} by hand when no consumer outside the repository needs that entry, or adopt the repository in delegate mode", manifest, p.Name, sourceEntry))
 			case after != nil:
 				writes = append(writes, conventionWrite{file: manifest, before: data, after: after, what: "exports " + sourceEntry + " added, so its dependents build against its sources"})
 			case reason != "":
