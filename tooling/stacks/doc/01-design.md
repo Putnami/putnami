@@ -428,7 +428,11 @@ program beside the toolchain on the task's `PATH`, such as a Flutter SDK's
 `dart`, then the first of that name on the task's `PATH`, where the
 directories of `Tools` are. `Stack.Selected`,
 `RunForeground`, `AnnounceReady` and `FreePort` serve a stack's `run` and
-`serve` commands.
+`serve` commands. `ImageName` and `ImageMember` serve a stack that packages an
+image: the image is the project's name as one lowercase path segment, the name
+the shared Docker publisher expects, so a project named `userService` packages
+`userservice`; `ImageMember` declares that image as a release-set member when
+the project's `putnami.json` publishes it.
 
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`

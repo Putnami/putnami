@@ -134,7 +134,8 @@ the targets it needs. An offline run fails and names what is missing.
 The image holds the binary at `/app` on a digest-pinned `cc-debian12` base, with
 no docker daemon. `--port` sets `PORT` and the exposed port, `--docker-tag` adds
 a tag, `--docker-base-image` replaces the base and `--docker-load` loads the
-image into the local daemon.
+image into the local daemon. The image name is the project name in lowercase;
+an archive keeps the project name as it is written.
 
 `--crates` copies the stack root without `target`, `.git`, `.putnami` and
 `node_modules`, with each path dependency outside it. It writes the release

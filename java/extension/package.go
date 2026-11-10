@@ -79,7 +79,7 @@ func assembleImage(ctx *pctx.Context, stack stacks.Stack, flags map[string]strin
 		return fmt.Errorf("%s: %w", code, err)
 	}
 	output := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", ctx.Project.Path, "package", dockerChannel)
-	name := imageName(ctx.Project.Name)
+	name := stacks.ImageName(ctx.Project.Name)
 	version := "0.0.0"
 	if ctx.Version != nil && ctx.Version.Full != "" {
 		version = ctx.Version.Full

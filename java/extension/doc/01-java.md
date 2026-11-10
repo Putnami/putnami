@@ -253,7 +253,8 @@ the application once with `--args` and answers its exit code.
 assembler of the extension SDK, with no Docker daemon: its runnable form under
 `/app`, on the Eclipse Temurin JRE of the task's Java major
 (`eclipse-temurin:<release>-jre`, pinned by digest for 17, 21 and 25), run as
-user 1000 with `PORT` and `SERVER_PORT` set to 8080.
+user 1000 with `PORT` and `SERVER_PORT` set to 8080. The image name is the
+project name in lowercase.
 
 ```bash
 putnami package --docker --docker-load --projects /java/samples/maven/application

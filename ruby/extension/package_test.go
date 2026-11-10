@@ -575,6 +575,35 @@ func TestAnApplicationThatPublishesAnImageIsAReleaseSetMember(t *testing.T) {
 	}
 }
 
+func TestAProjectNamedWithUppercaseLettersPackagesALowercaseImage(t *testing.T) {
+	rubyTools(t)
+	root := workspaceRoot(t)
+	rackApp(t, root, "Shop")
+	writeFile(t, root, "Shop/putnami.json", `{"publish": ["docker"]}`)
+	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
+	if status, _, err := runProjectJob(t, root, "Shop", PackageDockerJob(stack(t)), job.Params{"dry-run": json.RawMessage(`true`)}); status != "OK" || err != nil {
+		t.Fatalf("package: %s %v", status, err)
+	}
+	index, err := pkgmeta.ReadChannelIndex(root, "Shop")
+	if err != nil || index.Records[dockerChannel].Artifact != "shop" {
+		t.Fatalf("channel records = %+v, %v", index, err)
+	}
+	// The shared publisher finds the release-set member of the packaged image
+	// by its name.
+	s := stack(t)
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"Shop"}})
+	if err != nil || len(result.Projects) != 1 {
+		t.Fatalf("probe: %v %+v", err, result)
+	}
+	var meta stacks.Metadata
+	if err := json.Unmarshal(result.Projects[0].Metadata, &meta); err != nil || meta.ReleaseSet == nil || len(meta.ReleaseSet.Ecosystems) != 1 {
+		t.Fatalf("release set: %v %s", err, result.Projects[0].Metadata)
+	}
+	if member := meta.ReleaseSet.Ecosystems[0]; member.Coordinate != "acme/shop" {
+		t.Errorf("member = %+v", member)
+	}
+}
+
 func TestAStagedSymbolicLinkFailsPackaging(t *testing.T) {
 	source := t.TempDir()
 	writeFile(t, source, "public/app.js", "a")
