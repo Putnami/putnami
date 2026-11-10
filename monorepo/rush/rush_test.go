@@ -524,7 +524,7 @@ func TestTheModeParamOutranksTheRecordedMode(t *testing.T) {
 	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-from-rush-json")
 	d := readDemo(t)
 	root := repository(t, d, ModeDelegate, false)
-	ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{ModeParam: json.RawMessage(`"import"`), stacks.SyncDryRunParam: json.RawMessage("true")}}
+	ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{ModeParam: json.RawMessage(`"import"`), "dryRun": json.RawMessage("true")}}
 	var events strings.Builder
 	emit := jsonl.New()
 	emit.Observe(func(message string) { events.WriteString(message + "\n") })
@@ -575,7 +575,7 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 	var diffs []string
-	for _, diff := range dry.Diffs {
+	for _, diff := range dry.Changes {
 		diffs = append(diffs, diff.File)
 	}
 	slices.Sort(diffs)
@@ -584,12 +584,12 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 		t.Errorf("dry diffs = %v, want %v", diffs, want)
 	}
 	var pricingDiff string
-	for _, diff := range dry.Diffs {
-		if diff.File == "libs/pricing/package.json" {
-			pricingDiff = diff.Diff
+	for _, c := range dry.Changes {
+		if c.File == "libs/pricing/package.json" {
+			pricingDiff = stacks.Diff(c.File, c.Before, c.After)
 		}
 	}
-	if !strings.Contains(pricingDiff, `+   "exports": {`) || !strings.Contains(pricingDiff, `+     ".": "./src/index.ts"`) || strings.Contains(pricingDiff, "- ") {
+	if !strings.Contains(pricingDiff, "\n+  \"exports\": {") || !strings.Contains(pricingDiff, "\n+    \".\": \"./src/index.ts\"") || strings.Contains(pricingDiff, "\n- ") || strings.Contains(pricingDiff, "\n-  ") {
 		t.Errorf("the pricing diff adds exports alone:\n%s", pricingDiff)
 	}
 	if _, err := os.Stat(filepath.Join(root, "apps/api/tsconfig.json")); !os.IsNotExist(err) {
@@ -623,8 +623,8 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 		t.Errorf("apps/web keeps its tsconfig: %s", config)
 	}
 	again, err := Stale(context.Background(), root, &bytes.Buffer{})
-	if err != nil || len(again.Written) != 0 || len(again.Diffs) != 0 {
-		t.Errorf("a second import writes %v %v, %v", again.Written, again.Diffs, err)
+	if err != nil || len(again.Written) != 0 || len(again.Changes) != 0 {
+		t.Errorf("a second import writes %v %v, %v", again.Written, again.Changes, err)
 	}
 
 	// Delegate mode rewrites no package.json and writes no tsconfig.

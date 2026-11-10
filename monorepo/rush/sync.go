@@ -85,10 +85,10 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 	if err != nil {
 		return SyncResult{}, err
 	}
-	sync := graphSync(detection, mode)
+	sync := graphSync(detection)
 	packages := make([]stacks.GraphPackage, 0, len(detection.Projects))
 	for _, p := range detection.Projects {
-		pkg := stacks.GraphPackage{Dir: p.Folder, DependsOn: p.DependsOn, Tested: true}
+		pkg := stacks.GraphPackage{Dir: p.Folder, DependsOn: p.DependsOn, Extension: TypeScriptExtension}
 		if mode == ModeDelegate {
 			pkg.Inputs = delegateInputs(root, p.Folder, detection.Lockfile)
 			for _, job := range []string{stacks.TaskTest, stacks.TaskLint} {
@@ -96,7 +96,7 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 					pkg.Disabled = append(pkg.Disabled, job)
 				}
 			}
-			pkg.Tested = !slices.Contains(pkg.Disabled, stacks.TaskTest)
+			pkg.Extension = ExtensionName
 		}
 		packages = append(packages, pkg)
 	}
@@ -129,30 +129,25 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 	return result, nil
 }
 
-// graphSync writes the Rush project graph in the mode: the Rush extension
-// and its inputs in delegate mode, the TypeScript extension in import mode,
-// which also marks projects of no Rush project, so an import retracts none.
-func graphSync(detection detect.Detection, mode string) stacks.GraphSync {
+// graphSync writes the Rush project graph: each package names the extension
+// of the mode, the Rush extension with its inputs in delegate mode, the
+// TypeScript extension in import mode.
+func graphSync(detection detect.Detection) stacks.GraphSync {
 	folders := map[string]bool{}
 	for _, p := range detection.Projects {
 		folders[p.Folder] = true
 	}
-	isProject := func(_, dir string) bool { return folders[dir] }
-	if mode == ModeImport {
-		return stacks.GraphSync{
-			Extension:      TypeScriptExtension,
-			HoldsBuildFile: isProject,
-			KeepFormer:     true,
-			Replaces:       []string{ExtensionName},
-			ClearJobs:      []string{stacks.TaskTest, stacks.TaskLint},
-		}
-	}
 	return stacks.GraphSync{
-		Extension:      ExtensionName,
-		HoldsBuildFile: isProject,
+		Extension: ExtensionName,
+		// An imported project runs the TypeScript extension, a delegated one
+		// the Rush extension: the sync writes the package's and removes the
+		// other, so a mode switch leaves no project with both.
+		Extensions:     []string{TypeScriptExtension},
+		HoldsBuildFile: func(_, dir string) bool { return folders[dir] },
 		SkippedDirs:    []string{"common", "temp"},
-		OwnedJobs:      []string{stacks.TaskLint},
-		Replaces:       []string{TypeScriptExtension},
+		// The sync owns test and lint in disable.jobs: a delegated project
+		// lists those Rush has no command for, an imported one none.
+		Jobs: []string{stacks.TaskTest, stacks.TaskLint},
 	}
 }
 

@@ -229,7 +229,7 @@ func topLevelEntryEnd(data []byte) (int, error) {
 func applyConventions(root string, writes []conventionWrite, result *stacks.GraphResult, dry bool) error {
 	for _, w := range writes {
 		if dry {
-			result.Diffs = append(result.Diffs, stacks.GraphDiff{File: w.file, Diff: stacks.LineDiff(string(w.before), string(w.after))})
+			result.Changes = append(result.Changes, stacks.FileChange{File: w.file, Before: w.before, After: w.after})
 			continue
 		}
 		if err := writeAtomic(filepath.Join(root, filepath.FromSlash(w.file)), w.after); err != nil {
