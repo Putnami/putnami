@@ -281,7 +281,9 @@ these choices.
 
 `putnami install` runs the extension's `workspace-install` once per stack root
 of the workspace's Gradle and Maven builds, in path order, and leaves out the
-projects whose tags `disable.tags` names:
+projects whose tags `disable.tags` names. A change to `gradle.lockfile` or
+`settings-gradle.lockfile` at the workspace root makes the next `putnami`
+command run it again. It installs:
 
 1. The JDK `.java-version` accepts, as a task installs it, and the pinned JDKs
    the build's Gradle toolchains ask for.

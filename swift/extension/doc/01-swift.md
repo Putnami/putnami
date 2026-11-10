@@ -115,7 +115,9 @@ no target the filter names fails, since `xcodebuild` refuses the selection.
 ## Install and upgrade dependencies
 
 `putnami install` runs the `workspace-install` job of this extension over the
-workspace's components, except the projects `disable.tags` excludes:
+workspace's components, except the projects `disable.tags` excludes. A change
+to `Package.resolved` at the workspace root makes the next `putnami` command
+run it again:
 
 | Component | What it runs |
 |---|---|

@@ -93,7 +93,10 @@
       "obj",
       "TestResults"
     ],
-    "language": "dotnet"
+    "language": "dotnet",
+    "installInputs": [
+      "packages.lock.json"
+    ]
   },
   "commands": {
     "lint": {
@@ -131,7 +134,14 @@
             "^test"
           ]
         }
-      ]
+      ],
+      "flags": {
+        "test": {
+          "type": "string",
+          "short": "-t",
+          "description": "Test filter to run, passed to dotnet test as --filter"
+        }
+      }
     },
     "build": {
       "description": "Build the projects with dotnet build.",
@@ -391,6 +401,9 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 1800000,
       "inputs": {
+        "test": {
+          "from": "params"
+        },
         "sources": {
           "from": "project",
           "files": [

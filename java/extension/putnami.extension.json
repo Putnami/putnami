@@ -99,7 +99,11 @@
       "target",
       ".gradle"
     ],
-    "language": "java"
+    "language": "java",
+    "installInputs": [
+      "gradle.lockfile",
+      "settings-gradle.lockfile"
+    ]
   },
   "commands": {
     "lint": {

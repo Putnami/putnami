@@ -165,6 +165,7 @@ if [ "$1" = "test" ]; then
   for a in "$@"; do
     if [ "$prev" = "--results-directory" ]; then
       mkdir -p "$a/3f6c0e9a-run" "$a/_vm_2026-11-08/In/vm"
+      [ -n "$STUB_NO_TRX" ] && exit 0
       cp "`+filepath.Join(bin, "trx.xml")+`" "$a/_vm_2026-11-08.trx"
       covered="$(cd "$PWD/../../src/Pricing" && pwd)/Calculator.cs"
       if [ -z "$STUB_NO_COVERAGE" ]; then

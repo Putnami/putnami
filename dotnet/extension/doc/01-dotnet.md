@@ -70,8 +70,14 @@ which names it; a step that exits non-zero with no failed case, or a missing
 TRX report, fails it too. A test project with no Coverlet collector writes no
 Cobertura report: the task passes with the warning
 `stacks.coverage_unavailable` and no coverage, and `--enforce-coverage` fails
-it. The output directory is emptied before
-the step.
+it. The output directory is emptied before the step.
+
+`putnami test --test <filter>`, short `-t`, passes the filter to `dotnet test`
+as `--filter <filter>`: a bare value selects the tests whose fully qualified
+name contains it, and the test platform's expression syntax works as it does
+on the command line. The filter also reaches the test projects the selected
+ones depend on; one in which it selects no test writes no TRX report, and its
+run passes with zero tests. The filter is part of the task's cache key.
 
 `lint` also checks every relative link and anchor of the project's
 `README.md` files and `doc/` trees with the documentation link check every
@@ -84,6 +90,10 @@ build writes the `obj/` of each project it references: the .NET tasks of a
 workspace run one at a time.
 
 ## Restore and upgrade the packages
+
+A change to `packages.lock.json` at the workspace root makes the next
+`putnami` command reinstall the workspace, as a change to `putnami.lock.json`
+does.
 
 `dotnet build`, `dotnet test` and `dotnet format` restore their project
 themselves. The workspace commands restore every project ahead of them:

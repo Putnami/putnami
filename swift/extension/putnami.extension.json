@@ -98,7 +98,10 @@
       "Carthage",
       "xcuserdata"
     ],
-    "language": "swift"
+    "language": "swift",
+    "installInputs": [
+      "Package.resolved"
+    ]
   },
   "commands": {
     "workspace-install": {
