@@ -1,0 +1,21 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "dart-example-application",
+        "package": "dart-example-application",
+        "sourceKind": "manual"
+      }
+    }
+  ],
+  "digest": "sha256:86bf2feead34ef5ca3d39b9312d2d06d731d5d0afa06844a553b5f3825dd6a45"
+}
