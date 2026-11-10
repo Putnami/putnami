@@ -2,8 +2,10 @@ package workspace
 
 import (
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
+	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/git"
@@ -133,6 +135,88 @@ func ScanProjectPathsWithProviders(root string, scopes []ProviderScope) ([]strin
 
 	sort.Strings(paths)
 	return paths, nil
+}
+
+// DetectMarkers answers, for each scope, the root-relative directory of the
+// first directory that holds one of its markers: "." for root itself, "" when
+// none does. It walks as the project scan does, in the same order, with root
+// included: it never descends into `.git`, `.putnami`, a directory git ignores,
+// or a directory any of the scopes excludes. It reads each directory once,
+// matches names only and reads no file, and stops once every scope has a match.
+func DetectMarkers(root string, scopes []ProviderScope) []string {
+	found := make([]string, len(scopes))
+	remaining := len(scopes)
+	if remaining == 0 {
+		return found
+	}
+	gitIgnored := git.IgnoredDirs(root)
+	var walk func(dir, rel string) bool
+	walk = func(dir, rel string) bool {
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			return true
+		}
+		for i, scope := range scopes {
+			if found[i] == "" && markerAmong(dir, entries, scope.Markers) {
+				found[i] = rel
+				remaining--
+			}
+		}
+		if remaining == 0 {
+			return false
+		}
+		for _, entry := range entries {
+			if !entry.IsDir() {
+				continue
+			}
+			name := entry.Name()
+			child := name
+			if rel != "." {
+				child = rel + "/" + name
+			}
+			if name == ".git" || name == ".putnami" || gitIgnored[child] || ExcludedByProviderScopes(scopes, child) {
+				continue
+			}
+			if !walk(filepath.Join(dir, name), child) {
+				return false
+			}
+		}
+		return true
+	}
+	walk(root, ".")
+	return found
+}
+
+// markerAmong reports whether the directory dir, whose entries are entries,
+// holds one of markers, as markerPresent decides it. A one-segment marker is
+// matched against the entries alone; a deeper one globs only below an entry
+// that matches its first segment.
+func markerAmong(dir string, entries []os.DirEntry, markers []string) bool {
+	for _, marker := range markers {
+		first, rest, nested := strings.Cut(marker, "/")
+		for _, entry := range entries {
+			if matched, err := path.Match(first, entry.Name()); err != nil || !matched {
+				continue
+			}
+			candidate := filepath.Join(dir, entry.Name())
+			if nested {
+				if markerPresent(candidate, []string{rest}, "") {
+					return true
+				}
+				continue
+			}
+			if entry.Type()&os.ModeSymlink == 0 {
+				if !entry.IsDir() {
+					return true
+				}
+				continue
+			}
+			if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ExcludedByProviderScopes reports whether any adapter refuses to descend into a

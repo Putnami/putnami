@@ -94,8 +94,10 @@ These built-in commands manage workspace infrastructure:
 
 ### `putnami workspace`
 
-- `putnami workspace init` — Initialize a new workspace in the current directory
-  - `--project <name>` — Scaffold an initial project
+- `putnami workspace init` — Initialize a new workspace in the current directory, or adopt the repository it runs in
+  - `--extension <languages>` — Declare and install the extension of each language: `dart`, `dotnet`, `go`, `java`, `php`, `python`, `ruby`, `rust`, `swift` or `typescript` (`ts` and `py` name `typescript` and `python`), or a comma-separated list such as `rust,java`. When the repository holds a marker of a declared language, such as a `Cargo.toml`, `init` runs `putnami projects sync` and its projects join the workspace
+  - Without `--extension`, `--from` or `--project`, `init` proposes the languages whose markers it finds: a terminal asks with all of them preselected; without one, `init` writes nothing and prints the `putnami init --extension` command to run. At the root of a monorepo tool's repository it writes nothing and points at `putnami init --from <tool>`. A directory with no marker gets `typescript`
+  - `--project <name>` — Scaffold an initial project from the starter of the first `--extension` language: `typescript`, `go` and `python` ship one
   - `--project-path <path>` — Custom path for the initial project
   - `--channel <name>` — Resolve the extensions, the template and the starter's dependencies on one release channel (default: `PUTNAMI_CHANNEL`, then the channel the CLI was installed from, then `latest`). See [`workspace`](https://github.com/Putnami/putnami/blob/main/tooling/cli/doc/03-commands.md#workspace)
 - `putnami workspace describe` — Show workspace configuration

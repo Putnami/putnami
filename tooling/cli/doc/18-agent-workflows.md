@@ -232,7 +232,7 @@ reads and hashes them.
 
 ### `putnami init`
 
-No built-in starter (`--extension ts|go|py`) opts into agent content, so `init`
+No built-in starter (`typescript`, `go`, `python`) opts into agent content, so `init`
 does not install `@putnami/contributor` and writes no agent-content declaration.
 To ask for it, run `putnami extensions install @putnami/contributor`, which
 declares it, opts into its content and materializes it; a second run, or

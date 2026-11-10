@@ -8,13 +8,25 @@ when the machine lacks them.
 
 ## Adopt it
 
-1. Declare the extension in `putnami.workspace.json`:
+1. At the root of the repository, run:
+
+   ```bash
+   putnami init --extension rust
+   ```
+
+   It writes `putnami.workspace.json` with `@putnami/rust` declared, installs
+   the extension, and runs `putnami projects sync`, because the repository
+   holds a `Cargo.toml`. A repository of several languages takes a list, such as
+   `--extension rust,typescript`, and `putnami init` without `--extension`
+   proposes the languages it finds. In a workspace that already exists,
+   declare the extension in `putnami.workspace.json` and run
+   `putnami projects sync`:
 
    ```json
    { "extensions": ["@putnami/rust"] }
    ```
 
-2. Run `putnami projects sync`. Each directory that holds a `Cargo.toml` with
+2. Each directory that holds a `Cargo.toml` with
    a `[package]` table, or that a `[workspace]` names as a member, joins the
    workspace's `includes`, and so does each virtual Cargo workspace below the
    workspace root. The extension names each crate by its package, adds an edge

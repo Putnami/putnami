@@ -9,13 +9,25 @@ machine has none.
 
 ## Adopt it
 
-1. Declare the extension in `putnami.workspace.json`:
+1. At the root of the repository, run:
+
+   ```bash
+   putnami init --extension dotnet
+   ```
+
+   It writes `putnami.workspace.json` with `@putnami/dotnet` declared, installs
+   the extension, and runs `putnami projects sync`, because the repository
+   holds a `.csproj`, `.fsproj` or `.vbproj`. A repository of several languages takes a list, such as
+   `--extension dotnet,typescript`, and `putnami init` without `--extension`
+   proposes the languages it finds. In a workspace that already exists,
+   declare the extension in `putnami.workspace.json` and run
+   `putnami projects sync`:
 
    ```json
    { "extensions": ["@putnami/dotnet"] }
    ```
 
-2. Run `putnami projects sync`. Each directory that holds a `.csproj`,
+2. Each directory that holds a `.csproj`,
    `.fsproj` or `.vbproj` joins the workspace's `includes`. No `putnami.json`
    is needed: the extension names the project by its project file, adds an
    edge to each project it references with a `ProjectReference`, and tags it

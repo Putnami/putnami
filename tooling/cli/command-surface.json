@@ -517,12 +517,7 @@
         },
         {
           "long": "--extension",
-          "type": "value",
-          "values": [
-            "go",
-            "py",
-            "ts"
-          ]
+          "type": "value"
         },
         {
           "long": "--force",
@@ -1031,12 +1026,7 @@
         },
         {
           "long": "--extension",
-          "type": "value",
-          "values": [
-            "go",
-            "py",
-            "ts"
-          ]
+          "type": "value"
         },
         {
           "long": "--force",

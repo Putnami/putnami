@@ -46,15 +46,15 @@ func TestParseInitFlagsReadsTheChannel(t *testing.T) {
 		want initFlags
 	}{
 		{name: "a separate value", args: []string{"--channel", "canary"},
-			want: initFlags{extension: "ts", channel: "canary", channelSet: true}},
+			want: initFlags{channel: "canary", channelSet: true}},
 		{name: "an attached value", args: []string{"--channel=canary", "--project", "app"},
-			want: initFlags{extension: "ts", project: "app", channel: "canary", channelSet: true}},
+			want: initFlags{project: "app", channel: "canary", channelSet: true}},
 		{name: "an attached empty value", args: []string{"--channel="},
-			want: initFlags{extension: "ts", channelSet: true}},
+			want: initFlags{channelSet: true}},
 		{name: "no value", args: []string{"--project", "app", "--channel"},
-			want: initFlags{extension: "ts", project: "app", channelSet: true}},
+			want: initFlags{project: "app", channelSet: true}},
 		{name: "no flag", args: []string{"--project", "app"},
-			want: initFlags{extension: "ts", project: "app"}},
+			want: initFlags{project: "app"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

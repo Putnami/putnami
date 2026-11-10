@@ -23,9 +23,11 @@ import (
 	"go.putnami.dev/tooling/cli/internal/iox"
 )
 
-// initExtensionConfig maps --extension shorthand to extension package + default
-// template. It is the starter definition: everything `putnami init` writes into
-// a new workspace that is not derived from the user's flags comes from here.
+// initExtensionConfig is what init declares for one extension: the extension,
+// and, for a language that ships a starter (initStarters), the template
+// --project renders, the agent content it opts into and its registries.
+// Everything `putnami init` writes into a new workspace that is not derived
+// from the user's flags comes from here.
 type initExtensionConfig struct {
 	packageName string
 	template    string
@@ -44,19 +46,6 @@ type initExtensionConfig struct {
 	// the registry its framework dependencies install from. The extension that
 	// owns the ecosystem reads the entry; nothing else names the endpoint.
 	registries map[string]json.RawMessage
-}
-
-// starterNPMRegistries maps the @putnami npm scope to the Putnami package
-// registry, which serves the TypeScript framework packages the TypeScript
-// templates depend on.
-var starterNPMRegistries = map[string]json.RawMessage{
-	"npm": json.RawMessage(`{"scopes":{"@putnami":"https://npm.putnami.dev"}}`),
-}
-
-var initExtensions = map[string]initExtensionConfig{
-	"ts": {packageName: "@putnami/typescript", template: "typescript-web", registries: starterNPMRegistries},
-	"go": {packageName: "@putnami/go", template: "go-server"},
-	"py": {packageName: "@putnami/python", template: "python-server"},
 }
 
 // initSource is a monorepo tool `putnami init --from` adopts: the starter
@@ -179,7 +168,7 @@ type initFlags struct {
 }
 
 func parseInitFlags(args []string) initFlags {
-	f := initFlags{extension: "ts"}
+	var f initFlags
 	for i := 0; i < len(args); i++ {
 		if value, ok := strings.CutPrefix(args[i], initChannelFlag+"="); ok {
 			f.channel, f.channelSet = value, true
@@ -285,41 +274,90 @@ AGENTS.md tells coding agents how to work in this workspace.
 `
 }
 
+// initPlan is what an init run declares: the languages, in the order
+// --extension names them, and one config per language. An init --from run
+// declares no language, and its one config is the tool's.
+type initPlan struct {
+	languages []initLanguage
+	configs   []initExtensionConfig
+}
+
+// initPlanFor is the plan that declares languages.
+func initPlanFor(languages []initLanguage) initPlan {
+	plan := initPlan{languages: languages}
+	for _, language := range languages {
+		plan.configs = append(plan.configs, initConfigFor(language))
+	}
+	return plan
+}
+
+// starter is the config whose template --project renders: the first one's.
+func (p initPlan) starter() initExtensionConfig {
+	return p.configs[0]
+}
+
+// packageNames are the extensions of the plan's configs, in order.
+func (p initPlan) packageNames() []string {
+	names := make([]string, len(p.configs))
+	for i, config := range p.configs {
+		names[i] = config.packageName
+	}
+	return names
+}
+
 // resolveInitRequest validates what an init run was asked for before anything
-// is written: the starter extension, the project placement and the channel.
-// --from names the starter of a monorepo tool, which takes no project and no
-// --extension: the tool's packages are the projects.
-func resolveInitRequest(flags initFlags) (initExtensionConfig, initChannel, error) {
-	extConfig, ok := initExtensions[flags.extension]
+// is written: the languages, the starter, the project placement and the
+// channel. --from names the starter of a monorepo tool, which takes no project
+// and no --extension: the tool's packages are the projects.
+func resolveInitRequest(flags initFlags) (initPlan, initChannel, error) {
+	var plan initPlan
 	if flags.fromSet {
 		if flags.from == "" {
-			return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--from needs a tool (choose: %s)", initSourceNames())
+			return initPlan{}, initChannel{}, cmderr.Usagef("--from needs a tool (choose: %s)", initSourceNames())
 		}
 		source, known := initSources[flags.from]
 		if !known {
-			return initExtensionConfig{}, initChannel{}, cmderr.Usagef("unknown --from tool %q (choose: %s)", flags.from, initSourceNames())
+			return initPlan{}, initChannel{}, cmderr.Usagef("unknown --from tool %q (choose: %s)", flags.from, initSourceNames())
 		}
 		if flags.project != "" || flags.projectPath != "" || flags.extensionSet {
-			return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--from %s does not combine with --project, --project-path or --extension: the %s packages become the projects", flags.from, flags.from)
+			return initPlan{}, initChannel{}, cmderr.Usagef("--from %s does not combine with --project, --project-path or --extension: the %s packages become the projects", flags.from, flags.from)
 		}
 		if err := validateInitMode(flags, source); err != nil {
-			return initExtensionConfig{}, initChannel{}, err
+			return initPlan{}, initChannel{}, err
 		}
-		extConfig, ok = source.starter, true
-	} else if flags.modeSet || flags.apply {
-		return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--mode and --apply adopt a monorepo tool: give --from <tool> (choose: %s)", initSourceNames())
-	}
-	if !ok {
-		return initExtensionConfig{}, initChannel{}, cmderr.Usagef("unknown extension %q (choose: ts, go, py)", flags.extension)
+		plan = initPlan{configs: []initExtensionConfig{source.starter}}
+	} else {
+		if flags.modeSet || flags.apply {
+			return initPlan{}, initChannel{}, cmderr.Usagef("--mode and --apply adopt a monorepo tool: give --from <tool> (choose: %s)", initSourceNames())
+		}
+		value := flags.extension
+		if !flags.extensionSet {
+			value = initDefaultLanguage
+		}
+		languages, err := parseInitLanguages(value)
+		if err != nil {
+			return initPlan{}, initChannel{}, err
+		}
+		plan = initPlanFor(languages)
+		if flags.project != "" && plan.starter().template == "" {
+			return initPlan{}, initChannel{}, cmderr.Usagef("--project renders the starter of the first language of --extension, and %s ships none (languages with a starter: %s)",
+				plan.languages[0].Language, initStarterLanguages())
+		}
 	}
 	if flags.projectPath != "" && flags.project == "" {
-		return initExtensionConfig{}, initChannel{}, cmderr.Usagef("--project-path requires --project")
+		return initPlan{}, initChannel{}, cmderr.Usagef("--project-path requires --project")
 	}
 	channel, err := resolveInitChannel(flags, os.Getenv, runningCLIName())
 	if err != nil {
-		return initExtensionConfig{}, initChannel{}, err
+		return initPlan{}, initChannel{}, err
 	}
-	return extConfig, channel, nil
+	return plan, channel, nil
+}
+
+// initProposes reports whether init chooses the languages itself: no
+// --extension, --from or --project names what to declare (D-067).
+func initProposes(flags initFlags) bool {
+	return !flags.extensionSet && !flags.fromSet && flags.project == ""
 }
 
 // printInitChannel names the channel an init run resolves on and what chose
@@ -341,7 +379,7 @@ func printInitChannel(channel initChannel) {
 func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env LifecycleEnv) error {
 	flags := parseInitFlags(args)
 
-	extConfig, channel, err := resolveInitRequest(flags)
+	plan, channel, err := resolveInitRequest(flags)
 	if err != nil {
 		return err
 	}
@@ -384,7 +422,20 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	if err != nil {
 		return fmt.Errorf("get cwd: %w", err)
 	}
-	declared := initDeclaredExtensions(extConfig)
+	if initProposes(flags) {
+		languages, err := proposeInitLanguages(cwd)
+		if err != nil {
+			return err
+		}
+		if len(languages) > 0 {
+			plan = initPlanFor(languages)
+		}
+	}
+	// The repository as init found it decides what it adopts: the markers the
+	// starter project writes are not a repository to adopt.
+	adopted := detectInitLanguages(cwd, plan.languages)
+	extConfig := plan.starter()
+	declared := initDeclaredExtensions(plan.configs...)
 	var options map[string]initToolOptions
 	if source, ok := initSources[flags.from]; ok {
 		if !holdsAny(cwd, source.markers) {
@@ -466,8 +517,8 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		Name:           name,
 		Extensions:     declared,
 		Templates:      templates,
-		AgentArtifacts: initAgentArtifacts(cwd, extConfig),
-		Registries:     initRegistries(cwd, extConfig),
+		AgentArtifacts: initAgentArtifacts(cwd, plan.configs...),
+		Registries:     initRegistries(cwd, plan.configs...),
 		Includes:       []string{},
 		Options:        options,
 	}
@@ -491,7 +542,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	// Reload config from disk (now that putnami.workspace.json exists)
 	wsCfg := wsproto.Load(cwd)
 
-	installs := []string{extConfig.packageName}
+	installs := plan.packageNames()
 	if flags.from != "" {
 		// A tool's import mode hands targets to other extensions, which
 		// install beside the tool's.
@@ -521,7 +572,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	if len(cfg.AgentArtifacts) > 0 {
 		iox.Fprintln(os.Stdout)
 		iox.Fprintf(os.Stdout, "  → Installing agent content…\n")
-		if err := installInitAgentContent(ctx, cwd, wsCfg, extConfig, env.channel); err != nil {
+		if err := installInitAgentContent(ctx, cwd, wsCfg, env.channel, plan.configs...); err != nil {
 			// Reported, not fatal. The declarations are written and the
 			// content's extension is either unpinned or its content unwritten,
 			// so nothing is half-installed; `putnami install` installs and
@@ -568,6 +619,20 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
+	// A language whose markers the repository held is adopted: the sync
+	// records the projects its extension's probe answers.
+	if len(adopted) > 0 {
+		iox.Fprintln(os.Stdout)
+		iox.Fprintf(os.Stdout, "  → Synchronizing the %s projects…\n", initLanguageNamesOf(detectedLanguages(adopted)))
+		before := initDeclaredNames(cwd, wsproto.Load(cwd))
+		if err := syncInitProjects(ctx, cwd, wsproto.Load(cwd), env); err != nil {
+			return protocolcli.WithNext(fmt.Errorf("synchronize the %s projects: %w", initLanguageNamesOf(detectedLanguages(adopted)), err), "putnami projects sync")
+		}
+		if err := installSyncDeclaredExtensions(ctx, cwd, before, env); err != nil {
+			return err
+		}
+	}
+
 	// End with the lock metadata refresh `putnami install` ends with.
 	if _, err := refreshInitLockMetadata(ctx, cwd, env.CLIVersion); err != nil {
 		return protocolcli.WithNext(fmt.Errorf("refresh lock metadata: %w", err), "putnami install")
@@ -582,15 +647,19 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	iox.Fprintln(os.Stdout)
 
 	iox.Fprintln(os.Stdout, "  Next:")
-	if flags.from != "" {
-		iox.Fprintln(os.Stdout, "    putnami projects list")
-		iox.Fprintln(os.Stdout, "    putnami lint,test,build --impacted")
-	} else if flags.project != "" {
+	switch {
+	case flags.project != "":
 		iox.Fprintf(os.Stdout, "    putnami lint,test,build %s\n", flags.project)
 		iox.Fprintf(os.Stdout, "    putnami serve %s\n", flags.project)
-	} else {
+	case flags.from != "" || len(adopted) > 0:
+		iox.Fprintln(os.Stdout, "    putnami projects list")
+		iox.Fprintln(os.Stdout, "    putnami lint,test,build --impacted")
+	case extConfig.template != "":
 		iox.Fprintf(os.Stdout, "    putnami projects create my-app --template %s\n", extConfig.template)
 		iox.Fprintln(os.Stdout, "    putnami build --all")
+	default:
+		iox.Fprintf(os.Stdout, "    putnami projects sync    # once the repository holds a %s\n", plan.languages[0].Markers[0])
+		iox.Fprintln(os.Stdout, "    putnami lint,test,build --impacted")
 	}
 
 	return nil
@@ -687,26 +756,48 @@ func membersWith(members []string, projectPath string) []string {
 	return slices.Compact(projects)
 }
 
-// installInitAgentContent installs the extension the starter opts into, on
+// installInitAgentContent installs each extension the configs opt into, on
 // channel when init chose one, then materializes the agent content every
 // opt-in selects from the release the lock pins.
-func installInitAgentContent(ctx context.Context, cwd string, wsCfg *wsproto.Config, extConfig initExtensionConfig, channel string) error {
-	if extConfig.agentContent != "" {
-		if err := installExtension(ctx, cwd, wsCfg, []string{shared.ChannelArtifact(extConfig.agentContent, channel)}, ""); err != nil {
-			return fmt.Errorf("install extension %s: %w", extConfig.agentContent, err)
+func installInitAgentContent(ctx context.Context, cwd string, wsCfg *wsproto.Config, channel string, configs ...initExtensionConfig) error {
+	var installed []string
+	for _, config := range configs {
+		if config.agentContent == "" || slices.Contains(installed, config.agentContent) {
+			continue
+		}
+		installed = append(installed, config.agentContent)
+		if err := installExtension(ctx, cwd, wsCfg, []string{shared.ChannelArtifact(config.agentContent, channel)}, ""); err != nil {
+			return fmt.Errorf("install extension %s: %w", config.agentContent, err)
 		}
 	}
 	return agentctx.AdoptAgentWorkflows(ctx, cwd, wsCfg, os.Stdout)
 }
 
-// initDeclaredExtensions is the new workspace's `extensions`: the language
-// extension, and the extension whose agent content the starter opts into.
-func initDeclaredExtensions(extConfig initExtensionConfig) []string {
-	extensions := []string{extConfig.packageName}
-	if extConfig.agentContent != "" && extConfig.agentContent != extConfig.packageName {
-		extensions = append(extensions, extConfig.agentContent)
+// initDeclaredExtensions is the new workspace's `extensions`: each config's
+// extension, then the extension whose agent content it opts into, each once.
+func initDeclaredExtensions(configs ...initExtensionConfig) []string {
+	var extensions []string
+	for _, config := range configs {
+		for _, name := range []string{config.packageName, config.agentContent} {
+			if name != "" && !slices.Contains(extensions, name) {
+				extensions = append(extensions, name)
+			}
+		}
 	}
 	return extensions
+}
+
+// initLanguageNamesOf joins the ids of languages for a sentence: "rust",
+// "rust and java", "rust, java and go".
+func initLanguageNamesOf(languages []initLanguage) string {
+	names := make([]string, len(languages))
+	for i, language := range languages {
+		names[i] = language.Language
+	}
+	if len(names) < 2 {
+		return strings.Join(names, "")
+	}
+	return strings.Join(names[:len(names)-1], ", ") + " and " + names[len(names)-1]
 }
 
 type initConfig struct {
@@ -720,14 +811,16 @@ type initConfig struct {
 	Options        map[string]initToolOptions `json:"options,omitempty"`
 }
 
-// initRegistries is the new workspace's `registries`: the starter's entries,
-// and every entry a config already at this path declares, which wins. An
-// entry is kept or replaced whole, never merged key by key: its keys belong to
-// the profile of the extension that owns the ecosystem.
-func initRegistries(cwd string, extConfig initExtensionConfig) map[string]json.RawMessage {
-	registries := make(map[string]json.RawMessage, len(extConfig.registries))
-	for ecosystem, entry := range extConfig.registries {
-		registries[ecosystem] = entry
+// initRegistries is the new workspace's `registries`: the entries of each
+// config's starter, and every entry a config already at this path declares,
+// which wins. An entry is kept or replaced whole, never merged key by key: its
+// keys belong to the profile of the extension that owns the ecosystem.
+func initRegistries(cwd string, configs ...initExtensionConfig) map[string]json.RawMessage {
+	registries := make(map[string]json.RawMessage)
+	for _, config := range configs {
+		for ecosystem, entry := range config.registries {
+			registries[ecosystem] = entry
+		}
 	}
 	if existing := readWorkspaceConfigAt(cwd); existing != nil {
 		for ecosystem, entry := range existing.Registries {
@@ -741,8 +834,7 @@ func initRegistries(cwd string, extConfig initExtensionConfig) map[string]json.R
 }
 
 // initAgentArtifacts is the new workspace's agent-content opt-in: what the
-// selected starter opts into, merged with what a config already at this path
-// declared.
+// configs opt into, merged with what a config already at this path declared.
 //
 // The merge exists because `putnami init --force` REWRITES the workspace config
 // of a workspace that may already have opted in. Dropping that array would
@@ -755,7 +847,7 @@ func initRegistries(cwd string, extConfig initExtensionConfig) map[string]json.R
 // installs is kept under its own spelling: dropping it would orphan its files
 // and records, while keeping it makes every later command refuse it and say
 // how to replace it.
-func initAgentArtifacts(cwd string, extConfig initExtensionConfig) []string {
+func initAgentArtifacts(cwd string, configs ...initExtensionConfig) []string {
 	byName := make(map[string]string)
 	record := func(references []string, overwrite bool) {
 		for _, reference := range references {
@@ -776,8 +868,10 @@ func initAgentArtifacts(cwd string, extConfig initExtensionConfig) []string {
 		}
 	}
 	var starter []string
-	if extConfig.agentContent != "" {
-		starter = []string{"extension:" + extConfig.agentContent}
+	for _, config := range configs {
+		if config.agentContent != "" {
+			starter = append(starter, "extension:"+config.agentContent)
+		}
 	}
 	record(starter, false)
 	if existing := readWorkspaceConfigAt(cwd); existing != nil {

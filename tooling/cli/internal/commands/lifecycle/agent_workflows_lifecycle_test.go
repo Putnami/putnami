@@ -281,14 +281,14 @@ func agentPinNamed(t *testing.T, root, name string) (lockfile.AgentArtifactLockE
 // than the code path under test.
 func starterOptsInto(t *testing.T, starter, name string) {
 	t.Helper()
-	original, ok := initExtensions[starter]
+	original, ok := initStarters[starter]
 	if !ok {
 		t.Fatalf("unknown starter %q", starter)
 	}
 	updated := original
 	updated.agentContent = name
-	initExtensions[starter] = updated
-	t.Cleanup(func() { initExtensions[starter] = original })
+	initStarters[starter] = updated
+	t.Cleanup(func() { initStarters[starter] = original })
 }
 
 // productionInstallExtension is init's real extension install, captured before
@@ -365,10 +365,10 @@ func TestAgentWorkflows_InstallWithoutDeclarationIsANoOp(t *testing.T) {
 // content, so a new workspace holds none until someone asks for it.
 func TestBuiltInStartersOptIntoNoAgentContent(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-agent-content-opt-in", "no-built-in-starter-opts-into-agent-content")
-	if len(initExtensions) == 0 {
+	if len(initStarters) == 0 {
 		t.Fatal("no built-in starters, so this check proves nothing")
 	}
-	for name, starter := range initExtensions {
+	for name, starter := range initStarters {
 		if starter.agentContent != "" {
 			t.Errorf("starter %q opts into %q, want no agent content", name, starter.agentContent)
 		}

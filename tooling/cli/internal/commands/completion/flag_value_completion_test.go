@@ -116,9 +116,10 @@ func TestCompletionOffersOnlyTheValuesOfTheFlagBeforeTheCursor(t *testing.T) {
 		// A core command's flag offers the values the catalog lists for it, or
 		// nothing, over a global flag of the same name. An alias, and the init
 		// spelling, take the values of their command.
-		{words: []string{"workspace", "init", "--extension", ""}, want: []string{"ts", "go", "py"}, exact: true},
-		{words: []string{"init", "--extension", ""}, want: []string{"ts", "go", "py"}, exact: true},
-		{words: []string{"wi", "--extension", ""}, want: []string{"ts", "go", "py"}, exact: true},
+		{words: []string{"workspace", "init", "--mode", ""}, want: []string{"import", "delegate"}, exact: true},
+		{words: []string{"init", "--mode", ""}, want: []string{"import", "delegate"}, exact: true},
+		{words: []string{"wi", "--mode", ""}, want: []string{"import", "delegate"}, exact: true},
+		{words: []string{"init", "--extension", ""}, want: nothing, exact: true},
 		{words: []string{"workspace", "init", "--workspace", ""}, want: nothing, exact: true},
 		{words: []string{"upgrade", "--channel", ""}, want: []string{"stable", "canary"}, exact: true},
 		{words: []string{"up", "--channel", ""}, want: []string{"stable", "canary"}, exact: true},

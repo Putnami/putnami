@@ -1,0 +1,50 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cli/init-a-language",
+  "outcomes": [
+    "A team turns a repository of any language Putnami runs, or of several, into a workspace with one command, putnami init --extension <language>[,<language>…], and its projects are synchronized",
+    "putnami init without a flag in an existing repository proposes the languages it finds instead of declaring TypeScript, and points a monorepo tool's repository at putnami init --from",
+    "A stack extension reaches init by declaring its language in its own manifest, with no change to the CLI's code"
+  ],
+  "nonGoals": [
+    "Reading a language's build files in the CLI: init matches marker file names and the extension's sync reads the rest",
+    "A starter template for the languages that ship none",
+    "Detecting an extension published outside this repository's release: it is installed with putnami extensions install and adopted with putnami projects sync",
+    "Declaring a language without the user's choice when init cannot ask"
+  ],
+  "requirements": [
+    {
+      "id": "every-language",
+      "text": "putnami init --extension takes any language of the index, dart, dotnet, go, java, php, python, ruby, rust, swift and typescript, or a comma-separated list of them, and declares and installs the extension of each, once. ts and py name typescript and python. An unknown language, an empty item and an empty value are usage errors that list the languages, raised before anything is written."
+    },
+    {
+      "id": "languages-come-from-the-extensions",
+      "text": "The language index the CLI embeds holds, for every extension the root putnami.workspace.json declares by path whose manifest declares workspace.language, its name, language, markers and excludes as that manifest states them, and nothing else. Each starter's template exists next to its language extension and names that extension."
+    },
+    {
+      "id": "init-adopts-what-it-finds",
+      "text": "When the directory holds a marker of a declared language, init runs putnami projects sync after it installs the extensions and the starter project, then installs the extensions the sync declared. A declared language whose markers are absent is installed and nothing is synchronized."
+    },
+    {
+      "id": "project-needs-a-starter",
+      "text": "--project renders the starter of the first language of --extension: typescript-web, go-server or python-server. A first language without a starter is a usage error, raised before anything is written, that names the languages that have one."
+    },
+    {
+      "id": "init-proposes-what-it-detects",
+      "text": "putnami init without --extension, --from or --project, in a directory that holds the markers of one or more languages, asks in a terminal which to declare, every detected language preselected, and then adopts the answer. Without a terminal it writes nothing and fails with a usage error that names the detected languages and suggests putnami init --extension with them. A directory without a marker declares typescript, as before."
+    },
+    {
+      "id": "monorepo-tool-hint",
+      "text": "Without --extension, --from or --project, a directory whose root holds the marker of a tool --from accepts, such as nx.json, turbo.json, rush.json, .moon/workspace.yml, pants.toml or MODULE.bazel, makes init write nothing and fail with a usage error that names the tool and suggests putnami init --from <tool>."
+    },
+    {
+      "id": "detection-reads-names-only",
+      "text": "Detection matches the markers of the index against the directory and its subdirectories, the root included, reading no file. It skips .git, .putnami, directories git ignores and every directory a language of the walk excludes, and reports for each language the first directory that holds one of its markers."
+    }
+  ],
+  "decisions": [
+    "tooling/cli/doc/adr/0086-init-declares-the-languages-a-repository-holds.md",
+    "tooling/cli/doc/adr/0056-init-resolves-on-one-channel.md"
+  ]
+}

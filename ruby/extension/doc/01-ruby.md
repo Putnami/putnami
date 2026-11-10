@@ -9,13 +9,25 @@ that fits.
 
 ## Adopt it
 
-1. Declare the extension in `putnami.workspace.json`:
+1. At the root of the repository, run:
+
+   ```bash
+   putnami init --extension ruby
+   ```
+
+   It writes `putnami.workspace.json` with `@putnami/ruby` declared, installs
+   the extension, and runs `putnami projects sync`, because the repository
+   holds a `Gemfile`, a packwerk `package.yml` or a `*.gemspec`. A repository of several languages takes a list, such as
+   `--extension ruby,typescript`, and `putnami init` without `--extension`
+   proposes the languages it finds. In a workspace that already exists,
+   declare the extension in `putnami.workspace.json` and run
+   `putnami projects sync`:
 
    ```json
    { "extensions": ["@putnami/ruby"] }
    ```
 
-2. Run `putnami projects sync`. Each directory below the workspace root
+2. Each directory below the workspace root
    that holds a `Gemfile`, a packwerk `package.yml` or a `*.gemspec` joins
    the workspace's `includes`. No `putnami.json` is needed: the extension
    names the component by its gem, else by its pack's path; adds an edge to

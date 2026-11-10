@@ -11,13 +11,25 @@ builds.
 
 ## Adopt it
 
-1. Declare the extension in `putnami.workspace.json`:
+1. At the root of the repository, run:
+
+   ```bash
+   putnami init --extension java
+   ```
+
+   It writes `putnami.workspace.json` with `@putnami/java` declared, installs
+   the extension, and runs `putnami projects sync`, because the repository
+   holds a Gradle settings or build file or a `pom.xml`. A repository of several languages takes a list, such as
+   `--extension java,typescript`, and `putnami init` without `--extension`
+   proposes the languages it finds. In a workspace that already exists,
+   declare the extension in `putnami.workspace.json` and run
+   `putnami projects sync`:
 
    ```json
    { "extensions": ["@putnami/java"] }
    ```
 
-2. Run `putnami projects sync`. Each Gradle project that `settings.gradle.kts`
+2. Each Gradle project that `settings.gradle.kts`
    or `settings.gradle` includes with a string literal, the root project when
    it has a `src/` directory, and each module a `pom.xml` lists, with any
    packaging but `pom`, joins the workspace's `includes`. No `putnami.json` is

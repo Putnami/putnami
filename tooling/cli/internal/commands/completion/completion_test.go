@@ -63,8 +63,8 @@ func TestCompletionBash(t *testing.T) {
 	if !strings.Contains(output, "--path") {
 		t.Error("expected projects create structured flag")
 	}
-	if !strings.Contains(output, "go py ts") {
-		t.Error("expected workspace init extension values")
+	if !strings.Contains(output, "delegate import") {
+		t.Error("expected workspace init mode values")
 	}
 }
 
@@ -94,8 +94,8 @@ func TestCompletionZsh(t *testing.T) {
 	if !strings.Contains(output, "'--path[Workspace-relative project path]:path:'") {
 		t.Error("expected projects create flag in zsh completion")
 	}
-	if !strings.Contains(output, "                            'ts'\n") {
-		t.Error("expected workspace init extension values in zsh completion")
+	if !strings.Contains(output, "                            'import'\n") {
+		t.Error("expected workspace init mode values in zsh completion")
 	}
 	if !strings.Contains(output, "'upgrade:Upgrade CLI, extensions, and dependencies'") {
 		t.Error("expected upgrade command in zsh completion")
@@ -135,8 +135,8 @@ func TestCompletionFish(t *testing.T) {
 	if !strings.Contains(output, "-l 'path'") {
 		t.Error("expected projects create structured flag in fish completion")
 	}
-	if !strings.Contains(output, "-l 'extension'") || !strings.Contains(output, "-a 'go py ts'") {
-		t.Error("expected workspace init extension values in fish completion")
+	if !strings.Contains(output, "-l 'mode'") || !strings.Contains(output, "-a 'delegate import'") {
+		t.Error("expected workspace init mode values in fish completion")
 	}
 }
 
@@ -200,8 +200,8 @@ func TestGatherCompletionContext(t *testing.T) {
 	if !containsStructuredFlag(ctx.structuredFlags["upgrade"], "--deps") {
 		t.Error("expected upgrade structured flags")
 	}
-	if len(ctx.structuredFlagValues["workspace init --extension"]) != 3 {
-		t.Error("expected workspace init extension values")
+	if len(ctx.structuredFlagValues["workspace init --mode"]) != 2 {
+		t.Error("expected workspace init mode values")
 	}
 }
 
