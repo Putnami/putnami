@@ -97,11 +97,15 @@
     },
     {
       "id": "workspace-install-keeps-the-package-manager",
-      "text": "Workspace install runs the package manager the root package.json names in packageManager, bun, npm, pnpm or yarn, else the one whose lockfile lies at the root: bun.lock or bun.lockb, pnpm-lock.yaml, yarn.lock, then package-lock.json or npm-shrinkwrap.json. With neither it runs Bun. It runs npm, pnpm and yarn from PATH and fails naming the manager when PATH has none, fails on any other packageManager name, and writes no lockfile of another manager."
+      "text": "Workspace install runs the package manager the root package.json names in packageManager, bun, npm, pnpm or yarn, else the one the root names by its files: bun.lock or bun.lockb, pnpm-lock.yaml or pnpm-workspace.yaml, yarn.lock, then package-lock.json or npm-shrinkwrap.json. With none it runs Bun. It runs npm, pnpm and yarn from PATH and fails naming the manager when PATH has none, fails on any other packageManager name, and writes no lockfile of another manager."
     },
     {
       "id": "the-lockfile-in-use-keys-the-cache",
       "text": "The extension's workspace inputs and install inputs name the lockfile of every package manager it installs with and pnpm-workspace.yaml, so a change to the lockfile in use invalidates the cache of the TypeScript tasks and makes the installed workspace stale."
+    },
+    {
+      "id": "upgrade-installs-with-the-package-manager",
+      "text": "putnami upgrade --deps pins the @putnami/* versions in the catalog the workspace declares, in the root package.json, else in pnpm-workspace.yaml, else in the root dependencies, then reinstalls with the workspace's package manager and its own reinstall flag. It writes no lockfile of another manager, and a failed install restores the root package.json, pnpm-workspace.yaml and that manager's lockfiles."
     },
     {
       "id": "workspace-install-creates-the-root-manifest",
@@ -109,7 +113,7 @@
     },
     {
       "id": "hosted-install-fetches-first",
-      "text": "On a hosted run, workspace-fetch reads the handed credential before it starts a process, then downloads what the committed lockfile names into the manager cache from a scratch copy, running no script, pnpmfile or Yarn plugin, the bearer only in a private .npmrc or .yarnrc.yml it removes. It refuses a manager inside the workspace and a yarnPath. workspace-install then installs frozen and offline from that cache, writing no credential. Without that lockfile the fetch fails; no job rewrites it or .npmrc."
+      "text": "On a hosted run, workspace-fetch reads the handed credential before it starts a process, then downloads what the committed lockfile names into the manager cache from a scratch copy, its bearer only in a private .npmrc or .yarnrc.yml it removes. No process it starts runs a script, a pnpmfile, a Yarn plugin or a yarnPath, and it refuses a manager inside the workspace and pnpm configDependencies. The install is then frozen and offline from that cache. Without that lockfile the fetch fails; no job rewrites it."
     },
     {
       "id": "hook-order-determinism",

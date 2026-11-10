@@ -21,8 +21,11 @@ npm, pnpm, Yarn and Bun can do that from the repository's own lockfile.
 
 Workspace install runs the package manager the repository declares: the
 `packageManager` field of the root `package.json`, else the manager whose
-lockfile lies at the root. A workspace that declares neither installs with
-Bun, so a workspace `putnami init` creates is unchanged.
+lockfile, or for pnpm whose `pnpm-workspace.yaml`, lies at the root, the rule
+the Node-workspace detector of `putnami observe` and the monorepo probes read.
+A workspace that declares none installs with Bun, so a workspace `putnami
+init` creates is unchanged. `putnami upgrade --deps` pins the catalog the
+workspace declares and reinstalls with the same manager.
 
 - npm, pnpm and Yarn run from `PATH`, the way `turbo` does in delegate mode:
   the repository already provides them, through Corepack or a global
@@ -36,6 +39,18 @@ Bun, so a workspace `putnami init` creates is unchanged.
   the manager's own cache from a scratch copy of the committed manifests,
   with the bearer only in a private home and no repository code running, and
   workspace-install installs frozen and offline from that cache.
+- workspace-fetch keeps repository code out by two means, each enough for
+  the settings it covers. It starts every Yarn with `YARN_IGNORE_PATH=1` and
+  every pnpm with `npm_config_ignore_pnpmfile=true`, the cache probes in the
+  workspace root included, and the scratch install with no lifecycle script.
+  It refuses, before any process starts, a Yarn workspace whose `.yarnrc.yml`
+  or `.yarnrc`, at the root or in a directory above it other than the home,
+  mentions `yarnPath`, `yarn-path` or `plugins` in any letter case or holds a
+  backslash, and a pnpm workspace whose `pnpm-workspace.yaml` or `.npmrc`
+  mentions `configDependencies` or a pnpmfile, or whose `pnpm-workspace.yaml`
+  holds a backslash: a configuration dependency is fetched and loaded before
+  any flag applies, and a Yarn plugin has no switch. The refusal reads text,
+  not YAML, so a quoted, escaped or indented key cannot slip past it.
 
 ## Invariants
 
@@ -43,8 +58,8 @@ Bun, so a workspace `putnami init` creates is unchanged.
 - A workspace that declares no manager installs with Bun.
 - Bun stays the runtime of every TypeScript task, whatever the installer.
 - workspace-fetch runs no code the repository holds: no manager binary inside
-  the workspace, no Yarn `yarnPath` release, no Yarn plugin, no pnpmfile and
-  no lifecycle script.
+  the workspace, no Yarn `yarnPath` release, no Yarn plugin, no pnpmfile, no
+  pnpm configuration dependency and no lifecycle script.
 
 ## Rejected alternatives
 
@@ -58,11 +73,20 @@ Bun, so a workspace `putnami init` creates is unchanged.
   could only disagree with the first.
 - **Run a Yarn `yarnPath` release in workspace-fetch.** It is a file the
   repository commits, run next to the registry credential.
+- **Recognize the settings by parsing YAML.** A YAML key can be quoted,
+  escaped, indented or written as a flow mapping; a parser that misses one
+  spelling runs the repository's code. A refusal on the text over-refuses a
+  comment that names the setting, which costs a clear failure, not the
+  credential.
 
 ## Consequences
 
 - An adopted pnpm, npm or Yarn workspace keeps its lockfile, and its own
   `install` keeps working beside `putnami install`.
+- A hosted run of a workspace that relies on a Yarn plugin, a `yarnPath`
+  release or pnpm configuration dependencies fails at workspace-fetch; it
+  declares the Yarn release in `packageManager` instead, which Corepack
+  provides.
 - A Yarn 2+ workspace whose `nodeLinker` is `pnp` installs without a
   `node_modules` tree, which the Bun tasks need; it sets `nodeLinker:
   node-modules`.

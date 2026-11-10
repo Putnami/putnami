@@ -350,7 +350,8 @@
               "a-workspace-with-neither-installs-with-bun",
               "a-manager-missing-from-path-fails-naming-it",
               "an-unknown-package-manager-fails-the-install",
-              "a-pnpm-install-keeps-its-lockfile-and-writes-no-bun-lock"
+              "a-pnpm-install-keeps-its-lockfile-and-writes-no-bun-lock",
+              "a-pnpm-workspace-file-names-pnpm"
             ]
           }
         },
@@ -365,6 +366,20 @@
             "checks": [
               "every-lockfile-is-a-workspace-input",
               "every-lockfile-is-an-install-input"
+            ]
+          }
+        },
+        {
+          "id": "upgrade-installs-with-the-package-manager",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pnpm-upgrade-pins-the-pnpm-workspace-catalog-and-installs-with-pnpm",
+              "a-failed-upgrade-restores-the-managers-files"
             ]
           }
         },
@@ -401,7 +416,9 @@
               "a-hosted-run-installs-from-the-fetched-cache-and-no-process-reads-the-bearer",
               "each-manager-fetches-its-committed-lockfile-into-its-cache",
               "a-manager-inside-the-workspace-a-yarn-path-or-plugin-is-refused",
-              "each-manager-installs-frozen-and-offline"
+              "each-manager-installs-frozen-and-offline",
+              "pnpm-config-dependencies-and-pnpmfile-settings-are-refused",
+              "no-fetch-process-loads-a-pnpmfile-or-a-yarn-path"
             ]
           }
         },
