@@ -170,6 +170,19 @@
             "kind": "acceptance",
             "checks": ["python-is-listed-without-a-first-level-anchor"]
           }
+        },
+        {
+          "id": "every-language-and-tool-is-published",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "languages-page-lists-every-language-and-tool",
+              "stack-and-tool-references-use-owning-sources",
+              "single-file-copies-carry-no-relative-link"
+            ]
+          }
         }
       ]
     },
@@ -189,7 +202,8 @@
             "kind": "acceptance",
             "checks": [
               "published-page-matches-reviewed-catalog",
-              "documented-surface-badges-resolve-from-reviewed-catalog"
+              "documented-surface-badges-resolve-from-reviewed-catalog",
+              "languages-page-status-resolves-from-reviewed-catalog"
             ]
           }
         },
@@ -231,7 +245,11 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["unclassified-surface-renders-no-badge", "unlisted-subject-disclaimer-is-published"]
+            "checks": [
+              "unclassified-surface-renders-no-badge",
+              "unlisted-subject-disclaimer-is-published",
+              "unclassified-language-shows-no-reviewed-status"
+            ]
           }
         },
         {
