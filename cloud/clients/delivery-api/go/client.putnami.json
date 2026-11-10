@@ -16,8 +16,21 @@
       }
     ]
   },
-  "contractSha256": "9c7afb296a1457768634998db0f7ed34b37414a0ad7f326bd5bf5785e4eb6335",
+  "contractSha256": "877fae65738639aaecf103ed4eb28935876ed0dbd9a9a5bbbb42fc2055341ba6",
   "operations": [
+    {
+      "operationId": "getV1_Workspaces_Workspace_Ci_Queue",
+      "service": "delivery-api",
+      "methodSymbol": "GetV1WorkspacesCiQueue",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/queue",
+          "encoding": "json"
+        }
+      ]
+    },
     {
       "operationId": "getV1_Workspaces_Workspace_Ci_Status",
       "service": "delivery-api",
@@ -353,6 +366,19 @@
       ]
     },
     {
+      "operationId": "putV1_Workspaces_Workspace_Ci_Queue",
+      "service": "delivery-api",
+      "methodSymbol": "UpdateV1WorkspacesCiQueue",
+      "stream": "unary",
+      "transports": [
+        {
+          "protocol": "rest-json",
+          "path": "/v1/workspaces/{workspace}/ci/queue",
+          "encoding": "json"
+        }
+      ]
+    },
+    {
       "operationId": "putV1_Workspaces_Workspace_Ci_Subscription",
       "service": "delivery-api",
       "methodSymbol": "UpdateV1WorkspacesCiSubscription",
@@ -369,7 +395,7 @@
   "files": [
     {
       "path": "client.gen.go",
-      "sha256": "b9fe5c4fcafb6bcbad295aa2090e2e925d0b430e30ecf471df900d9a1095a26e"
+      "sha256": "6c9830fb088aee7f8effad3d397a96402e90423c3126878d27265902dd97e756"
     }
   ]
 }

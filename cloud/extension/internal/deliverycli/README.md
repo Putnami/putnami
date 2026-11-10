@@ -13,6 +13,11 @@ The aggregator in [`internal/cloudcli`](../cloudcli) imports it.
   also reads the commands every discovered extension declares, so it reports a
   job no extension serves, and refuses `distribution` and `envs` when no
   extension serves release sets.
+- `putnami cloud ci queue [status|enable|disable]` (`queue.go`): a branch's
+  merge queue setting. `enable` reads and splits the branch's GitHub rulesets
+  with the person's own GitHub credentials (`queue_rules.go`, the one call to
+  GitHub's REST API, claimed in `clientgen.external.json`), then turns the
+  setting on.
 - `putnami cloud channels follow <namespace> <channel|rs_id>` (`subscription.go`):
   changes what the workspace's CI follows.
 - `putnami cloud cache` (`cache.go`), and the `cache-provider` and

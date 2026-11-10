@@ -1,6 +1,54 @@
 {
   "components": {
     "schemas": {
+      "ArchitectureRule": {
+        "additionalProperties": false,
+        "properties": {
+          "rule": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "violationCount": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "violations": {
+            "items": {
+              "$ref": "#/components/schemas/ArchitectureViolation"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ArchitectureViolation": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "type": "string"
+          },
+          "file": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "BuildsReport": {
         "additionalProperties": false,
         "properties": {
@@ -2049,6 +2097,62 @@
         },
         "type": "object"
       },
+      "DecisionRecord": {
+        "additionalProperties": false,
+        "properties": {
+          "change": {
+            "type": "string"
+          },
+          "date": {
+            "type": "string"
+          },
+          "governs": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "path": {
+            "type": "string"
+          },
+          "scope": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "status": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DeclarationChange": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "nullable": true,
+            "type": "string"
+          },
+          "before": {
+            "nullable": true,
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "previousPath": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "DependencyChange": {
         "additionalProperties": false,
         "properties": {
@@ -3082,9 +3186,74 @@
         },
         "type": "object"
       },
+      "QueueRefusal": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "QueueSetting": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "configured": {
+            "type": "boolean"
+          },
+          "depth": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "repository": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "QueueSettingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "depth": {
+            "format": "int64",
+            "maximum": 16,
+            "minimum": 0,
+            "type": "integer"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
       "ReportBatchRequest": {
         "additionalProperties": false,
         "properties": {
+          "architecture": {
+            "items": {
+              "$ref": "#/components/schemas/ArchitectureRule"
+            },
+            "type": "array"
+          },
           "builds": {
             "$ref": "#/components/schemas/BuildsReport",
             "nullable": true
@@ -3106,6 +3275,18 @@
           "coverage": {
             "$ref": "#/components/schemas/CoverageReport",
             "nullable": true
+          },
+          "decisions": {
+            "items": {
+              "$ref": "#/components/schemas/DecisionRecord"
+            },
+            "type": "array"
+          },
+          "declarations": {
+            "items": {
+              "$ref": "#/components/schemas/DeclarationChange"
+            },
+            "type": "array"
           },
           "dependencyChanges": {
             "items": {
@@ -3129,6 +3310,9 @@
           "selection": {
             "$ref": "#/components/schemas/SelectionReport",
             "nullable": true
+          },
+          "specVerification": {
+            "x-putnami-json": "any"
           },
           "stream": {
             "$ref": "#/components/schemas/ReportStreamStats"
@@ -3811,6 +3995,7 @@
             "type": "string"
           },
           "provenance": {
+            "description": "Who ran the job: local for a developer's machine (the default), gha for GitHub Actions, gitlab for GitLab CI, external for any other CI. gha, gitlab and external are self-reported, never verified; ci is reserved for Putnami's own runner and refused.",
             "type": "string"
           },
           "provider": {
@@ -5355,6 +5540,350 @@
             {
               "encoding": "json",
               "path": "/v1/workspaces/{workspace}/ci/local-sessions/{session}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/ci/queue": {
+      "get": {
+        "description": "Read the merge queue setting of one branch of the repository the workspace binds. configured is false while the branch has no setting: it has no queue, and its pull requests merge through the pull request gate. depth is the depth the branch runs at: 1 until the putnami CLI can cut a release set from the entry ahead (`putnami publish --inherit-channel`). Requires platform.workspace.read at the path workspace. Responses are not cacheable.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Ci_Queue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSetting"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "Missing or malformed branch"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "The workspace binds no repository"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "Source or the setting store is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/queue",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Turn the merge queue of one branch on or off, and set its depth: the number of queue runs in flight at most, 1 to 16, 4 when zero or absent. Until the putnami CLI can cut a release set from the entry ahead (`putnami publish --inherit-channel`), a depth above 1 answers 400 with the reason, and the branch runs at depth 1. Turning it on first asks Source that the workspace's code host builds queue commits and that the branch's rules make the Putnami App the bypass actor of the pull request rule and of no other rule; otherwise it answers 409 with the reason, and changes nothing. Turning it off asks nothing. Requires platform.workspace.manage at the path workspace, and a person: the setting records the principal ID of who changed it.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "putV1_Workspaces_Workspace_Ci_Queue",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QueueSettingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueSetting"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "Missing or malformed branch, body or depth, or a depth the queue cannot run yet"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions, or not a person"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "The workspace binds no repository, or the branch does not exist"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "The code host or the branch's rules keep the queue off"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "Source or the setting store is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/queue",
               "protocol": "rest-json"
             }
           ]

@@ -538,6 +538,8 @@ func CI(params map[string]any, args []string, workspaceRoot string, env map[stri
 		return ciResults(params, args, workspaceRoot, env, ioctx)
 	case "repair":
 		return ciRepair(params, workspaceRoot, env, ioctx)
+	case "queue":
+		return ciQueue(params, args, workspaceRoot, env, ioctx)
 	case "report":
 		return Report(params, clicore.DropFirstPositional(args), workspaceRoot, env, ioctx)
 	case "init", "validate", "fmt", "explain":
@@ -572,6 +574,9 @@ func ciHelp(params map[string]any, ioctx clicore.IO) error {
 		{"command": "cloud ci results <run>", "description": "what one run's gate found — failed tests with their output, coverage per project against its threshold, diagnostics by file and line, and what it published (--output=json for every kept case)"},
 		{"command": "cloud ci repair --reason <why>", "description": "idempotently terminalize stale rows, cancel persisted compute, and reconcile terminal checks"},
 		{"command": "cloud ci pause|drain|resume --reason <why>", "description": "set the workspace pipeline circuit-breaker mode"},
+		{"command": "cloud ci queue [status] [--branch <b>]", "description": "show a branch's merge queue setting, and whether its GitHub rulesets let the queue land"},
+		{"command": "cloud ci queue enable [--branch <b>] [--depth <n>] [--dry-run]", "description": "turn the merge queue on: split the branch's ruleset with your GitHub credentials once you confirm, check it, then turn the setting on"},
+		{"command": "cloud ci queue disable [--branch <b>]", "description": "turn the merge queue off; the rulesets stay as they are"},
 		{"command": "cloud ci report -- <command>", "description": "run a command and report its outcome to a CI run"},
 		{"command": "cloud ci init [--force]", "description": "write a putnami.ci.json that runs the lint, test, build and validate jobs the workspace declares"},
 		{"command": "cloud ci validate", "description": "check putnami.ci.json against its schema and the jobs the workspace's extensions declare"},
