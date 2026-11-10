@@ -27,9 +27,12 @@ oci-server, put-server, runtime-api and source-api.
 | File layout | `docs/cloud-cli-schema/services/<service>/openapi.json` |
 
 Each `<service>/schema/openapi.json` is a byte-for-byte copy of the package
-file. `delivery-api` comes from the later version
-`0.0.0-20261107144815-c2b4ed021`, published on 2026-11-07, archive digest
-`sha256:f3e6f0871f861d1966e4891a01a01d169675c655935c2cec32f1f59df49fcf20`.
+file. `delivery-api` comes from a later source: the package's
+`services/delivery-api/openapi.json` as Putnami/putnami-cloud#4758 generates
+it at commit `daa035a87`, the change that adds the merge queue setting
+(`getV1_Workspaces_Workspace_Ci_Queue`, `putV1_Workspaces_Workspace_Ci_Queue`).
+The main run publishes it on `canary` once that pull request merges; record
+the published version and its archive digest here then.
 
 ## Update the schemas
 

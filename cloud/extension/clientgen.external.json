@@ -162,6 +162,24 @@
       "reason": "Mints the audience-bound ID token for secretless CI cache access from the fixed metadata endpoint."
     },
     {
+      "authority": "GitHub REST API, repository rules and rulesets (docs.github.com/rest/repos/rules): get rules for a branch, get, list, create and update a repository ruleset; and get a repository (docs.github.com/rest/repos/repos#get-a-repository)",
+      "adapter": "cloud/extension/internal/deliverycli/queue_rules.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/queue_rules.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "a38a90153f496c4eff8d8b9d945c0b891ce7dd04d64290eaa8cbfd379f48abe0"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/queue_rules_test.go",
+        "cloud/extension/internal/deliverycli/queue_test.go"
+      ],
+      "reason": "`putnami cloud ci queue` reads a branch's rulesets and, once the person confirms, splits them so the Putnami App bypasses only the pull_request rule. It calls GitHub with the person's own credentials (GH_TOKEN, GITHUB_TOKEN or `gh auth token`): Putnami never writes a ruleset with its App. GitHub's REST API is a third-party contract, not a first-party provider."
+    },
+    {
       "authority": "OCI Distribution Specification v1.1 (github.com/opencontainers/distribution-spec)",
       "adapter": "cloud/extension/internal/distributioncli/oci.go",
       "callsites": [

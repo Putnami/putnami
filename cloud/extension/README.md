@@ -223,6 +223,67 @@ edit. Delivery resolves producer ownership and the current Distribution read
 grant; subscription enablement does not grant arbitrary registry access. The
 CLI needs an existing subscription before setting a track.
 
+## Merge queue
+
+On a branch with a merge queue, Putnami merges pull requests itself: it tests
+the exact commit that becomes the head of the branch, then moves the branch
+to that commit, so nothing is built again after the merge. A pull request
+enters the queue when someone turns on its auto-merge.
+
+```sh
+putnami cloud ci queue                          # the setting of main, and whether its rulesets let the queue land
+putnami cloud ci queue enable --dry-run         # what enable would change, without changing it
+putnami cloud ci queue enable                   # split the rulesets once you confirm, then turn the queue on
+putnami cloud ci queue disable                  # turn the queue off; the rulesets stay as they are
+```
+
+Every verb takes `--branch <branch>`, `main` by default.
+
+The queue lands a change by pushing the branch as the Putnami GitHub App.
+GitHub checks that push against every ruleset of the branch, and a bypass
+actor bypasses its whole ruleset. So the `pull_request` rule must sit alone in
+its own ruleset, with the App as its bypass actor in mode `always`, and the
+App must bypass no other ruleset. Delivery refuses to turn the queue on until
+the rules have that shape.
+
+`enable` gives them that shape. It reads the branch's rulesets with your
+GitHub credentials: `GH_TOKEN`, then `GITHUB_TOKEN`, then `gh auth token`.
+Your account must administer the repository. It prints the plan: create a
+ruleset named `<name>: pull requests` holding the `pull_request` rule, with
+the App as its only bypass actor, then remove that rule, and the App's bypass,
+from the first ruleset. Nothing changes until you confirm, or pass `--yes`. It
+keeps the first ruleset as it was in a local file and prints its path. It
+creates the new ruleset before it edits the first, so the branch never runs
+without a `pull_request` rule, then checks that the branch enforces the same
+rules as before. Last, it turns the Delivery setting on, which takes a person:
+run `putnami cloud login`, since a machine token cannot change it. Run again
+after a failure, `enable` resumes where it stopped. Putnami never writes a
+ruleset with its App: the App holds `Administration: read` only.
+
+`enable` stops before any change when the rules have a shape it does not
+change by itself, and says what to fix:
+
+- a required check that never reports on a queue commit, such as a GitHub
+  Actions workflow that runs only on `pull_request`: the queue commit lives on
+  a `putnami-queue/<n>` branch and has no pull request, so GitHub would refuse
+  every landing;
+- GitHub's own merge queue rule, or an organization ruleset holding the
+  `pull_request` rule;
+- several rulesets holding the `pull_request` rule, or the App bypassing a
+  ruleset that holds other rules.
+
+`--depth <n>` sets how many queue commits run at once, 1 to 16. Delivery
+refuses a depth its runners cannot run yet, and says why. `--app-id <id>`
+names another GitHub App than Putnami Cloud's, `4203649`; `GITHUB_API_URL`
+names another API host, such as GitHub Enterprise Server. `--output=json`
+carries the setting, the plan (`rules.create`, `rules.update`) and what
+`enable` applied.
+
+`disable` turns the setting off. Within 5 minutes Delivery drops every open
+entry with the reason `queue-off`, and GitHub's auto-merge then merges each
+pull request that still has it on. The rulesets stay split: the
+`pull_request` rule still applies to everyone but the App.
+
 ## Report local gate sessions
 
 A gate session run on your machine, or by an agent on it, can report to
@@ -690,6 +751,7 @@ putnami cloud ci report --conclusion success       # report a delivery-run outco
 putnami cloud ci status                            # CI readiness checks, queue, last run reuse, runs and spend over 7 days
 putnami cloud ci view <run> [--output=json]        # one run: phases, timing, cache, failures, its verdict, and the release-set members it reused
 putnami cloud ci usage [--window <duration>]       # runs, spend, billed cost, merges by verdict, and deploys over the window
+putnami cloud ci queue [enable|disable] [--branch <b>]  # the merge queue: enable splits the rulesets with your GitHub credentials, then turns it on
 putnami cloud cache [status]                       # the build cache config, its identity, and the reuse of the last CI run
 putnami cloud cache disable [--remove]             # disable (enabled:false) or delete the cache config
 putnami cloud source connect [--repo owner/name] [--replace]  # browser-assisted GitHub authorization; structured mode requires --repo
@@ -1412,7 +1474,8 @@ The schemas come from the Put package `cloud/doc-contents-cloud-cli-schema`,
 channel `canary`, version `0.0.0-20261102145238-eda90513c` (archive digest
 `sha256:dab1f1b3075d46e412de527001649b4e46a7f8374e57764ae532bf5216df1204`). Its
 file layout is `docs/cloud-cli-schema/services/<service>/openapi.json`. Each
-file is copied byte for byte. To update the schemas:
+file is copied byte for byte. `delivery-api` comes from a later source, which
+[`../clients/README.md`](../clients/README.md) names. To update the schemas:
 
 1. Fetch a newer version of `cloud/doc-contents-cloud-cli-schema`.
 2. Copy each `services/<service>/openapi.json` over

@@ -291,7 +291,7 @@
           ]
         },
         "ci": {
-          "description": "Operate workspace CI runs and recovery (list, view <run>, logs <run>, start, cancel <run>, retry <run>, status, usage, repair, pause|drain|resume), report an outcome (report), and author putnami.ci.json (init, validate, fmt, explain). Run ids abbreviate: any unambiguous prefix works wherever <run> appears, and `list` prints ids at that width. `putnami cloud ci help` prints every verb with its flags.",
+          "description": "Operate workspace CI runs and recovery (list, view <run>, logs <run>, start, cancel <run>, retry <run>, status, usage, repair, pause|drain|resume), turn a branch's merge queue on or off (queue [enable|disable]), report an outcome (report), and author putnami.ci.json (init, validate, fmt, explain). Run ids abbreviate: any unambiguous prefix works wherever <run> appears, and `list` prints ids at that width. `putnami cloud ci help` prints every verb with its flags.",
           "command": "cloud-ci",
           "interactive": true,
           "examples": [
@@ -358,6 +358,14 @@
             {
               "command": "putnami cloud ci explain --event push --branch main",
               "description": "Show the rule a push to main matches and what the run would publish"
+            },
+            {
+              "command": "putnami cloud ci queue enable --dry-run",
+              "description": "Show how main's rulesets must change before the merge queue can land, and change nothing"
+            },
+            {
+              "command": "putnami cloud ci queue enable",
+              "description": "Split main's ruleset with your GitHub credentials once you confirm, then turn the merge queue on"
             }
           ]
         },
@@ -1232,7 +1240,7 @@
       "activationFiles": [
         "putnami.extension.json"
       ],
-      "description": "Operate workspace CI runs and recovery (status, list, view, start, cancel, retry, logs, usage, insights, repair, pause, drain, resume), report a run outcome (report), and author putnami.ci.json (init, validate, fmt, explain).",
+      "description": "Operate workspace CI runs and recovery (status, list, view, start, cancel, retry, logs, usage, insights, repair, pause, drain, resume), turn a branch's merge queue on or off (queue), report a run outcome (report), and author putnami.ci.json (init, validate, fmt, explain).",
       "flags": {
         "strict": {
           "type": "boolean",
@@ -1274,7 +1282,7 @@
         },
         "branch": {
           "type": "string",
-          "description": "list, start, explain: branch name — a list filter, start's target branch, or the branch of the explained event."
+          "description": "list, start, explain, queue: branch name — a list filter, start's target branch, the branch of the explained event, or the branch whose merge queue to read or change (queue: main by default)."
         },
         "ref": {
           "type": "string",
@@ -1402,6 +1410,19 @@
           "type": "boolean",
           "default": false,
           "description": "fmt: report a non-canonical putnami.ci.json instead of rewriting it."
+        },
+        "dry-run": {
+          "type": "boolean",
+          "default": false,
+          "description": "queue enable: print how the rulesets would change, and change nothing."
+        },
+        "depth": {
+          "type": "string",
+          "description": "queue enable: how many queue commits run at once, 1 to 16."
+        },
+        "app-id": {
+          "type": "string",
+          "description": "queue: the id of the GitHub App that lands the queue (default 4203649, Putnami Cloud's)."
         }
       },
       "run": [
