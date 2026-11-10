@@ -127,6 +127,7 @@ use (
 	./tooling/memory-store
 	./tooling/observe
 	./monorepo/pants
+	./monorepo/turbo
 	./tooling/scaffold
 	./tooling/sdd-extension
 	./tooling/stacks

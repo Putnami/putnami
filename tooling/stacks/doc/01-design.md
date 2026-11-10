@@ -503,7 +503,11 @@ affected component instead of importing its targets
   Bazel's test logs, keeps them, and the extension's runtime copies the run's
   reports into `{output}`, which the core never reads from another run.
 
-`@putnami/pants` and `@putnami/bazel` are the delegated stacks.
+`@putnami/pants` and `@putnami/bazel` are the delegated stacks. `@putnami/turbo`
+delegates a Turborepo repository with a sync of its own, which reads the
+package manifests and the adoption mode; in import mode a TypeScript
+package's task whose script already runs `bun build`, `bun test` or Biome runs
+`@putnami/typescript` instead, so no Putnami cache sits over Turborepo's.
 
 ## What stays out
 

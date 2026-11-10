@@ -198,6 +198,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		filepath.Join("monorepo", "bazel", ManifestFilename):                      true,
 		filepath.Join("monorepo", "moon", ManifestFilename):                       true,
 		filepath.Join("monorepo", "pants", ManifestFilename):                      true,
+		filepath.Join("monorepo", "turbo", ManifestFilename):                      true,
 		filepath.Join("tooling", "scaffold", ManifestFilename):                    true,
 		filepath.Join("typescript", "extension", ManifestFilename):                true,
 		filepath.Join("typescript", "framework", "application", ManifestFilename): true,

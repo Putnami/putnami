@@ -1,0 +1,391 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "@putnami/turbo",
+  "cliContract": 14,
+  "extensionDependencies": {
+    "@putnami/dev": ""
+  },
+  "runtime": {
+    "executable": "compiled/putnami-turbo",
+    "toolchains": {
+      "runtimeCompiler": {
+        "lock": "go",
+        "candidates": [
+          {
+            "from": "environment",
+            "environment": "GOROOT",
+            "path": "bin/go"
+          },
+          {
+            "from": "path",
+            "path": "go"
+          },
+          {
+            "from": "putnami-home",
+            "path": "toolchains/go/go-{version}/go/bin/go"
+          }
+        ],
+        "probe": {
+          "args": [
+            "env",
+            "GOVERSION"
+          ],
+          "expect": "go{version}",
+          "unset": [
+            "GOROOT"
+          ],
+          "environment": {
+            "GOTOOLCHAIN": "local"
+          }
+        },
+        "environment": {
+          "GOROOT": {
+            "from": "ancestor",
+            "levels": 2
+          },
+          "GOTOOLCHAIN": {
+            "from": "literal",
+            "value": "local"
+          }
+        },
+        "prependPath": true
+      }
+    },
+    "prepare": {
+      "command": "{extensionRoot}/bin/prepare",
+      "args": [
+        "--output",
+        "{runtimeOutput}"
+      ],
+      "inputs": [
+        "bin/prepare",
+        "cmd/**",
+        "go.mod",
+        "go.sum",
+        "*.go",
+        "profile.json"
+      ],
+      "toolchains": [
+        "runtimeCompiler"
+      ]
+    },
+    "inputSelectors": [
+      "turbo:build",
+      "turbo:lint",
+      "turbo:test"
+    ]
+  },
+  "workspace": {
+    "markers": [
+      "package.json"
+    ],
+    "inputs": [
+      "package.json",
+      "turbo.json",
+      "pnpm-workspace.yaml",
+      ".npmrc",
+      "pnpm-lock.yaml",
+      "yarn.lock",
+      "package-lock.json",
+      "npm-shrinkwrap.json",
+      "putnami.workspace.json"
+    ],
+    "excludes": [
+      "node_modules",
+      "dist",
+      ".turbo"
+    ],
+    "syncTask": "workspace-sync-exec"
+  },
+  "commands": {
+    "lint": {
+      "description": "Lint each package with turbo run lint, which keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "lint",
+          "task": "lint-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "test": {
+      "description": "Test each package with turbo run test, and read the reports its options name; Turborepo keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "test",
+          "heavy": true,
+          "task": "test-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "build": {
+      "description": "Build each package with turbo run build, which keeps its own cache.",
+      "run": [
+        {
+          "id": "graph",
+          "task": "graph-run",
+          "dependsOn": [
+            "^graph"
+          ]
+        },
+        {
+          "id": "build",
+          "heavy": true,
+          "task": "build-run",
+          "dependsOn": [
+            "graph"
+          ]
+        }
+      ]
+    },
+    "validate": {
+      "description": "Fail when a package's putnami.json no longer matches the package manifests and turbo.json, such as after a package gains a workspace dependency.",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "turbo-graph-check",
+          "task": "turbo-graph-check-exec"
+        }
+      ]
+    },
+    "workspace-sync": {
+      "description": "Write each Turborepo package's putnami.json from the package manifests and turbo.json, in the mode the workspace config records.",
+      "visibility": "internal",
+      "activation": "workspace-once",
+      "run": [
+        {
+          "id": "workspace-sync",
+          "task": "workspace-sync-exec"
+        }
+      ]
+    }
+  },
+  "tasks": {
+    "graph-run": {
+      "description": "Carry the package graph: each lint, test and build step depends on the graph step of its own package, which alone depends on the graph step of each package upstream, so a change selects the packages that depend on it while a dependency runs no turbo. Runs nothing and passes.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "graph"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 60000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "turbo:test"
+          ]
+        }
+      },
+      "cache": {
+        "enabled": false
+      }
+    },
+    "lint-run": {
+      "description": "Run turbo run lint --filter=<package> in the workspace root, after the turbo --version check. Putnami's cache is off: Turborepo's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "lint",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "turbo:lint"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "turbo.json",
+            "package.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo turbo, and the test and coverage totals of a test task that names its reports."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "lint",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: each JUnit and coverage report the package's options name."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "test-run": {
+      "description": "Run turbo run test --filter=<package> in the workspace root, after the turbo --version check; then read the JUnit and coverage reports the package's options name, if any. A failed case or a step that exits non-zero fails the task. Putnami's cache is off: Turborepo's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "test",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "turbo:test"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "turbo.json",
+            "package.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo turbo, and the test and coverage totals of a test task that names its reports."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "test",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: each JUnit and coverage report the package's options name."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "build-run": {
+      "description": "Run turbo run build --filter=<package> in the workspace root, after the turbo --version check. Turborepo's dependsOn runs the upstream tasks; Putnami's cache is off: Turborepo's cache decides what reruns.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build",
+        "--report-dir",
+        "{outputRoot}"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 1800000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "turbo:build"
+          ]
+        },
+        "stackRoot": {
+          "from": "workspace",
+          "files": [
+            "turbo.json",
+            "package.json"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The task result: delegatedTo turbo, and the test and coverage totals of a test task that names its reports."
+        }
+      },
+      "cache": {
+        "enabled": false
+      },
+      "declares": {
+        "outputs": {
+          "reports": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "build",
+            "optionalEmpty": true,
+            "description": "The reports the task copied: each JUnit and coverage report the package's options name."
+          }
+        },
+        "effects": [
+          "network",
+          "toolchain-cache"
+        ]
+      }
+    },
+    "workspace-sync-exec": {
+      "description": "Write in each Turborepo package's putnami.json the extension it runs in the recorded mode, its dependencies as the project IDs of the workspace packages it depends on, the turbo tag, and each of build, lint and test it has no task for in disable.jobs. The dry-run parameter prints the diffs and writes nothing. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "workspace-sync"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000,
+      "declares": {
+        "effects": [
+          "workspace-files"
+        ]
+      }
+    },
+    "turbo-graph-check-exec": {
+      "description": "Compare each Turborepo package's putnami.json with what the sync would write from the package manifests and turbo.json, and fail with turbo.sync_stale when a sync would change one. Writes nothing.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "turbo-graph-check"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 600000
+    }
+  }
+}
