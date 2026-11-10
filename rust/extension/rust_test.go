@@ -112,7 +112,12 @@ func TestTheCratesOfACargoWorkspaceBecomeProjects(t *testing.T) {
 // stubTools puts first on PATH a rustc that prints version and a cargo that
 // logs its arguments and writes the reports cargo-nextest and
 // cargo-llvm-cov write. The real tools are the stack's own build: the stub
-// stands at that boundary.
+// stands at that boundary. The cargo also records, in the log's .env file,
+// the variables that choose its network, its home and its rustc; answers
+// help with a nextest that lists --no-tests, unless
+// STUB_NEXTEST_WITHOUT_NO_TESTS is set; and plays cargo fetch, which marks
+// the stack root fetched and writes a Cargo.lock it lacks, and whose
+// --offline form passes only on a root a fetch marked.
 func stubTools(t *testing.T, root, version, junit string) string {
 	t.Helper()
 	// A stubbed toolchain stays the one under test: nothing is installed.
@@ -122,7 +127,20 @@ func stubTools(t *testing.T, root, version, junit string) string {
 	writeFile(t, bin, "rustc", "#!/bin/sh\necho 'rustc "+version+" (stub 2024-10-15)'\n")
 	writeFile(t, bin, "cargo", `#!/bin/sh
 echo "$PWD: cargo $*" >> "`+log+`"
-case "$*" in *nextest*)
+echo "$PWD: cargo $1 CARGO_NET_OFFLINE=${CARGO_NET_OFFLINE-unset} CARGO_HOME=${CARGO_HOME-unset} RUSTC_WRAPPER=${RUSTC_WRAPPER-unset} RUSTC_WORKSPACE_WRAPPER=${RUSTC_WORKSPACE_WRAPPER-unset} RUSTC=${RUSTC-unset}" >> "`+log+`.env"
+case "$*" in *--help*)
+  [ -n "$STUB_NEXTEST_WITHOUT_NO_TESTS" ] || echo "      --no-tests <ACTION>"
+  exit 0;;
+esac
+case "$*" in fetch*)
+  case "$*" in *--offline*)
+    [ -f "$PWD/.stub-fetched" ] || exit 101
+    exit 0;;
+  esac
+  [ -z "$STUB_FETCH_FAILS" ] || exit 101
+  [ -f "$PWD/Cargo.lock" ] || echo "version = 4" > "$PWD/Cargo.lock"
+  : > "$PWD/.stub-fetched";;
+*nextest*)
   mkdir -p "`+root+`/target/nextest/ci"
   cat > "`+root+`/target/nextest/ci/junit.xml" <<'XML'
 `+junit+`
@@ -201,7 +219,8 @@ func runJobParams(t *testing.T, root, rel, task string, params pctx.Params) (str
 	out := filepath.Join(root, ".putnami/out", strings.ReplaceAll(rel, "/", "_"), task)
 	jobs := s.Jobs()
 	maps.Copy(jobs, Jobs(s))
-	job := jobs[task]
+	job := OfflineCargo(jobs)[task]
+	defer keepEnv(cargoNetOfflineEnv)()
 	emitted, err := os.CreateTemp(t.TempDir(), "emitted")
 	if err != nil {
 		t.Fatal(err)
@@ -216,6 +235,19 @@ func runJobParams(t *testing.T, root, rel, task string, params pctx.Params) (str
 		t.Fatal(err)
 	}
 	return status, data, out, string(text), runErr
+}
+
+// keepEnv returns the function that gives name back the value it holds now:
+// a job of the runtime owns its process, and a test runs several.
+func keepEnv(name string) func() {
+	value, set := os.LookupEnv(name)
+	return func() {
+		if set {
+			_ = os.Setenv(name, value)
+		} else {
+			_ = os.Unsetenv(name)
+		}
+	}
 }
 
 func TestATaskRunsTheProfileStepsAfterTheToolchainCheck(t *testing.T) {

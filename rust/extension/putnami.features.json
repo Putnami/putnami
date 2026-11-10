@@ -7,7 +7,7 @@
       "id": "rust/stack-extension",
       "type": "feature",
       "name": "Run the crates of a Cargo workspace as Putnami tasks",
-      "outcome": "A team with a Cargo workspace runs putnami lint, test and build over its crates through @putnami/rust with no putnami.json override: each crate is a project with its edges and stack root, nested Cargo workspaces included, each task reads only its own inputs, the test task attributes each case and coverage line to its crate, and a crate may override any profile value",
+      "outcome": "A team with a Cargo workspace runs putnami lint, test and build over its crates through @putnami/rust with no putnami.json override: each crate is a project with its edges and stack root, nested Cargo workspaces included, each task reads only its own inputs, the test task attributes each case and coverage line to its crate, and a crate may override any profile value; putnami install fetches the locked crates, a hosted run tests offline, and a test filter reaches nextest",
       "owner": "rust",
       "target": "coded",
       "requirements": [
@@ -198,6 +198,63 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["publish-pushes-the-image-through-the-shared-publisher"]
+          }
+        },
+        {
+          "id": "fetches-the-locked-crates",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["workspace-fetch-runs-cargo-fetch-locked-at-each-stack-root"]
+          }
+        },
+        {
+          "id": "offline-tasks-stay-offline",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["offline-jobs-run-cargo-offline-with-the-home-the-fetch-filled"]
+          }
+        },
+        {
+          "id": "workspace-install-runs-cargo-fetch",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-install-fetches-each-stack-root-the-workspace-includes",
+              "an-offline-workspace-install-checks-cargos-home-and-writes-nothing"
+            ]
+          }
+        },
+        {
+          "id": "upgrades-the-lockfile",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["deps-upgrade-runs-cargo-update-at-each-stack-root"]
+          }
+        },
+        {
+          "id": "checks-documentation-links",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["lint-fails-on-a-broken-documentation-link-unless-docs-links-is-off"]
+          }
+        },
+        {
+          "id": "filters-the-tests",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["test-passes-the-filter-to-nextest-and-keys-the-task-on-it"]
           }
         }
       ]

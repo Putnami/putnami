@@ -10,12 +10,16 @@
     "A crate overrides any value of the Rust profile in its putnami.json, and the override reaches the cache key",
     "On the Cargo detector's fixture repository, with the real cargo, cargo-nextest and cargo-llvm-cov, lint, test and build pass with no putnami.json override and every case and coverage line attributed; a CI leg that installs those tools proves it, since the workspace gate has none",
     "On a machine with no Rust, cargo-nextest or cargo-llvm-cov, putnami lint, test and build install what is missing and pass on a Cargo repository; a machine that holds a Rust satisfying the repository's statement keeps it",
-    "putnami run and serve start a binary crate, and putnami package and publish ship it as archives, an OCI image built from any host with no docker daemon, or a crate on a registry at the Putnami release version"
+    "putnami run and serve start a binary crate, and putnami package and publish ship it as archives, an OCI image built from any host with no docker daemon, or a crate on a registry at the Putnami release version",
+    "putnami install fetches the crates each stack root's Cargo.lock names, a hosted run downloads them with workspace-fetch and runs every cargo step offline, deps-upgrade refreshes each Cargo.lock, lint checks the documentation links, and putnami test -t runs the tests whose name holds the filter"
   ],
   "nonGoals": [
     "A C linker, which rustc needs and the machine must hold, and the targets and components a rust-toolchain file lists beyond rustfmt, clippy and llvm-tools",
     "A member of a nested Cargo workspace whose root package depends on that member: the edge to its root would close a cycle",
-    "A release-set member: publish --channel does not carry a crate, an image or an archive of a Rust project"
+    "A release-set member: publish --channel does not carry a crate, an image or an archive of a Rust project",
+    "Major version bumps: cargo update --breaking is unstable in the cargo of Rust 1.99.1, the release the extension installs by default, and cargo-edit's cargo upgrade is not installed, so deps-upgrade stays within each semver requirement",
+    "An offline task that runs a Rust, cargo-nextest or cargo-llvm-cov installed under the Putnami home: the stack core installs and selects them only with the network, so a hosted run runs the ones on its runner's PATH",
+    "Handing the read credential of a hosted run to cargo: its hosts serve no Cargo registry, and cargo authenticates to an alternative registry with its own credential providers"
   ],
   "requirements": [
     {
@@ -60,7 +64,7 @@
     },
     {
       "id": "provides-its-test-tools",
-      "text": "The test task, and no other, makes cargo-nextest and cargo-llvm-cov available when the PATH holds neither: each is installed from an archive the extension pins by SHA-256 and its directory is appended to the PATH of the task, so a tool the machine holds comes first."
+      "text": "The test task, and no other task of the profile, makes cargo-nextest and cargo-llvm-cov available when the PATH holds neither: each is installed from an archive the extension pins by SHA-256 and its directory is appended to the PATH of the task, so a tool the machine holds comes first. workspace-install installs the same archives ahead of the first test."
     },
     {
       "id": "coverage-is-optional",
@@ -101,12 +105,37 @@
     {
       "id": "publish-pushes-the-image",
       "text": "publish --docker pushes the assembled image through the shared Docker publisher, and the crates and docker publish tasks each declare their channel with the registry effect."
+    },
+    {
+      "id": "fetches-the-locked-crates",
+      "text": "workspace-fetch reads and closes the credential descriptor of a hosted run before it starts any process, and uses nothing it held. At each stack root that holds a Cargo.lock it runs cargo fetch --locked with RUSTC_WRAPPER and RUSTC_WORKSPACE_WRAPPER empty and RUSTC set to the selected rustc: no build script, procedural macro, wrapper or compiler the repository names runs, and the repository is not written. A root with no Cargo.lock is left out with the warning rust.lockfile_missing, which names it."
+    },
+    {
+      "id": "offline-tasks-stay-offline",
+      "text": "When PUTNAMI_OFFLINE_DEPENDENCIES is 1, every job of the runtime but publish-crates sets CARGO_NET_OFFLINE=true before it starts a process, so each cargo of lint, test, build, run, serve, package and workspace-install reads only the crates workspace-fetch downloaded. No job sets CARGO_HOME: workspace-fetch and the tasks read the cargo home of the environment."
+    },
+    {
+      "id": "workspace-install-runs-cargo-fetch",
+      "text": "workspace-install runs cargo fetch, which writes a missing Cargo.lock, at each stack root of the workspace's projects, except a project disable.tags excludes and a root where cargo fetch --locked --offline passes, unless the force flag is set; then it installs cargo-nextest and cargo-llvm-cov when the PATH holds neither. Offline, it runs cargo fetch --locked --offline at each root that holds a Cargo.lock, writes and installs nothing, and leaves a root with no Cargo.lock out with rust.lockfile_missing."
+    },
+    {
+      "id": "upgrades-the-lockfile",
+      "text": "deps-upgrade runs cargo update at each stack root of the workspace's projects, with the cargo the toolchain check selects: each locked version moves to the newest one its semver requirement accepts, as bundle update, composer update, pub upgrade and swift package update do. With offline dependencies it fails with rust.cargo_update_failed, which says that cargo update needs the network, and runs no cargo."
+    },
+    {
+      "id": "checks-documentation-links",
+      "text": "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the SDK's documentation link check, and a broken one fails lint. The docs-links flag, on by default, turns the check off. A crate below the project, marked by its Cargo.toml, answers for its own documents."
+    },
+    {
+      "id": "filters-the-tests",
+      "text": "test with the test flag, short -t, passes its value to nextest as -E 'test(~<value>)', with the characters a name matcher reads only escaped, with or without coverage, so it selects the tests whose name contains the value. It adds --no-tests=pass when cargo nextest run --help lists --no-tests, so a crate in which the filter selects no test passes. A last step that runs no nextest gets no argument. The value is part of the task's key, so a filtered result never answers an unfiltered run."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
     "tooling/stacks/doc/adr/0012-a-nested-stack-root-is-an-input-only-project.md",
     "tooling/stacks/doc/adr/0004-a-stack-extension-may-install-its-toolchain-at-task-time.md",
-    "tooling/stacks/doc/adr/0011-rust-runs-on-the-core-helpers-and-owns-its-packaging.md"
+    "tooling/stacks/doc/adr/0011-rust-runs-on-the-core-helpers-and-owns-its-packaging.md",
+    "rust/extension/doc/adr/0001-cargo-runs-offline-from-the-fetched-home.md"
   ]
 }

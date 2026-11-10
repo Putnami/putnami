@@ -4,13 +4,15 @@
 # The workspace gate has no Rust toolchain, so the tests of @putnami/rust run
 # its tasks with a stub cargo. This job installs the real tools and runs the
 # real-tool proof, TestTheFixtureRepositoryPassesWithTheRealTools, on the
-# fixture repository of the observe Cargo detector: each crate's lint, test
-# and build pass, and every nextest case and coverage line is attributed to
-# its crate. PUTNAMI_RUST_REAL_TOOLS=1 makes a missing tool fail the test
-# instead of skipping it, and --no-cache keeps a result stored by a run
-# without the tools from standing in for this one. One test runs, so the
-# project's coverage is reported and not enforced; the workspace gate
-# enforces it.
+# fixture repository of the observe Cargo detector: workspace-fetch downloads
+# its crates from crates.io into an empty cargo home, then each crate's lint,
+# test and build pass offline, every nextest case and coverage line is
+# attributed to its crate, and a test filter runs with and without coverage,
+# passing a crate where it selects no test. PUTNAMI_RUST_REAL_TOOLS=1 makes a
+# missing tool fail the test instead of skipping it, and --no-cache keeps a
+# result stored by a run without the tools from standing in for this one. One
+# test runs, so the project's coverage is reported and not enforced; the
+# workspace gate enforces it.
 #
 # Like the credential-free gate, the job reads no secret.
 name: Rust stack with the real tools
