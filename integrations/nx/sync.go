@@ -18,6 +18,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	detect "go.putnami.dev/tooling/observe/detect/nx"
+	"go.putnami.dev/tooling/stacks"
 )
 
 // SyncJob is the job name of the workspace sync task.
@@ -61,6 +62,9 @@ const (
 	// CodeSyncPreview is a putnami.json a dry run would change, with its
 	// diff.
 	CodeSyncPreview = "nx.sync_preview"
+	// CodeImportUnmatched is an entry of options["@putnami/nx"].import that
+	// selects no Nx project.
+	CodeImportUnmatched = "nx.import_unmatched"
 )
 
 // lifecycleTasks are the Putnami tasks a Nx target maps to, by name.
@@ -76,6 +80,11 @@ type SyncOptions struct {
 	// Declared are extensions the sync reads as declared, beside the ones
 	// the workspace config lists.
 	Declared []string
+	// Import lists, in delegate mode, the project paths and globs whose
+	// projects the sync writes as import mode does, in place of the
+	// workspace option when ImportGiven is set.
+	Import      []string
+	ImportGiven bool
 }
 
 // Unmapped is a target the sync does not hand to a Putnami task of its own.
@@ -120,6 +129,11 @@ type SyncResult struct {
 	// EmptyGraph reports a graph that lists no project while projects are
 	// marked: the sync wrote nothing, so a filtered graph retracts none.
 	EmptyGraph bool
+	// Imported are the workspace-relative directories of the projects a
+	// delegated workspace's import list selects, sorted.
+	Imported []string
+	// Unmatched are the entries of the import list that select no project.
+	Unmatched []string
 }
 
 // Sync writes the project graph of the Nx workspace at root into each
@@ -167,9 +181,18 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	for _, dir := range former {
 		components[wsproto.ProjectIDFromPath(dir)] = true
 	}
+	imports, err := importList(root, mode, opts)
+	if err != nil {
+		return SyncResult{}, err
+	}
 	typeScript := slices.Contains(opts.Declared, TypeScriptExtension) || declaresExtension(root, TypeScriptExtension)
 	for _, p := range detection.Projects {
-		plan := planProject(root, p, mode, typeScript)
+		projectMode := mode
+		if imports.Selects(p.Path) {
+			projectMode = ModeImport
+			result.Imported = append(result.Imported, p.Path)
+		}
+		plan := planProject(root, p, projectMode, typeScript)
 		result.Unmapped = append(result.Unmapped, plan.unmapped...)
 		file := path.Join(p.Path, wsproto.ConfigFilename)
 		change, err := writeProject(root, file, plan, components, opts.DryRun)
@@ -197,7 +220,37 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 			result.Changes = append(result.Changes, *change)
 		}
 	}
+	slices.Sort(result.Imported)
+	result.Unmatched = imports.Unmatched()
 	return result, nil
+}
+
+// importList is the import list of a delegated workspace: opts.Import when
+// given, else options["@putnami/nx"].import. Import mode reads none.
+func importList(root, mode string, opts SyncOptions) (*stacks.ImportList, error) {
+	if mode != ModeDelegate {
+		return nil, nil
+	}
+	entries := opts.Import
+	if !opts.ImportGiven {
+		recorded, err := WorkspaceImport(root)
+		if err != nil {
+			return nil, err
+		}
+		entries = recorded
+	}
+	return stacks.NewImportList(entries)
+}
+
+// WorkspaceImport reads options["@putnami/nx"].import of the workspace at
+// root; nil when the workspace records none.
+func WorkspaceImport(root string) ([]string, error) {
+	doc, err := readWorkspace(root)
+	if err != nil || doc == nil {
+		return nil, err
+	}
+	layer, _ := doc.Options[ExtensionName].(map[string]any)
+	return stacks.ImportEntries(ExtensionName, layer)
 }
 
 // Stale answers what Sync would change in the recorded mode, and writes
@@ -803,7 +856,12 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
 	}
-	result, err := Sync(context.Background(), ctx.WorkspaceRoot, SyncOptions{Mode: mode, DryRun: dry, Declared: declared})
+	imports, importGiven, err := stacks.ImportParam(ctx.Params[stacks.ImportOption])
+	if err != nil {
+		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
+		return "FAILED", nil, errors.New(CodeSyncFailed)
+	}
+	result, err := Sync(context.Background(), ctx.WorkspaceRoot, SyncOptions{Mode: mode, DryRun: dry, Declared: declared, Import: imports, ImportGiven: importGiven})
 	if err != nil {
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
@@ -813,7 +871,7 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 		return "OK", nil, nil
 	}
 	report(emit, result, dry)
-	return "OK", map[string]any{"mode": result.Mode, "written": result.Written, "retracted": result.Retracted, "unmapped": result.Unmapped, "dryRun": dry}, nil
+	return "OK", map[string]any{"mode": result.Mode, "written": result.Written, "retracted": result.Retracted, "unmapped": result.Unmapped, "imported": result.Imported, "dryRun": dry}, nil
 }
 
 // stringsParam reads a parameter that is a list of strings: a JSON array, or
@@ -848,11 +906,20 @@ func report(emit *jsonl.Emitter, result SyncResult, dry bool) {
 	for _, u := range result.Unmapped {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("%s:%s %s", u.Project, u.Target, u.Reason), "", 0, 0, CodeUnmapped)
 	}
+	reportUnmatched(emit, result)
 	if !dry {
 		return
 	}
 	for _, c := range result.Changes {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("%s would change (%s mode):\n%s", c.File, result.Mode, strings.TrimSuffix(Diff(c.File, c.Before, c.After), "\n")), c.File, 0, 0, CodeSyncPreview)
+	}
+}
+
+// reportUnmatched warns of each entry of the import list that selects no
+// project: a typo, or a project not created yet.
+func reportUnmatched(emit *jsonl.Emitter, result SyncResult) {
+	for _, entry := range result.Unmatched {
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("options[%q].%s lists %q, which selects no Nx project of %s", ExtensionName, stacks.ImportOption, entry, result.Source), wsproto.WorkspaceConfigFilename, 0, 0, CodeImportUnmatched)
 	}
 }
 
@@ -864,8 +931,12 @@ func syncSummary(r SyncResult, dry bool) string {
 	if dry {
 		verb = "would change"
 	}
-	return fmt.Sprintf("the Nx project graph of %s, %s mode: %d putnami.json %s, %d current, %d former projects retracted, %d targets unmapped",
-		r.Source, r.Mode, len(r.Written), verb, r.Unchanged, len(r.Retracted), len(r.Unmapped))
+	mode := r.Mode + " mode"
+	if len(r.Imported) > 0 {
+		mode += fmt.Sprintf(" with %d imported (%s)", len(r.Imported), strings.Join(r.Imported, ", "))
+	}
+	return fmt.Sprintf("the Nx project graph of %s, %s: %d putnami.json %s, %d current, %d former projects retracted, %d targets unmapped",
+		r.Source, mode, len(r.Written), verb, r.Unchanged, len(r.Retracted), len(r.Unmapped))
 }
 
 // RunCheck is the job of the validate task: it fails when a sync in the
@@ -878,6 +949,7 @@ func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
 	}
+	reportUnmatched(emit, result)
 	stale := append(slices.Clone(result.Written), result.Retracted...)
 	if len(stale) == 0 {
 		return "OK", nil, nil

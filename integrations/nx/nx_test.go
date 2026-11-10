@@ -632,3 +632,108 @@ func changes(r SyncResult) []string {
 	}
 	return out
 }
+
+// workspaceWithImport writes the workspace file of a delegated workspace
+// that declares @putnami/typescript and lists the import entries.
+func workspaceWithImport(t *testing.T, root string, entries ...string) {
+	t.Helper()
+	data, _ := json.Marshal(map[string]any{
+		"name":       "shop",
+		"extensions": []string{ExtensionName, TypeScriptExtension},
+		"options":    map[string]any{ExtensionName: map[string]any{ModeOption: ModeDelegate, "import": entries}},
+	})
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, string(data))
+}
+
+func TestDelegateModeImportsTheProjectsTheImportListSelects(t *testing.T) {
+	spectest.Proves(t, feature, "delegate-imports-listed-projects", "delegate-mode-imports-the-projects-the-import-list-selects")
+	d := readDemo(t)
+	root := repository(t, d, ModeDelegate)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "bun build src/index.ts --outdir dist", "test": "bun test"}}`)
+	workspaceWithImport(t, root, "/packages/pricing", "/tools/*")
+	result := sync(t, root, SyncOptions{})
+	if result.Mode != ModeDelegate || !slices.Equal(result.Imported, []string{"packages/pricing"}) {
+		t.Fatalf("mode %s, imported %v", result.Mode, result.Imported)
+	}
+	if !slices.Equal(result.Unmatched, []string{"/tools/*"}) {
+		t.Errorf("unmatched = %v, want the entry that selects no project", result.Unmatched)
+	}
+	jobs := func(dir string) any { return readProjectFile(t, root, dir)["disable"].(map[string]any)["jobs"] }
+	// pricing is imported: @putnami/typescript runs its build and test.
+	if got, want := jobs("packages/pricing"), []any{"@putnami/nx:build", "@putnami/nx:test", "lint"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing jobs = %v, want %v", got, want)
+	}
+	// api stays delegated: every target runs through nx run, and the
+	// TypeScript extension that claims it too runs none.
+	if got, want := jobs("apps/api"), []any{"@putnami/typescript:build", "@putnami/typescript:test", "lint"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("api jobs = %v, want %v", got, want)
+	}
+	// A delegated project's targets are not listed as staying on Nx: that is
+	// what delegate mode does.
+	for _, u := range result.Unmapped {
+		if u.Project == "@demo/api" && u.Target != "start" {
+			t.Errorf("a delegated target is listed: %+v", u)
+		}
+	}
+
+	// The import parameter outranks the option: an empty list delegates
+	// pricing again, and validate then reports pricing as stale.
+	preview := sync(t, root, SyncOptions{DryRun: true, Import: []string{}, ImportGiven: true})
+	if len(preview.Imported) != 0 || !slices.Contains(preview.Written, "packages/pricing/putnami.json") {
+		t.Errorf("the empty import parameter: imported %v, written %v", preview.Imported, preview.Written)
+	}
+	// Import mode reads no list.
+	if r := sync(t, root, SyncOptions{Mode: ModeImport, DryRun: true}); r.Imported != nil || r.Unmatched != nil {
+		t.Errorf("import mode read the list: %v %v", r.Imported, r.Unmatched)
+	}
+
+	run := func() (string, string) {
+		var events strings.Builder
+		emit := jsonl.New()
+		emit.Observe(func(message string) { events.WriteString(message + "\n") })
+		status, _, _ := RunCheck(&pctx.Context{WorkspaceRoot: root}, emit, nil)
+		return status, events.String()
+	}
+	status, events := run()
+	if status != "OK" || !strings.Contains(events, `lists "/tools/*", which selects no Nx project`) {
+		t.Errorf("a current list: %s %s", status, events)
+	}
+	// pricing leaves the list with no sync: validate fails until the sync
+	// runs.
+	workspaceWithImport(t, root, "apps/*")
+	if status, events := run(); status != "FAILED" || !strings.Contains(events, "packages/pricing/putnami.json no longer matches") {
+		t.Errorf("a list the putnami.json files do not match: %s %s", status, events)
+	}
+	sync(t, root, SyncOptions{})
+	if status, events := run(); status != "OK" {
+		t.Errorf("after the sync: %s %s", status, events)
+	}
+
+	// A malformed entry fails the sync and writes nothing.
+	workspaceWithImport(t, root, "packages/[")
+	if _, err := Sync(context.Background(), root, SyncOptions{}); err == nil || !strings.Contains(err.Error(), "packages/[") {
+		t.Errorf("a malformed entry: %v", err)
+	}
+}
+
+func TestTheSyncJobReadsTheImportParameter(t *testing.T) {
+	spectest.Proves(t, feature, "delegate-imports-listed-projects", "delegate-mode-imports-the-projects-the-import-list-selects")
+	root := repository(t, readDemo(t), ModeDelegate, TypeScriptExtension)
+	var events strings.Builder
+	emit := jsonl.New()
+	emit.Observe(func(message string) { events.WriteString(message + "\n") })
+	ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{"dryRun": json.RawMessage(`true`), "import": json.RawMessage(`"/packages/pricing,/nowhere"`)}}
+	status, data, err := RunSync(ctx, emit, nil)
+	if err != nil || status != "OK" || !reflect.DeepEqual(data["imported"], []string{"packages/pricing"}) {
+		t.Fatalf("status %s, data %v, err %v", status, data, err)
+	}
+	for _, want := range []string{"delegate mode with 1 imported (packages/pricing)", `lists "/nowhere", which selects no Nx project`} {
+		if !strings.Contains(events.String(), want) {
+			t.Errorf("the dry run's output lacks %q:\n%s", want, events.String())
+		}
+	}
+	ctx.Params["import"] = json.RawMessage(`3`)
+	if status, _, _ := RunSync(ctx, emit, nil); status != "FAILED" {
+		t.Errorf("an import parameter that is no list: %s", status)
+	}
+}
