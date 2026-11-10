@@ -21,6 +21,7 @@ Putnami adopts a tool in one of two modes:
 | Nx | Import or delegate, asked | `putnami init --from nx` |
 | moon | Import or delegate, asked | `putnami init --from moon` |
 | Turborepo | Import or delegate, asked | `putnami init --from turbo` |
+| Rush | Import or delegate, asked | `putnami init --from rush` |
 
 ## Pants
 
@@ -519,6 +520,106 @@ putnami init --from turbo --mode delegate
 Add `--apply` to write it, install an extension the mode needs, and
 synchronize the projects.
 
+## Rush
+
+Rush offers both modes. Import hands the projects to Putnami's TypeScript
+extension; delegate keeps Rush and its build cache.
+
+### Before you start
+
+- `@putnami/rush` is not published yet: until its first release,
+  `putnami init --from rush` stops at the extension install.
+- `rush.json` lies at the root of the repository, which becomes the workspace
+  root.
+- For delegate mode, `rush` is on `PATH`, at the `rushVersion` of `rush.json`.
+
+### Turn the repository into a workspace
+
+At the repository root:
+
+```bash
+putnami init --from rush --mode import
+```
+
+or
+
+```bash
+putnami init --from rush --mode delegate
+```
+
+`init` records the mode under `options["@putnami/rush"].mode` of
+`putnami.workspace.json`, declares the extensions of the mode, installs them,
+and synchronizes the projects. The sync reads `rush.json` and each project's
+`package.json`, and writes each project's `putnami.json` with the projects it
+depends on:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "extensions": ["@putnami/rush"],
+  "dependencies": ["/libs/pricing"]
+}
+```
+
+In import mode the extension is `@putnami/typescript`, and the TypeScript
+install writes the root `package.json` with the projects as `workspaces` and
+installs them with Bun: Rush's lockfile and `rush install` are no longer used.
+A project whose `main` names Rush's build output, such as `lib/index.js`,
+gains `"exports": { ".": "./src/index.ts" }` unless `rush.json` publishes it,
+and a project without `tsconfig.json` gets one that extends the root's, so
+Putnami builds each project from its sources. A project `rush.json`
+publishes keeps its build-output entry, so the projects that depend on it
+cannot resolve it in import mode: the sync warns, and delegate mode suits such
+a repository better.
+
+The sync writes nothing it cannot map. It warns, with the reason, about each
+`command-line.json` command other than `build`, `test` and `lint`, which keeps
+running through Rush, and in import mode about each project script other than
+those three, which `rushx` still runs.
+
+Commit the files. Run `putnami init --from rush` again later to see what a
+sync would change, and `putnami init --from rush --apply` to write it.
+
+### Run what a change affects in import mode
+
+```bash
+putnami lint,test,build --impacted
+```
+
+Putnami's TypeScript tasks replace the `build`, `test` and `lint` scripts, and
+Putnami's cache stores their results.
+
+### Run what a change affects in delegate mode
+
+```bash
+putnami build --impacted
+```
+
+After a change to `libs/pricing`, Putnami runs `@demo/pricing` and the projects
+that depend on it, `@demo/api` here, each with one command at the root:
+
+```text
+rush build --to @demo/pricing
+rush build --to @demo/api
+```
+
+A project it depends on runs no task of its own. Each result records
+`delegatedTo: rush`, and Putnami stores no cache entry. `rush build --to`
+also builds the projects upstream of the one it names, so turn Rush's build
+cache on in `common/config/rush/build-cache.json`: without it, the sync warns
+that each task reruns them.
+
+`putnami test` and `putnami lint` run `rush test` and `rush lint --to
+<package>` when `command-line.json` declares a bulk or phased command of that
+name; otherwise the sync disables them. Rush has no report convention, so the
+test task reads the JUnit and coverage files a project names under
+`options["@putnami/rush"].tasks.test.reports` of its `putnami.json`; without
+them its result is the exit code, and the sync names those projects.
+
+`putnami validate` fails with `rush.sync_stale` when the edges no longer match
+`rush.json` and the project manifests: run `putnami projects sync` and commit
+the result.
+
 ## Next
 
 - [Run a Pants repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/pants/doc/01-pants.md):
@@ -531,5 +632,7 @@ synchronize the projects.
   the two modes, task matching, reports, what the sync owns.
 - [Run a Turborepo repository with Putnami](https://github.com/Putnami/putnami/blob/main/monorepo/turbo/doc/01-turbo.md):
   the two modes, what the sync owns, the test reports.
+- [Adopt a Rush repository](https://github.com/Putnami/putnami/blob/main/monorepo/rush/doc/01-rush.md):
+  both modes, what the sync writes, the test reports.
 - [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci): the
   report on a pull request, before you adopt anything.
