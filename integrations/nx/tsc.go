@@ -240,26 +240,31 @@ func inside(dir, p string) bool {
 // project whose @nx/js:tsc target maps, when the project sets no compiler,
 // and records in options["@putnami/nx"] that it wrote it. Without want, it
 // removes only a compiler it recorded, and only while the value is still the
-// one it wrote; a compiler the project wrote stays.
+// one it wrote; a compiler the project wrote stays. It changes nothing else:
+// an empty options member it did not empty stays as the project wrote it.
 func setCompiler(doc map[string]any, want bool) {
 	options, _ := doc["options"].(map[string]any)
-	if options == nil {
-		options = map[string]any{}
-	}
 	ts, _ := options[TypeScriptExtension].(map[string]any)
-	if ts == nil {
-		ts = map[string]any{}
-	}
 	nx, _ := options[ExtensionName].(map[string]any)
-	if nx == nil {
-		nx = map[string]any{}
-	}
 	wrote := nx[compilerRecord] == "tsc"
 	current, set := ts["compiler"]
 	switch {
 	case want && !set:
+		if options == nil {
+			options = map[string]any{}
+			doc["options"] = options
+		}
+		if ts == nil {
+			ts = map[string]any{}
+			options[TypeScriptExtension] = ts
+		}
+		if nx == nil {
+			nx = map[string]any{}
+			options[ExtensionName] = nx
+		}
 		ts["compiler"] = "tsc"
 		nx[compilerRecord] = "tsc"
+		return
 	case want && wrote && current != "tsc":
 		// The project changed the value: it is the project's now.
 		delete(nx, compilerRecord)
@@ -268,17 +273,16 @@ func setCompiler(doc map[string]any, want bool) {
 			delete(ts, "compiler")
 		}
 		delete(nx, compilerRecord)
+	default:
+		return
 	}
+	// It removed a member: it prunes what that emptied.
 	for name, layer := range map[string]map[string]any{TypeScriptExtension: ts, ExtensionName: nx} {
-		if len(layer) == 0 {
+		if layer != nil && len(layer) == 0 {
 			delete(options, name)
-		} else {
-			options[name] = layer
 		}
 	}
 	if len(options) == 0 {
 		delete(doc, "options")
-	} else {
-		doc["options"] = options
 	}
 }

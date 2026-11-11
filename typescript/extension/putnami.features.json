@@ -847,7 +847,8 @@
             "checks": [
               "the-runtime-defaults-to-bun",
               "an-unknown-runtime-fails-naming-bun-and-node",
-              "a-node-project-transpiles-for-node-unless-the-command-names-a-target"
+              "a-node-project-transpiles-for-node-unless-the-command-names-a-target",
+              "a-tsc-build-on-node-runs-the-node-target-check"
             ]
           }
         },
@@ -968,7 +969,8 @@
               "a-dependent-builds-after-its-tsc-library",
               "a-file-tsc-stops-emitting-is-gone-after-a-rebuild",
               "the-tsbuildinfo-outside-the-outdir-is-declared",
-              "an-unusable-outdir-fails-before-tsc-runs"
+              "an-unusable-outdir-fails-before-tsc-runs",
+              "serve-run-and-package-run-after-the-tsc-steps"
             ]
           }
         },

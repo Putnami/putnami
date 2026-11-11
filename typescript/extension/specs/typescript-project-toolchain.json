@@ -227,7 +227,7 @@
     },
     {
       "id": "node-workload-runtime",
-      "text": "A project declares the runtime of its workload as options[\"@putnami/typescript\"].runtime in its putnami.json, bun or node, and runs on bun when it declares none; any other value fails the job with typescript.invalid_runtime, naming both values. On node, build transpiles with the node target unless the command names a target."
+      "text": "A project declares the runtime of its workload as options[\"@putnami/typescript\"].runtime in its putnami.json, bun or node, and runs on bun when it declares none; any other value fails the job with typescript.invalid_runtime, naming both values. On node, build transpiles with the node target unless the command names a target, and a project that compiles with tsc runs the node-target check after tsc."
     },
     {
       "id": "node-compile-bundle",
@@ -251,7 +251,7 @@
     },
     {
       "id": "tsc-compiler-choice",
-      "text": "A project's compiler is the compiler parameter of build, test and package, set by options[\"@putnami/typescript\"].compiler or --compiler: bun, tsc or auto, the default. Under auto it is tsc when the package.json build script runs tsc alone (tsc, tsc -b or tsc -p with at most one config, plus --pretty or --verbose, and nothing else), else bun. A tsc project runs no Bun transpile or types step; an explicit tsc whose build script is something else fails naming it."
+      "text": "A project's compiler is the compiler parameter of build, test, serve, run and package, set by options[\"@putnami/typescript\"].compiler or --compiler: bun, tsc or auto, the default. Under auto it is tsc when the package.json build script runs tsc alone (tsc, tsc -b or tsc -p with at most one config, plus --pretty or --verbose, and nothing else), else bun. A tsc project runs no Bun transpile or types step; an explicit tsc whose build script is something else fails naming it."
     },
     {
       "id": "tsc-build-runs-the-installed-tsc",
@@ -259,7 +259,7 @@
     },
     {
       "id": "tsc-output-restores-at-outdir",
-      "text": "With tsc, build declares the config's outDir, and its declarationDir and .tsbuildinfo where they lie outside the outDir, as its outputs. A run empties them before tsc starts, a cache hit restores them in place, and every job of a project that depends on it runs after it. An outDir that is unset, outside the project, the project itself, not ignored by Git, or holding a file Git tracks fails the build before tsc runs, naming the setting."
+      "text": "With tsc, build declares the config's outDir, and its declarationDir and .tsbuildinfo where they lie outside the outDir, as its outputs. A run empties them before tsc starts, a cache hit restores them in place, and every job of a project that depends on it runs after it, as do the compile, serve and run jobs of the project. An outDir that is unset, outside the project, the project itself, not ignored by Git, or holding a file Git tracks fails the build before tsc runs, naming the setting."
     },
     {
       "id": "tsc-key-follows-what-tsc-reads",
@@ -279,7 +279,7 @@
     "typescript/extension/doc/adr/0006-a-node-build-reads-its-whole-graph-for-bun-apis.md",
     "typescript/extension/doc/adr/0007-the-repository-chooses-its-package-manager.md",
     "typescript/extension/doc/adr/0008-a-project-keeps-its-test-runner.md",
-    "typescript/extension/doc/adr/0009-a-node-image-ships-the-installed-production-dependencies.md",
+    "typescript/extension/doc/adr/0011-a-node-image-ships-the-installed-production-dependencies.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",

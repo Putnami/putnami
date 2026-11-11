@@ -12,6 +12,8 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/typescript/extension/internal/build"
+	"go.putnami.dev/typescript/extension/internal/errs"
 )
 
 // tscWorkspaceFiles is a workspace of two tsc projects: lib, which builds with
@@ -147,5 +149,45 @@ func TestBuildTscCompilesWithTheScriptsTscAndLeavesAReferenceAlone(t *testing.T)
 	}
 	if !after.ModTime().Equal(before.ModTime()) {
 		t.Errorf("app's build rewrote lib's .tsbuildinfo (%s, was %s): it rebuilt a reference", after.ModTime(), before.ModTime())
+	}
+}
+
+// TestATscBuildOnNodeRunsTheNodeTargetCheck runs build-tsc on a project on the
+// node runtime: tsc compiles it, then a Bun API the node-target check reports
+// fails the build, as it fails a transpile. On the bun runtime the check does
+// not run.
+func TestATscBuildOnNodeRunsTheNodeTargetCheck(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "node-workload-runtime", "a-tsc-build-on-node-runs-the-node-target-check")
+	requireBun(t)
+	if _, err := stdexec.LookPath("git"); err != nil {
+		t.Skip("git is not on PATH")
+	}
+	root := writeTscWorkspace(t)
+	called := false
+	stubNodeCheck(t, func(string, string) ([]build.BunAPIUse, error) {
+		called = true
+		return []build.BunAPIUse{{Module: "src/index.ts", Imports: []string{"bun"}, Chain: []string{"src/index.ts"}}}, nil
+	})
+
+	status, _, err := runBuildTsc(withParams(tscJob(root, "libs/lib"), map[string]any{"runtime": "bun"}), jsonl.New(), nil)
+	expectJobOK(t, "lib build~tsc on bun", status, err)
+	if called {
+		t.Fatal("the node-target check ran for a project on the bun runtime")
+	}
+
+	events := captureEvents(t, func() {
+		status, _, err = runBuildTsc(withParams(tscJob(root, "libs/lib"), map[string]any{"runtime": "node"}), jsonl.New(), nil)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status != "FAILED" {
+		t.Fatalf("lib build~tsc on node ended %s, want FAILED: %v", status, events)
+	}
+	if !called {
+		t.Fatal("the node-target check did not run for a project on the node runtime")
+	}
+	if len(diagnosticsWithCode(events, errs.CodeBunAPIOnNode.String())) != 1 {
+		t.Fatalf("want one %s diagnostic: %v", errs.CodeBunAPIOnNode, events)
 	}
 }

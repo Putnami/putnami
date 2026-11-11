@@ -388,7 +388,7 @@ COPY putnami-buildinfo.json /app/.gen/version.json
   with `typescript.dependency_not_installed`, which names `putnami install`.
   A native addon ships as the install built it, for the build host's
   platform. See ADR
-  [0009](adr/0009-a-node-image-ships-the-installed-production-dependencies.md).
+  [0011](adr/0011-a-node-image-ships-the-installed-production-dependencies.md).
 
 ### Caching
 

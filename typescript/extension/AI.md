@@ -34,6 +34,10 @@ It empties that output itself, since the engine empties no `pathFrom` output,
 and runs `tsc -b` on a config with references as `tsc -p`. The rule of what
 "runs tsc alone" is lives in the SDK's `tscscript` package, which the Nx and
 Turborepo imports read too: change it there, never in a copy.
+`serve`, `run` and `package` plan the same tsc steps: every step that loads or
+bundles a project depends on its own and its dependencies' `tsc` and
+`tsc-auto`. On the `node` runtime `build-tsc` runs the node-target check after
+`tsc`, as the transpile does.
 
 Each phase caches independently and can be batched across projects. Batching is
 an execution strategy only: every batched phase writes each project's artifacts

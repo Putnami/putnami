@@ -1,4 +1,4 @@
-# ADR 0009 — A Node image ships the installed production dependencies
+# ADR 0011 — A Node image ships the installed production dependencies
 
 - **Status**: accepted
 - **Scope**: `@putnami/typescript` (`typescript/extension`)

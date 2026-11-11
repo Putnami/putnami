@@ -436,7 +436,8 @@ A project whose workload runs on Node declares it in its `putnami.json`:
 `typescript.invalid_runtime`. Bun still builds the project. On `node`:
 
 - the transpile phase targets Node unless the command names `--target`, so
-  the [Node.js target](#nodejs-target) check runs on every build;
+  the [Node.js target](#nodejs-target) check runs on every build, after
+  `tsc` for a [library built with tsc](#a-library-built-with-tsc);
 - the compile phase writes a Node bundle instead of Bun executables (see
   [Phase 4](#phase-4-compile));
 - `serve`, `run` and `package --docker` start and ship that bundle with
@@ -472,7 +473,8 @@ assignment or other argument. `tsc && cp README.md dist`, `tsc --watch` or a
 bundler (`tsup`, `vite`, `webpack`, `rollup`, `esbuild`) is not: under `auto`
 such a project compiles with Bun, and an explicit `tsc` fails naming the
 script. Set the option in `options["@putnami/typescript"]`, not
-`options["@putnami/typescript:build"]`: `test` and `package` read it too.
+`options["@putnami/typescript:build"]`: `test`, `serve`, `run` and `package`
+read it too.
 
 With `tsc`:
 
@@ -488,6 +490,12 @@ With `tsc`:
   `src` writes `tsconfig.tsbuildinfo` next to itself), as its outputs. It
   empties them before `tsc` starts, a cache hit restores them in place, and
   every job of a project that depends on the library runs after it.
+- `serve`, `run` and `package` plan the same steps, and the project's own
+  `compile`, `serve` and `run` jobs run after them, so a package never loads
+  a stale or missing `outDir`.
+- On the `node` runtime, the build runs the node-target check after `tsc`,
+  as after a Bun transpile: a module that needs a Bun API fails the build
+  with `typescript.bun_api_on_node`.
 - `tsc -b` on a config that declares `references` runs as `tsc -p` on that
   config. Putnami builds or restores each referenced project first, in
   dependency order; a restored file keeps the time it was stored, so `tsc -b`

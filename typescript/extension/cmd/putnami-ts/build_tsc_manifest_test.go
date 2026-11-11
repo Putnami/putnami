@@ -71,26 +71,28 @@ func steps(m tscManifest, command string) map[string]tscManifestStep {
 }
 
 // TestTscStepsArePlannedOnlyForATscProject pins the plan of the compiler
-// choice: build and test plan build-tsc as tsc when the compiler is tsc, and
-// as tsc-auto, spliced out of a project whose package.json never names tsc,
-// under auto. The Bun transpile and types steps are not planned for an
-// explicit tsc.
+// choice: build, test, serve, run and package plan build-tsc as tsc when the
+// compiler is tsc, and as tsc-auto, spliced out of a project whose
+// package.json never names tsc, under auto. The Bun transpile and types steps
+// of build are not planned for an explicit tsc.
 func TestTscStepsArePlannedOnlyForATscProject(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "tsc-compiler-choice", "a-tsc-project-plans-no-bun-transpile-or-types")
 	m := readTscManifest(t)
-	for _, command := range []string{"build", "test", "package"} {
+	for _, command := range []string{"build", "test", "serve", "run", "package"} {
 		flag, ok := m.Commands[command].Flags["compiler"]
 		if !ok || flag.Default != "auto" || !slices.Equal(flag.Choices, []string{"auto", "bun", "tsc"}) {
 			t.Errorf("%s compiler flag = %+v, want auto, bun or tsc, auto by default", command, flag)
 		}
 	}
-	for _, command := range []string{"build", "test"} {
+	// package builds nothing when it assembles an image built before.
+	guards := map[string]string{"build": "", "test": "", "serve": "", "run": "", "package": " && !params.image"}
+	for command, guard := range guards {
 		run := steps(m, command)
 		auto, explicit := run["tsc-auto"], run["tsc"]
-		if auto.Task != "build-tsc" || auto.If != "params.compiler == 'auto'" || auto.Activation == nil {
+		if auto.Task != "build-tsc" || auto.If != "params.compiler == 'auto'"+guard || auto.Activation == nil {
 			t.Errorf("%s~tsc-auto = %+v, want build-tsc under auto with an activation gate", command, auto)
 		}
-		if explicit.Task != "build-tsc" || explicit.If != "params.compiler == 'tsc'" || explicit.Activation != nil {
+		if explicit.Task != "build-tsc" || explicit.If != "params.compiler == 'tsc'"+guard || explicit.Activation != nil {
 			t.Errorf("%s~tsc = %+v, want build-tsc under tsc with no gate", command, explicit)
 		}
 		// tsc reads what generate writes into the project.
@@ -154,6 +156,23 @@ func TestTscOutputsRestoreWhereDependentsReadThem(t *testing.T) {
 	}
 }
 
+// TestWorkloadStepsRunAfterTheTscSteps pins that a step which loads or
+// bundles the project runs after the tsc steps of the project and of its
+// dependencies: a package resolves a tsc library through its outDir, which
+// only tsc writes or restores.
+func TestWorkloadStepsRunAfterTheTscSteps(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "tsc-output-restores-at-outdir", "serve-run-and-package-run-after-the-tsc-steps")
+	m := readTscManifest(t)
+	for command, id := range map[string]string{"build": "compile", "serve": "serve", "run": "run", "package": "compile"} {
+		step := steps(m, command)[id]
+		for _, dep := range []string{"tsc", "tsc-auto", "^tsc", "^tsc-auto"} {
+			if !slices.Contains(step.DependsOn, dep) {
+				t.Errorf("%s~%s depends on %v, want %s", command, id, step.DependsOn, dep)
+			}
+		}
+	}
+}
+
 // TestTscKeyReadsWhatTscReads pins the key of build-tsc and of the test
 // steps that read a library's compiled output.
 func TestTscKeyReadsWhatTscReads(t *testing.T) {
@@ -177,8 +196,11 @@ func TestTscKeyReadsWhatTscReads(t *testing.T) {
 			t.Errorf("build-tsc workspaceConfig lacks %s", file)
 		}
 	}
-	if inputs["compiler"].From != "params" {
-		t.Errorf("build-tsc does not key on the compiler parameter")
+	// The runtime and the target decide the node-target check after tsc.
+	for _, param := range []string{"compiler", "runtime", "target"} {
+		if inputs[param].From != "params" {
+			t.Errorf("build-tsc does not key on the %s parameter", param)
+		}
 	}
 	run := steps(m, "test")
 	for _, id := range []string{"test", "types"} {

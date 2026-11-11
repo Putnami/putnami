@@ -34,6 +34,12 @@ func runBuildTsc(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string,
 		return "OK", map[string]any{}, nil
 	}
 
+	// The runtime decides the Bun API check after tsc, as after a transpile:
+	// a project on node that calls a Bun API must not build green.
+	params, err := transpileParams(ctx)
+	if err != nil {
+		return "FAILED", nil, err
+	}
 	plan, err := build.PlanTsc(projectPath, ctx.WorkspaceRoot)
 	if err != nil {
 		return tscRefused(emit, err)
@@ -68,6 +74,10 @@ func runBuildTsc(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string,
 	if info, err := os.Stat(plan.OutDir); err != nil || !info.IsDir() {
 		emit.PhaseEnd("tsc", "failed")
 		emit.DiagnosticWithCode("error", "tsc emitted nothing into "+relPath(projectPath, plan.OutDir)+", the outDir of "+relPath(projectPath, plan.Config), relPath(projectPath, plan.Config), 0, 0, build.CodeTscEmittedNothing)
+		return "FAILED", nil, nil
+	}
+	if emitDiagnostics(emit, checkBunAPIsOnNode(bunBin, projectPath, params)) {
+		emit.PhaseEnd("tsc", "failed")
 		return "FAILED", nil, nil
 	}
 	emit.PhaseEnd("tsc", "success")
