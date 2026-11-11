@@ -60,8 +60,8 @@ task's, so a task moves only with arguments that choose the whole project or
 only change the output, such as `./...`, `-v` or `--locked`.
 A task that selects build tags, a release profile, a package or a subset of
 the suite, such as `go test -tags integration ./...`, `cargo build --release`
-or `pytest tests/unit`, stays on moon, and so does `go test .`, since the Go
-extension tests `./...`; the sync names the arguments.
+or `pytest tests/unit`, stays on moon, and so do `go test .` and `go build .`,
+since the Go extension tests and builds `./...`; the sync names the arguments.
 A runner prefix such as `bundle exec`, `uv run` or `npx`, or a path such as
 `vendor/bin/`, does not change the tool. A task chained with another command
 stays on moon. A TypeScript task also stays when the project's `package.json`

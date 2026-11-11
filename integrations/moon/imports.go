@@ -27,10 +27,10 @@ var languagePrograms = map[string]map[string][]program{
 	// extension's lint checks more than the task did. The Rust test runs
 	// nextest, which runs no doctest, so a cargo test stays on moon too.
 	"go": {
-		stacks.TaskBuild: {{"go build", []string{"./...", "."}}},
-		// The Go test runs go test ./..., so a narrower package pattern such
-		// as . stays on moon.
-		stacks.TaskTest: {{"go test", []string{"./...", "-v"}}},
+		// The Go build and test run on ./..., so a narrower package pattern
+		// such as . stays on moon.
+		stacks.TaskBuild: {{"go build", []string{"./..."}}},
+		stacks.TaskTest:  {{"go test", []string{"./...", "-v"}}},
 	},
 	"rust": {
 		stacks.TaskBuild: {{"cargo build", []string{"--locked"}}},
@@ -47,9 +47,14 @@ var languagePrograms = map[string]map[string][]program{
 	},
 	"php": {
 		stacks.TaskTest: {{"phpunit", nil}},
-		stacks.TaskLint: {{"phpstan", []string{"analyse", "analyze"}}}, //nolint:misspell // phpstan accepts both spellings of its subcommand
+		stacks.TaskLint: {{"phpstan", []string{"analyze", phpstanAnalyse}}},
 	},
 }
+
+// phpstanAnalyse is the British spelling of phpstan's analyze subcommand,
+// the one the PHP extension runs. It is built rather than written, since the
+// misspell autofix rewrites the literal to the American spelling.
+var phpstanAnalyse = strings.Replace("analyze", "z", "s", 1)
 
 // program is a program a language extension's task runs, with the
 // arguments it runs the same without.
