@@ -11,14 +11,34 @@ Putnami adopts a tool in one of two modes:
 - **Delegate**: a build system with its own hermetic cache keeps it. Putnami
   runs the tool on each affected package and reads its reports, and caches
   nothing for those tasks.
-- **Import**: Putnami's runner and cache take over the tasks a Putnami
-  extension can map, and every other task keeps running through the tool.
-  What an import maps depends on the tool: every Rush project, each moon
-  project whose language has a Putnami extension, and in Nx and Turborepo
-  only a TypeScript project's targets whose script already runs `bun build`,
-  Biome, a bare ESLint, a test runner Putnami runs: `bun test`, Vitest or
-  Jest, or a `build` that runs `tsc` alone. Each tool's section below gives
-  the exact scope.
+- **Import**: Putnami's runner and cache take over each task a Putnami
+  extension runs with the same tool, and every other task keeps running
+  through the tool.
+
+An import never changes the tool that checks the code, whatever the monorepo
+tool:
+
+- A project whose language has a Putnami extension moves to that extension.
+  A project in any other language stays on the tool.
+- A `build`, `test` or `lint` target moves to Putnami only when the extension
+  runs the same tool as the target. For TypeScript, that is a script that
+  runs `bun build` or `tsc` alone, `bun test`, Vitest or Jest, Biome or a bare
+  `eslint`, with no other command chained to it. A Vitest or Jest suite keeps
+  its runner and configuration, and an ESLint lint its configuration.
+- Every other target, such as a webpack build, a Mocha test or an ESLint with
+  arguments, keeps running as the repository defines it, through the tool.
+  The sync lists it as not mapped, with its reason, and rewrites no script.
+- Putnami installs the dependencies with the repository's package manager and
+  its lockfile.
+- An imported TypeScript project whose build moves to the Bun build, and that
+  the repository does not publish, gains `"exports": { ".": "./src/index.ts" }`
+  when its `main` names a build output, since that build writes nothing in the
+  project. A project with no `tsconfig*.json` gets a `tsconfig.json` that
+  extends the root's. The sync lists each file it rewrites.
+- `putnami validate` fails with `<tool>.sync_stale` in both modes when a
+  `putnami.json` no longer matches the tool's graph or the scripts.
+
+Each tool's section below gives how a kept target runs.
 
 | Tool | Mode | Command |
 |---|---|---|
@@ -320,6 +340,11 @@ it, and synchronizes:
 putnami init --from nx --mode import --apply
 ```
 
+Back to delegate mode with no import list, `--apply` also removes from the
+workspace each extension the import declared, `@putnami/typescript` here,
+once no `putnami.json` names it. The same holds for every tool, moon's
+language extensions included.
+
 ### Move one project at a time
 
 A large repository can stay in delegate mode and import its TypeScript
@@ -383,10 +408,11 @@ run `putnami projects sync` and commit the result.
 ## moon
 
 moon offers both modes. Delegate keeps moon and its cache, local and remote:
-each Putnami task runs `moon run` on one project. Import runs each project
+each Putnami task runs `moon run` on one project. Import moves each project
 whose language has a Putnami extension (TypeScript, Go, Python, PHP, Ruby or
-Rust) through that extension, under Putnami's cache, and keeps every other
-project delegated to moon, so no Putnami cache sits over moon's.
+Rust) to that extension, under Putnami's cache, for each task that extension
+runs with the same tool. Every other task, and every project in another
+language, keeps running through moon, so no Putnami cache sits over moon's.
 
 ### Before you start
 
@@ -432,12 +458,31 @@ depends on:
 no such task has that command in `disable.jobs`. The sync lists every other
 task, such as `api:dev`: it keeps running through moon.
 
-In import mode, `putnami init --from moon` writes `@putnami/typescript` in
-the `putnami.json` of a TypeScript project, declares the extension in the
-workspace and installs it; a project in a language with no Putnami extension
-stays on `@putnami/moon`. `@putnami/typescript`'s workspace install then
-lists the projects where the repository's package manager reads its members
-and installs with that manager, which keeps its lockfile; it writes no
+In import mode, `putnami init --from moon` writes the language extension in
+the `putnami.json` of a project whose language has one, declares the
+extension in the workspace and installs it; a project in a language with no
+Putnami extension stays on `@putnami/moon`. The sync reads what each moon
+task runs, its `script`, else its `command` and `args`, and moves the task
+only when the extension runs the same tool:
+
+| Language | Tools the extension runs |
+|---|---|
+| TypeScript | `bun build` or `tsc` alone, the `build` script of `package.json` for `tsc`; `bun test`, Vitest or Jest; Biome or a bare `eslint` |
+| Go | `go build`, `go test`, `golangci-lint` |
+| Rust | `cargo build`; `cargo test`, `cargo nextest` or `cargo llvm-cov`; `cargo clippy` |
+| Python | `pytest`, `ruff` |
+| Ruby | `rspec`, `rubocop` |
+| PHP | `phpunit`, `phpstan` |
+
+A project that keeps a task, such as a `go vet` lint or a Mocha test, names
+`@putnami/moon` beside its language extension, and `disable.jobs` names the
+extension that does not run each command: `@putnami/moon:test` for a test
+that moved, `@putnami/go:lint` for a lint that stays. The kept task runs
+`moon run <project>:<task>`, and the sync lists it with its reason. A
+TypeScript project records the Vitest or Jest runner and the ESLint linter
+of the tasks that moved. `@putnami/typescript`'s workspace install then lists
+the projects where the repository's package manager reads its members and
+installs with that manager, which keeps its lockfile; it writes no
 `bun.lock`.
 
 Commit the files: they are the project graph Putnami selects on. Run
@@ -619,7 +664,9 @@ putnami init --from turbo --mode delegate
 ```
 
 Add `--apply` to write it, install an extension the mode needs, and
-synchronize the projects.
+synchronize the projects. A switch to delegate mode with no import list then
+removes `@putnami/typescript` from the workspace once no `putnami.json` names
+it.
 
 ### Move one project at a time
 
@@ -653,7 +700,8 @@ and `putnami validate` fails with `turbo.sync_stale` until the
 ## Rush
 
 Rush offers both modes. Import hands the projects to Putnami's TypeScript
-extension; delegate keeps Rush and its build cache.
+extension, which takes over each script it runs with the same tool; delegate
+keeps Rush and its build cache.
 
 ### Before you start
 
@@ -661,7 +709,8 @@ extension; delegate keeps Rush and its build cache.
   `putnami init --from rush` stops at the extension install.
 - `rush.json` lies at the root of the repository, which becomes the workspace
   root.
-- For delegate mode, `rush` is on `PATH`, at the `rushVersion` of `rush.json`.
+- For delegate mode, and in import mode for a script Putnami keeps on Rush,
+  `rush` is on `PATH`, at the `rushVersion` of `rush.json`.
 
 ### Turn the repository into a workspace
 
@@ -697,10 +746,21 @@ installs them with Bun, since a Rush root declares no package manager of its
 own: Rush's lockfile and `rush install` are no longer used. A root
 `package.json` that declares `packageManager`, or a root lockfile, selects that
 manager instead.
-A project whose `main` names Rush's build output, such as `lib/index.js`,
-gains `"exports": { ".": "./src/index.ts" }` unless `rush.json` publishes it,
-and a project without `tsconfig.json` gets one that extends the root's, so
-Putnami builds each project from its sources. A project `rush.json`
+
+A `build`, `test` or `lint` script moves to `@putnami/typescript` only when
+it runs a tool that extension runs: a Jest `test` runs Jest, an `eslint .`
+lint runs ESLint, a `tsc` build runs `tsc`. A script that runs another tool,
+such as `mocha` or `webpack`, keeps running as the repository wrote it, with
+`rushx <script>` in the project's directory: the project names
+`@putnami/rush` beside `@putnami/typescript`, `disable.jobs` names the
+extension that does not run each task, and the sync lists the script with its
+reason. A project with no script of a task has that task disabled.
+
+A project whose build moves to the Bun build and whose `main` names Rush's
+build output, such as `lib/index.js`, gains
+`"exports": { ".": "./src/index.ts" }` unless `rush.json` publishes it, and a
+project with no `tsconfig*.json` gets a `tsconfig.json` that extends the
+root's, so Putnami builds the project from its sources. A project `rush.json`
 publishes keeps its build-output entry, so the projects that depend on it
 cannot resolve it in import mode: the sync warns, and delegate mode suits such
 a repository better.
@@ -719,8 +779,12 @@ sync would change, and `putnami init --from rush --apply` to write it.
 putnami lint,test,build --impacted
 ```
 
-Putnami's TypeScript tasks replace the `build`, `test` and `lint` scripts, and
-Putnami's cache stores their results.
+Putnami's TypeScript tasks run each script they take over with its own tool,
+and Putnami's cache stores their results. A script kept on Rush runs
+`rushx <script>`, and its result records `delegatedTo: rush`.
+
+`putnami validate` fails with `rush.sync_stale` when a `putnami.json` no
+longer matches `rush.json`, the project manifests or their scripts.
 
 ### Run what a change affects in delegate mode
 

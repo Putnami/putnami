@@ -95,6 +95,23 @@ missing, and installs with that manager, which keeps its lockfile: no
 `bun.lock` is written. Delegate mode declares only `@putnami/turbo` and changes
 none of them.
 
+An import also adopts Putnami's TypeScript conventions (D-066) on each
+TypeScript project it hands to `@putnami/typescript`, so the projects that
+depend on it build against its sources:
+
+- A private `package.json` whose build moves to the Bun build, that declares
+  no `exports`, whose top-level `main` or `types` names a file outside `src/`,
+  and whose project holds `src/index.ts`, gains
+  `"exports": { ".": "./src/index.ts" }`: the Bun build writes nothing in the
+  project. A `tsc` build, or one that stays on Turborepo, writes the output
+  its `main` names, so its entry stays. A package that is not private keeps
+  its entry, and the sync warns.
+- A project with no `tsconfig*.json` gets a `tsconfig.json` that extends the
+  root's. A project that holds another one, such as `tsconfig.lib.json`,
+  keeps its configuration, which Jest or ESLint may read.
+
+The sync lists each file it writes, and a dry run shows its diff.
+
 ## What the sync writes
 
 `putnami projects sync` runs the extension's sync task. It reads the members

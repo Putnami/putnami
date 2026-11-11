@@ -7,8 +7,9 @@ as Putnami projects, in the mode the workspace adopted it in:
   `moon run <project>:<task>` on each affected project, read the reports its
   options name, and leave caching to moon;
 - **import**: a project whose language has a Putnami extension runs that
-  extension under Putnami's runner and cache, and every other project stays
-  delegated to moon.
+  extension under Putnami's runner and cache for each task it runs with the
+  same tool; every other task, and every other project, stays delegated to
+  moon (D-070).
 
 It is a delegated stack extension: a manifest, the moon stack profile
 (`profile.json`), the entrypoint of the stack core,

@@ -5,7 +5,7 @@ project, in one of two modes:
 
 | Mode | Who runs the tasks | Who installs | Whose cache |
 |---|---|---|---|
-| `import` | Putnami, through `@putnami/typescript` | Putnami, with Bun | Putnami's |
+| `import` | Putnami, through `@putnami/typescript`, for each script it runs with the same tool; `rushx <script>` for the others | Putnami, with Bun | Putnami's |
 | `delegate` | Rush: `rush build`, `rush test` or `rush lint --to <package>` | Rush | Rush's build cache |
 
 ## Adopt it
@@ -51,10 +51,11 @@ on another when a dependency of its `package.json` names it with the
 
 | Member | Delegate mode | Import mode |
 |---|---|---|
-| `extensions` | `@putnami/rush` | `@putnami/typescript` |
+| `extensions` | `@putnami/rush` | `@putnami/typescript`, beside `@putnami/rush` when a script stays on Rush |
 | `dependencies` | the project IDs of the Rush projects it depends on | the same |
 | `options["@putnami/rush"].filePatterns` | `rush.json`, `command-line.json` and the Rush lockfile, so a lockfile change runs every project | none |
-| `disable.jobs` | `test` and `lint` when `command-line.json` declares no bulk or phased command of that name | none |
+| `options["@putnami/rush"].tasks.<task>` | none | `rushx <task>` in the project's directory, for each script that stays on Rush |
+| `disable.jobs` | `test` and `lint` when `command-line.json` declares no bulk or phased command of that name | `build`, `test` or `lint` without a script of that name, and each task qualified by the extension that does not run it, such as `@putnami/rush:test` for a Jest test that moved and `@putnami/typescript:build` for a webpack build that stays |
 
 It writes a file only when a member it owns changes, and keeps every other
 member. In delegate mode it removes the extension and its edges from a project
@@ -67,6 +68,9 @@ The sync writes nothing it cannot map, and lists it instead:
   each global command: it keeps running through Rush;
 - in import mode, each project script other than `build`, `test` and `lint`:
   run it with `rushx <script>`;
+- in import mode, each `build`, `test` or `lint` script whose tool
+  `@putnami/typescript` does not run, with the reason: it keeps running with
+  `rushx`;
 - in delegate mode, the projects whose test task names no report.
 
 ## Delegate mode
@@ -120,9 +124,18 @@ code of `rush test` alone.
 
 ## Import mode
 
-Each project becomes a `@putnami/typescript` project: `putnami build`, `test`
-and `lint` run Putnami's TypeScript tasks, which replace the `build`, `test`
-and `lint` scripts, and Putnami's cache stores their results. The TypeScript
+Each project becomes a `@putnami/typescript` project, and an import never
+changes the tool that checks the code (D-070). A `build`, `test` or `lint`
+script moves to Putnami's TypeScript task only when that task runs the same
+tool: `bun build` or `tsc` alone, `bun test`, Vitest or Jest, Biome or a bare
+`eslint`, with no other command chained. The task then runs that tool, under
+Putnami's cache: a Jest suite keeps Jest and its configuration. A script that
+runs another tool, such as `mocha`, `webpack` or an ESLint with arguments,
+keeps running as the repository wrote it, with `rushx <script>` in the
+project's directory: `rush` must be on `PATH` at the `rushVersion` of
+`rush.json`, and the result records `delegatedTo: rush`. The probe answers a
+project only when its `putnami.json` names `@putnami/rush`, that is when one
+of its scripts stays on Rush. The TypeScript
 extension's install writes the root `package.json` with the projects as
 `workspaces` and installs them with Bun, since a Rush root declares no package
 manager of its own: its lockfile lies under `common/config/rush`. Rush's
@@ -132,9 +145,10 @@ declares `packageManager`, or a root lockfile, selects that manager instead.
 An import also adopts Putnami's TypeScript conventions (D-066), so each
 project builds and resolves its neighbours from their sources:
 
-- A `package.json` that declares no `exports`, whose top-level `main` or
-  `types` names a file outside `src/` such as Rush's `lib/index.js`, and whose
-  project holds `src/index.ts`, gains `"exports": { ".": "./src/index.ts" }`
+- A `package.json` whose `build` script moves to the Bun build, that
+  declares no `exports`, whose top-level `main` or `types` names a file
+  outside `src/` such as Rush's `lib/index.js`, and whose project holds
+  `src/index.ts`, gains `"exports": { ".": "./src/index.ts" }`
   after that member. Every other byte stays. A project `rush.json` publishes,
   with `shouldPublish` or a `versionPolicyName`, keeps its entry, since
   `rush publish` ships it to consumers that read the build output. Putnami's
@@ -143,18 +157,24 @@ project builds and resolves its neighbours from their sources:
   consumer outside the repository needs the build-output entry, or adopt the
   repository in delegate mode, where Rush builds it. So does a manifest it cannot edit line by line, such as one with CRLF
   line ends: add the `exports` by hand.
-- A project without `tsconfig.json` gets one that extends the root's, which
-  the TypeScript install writes.
+- A `tsc` build, or a build that stays on Rush, writes the output its `main`
+  names, so its entry stays.
+- A project with no `tsconfig*.json` gets a `tsconfig.json` that extends the
+  root's, which the TypeScript install writes. A project that holds another
+  `tsconfig*.json` keeps its configuration, which Jest or ESLint may read.
 
 The sync warns about each file it writes, and a rerun of `putnami init --from
 rush` shows their diffs.
 
-`rush.sync_stale` does not apply: the projects belong to Putnami.
+`putnami validate` fails with `rush.sync_stale` in import mode too, when a
+`putnami.json` no longer matches `rush.json`, the project manifests or their
+scripts. `putnami init --from rush --mode delegate --apply` removes
+`@putnami/typescript` from the workspace once no `putnami.json` names it.
 
 ## What it does not do
 
 - Install or switch Rush: the version check compares and never installs.
 - Rewrite `rush.json`, `command-line.json`, or a project's `package.json`
-  beyond the `exports` an import adds.
+  beyond the `exports` an import adds: an import never rewrites a script.
 - Map subspaces, version policies, `rush publish` or `rush version`: they keep
   running through Rush.

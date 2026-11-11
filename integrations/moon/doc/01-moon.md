@@ -33,12 +33,34 @@ would write and changes nothing; `--apply` writes it.
 
 | | Import | Delegate |
 |---|---|---|
-| A TypeScript, Go, Python, PHP, Ruby or Rust project | runs `@putnami/<language>` | runs `moon run` |
+| A task of a TypeScript, Go, Python, PHP, Ruby or Rust project that runs the tool its extension runs | runs `@putnami/<language>` | runs `moon run` |
+| Any other task of such a project | runs `moon run` | runs `moon run` |
 | Any other project | runs `moon run` | runs `moon run` |
-| Cache | Putnami's for the imported projects, moon's for the others | moon's, local and remote |
+| Cache | Putnami's for the tasks that moved, moon's for the others | moon's, local and remote |
 
-A project never runs both: no Putnami cache sits over moon's. Switching mode
-is a change to `options["@putnami/moon"].mode` and a `putnami projects sync`.
+An import never changes the tool that checks the code (D-070): a task moves
+only when the language extension runs its tool, read from its `script`, else
+its `command` and `args`:
+
+| Language | Tools the extension runs |
+|---|---|
+| TypeScript | `bun build`, or `tsc` alone when it is the `build` script of `package.json`; `bun test`, Vitest or Jest; Biome or a bare `eslint` |
+| Go | `go build`, `go test`, `golangci-lint` |
+| Rust | `cargo build`; `cargo test`, `cargo nextest` or `cargo llvm-cov`; `cargo clippy` |
+| Python | `pytest`, `ruff` |
+| Ruby | `rspec`, `rubocop` |
+| PHP | `phpunit`, `phpstan` |
+
+A runner prefix such as `bundle exec`, `uv run` or `npx`, or a path such as
+`vendor/bin/`, does not change the tool. A task chained with another command
+stays on moon. A TypeScript task also stays when the project's `package.json`
+scripts would lead `@putnami/typescript` to another tool: a Bun build beside a
+`tsc` build script, a Biome lint beside an ESLint lint script.
+
+No task runs both: no Putnami cache sits over moon's. Switching mode is a
+change to `options["@putnami/moon"].mode` and a `putnami projects sync`;
+`putnami init --from moon --mode delegate --apply` also removes from the
+workspace each language extension no `putnami.json` names any more.
 A workspace that records no mode imports, as `init` does without a terminal;
 a value other than `import` or `delegate` fails the sync and the probe with
 `stacks.adoption_mode_invalid`.
@@ -88,12 +110,22 @@ task is listed by the sync and keeps running through moon.
 - `options["@putnami/moon"].graphSync`, which marks the project as the
   sync's, whatever extension it runs: a project the team tags `moon` is not
   the sync's;
-- the extension the mode maps it to;
+- the extension the mode maps it to, and in import mode `@putnami/moon`
+  beside its language extension when a task stays on moon;
 - its `dependencies` on the other moon projects, as project IDs;
 - `build`, `lint` or `test` in `disable.jobs` when the project has no task for
-  it;
-- for a delegated project whose task is tagged rather than named, the step
-  under `options["@putnami/moon"].tasks.<command>.steps`.
+  it, and for a project that runs both extensions, the command qualified by
+  the one that does not run it, such as `@putnami/moon:test` for a test that
+  moved and `@putnami/go:lint` for a lint that stays;
+- for a task moon runs that is tagged rather than named, the step under
+  `options["@putnami/moon"].tasks.<command>.steps`;
+- for a TypeScript project, the Vitest or Jest runner of a test that moved
+  under `options["@putnami/typescript:test"].runner`, and `eslint` under
+  `options["@putnami/typescript"].lint.linter` for an ESLint lint that moved;
+- for a TypeScript project, the conventions of D-066: a `tsconfig.json` that
+  extends the root's when it holds no `tsconfig*.json`, and
+  `"exports": { ".": "./src/index.ts" }` when its build moves to the Bun
+  build, its `package.json` is private and its `main` names a build output.
 
 It keeps every other member, the project's own steps included: it writes a
 step only where none is set or where it wrote the one there. It retracts a
@@ -103,11 +135,13 @@ runs, and in import mode adds the language extensions to the workspace's
 
 Import sets each project's extension from moon's language: a JavaScript
 project runs `@putnami/moon` even when its `putnami.json` named
-`@putnami/typescript`, and a TypeScript project loses `@putnami/moon`.
+`@putnami/typescript`, and a TypeScript project whose tasks all moved loses
+`@putnami/moon`. The sync lists each task it keeps on moon with its reason.
 
 `putnami validate` fails with `moon.sync_stale` when a sync would change a
-`putnami.json`: moon infers edges from manifests and task inputs, so an edit
-can change them.
+`putnami.json`, in both modes: moon infers edges from manifests and task
+inputs, and a task's command decides where it runs, so an edit can change
+them.
 
 ## Reports
 
