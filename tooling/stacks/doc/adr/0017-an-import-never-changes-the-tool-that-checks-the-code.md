@@ -44,8 +44,12 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    that decides whether `@putnami/typescript` runs what a TypeScript script
    runs: `bun build` or a `tsc` alone for `build` (the `tscscript` package of
    the extension SDK), `bun test`, Vitest or Jest for `test`, Biome or a bare
-   ESLint for `lint`, with no other command chained. Turborepo, Rush and moon
-   read it; Nx reads it beside its executors.
+   ESLint for `lint`, with no other command chained. The extension passes
+   none of a script's arguments, so a test script moves only with arguments
+   that choose no configuration and no subset of the suite (`run`,
+   `--coverage`, `--ci`, `--passWithNoTests` and the like), as an ESLint
+   script moves only bare. Turborepo, Rush and moon read it; Nx reads it
+   beside its executors.
 3. **A project runs both extensions.** A project that keeps one target on
    the tool names the tool's extension and the language extension in its
    `putnami.json`, and `disable.jobs` names the extension that does not run
@@ -60,12 +64,17 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    command over the projects upstream of it.
 5. **moon reads what a task runs.** A moon task's `command` and `args`, or
    its `script`, decide whether it moves. A TypeScript task moves under the
-   rule above, and its project records the runner or the linter, since
-   `@putnami/typescript` would otherwise read them from `package.json`. A
-   task of another language moves when it runs the program its extension
-   runs: `go build`, `go test` or `golangci-lint`; `cargo build`,
-   `cargo test`, `cargo nextest` or `cargo clippy`; `pytest` or `ruff`;
-   `rspec` or `rubocop`; `phpunit` or `phpstan`.
+   rule above, and its project records the test runner, `bun` included, and
+   the ESLint linter, since `@putnami/typescript` would otherwise read them
+   from `package.json`. A task of another language moves when it runs the
+   program its extension runs, and nothing more: `go build` or `go test`;
+   `cargo build`, `cargo nextest` or `cargo llvm-cov nextest`; `pytest` or
+   `ruff`; `rspec` or `rubocop`; `phpunit` or `phpstan`. A Go or Rust lint
+   stays on moon, since the extension's lint checks more than the task did
+   (staticcheck and the documentation links beside golangci-lint,
+   `cargo fmt --check` and `-D warnings` beside clippy), and so does a
+   `cargo test`, since the Rust extension tests with nextest, which runs no
+   doctest.
 6. **D-066 follows the build.** An import rewrites the entry of a project
    the repository does not publish, whose `main` names a build output, only
    when its `build` moves to the Bun build: that build writes nothing in the

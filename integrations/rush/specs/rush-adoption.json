@@ -48,7 +48,7 @@
     },
     {
       "id": "import-keeps-the-tool-that-checks-the-code",
-      "text": "In import mode, a build, test or lint script moves to @putnami/typescript only when that extension runs its tool: bun build or tsc alone, bun test, Vitest or Jest, Biome or a bare ESLint, with no command chained. Any other script keeps running with rushx <task> in the project's directory: its putnami.json names @putnami/rush beside @putnami/typescript, disables each task for the extension that does not run it, and the sync lists the script with its reason (D-070)."
+      "text": "In import mode, a build, test or lint script moves to @putnami/typescript only when that extension runs its tool: bun build or tsc alone, bun test, Vitest or Jest with no argument that picks a configuration or a subset, Biome or a bare ESLint, with no command chained. Any other script keeps running with rushx <task> in the project's directory: its putnami.json names @putnami/rush beside @putnami/typescript, disables each task for the extension that does not run it, and the sync lists the script (D-070)."
     },
     {
       "id": "import-adopts-typescript-conventions",
