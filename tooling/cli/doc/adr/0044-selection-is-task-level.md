@@ -14,6 +14,9 @@
   no job it is only serialized after, the narrowed plan orders any two kept
   jobs as the full plan does, and a kept `validate` job keeps no `test` job
   the scope does not name.
+- **Amended**: 2026-11-11, §1: a task's ports are read only where the planner
+  may run the command that declares them; a `closure` port and a `^`-named
+  step also where a dependent may, and a `workspace-once` command nowhere.
 
 ## Context
 
@@ -45,6 +48,19 @@ protocol helpers:
 A file no declaration selects seeds nothing: its project is not selected, and
 nothing downstream is. A pattern above the project root is matched in the
 `../` form `filepath.Rel` produces, the coordinate system of the cache hasher.
+
+One task scope merges what every extension declares for it, but each
+declaration is read only where the planner may run the command that declares
+it: in a project that uses the command's extension and, when the command names
+activation files, holds one of them. A docs check that reads `git:**` and a
+Docker packaging that reads `**/*` in another stack would otherwise credit
+every file of a Go project to tasks it never runs, and their closure and `^`
+edges would carry it to every dependent. A `closure` port reads the files of
+every project in a dependent's closure, and a dependent's toolchain may read
+the sources of a project that runs no `^`-named step, so those two are also
+read where a project that depends on this one may run the command. A
+`workspace-once` command is planned on every impacted run, whatever the
+selection, so it reads for no project.
 
 ### 2. Propagation follows the `^` references a task declares
 
@@ -123,5 +139,12 @@ something. `impacted` and `why_impacted` name the same scopes as the run.
   Narrowing that is a manifest change.
 - A README still selects `@putnami/cli-documents`, which declares `git:**` as
   a `test` input: it is the documentation drift gate.
+- A text file in a Go project selects only the tasks of the commands that
+  project may run. One in `protocols/ci` planned 714 jobs across 153 projects
+  for `lint,test,build,validate`, carried by another stack's Docker closure
+  port to `@putnami/cloud-extension` and its consumers; it now plans 130 and
+  selects 2 projects: `protocols/ci`, for the Go docs check and the features
+  check, which read `from: "workspace"` `git:**`, and
+  `@putnami/cli-documents`.
 - Nothing propagates out of the tasks an extension-consumer edge added
   ([ADR 0042](0042-impacted-plans-from-the-commit-and-records-why.md)).

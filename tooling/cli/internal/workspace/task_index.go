@@ -23,20 +23,28 @@ import (
 // `options.generate.assets`, and the `^` step references the planner resolves
 // in resolveExternalDeps.
 //
-// It is deliberately EXTENSION-AGNOSTIC: one `<command>~<step>` entry merges
-// what every loaded manifest declares for that command and step, and no
-// activation is evaluated. That can only widen an answer — a Go project's
-// `build~compile` is credited with reading `src/**/*.ts`, which selects nothing
-// because no such file is there — and the plan drops a scope entry that names a
-// task the project does not run. The asymmetry ADR 0043 states decides the
-// direction: a task wrongly left out is a gate that never ran, one wrongly left
-// in is a cache hit.
+// One `<command>~<step>` entry merges what every loaded manifest declares for
+// that command and step, but each declaration keeps the command that names it
+// and is read only in a project the planner may run that command in
+// (MayPlanJob). A pattern of another language is no narrower than the path it
+// names: a docs check of every stack reads `git:**`, a Docker packaging of
+// several reads `**/*`, so a merged entry would credit a Go project's text file
+// to tasks the project never runs, and their `^` and closure edges would carry
+// it to every dependent. MayPlanJob is the planner's own condition, so the
+// index stays wider than the plan, and the asymmetry ADR 0043 states holds: a
+// task wrongly left out is a gate that never ran, one wrongly left in is a
+// cache hit.
 //
-// An input selector is the exception: it is asked of the extension that lists
-// it, which cannot answer for a project of another language, and a selector
-// that does not answer reads every path. So a selector takes part only in the
-// projects the planner may run its command in (MayPlanJob), and there it reads
-// every path when its answer fails.
+// A `closure` port reads the file in every project of a dependent's dependency
+// closure, so it is read where the command may run in the project or in any
+// project that depends on it. So is a step a dependent's step names through
+// `^`: the dependent's toolchain may read the sources of a project that runs
+// no such step, which the index cannot see, so it errs wide there too. A
+// command the workspace-once activation plans reads no path for a project: the
+// engine plans it on every impacted run, whatever the selection, so crediting
+// it to a project would only add that project's own tasks. An input selector
+// is read by the same rule, and where its command may run it reads every path
+// when its answer fails.
 
 // InputSelectorQuery is one input selector a task names in one project: the
 // extension that lists it, the absolute project directory, the selector, and
@@ -145,11 +153,20 @@ type indexedTask struct {
 	// selectors are the input selectors the task's project inputs name, each
 	// with the extension that lists it and the other patterns of its input.
 	selectors []indexedSelector
-	// perProject is set when a manifest plans the task in each project, and
-	// unset when every manifest plans it once for the workspace (the
-	// workspace-once activation): such a task runs on every impacted run, so
-	// no changed file needs to select a project for it.
-	perProject bool
+	// declarations are the patterns above, one entry per command that
+	// declares the task: each is read only where its command may be planned
+	// (TasksReadingPath). files, closureFiles and workspaceFiles keep their
+	// union for the questions no project asks.
+	declarations []indexedPatterns
+}
+
+// indexedPatterns is the file patterns one command's step declares for a task
+// scope, with that command.
+type indexedPatterns struct {
+	job            *extension.JobDefinition
+	files          []string
+	closureFiles   []string
+	workspaceFiles []string
 }
 
 // workspaceOnceActivation is the command activation the planner plans once
@@ -221,11 +238,15 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 //
 // A single declaration is enough, and a task that declares none inside an
 // otherwise-declaring workspace reads nothing of its own: it runs when a task it
-// depends on runs, through the intra-project closure.
+// depends on runs, through the intra-project closure. A declaration of a
+// command the workspace-once activation plans does not count: it reads for no
+// project (answersForProjects).
 func (idx *taskIndex) attributes() bool {
 	for _, task := range idx.tasks {
-		if len(task.files) > 0 || len(task.workspaceFiles) > 0 {
-			return true
+		for _, declared := range task.declarations {
+			if answersForProjects(declared.job) && (len(declared.files) > 0 || len(declared.workspaceFiles) > 0) {
+				return true
+			}
 		}
 	}
 	return false
@@ -247,10 +268,8 @@ func (idx *taskIndex) addExtension(
 		if job.CommandName != "" {
 			command = job.CommandName
 		}
+		job = withDeclaringExtension(job, ext)
 		for _, scope := range idx.addCommand(ext, command, job, successors) {
-			if job.Activation != workspaceOnceActivation {
-				idx.tasks[scope].perProject = true
-			}
 			register(idx.byCommand, command, scope)
 			register(idx.byExtension, ext.Name, scope)
 			register(idx.byExtension, wsproto.CleanWorkspacePath(ext.RelPath), scope)
@@ -270,6 +289,27 @@ func (idx *taskIndex) addExtension(
 			commandDeps[command][prerequisite.Command] = true
 		}
 	}
+}
+
+// withDeclaringExtension returns job naming the extension that declares it,
+// as discovery fills it in: a copy carrying the manifest's name or
+// workspace-relative path where the job leaves it empty, and job itself when
+// it names both or the manifest has neither. The planner's job is left as it
+// is.
+func withDeclaringExtension(job *extension.JobDefinition, ext *extension.ExtensionDescription) *extension.JobDefinition {
+	fillName := job.ExtensionName == "" && ext.Name != ""
+	fillPath := job.ExtensionPath == "" && ext.RelPath != ""
+	if !fillName && !fillPath {
+		return job
+	}
+	named := *job
+	if fillName {
+		named.ExtensionName = ext.Name
+	}
+	if fillPath {
+		named.ExtensionPath = ext.RelPath
+	}
+	return &named
 }
 
 // linkCommandDeps turns each command-level prerequisite into intra-project task
@@ -300,14 +340,14 @@ func (idx *taskIndex) addCommand(
 	if len(job.PipelineSteps) == 0 {
 		// A command with no pipeline is one job named after the command.
 		scope := command
-		idx.mergeTask(scope, command, job.FilePatterns, nil, nil, nil)
+		idx.mergeTask(scope, command, job, job.FilePatterns, nil, nil, nil)
 		return []string{scope}
 	}
 	scopes := make([]string, 0, len(job.PipelineSteps))
 	for _, step := range job.PipelineSteps {
 		scope := taskScope(command, step.ID)
 		files, closureFiles, workspaceFiles := stepKeyPatterns(ext, step.Task)
-		idx.mergeTask(scope, command, append(files, job.FilePatterns...), closureFiles, workspaceFiles, stepSelectors(ext, job, step.Task))
+		idx.mergeTask(scope, command, job, append(files, job.FilePatterns...), closureFiles, workspaceFiles, stepSelectors(ext, job, step.Task))
 		scopes = append(scopes, scope)
 		for _, dep := range step.DependsOn {
 			if upstream, ok := strings.CutPrefix(dep, "^"); ok {
@@ -372,7 +412,14 @@ func stepSelectors(ext *extension.ExtensionDescription, job *extension.JobDefini
 	return selectors
 }
 
-func (idx *taskIndex) mergeTask(scope, command string, files, closureFiles, workspaceFiles []string, selectors []indexedSelector) {
+// mergeTask folds one command's declaration of a task scope in: its patterns
+// join the scope's union and are kept with the command that declares them.
+func (idx *taskIndex) mergeTask(
+	scope, command string,
+	job *extension.JobDefinition,
+	files, closureFiles, workspaceFiles []string,
+	selectors []indexedSelector,
+) {
 	task, known := idx.tasks[scope]
 	if !known {
 		task = &indexedTask{scope: scope, command: command}
@@ -382,6 +429,14 @@ func (idx *taskIndex) mergeTask(scope, command string, files, closureFiles, work
 	task.closureFiles = mergePatterns(task.closureFiles, closureFiles)
 	task.workspaceFiles = mergePatterns(task.workspaceFiles, workspaceFiles)
 	task.selectors = append(task.selectors, selectors...)
+	if len(files) > 0 || len(closureFiles) > 0 || len(workspaceFiles) > 0 {
+		task.declarations = append(task.declarations, indexedPatterns{
+			job:            job,
+			files:          mergePatterns(nil, files),
+			closureFiles:   mergePatterns(nil, closureFiles),
+			workspaceFiles: mergePatterns(nil, workspaceFiles),
+		})
+	}
 }
 
 // buildClosure resolves the transitive intra-project successors of every task
@@ -529,11 +584,15 @@ func (idx *taskIndex) ReadsAsExtensionRuntime(projectID, path string) bool {
 // "no task reads this" for such a layer would drop exactly the drift gates that
 // exist to watch files they do not own.
 //
+// A task's ports are read only where the command that declares them may be
+// planned, as the header states: in the project for its own ports, and in the
+// project or one of its dependents for a `closure` port, whose closure scope
+// then travels to the dependents, and for the ports of a step a dependent's
+// step names through `^`. A command the workspace-once activation plans
+// answers for no project.
+//
 // A file wsproto.IsNamedOnlyInput reports is read only by a task whose pattern
-// names it, as every pattern match below states (wsproto.SelectsPath). A task
-// the workspace-once activation plans does not answer for it: that task runs
-// on every impacted run and keys on the file itself, so crediting it to the
-// file's project would only add that project's other tasks.
+// names it, as every pattern match below states (wsproto.SelectsPath).
 func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 	project := idx.ws.ProjectByID(projectID)
 	if project == nil {
@@ -545,23 +604,29 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 		return idx.closureOf(idx.every)
 	}
 	inProject := relative && !isParentRelative(rel)
-	namedOnly := wsproto.IsNamedOnlyInput(lookup)
 	reading := make(map[string]bool)
 	dir := filepath.Join(idx.ws.Root, project.Path)
 	for _, scope := range idx.every {
 		task := idx.tasks[scope]
-		if namedOnly && !task.perProject {
-			continue
-		}
-		if inProject && (wsproto.SelectsPath(rel, task.files) || idx.selectorsRead(task, project, dir, rel)) {
+		if inProject && idx.selectorsRead(task, project, dir, rel) {
 			reading[scope] = true
-			if wsproto.SelectsPath(rel, task.closureFiles) {
-				reading[closureScopePrefix+scope] = true
+		}
+		for _, declared := range task.declarations {
+			if !answersForProjects(declared.job) {
+				continue
 			}
-			continue
-		}
-		if wsproto.SelectsPath(lookup, task.workspaceFiles) {
-			reading[scope] = true
+			if inProject && wsproto.SelectsPath(rel, declared.files) {
+				if idx.readsWhere(scope, declared.job, project) {
+					reading[scope] = true
+				}
+				if wsproto.SelectsPath(rel, declared.closureFiles) && idx.mayPlanInClosureOf(declared.job, project) {
+					reading[closureScopePrefix+scope] = true
+				}
+				continue
+			}
+			if wsproto.SelectsPath(lookup, declared.workspaceFiles) && idx.readsWhere(scope, declared.job, project) {
+				reading[scope] = true
+			}
 		}
 	}
 	for layer, patterns := range declaredLayerPatterns(project) {
@@ -580,13 +645,13 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 
 // selectorsRead reports whether an input selector the task names reads rel in
 // project, whose directory is dir. A selector whose command the planner cannot
-// run in the project reads nothing there. Without a matcher each other
-// selector reads every path but a file wsproto.IsNamedOnlyInput reports, which
-// a selector reads only when its extension lists the file: a task wrongly left
-// out is a gate that never ran.
+// run in the project, or plans once for the workspace, reads nothing there.
+// Without a matcher each other selector reads every path but a file
+// wsproto.IsNamedOnlyInput reports, which a selector reads only when its
+// extension lists the file: a task wrongly left out is a gate that never ran.
 func (idx *taskIndex) selectorsRead(task *indexedTask, project *Project, dir, rel string) bool {
 	for _, selector := range task.selectors {
-		if !idx.mayPlan(selector.job, project) {
+		if !answersForProjects(selector.job) || !idx.mayPlan(selector.job, project) {
 			continue
 		}
 		if idx.inputs == nil {
@@ -602,10 +667,19 @@ func (idx *taskIndex) selectorsRead(task *indexedTask, project *Project, dir, re
 	return false
 }
 
-// mayPlan reports MayPlanJob for job in project, once per pair. A selector of
-// a task with no command job takes part in every project.
+// answersForProjects reports whether a command's declarations can credit a
+// changed path to a project: every command but one the workspace-once
+// activation plans, which the engine plans on every impacted run whatever the
+// selection. A declaration with no command answers.
+func answersForProjects(job *extension.JobDefinition) bool {
+	return job == nil || job.Activation != workspaceOnceActivation
+}
+
+// mayPlan reports MayPlanJob for job in project, once per pair. A declaration
+// with no command job, or whose command names no extension, takes part in
+// every project: the index cannot tell where it runs, and errs wide.
 func (idx *taskIndex) mayPlan(job *extension.JobDefinition, project *Project) bool {
-	if job == nil {
+	if job == nil || (job.ExtensionName == "" && job.ExtensionPath == "") {
 		return true
 	}
 	key := plannedKey{job: job, project: project.ID}
@@ -635,6 +709,34 @@ func (idx *taskIndex) mayPlan(job *extension.JobDefinition, project *Project) bo
 	return planned
 }
 
+// readsWhere reports whether a port of scope, which job declares, is read in
+// project: where the planner may run job there, or, for a step a dependent's
+// step names through `^`, where it may run in a project that depends on it.
+func (idx *taskIndex) readsWhere(scope string, job *extension.JobDefinition, project *Project) bool {
+	if idx.mayPlan(job, project) {
+		return true
+	}
+	return len(idx.reachedBy[scope]) > 0 && idx.mayPlanInClosureOf(job, project)
+}
+
+// mayPlanInClosureOf reports whether job may be planned in project or in a
+// project that depends on it, transitively: the projects whose `closure` ports
+// and `^` steps read project's files. Without a graph it answers true.
+func (idx *taskIndex) mayPlanInClosureOf(job *extension.JobDefinition, project *Project) bool {
+	if idx.mayPlan(job, project) {
+		return true
+	}
+	if idx.ws.Graph == nil {
+		return true
+	}
+	for _, id := range idx.ws.Graph.TransitiveDependentsOf([]string{project.ID}) {
+		if dependent := idx.ws.ProjectByID(id); dependent != nil && idx.mayPlan(job, dependent) {
+			return true
+		}
+	}
+	return false
+}
+
 // PrimeChangedPaths asks the extensions once for every input selector the
 // tasks name in each project a changed path falls in, before the impact pass
 // reads them path by path. It asks for no selector in a project the planner
@@ -654,7 +756,7 @@ func (idx *taskIndex) PrimeChangedPaths(paths []string) {
 		dir := filepath.Join(idx.ws.Root, projects[id].Path)
 		for _, scope := range idx.every {
 			for _, selector := range idx.tasks[scope].selectors {
-				if idx.mayPlan(selector.job, projects[id]) {
+				if answersForProjects(selector.job) && idx.mayPlan(selector.job, projects[id]) {
 					queries = append(queries, selectorQuery(selector, dir))
 				}
 			}

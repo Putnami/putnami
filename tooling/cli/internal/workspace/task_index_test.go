@@ -87,7 +87,7 @@ func taskIndexWorkspace(t *testing.T, config *wsproto.ProjectConfig) *Workspace 
 	t.Helper()
 	return NewWorkspace("/workspace", nil, []*Project{
 		{ID: "/go/extension", Name: "@fixture/go", Path: "go/extension"},
-		{ID: "/libs/http", Name: "http", Path: "libs/http", Config: config},
+		{ID: "/libs/http", Name: "http", Path: "libs/http", Config: config, Extensions: []string{"/go/extension"}},
 	})
 }
 
