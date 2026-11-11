@@ -22,10 +22,14 @@ import (
 // appFixture writes a nested Gradle build whose app applies the application
 // plugin and whose boot project applies Spring Boot, and a nested Maven build
 // whose app is a Spring Boot module, with stub build tools that log what they
-// run and write what each build writes.
+// run and write what each build writes. Its root is a resolved path, the one
+// the stubs log as $PWD.
 func appFixture(t *testing.T) (string, string) {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	bin := t.TempDir()
 	log := filepath.Join(bin, "run.log")
 	stackstest.WriteFile(t, root, "g/settings.gradle.kts", "include(\":app\", \":boot\", \":lib\")\n")

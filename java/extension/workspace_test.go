@@ -23,10 +23,14 @@ import (
 // build in samples that the e2e tag disables, and a project of another
 // extension. Its stub javac prints 21, its gradlew and mvn log their
 // arguments to the returned log, and the resolve task of gradlew prints one
-// configuration it cannot resolve.
+// configuration it cannot resolve. Its root is a resolved path, the one the
+// stubs log as $PWD.
 func installWorkspace(t *testing.T) (string, string, []job.ProjectRef) {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	bin := t.TempDir()
 	log := filepath.Join(bin, "install.log")
 	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"disable": {"tags": ["e2e"]}}`)

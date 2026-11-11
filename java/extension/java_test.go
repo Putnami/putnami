@@ -30,9 +30,13 @@ func init() {
 // :pricing through projects.pricing and applies jacoco; :app, an Android
 // library with unit test coverage, depends on it through project(":pricing");
 // :pricing applies jacoco and locks its dependencies; :model has no tests.
+// Its root is a resolved path, the one the stub tools log as $PWD.
 func gradleFixture(t *testing.T) string {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	stackstest.WriteFile(t, root, ".java-version", "21\n")
 	stackstest.WriteFile(t, root, "settings.gradle.kts", "rootProject.name = \"shop\"\nenableFeaturePreview(\"TYPESAFE_PROJECT_ACCESSORS\")\ninclude(\":app\", \":api\", \":pricing\", \":libs:model\", \":bom\", \":catalog\")\n")
 	stackstest.WriteFile(t, root, "build.gradle.kts", "plugins {\n    alias(libs.plugins.android.library) apply false\n}\n")
@@ -56,10 +60,14 @@ func gradleFixture(t *testing.T) string {
 }
 
 // mavenFixture writes the build of the observe maven demo: the aggregator
-// lists pricing and api, and api depends on pricing.
+// lists pricing and api, and api depends on pricing. Its root is a resolved
+// path, the one the stub tools log as $PWD.
 func mavenFixture(t *testing.T) string {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	stackstest.WriteFile(t, root, "pom.xml", `<project><modelVersion>4.0.0</modelVersion><groupId>com.acme</groupId><artifactId>shop</artifactId><version>1.0.0</version><packaging>pom</packaging><modules><module>pricing</module><module>api</module></modules></project>`)
 	stackstest.WriteFile(t, root, "pricing/pom.xml", `<project><parent><groupId>com.acme</groupId><artifactId>shop</artifactId><version>1.0.0</version></parent><artifactId>pricing</artifactId></project>`)
 	stackstest.WriteFile(t, root, "pricing/src/main/java/com/acme/pricing/Pricing.java", "class Pricing {}\n")
