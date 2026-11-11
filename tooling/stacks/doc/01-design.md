@@ -442,7 +442,8 @@ jobs that select the component's toolchain, offline too, such as the home of
 an SDK the build reads from the environment. It reads an `EnvRequest`: the
 task, the workspace root, the component's metadata, the task's environment,
 the extension's block of the workspace's options and whether the run is
-offline. Its error fails the task with `stacks.toolchain_missing`
+offline. Its error, or an entry that names no variable, fails the task with
+`stacks.toolchain_missing`
 ([ADR 0016](adr/0016-a-stack-sets-the-environment-of-a-task.md)). `Stack.Selected`,
 `RunForeground`, `AnnounceReady` and `FreePort` serve a stack's `run` and
 `serve` commands. `ImageName`, `ImageMember` and `ImagePort` serve a stack

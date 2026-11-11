@@ -313,15 +313,17 @@ plugin then downloads the platforms and build tools on the first task that
 needs them. The extension pins 22.0 because from 23.0 `sdkmanager` hands over
 to the Android CLI, which downloads itself unchecked and accepts no license.
 
-The SDK's location does not reach a task's key; the option does, as every
-key of the extension's block of the workspace's options does, so turning it on
-reruns the Java tasks once.
+Neither the option nor the SDK's location reaches a task's key.
 
-Without the option, a task of an Android component on a machine with no SDK
-fails with `stacks.toolchain_missing`, and the message names the option; a
-task of another project of the build is left to Gradle. Offline, a task
+Without the option, a task of an Android component on a machine with no SDK,
+and `putnami install` of its build, fail with `stacks.toolchain_missing`, and
+the message names the option; a task of another project of the build is left
+to Gradle. On Linux on arm64, for which the extension pins no command-line
+tools, the message names `ANDROID_HOME` and `sdk.dir` only. Offline, a task
 installs nothing: it uses the SDK an earlier task or `putnami install`
-installed.
+installed. A build that applies the Android plugin only through a convention
+plugin of `build-logic` or `buildSrc`, with no `android` block in a project's
+build file, is not seen as Android: it needs `ANDROID_HOME` or `sdk.dir`.
 [ADR 0005](https://github.com/Putnami/putnami/blob/main/java/extension/doc/adr/0005-an-android-build-gets-the-sdk-the-workspace-accepts.md)
 records these choices.
 
@@ -335,8 +337,9 @@ command run it again. It installs:
 
 1. The JDK `.java-version` accepts, as a task installs it, and the pinned JDKs
    the build's Gradle toolchains ask for.
-   An Android build whose workspace accepts the Android SDK licenses also
-   gets the SDK's command-line tools and its accepted licenses.
+   An Android build gets the SDK's command-line tools and its accepted
+   licenses when the workspace accepts them; without the option and with no
+   SDK on the machine, its install fails and names the option.
 2. The build tool: a Gradle build runs `gradlew --version`, so the wrapper
    downloads its distribution, or installs the pinned Gradle; a Maven build
    installs the Maven its wrapper states, or Maven 3.9.11 when the machine
@@ -536,6 +539,8 @@ declare. The design of the stack core is in
 - The Android SDK is installed only once the workspace accepts its licenses,
   and Linux on arm64 gets none: Google publishes its build tools for x64
   only. The platforms and build tools are left to the Android Gradle plugin.
+  A build that applies the Android plugin only through a convention plugin is
+  not seen as Android.
 - Credentials for a private Maven or Gradle repository are the build's own:
   `~/.m2/settings.xml`, `~/.gradle/gradle.properties` or the environment the
   build reads. The extension passes none.

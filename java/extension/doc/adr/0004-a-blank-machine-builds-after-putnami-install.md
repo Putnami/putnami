@@ -101,4 +101,6 @@ on a machine that holds no JDK, Gradle or Maven:
 - There is still no `workspace-fetch`: resolving a Gradle build evaluates its
   scripts, and `go-offline` loads the build's extensions.
 - The Android SDK, credentials for private repositories and `deps-upgrade`
-  stay outside the extension.
+  stay outside the extension. Amended by
+  [ADR 0005](0005-an-android-build-gets-the-sdk-the-workspace-accepts.md): the
+  extension installs the Android SDK once the workspace accepts its licenses.

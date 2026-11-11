@@ -92,7 +92,8 @@
               "an-android-task-keeps-the-machine-sdk",
               "an-android-task-installs-the-sdk-the-workspace-accepts",
               "an-android-task-without-the-option-names-it",
-              "an-offline-android-task-installs-nothing"
+              "an-offline-android-task-installs-nothing",
+              "workspace-install-gives-an-android-build-the-sdk"
             ]
           }
         },

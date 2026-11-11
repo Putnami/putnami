@@ -87,6 +87,15 @@ func (s Stack) runWith(task string, extra func(ctx *pctx.Context, root RootStep,
 	}
 }
 
+// subject names what the run prepares in a message: the task, or the job of
+// the extension when it runs no task.
+func (in runInput) subject() string {
+	if in.task == "" {
+		return "the job"
+	}
+	return "the " + in.task + " task"
+}
+
 func outputFlag(args []string) (string, error) {
 	for i := 0; i < len(args); i++ {
 		if v, ok := strings.CutPrefix(args[i], "--report-dir="); ok {
@@ -266,7 +275,7 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 	if s.Tools != nil && !offline {
 		dirs, err := s.Tools(ctx, in.task, meta, selected.Env, emit.Info)
 		if err != nil {
-			return Selection{}, failWith(emit, CodeToolchainMissing, "install the tools of the %s task: %v", in.task, err)
+			return Selection{}, failWith(emit, CodeToolchainMissing, "install the tools of %s: %v", in.subject(), err)
 		}
 		for _, dir := range dirs {
 			selected.Env = appendPath(selected.Env, dir)
@@ -275,12 +284,12 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 	if s.Env != nil {
 		entries, err := s.Env(ctx, EnvRequest{Task: in.task, Root: in.workspaceRoot, Meta: meta, Env: selected.Env, Options: in.options, Offline: offline, Info: emit.Info})
 		if err != nil {
-			return Selection{}, failWith(emit, CodeToolchainMissing, "prepare the environment of the %s task: %v", in.task, err)
+			return Selection{}, failWith(emit, CodeToolchainMissing, "prepare the environment of %s: %v", in.subject(), err)
 		}
 		for _, entry := range entries {
 			name, value, ok := strings.Cut(entry, "=")
 			if !ok || name == "" {
-				return Selection{}, failWith(emit, CodeToolchainMissing, "the environment of the %s task names no variable in %q", in.task, entry)
+				return Selection{}, failWith(emit, CodeToolchainMissing, "the environment of %s names no variable in %q", in.subject(), entry)
 			}
 			selected.Env = setEnv(selected.Env, name, value)
 		}

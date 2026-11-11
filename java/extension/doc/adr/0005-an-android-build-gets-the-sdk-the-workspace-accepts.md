@@ -27,6 +27,9 @@ workspace's owner, so the extension cannot take it by default.
   `"options": {"@putnami/java": {"android": {"acceptSdkLicenses": true}}}`.
   The option reaches the extension through the job context
   ([ADR 0016 of the stack core](../../../../tooling/stacks/doc/adr/0016-a-stack-sets-the-environment-of-a-task.md)).
+  The block is also the parameter defaults of every Java command, so no Java
+  command declares a flag named `android`, and the option stays out of the
+  tasks' keys.
 - **What the extension installs.** With the option, a task of a Gradle build
   that applies the Android plugin, and the `workspace-install` of its stack
   root, install the Android SDK command-line tools 22.0 (build 15859902) under
@@ -45,14 +48,19 @@ workspace's owner, so the extension cannot take it by default.
 - **The machine's SDK first.** `ANDROID_HOME`, `ANDROID_SDK_ROOT` or `sdk.dir`
   in the stack root's `local.properties` keeps the machine's SDK, with or
   without the option.
-- **Without the option.** A task of an Android component with no SDK fails
-  with `stacks.toolchain_missing`, and the message names the option. A task of
-  another component of an Android build is left to Gradle.
+- **Without the option.** A task of an Android component with no SDK, and a
+  job at the stack root of an Android build, such as its `workspace-install`,
+  fail with `stacks.toolchain_missing`, and the message names the option. A
+  task of another component of an Android build is left to Gradle. On a
+  platform the extension pins no command-line tools for, the message names
+  `ANDROID_HOME` and `sdk.dir` only.
 - **Offline.** A run installs nothing: it uses the SDK an earlier run or
   `putnami install` installed, and an Android component with none fails.
 - **What makes a build Android.** The component's variant, `android` or
   `android-coverage`, or a build file of the stack root or of one of its
-  projects that applies the Android plugin, as the detector reads it.
+  projects that applies the Android plugin, as the detector reads it, on each
+  task. A plugin a convention plugin of `build-logic` or `buildSrc` applies is
+  not read.
 
 ## Rejected alternatives
 

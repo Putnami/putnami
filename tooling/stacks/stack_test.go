@@ -793,6 +793,15 @@ func TestEnvSetsTheEnvironmentOfTheTask(t *testing.T) {
 	}
 }
 
+func TestAHookFailureNamesTheTaskOrTheJob(t *testing.T) {
+	if got := (runInput{task: TaskLint}).subject(); got != "the lint task" {
+		t.Errorf("a task: %q", got)
+	}
+	if got := (runInput{}).subject(); got != "the job" {
+		t.Errorf("a job of the extension: %q", got)
+	}
+}
+
 func TestEnvReadsTheWorkspaceOptionsOfItsExtensionAndRunsOffline(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")

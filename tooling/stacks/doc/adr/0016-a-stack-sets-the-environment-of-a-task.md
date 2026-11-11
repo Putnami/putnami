@@ -37,7 +37,7 @@ SDK's licenses.
   task: their steps read the same variables.
 - An offline run calls it too: the stack decides what it may provide without
   the network.
-- Its error, or an entry with no `=`, fails the task with
+- Its error, or an entry that names no variable, fails the task with
   `stacks.toolchain_missing`.
 
 ## Consequences
@@ -46,7 +46,9 @@ SDK's licenses.
   in one place for every step of every task and job, overrides included.
 - The workspace's options reach the hook from the job context, so the stack
   reads the policy the orchestrator loaded.
-- The entries `Env` answers do not reach the cache key: they locate a tool, as
-  the toolchain's home does. The extension's block of the workspace's options
-  also reaches its tasks as parameters, which the key folds, so a change to
-  the block reruns the extension's tasks once.
+- Neither the entries `Env` answers nor the options reach the cache key: the
+  entries locate a tool, as the toolchain's home does. The extension's block
+  of the workspace's options is also the parameter defaults of every command
+  of the extension (`options.<extension>`), and the key keeps only the
+  parameters a task declares, so a member of the block that no flag names
+  stays out of it.

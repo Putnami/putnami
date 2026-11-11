@@ -14,7 +14,10 @@ import (
 	"runtime"
 	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/stacks"
@@ -67,17 +70,22 @@ func androidWorkspace(t *testing.T) string {
 	return root
 }
 
-// sdkServer serves the stub archive as every platform's pinned archive, and
-// counts the downloads.
-func sdkServer(t *testing.T) *int {
+// realLicenseJava is the JDK sdkmanager runs on, which sdkServer stubs.
+var realLicenseJava = licenseJava
+
+// sdkServer serves the stub archive as every platform's pinned archive, after
+// delay, and counts the downloads. Another download goes where downloadURL
+// sent it before.
+func sdkServer(t *testing.T, delay time.Duration) *atomic.Int32 {
 	t.Helper()
 	if runtime.GOOS == "windows" {
 		t.Skip("the stub sdkmanager is a shell script")
 	}
 	data := cmdlineToolsArchive(t)
-	downloads := 0
+	downloads := &atomic.Int32{}
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		downloads++
+		downloads.Add(1)
+		time.Sleep(delay)
 		_, _ = w.Write(data)
 	}))
 	t.Cleanup(server.Close)
@@ -86,15 +94,15 @@ func sdkServer(t *testing.T) *int {
 	cmdlineTools = map[string]cmdlineArchive{"linux/amd64": {"commandlinetools-linux-15859902_latest.zip", hex.EncodeToString(sum[:])}}
 	hostPlatform = "linux/amd64"
 	downloadURL = func(url string) string {
-		if !strings.HasPrefix(url, androidRepository) {
-			t.Errorf("the archive comes from %s", url)
+		if name, ok := strings.CutPrefix(url, androidRepository); ok {
+			return server.URL + "/" + name
 		}
-		return server.URL + "/" + strings.TrimPrefix(url, androidRepository)
+		return oldURL(url)
 	}
 	licenseJava = func(context.Context, func(string)) (string, error) { return "/pinned/jdk-21", nil }
 	t.Cleanup(func() { cmdlineTools, hostPlatform, downloadURL, licenseJava = oldTools, oldPlatform, oldURL, oldJava })
 	t.Setenv("PUTNAMI_HOME", t.TempDir())
-	return &downloads
+	return downloads
 }
 
 var acceptLicenses = json.RawMessage(`{"android": {"acceptSdkLicenses": true}}`)
@@ -109,7 +117,7 @@ func androidRequest(root, variant string, options json.RawMessage, offline bool,
 
 func TestAnAndroidTaskKeepsTheMachineSDK(t *testing.T) {
 	spectest.Proves(t, feature, "android-sdk-is-provided", "an-android-task-keeps-the-machine-sdk")
-	downloads := sdkServer(t)
+	downloads := sdkServer(t, 0)
 	root := androidWorkspace(t)
 	if s, err := Stack(); err != nil || s.Env == nil {
 		t.Fatalf("the stack sets no Env hook: %v", err)
@@ -126,8 +134,8 @@ func TestAnAndroidTaskKeepsTheMachineSDK(t *testing.T) {
 	if entries, err := Env(context.Background(), androidRequest(root, VariantAndroidCoverage, nil, false)); err != nil || entries != nil {
 		t.Errorf("sdk.dir in local.properties: %v %v", entries, err)
 	}
-	if *downloads != 0 {
-		t.Errorf("a machine SDK downloads nothing: %d downloads", *downloads)
+	if downloads.Load() != 0 {
+		t.Errorf("a machine SDK downloads nothing: %d downloads", downloads.Load())
 	}
 }
 
@@ -144,7 +152,7 @@ func TestAnAndroidTaskInstallsTheSDKTheWorkspaceAccepts(t *testing.T) {
 	if a := cmdlineTools["linux/amd64"]; a.sha256 != "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583" {
 		t.Errorf("the Linux archive = %+v", a)
 	}
-	downloads := sdkServer(t)
+	downloads := sdkServer(t, 0)
 	root := androidWorkspace(t)
 	var infos []string
 	request := androidRequest(root, VariantAndroid, acceptLicenses, false)
@@ -166,8 +174,8 @@ func TestAnAndroidTaskInstallsTheSDKTheWorkspaceAccepts(t *testing.T) {
 	// Another component of the Android build gets the installed SDK, with no
 	// second download.
 	entries, err = Env(context.Background(), androidRequest(root, VariantGradle, acceptLicenses, false))
-	if err != nil || len(entries) != 2 || *downloads != 1 {
-		t.Errorf("a second task: %v %v, %d downloads", entries, err, *downloads)
+	if err != nil || len(entries) != 2 || downloads.Load() != 1 {
+		t.Errorf("a second task: %v %v, %d downloads", entries, err, downloads.Load())
 	}
 	// A plain Gradle build needs no SDK.
 	plain := t.TempDir()
@@ -176,16 +184,69 @@ func TestAnAndroidTaskInstallsTheSDKTheWorkspaceAccepts(t *testing.T) {
 	if entries, err := Env(context.Background(), androidRequest(plain, VariantGradle, json.RawMessage(`not json`), false)); err != nil || entries != nil {
 		t.Errorf("a plain Gradle build: %v %v", entries, err)
 	}
+	// An interrupted sdkmanager leaves an empty license file: the next online
+	// task accepts the licenses again, with no second download.
+	if err := os.WriteFile(licenseFile(sdk), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if entries, err := Env(context.Background(), androidRequest(root, VariantAndroid, acceptLicenses, false)); err != nil || len(entries) != 2 || !licensesAccepted(sdk) || downloads.Load() != 1 {
+		t.Errorf("an empty license file: %v %v, %d downloads", entries, err, downloads.Load())
+	}
 	t.Setenv("PUTNAMI_HOME", t.TempDir())
 	hostPlatform = "linux/arm64"
-	if _, err := Env(context.Background(), androidRequest(root, VariantAndroid, acceptLicenses, false)); err == nil || !strings.Contains(err.Error(), "pins no Android SDK command-line tools for linux/arm64") {
-		t.Errorf("a platform with no pinned archive: %v", err)
+	for _, options := range []json.RawMessage{acceptLicenses, nil} {
+		_, err := Env(context.Background(), androidRequest(root, VariantAndroid, options, false))
+		if err == nil || !strings.Contains(err.Error(), "pins no Android SDK command-line tools for linux/arm64: set ANDROID_HOME, or sdk.dir") || strings.Contains(err.Error(), "acceptSdkLicenses") {
+			t.Errorf("%s: a platform with no pinned archive: %v", options, err)
+		}
+		if entries, err := Env(context.Background(), androidRequest(root, VariantGradle, options, false)); err != nil || entries != nil {
+			t.Errorf("%s: another component on a platform with no pinned archive is left to Gradle: %v %v", options, entries, err)
+		}
+	}
+}
+
+func TestConcurrentAndroidTasksInstallTheSDKOnce(t *testing.T) {
+	downloads := sdkServer(t, 200*time.Millisecond)
+	root := androidWorkspace(t)
+	var wg sync.WaitGroup
+	results := make([][]string, 2)
+	errs := make([]error, 2)
+	for i := range results {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			results[i], errs[i] = Env(context.Background(), androidRequest(root, VariantAndroid, acceptLicenses, false))
+		}()
+	}
+	wg.Wait()
+	if errs[0] != nil || errs[1] != nil || !slices.Equal(results[0], results[1]) || len(results[0]) != 2 || downloads.Load() != 1 {
+		t.Errorf("two tasks at once: %v %v, %v %v, %d downloads", results[0], errs[0], results[1], errs[1], downloads.Load())
+	}
+}
+
+func TestNoJavaCommandDeclaresAFlagTheOptionsShadow(t *testing.T) {
+	data, err := os.ReadFile("putnami.extension.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest struct {
+		Commands map[string]struct {
+			Flags map[string]json.RawMessage `json:"flags"`
+		} `json:"commands"`
+	}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	for name, command := range manifest.Commands {
+		if _, ok := command.Flags["android"]; ok {
+			t.Errorf("the %s command declares a flag named android, which options[%q].android would set on every run", name, ExtensionName)
+		}
 	}
 }
 
 func TestAnAndroidTaskWithoutTheOptionNamesIt(t *testing.T) {
 	spectest.Proves(t, feature, "android-sdk-is-provided", "an-android-task-without-the-option-names-it")
-	downloads := sdkServer(t)
+	downloads := sdkServer(t, 0)
 	root := androidWorkspace(t)
 	for _, options := range []json.RawMessage{nil, json.RawMessage(`{"android": {}}`), json.RawMessage(`{"android": {"acceptSdkLicenses": false}}`)} {
 		_, err := Env(context.Background(), androidRequest(root, VariantAndroid, options, false))
@@ -196,17 +257,22 @@ func TestAnAndroidTaskWithoutTheOptionNamesIt(t *testing.T) {
 	if entries, err := Env(context.Background(), androidRequest(root, VariantGradle, nil, false)); err != nil || entries != nil {
 		t.Errorf("another component of the build is left to Gradle: %v %v", entries, err)
 	}
+	job := androidRequest(root, VariantGradle, nil, false)
+	job.Task = ""
+	if _, err := Env(context.Background(), job); err == nil || !strings.Contains(err.Error(), "acceptSdkLicenses") {
+		t.Errorf("a job at the stack root of the build, such as its install, names the option: %v", err)
+	}
 	if _, err := Env(context.Background(), androidRequest(root, VariantAndroid, json.RawMessage(`{"android": true}`), false)); err == nil || !strings.Contains(err.Error(), "putnami.workspace.json") {
 		t.Errorf("invalid options: %v", err)
 	}
-	if *downloads != 0 {
-		t.Errorf("no option downloads nothing: %d downloads", *downloads)
+	if downloads.Load() != 0 {
+		t.Errorf("no option downloads nothing: %d downloads", downloads.Load())
 	}
 }
 
 func TestAnOfflineAndroidTaskInstallsNothing(t *testing.T) {
 	spectest.Proves(t, feature, "android-sdk-is-provided", "an-offline-android-task-installs-nothing")
-	downloads := sdkServer(t)
+	downloads := sdkServer(t, 0)
 	root := androidWorkspace(t)
 	if _, err := Env(context.Background(), androidRequest(root, VariantAndroid, acceptLicenses, true)); err == nil || !strings.Contains(err.Error(), "an offline run installs nothing") {
 		t.Errorf("an offline Android task with no SDK: %v", err)
@@ -214,10 +280,14 @@ func TestAnOfflineAndroidTaskInstallsNothing(t *testing.T) {
 	if entries, err := Env(context.Background(), androidRequest(root, VariantGradle, acceptLicenses, true)); err != nil || entries != nil {
 		t.Errorf("another component is left to Gradle: %v %v", entries, err)
 	}
-	if *downloads != 0 {
-		t.Errorf("an offline run downloads nothing: %d downloads", *downloads)
+	if downloads.Load() != 0 {
+		t.Errorf("an offline run downloads nothing: %d downloads", downloads.Load())
 	}
 	sdk := filepath.Join(os.Getenv("PUTNAMI_HOME"), "toolchains", "android", "sdk")
+	stackstest.WriteFile(t, sdk, "licenses/android-sdk-license", "")
+	if _, err := Env(context.Background(), androidRequest(root, VariantAndroid, acceptLicenses, true)); err == nil || !strings.Contains(err.Error(), licenseFile(sdk)+" holds no accepted license") {
+		t.Errorf("an offline task with an empty license file names it: %v", err)
+	}
 	stackstest.WriteFile(t, sdk, "licenses/android-sdk-license", "accepted\n")
 	if entries, err := Env(context.Background(), androidRequest(root, VariantAndroid, acceptLicenses, true)); err != nil || len(entries) != 2 || entries[0] != "ANDROID_HOME="+sdk {
 		t.Errorf("an offline task uses the installed SDK: %v %v", entries, err)

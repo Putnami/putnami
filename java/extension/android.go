@@ -18,11 +18,8 @@ import (
 )
 
 // cmdlineToolsVersion is the release of the Android SDK command-line tools
-// the extension installs, build 15859902: the newest whose sdkmanager accepts
-// the licenses. From 23.0, sdkmanager hands over to the Android CLI, which
-// downloads itself into ~/.android unchecked, collects usage metrics, and
-// writes no license for --licenses, where the Android Gradle plugin still
-// reads them from the SDK's licenses directory.
+// the extension installs, build 15859902; its sdkmanager accepts the licenses
+// with --licenses.
 const cmdlineToolsVersion = "22.0"
 
 // androidRepository is where Google publishes the Android SDK archives.
@@ -41,9 +38,7 @@ type cmdlineArchive struct {
 }
 
 // cmdlineTools are the archives of the pinned command-line tools by platform,
-// with the SHA-256 of each, computed from the archive Google serves, whose
-// SHA-1 is the one Google's repository index (repository2-3.xml) states.
-// Google publishes the SDK's build tools for Linux on x64 only.
+// with the SHA-256 of each.
 var cmdlineTools = map[string]cmdlineArchive{
 	"linux/amd64":   {"commandlinetools-linux-15859902_latest.zip", "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583"},
 	"darwin/amd64":  {"commandlinetools-mac_x86_64-15859902_latest.zip", "c5a6378ab5cf7e0d5701921405115befff13e9ff7417fb588389338f8bd050f3"},
@@ -79,15 +74,18 @@ var licenseJava = func(ctx context.Context, info func(string)) (string, error) {
 // sdk.dir in the stack root's local.properties; else, when the workspace's
 // options accept the SDK's licenses, the SDK the extension installs under the
 // Putnami home, as ANDROID_HOME and ANDROID_SDK_ROOT. Without either, the task
-// of an Android component fails with a message that names the option, and the
-// task of another component of the build is left to Gradle. Offline, it
-// installs nothing.
+// of an Android component and a job at the build's stack root, such as its
+// install, fail with a message that names the way out, and the task of another
+// component of the build is left to Gradle. Offline, it installs nothing.
 func Env(ctx context.Context, request stacks.EnvRequest) ([]string, error) {
 	root := filepath.Join(request.Root, filepath.FromSlash(request.Meta.Root))
 	component := request.Meta.Variant == VariantAndroid || request.Meta.Variant == VariantAndroidCoverage
 	if !component && !androidBuild(root) {
 		return nil, nil
 	}
+	// The task of an Android component and a job at the stack root, which
+	// names no task, need the SDK.
+	required := component || request.Task == ""
 	if machineSDK(root, request.Env) {
 		return nil, nil
 	}
@@ -97,8 +95,14 @@ func Env(ctx context.Context, request stacks.EnvRequest) ([]string, error) {
 			return nil, fmt.Errorf("the options of %s in putnami.workspace.json: %w", ExtensionName, err)
 		}
 	}
+	if _, pinned := cmdlineTools[hostPlatform]; !pinned {
+		if !required {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("the Android build at %s needs an Android SDK, and %s pins no Android SDK command-line tools for %s: set ANDROID_HOME, or sdk.dir in its local.properties", root, ExtensionName, hostPlatform)
+	}
 	if !options.Android.AcceptSdkLicenses {
-		if !component {
+		if !required {
 			return nil, nil
 		}
 		return nil, fmt.Errorf(`the Android build at %s needs an Android SDK: set ANDROID_HOME, or sdk.dir in its local.properties, or let %s install one, which accepts the Android SDK licenses on the team's behalf, with "options": {%q: {"android": {"acceptSdkLicenses": true}}} in putnami.workspace.json`, root, ExtensionName, ExtensionName)
@@ -108,10 +112,10 @@ func Env(ctx context.Context, request stacks.EnvRequest) ([]string, error) {
 		return nil, err
 	}
 	if !installed {
-		if !component {
+		if !required {
 			return nil, nil
 		}
-		return nil, fmt.Errorf("the Android build at %s needs the Android SDK, which is not installed under %s: an offline run installs nothing, so run putnami install with network access", root, sdk)
+		return nil, fmt.Errorf("the Android build at %s needs the Android SDK, and %s holds no accepted license: an offline run installs nothing, so run putnami install with network access", root, licenseFile(sdk))
 	}
 	return []string{envAndroidHome + "=" + sdk, envAndroidSDKRoot + "=" + sdk}, nil
 }
@@ -208,7 +212,7 @@ func androidSDK(ctx context.Context, offline bool, info func(string)) (string, b
 		return "", false, fmt.Errorf("%s: %w", strings.Join(argv, " "), err)
 	}
 	if !licensesAccepted(sdk) {
-		return "", false, fmt.Errorf("%s accepted no Android SDK license in %s", strings.Join(argv, " "), sdk)
+		return "", false, fmt.Errorf("%s wrote no accepted license to %s", strings.Join(argv, " "), licenseFile(sdk))
 	}
 	return sdk, true, nil
 }
@@ -222,9 +226,15 @@ func sdkmanager(dir string) string {
 	return filepath.Join(dir, "cmdline-tools", "bin", name)
 }
 
-// licensesAccepted reports whether the SDK holds the accepted Android SDK
+// licenseFile is the file of the SDK that holds the accepted Android SDK
 // license, the one its platforms and build tools need.
+func licenseFile(sdk string) string {
+	return filepath.Join(sdk, "licenses", "android-sdk-license")
+}
+
+// licensesAccepted reports whether the SDK's license file is a regular file
+// that is not empty.
 func licensesAccepted(sdk string) bool {
-	info, err := os.Stat(filepath.Join(sdk, "licenses", "android-sdk-license"))
-	return err == nil && info.Mode().IsRegular()
+	info, err := os.Stat(licenseFile(sdk))
+	return err == nil && info.Mode().IsRegular() && info.Size() > 0
 }

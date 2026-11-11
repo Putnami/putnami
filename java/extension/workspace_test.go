@@ -70,7 +70,7 @@ func installWorkspace(t *testing.T) (string, string, []job.ProjectRef) {
 
 // runInstall runs workspace-install with the force flag and answers its
 // status and the diagnostics it emitted, as "severity code: message".
-func runInstall(t *testing.T, root string, force bool, refs []job.ProjectRef) (string, []string) {
+func runInstall(t *testing.T, root string, force bool, refs []job.ProjectRef, workspace ...pctx.Workspace) (string, []string) {
 	t.Helper()
 	out, err := os.CreateTemp(t.TempDir(), "emit")
 	if err != nil {
@@ -83,7 +83,11 @@ func runInstall(t *testing.T, root string, force bool, refs []job.ProjectRef) (s
 		params["force"] = json.RawMessage("true")
 	}
 	jobFunc := WorkspaceInstallJob(stack(t))
-	status, _, _ := jobFunc(&pctx.Context{WorkspaceRoot: root, WorkspaceProjects: refs, Params: params}, jsonl.New(), nil)
+	ctx := &pctx.Context{WorkspaceRoot: root, WorkspaceProjects: refs, Params: params}
+	if len(workspace) > 0 {
+		ctx.Workspace = workspace[0]
+	}
+	status, _, _ := jobFunc(ctx, jsonl.New(), nil)
 	os.Stdout = stdout
 	if _, err := out.Seek(0, 0); err != nil {
 		t.Fatal(err)
@@ -209,5 +213,62 @@ func TestAnOfflineWorkspaceInstallInstallsNothing(t *testing.T) {
 	status, diags = runInstall(t, root, false, refs)
 	if status != "OK" || !strings.Contains(strings.Join(diags, "\n"), "warning "+CodeInstallFailed+": "+filepath.Join(root, "billing")+": the Apache Maven "+mavenVersion+" is not installed: an offline run installs nothing: the stack root is left out") {
 		t.Errorf("a Maven root with no Maven is left out offline: %s %v", status, diags)
+	}
+}
+
+func TestWorkspaceInstallGivesAnAndroidBuildTheSDK(t *testing.T) {
+	spectest.Proves(t, feature, "android-sdk-is-provided", "workspace-install-gives-an-android-build-the-sdk")
+	root := t.TempDir()
+	bin := t.TempDir()
+	log := filepath.Join(bin, "install.log")
+	stackstest.WriteFile(t, root, ".java-version", "21\n")
+	stackstest.WriteFile(t, root, "droid/settings.gradle.kts", "include(\":app\", \":core\")\n")
+	stackstest.WriteFile(t, root, "droid/app/build.gradle.kts", "plugins {\n    id(\"com.android.application\")\n}\n")
+	stackstest.WriteFile(t, root, "droid/core/build.gradle.kts", "plugins {\n    `java-library`\n}\n")
+	stackstest.WriteFile(t, root, "droid/gradlew", "#!/bin/sh\necho \"gradlew $* ANDROID_HOME=$ANDROID_HOME\" >> \""+log+"\"\n")
+	stackstest.WriteFile(t, bin, "javac", "#!/bin/sh\necho 'javac 21.0.4'\n")
+	for _, f := range []string{filepath.Join(root, "droid", "gradlew"), filepath.Join(bin, "javac")} {
+		if err := os.Chmod(f, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("GRADLE_USER_HOME", t.TempDir())
+	t.Setenv(envAndroidHome, "")
+	t.Setenv(envAndroidSDKRoot, "")
+	serveJDKs(t)
+	sdkServer(t, 0)
+	// sdkmanager runs on the pinned JDK 21 the extension installs.
+	licenseJava = realLicenseJava
+	refs := []job.ProjectRef{}
+	for _, path := range []string{"droid", "droid/app", "droid/core"} {
+		refs = append(refs, job.ProjectRef{Name: path, Path: path, FullPath: filepath.Join(root, path), Extensions: []string{ExtensionName}, Config: []byte(`{}`)})
+	}
+
+	status, diags := runInstall(t, root, false, refs)
+	if status == "OK" || !strings.Contains(strings.Join(diags, "\n"), "error stacks.toolchain_missing: prepare the environment of the job: the Android build at "+filepath.Join(root, "droid")+" needs an Android SDK") || !strings.Contains(strings.Join(diags, "\n"), "acceptSdkLicenses") {
+		t.Errorf("without the option, the install names it: %s %v", status, diags)
+	}
+	if _, err := os.Stat(log); !os.IsNotExist(err) {
+		t.Errorf("without the option, Gradle does not run: %v", err)
+	}
+
+	status, diags = runInstall(t, root, false, refs, pctx.Workspace{Options: map[string]json.RawMessage{ExtensionName: json.RawMessage(`{"android": {"acceptSdkLicenses": true}}`)}})
+	if status != "OK" {
+		t.Fatalf("with the option: %s %v", status, diags)
+	}
+	home := os.Getenv("PUTNAMI_HOME")
+	sdk := filepath.Join(home, "toolchains", "android", "sdk")
+	lines := strings.Split(strings.TrimSpace(ran(t, log)), "\n")
+	if len(lines) != 2 {
+		t.Fatalf("one Gradle version and one Gradle resolution: %q", lines)
+	}
+	for _, line := range lines {
+		if !strings.HasSuffix(line, " ANDROID_HOME="+sdk) {
+			t.Errorf("Gradle runs with the installed SDK: %q", line)
+		}
+	}
+	if got, _ := os.ReadFile(filepath.Join(sdk, "java-home")); strings.TrimSpace(string(got)) != filepath.Join(home, "toolchains", "java", "java-21.0.13", "jdk-17") {
+		t.Errorf("sdkmanager ran on JAVA_HOME=%q", got)
 	}
 }
