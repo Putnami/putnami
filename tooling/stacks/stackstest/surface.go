@@ -31,11 +31,14 @@ var surfaceFlags = map[string][]string{
 	"publish": {"docker", "docker-registry", "dry-run"},
 }
 
-// The defaults the surface fixes for a flag of a command.
+// The defaults the surface fixes for a flag of a command. A nil default means
+// the manifest declares none: package --port is shared with the Go and
+// TypeScript extensions, whose default differs, so each stack applies 8080 in
+// code (stacks.ImagePort) and the manifests stay compatible.
 var surfaceDefaults = map[[2]string]any{
 	{"lint", "docs-links"}: true,
 	{"serve", "port"}:      float64(3000),
-	{"package", "port"}:    float64(8080),
+	{"package", "port"}:    nil,
 }
 
 type surfaceFlag struct {

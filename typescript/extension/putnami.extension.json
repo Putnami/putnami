@@ -672,8 +672,7 @@
         },
         "port": {
           "type": "number",
-          "default": 3000,
-          "description": "Container port to expose"
+          "description": "Container port to expose, 3000 by default"
         },
         "npm": {
           "type": "boolean",
