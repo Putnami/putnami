@@ -240,8 +240,7 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 // otherwise-declaring workspace reads nothing of its own: it runs when a task it
 // depends on runs, through the intra-project closure. A declaration of a
 // command the workspace-once activation plans does not count: it reads for no
-// project (answersForProjects), so an index built from such declarations alone
-// would select nothing as well.
+// project (answersForProjects).
 func (idx *taskIndex) attributes() bool {
 	for _, task := range idx.tasks {
 		for _, declared := range task.declarations {
