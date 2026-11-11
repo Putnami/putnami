@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/gitcandidate"
 )
 
@@ -18,6 +19,11 @@ import (
 // it is the disk. Validation, the workspace probe, packaging and publication
 // all read site content through it, so a project that passes validation
 // packages the sections and files validation checked.
+//
+// A putnami.verdict-policy.json file is never site content. The CI plane
+// reads it, and no task key holds it unless a pattern names it, so neither
+// the validation key nor the package's selection fingerprint would move when
+// it changes. The source leaves it out of every section and walk.
 type siteContentSource struct {
 	dir string
 	// tree is nil outside a Git work tree.
@@ -60,6 +66,9 @@ func (s *siteContentSource) sectionNames() ([]string, error) {
 		}
 	} else {
 		for _, candidate := range s.candidates {
+			if wsproto.IsNamedOnlyInput(candidate) {
+				continue
+			}
 			section, _, nested := strings.Cut(candidate, "/")
 			if mode, _ := s.tree.Lstat(candidate); nested || mode.IsDir() {
 				names = append(names, section)
@@ -90,6 +99,9 @@ func (s *siteContentSource) walkSection(sourceDir, mount string, visit func(site
 	}
 	for _, candidate := range s.candidates {
 		if candidate != section && !strings.HasPrefix(candidate, section+"/") {
+			continue
+		}
+		if wsproto.IsNamedOnlyInput(candidate) {
 			continue
 		}
 		mode, found := s.tree.Lstat(candidate)

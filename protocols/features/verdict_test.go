@@ -144,6 +144,49 @@ func TestSpecVerificationRecordCarriesUnconsultedCandidates(t *testing.T) {
 	}
 }
 
+// TestSpecVerificationRecordCarriesTheFeatureTarget pins the additive member:
+// it round-trips; a record without it, as an older CLI wrote it, still reads
+// and differs only by the missing line; and a stage outside the maturity
+// ladder is refused.
+func TestSpecVerificationRecordCarriesTheFeatureTarget(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "groups-name-the-feature-target", "a-record-group-round-trips-its-feature-target")
+	spectest.Proves(t, "features/feature-contracts", "groups-name-the-feature-target", "a-group-without-a-target-keeps-its-bytes-and-reads")
+	spectest.Proves(t, "features/feature-contracts", "groups-name-the-feature-target", "a-target-outside-the-maturity-ladder-is-refused")
+	record := sampleVerificationRecord()
+	record.Groups[0].Target = MaturityLiveVerified
+	encoded, err := MarshalSpecVerificationRecord(record)
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, diagnostics := ParseSpecVerificationRecord(encoded)
+	if parsed == nil || diag.HasErrors(ValidateSpecVerificationRecord(parsed)) {
+		t.Fatalf("a record with a target did not read: %v", diagnostics)
+	}
+	if got := parsed.Groups[0].Target; got != MaturityLiveVerified {
+		t.Fatalf("target = %q, want live-verified", got)
+	}
+
+	older, err := MarshalSpecVerificationRecord(sampleVerificationRecord())
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetLine := []byte(`      "target": "live-verified",` + "\n")
+	if !bytes.Contains(encoded, targetLine) || !bytes.Equal(bytes.Replace(encoded, targetLine, nil, 1), older) {
+		t.Fatalf("a group without a target does not keep its bytes:\n%s\n---\n%s", older, encoded)
+	}
+	if parsed, diagnostics := ParseSpecVerificationRecord(older); parsed == nil || parsed.Groups[0].Target != "" {
+		t.Fatalf("a record without the member did not read without a target: %v", diagnostics)
+	}
+
+	for _, stage := range []MaturityStage{"shipped", "Coded", "coded "} {
+		broken := sampleVerificationRecord()
+		broken.Groups[0].Target = stage
+		if findings := ValidateSpecVerificationRecord(broken); !hasCode(findings, ErrorCodeInvalidStage) {
+			t.Errorf("target %q was accepted: %v", stage, findings)
+		}
+	}
+}
+
 func TestCountSpecVerdictsCoversEveryState(t *testing.T) {
 	counts := CountSpecVerdicts([]SpecRequirementVerdict{
 		{State: RequirementVerified}, {State: RequirementVerified},

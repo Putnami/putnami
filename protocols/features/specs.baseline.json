@@ -13,6 +13,7 @@
     "features/feature-contracts#gherkin-malformed-files",
     "features/feature-contracts#gherkin-projection",
     "features/feature-contracts#gherkin-scenarios",
+    "features/feature-contracts#groups-name-the-feature-target",
     "features/feature-contracts#kiro-findings",
     "features/feature-contracts#kiro-projection",
     "features/feature-contracts#kiro-requirement-identity",

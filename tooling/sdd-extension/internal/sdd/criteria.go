@@ -61,6 +61,7 @@ func criteriaProjectionFromRepository(repository *specRepository) *featureproto.
 			SpecRequirements: identities,
 		}
 		if feature, exists := authored[spec.Feature]; exists {
+			group.Target = feature.Target
 			for _, requirement := range feature.Requirements {
 				if containsIdentity(identities, requirement.ID) {
 					group.Requirements = append(group.Requirements, requirement)

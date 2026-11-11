@@ -5,13 +5,15 @@
   "outcomes": [
     "A reviewer reads in Git what a run executes, publishes and deploys, and a command explains it locally.",
     "An extension reads the impacted plan of a change and admits it as one ChangePlan with one digest.",
-    "A run's verdict names the tree it tested and what its producer does not know."
+    "A run's verdict names the tree it tested and what its producer does not know.",
+    "A repository states, next to the code each rule governs, what each verdict gap and each declaration change costs a change, by directory and by feature maturity."
   ],
   "nonGoals": [
     "Granting trust, resources, publication or deploy authority, which the execution plane owns.",
     "Signing a verdict or verifying a signature.",
     "Impact planning in the CLI and the behavior of the Cloud ci commands beyond the contract.",
-    "Reading putnami.ci.json versions 1 and 2."
+    "Reading putnami.ci.json versions 1 and 2.",
+    "Applying a verdict policy, which the CI plane owns. A policy never changes the verdict."
   ],
   "requirements": [
     {
@@ -109,6 +111,26 @@
     {
       "id": "verdicts-parse-strictly-against-one-schema",
       "text": "ParseVerdict reads one strict JSON verdict of at most MaxVerdictBytes and refuses a larger one, a trailing value, truncated data, a wrong type and a non-object. The embedded verdict schema has its $id, closes all sixteen object schemas and is returned as a copy. It lists the members of each Go type, required exactly when Go always writes them, and states the vocabularies, bounds and patterns of the Go code."
+    },
+    {
+      "id": "verdict-policies-parse-strictly-against-one-schema",
+      "text": "ParseVerdictPolicy reads one strict JSON verdict policy of at most MaxVerdictPolicyBytes and refuses a larger one, a duplicate key, an unknown member, a second value, a wrong type and a non-object. The embedded policy schema has its $id, closes all five object schemas and is returned as a copy. It lists the declaration kinds, gap keys, values and maturities of the Go validator, with a map by maturity exactly on the keys that concern a feature."
+    },
+    {
+      "id": "a-verdict-policy-is-validated",
+      "text": "ValidateVerdictPolicy refuses a path that is not a clean workspace-relative path to putnami.verdict-policy.json, another $schema, an unknown declaration kind or gap key, the policy kind, the unapproved-declaration gap, unknown-impact and unknown-declarations outside the root file, a value outside its key's vocabulary, a map by maturity on a key that concerns no feature, an unknown maturity and a map without modeled. It admits a valid file at the root or in a directory, and an empty file."
+    },
+    {
+      "id": "the-nearest-verdict-policy-decides",
+      "text": "The policy files that govern a project or a declaration are one per directory, from its directory up to the root, nearest first. For each key, the nearest file that names it decides, and a key no file names is left to the caller. unknown-impact and unknown-declarations are read from the root file only. A change to a policy file is a declaration of kind policy and always waits for an approval: no file decides it."
+    },
+    {
+      "id": "the-feature-maturity-picks-the-value",
+      "text": "A key that concerns a feature, unproven-requirement, lost-proof, spec and binding, takes one value or one value per maturity. The value of the highest maturity the feature reaches applies, and an unknown or empty maturity takes the strictest value of the map. The maturities are the order of the features protocol."
+    },
+    {
+      "id": "a-loosened-verdict-policy-is-detected",
+      "text": "VerdictPolicyLoosens reports a new version of a policy file that can make a change cost less: a key it removes, a value that costs less at some maturity, and a key it adds below the strictest value at some maturity. A stricter or unchanged file does not loosen."
     }
   ],
   "decisions": [
@@ -118,6 +140,7 @@
     "protocols/ci/doc/adr/0004-a-rule-names-its-baseline-channel.md",
     "protocols/ci/doc/adr/0005-a-change-plan-projects-an-impact-plan.md",
     "protocols/ci/doc/adr/0006-a-run-carries-one-verdict.md",
-    "protocols/ci/doc/adr/0007-a-verdict-names-the-tested-tree-and-what-it-does-not-know.md"
+    "protocols/ci/doc/adr/0007-a-verdict-names-the-tested-tree-and-what-it-does-not-know.md",
+    "protocols/ci/doc/adr/0008-a-verdict-policy-states-what-a-gap-costs.md"
   ]
 }

@@ -25,6 +25,7 @@
 //	agent-attribution-validate        Check that the proposed squash commit names no agent, when the workspace forbids it
 //	feature-coverage-validate         Check that every project carries a feature, a spec or a featureAuthority
 //	feature-coverage-ratchet-validate Check that the feature-coverage debt list holds no entry its merge base lacks
+//	verdict-policy-validate           Check every putnami.verdict-policy.json and the directory it sits in
 //
 // Command groups (the interactive surface):
 //
@@ -87,6 +88,7 @@ func commandHandlers() map[string]cli.JobFunc {
 		"agent-attribution-validate":        runAgentAttributionValidate,
 		"feature-coverage-validate":         runFeatureCoverageValidate,
 		"feature-coverage-ratchet-validate": runFeatureCoverageRatchetValidate,
+		"verdict-policy-validate":           runVerdictPolicyValidate,
 	}
 }
 

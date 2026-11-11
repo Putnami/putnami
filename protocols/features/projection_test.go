@@ -173,3 +173,92 @@ func TestMarshalSpecCriteriaProjectionIsCanonicalAndByteStable(t *testing.T) {
 		t.Fatalf("marshal is not byte-stable:\n%s\n---\n%s", first, second)
 	}
 }
+
+// projectionGolden is the canonical form of validProjectionDocument. These are
+// the bytes of the first projection version, which a group without a target
+// keeps.
+const projectionGolden = `{
+  "$schema": "https://putnami.dev/schemas/putnami-spec-criteria.json",
+  "protocolVersion": 1,
+  "groups": [
+    {
+      "feature": "go/structured-logging",
+      "spec": "go/framework/logger/specs/structured-logging.json",
+      "specRequirements": [
+        "lifecycle",
+        "record"
+      ],
+      "requirements": [
+        {
+          "id": "lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "close-visits-every-sink",
+              "flush-visits-every-sink"
+            ]
+          }
+        },
+        {
+          "id": "record",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ]
+        }
+      ]
+    }
+  ]
+}
+`
+
+// TestSpecCriteriaGroupCarriesTheFeatureTarget pins the additive member: it
+// round-trips, written after the spec path; a group without it keeps the exact
+// bytes of the first projection version and still reads; and a stage outside
+// the maturity ladder is refused.
+func TestSpecCriteriaGroupCarriesTheFeatureTarget(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "groups-name-the-feature-target", "a-criteria-group-round-trips-its-feature-target")
+	spectest.Proves(t, "features/feature-contracts", "groups-name-the-feature-target", "a-group-without-a-target-keeps-its-bytes-and-reads")
+	spectest.Proves(t, "features/feature-contracts", "groups-name-the-feature-target", "a-target-outside-the-maturity-ladder-is-refused")
+
+	native, diagnostics := ParseAndValidateSpecCriteriaProjection([]byte(validProjectionDocument()))
+	if native == nil || diag.HasErrors(diagnostics) {
+		t.Fatalf("a projection without a target did not read: %v", diagnostics)
+	}
+	if native.Groups[0].Target != "" {
+		t.Fatalf("a group without the member read target %q", native.Groups[0].Target)
+	}
+	encoded, err := MarshalSpecCriteriaProjection(native)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(encoded) != projectionGolden {
+		t.Fatalf("a group without a target changed its bytes:\n%s", encoded)
+	}
+
+	native.Groups[0].Target = MaturityWired
+	targeted, err := MarshalSpecCriteriaProjection(native)
+	if err != nil {
+		t.Fatal(err)
+	}
+	specLine := `      "spec": "go/framework/logger/specs/structured-logging.json",` + "\n"
+	want := strings.Replace(projectionGolden, specLine, specLine+`      "target": "wired",`+"\n", 1)
+	if string(targeted) != want {
+		t.Fatalf("the target is not written right after the spec path:\n%s", targeted)
+	}
+	parsed, diagnostics := ParseAndValidateSpecCriteriaProjection(targeted)
+	if parsed == nil || diag.HasErrors(diagnostics) || parsed.Groups[0].Target != MaturityWired {
+		t.Fatalf("the target did not round-trip: %v", diagnostics)
+	}
+
+	for _, stage := range []string{"shipped", "Coded", "coded "} {
+		broken := strings.Replace(want, `"target": "wired"`, `"target": "`+stage+`"`, 1)
+		if _, diagnostics := ParseAndValidateSpecCriteriaProjection([]byte(broken)); !hasCode(diagnostics, ErrorCodeInvalidStage) {
+			t.Errorf("target %q was accepted: %v", stage, diagnostics)
+		}
+	}
+}

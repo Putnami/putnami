@@ -9,6 +9,7 @@ import (
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/protocol/sitecontent"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // ValidateSiteContentSources checks only the declared site source structure of
@@ -79,7 +80,8 @@ func refuseOtherSiteContentProject(project string) error {
 	return nil
 }
 
-// walkSiteContentFiles is the disk half of siteContentSource.walkSection.
+// walkSiteContentFiles is the disk half of siteContentSource.walkSection. It
+// leaves out a putnami.verdict-policy.json file, as the Git half does.
 func walkSiteContentFiles(sourceDir, mount string, visit func(siteContentFile)) error {
 	info, err := os.Lstat(sourceDir)
 	if os.IsNotExist(err) {
@@ -95,7 +97,7 @@ func walkSiteContentFiles(sourceDir, mount string, visit func(siteContentFile)) 
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() {
+		if entry.IsDir() || wsproto.IsNamedOnlyInput(path) {
 			return nil
 		}
 		payloadPath, err := siteContentPayloadPath(sourceDir, mount, path, entry.Type().IsRegular())

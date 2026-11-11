@@ -161,6 +161,33 @@ func TestCheckRefusesLinksThatLeaveTheWorkspace(t *testing.T) {
 	}
 }
 
+// A link to a putnami.verdict-policy.json file inside the workspace is not
+// checked, present or absent: no `git:**` key holds that file. A link that
+// leaves the workspace is refused whatever it names.
+func TestCheckSkipsALinkToAVerdictPolicy(t *testing.T) {
+	parent := t.TempDir()
+	root := filepath.Join(parent, "ws")
+	writeFile(t, root, "lib/putnami.verdict-policy.json", "{}\n")
+	readme := writeFile(t, root, "README.md", strings.Join([]string{
+		"[absent](putnami.verdict-policy.json)",
+		"[present](lib/putnami.verdict-policy.json#rules)",
+		"[outside](../putnami.verdict-policy.json)",
+		"[missing](doc/missing.md)",
+	}, "\n"))
+
+	findings, err := Check(root, []string{readme})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{
+		"README.md:3:11 ../putnami.verdict-policy.json",
+		"README.md:4:11 doc/missing.md",
+	}
+	if got := messages(t, root, findings); !reflect.DeepEqual(got, want) {
+		t.Fatalf("findings = %q, want %q", got, want)
+	}
+}
+
 func TestCheckIgnoresAnchorsOfOtherFileTypes(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "main.go", "package main\n")

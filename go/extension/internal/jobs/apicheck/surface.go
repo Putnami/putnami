@@ -139,12 +139,17 @@ func inUnkeyedDirectory(rel string) bool {
 // surfaceDocumentKeyed refuses a working-tree document the task's cache key
 // does not read, which could change and leave a stored verdict in place. The
 // key reads the project's .json files outside unkeyed directories
-// (putnami.extension.json, validate-api inputs). rel is a surfaceDocumentPath
-// result. The document at the tag needs no such rule: the key reads the whole
-// tree the tag holds at the project.
+// (putnami.extension.json, validate-api inputs), except a file only a pattern
+// that names it selects (wsproto.IsNamedOnlyInput). rel is a
+// surfaceDocumentPath result. The document at the tag needs no such rule: the
+// key reads the whole tree the tag holds at the project.
 func surfaceDocumentKeyed(rel string) error {
 	if path.Ext(rel) != ".json" {
 		return protocolcli.InvalidConfigf("option %s is %q, want a .json file: the task's cache key reads the project's .json files",
+			commandSurfaceOption, rel)
+	}
+	if wsproto.IsNamedOnlyInput(rel) {
+		return protocolcli.InvalidConfigf("option %s is %q, a file the CI plane reads: the task's cache key does not read it; name the document differently",
 			commandSurfaceOption, rel)
 	}
 	dirs := strings.Split(rel, "/")

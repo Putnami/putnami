@@ -79,6 +79,21 @@
           }
         },
         {
+          "id": "a-verdict-policy-selects-only-the-tasks-that-name-it",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-verdict-policy-alone-selects-no-project",
+              "a-task-that-names-a-verdict-policy-is-selected",
+              "a-verdict-policy-is-no-changed-file-of-its-project"
+            ]
+          }
+        },
+        {
           "id": "canonical-identity",
           "stage": "coded",
           "evidenceKinds": [

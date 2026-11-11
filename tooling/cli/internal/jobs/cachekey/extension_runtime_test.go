@@ -62,6 +62,52 @@ func TestCollectRuntimeInputsRejectsSymlink(t *testing.T) {
 	}
 }
 
+// A putnami.verdict-policy.json file is no runtime input. A prepare input that
+// does not name it leaves it out of the runtime digest, and a replaced
+// module's tree leaves it out of what staging copies and hashes. An input that
+// names it reads it.
+func TestExtensionRuntimeDigestLeavesOutAVerdictPolicy(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-verdict-policy-is-no-build-input",
+		"a-pattern-that-does-not-name-a-verdict-policy-leaves-it-out-of-the-key")
+	root := t.TempDir()
+	mustWriteRuntimeFile(t, filepath.Join(root, "bin", "prepare"), "#!/bin/sh\n", 0o755)
+	mustWriteRuntimeFile(t, filepath.Join(root, "cmd", "main.go"), "package main\n", 0o644)
+	ext := runtimeTestExtension(root)
+	before, err := ExtensionRuntimeDigest(ext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWriteRuntimeFile(t, filepath.Join(root, "cmd", "putnami.verdict-policy.json"), "{}\n", 0o644)
+	if after, err := ExtensionRuntimeDigest(ext); err != nil || after != before {
+		t.Fatalf("a verdict policy moved the runtime digest: %q, %q, %v", before, after, err)
+	}
+	for _, tc := range []struct {
+		patterns []string
+		want     string
+	}{
+		{patterns: []string{"cmd/**"}, want: "cmd/main.go"},
+		{patterns: []string{"**/*.json", "cmd/*.go"}, want: "cmd/main.go"},
+		{patterns: []string{"cmd/**", "**/putnami.verdict-policy.json"}, want: "cmd/main.go cmd/putnami.verdict-policy.json"},
+	} {
+		files, err := CollectRuntimeInputs(root, tc.patterns)
+		if got := strings.Join(files, " "); err != nil || got != tc.want {
+			t.Errorf("CollectRuntimeInputs(%q) = %q, %v, want %q", tc.patterns, got, err, tc.want)
+		}
+	}
+	tree, err := CollectRuntimeTree(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, entry := range tree {
+		if entry.Rel == "cmd/putnami.verdict-policy.json" {
+			t.Fatalf("a replaced module's tree holds %s", entry.Rel)
+		}
+	}
+	if len(tree) != 2 {
+		t.Fatalf("a replaced module's tree = %+v, want bin/prepare and cmd/main.go", tree)
+	}
+}
+
 func writeRuntimeReplacementFixture(t *testing.T, root string) (string, string) {
 	t.Helper()
 	extensionRoot := filepath.Join(root, "extension")

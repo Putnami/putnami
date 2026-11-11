@@ -43,7 +43,7 @@
     },
     {
       "id": "one-selection-vocabulary",
-      "text": "File patterns are project-relative, with *, ** and ! exclusions. ** matches zero segments, a wildcard of an ordinary include never crosses .., an empty include list selects nothing, and git: changes which candidates are collected, not how a path matches. ParseSelector reads tag:, group:, scope: or a project id; an unknown prefix is a project id, and String renders a selector that parses back to itself."
+      "text": "File patterns are project-relative, with *, ** and ! exclusions. ** matches zero segments, a wildcard of an ordinary include never crosses .., an empty include list selects nothing, and git: changes which candidates are collected, not how a path matches. Only an include whose last segment names putnami.verdict-policy.json selects that file. ParseSelector reads tag:, group:, scope: or a project id; an unknown prefix is a project id, and String renders a selector that parses back to itself."
     },
     {
       "id": "the-agent-artifact-manifest-is-strict",

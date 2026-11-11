@@ -117,11 +117,15 @@ const (
 	DeclarationCI = "ci"
 	// DeclarationOwners is an ownership document.
 	DeclarationOwners = "owners"
+	// DeclarationPolicy is a verdict policy file, VerdictPolicyFile. A change
+	// to one always waits for an approval: no policy can set it.
+	DeclarationPolicy = "policy"
 )
 
 var verdictDeclarationKinds = []string{
 	DeclarationSpec, DeclarationBaseline, DeclarationBinding, DeclarationADR,
 	DeclarationDecisions, DeclarationArchitecture, DeclarationCI, DeclarationOwners,
+	DeclarationPolicy,
 }
 
 // The places an approval of a declaration change is given.

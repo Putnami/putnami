@@ -31,6 +31,7 @@ import (
 	"sort"
 	"strings"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/sourcebinding"
 )
 
@@ -344,6 +345,10 @@ func (t *Tree) ReadFile(rel string) ([]byte, error) {
 // them apart either. A test of a task that reads through a Tree uses it to
 // prove the task's verdict moves only with what its key reads.
 //
+// It leaves out a putnami.verdict-policy.json file, as the key of `git:**`
+// does: only a pattern that names that file keys it
+// (go.putnami.dev/protocol/workspace, IsNamedOnlyInput).
+//
 // It fails where the key produces none: on a candidate Git lists as a
 // directory (a submodule's commit is not keyed), a socket, a pipe or a
 // device, and on an unmerged index entry.
@@ -365,6 +370,9 @@ func (t *Tree) Fingerprint() (string, error) {
 	}
 	h := sha256.New()
 	for _, rel := range t.paths {
+		if wsproto.IsNamedOnlyInput(rel) {
+			continue
+		}
 		writeField(h, rel)
 		if t.files[rel] {
 			target, err := t.readlink(rel)

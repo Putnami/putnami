@@ -91,6 +91,7 @@ func authoredSDDDomain() *arch.Builder {
 				arch.Justification("The SDD extension validates features, specs, and architecture through the shared strict contract packages; the ADR 0013 boundary allows protocol and SDK references and forbids CLI internals."),
 				arch.Bind("/tooling/sdd-extension", "/protocols/architecture"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/capabilities"),
+				arch.Bind("/tooling/sdd-extension", "/protocols/ci"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/cli"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/config"),
 				arch.Bind("/tooling/sdd-extension", "/protocols/contracts"),

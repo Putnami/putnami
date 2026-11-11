@@ -19,6 +19,11 @@
 // That cut is exactly what a `git:**` task input keys, so the tasks that run
 // the check are cached on it. Outside a Git work tree the check reads the
 // disk, and no `git:` input can key it.
+//
+// A link to a putnami.verdict-policy.json file inside the workspace is not
+// checked: the CI plane reads that file and no build does, so `git:**` does
+// not key it (go.putnami.dev/protocol/workspace, IsNamedOnlyInput), and a
+// verdict that depended on it could go stale.
 package docslinks
 
 import (
@@ -39,6 +44,7 @@ import (
 	"strings"
 	"unicode"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/sdk/extension/gitcandidate"
 )
@@ -541,6 +547,9 @@ func (c *checker) resolve(file string, source []byte, target string) string {
 		rel, inside := within(c.root, resolved)
 		if !inside {
 			return fmt.Sprintf("link %q leaves the workspace", target)
+		}
+		if wsproto.IsNamedOnlyInput(rel) {
+			return ""
 		}
 		if message := c.reach(target, rel, resolved); message != "" {
 			return message

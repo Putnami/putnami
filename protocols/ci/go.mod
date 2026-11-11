@@ -7,9 +7,12 @@ require (
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/distribution v0.0.0
 	// features is TEST-ONLY: spectest binds the conformance tests to the
-	// requirements of ci/ci-contract.
+	// requirements of ci/ci-contract, and a test holds the verdict policy's
+	// maturities to the features ladder.
 	go.putnami.dev/protocol/features v0.0.0
 )
+
+require go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 
 replace go.putnami.dev/protocol/capabilities => ../capabilities
 

@@ -140,6 +140,7 @@ func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode f
 		Project:    projectID,
 		Feature:    criteria.Feature,
 		Spec:       criteria.Spec,
+		Target:     criteria.Target,
 		Mode:       mode,
 		ModeSource: source,
 	}

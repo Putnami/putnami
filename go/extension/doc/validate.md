@@ -131,9 +131,10 @@ CLI's rule for the option's two spellings: a layer can write
 
 The document in the working tree must be a `.json` file outside the
 directories the task's [cache key](#caching) does not read: a directory whose
-name starts with `.`, `node_modules`, `out`, `dist` or `vendor`. Any other
-path fails the task, because a change to it would leave a stored verdict in
-place. The document at the tag has no such rule.
+name starts with `.`, `node_modules`, `out`, `dist` or `vendor`. It must not be
+named `putnami.verdict-policy.json`: the CI plane reads that file, and the key
+leaves it out. Any other path fails the task, because a change to it would
+leave a stored verdict in place. The document at the tag has no such rule.
 
 These changes are incompatible:
 
@@ -259,7 +260,8 @@ The task is cached. Its key holds what the verdict reads:
 
 - the project's non-test Go files, which are the files the API comes from,
   and the files their `//go:embed` directives select;
-- the project's `go.mod` files and `.json` files;
+- the project's `go.mod` files and `.json` files, except a
+  `putnami.verdict-policy.json` file, which only the CI plane reads;
 - the root `putnami.support.json`;
 - the project's resolved tags, which the job context carries as
   `project.tags`;

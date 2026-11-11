@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-verdict-policy.json",
+  "title": "Putnami verdict policy",
+  "description": "What each verdict gap and each declaration change costs a change. A repository places a putnami.verdict-policy.json at its root, in a scope directory or in a project directory. The nearest file that names a key decides; inside that key, the maturity of the feature concerned can pick the value. The policy decides what blocks a change; it never changes the verdict. The Go validator also checks what this schema does not state: unknown-impact and unknown-declarations are set only in the root file.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "const": "https://putnami.dev/schemas/putnami-verdict-policy.json"
+    },
+    "declarations": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "When a change to a declaration of each kind waits for an approval. A change to a verdict policy always waits: no policy sets the policy kind.",
+      "properties": {
+        "adr": { "$ref": "#/$defs/approval" },
+        "architecture": { "$ref": "#/$defs/approval" },
+        "baseline": { "$ref": "#/$defs/approval" },
+        "binding": { "$ref": "#/$defs/approvalByMaturity" },
+        "ci": { "$ref": "#/$defs/approval" },
+        "decisions": { "$ref": "#/$defs/approval" },
+        "owners": { "$ref": "#/$defs/approval" },
+        "spec": { "$ref": "#/$defs/approvalByMaturity" }
+      }
+    },
+    "gaps": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What a gap of each kind costs a change. lost-proof is an unproven requirement that the change's base proved.",
+      "properties": {
+        "lost-proof": { "$ref": "#/$defs/costByMaturity" },
+        "no-requirement": { "$ref": "#/$defs/cost" },
+        "unknown-declarations": { "$ref": "#/$defs/cost" },
+        "unknown-impact": { "$ref": "#/$defs/cost" },
+        "unknown-requirements": { "$ref": "#/$defs/cost" },
+        "unproven-requirement": { "$ref": "#/$defs/costByMaturity" }
+      }
+    }
+  },
+  "$defs": {
+    "approval": {
+      "enum": ["always", "when-weakening", "never"],
+      "description": "always: every change waits for an approval. when-weakening: a change that weakens the declaration waits; one the producer could not judge counts as weakening. never: no change waits."
+    },
+    "approvalByMaturity": {
+      "oneOf": [
+        { "$ref": "#/$defs/approval" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["modeled"],
+          "description": "From each maturity on, for the highest maturity of the features the declaration declares.",
+          "properties": {
+            "modeled": { "$ref": "#/$defs/approval" },
+            "coded": { "$ref": "#/$defs/approval" },
+            "wired": { "$ref": "#/$defs/approval" },
+            "default-on": { "$ref": "#/$defs/approval" },
+            "live-verified": { "$ref": "#/$defs/approval" },
+            "design-partner-proven": { "$ref": "#/$defs/approval" },
+            "ga": { "$ref": "#/$defs/approval" }
+          }
+        }
+      ]
+    },
+    "cost": {
+      "enum": ["inform", "accept", "block"],
+      "description": "inform: listed, never blocks. accept: blocks until a person accepts it. block: blocks, and nobody can accept it."
+    },
+    "costByMaturity": {
+      "oneOf": [
+        { "$ref": "#/$defs/cost" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["modeled"],
+          "description": "From each maturity on, for the maturity of the feature the requirement belongs to.",
+          "properties": {
+            "modeled": { "$ref": "#/$defs/cost" },
+            "coded": { "$ref": "#/$defs/cost" },
+            "wired": { "$ref": "#/$defs/cost" },
+            "default-on": { "$ref": "#/$defs/cost" },
+            "live-verified": { "$ref": "#/$defs/cost" },
+            "design-partner-proven": { "$ref": "#/$defs/cost" },
+            "ga": { "$ref": "#/$defs/cost" }
+          }
+        }
+      ]
+    }
+  }
+}

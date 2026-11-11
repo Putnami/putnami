@@ -252,7 +252,7 @@ activation:
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
 | `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
+| `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
 
 Both are in the canonical gate:
 
@@ -293,6 +293,10 @@ A task may be cacheable only when its declared inputs COVER what it reads.
 - `specs-ratchet-validate` keys on the manifests, specs, options and every
   committed `specs.baseline.json` — both sides of its shrink-only comparison
   are committed files its patterns name.
+- `verdict-policy-validate` keys on every `putnami.verdict-policy.json`, with
+  patterns that spell out the file name, and on `putnami.workspace.json` and
+  every `putnami.json`, which place the root, the scopes and the projects. See
+  [the validation jobs](doc/02-validation-jobs.md#verdict-policy-validate--cached-on-the-policy-and-layout-files).
 - `decisions-validate`, `recipes-validate`, `codeowners-sync`,
   `docs-links-validate` and `feature-coverage-validate` read files no narrow
   pattern names: the globs a repository authors in its `decisions.json`, the
@@ -372,6 +376,28 @@ directory exists when it holds a tracked or unignored file, and the task is
 cached on the input `git:**`, so emptying, renaming or deleting a sample
 directory moves the key. `putnami context generate` renders the indexes
 into the `build` skill's `references/recipes.md`.
+
+### The verdict policy gate
+
+A `putnami.verdict-policy.json` file states what a gap and a declaration change
+cost in a verdict
+([ADR 0008 of the ci protocol](../../protocols/ci/doc/adr/0008-a-verdict-policy-states-what-a-gap-costs.md)).
+`verdict-policy-validate` checks every such file of the workspace:
+
+- The ci protocol's strict parser checks the content. An unknown kind, value,
+  key or maturity, a map by maturity that does not hold `modeled`, and a map
+  on a key that concerns no feature fail with the protocol's code, such as
+  `ci.verdict_policy_kind`, naming the file and the member.
+- The step checks the place. A file sits at the workspace root, in a project
+  directory, or in a scope directory: a directory above a project whose
+  `putnami.json` is a scope manifest. A file in any other directory fails with
+  `sdd.verdict_policy_location`.
+- A file the step cannot read, such as a symbolic link, fails with
+  `sdd.verdict_policy_unreadable`.
+- A workspace without a policy file passes.
+
+Inside a Git work tree the step reads the candidate cut, so an ignored file is
+never read.
 
 ### The feature-coverage gate
 

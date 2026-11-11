@@ -265,6 +265,7 @@ func TestTheVerdictMovesOnlyWithTheGitKey(t *testing.T) {
 		"[draft](doc/draft.local.md)",
 		"[output](build/out.md)",
 		"[later](doc/later.md)",
+		"[policy](putnami.verdict-policy.json)",
 	}, "\n"))
 	runGit(t, root, "add", "-A")
 
@@ -282,6 +283,9 @@ func TestTheVerdictMovesOnlyWithTheGitKey(t *testing.T) {
 		apply func()
 		moves bool
 	}{
+		{"a verdict policy appears at a link target", func() { writeFile(t, root, "lib/putnami.verdict-policy.json", "{}\n") }, false},
+		{"the verdict policy is staged", func() { runGit(t, root, "add", "-A") }, false},
+		{"the verdict policy is deleted", func() { remove(t, root, "lib/putnami.verdict-policy.json") }, false},
 		{"an ignored file appears at a link target", func() { writeFile(t, root, "lib/doc/draft.local.md", "# Draft\n") }, false},
 		{"an ignored directory fills a link target", func() { writeFile(t, root, "lib/build/out.md", "# Out\n") }, false},
 		{"an untracked file appears at a link target", func() { writeFile(t, root, "lib/doc/later.md", "# Later\n") }, true},

@@ -198,6 +198,10 @@
       "text": "Two runs on one tree, at one base version of its release line, compute the same task cache key, whatever the commit, the branch or the checkout directory. A file pattern reads the build stamp without its build-time, commit and publication fields. A generate asset under the workspace root contributes its workspace-relative path and content; a stamp inside it keeps all but its build time. Otherwise, the commit reaches a key only through the publish version of a task with cache.versionAware or version-var."
     },
     {
+      "id": "a-verdict-policy-is-no-build-input",
+      "text": "A putnami.verdict-policy.json file is no task input unless a pattern names it in its last segment. A pattern by type or by directory, git:**, the empty pattern set, a generate asset directory and an extension runtime input leave it out of the key, so adding, editing or removing one moves no key and selects no task but those of a naming pattern. The workspace protocol states the CI protocol's file name."
+    },
+    {
       "id": "release-baseline-cache-key",
       "text": "A task that declares the releaseBaseline runtime input keys on its project's release baseline: the repository state, the line's tag pattern, the tag of its last release, the tree that tag holds at the project, and whether a commit since that tag that touches the project declares a breaking change. The key names no commit: a branch and its squash merge share it if they declare one break. A new tag, other content at the tag, a shallow clone and a changed breaking marker, even in a squash title, move it."
     },

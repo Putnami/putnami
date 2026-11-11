@@ -37,14 +37,15 @@ const (
 //
 // The walk never follows a link. Each path below root is named by its
 // root-relative slash path; root itself is not a record. A set selects a path
-// when SelectsPath of that set alone selects it. For each path a Content set
-// selects, the digest records its kind and, for a regular file, the sha256 of
-// its bytes, or, for a link, its target text. For each path a Listing set
-// selects, it records its kind and, for a link, its target text. A path both
-// kinds select gets both records. The records are sorted before they are
-// hashed, so the digest does not depend on the walk's order, on root's
-// location, or on the host. A directory no set can select, at or below it, is
-// not walked.
+// when SelectsPath of that set alone selects it, except that a file
+// IsNamedOnlyInput reports is matched as any other path: an answer may read
+// one, as a go:embed directive can. For each path a Content set selects, the
+// digest records its kind and, for a regular file, the sha256 of its bytes,
+// or, for a link, its target text. For each path a Listing set selects, it
+// records its kind and, for a link, its target text. A path both kinds select
+// gets both records. The records are sorted before they are hashed, so the
+// digest does not depend on the walk's order, on root's location, or on the
+// host. A directory no set can select, at or below it, is not walked.
 //
 // A basis that ValidateInputResolveResult would refuse, a root that is
 // missing, relative or not a directory, and any error of the walk are errors.
@@ -188,7 +189,8 @@ func splitBasisSets(sets [][]string) []basisSet {
 	return split
 }
 
-// selectsAny reports whether a set selects rel, with SelectsPath's rule.
+// selectsAny reports whether a set selects rel, with SelectsPath's rule, and
+// matches a file IsNamedOnlyInput reports as any other path.
 func selectsAny(sets []basisSet, rel string) bool {
 	for _, set := range sets {
 		if !MatchesAnyFilePattern(rel, set.excludes) && MatchesAnyFilePattern(rel, set.includes) {

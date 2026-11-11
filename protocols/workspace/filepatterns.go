@@ -39,6 +39,41 @@ import (
 //     its wildcards match ".." segments.
 //     Matching a changed path strips this prefix: deleted paths must still
 //     select their readers, so impact never consults current Git membership.
+//   - A file IsNamedOnlyInput reports is selected only by an include whose
+//     last segment names it: "**/putnami.verdict-policy.json" selects one,
+//     "**/*.json", "**" and "git:**" do not. An exclusion matches it as any
+//     other path.
+
+// VerdictPolicyFile is the name of the file that states what a gap costs a
+// change. The CI plane reads it, and no build does. The CI protocol states
+// the same name (go.putnami.dev/protocol/ci, ci.VerdictPolicyFile); this
+// module does not depend on that one, so a test of the CLI pins the two
+// equal.
+const VerdictPolicyFile = "putnami.verdict-policy.json"
+
+// IsNamedOnlyInput reports whether rel names a file that no task reads unless
+// one of its include patterns names that file in its last segment. Such a
+// file configures the CI plane rather than a build, so a pattern that selects
+// files by type or by directory must not make it an input: adding, editing or
+// removing one then moves no cache key and selects no task. Today the only
+// such file is putnami.verdict-policy.json, wherever it sits.
+func IsNamedOnlyInput(rel string) bool {
+	return path.Base(filepath.ToSlash(rel)) == VerdictPolicyFile
+}
+
+// PatternNamesFile reports whether pattern names the file at rel literally in
+// its last segment, the way "**/putnami.verdict-policy.json" or
+// "git:putnami.verdict-policy.json" names it. A last segment that holds a
+// wildcard names no file: "*.json" selects the file by type, "**" by
+// directory. The other segments are not compared; a caller that needs the
+// whole path to match matches the pattern too. A leading "!" is ignored: the
+// answer is about the path the pattern spells.
+func PatternNamesFile(pattern, rel string) bool {
+	pattern, _ = GitFilePattern(strings.TrimPrefix(pattern, "!"))
+	pattern = filepath.ToSlash(pattern)
+	last := pattern[strings.LastIndex(pattern, "/")+1:]
+	return last == path.Base(filepath.ToSlash(rel))
+}
 
 // GitFilePattern separates a candidate input's source from its path pattern.
 // The collector uses the source; impact uses the same path grammar as usual.
@@ -171,14 +206,26 @@ func ExcludesTree(rel string, excludes []string) bool {
 //
 // An include selects the path the way the collector would: "**" selects
 // "src/a.go" and never "../../docs/README.md", which the collector, walking the
-// project root, never lists.
+// project root, never lists. A file IsNamedOnlyInput reports is selected only
+// by an include that names it (PatternNamesFile).
 func SelectsPath(rel string, patterns []string) bool {
+	return selectsPath(rel, patterns, true)
+}
+
+// selectsPath is SelectsPath. namedOnly says whether a file IsNamedOnlyInput
+// reports needs an include that names it; without it, such a file is matched
+// as any other path.
+func selectsPath(rel string, patterns []string, namedOnly bool) bool {
 	includes, excludes := SplitFilePatterns(patterns)
 	slashed := filepath.ToSlash(rel)
 	if MatchesAnyFilePattern(slashed, excludes) {
 		return false
 	}
+	namedOnly = namedOnly && IsNamedOnlyInput(slashed)
 	for _, include := range includes {
+		if namedOnly && !PatternNamesFile(include, slashed) {
+			continue
+		}
 		if matchIncludePattern(slashed, include) {
 			return true
 		}

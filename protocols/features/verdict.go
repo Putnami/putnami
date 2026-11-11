@@ -56,6 +56,11 @@ type SpecVerificationGroup struct {
 	Feature string `json:"feature,omitempty"`
 	// Spec is the workspace-relative spec document path.
 	Spec string `json:"spec,omitempty"`
+	// Target is the maturity stage the feature aims at, copied from the
+	// criteria group, so a reader of the record knows it without reading the
+	// manifests. Empty when the criteria group names none, when the projection
+	// could not be read, or when an older CLI wrote the record.
+	Target MaturityStage `json:"target,omitempty"`
 	// Mode is the effective verification mode and ModeSource its provenance.
 	Mode       VerificationMode       `json:"mode"`
 	ModeSource VerificationModeSource `json:"modeSource"`
@@ -321,6 +326,12 @@ func ValidateSpecVerificationRecord(input *SpecVerificationRecord) []diag.Diagno
 		if !validVerificationModes[group.Mode] {
 			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidVerification, field+".mode",
 				"mode %q is not a verification mode", group.Mode))
+		}
+		if group.Target != "" {
+			if _, valid := StageRank(group.Target); !valid {
+				diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidStage, field+".target",
+					"target %q is not a maturity stage", group.Target))
+			}
 		}
 		for j, verdict := range group.Requirements {
 			if !ValidRequirementVerificationStates[verdict.State] {

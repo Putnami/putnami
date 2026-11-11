@@ -177,3 +177,79 @@ func TestExcludesTree(t *testing.T) {
 		t.Error("no exclusion covers a tree")
 	}
 }
+
+// A putnami.verdict-policy.json file configures the CI plane, and no build
+// reads it. A pattern that selects files by type or by directory therefore
+// selects none, wherever it sits; only an include whose last segment names
+// the file selects it. An exclusion still removes it.
+func TestSelectsPath_AVerdictPolicyNeedsAPatternThatNamesIt(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
+	for _, testCase := range []struct {
+		rel      string
+		patterns []string
+		want     bool
+	}{
+		{"putnami.verdict-policy.json", []string{"**"}, false},
+		{"putnami.verdict-policy.json", []string{"*.json"}, false},
+		{"putnami.verdict-policy.json", []string{"**/*.json"}, false},
+		{"putnami.verdict-policy.json", []string{"git:**"}, false},
+		{"../../putnami.verdict-policy.json", []string{"git:**"}, false},
+		{"conf/putnami.verdict-policy.json", []string{"conf/**"}, false},
+		{"conf/putnami.verdict-policy.json", []string{"conf/putnami.verdict-policy.jso?"}, false},
+		{"putnami.verdict-policy.json", []string{"putnami.verdict-policy.json"}, true},
+		{"conf/putnami.verdict-policy.json", []string{"**/putnami.verdict-policy.json"}, true},
+		{"../../putnami.verdict-policy.json", []string{"git:**/putnami.verdict-policy.json"}, true},
+		{"conf/putnami.verdict-policy.json", []string{"**", "**/putnami.verdict-policy.json"}, true},
+		{"conf/putnami.verdict-policy.json", []string{"**/putnami.verdict-policy.json", "!conf/**"}, false},
+		{"other/putnami.verdict-policy.json", []string{"conf/putnami.verdict-policy.json"}, false},
+		{"conf/putnami.json", []string{"**/*.json"}, true},
+		{"conf/my-putnami.verdict-policy.json", []string{"**/*.json"}, true},
+	} {
+		if got := SelectsPath(testCase.rel, testCase.patterns); got != testCase.want {
+			t.Errorf("SelectsPath(%q, %q) = %v, want %v", testCase.rel, testCase.patterns, got, testCase.want)
+		}
+	}
+	if !MatchesAnyFilePattern("conf/putnami.verdict-policy.json", []string{"**/*.json"}) {
+		t.Error("an exclusion pattern must match a verdict policy as any other path")
+	}
+}
+
+func TestIsNamedOnlyInput(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
+	for rel, want := range map[string]bool{
+		"putnami.verdict-policy.json":              true,
+		"protocols/ci/putnami.verdict-policy.json": true,
+		"../../putnami.verdict-policy.json":        true,
+		"/abs/putnami.verdict-policy.json":         true,
+		"putnami.json":                             false,
+		"schemas/putnami-verdict-policy.json":      false,
+		"putnami.verdict-policy.json/inner.txt":    false,
+	} {
+		if got := IsNamedOnlyInput(rel); got != want {
+			t.Errorf("IsNamedOnlyInput(%q) = %v, want %v", rel, got, want)
+		}
+	}
+}
+
+func TestPatternNamesFile(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "one-selection-vocabulary", "file-patterns-follow-one-grammar")
+	rel := "conf/putnami.verdict-policy.json"
+	for pattern, want := range map[string]bool{
+		"putnami.verdict-policy.json":         true,
+		"**/putnami.verdict-policy.json":      true,
+		"git:**/putnami.verdict-policy.json":  true,
+		"git:putnami.verdict-policy.json":     true,
+		"*/putnami.verdict-policy.json":       true,
+		"!**/putnami.verdict-policy.json":     true,
+		"**":                                  false,
+		"**/*.json":                           false,
+		"putnami.*.json":                      false,
+		"git:**":                              false,
+		"conf":                                false,
+		"conf/putnami.verdict-policy.json/**": false,
+	} {
+		if got := PatternNamesFile(pattern, rel); got != want {
+			t.Errorf("PatternNamesFile(%q, %q) = %v, want %v", pattern, rel, got, want)
+		}
+	}
+}

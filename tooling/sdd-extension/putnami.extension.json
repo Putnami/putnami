@@ -287,7 +287,7 @@
       ]
     },
     "validate-workspace": {
-      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks.",
+      "description": "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks, and check each putnami.verdict-policy.json file and the directory it sits in.",
       "activation": "workspace-once",
       "traits": {"kind": "criteria"},
       "run": [
@@ -330,6 +330,10 @@
         {
           "id": "feature-coverage-ratchet",
           "task": "feature-coverage-ratchet-validate"
+        },
+        {
+          "id": "verdict-policy",
+          "task": "verdict-policy-validate"
         }
       ]
     }
@@ -1500,6 +1504,44 @@
           }
         }
       }
+    },
+    "verdict-policy-validate": {
+      "description": "Validate every putnami.verdict-policy.json of the workspace. The ci protocol's strict parser checks the content: an unknown kind, value, key or maturity, a map by maturity that does not hold modeled, and a map on a key that concerns no feature fail with the protocol's code, naming the file and the member. A file sits at the root, in a project directory, or in a directory above a project whose putnami.json is a scope manifest; a file in any other directory fails with sdd.verdict_policy_location, and a file the task cannot read, such as a symbolic link, fails with sdd.verdict_policy_unreadable. A workspace without a policy file passes. Inside a Git work tree the task reads the candidate cut, so an ignored file is never read, and it never enters .gen, .git, .putnami, dist, node_modules, out or vendor. The key names the policy file itself, and the files that place the root, the scopes and the projects: putnami.workspace.json and every putnami.json.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "verdict-policy-validate"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "inputs": {
+        "layout": {
+          "from": "workspace",
+          "files": [
+            "putnami.workspace.json",
+            "**/putnami.json",
+            "!**/.gen/**"
+          ]
+        },
+        "policies": {
+          "from": "workspace",
+          "files": [
+            "putnami.verdict-policy.json",
+            "**/putnami.verdict-policy.json",
+            "!**/.gen/**"
+          ]
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "Verdict policy report: the policy files found and sorted diagnostics."
+        }
+      },
+      "cache": {
+        "enabled": true,
+        "noOutput": true
+      },
+      "declares": {}
     }
   }
 }

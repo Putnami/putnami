@@ -4,7 +4,9 @@
   "executableRequirements": [
     "ci/ci-contract#a-change-plan-is-admitted-only-when-canonical",
     "ci/ci-contract#a-deploy-binds-the-published-release-set",
+    "ci/ci-contract#a-loosened-verdict-policy-is-detected",
     "ci/ci-contract#a-verdict-is-validated",
+    "ci/ci-contract#a-verdict-policy-is-validated",
     "ci/ci-contract#an-impact-plan-is-validated",
     "ci/ci-contract#baseline-names-a-channel-the-rule-reads",
     "ci/ci-contract#branch-globs-are-slash-aware",
@@ -20,11 +22,14 @@
     "ci/ci-contract#the-answer-and-the-mark-are-folds",
     "ci/ci-contract#the-change-plan-v1-is-frozen",
     "ci/ci-contract#the-document-is-version-3-and-strict",
+    "ci/ci-contract#the-feature-maturity-picks-the-value",
+    "ci/ci-contract#the-nearest-verdict-policy-decides",
     "ci/ci-contract#the-projection-is-one-change-plan",
     "ci/ci-contract#the-runner-object-is-opaque",
     "ci/ci-contract#the-verdict-corpus-is-the-conformance-case",
     "ci/ci-contract#validating-commands-resolve-the-graph",
     "ci/ci-contract#verdict-identities-are-canonical",
+    "ci/ci-contract#verdict-policies-parse-strictly-against-one-schema",
     "ci/ci-contract#verdicts-parse-strictly-against-one-schema"
   ]
 }

@@ -57,6 +57,10 @@
       "text": "A version 3 manifest entry may name an external spec with a closed {format, path} object. The format is openspec, speckit, kiro or gherkin. The path is workspace-relative and cannot escape the workspace. Versions 1 and 2 refuse the member as an unknown field. A criteria group for an external spec carries its format, and a group with no format keeps the specs/*.json path rule."
     },
     {
+      "id": "groups-name-the-feature-target",
+      "text": "A criteria group names the target maturity its feature's manifest entry declares. The gate copies it into the record group, and specs verify into a group no session evaluated. A spec whose feature no manifest declares, or a projection the gate cannot read, gives a group with no target. The member is additive under version 1: a group without it keeps its exact bytes and still reads. Both readers refuse a target outside the maturity ladder."
+    },
+    {
       "id": "spec-reader-contract",
       "text": "A reader turns the bytes of one external spec into a spec, a record per requirement and findings, with no network, model, clock or filesystem. The contract wraps every reader: a finding names its file and line, also on an outcome or a non-goal the reader located, a text over 512 bytes stays whole with an enforce finding that names a split, two requirements with one ID name both positions, and the same bytes give the same result."
     },

@@ -322,7 +322,7 @@
       "properties": {
         "path": { "$ref": "#/$defs/path" },
         "kind": {
-          "enum": ["spec", "baseline", "binding", "adr", "decisions", "architecture", "ci", "owners"]
+          "enum": ["spec", "baseline", "binding", "adr", "decisions", "architecture", "ci", "owners", "policy"]
         },
         "weakening": {
           "type": "boolean",

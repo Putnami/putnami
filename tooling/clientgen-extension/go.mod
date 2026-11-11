@@ -34,6 +34,7 @@ require (
 	go.putnami.dev/protocol/platform v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
+	go.putnami.dev/protocol/workspace v0.0.0 // indirect
 	go.putnami.dev/schema v0.0.1 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect

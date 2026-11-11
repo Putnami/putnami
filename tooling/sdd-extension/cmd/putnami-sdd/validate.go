@@ -459,6 +459,27 @@ func runFeatureCoverageRatchetValidate(ctx *pctx.Context, emit *jsonl.Emitter, _
 	return finish(report, verdict)
 }
 
+// runVerdictPolicyValidate is the eleventh step of the workspace-scoped
+// `validate-workspace` command: every putnami.verdict-policy.json of the
+// workspace. A file whose content the ci protocol refuses fails with the
+// protocol's code. A file that is not at the root, in a scope directory or in
+// a project directory fails with sdd.verdict_policy_location. A workspace
+// without a policy file passes.
+//
+// The step reads the policy files of the candidate cut, and the putnami.json of
+// a directory above a project that holds one. Its cache key names the policy
+// file, putnami.workspace.json and every putnami.json.
+func runVerdictPolicyValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+	ws, err := workspaceValidationView(ctx)
+	if err != nil {
+		return "", nil, err
+	}
+	report, verdict := sdd.BuildVerdictPolicyResult(ws)
+	publishDiagnostics(emit, report.Diagnostics)
+	emit.Summary(fmt.Sprintf("verdict policy: %d file(s), %d diagnostic(s)", len(report.Policies), len(report.Diagnostics)))
+	return finish(report, verdict)
+}
+
 // projectValidationView builds the membership and the projection a PROJECT-
 // SCOPED validation task runs over.
 //

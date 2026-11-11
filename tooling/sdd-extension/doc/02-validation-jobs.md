@@ -8,7 +8,7 @@ contract.
 | Command | Activation | Steps | Cached |
 |---|---|---|---|
 | `validate` | project-scoped, on `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
-| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate` | yes: architecture and ratchet on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
+| `validate-workspace` | `workspace-once` | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
 
 Two commands rather than one, because one command carries one activation and
 these two have different subjects. A project's features and specs are a
@@ -333,6 +333,27 @@ the verdict.
   `--impacted` alone, which resolves the trunk or the nearest epic branch. A
   run without `--impacted` enforces nothing here. The step is never cached (see
   [below](#feature-coverage-ratchet-validate--never-cached)).
+
+- **`verdict-policy-validate`** — the verdict policy gate. A
+  `putnami.verdict-policy.json` file states what a gap and a declaration change
+  cost in a verdict
+  ([ADR 0008 of the ci protocol](../../../protocols/ci/doc/adr/0008-a-verdict-policy-states-what-a-gap-costs.md)).
+  The step reads every such file of the workspace with the ci protocol's
+  strict parser, and checks the directory each one sits in.
+
+  | Situation | Result |
+  |---|---|
+  | No policy file | Passes |
+  | A valid file at the workspace root, in a project directory or in a scope directory | Passes |
+  | An unknown kind, value, key or maturity, a map by maturity without `modeled`, or a map on a key that concerns no feature | Fails with the ci protocol's code, such as `ci.verdict_policy_kind`, at the file and the member |
+  | `unknown-impact` or `unknown-declarations` outside the root file | Fails with `ci.verdict_policy_root_only`: these keys concern the whole change |
+  | A file in any other directory | Fails with `sdd.verdict_policy_location` at the file |
+  | A file the step cannot read, such as a symbolic link | Fails with `sdd.verdict_policy_unreadable` at the file |
+
+  A scope directory is a directory above a project whose `putnami.json` is a
+  scope manifest. A misplaced file is still parsed, so one run reports both
+  its place and its content. The step is cached (see
+  [Caching](#verdict-policy-validate--cached-on-the-policy-and-layout-files)).
 
 Selection narrows what a run **owns**, never what it **reads**: durable
 manifests and canonical spec documents are read at every root under any
@@ -719,6 +740,30 @@ candidate cut holds neither the baseline nor the history. So the task runs
 every time, and costs a few Git reads and one blob read. It declares no
 port: the current list arrives on the job context. `feature-coverage-validate`
 keeps its key on the candidate cut and reads no history.
+
+### `verdict-policy-validate` — cached on the policy and layout files
+
+```json
+"inputs": {
+  "policies": { "from": "workspace", "files": ["putnami.verdict-policy.json", "**/putnami.verdict-policy.json", "!**/.gen/**"] },
+  "layout":   { "from": "workspace", "files": ["putnami.workspace.json", "**/putnami.json", "!**/.gen/**"] }
+}
+```
+
+The step reads the policy files, and the `putnami.json` of a directory that
+holds one, to tell a scope from a plain directory. Each pattern of the
+`policies` port spells out the file name, never a glob such as `**/*.json`.
+The `layout` port holds the files that place the root, the scopes and the
+projects, so moving a project or turning a directory into a scope moves the
+key.
+
+Inside a Git work tree the step reads the candidate cut, so an ignored policy
+file is neither read nor judged. The listing never enters `.gen`, which the
+ports exclude, nor `.git`, `.putnami`, `dist`, `node_modules`, `out` or
+`vendor`, which the key's file walk skips, so the key holds every file the
+step reads. Both ports are workspace ports. The project side of the key is
+therefore empty, and the CLI keys an empty project side on every file under
+the root, so most edits re-run the step. It reads a few small files.
 
 ## Exit codes
 

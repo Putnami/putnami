@@ -28,6 +28,10 @@
       "text": "A changed file claims its nearest directory owner (symlinks, grouped paths canonicalized), asset, declared-input and scope-config readers, then the tasks of each that read it; a file no task reads claims nothing. Dependency edges, and contract edges whose committed contract changed, carry the tasks whose `^` reference names a source task; ordering-only edges carry none. A rebuilt extension reaches consumers for its own tasks; an unattributable claim or workspace-wide input keeps a project whole."
     },
     {
+      "id": "a-verdict-policy-selects-only-the-tasks-that-name-it",
+      "text": "A changed putnami.verdict-policy.json file, at the workspace root, in a scope or in a project, claims only the tasks whose input pattern names it in its last segment. Owning one keeps no project whole, an extension project included, and it is no changed file of its project, which still owns it by path."
+    },
+    {
       "id": "canonical-identity",
       "text": "A project's canonical id derives from its workspace-relative path, grouped folders stay transparent so a grouped physical path resolves to the logical id, and a legacy name still resolves as a fallback."
     },

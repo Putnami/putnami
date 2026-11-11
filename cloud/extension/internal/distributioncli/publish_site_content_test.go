@@ -664,3 +664,37 @@ func TestSiteContentSectionIsADirectoryOfItsSite(t *testing.T) {
 		}
 	}
 }
+
+// A putnami.verdict-policy.json file is no site content, in a Git work tree as
+// on disk: the CI plane reads it, and no task key holds it. A directory that
+// holds only such a file is no section of the Git cut.
+func TestSiteContentLeavesOutAVerdictPolicy(t *testing.T) {
+	site := t.TempDir()
+	for name, content := range map[string]string{
+		"platform/index.md":                    "# Platform\n",
+		"platform/putnami.verdict-policy.json": "{}\n",
+		"policy/putnami.verdict-policy.json":   "{}\n",
+	} {
+		path := filepath.Join(site, filepath.FromSlash(name))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, repository := range []bool{false, true} {
+		if repository {
+			gitInit(t, site)
+			sections, err := DeriveSiteContentSections(site, filepath.Base(site), "", map[string]string{})
+			if err != nil || len(sections) != 1 || sections[0].Section != "platform" {
+				t.Fatalf("sections = (%+v, %v), want [platform]", sections, err)
+			}
+		}
+		section := SiteContentSection{Dir: filepath.Join(site, "platform"), Mount: "/docs/platform"}
+		files, err := collectSiteContentFiles(section)
+		if err != nil || len(files) != 1 || files[0].payloadPath != "docs/platform/index.md" {
+			t.Fatalf("repository %v: files = (%+v, %v), want [docs/platform/index.md]", repository, files, err)
+		}
+	}
+}

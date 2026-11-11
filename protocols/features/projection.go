@@ -67,6 +67,11 @@ type SpecCriteriaGroup struct {
 	// Format names the market format of an external spec. A native group omits
 	// it, so its bytes stay those of the first projection version.
 	Format SpecFormat `json:"format,omitempty"`
+	// Target is the maturity stage the feature aims at, copied from the
+	// manifest that declares it. A group whose feature no manifest declares
+	// omits it, and so does a group an older extension wrote: the bytes of such
+	// a group stay those of the first projection version.
+	Target MaturityStage `json:"target,omitempty"`
 	// SpecRequirements lists the spec's textual requirement identities, sorted.
 	SpecRequirements []string `json:"specRequirements"`
 	// Requirements carries the authored feature requirements whose IDs match a
@@ -155,6 +160,12 @@ func validateSpecCriteriaGroup(field string, group SpecCriteriaGroup) []diag.Dia
 			"spec path %q is not a canonical specs/ document path", group.Spec))
 	} else {
 		diagnostics = append(diagnostics, validateProtocolPath(field+".spec", group.Spec)...)
+	}
+	if group.Target != "" {
+		if _, valid := StageRank(group.Target); !valid {
+			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidStage, field+".target",
+				"target %q is not in the maturity ladder", group.Target))
+		}
 	}
 	if len(group.SpecRequirements) == 0 {
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".specRequirements",

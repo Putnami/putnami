@@ -165,6 +165,7 @@
     "cli/job-planning-execution#a-serve-step-releases-its-command-output-once-it-started",
     "cli/job-planning-execution#a-short-alias-reaches-the-task-under-its-long-name",
     "cli/job-planning-execution#a-step-reads-the-changed-files",
+    "cli/job-planning-execution#a-verdict-policy-is-no-build-input",
     "cli/job-planning-execution#an-extension-manifest-names-its-extension",
     "cli/job-planning-execution#an-interactive-command-stops-on-its-own-terms",
     "cli/job-planning-execution#an-interactive-launch-names-the-directory-it-was-typed-in",

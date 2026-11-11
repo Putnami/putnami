@@ -147,10 +147,11 @@ type InputResolveAnswer struct {
 
 // InputBasis is what an answer was computed from, as pattern sets relative to
 // the project directory. Each set is matched on its own, with SelectsPath: a
-// set's "!" exclusions remove paths from that set only. A pattern is a clean
-// relative slash path in the file-pattern grammar, with an optional leading
-// "!", no `git:` prefix and valid glob syntax in every segment; each set
-// names at least one include.
+// set's "!" exclusions remove paths from that set only. Unlike SelectsPath, a
+// set matches a file IsNamedOnlyInput reports as any other path, because an
+// answer may read one. A pattern is a clean relative slash path in the
+// file-pattern grammar, with an optional leading "!", no `git:` prefix and
+// valid glob syntax in every segment; each set names at least one include.
 type InputBasis struct {
 	// Content are the sets whose files' bytes the answer read. The digest
 	// covers the bytes of each regular file, the target of each link, and the
@@ -488,11 +489,12 @@ func validateInputFiles(field string, files []string, basis InputBasis) []diag.D
 	return diags
 }
 
-// basisSelects reports whether a set of either kind selects rel.
+// basisSelects reports whether a set of either kind selects rel, matching a
+// file IsNamedOnlyInput reports as any other path.
 func basisSelects(basis InputBasis, rel string) bool {
 	for _, sets := range [][][]string{basis.Content, basis.Listing} {
 		for _, set := range sets {
-			if SelectsPath(rel, set) {
+			if selectsPath(rel, set, false) {
 				return true
 			}
 		}

@@ -33,6 +33,7 @@
     "tooling/specification-driven-development#squash-names-no-agent",
     "tooling/specification-driven-development#structurizr-models-import-as-manifests",
     "tooling/specification-driven-development#unpromised-finding-ids-warn",
+    "tooling/specification-driven-development#verdict-policies-are-checked",
     "tooling/specification-driven-development#verify-names-an-empty-evaluation"
   ]
 }

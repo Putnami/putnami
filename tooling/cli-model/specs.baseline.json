@@ -6,6 +6,7 @@
     "cli/job-model#declared-verification-producers",
     "cli/job-model#extension-verb-vocabulary",
     "cli/job-model#vocabulary-default-traits",
+    "cli/workspace-model#a-verdict-policy-selects-only-the-tasks-that-name-it",
     "cli/workspace-model#canonical-identity",
     "cli/workspace-model#change-impact",
     "cli/workspace-model#dependency-graph",

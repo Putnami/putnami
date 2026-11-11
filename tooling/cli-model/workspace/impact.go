@@ -620,9 +620,18 @@ func sortedKeys(set map[string]bool) []string {
 // other change keeps the extension whole, as does an extension no `extensions`
 // list names, whose consumers reach it as a package dependency.
 //
+// A file wsproto.IsNamedOnlyInput reports, putnami.verdict-policy.json, is
+// read by the CI plane and by no build. Every pattern the index and the claims
+// match leaves it out unless the pattern names it, so it claims only the tasks
+// whose input names it. Owning it keeps no project whole, an extension project
+// included. A declaration that names it still keeps a project whole as for any
+// file: an extension's runtime input, a workspace-input pattern, or a
+// provider's root-watched-file answer, which names its path exactly.
+//
 // Each scope also names its cause (impactScope.cause), which the
 // extension-consumer edge reports. Without an index every seed is full, and its
-// cause is its first claim.
+// cause is its first claim. A path-owner claim on a file only a naming pattern
+// reads is dropped first: without an index no task can be shown to name it.
 func scopeSeedsToTasks(
 	ws *Workspace,
 	index TaskImpactIndex,
@@ -630,17 +639,23 @@ func scopeSeedsToTasks(
 	seeds map[string][]ImpactSeed,
 ) (map[string][]ImpactSeed, map[string]*impactScope) {
 	if index == nil {
+		kept := make(map[string][]ImpactSeed, len(seeds))
 		scopes := make(map[string]*impactScope, len(seeds))
 		for id, claims := range seeds {
+			named := slices.DeleteFunc(slices.Clone(claims), ownsNamedOnlyInput)
+			if len(claims) > 0 && len(named) == 0 {
+				continue
+			}
 			scope := &impactScope{}
-			if len(claims) > 0 {
-				scope.makeFullBy(claims[0].File)
+			if len(named) > 0 {
+				scope.makeFullBy(named[0].File)
 			} else {
 				scope.makeFull()
 			}
+			kept[id] = named
 			scopes[id] = scope
 		}
-		return seeds, scopes
+		return kept, scopes
 	}
 	kept := make(map[string][]ImpactSeed, len(seeds))
 	scopes := make(map[string]*impactScope, len(seeds))
@@ -692,11 +707,24 @@ func claimTasks(
 		}
 		return true
 	}
-	if claim.Kind != ImpactSeedRootWatchedFile && !isExtensionProject(p, consumers) {
+	if claim.Kind == ImpactSeedRootWatchedFile {
+		scope.makeFullBy(claim.File)
+		return true
+	}
+	// A file only a naming pattern reads claimed no task above, so nothing of
+	// the project reads it, whatever the project is.
+	if !isExtensionProject(p, consumers) || wsproto.IsNamedOnlyInput(claim.File) {
 		return false
 	}
 	scope.makeFullBy(claim.File)
 	return true
+}
+
+// ownsNamedOnlyInput reports whether a claim is a path owner's claim on a file
+// wsproto.IsNamedOnlyInput reports. Owning such a file says nothing about which
+// task reads it.
+func ownsNamedOnlyInput(claim ImpactSeed) bool {
+	return claim.Kind == ImpactSeedPathOwner && wsproto.IsNamedOnlyInput(claim.File)
 }
 
 // claimManifest merges a change to a project's own extension manifest. On an
@@ -1178,7 +1206,12 @@ func firstMatchingFilePattern(files, patterns []string) (file, pattern string, o
 	}
 	for _, file := range files {
 		slashFile := filepath.ToSlash(file)
+		namedOnly := wsproto.IsNamedOnlyInput(slashFile)
 		for _, pattern := range patterns {
+			// A file only a naming pattern reads matches no other pattern.
+			if namedOnly && !wsproto.PatternNamesFile(pattern, slashFile) {
+				continue
+			}
 			if matched, _ := path.Match(pattern, slashFile); matched {
 				return file, pattern, true
 			}
@@ -1225,8 +1258,9 @@ func ProjectOwnersForPath(ws *Workspace, path string) []*Project {
 // owns a file here only through its directory, the nearest one that holds a
 // project, so a nested project's files are the nested project's, and an asset
 // claim, a declared input, a scope config or a watched root file adds no file.
-// A project reached only through a dependency edge holds none, and a nil or
-// empty list answers nil.
+// A file wsproto.IsNamedOnlyInput reports is none of a project's: the CI plane
+// reads it, and no step does. A project reached only through a dependency edge
+// holds none, and a nil or empty list answers nil.
 func OwnedChangedFiles(ws *Workspace, changedFiles []string) map[string][]string {
 	if ws == nil || len(changedFiles) == 0 {
 		return nil
@@ -1237,7 +1271,8 @@ func OwnedChangedFiles(ws *Workspace, changedFiles []string) map[string][]string
 		dir := filepath.ToSlash(cleanIndexPath(p.Path))
 		var files []string
 		for _, seed := range seeds[p.ID] {
-			if seed.Kind != ImpactSeedPathOwner || seed.Via != dir || seed.File == dir {
+			if seed.Kind != ImpactSeedPathOwner || seed.Via != dir || seed.File == dir ||
+				wsproto.IsNamedOnlyInput(seed.File) {
 				continue
 			}
 			rel := seed.File

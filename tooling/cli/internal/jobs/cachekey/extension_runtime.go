@@ -17,6 +17,7 @@ import (
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey/framing"
@@ -116,6 +117,8 @@ func ExtensionRuntimeDigestWithToolchains(ext *extension.ExtensionDescription, t
 // regular files under root that patterns select, sorted. A directory link at
 // root, a junction on Windows included, is followed first, so the walk reads
 // the directory the digest hashes and staging copies, never the link itself.
+// A file wsproto.IsNamedOnlyInput reports is selected only by a pattern whose
+// last segment names it.
 func CollectRuntimeInputs(root string, patterns []string) ([]string, error) {
 	resolved, err := dirlink.Resolve(root)
 	if err != nil {
@@ -136,7 +139,11 @@ func CollectRuntimeInputs(root string, patterns []string) ([]string, error) {
 			return nil
 		}
 		matched := false
+		namedOnly := wsproto.IsNamedOnlyInput(rel)
 		for _, pattern := range patterns {
+			if namedOnly && !wsproto.PatternNamesFile(pattern, rel) {
+				continue
+			}
 			if matchRuntimeInput(pattern, rel) {
 				matched = true
 				break
@@ -268,6 +275,10 @@ type RuntimeTreeEntry struct {
 	Target string
 }
 
+// CollectRuntimeTree returns the entries of a replaced module's tree under
+// root, sorted by path. It leaves out the directories runtimeReplacementIgnoredDir
+// names and every file wsproto.IsNamedOnlyInput reports: such a file configures
+// the CI plane, so no build of the module reads it.
 func CollectRuntimeTree(root string) ([]RuntimeTreeEntry, error) {
 	root = filepath.Clean(root)
 	var out []RuntimeTreeEntry
@@ -289,7 +300,7 @@ func CollectRuntimeTree(root string) ([]RuntimeTreeEntry, error) {
 			}
 			return nil
 		}
-		if entry.IsDir() {
+		if entry.IsDir() || wsproto.IsNamedOnlyInput(rel) {
 			return nil
 		}
 		info, err := entry.Info()

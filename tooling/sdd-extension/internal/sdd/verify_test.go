@@ -243,6 +243,43 @@ func TestBuildSpecVerifyResultRefusesABrokenOrForeignRecord(t *testing.T) {
 	}
 }
 
+// TestBuildSpecVerifyResultNamesTheFeatureTarget pins the target on both paths
+// of the audit: a group no session evaluated takes it from the manifest, in
+// every mode, and a recorded group keeps the one its record names.
+func TestBuildSpecVerifyResultNamesTheFeatureTarget(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "groups-name-the-feature-target",
+		"specs-verify-copies-the-target-into-an-unevaluated-group")
+	for name, options := range map[string]map[string]map[string]any{
+		"enforce": enforceOptions(),
+		"off":     {"sdd": {"verification": map[string]any{"specs": "off"}}},
+	} {
+		report, _ := BuildSpecVerifyResult(verifyWorkspace(t, options), Selection{}, "")
+		if len(report.Groups) != 1 || report.Recorded {
+			t.Fatalf("%s: groups = %+v recorded %v, want one unevaluated group", name, report.Groups, report.Recorded)
+		}
+		if got := report.Groups[0].Target; got != featureproto.MaturityCoded {
+			t.Errorf("%s: target = %q, want the manifest's coded", name, got)
+		}
+	}
+
+	const sessionID = "20260823-150000-abcdef"
+	spec := `"spec": "app/specs/invoicing.json",`
+	record := strings.Replace(verifySessionRecord(sessionID, featureproto.RequirementVerified, false),
+		spec, spec+` "target": "wired",`, 1)
+	if !strings.Contains(record, `"target": "wired"`) {
+		t.Fatal("the session record fixture no longer names its spec path")
+	}
+	ws := verifyWorkspace(t, enforceOptions())
+	writeVerifySession(t, ws.Root, sessionID, record)
+	report, verdict := BuildSpecVerifyResult(ws, Selection{}, sessionID)
+	if verdict != nil || !report.Recorded {
+		t.Fatalf("a record that names a target did not replay: %v / %+v", verdict, report)
+	}
+	if got := report.Groups[0].Target; got != featureproto.MaturityWired {
+		t.Errorf("recorded target = %q, want the record's wired, not the manifest's coded", got)
+	}
+}
+
 func TestBuildSpecVerifyResultUnderOffReportsWithoutEvaluating(t *testing.T) {
 	off := map[string]map[string]any{"sdd": {"verification": map[string]any{"specs": "off"}}}
 	report, verdict := BuildSpecVerifyResult(verifyWorkspace(t, off), Selection{}, "")

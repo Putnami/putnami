@@ -363,6 +363,79 @@
               "the-verdict-schema-tracks-the-go-types"
             ]
           }
+        },
+        {
+          "id": "verdict-policies-parse-strictly-against-one-schema",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "parse-verdict-policy-is-strict-and-bounded",
+              "the-verdict-policy-schema-is-closed",
+              "the-verdict-policy-schema-tracks-the-go-vocabulary"
+            ]
+          }
+        },
+        {
+          "id": "a-verdict-policy-is-validated",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-verdict-policy-defect-is-refused",
+              "a-valid-verdict-policy-is-admitted"
+            ]
+          }
+        },
+        {
+          "id": "the-nearest-verdict-policy-decides",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-policy-paths-climb-to-the-root",
+              "the-nearest-file-that-names-a-key-decides",
+              "a-policy-change-always-waits"
+            ]
+          }
+        },
+        {
+          "id": "the-feature-maturity-picks-the-value",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-highest-maturity-reached-applies",
+              "an-unknown-maturity-takes-the-strictest-value",
+              "the-policy-maturities-are-the-features-ladder"
+            ]
+          }
+        },
+        {
+          "id": "a-loosened-verdict-policy-is-detected",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-removed-or-cheaper-rule-loosens",
+              "a-stricter-rule-does-not-loosen"
+            ]
+          }
         }
       ]
     }

@@ -149,7 +149,11 @@ change impact. Patterns are project-relative, with `*`, `**` and leading `!`
 exclusions. A `git:` prefix selects the containing repository's tracked and
 non-ignored untracked candidates; `git:**` covers the whole repository.
 The prefix changes collection, not path matching: deleted paths still select
-their readers. Configuration keeps its existing array-of-strings shape.
+their readers. A `putnami.verdict-policy.json` file (`VerdictPolicyFile`) is
+read by the CI plane, not by a build: only an include whose last segment names
+it, such as `**/putnami.verdict-policy.json`, selects it, and `**/*.json`,
+`**` and `git:**` do not. An input basis set matches it as any other path.
+Configuration keeps its existing array-of-strings shape.
 
 `ParseSelector` is the one grammar every Putnami document uses to select
 projects, so a selection means the same thing wherever it is authored:

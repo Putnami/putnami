@@ -1274,6 +1274,21 @@
           }
         },
         {
+          "id": "a-verdict-policy-is-no-build-input",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pattern-that-does-not-name-a-verdict-policy-leaves-it-out-of-the-key",
+              "only-a-task-that-names-a-verdict-policy-reads-it",
+              "the-workspace-protocol-names-the-ci-verdict-policy-file"
+            ]
+          }
+        },
+        {
           "id": "release-baseline-cache-key",
           "stage": "coded",
           "evidenceKinds": [

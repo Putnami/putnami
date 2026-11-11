@@ -290,6 +290,8 @@ func TestFingerprintMovesWithWhatAGitKeyReads(t *testing.T) {
 				t.Fatal(err)
 			}
 		}, false},
+		{"a verdict policy appears", func() { write(t, root, "doc/putnami.verdict-policy.json", "{}\n") }, false},
+		{"a verdict policy changes", func() { write(t, root, "doc/putnami.verdict-policy.json", "{\"version\": 1}\n") }, false},
 		{"the cut is staged", func() { git(t, root, "add", "-A") }, false},
 		{"a candidate becomes executable", func() { makeExecutable(t, root, "doc/x.md") }, true},
 		{"a candidate changes", func() { write(t, root, "doc/x.md", "# y\n") }, true},

@@ -195,6 +195,25 @@
           }
         },
         {
+          "id": "groups-name-the-feature-target",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sdd-extension-copies-the-authored-target-into-the-criteria-group",
+              "the-gate-copies-the-target-into-the-record-group",
+              "specs-verify-copies-the-target-into-an-unevaluated-group",
+              "a-criteria-group-round-trips-its-feature-target",
+              "a-record-group-round-trips-its-feature-target",
+              "a-group-without-a-target-keeps-its-bytes-and-reads",
+              "a-target-outside-the-maturity-ladder-is-refused"
+            ]
+          }
+        },
+        {
           "id": "spec-reader-contract",
           "stage": "coded",
           "evidenceKinds": [

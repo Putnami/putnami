@@ -341,6 +341,26 @@ not change:
   means the gate ran and no selected project states a requirement; a session
   with no record evaluated nothing.
 
+A criteria group and a record group may name `target`: the maturity stage the
+feature aims at, as its `putnami.features.json` entry declares it. A reader of
+the record then knows the target of each requirement's feature without reading
+the manifests. `@putnami/sdd` copies the target from the manifest into the
+criteria group, the gate copies it into the record group, and
+`putnami specs verify` copies it into a group no session evaluated. A group
+whose feature no manifest declares names no target, and neither does the
+record group of a projection the gate could not read. The member is additive
+under protocol version 1: a group without it keeps its bytes, and both readers
+refuse a target that is not a maturity stage.
+
+Both readers also refuse a member they do not know, and the extension
+manifest's `cliContract` does not cover these documents. A CLI built before
+`target` therefore reads the projection of an `@putnami/sdd` that writes it as
+unreadable, which blocks under `enforce`. A reader of the record built before
+`target` refuses a record that carries it. Upgrade the CLI before or together
+with `@putnami/sdd`, and every other reader of the record together with them. A
+CLI that reads `target` still reads a projection without it, and records no
+target for that group.
+
 The committed policy is one domain-keyed object under the open command-options
 surface, resolved by this package. Project-scoped subjects use
 `ResolveVerificationMode`: the spec-hosting project's policy, then the

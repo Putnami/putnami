@@ -145,6 +145,24 @@
           }
         },
         {
+          "id": "verdict-policies-are-checked",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-content-defect-fails-with-the-protocol-code",
+              "a-policy-outside-the-root-a-scope-or-a-project-fails",
+              "a-valid-policy-passes",
+              "an-unreadable-policy-fails-closed",
+              "no-policy-is-adoption",
+              "the-key-names-the-policy-file"
+            ]
+          }
+        },
+        {
           "id": "codeowners-follow-declared-owners",
           "stage": "coded",
           "evidenceKinds": [

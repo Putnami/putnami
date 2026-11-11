@@ -47,7 +47,7 @@ type InputSelectorMatcher interface {
 	// SelectsInput reports whether the selector reads rel, a slash path
 	// relative to the query's directory: a file its expansion lists, or a path
 	// a set of its basis selects. A selector it cannot expand selects every
-	// path.
+	// path but a file wsproto.IsNamedOnlyInput reports.
 	SelectsInput(query InputSelectorQuery, rel string) bool
 	// PrimeInputs asks each extension once for every query.
 	PrimeInputs(queries []InputSelectorQuery)
@@ -57,7 +57,7 @@ type InputSelectorMatcher interface {
 type taskIndex struct {
 	ws *Workspace
 	// inputs expands the input selectors tasks name; nil selects every path
-	// for each of them.
+	// but a file wsproto.IsNamedOnlyInput reports for each of them.
 	inputs InputSelectorMatcher
 	// tasks holds one entry per declared task scope, keyed by `<command>~<step>`
 	// (or the command alone for a command with no pipeline).
@@ -117,7 +117,16 @@ type indexedTask struct {
 	// selectors are the input selectors the task's project inputs name, each
 	// with the extension that lists it and the other patterns of its input.
 	selectors []indexedSelector
+	// perProject is set when a manifest plans the task in each project, and
+	// unset when every manifest plans it once for the workspace (the
+	// workspace-once activation): such a task runs on every impacted run, so
+	// no changed file needs to select a project for it.
+	perProject bool
 }
+
+// workspaceOnceActivation is the command activation the planner plans once
+// for the whole workspace (planner.workspaceOnceActivation).
+const workspaceOnceActivation = "workspace-once"
 
 // indexedSelector is one input selector a task names in a project input.
 type indexedSelector struct {
@@ -208,6 +217,9 @@ func (idx *taskIndex) addExtension(
 			command = job.CommandName
 		}
 		for _, scope := range idx.addCommand(ext, command, job, successors) {
+			if job.Activation != workspaceOnceActivation {
+				idx.tasks[scope].perProject = true
+			}
 			register(idx.byCommand, command, scope)
 			register(idx.byExtension, ext.Name, scope)
 			register(idx.byExtension, wsproto.CleanWorkspacePath(ext.RelPath), scope)
@@ -484,6 +496,12 @@ func (idx *taskIndex) ReadsAsExtensionRuntime(projectID, path string) bool {
 // resolves them in and the model's declared-input index seeds from. Answering
 // "no task reads this" for such a layer would drop exactly the drift gates that
 // exist to watch files they do not own.
+//
+// A file wsproto.IsNamedOnlyInput reports is read only by a task whose pattern
+// names it, as every pattern match below states (wsproto.SelectsPath). A task
+// the workspace-once activation plans does not answer for it: that task runs
+// on every impacted run and keys on the file itself, so crediting it to the
+// file's project would only add that project's other tasks.
 func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 	project := idx.ws.ProjectByID(projectID)
 	if project == nil {
@@ -495,10 +513,14 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 		return idx.closureOf(idx.every)
 	}
 	inProject := relative && !isParentRelative(rel)
+	namedOnly := wsproto.IsNamedOnlyInput(lookup)
 	reading := make(map[string]bool)
 	dir := filepath.Join(idx.ws.Root, project.Path)
 	for _, scope := range idx.every {
 		task := idx.tasks[scope]
+		if namedOnly && !task.perProject {
+			continue
+		}
 		if inProject && (wsproto.SelectsPath(rel, task.files) || idx.selectorsRead(task, dir, rel)) {
 			reading[scope] = true
 			if wsproto.SelectsPath(rel, task.closureFiles) {
@@ -526,10 +548,18 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 
 // selectorsRead reports whether an input selector the task names reads rel in
 // the project directory dir. Without a matcher each selector reads every
-// path: a task wrongly left out is a gate that never ran.
+// path but a file wsproto.IsNamedOnlyInput reports, which a selector reads
+// only when its extension lists the file: a task wrongly left out is a gate
+// that never ran.
 func (idx *taskIndex) selectorsRead(task *indexedTask, dir, rel string) bool {
 	for _, selector := range task.selectors {
-		if idx.inputs == nil || idx.inputs.SelectsInput(selectorQuery(selector, dir), rel) {
+		if idx.inputs == nil {
+			if !wsproto.IsNamedOnlyInput(rel) {
+				return true
+			}
+			continue
+		}
+		if idx.inputs.SelectsInput(selectorQuery(selector, dir), rel) {
 			return true
 		}
 	}
@@ -656,10 +686,13 @@ func (idx *taskIndex) extensionRefTasks(ref string) []string {
 // readsAsGenerateAsset reports whether a path is one of the project's
 // cross-project generate assets. Such a file is folded into EVERY job's key of
 // the declaring project (cachekey.GenerateAssetFiles), so every task reads it.
+// A file wsproto.IsNamedOnlyInput reports under an asset directory is not
+// folded in (store.ExtraKeyFiles): only an asset that names the file itself
+// reads it.
 func (idx *taskIndex) readsAsGenerateAsset(project *Project, path string) bool {
 	for _, source := range idx.assets[project.ID] {
 		source = filepath.ToSlash(filepath.Clean(source))
-		if path == source || strings.HasPrefix(path, source+"/") {
+		if path == source || (strings.HasPrefix(path, source+"/") && !wsproto.IsNamedOnlyInput(path)) {
 			return true
 		}
 	}

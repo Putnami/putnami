@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	extproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
@@ -330,5 +331,74 @@ func TestTaskIndex_ReadsAsExtensionRuntime(t *testing.T) {
 		if got := idx.ReadsAsExtensionRuntime(project, path); got != want {
 			t.Errorf("ReadsAsExtensionRuntime(%s, %s) = %t, want %t", project, path, got, want)
 		}
+	}
+}
+
+// A putnami.verdict-policy.json file is read only by a task one of whose
+// patterns names it in its last segment. A pattern by type (`**/*.json`) or by
+// directory (`git:**`), an input selector without a matcher, an option layer,
+// a generate asset directory and a runtime input that do not name it leave it
+// out. A task the workspace-once activation plans answers for no project: it
+// runs on every impacted run, whatever changed.
+func TestTaskIndex_AVerdictPolicyIsReadOnlyByATaskThatNamesIt(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-verdict-policy-is-no-build-input",
+		"only-a-task-that-names-a-verdict-policy-reads-it")
+	ext := taskIndexExtension()
+	ext.Tasks["config-check"] = extproto.TaskDefinition{Inputs: map[string]extproto.TaskInputPort{
+		"config":     {From: extproto.TaskInputFromProject, Files: []string{"**/*.json"}},
+		"repository": {From: extproto.TaskInputFromProject, Files: []string{"git:**"}},
+		"embeds":     {From: extproto.TaskInputFromProject, Files: []string{"go-embed:build"}},
+	}}
+	ext.Tasks["policy-check"] = extproto.TaskDefinition{Inputs: map[string]extproto.TaskInputPort{
+		"policy": {From: extproto.TaskInputFromProject, Files: []string{"**/putnami.verdict-policy.json"}},
+	}}
+	ext.Tasks["root-policy-check"] = extproto.TaskDefinition{Inputs: map[string]extproto.TaskInputPort{
+		"policy": {From: extproto.TaskInputFromWorkspace, Files: []string{"putnami.verdict-policy.json"}},
+	}}
+	ext.Tasks["policy-gate"] = extproto.TaskDefinition{Inputs: map[string]extproto.TaskInputPort{
+		"policy": {From: extproto.TaskInputFromWorkspace, Files: []string{"**/putnami.verdict-policy.json"}},
+	}}
+	ext.Jobs["validate"] = &extension.JobDefinition{CommandName: "validate", PipelineSteps: []extproto.PipelineStep{
+		{ID: "config", Task: "config-check"},
+		{ID: "policy", Task: "policy-check"},
+		{ID: "root-policy", Task: "root-policy-check"},
+	}}
+	ext.Jobs["validate-workspace"] = &extension.JobDefinition{
+		CommandName: "validate-workspace", Activation: workspaceOnceActivation,
+		PipelineSteps: []extproto.PipelineStep{{ID: "verdict-policy", Task: "policy-gate"}},
+	}
+	ext.Runtime = &extension.RuntimeDefinition{Prepare: &extproto.RuntimePrepare{Inputs: []string{"**"}}}
+	config := projectOptions(map[string][]string{
+		"test": {"**/*.json"},
+		"lint": {"policy/putnami.verdict-policy.json"},
+	}, "/shared/assets")
+	idx := NewTaskIndex(taskIndexWorkspace(t, config), []*extension.ExtensionDescription{ext}, nil)
+
+	for path, want := range map[string][]string{
+		"libs/http/putnami.verdict-policy.json":        {"validate~policy"},
+		"libs/http/policy/putnami.verdict-policy.json": {"lint~lint", "validate~policy"},
+		"putnami.verdict-policy.json":                  {"validate~root-policy"},
+		"libs/putnami.verdict-policy.json":             nil,
+		"shared/assets/putnami.verdict-policy.json":    nil,
+	} {
+		if got := idx.TasksReadingPath("/libs/http", path); !slices.Equal(got, want) {
+			t.Errorf("%s is read by %v, want %v", path, got, want)
+		}
+	}
+	// The same patterns read every other file, so the cases above prove a rule
+	// and not a pattern that matches nothing.
+	for _, path := range []string{"libs/http/settings.json", "libs/http/policy/settings.json"} {
+		if got := idx.TasksReadingPath("/libs/http", path); !slices.Contains(got, "validate~config") || !slices.Contains(got, "test~test") {
+			t.Errorf("%s is read by %v, want validate~config and test~test among them", path, got)
+		}
+	}
+	if got := idx.TasksReadingPath("/libs/http", "shared/assets/logo.svg"); !slices.Contains(got, "validate~config") {
+		t.Errorf("a generate asset is read by %v, want every task", got)
+	}
+	if !idx.ReadsAsExtensionRuntime("/go/extension", "go/extension/tools/versions.json") {
+		t.Error("a runtime input outside the rule is not read as the runtime")
+	}
+	if idx.ReadsAsExtensionRuntime("/go/extension", "go/extension/putnami.verdict-policy.json") {
+		t.Error("a verdict policy is read as the extension runtime by a pattern that does not name it")
 	}
 }

@@ -426,6 +426,68 @@ answer arrives. A higher `revision` replaces every lower one. See
 [ADR 0006](doc/adr/0006-a-run-carries-one-verdict.md) and
 [ADR 0007](doc/adr/0007-a-verdict-names-the-tested-tree-and-what-it-does-not-know.md).
 
+## The verdict policy
+
+A verdict policy states what each gap and each declaration change costs a
+change. A repository places a `putnami.verdict-policy.json` at its root, in a
+scope directory or in a project directory. The policy decides what blocks a
+change. It never changes the verdict: the gaps and the mark stay what the run
+found. The CI plane applies it; this package parses, validates and resolves it.
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-verdict-policy.json",
+  "declarations": { "adr": "never", "spec": { "modeled": "when-weakening", "default-on": "always" } },
+  "gaps": {
+    "no-requirement": "inform",
+    "unproven-requirement": { "modeled": "inform", "coded": "accept" },
+    "lost-proof": { "modeled": "accept", "live-verified": "block" }
+  }
+}
+```
+
+- `declarations` maps a declaration kind to when a change to it waits for an
+  approval: `always`, `when-weakening` or `never`. A change the producer could
+  not judge counts as weakening.
+- `gaps` maps a gap kind to what the gap costs: `inform` (listed, never
+  blocks), `accept` (blocks until a person accepts it) or `block` (blocks, and
+  nobody can accept it). `lost-proof` is a key of the policy only: an
+  `unproven-requirement` gap whose requirement the change's base proved.
+  `unapproved-declaration` is not a key: `declarations` sets it by kind.
+- A key that concerns a feature takes one value or a map by maturity:
+  `unproven-requirement`, `lost-proof`, `spec` and `binding`. Each key of the
+  map reads "from this maturity on", and the value of the highest maturity the
+  feature reaches applies. The map holds `modeled`, so it covers every
+  feature. An unknown maturity takes the strictest value of the map. The
+  maturities are the order of `go.putnami.dev/protocol/features`.
+- `unknown-impact` and `unknown-declarations` concern the whole change: only
+  the root file sets them.
+- A change to a policy file is a declaration of kind `policy`. It always waits
+  for an approval: no file sets the `policy` kind.
+
+**Resolution.** `ProjectVerdictPolicyPaths` and
+`DeclarationVerdictPolicyPaths` list the files that may govern a project or a
+declaration: one per directory, from its directory up to the root, nearest
+first. A project is given by its directory, not its ID: an ID leaves out
+grouping folders such as `(web)`. A nested project also reads the file of the
+project that holds it. The
+caller reads the files that exist into a `VerdictPolicyChain`, in that order.
+For each key, the nearest file that names it decides: `Gap` and `Declaration`
+return the value and the path of that file. When no file names the key, the
+caller applies its own default.
+
+**Loosening.** `VerdictPolicyLoosens` reports a new version of a file that can
+make a change cost less: a key it removes, a value that costs less at some
+maturity, or a key it adds below the strictest value, since that key now
+overrides the files above it.
+
+**Parsing.** `ParseVerdictPolicy` reads one file strictly: no duplicate key,
+no unknown member, no trailing data, and at most `MaxVerdictPolicyBytes`
+(64 KiB). `ValidateVerdictPolicy` reports every defect with a stable code. It
+does not check that the directory is the root, a scope or a project: the
+workspace knows them, the protocol does not. See
+[ADR 0008](doc/adr/0008-a-verdict-policy-states-what-a-gap-costs.md).
+
 ## Schema and fixtures
 
 - Schema: [`schemas/putnami-ci.json`](schemas/putnami-ci.json)
@@ -480,6 +542,13 @@ answer arrives. A higher `revision` replaces every lower one. See
   the order of a list: `ValidateVerdict` checks those.
   `TestVerdictSchemaNamesTheGoMembers` and
   `TestVerdictSchemaMatchesTheGoVocabulary` pin it to the Go types.
+- Verdict policy schema:
+  [`schemas/putnami-verdict-policy.json`](schemas/putnami-verdict-policy.json)
+  (`$id` `https://putnami.dev/schemas/putnami-verdict-policy.json`), embedded
+  in the package and returned by `VerdictPolicySchema()`. Every object is
+  closed. It does not state that only the root file sets `unknown-impact` and
+  `unknown-declarations`: `ValidateVerdictPolicy` checks it.
+  `TestVerdictPolicySchemaTracksTheGoVocabulary` pins it to the Go validator.
 - Verdict conformance corpus: [`fixtures/verdict`](fixtures/verdict).
   `expectations.json` maps every `valid/*` verdict to its answer and mark, and
   every `invalid/*` verdict to the refusal `ParseVerdict` returns. The valid
@@ -550,8 +619,8 @@ only implementation; there is no TypeScript or Python parser of
 The module owns the feature of its contract, `ci/ci-contract`, specified in
 [`specs/ci-contract.json`](specs/ci-contract.json). The tests here prove the
 document, its validation, canonical form and explanation, the deploy binding,
-the ChangePlan, the ImpactPlan and its projection, and the Verdict, with their
-fixture corpora. Two implementations prove the rest in their own tests. The
+the ChangePlan, the ImpactPlan and its projection, the Verdict and the verdict
+policy, with their fixture corpora. Two implementations prove the rest in their own tests. The
 CLI (`tooling/cli`) proves that `putnami impact-plan` reproduces the ImpactPlan
 corpus, projects onto the ChangePlan corpus and never emits a plan the
 protocol refuses; two of those checks moved here from the CLI's

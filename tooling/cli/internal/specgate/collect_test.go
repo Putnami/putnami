@@ -262,6 +262,52 @@ func TestCollectUnderOffListsWithoutEvaluating(t *testing.T) {
 	}
 }
 
+// TestCollectCopiesTheFeatureTarget pins that the record names each group's
+// feature target, copied from the criteria group in every mode. A criteria
+// group without a target records none, and a projection whose target is not a
+// maturity stage fails its strict reader, so its group names no feature and no
+// target and blocks under enforce.
+func TestCollectCopiesTheFeatureTarget(t *testing.T) {
+	spectest.Proves(t, "features/feature-contracts", "groups-name-the-feature-target",
+		"the-gate-copies-the-target-into-the-record-group")
+	spec := `"spec": "billing/specs/invoicing.json",`
+	targeted := func(stage string) string {
+		return strings.Replace(fixtureProjection, spec, spec+` "target": "`+stage+`",`, 1)
+	}
+	if targeted("wired") == fixtureProjection {
+		t.Fatal("the projection fixture no longer names its spec path")
+	}
+	for _, mode := range []string{"enforce", "report", "off"} {
+		fixture := newGateFixture(t, targeted("wired"), fixtureReport("passed"))
+		fixture.setPolicy("project", mode)
+		record := collect(t, fixture)
+		if got := soleGroup(t, record).Target; got != features.MaturityWired {
+			t.Errorf("%s: target = %q, want the criteria group's wired", mode, got)
+		}
+		encoded, err := features.MarshalSpecVerificationRecord(record)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if parsed, _ := features.ParseSpecVerificationRecord(encoded); parsed == nil ||
+			diag.HasErrors(features.ValidateSpecVerificationRecord(parsed)) || parsed.Groups[0].Target != features.MaturityWired {
+			t.Errorf("%s: the persisted record does not name the target:\n%s", mode, encoded)
+		}
+	}
+
+	fixture := newGateFixture(t, fixtureProjection, fixtureReport("passed"))
+	fixture.setPolicy("project", "enforce")
+	if got := soleGroup(t, collect(t, fixture)).Target; got != "" {
+		t.Errorf("a criteria group without a target recorded target %q", got)
+	}
+
+	unreadable := newGateFixture(t, targeted("shipped"), fixtureReport("passed"))
+	unreadable.setPolicy("project", "enforce")
+	group := soleGroup(t, collect(t, unreadable))
+	if group.Feature != "" || group.Target != "" || !group.Blocked {
+		t.Errorf("the group of a projection with an unknown target = %+v, want no feature, no target, and a block", group)
+	}
+}
+
 // TestCollectRejectsUntrustedInputsDeterministically covers the contained
 // artifact path: a symlinked report, a provenance that escapes or names no
 // real file, and an observation for an undeclared check all fail closed.

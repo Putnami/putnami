@@ -142,6 +142,10 @@ func globDoubleStar(dir, pattern string) []string {
 //     (extensionproto.NamesInputSelector). It selects the files expander lists
 //     for it in dir and marks them exact: the key hashes their exact bytes. A
 //     file a pattern selects too keeps the mark.
+//   - A file wsproto.IsNamedOnlyInput reports, putnami.verdict-policy.json, is
+//     selected only by a pattern whose last segment names it, as
+//     wsproto.SelectsPath states. The empty pattern set never selects one. An
+//     input selector that lists one selects it: the extension read it.
 func collectFiles(dir string, patterns []string, expander InputExpander) ([]fileEntry, error) {
 	dir, err := gitInputDirectory(dir, patterns)
 	if err != nil {
@@ -265,7 +269,9 @@ func collectDefaultFiles(dir string) ([]fileEntry, error) {
 			}
 			return nil
 		}
-		if !info.IsDir() {
+		// An empty pattern set names no file, so it leaves out a file only a
+		// pattern that names it selects.
+		if !info.IsDir() && !wsproto.IsNamedOnlyInput(path) {
 			files = append(files, fileEntry{path: path, info: info})
 		}
 		return nil
@@ -285,6 +291,9 @@ func collectOrdinaryFiles(dir string, patterns, excludes []string) []fileEntry {
 			matches, _ = filepath.Glob(filepath.Join(dir, pattern))
 		}
 		for _, match := range matches {
+			if wsproto.IsNamedOnlyInput(match) && !wsproto.PatternNamesFile(pattern, match) {
+				continue
+			}
 			file, ok := ordinaryFileEntry(dir, match, excludes, sweptByGlob)
 			if ok {
 				files = append(files, file)
@@ -460,7 +469,9 @@ func collectGitFiles(dir string, includes, excludes []string) ([]fileEntry, erro
 		if err != nil {
 			return nil, err
 		}
-		if !wsproto.MatchesAnyFilePattern(rel, includes) || wsproto.MatchesAnyFilePattern(rel, excludes) {
+		// The includes are all "git:" patterns, which SelectsPath matches as
+		// MatchFilePattern does, less a file only a naming pattern selects.
+		if !wsproto.SelectsPath(rel, includes) || wsproto.MatchesAnyFilePattern(rel, excludes) {
 			continue
 		}
 		if index.Unmerged[path] {
@@ -585,7 +596,9 @@ func CollectKeyFiles(dir string, patterns []string, expander InputExpander) ([]s
 // extra-file declaration (a cross-project generate asset) folds into a cache
 // key: the path itself when it is a file, every file beneath it when it is a
 // directory, nothing when it is absent — the walk hashPathContent performs,
-// so the two cannot drift apart.
+// so the two cannot drift apart. Beneath a directory, a file
+// wsproto.IsNamedOnlyInput reports is left out: the declaration names the
+// directory, not that file.
 func ExtraKeyFiles(paths []string) []string {
 	var files []string
 	for _, p := range paths {
@@ -597,15 +610,24 @@ func ExtraKeyFiles(paths []string) []string {
 			files = append(files, p)
 			continue
 		}
-		_ = filepath.WalkDir(p, func(path string, d os.DirEntry, walkErr error) error {
-			if walkErr != nil || d.IsDir() {
-				return nil
-			}
-			files = append(files, path)
-			return nil
-		})
+		files = append(files, extraTreeFiles(p)...)
 	}
 	sort.Strings(files)
+	return files
+}
+
+// extraTreeFiles returns the files beneath the directory dir an extra-file
+// declaration reads, in walk order: every file but one wsproto.IsNamedOnlyInput
+// reports.
+func extraTreeFiles(dir string) []string {
+	var files []string
+	_ = filepath.WalkDir(dir, func(path string, d os.DirEntry, walkErr error) error {
+		if walkErr != nil || d.IsDir() || wsproto.IsNamedOnlyInput(path) {
+			return nil
+		}
+		files = append(files, path)
+		return nil
+	})
 	return files
 }
 
@@ -678,7 +700,13 @@ func HasMatchingFiles(dir string, patterns []string, expander InputExpander) (bo
 			return nil
 		}
 		rel = filepath.ToSlash(rel)
-		if len(includes) > 0 && !wsproto.MatchesAnyFilePattern(rel, includes) {
+		// SelectsPath matches these includes as collectOrdinaryFiles does,
+		// and leaves out a file only a pattern that names it selects, as
+		// collectDefaultFiles does when there is no include.
+		if len(includes) > 0 && !wsproto.SelectsPath(rel, includes) {
+			return nil
+		}
+		if len(includes) == 0 && wsproto.IsNamedOnlyInput(rel) {
 			return nil
 		}
 		if wsproto.MatchesAnyFilePattern(rel, excludes) {
@@ -1445,9 +1473,11 @@ func hashExtraFiles(workspaceRoot string, paths []string) string {
 // contributes its raw bytes; a directory contributes every file beneath it,
 // each keyed by its directory-relative (forward-slash) path so additions,
 // removals, and renames are all observed, folded in slash-form lexical order
-// (slashPathLess) so the result does not depend on the host separator. A path
-// that does not exist contributes the stable "__missing__" sentinel, matching
-// the prior behavior so its absence stays distinguishable from an empty file.
+// (slashPathLess) so the result does not depend on the host separator. Beneath
+// a directory, a file wsproto.IsNamedOnlyInput reports contributes nothing
+// (extraTreeFiles). A path that does not exist contributes the stable
+// "__missing__" sentinel, matching the prior behavior so its absence stays
+// distinguishable from an empty file.
 func hashPathContent(h hash.Hash, p string) {
 	info, err := os.Stat(p)
 	if err != nil {
@@ -1459,14 +1489,7 @@ func hashPathContent(h hash.Hash, p string) {
 		return
 	}
 
-	var files []string
-	_ = filepath.WalkDir(p, func(path string, d os.DirEntry, walkErr error) error {
-		if walkErr != nil || d.IsDir() {
-			return nil
-		}
-		files = append(files, path)
-		return nil
-	})
+	files := extraTreeFiles(p)
 	sort.Slice(files, func(i, j int) bool { return slashPathLess(files[i], files[j], filepath.Separator) })
 	for _, f := range files {
 		rel, relErr := filepath.Rel(p, f)

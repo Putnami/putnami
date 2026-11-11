@@ -55,6 +55,10 @@
       "text": "validate-workspace reads every committed <lang>/samples/recipes.json: a recipe whose sample is not a directory in the worktree fails naming the sample, two recipes for one intention fail, a malformed index fails closed, and an absent index is adoption."
     },
     {
+      "id": "verdict-policies-are-checked",
+      "text": "validate-workspace reads every putnami.verdict-policy.json with the ci protocol's strict parser: an unknown kind, value, key or maturity, a map by maturity without modeled, and a map on a key that concerns no feature fail with the protocol's code. A file that is not at the root, in a project or in a scope above a project fails with sdd.verdict_policy_location, an unreadable file fails closed, and no file is adoption. The key names the file itself, putnami.workspace.json and every putnami.json."
+    },
+    {
       "id": "codeowners-follow-declared-owners",
       "text": "validate-workspace writes .github/CODEOWNERS from options.sdd.owners: putnami.workspace.json gives the catch-all rule, a scope or project putnami.json gives its directory a rule placed after the rules above it, and the spec-governance files stay with the workspace owners. An unchanged file is not rewritten, an invalid declaration or one without a catch-all fails without writing, and a workspace that declares no owners is left alone."
     },
@@ -160,6 +164,7 @@
     "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
     "protocols/features/doc/adr/0006-the-spec-source-contract.md",
     "protocols/architecture/doc/adr/0003-authored-documents-are-promised-findings-are-not.md",
-    "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md"
+    "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md",
+    "protocols/ci/doc/adr/0008-a-verdict-policy-states-what-a-gap-costs.md"
   ]
 }

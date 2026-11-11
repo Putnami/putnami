@@ -176,6 +176,7 @@ func unevaluatedGroup(ws *workspace.Workspace, repository *specRepository, expec
 		Project:    projectID,
 		Feature:    expected.Feature,
 		Spec:       expected.Spec,
+		Target:     expected.Target,
 		Mode:       mode,
 		ModeSource: source,
 	}

@@ -486,7 +486,8 @@ input it reads changes:
 - the project's Git candidate files: every file under the project directory
   that Git tracks, or that is untracked and matches no ignore rule. A regular
   file counts by its bytes and its executable bit, a symbolic link by its
-  target text.
+  target text. A `putnami.verdict-policy.json` file does not count: the CI
+  plane reads it, and no build does.
 - the `--app` parameter
 - the workspace's projects: their names, paths, `putnami.json` files and
   dependencies. The CLI keys them for every task that reads the Git candidate
@@ -502,6 +503,9 @@ files, so the key holds everything the step judges:
   directories.
 - A symbolic link is a candidate, keyed by its target text. Replacing a page
   with a link changes the key, and the step refuses the link.
+- A `putnami.verdict-policy.json` file is no site content. The step, packaging
+  and publishing leave it out, and a directory that holds only such a file is
+  no section.
 - A submodule or a nested repository has no key, so the step runs uncached.
   In a section, or directly under the site directory where it is a section,
   the step refuses it, as packaging does.

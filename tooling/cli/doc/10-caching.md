@@ -231,6 +231,15 @@ File hashing algorithm:
 
 When no patterns are specified, all non-hidden, non-ignored files in the project are hashed (excluding `node_modules/`, `.putnami/`, `out/`, and dotfiles).
 
+A `putnami.verdict-policy.json` file, wherever it sits, is read by the CI
+plane and by no build, so a key leaves it out unless a pattern names it in its
+last segment. `**/putnami.verdict-policy.json` and
+`git:putnami.verdict-policy.json` key it. `**/*.json`, `**`, `git:**`, an empty
+pattern list, a generate asset directory and an extension's
+`runtime.prepare.inputs` do not. Adding, editing or removing one therefore
+moves only the keys of the tasks whose patterns name it. A file an input
+selector lists is keyed whatever its name, because the extension read it.
+
 A `from: "project"` task input, or a task's `cache.key.files`, can name an
 input selector, `<scheme>:<name>`, that the extension declaring the task lists
 in `runtime.inputSelectors`; project or CLI `filePatterns` cannot name one.

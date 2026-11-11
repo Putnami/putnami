@@ -378,20 +378,23 @@ func TestADeclaredCommandSurfaceMustBeAFileOfTheProject(t *testing.T) {
 // The task's cache key reads the project's .json files outside the directories
 // a run writes and the key's walk skips, so the working-tree document must be
 // one of them: a document the key does not read could change under a stored
-// verdict. The released document has no such rule, because the key reads the
-// whole tree the tag holds.
+// verdict. The key leaves out a putnami.verdict-policy.json file wherever it
+// sits, so that name is refused too. The released document has no such rule,
+// because the key reads the whole tree the tag holds.
 func TestADeclaredCommandSurfaceIsAFileTheCacheKeyReads(t *testing.T) {
 	t.Parallel()
 	f := newFixture(t, catalog("package", "stable"))
 	for option, want := range map[string]string{
-		"surface.yaml":           `option command-surface is "surface.yaml", want a .json file`,
-		"surface":                `option command-surface is "surface", want a .json file`,
-		".gen/surface.json":      `option command-surface is ".gen/surface.json", which is inside .gen`,
-		"docs/.cli/surface.json": `option command-surface is "docs/.cli/surface.json", which is inside .cli`,
-		"dist/surface.json":      `option command-surface is "dist/surface.json", which is inside dist`,
-		"out/surface.json":       `option command-surface is "out/surface.json", which is inside out`,
-		"vendor/surface.json":    `option command-surface is "vendor/surface.json", which is inside vendor`,
-		"node_modules/s.json":    `option command-surface is "node_modules/s.json", which is inside node_modules`,
+		"surface.yaml":                     `option command-surface is "surface.yaml", want a .json file`,
+		"surface":                          `option command-surface is "surface", want a .json file`,
+		".gen/surface.json":                `option command-surface is ".gen/surface.json", which is inside .gen`,
+		"docs/.cli/surface.json":           `option command-surface is "docs/.cli/surface.json", which is inside .cli`,
+		"dist/surface.json":                `option command-surface is "dist/surface.json", which is inside dist`,
+		"out/surface.json":                 `option command-surface is "out/surface.json", which is inside out`,
+		"vendor/surface.json":              `option command-surface is "vendor/surface.json", which is inside vendor`,
+		"node_modules/s.json":              `option command-surface is "node_modules/s.json", which is inside node_modules`,
+		"putnami.verdict-policy.json":      `option command-surface is "putnami.verdict-policy.json", a file the CI plane reads`,
+		"docs/putnami.verdict-policy.json": `option command-surface is "docs/putnami.verdict-policy.json", a file the CI plane reads`,
 	} {
 		_, err := Check(f.root, f.project, projectName, f.tags, Options{CommandSurface: option})
 		if err == nil || !strings.Contains(err.Error(), want) || !errors.Is(err, protocolcli.ErrInvalidConfig) {

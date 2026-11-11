@@ -5,6 +5,7 @@ go 1.25.7
 require (
 	go.putnami.dev/protocol/architecture v0.0.0
 	go.putnami.dev/protocol/capabilities v0.0.0
+	go.putnami.dev/protocol/ci v0.0.0
 	go.putnami.dev/protocol/cli v0.0.0
 	go.putnami.dev/protocol/contracts v0.0.0
 	go.putnami.dev/protocol/diagnostic v0.0.0
@@ -18,6 +19,7 @@ require (
 
 require (
 	go.putnami.dev/protocol/config v0.0.0 // indirect
+	go.putnami.dev/protocol/distribution v0.0.0 // indirect
 	go.putnami.dev/protocol/job v0.0.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 )
@@ -53,3 +55,5 @@ replace go.putnami.dev/protocol/registry => ../../protocols/registry
 replace go.putnami.dev/protocol/storage => ../../protocols/storage
 
 replace go.putnami.dev/protocol/distribution => ../../protocols/distribution
+
+replace go.putnami.dev/protocol/ci => ../../protocols/ci

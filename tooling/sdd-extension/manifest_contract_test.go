@@ -88,10 +88,10 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			},
 		}).
 		Command("validate-workspace", proto.CommandDefinition{
-			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks.",
+			Description: "Validate the workspace's architecture declarations against its resolved project graph, the executable-spec enforce floor against the specs.baseline.json each enforced project commits, the settled decisions in the committed decisions.json registries, and the committed <lang>/samples/recipes.json indexes, write .github/CODEOWNERS from the owners each putnami.json declares, check the links of every README.md file and doc/ tree of the workspace, check that the proposed squash commit keeps the breaking marker the commits of the change declare and, when the workspace forbids it, names no agent, and, when the workspace declares a feature-coverage debt list, check that every project carries a feature, a spec or a featureAuthority and that the list holds no entry the merge base with the impacted baseline lacks, and check each putnami.verdict-policy.json file and the directory it sits in.",
 			Activation:  "workspace-once",
 			Traits:      &proto.CommandTraits{Kind: proto.CommandKindCriteria},
-			// The ten steps are independent workspace-wide steps; none reads
+			// The eleven steps are independent workspace-wide steps; none reads
 			// another's answer, so no dependsOn orders them.
 			Run: []proto.PipelineStep{
 				{ID: "architecture", Task: "architecture-validate"},
@@ -104,6 +104,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				{ID: "agent-attribution", Task: "agent-attribution-validate"},
 				{ID: "feature-coverage", Task: "feature-coverage-validate"},
 				{ID: "feature-coverage-ratchet", Task: "feature-coverage-ratchet-validate"},
+				{ID: "verdict-policy", Task: "verdict-policy-validate"},
 			},
 		}).
 		Task("features-validate", proto.TaskDefinition{
@@ -381,6 +382,39 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Cache: sdkmanifest.NoCache(),
 			Outputs: map[string]proto.TaskOutputPort{
 				"data": {Description: "Feature-coverage ratchet report: whether the gate is adopted, the baseline, the merge base, the current and merge-base debt lists, the new entries, and diagnostics in list order."},
+			},
+			Declares: sdkmanifest.Declares(),
+		}).
+		Task("verdict-policy-validate", proto.TaskDefinition{
+			Description: "Validate every putnami.verdict-policy.json of the workspace. The ci protocol's strict parser checks the content: an unknown kind, value, key or maturity, " +
+				"a map by maturity that does not hold modeled, and a map on a key that concerns no feature fail with the protocol's code, naming the file and the member. " +
+				"A file sits at the root, in a project directory, or in a directory above a project whose putnami.json is a scope manifest; a file in any other directory fails with sdd.verdict_policy_location, " +
+				"and a file the task cannot read, such as a symbolic link, fails with sdd.verdict_policy_unreadable. A workspace without a policy file passes. " +
+				"Inside a Git work tree the task reads the candidate cut, so an ignored file is never read, and it never enters .gen, .git, .putnami, dist, node_modules, out or vendor. " +
+				"The key names the policy file itself, and the files that place the root, the scopes and the projects: putnami.workspace.json and every putnami.json.",
+			Kind:      "command",
+			Command:   "{extensionRuntime}",
+			Args:      []string{"verdict-policy-validate"},
+			Cwd:       "{workspaceRoot}",
+			TimeoutMs: 120000,
+			// The policies port names the policy file itself in each pattern,
+			// never a glob such as `**/*.json`. The layout port holds the files
+			// that place the root, the scopes and the projects.
+			Inputs: map[string]proto.TaskInputPort{
+				"policies": {From: "workspace", Files: []string{
+					"putnami.verdict-policy.json",
+					"**/putnami.verdict-policy.json",
+					"!**/.gen/**",
+				}},
+				"layout": {From: "workspace", Files: []string{
+					"putnami.workspace.json",
+					"**/putnami.json",
+					"!**/.gen/**",
+				}},
+			},
+			Cache: cacheEnabledNoOutput(),
+			Outputs: map[string]proto.TaskOutputPort{
+				"data": {Description: "Verdict policy report: the policy files found and sorted diagnostics."},
 			},
 			Declares: sdkmanifest.Declares(),
 		}).
@@ -774,9 +808,9 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 	if workspace.Activation != "workspace-once" {
 		t.Errorf("validate-workspace activation = %q, want workspace-once", workspace.Activation)
 	}
-	// The ten workspace-wide steps are independent — none reads another's
+	// The eleven workspace-wide steps are independent — none reads another's
 	// answer — so no dependsOn orders them.
-	if len(workspace.Run) != 10 ||
+	if len(workspace.Run) != 11 ||
 		workspace.Run[0].Task != "architecture-validate" ||
 		workspace.Run[1].Task != "specs-ratchet-validate" ||
 		workspace.Run[2].Task != "decisions-validate" ||
@@ -787,6 +821,7 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 		workspace.Run[7].Task != "agent-attribution-validate" ||
 		workspace.Run[8].Task != "feature-coverage-validate" ||
 		workspace.Run[9].Task != "feature-coverage-ratchet-validate" ||
+		workspace.Run[10].Task != "verdict-policy-validate" ||
 		len(workspace.Run[1].DependsOn) != 0 ||
 		len(workspace.Run[2].DependsOn) != 0 ||
 		len(workspace.Run[3].DependsOn) != 0 ||
@@ -795,8 +830,9 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 		len(workspace.Run[6].DependsOn) != 0 ||
 		len(workspace.Run[7].DependsOn) != 0 ||
 		len(workspace.Run[8].DependsOn) != 0 ||
-		len(workspace.Run[9].DependsOn) != 0 {
-		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate, the breaking-marker step, the agent-attribution step, the feature-coverage gate and its ratchet", workspace.Run)
+		len(workspace.Run[9].DependsOn) != 0 ||
+		len(workspace.Run[10].DependsOn) != 0 {
+		t.Errorf("validate-workspace pipeline = %+v, want the architecture step, the specs ratchet, the decision gate, the recipe gate, the CODEOWNERS step, the documentation link gate, the breaking-marker step, the agent-attribution step, the feature-coverage gate, its ratchet and the verdict policy gate", workspace.Run)
 	}
 	// Both are user-facing: they are what `putnami validate` and the CI gate
 	// run. The internal self-check is the only hidden command here.
@@ -883,6 +919,9 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 		// project's files. The policy port covers the committed mode that changes
 		// whether the same coherent findings block.
 		"architecture-validate": {"declarations": "workspace", "evidence": "workspace", "policy": "workspace"},
+		// A policy file may sit in any scope or project directory, and the
+		// files that place the scopes and the projects belong to no project.
+		"verdict-policy-validate": {"policies": "workspace", "layout": "workspace"},
 	}
 	for _, name := range sortedKeys(wantScopes) {
 		task := m.Tasks[name]
@@ -969,6 +1008,28 @@ func TestTheCoverageRatchetIsNeverServedFromCache(t *testing.T) {
 	// TestCachePolicyMatchesTheDeclaredReadSet pins that key.
 	if coverage := m.Tasks["feature-coverage-validate"]; !coverage.Cache.IsEnabled() {
 		t.Errorf("feature-coverage-validate cache = %+v, want enabled", coverage.Cache)
+	}
+}
+
+// TestTheVerdictPolicyStepKeysOnTheFileItNames pins the key of
+// verdict-policy-validate: each pattern of its policies port names the policy
+// file itself, and its layout port names the files that place the root, the
+// scopes and the projects.
+func TestTheVerdictPolicyStepKeysOnTheFileItNames(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "verdict-policies-are-checked", "the-key-names-the-policy-file")
+	task, found := committedManifest(t).Tasks["verdict-policy-validate"]
+	if !found {
+		t.Fatal("the manifest declares no verdict-policy-validate task")
+	}
+	want := map[string]proto.TaskInputPort{
+		"policies": {From: "workspace", Files: []string{"putnami.verdict-policy.json", "**/putnami.verdict-policy.json", "!**/.gen/**"}},
+		"layout":   {From: "workspace", Files: []string{"putnami.workspace.json", "**/putnami.json", "!**/.gen/**"}},
+	}
+	if !reflect.DeepEqual(task.Inputs, want) {
+		t.Errorf("inputs = %+v, want %+v", task.Inputs, want)
+	}
+	if !task.Cache.IsEnabled() || !task.Cache.NoOutput {
+		t.Errorf("cache = %+v, want enabled with noOutput: the key holds every file the task reads", task.Cache)
 	}
 }
 

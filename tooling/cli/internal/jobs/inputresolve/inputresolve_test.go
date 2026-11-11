@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -361,6 +362,35 @@ func TestMatcherSelectsTheAnswerAndItsBasis(t *testing.T) {
 	}
 	if got := requests(t, log); len(got) != 1 {
 		t.Fatalf("requests = %v, want the primed answer read", got)
+	}
+}
+
+// An input that does not expand selects every path but a verdict policy, as a
+// nil resolver does: the extension reads such a file only when its answer
+// lists it. The task index merges the selectors of every extension per task,
+// so a selector of another language, which cannot answer for the project,
+// then selects no task for the file.
+func TestMatcherLeavesAVerdictPolicyOutOfAnInputThatDoesNotExpand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-verdict-policy-is-no-build-input",
+		"only-a-task-that-names-a-verdict-policy-reads-it")
+	root, app := selectorWorkspace(t)
+	failing, _ := helperResolver(t, root, "error", 30*time.Second)
+	var none *Resolver
+	q := workspace.InputSelectorQuery{Extension: "@test/selectors", Dir: app, Selector: "sel:build"}
+	for name, matcher := range map[string]workspace.InputSelectorMatcher{
+		"an error answer": failing.Matcher(),
+		"a nil resolver":  none.Matcher(),
+	} {
+		for _, rel := range []string{"putnami.verdict-policy.json", "sub/putnami.verdict-policy.json"} {
+			if matcher.SelectsInput(q, rel) {
+				t.Errorf("%s selects %s", name, rel)
+			}
+		}
+		for _, rel := range []string{"README.md", "sub/settings.json"} {
+			if !matcher.SelectsInput(q, rel) {
+				t.Errorf("%s leaves out %s, want every other path", name, rel)
+			}
+		}
 	}
 }
 

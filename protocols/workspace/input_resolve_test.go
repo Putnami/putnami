@@ -149,6 +149,9 @@ func TestValidateInputResolveResult(t *testing.T) {
 		{"an exclusion keeps another set's path", func(r *InputResolveResult) {
 			r.Inputs[0].Basis.Listing = [][]string{{"assets/**", "!assets/app.js"}, {"assets/app.js"}, {"templates/*.html"}}
 		}, "", ""},
+		{"a verdict policy a directory set selects", func(r *InputResolveResult) {
+			r.Inputs[0].Files = []string{"assets/app.css", "assets/app.js", "assets/putnami.verdict-policy.json", "templates/index.html"}
+		}, "", ""},
 		{"4096-byte error", func(r *InputResolveResult) { r.Inputs[1].Error = strings.Repeat("e", 4096) }, "", ""},
 		{"version", func(r *InputResolveResult) { r.Version = 0 }, "invalid-input-resolve-version", "version"},
 		{"extension", func(r *InputResolveResult) { r.Extension = "" }, "required-field", "extension"},

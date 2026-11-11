@@ -146,7 +146,8 @@ func siteContentKeyOf(t *testing.T, project string) string {
 // TestValidateSiteContentVerdictMovesOnlyWithItsKey changes the project one
 // state at a time. A state the key does not hold must leave the verdict as it
 // was: an empty directory and a file Git ignores are absent for the check, as
-// they are from a clone. A state the key holds must move the verdict, so the
+// they are from a clone, and a putnami.verdict-policy.json file is no site
+// content. A state the key holds must move the verdict, so the
 // fixture exercises every policy the check applies.
 func TestValidateSiteContentVerdictMovesOnlyWithItsKey(t *testing.T) {
 	write := func(rel, content string) func(*testing.T, string) {
@@ -180,6 +181,8 @@ func TestValidateSiteContentVerdictMovesOnlyWithItsKey(t *testing.T) {
 		{name: "an ignored file in a section", change: write("guide/notes.draft", "notes\n")},
 		{name: "an ignored symbolic link in a section", change: link("guide/alias.draft", "index.md")},
 		{name: "a directory of ignored files", change: write("scratch/notes.draft", "notes\n")},
+		{name: "a verdict policy in a section", change: write("guide/putnami.verdict-policy.json", "{}\n")},
+		{name: "a directory that holds only a verdict policy", change: write("policy/putnami.verdict-policy.json", "{}\n")},
 
 		{name: "an untracked page", change: write("guide/new.md", "# New\n"), want: "(2 sections, 4 files)"},
 		{name: "a new section", change: write("howto/index.md", "# How to\n"), want: "(3 sections, 4 files)"},
@@ -251,6 +254,12 @@ func TestSiteContentPackagingReadsTheTreeValidationChecks(t *testing.T) {
 		}},
 		{name: "an ignored file in a section", change: func(t *testing.T, project string) {
 			writeFixtureFile(t, filepath.Join(project, "guide", "notes.draft"), "notes\n")
+		}},
+		{name: "a verdict policy in a section", change: func(t *testing.T, project string) {
+			writeFixtureFile(t, filepath.Join(project, "guide", "putnami.verdict-policy.json"), "{}\n")
+		}},
+		{name: "a directory that holds only a verdict policy", change: func(t *testing.T, project string) {
+			writeFixtureFile(t, filepath.Join(project, "policy", "putnami.verdict-policy.json"), "{}\n")
 		}},
 		{name: "an empty directory", change: func(t *testing.T, project string) {
 			if err := os.Mkdir(filepath.Join(project, "empty"), 0o755); err != nil {
