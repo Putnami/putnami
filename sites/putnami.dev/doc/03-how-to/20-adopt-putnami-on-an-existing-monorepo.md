@@ -472,15 +472,15 @@ only when the extension runs the same tool:
 | TypeScript | `bun build` or `tsc` alone, the `build` script of `package.json` for `tsc`; `bun test`, Vitest or Jest without an argument that picks a configuration or a subset; Biome or a bare `eslint` |
 | Go | `go build`, `go test` |
 | Rust | `cargo build`; `cargo nextest` or `cargo llvm-cov nextest` |
-| Python | `pytest`, `ruff` |
+| Python | `pytest` |
 | Ruby | `rspec`, `rubocop` |
 | PHP | `phpunit`, `phpstan` |
 
 The extension drops the task's own arguments, so a task that selects build
 tags, a release profile, a package or a subset of the suite, such as
 `go test -tags integration ./...` or `cargo build --release`, stays on moon.
-A Go or Rust lint stays on moon, since the extension's lint checks more than
-the task did, and so does a `cargo test`, since the Rust extension tests with
+A Go, Rust or Python lint stays on moon, since the extension's lint checks
+more than the task did, and so does a `cargo test`, since the Rust extension tests with
 nextest, which runs no doctest. A project that keeps a task, such as a
 `go vet` lint or a Mocha test, names
 `@putnami/moon` beside its language extension, and `disable.jobs` names the

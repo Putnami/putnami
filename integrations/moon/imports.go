@@ -28,15 +28,18 @@ var languagePrograms = map[string]map[string][]program{
 	// nextest, which runs no doctest, so a cargo test stays on moon too.
 	"go": {
 		stacks.TaskBuild: {{"go build", []string{"./...", "."}}},
-		stacks.TaskTest:  {{"go test", []string{"./...", ".", "-v"}}},
+		// The Go test runs go test ./..., so a narrower package pattern such
+		// as . stays on moon.
+		stacks.TaskTest: {{"go test", []string{"./...", "-v"}}},
 	},
 	"rust": {
 		stacks.TaskBuild: {{"cargo build", []string{"--locked"}}},
 		stacks.TaskTest:  {{"cargo nextest", []string{"run"}}, {"cargo llvm-cov nextest", nil}},
 	},
+	// The Python lint runs ruff format --check beside ruff check: a lint
+	// task stays on moon, as Go's and Rust's do.
 	"python": {
 		stacks.TaskTest: {{"pytest", []string{"-q", "-v"}}},
-		stacks.TaskLint: {{"ruff", []string{"check", "."}}},
 	},
 	"ruby": {
 		stacks.TaskTest: {{"rspec", nil}},
@@ -44,7 +47,7 @@ var languagePrograms = map[string]map[string][]program{
 	},
 	"php": {
 		stacks.TaskTest: {{"phpunit", nil}},
-		stacks.TaskLint: {{"phpstan", []string{"analyze", "analyze"}}},
+		stacks.TaskLint: {{"phpstan", []string{"analyse", "analyze"}}}, //nolint:misspell // phpstan accepts both spellings of its subcommand
 	},
 }
 

@@ -47,20 +47,21 @@ its `command` and `args`:
 | TypeScript | `bun build`, or `tsc` alone when it is the `build` script of `package.json`; `bun test`, Vitest or Jest without an argument that picks a configuration or a subset; Biome or a bare `eslint` |
 | Go | `go build`, `go test` |
 | Rust | `cargo build`; `cargo nextest` or `cargo llvm-cov nextest` |
-| Python | `pytest`, `ruff` |
+| Python | `pytest` |
 | Ruby | `rspec`, `rubocop` |
 | PHP | `phpunit`, `phpstan` |
 
-A Go or Rust lint stays on moon, since the extension's lint checks more than
-the task did (staticcheck beside golangci-lint, `cargo fmt --check` beside
-clippy), and so does a `cargo test`, since the Rust extension tests with
+A Go, Rust or Python lint stays on moon, since the extension's lint checks
+more than the task did (staticcheck beside golangci-lint, `cargo fmt --check`
+beside clippy, `ruff format --check` beside `ruff check`), and so does a `cargo test`, since the Rust extension tests with
 nextest, which runs no doctest. A TypeScript test records its runner, `bun`
 included. The extension runs the program under its own arguments and drops the
 task's, so a task moves only with arguments that choose the whole project or
-only change the output, such as `./...`, `-v`, `--locked` or `ruff check .`.
+only change the output, such as `./...`, `-v` or `--locked`.
 A task that selects build tags, a release profile, a package or a subset of
 the suite, such as `go test -tags integration ./...`, `cargo build --release`
-or `pytest tests/unit`, stays on moon, and the sync names the arguments.
+or `pytest tests/unit`, stays on moon, and so does `go test .`, since the Go
+extension tests `./...`; the sync names the arguments.
 A runner prefix such as `bundle exec`, `uv run` or `npx`, or a path such as
 `vendor/bin/`, does not change the tool. A task chained with another command
 stays on moon. A TypeScript task also stays when the project's `package.json`

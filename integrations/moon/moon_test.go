@@ -784,8 +784,10 @@ func TestATypeScriptTaskMovesOnlyWhereItsScriptsLeadTheExtension(t *testing.T) {
 		{"rust", "test", "cargo nextest run -p pricing", false, "-p pricing"},
 		{"python", "test", "uv run pytest tests/unit", false, "tests/unit"},
 		{"python", "test", "pytest -q", true, ""},
-		{"python", "lint", "ruff check .", true, ""},
+		{"go", "test", "go test .", false, "."},
+		{"python", "lint", "ruff check .", false, ""},
 		{"php", "test", "vendor/bin/phpunit --testsuite unit", false, "--testsuite unit"},
+		{"php", "lint", "vendor/bin/phpstan analyse", true, ""}, //nolint:misspell // phpstan's subcommand
 		{"php", "lint", "vendor/bin/phpstan analyze", true, ""},
 		{"ruby", "test", "bundle exec rspec", true, ""},
 		{"ruby", "test", "bundle exec rspec spec/models", false, "spec/models"},
