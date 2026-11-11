@@ -222,11 +222,11 @@
     },
     {
       "id": "tsc-key-follows-what-tsc-reads",
-      "text": "The key of a tsc build reads every file of the project Git does not ignore, the JSON configuration files at the top of each project of its dependency closure and its tsconfig files, the root tsconfig files and lockfiles, and the key of each dependency's tsc build. test plans the same tsc step, so a dependent's tests run against its dependencies' compiled output and their keys move with it."
+      "text": "The key of a tsc build reads every file of the project Git does not ignore, the JSON configuration files at the top of each project of its dependency closure and its tsconfig files, the root tsconfig files and lockfiles, and the key of each dependency's tsc build. test plans the same step for each project it tests, so a run that tests a library and its dependent runs the dependent's tests after the library's tsc and keys them on it."
     },
     {
       "id": "tsc-project-does-not-package",
-      "text": "package refuses a project that compiles with tsc, naming it, rather than packing a tarball without its compiled code."
+      "text": "The npm packager of package refuses a project that compiles with tsc, naming it, rather than packing a tarball without its compiled code."
     }
   ],
   "decisions": [

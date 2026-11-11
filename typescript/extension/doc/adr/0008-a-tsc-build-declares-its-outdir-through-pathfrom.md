@@ -61,9 +61,12 @@ Two facts constrain the answer:
    the top-level JSON and `tsconfig` files of each project of the dependency
    closure (a shared configuration package, a reference's config), the root
    `tsconfig` files and lockfiles, and the upstream `tsc` keys.
-6. **`test` plans the same step**, so a test-only run of a dependent compiles
-   or restores its libraries and keys on them. **`package` refuses** a `tsc`
-   project: it would pack a tarball without the compiled code.
+6. **`test` plans the same step** for each project it tests, so a run that
+   tests a library and its dependent runs the dependent's tests after the
+   library's `tsc` and keys them on it. A run that tests the dependent alone,
+   such as a library with no tests of its own, reads the `outDir` an earlier
+   build left. **The npm packager of `package` refuses** a `tsc` project: it
+   would pack a tarball without the compiled code.
 7. **Bun runs `tsc`.** The task starts the compiler of the workspace's
    `typescript` package, the first `node_modules/typescript/bin/tsc` from the
    project up to the workspace root, with the task's Bun, never a `node` from
@@ -77,19 +80,23 @@ Two facts constrain the answer:
   again restores it, and its dependents build after it.
 - The planner counts a `pathFrom` write without `within` as a write to the
   whole project root, so it records no precomputed key for the project's
-  other tasks. That cost applies only to projects that compile with `tsc`;
-  `build-generate`'s `client` output already pays it.
+  other tasks. That cost applies to each project that plans the step: one
+  that compiles with `tsc`, and one whose `package.json` merely contains
+  `tsc` (below); `build-generate`'s `client` output already pays it.
 - The step is spliced out at plan time for an `auto` project whose
   `package.json` does not contain `tsc`, so the plan and the keys of a Bun
   project keep their shape. A project whose `package.json` merely mentions
-  `tsc` (a `typecheck` script, an `@tsconfig/*` package) plans a step that
-  compiles nothing, and its dependents wait for it.
+  `tsc` (a `typecheck` script, an `@tsconfig/*` package, `tsconfig` in a
+  script) plans a step that compiles nothing, and its dependents wait for it.
 - A cold `test,build` run compiles a `tsc` library once per command: the two
-  steps are separate keys, as `build~generate` and `test~generate` are.
+  steps are separate keys, as `build~generate` and `test~generate` are. They
+  write the same `outDir`, so the task declares the project-scoped
+  `tsc-output` write resource, which runs them one after the other.
 - A `tsc -b` script on a config with references does not run as written. Its
   emit is the same, and the build order of the references moves to Putnami.
-- An `outDir` that Git does not ignore, or that holds a tracked file, fails
-  the build and names the setting.
+- In a Git work tree, an `outDir` that Git does not ignore, or that holds a
+  tracked file, fails the build and names the setting. Outside one, the build
+  checks neither, and the `git:` key needs a work tree anyway.
 
 ## Alternatives
 
