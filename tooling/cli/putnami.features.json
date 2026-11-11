@@ -200,7 +200,8 @@
               "a-kept-spec-gate-keeps-no-unscoped-test",
               "a-narrowed-plan-orders-its-jobs-as-the-full-plan-does",
               "a-manifest-change-reaches-the-tasks-it-moves",
-              "the-trace-names-the-runtime-input"
+              "the-trace-names-the-runtime-input",
+              "a-file-claims-only-the-tasks-its-project-may-plan"
             ]
           }
         },
