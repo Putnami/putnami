@@ -8,10 +8,9 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-var ProjectWalkExcludedDirs = map[string]bool{
-	".git": true, ".putnami": true, ".venv": true,
-	"dist": true, "node_modules": true, "vendor": true,
-}
+// ProjectWalkExcludedDirs are the directories a walk of a project's tree does
+// not enter (workspace.ProjectWalkExcludedDirs).
+var ProjectWalkExcludedDirs = workspace.ProjectWalkExcludedDirs
 
 // MergeParamLayers merges the layered param sources shared by plan-time `if`
 // evaluation (mergeCommandParams) and the job context file (BuildJobContext)

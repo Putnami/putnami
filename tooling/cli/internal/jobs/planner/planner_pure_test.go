@@ -167,9 +167,9 @@ func TestExtensionActivatesForProject_CacheReusesResult(t *testing.T) {
 	}
 }
 
-// --- matchDoubleStarGlob ---
+// --- a "**" activation pattern ---
 
-func TestMatchDoubleStarGlob(t *testing.T) {
+func TestDoubleStarActivationPattern(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
 		name    string
@@ -234,9 +234,9 @@ func TestMatchDoubleStarGlob(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			dir := tt.setupFn(t)
-			got := matchDoubleStarGlob(dir, tt.pattern, nil)
+			got := hasActivationFilesUncached(dir, []string{tt.pattern}, nil)
 			if got != tt.want {
-				t.Errorf("matchDoubleStarGlob(%q) = %v, want %v", tt.pattern, got, tt.want)
+				t.Errorf("hasActivationFilesUncached(%q) = %v, want %v", tt.pattern, got, tt.want)
 			}
 		})
 	}

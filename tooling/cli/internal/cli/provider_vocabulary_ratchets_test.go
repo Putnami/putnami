@@ -114,7 +114,7 @@ var providerVocabularyAllowlist = map[string]providerVocabularyResidue{
 			"has to be buildable before any extension exists to build it. It goes when local " +
 			"extensions are resolved as prepared artifacts rather than compiled in place",
 	},
-	"internal/jobs/cachekey/planner_helpers.go": {
+	"internal/workspace/job_activation.go": {
 		sites: 1,
 		why: "A WALK EXCLUSION, not a branch: `node_modules` sits beside `.git`, `dist` and " +
 			"`vendor` in the directories a content probe refuses to descend into. Nothing " +

@@ -4,6 +4,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
 
@@ -30,6 +31,12 @@ import (
 // task the project does not run. The asymmetry ADR 0043 states decides the
 // direction: a task wrongly left out is a gate that never ran, one wrongly left
 // in is a cache hit.
+//
+// An input selector is the exception: it is asked of the extension that lists
+// it, which cannot answer for a project of another language, and a selector
+// that does not answer reads every path. So a selector takes part only in the
+// projects the planner may run its command in (MayPlanJob), and there it reads
+// every path when its answer fails.
 
 // InputSelectorQuery is one input selector a task names in one project: the
 // extension that lists it, the absolute project directory, the selector, and
@@ -95,6 +102,24 @@ type taskIndex struct {
 	// baseline reads a manifest as the diff's base records it; nil reads
 	// nothing (WithManifestBaseline).
 	baseline ManifestBaseline
+
+	// planned memoizes MayPlanJob; an index WithManifestBaseline binds
+	// shares it.
+	planned *plannedMemo
+}
+
+// plannedMemo memoizes MayPlanJob per command and project ID. projectRoots
+// holds the absolute directories of the workspace's projects. mu guards both.
+type plannedMemo struct {
+	mu           sync.Mutex
+	answers      map[plannedKey]bool
+	projectRoots map[string]bool
+}
+
+// plannedKey is one command of one extension in one project.
+type plannedKey struct {
+	job     *extension.JobDefinition
+	project string
 }
 
 // indexedTask is one declared task scope, merged across every manifest that
@@ -128,9 +153,11 @@ type indexedTask struct {
 // for the whole workspace (planner.workspaceOnceActivation).
 const workspaceOnceActivation = "workspace-once"
 
-// indexedSelector is one input selector a task names in a project input.
+// indexedSelector is one input selector a task names in a project input, with
+// the command whose step runs the task.
 type indexedSelector struct {
 	extension string
+	job       *extension.JobDefinition
 	input     extproto.SelectorInput
 }
 
@@ -157,6 +184,7 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 		extensionProjects: make(map[string][]string),
 		runtimeInputs:     make(map[string][]string),
 		ownManifests:      make(map[string]bool),
+		planned:           &plannedMemo{answers: make(map[plannedKey]bool)},
 	}
 	// successors is the intra-project task graph: a task scope mapped to the
 	// task scopes of the same project that depend on it.
@@ -276,7 +304,7 @@ func (idx *taskIndex) addCommand(
 	for _, step := range job.PipelineSteps {
 		scope := taskScope(command, step.ID)
 		files, closureFiles, workspaceFiles := stepKeyPatterns(ext, step.Task)
-		idx.mergeTask(scope, command, append(files, job.FilePatterns...), closureFiles, workspaceFiles, stepSelectors(ext, step.Task))
+		idx.mergeTask(scope, command, append(files, job.FilePatterns...), closureFiles, workspaceFiles, stepSelectors(ext, job, step.Task))
 		scopes = append(scopes, scope)
 		for _, dep := range step.DependsOn {
 			if upstream, ok := strings.CutPrefix(dep, "^"); ok {
@@ -327,15 +355,16 @@ func stepKeyPatterns(ext *extension.ExtensionDescription, taskName string) (file
 }
 
 // stepSelectors lists the input selectors a step's task names in its project
-// inputs, each with the extension that declares the task.
-func stepSelectors(ext *extension.ExtensionDescription, taskName string) []indexedSelector {
+// inputs, each with the extension that declares the task and the command job
+// whose step runs it.
+func stepSelectors(ext *extension.ExtensionDescription, job *extension.JobDefinition, taskName string) []indexedSelector {
 	task, ok := ext.Tasks[taskName]
 	if !ok {
 		return nil
 	}
 	var selectors []indexedSelector
 	for _, input := range extproto.TaskSelectorInputs(task) {
-		selectors = append(selectors, indexedSelector{extension: ext.Name, input: input})
+		selectors = append(selectors, indexedSelector{extension: ext.Name, job: job, input: input})
 	}
 	return selectors
 }
@@ -521,7 +550,7 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 		if namedOnly && !task.perProject {
 			continue
 		}
-		if inProject && (wsproto.SelectsPath(rel, task.files) || idx.selectorsRead(task, dir, rel)) {
+		if inProject && (wsproto.SelectsPath(rel, task.files) || idx.selectorsRead(task, project, dir, rel)) {
 			reading[scope] = true
 			if wsproto.SelectsPath(rel, task.closureFiles) {
 				reading[closureScopePrefix+scope] = true
@@ -547,12 +576,16 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 }
 
 // selectorsRead reports whether an input selector the task names reads rel in
-// the project directory dir. Without a matcher each selector reads every
-// path but a file wsproto.IsNamedOnlyInput reports, which a selector reads
-// only when its extension lists the file: a task wrongly left out is a gate
-// that never ran.
-func (idx *taskIndex) selectorsRead(task *indexedTask, dir, rel string) bool {
+// project, whose directory is dir. A selector whose command the planner cannot
+// run in the project reads nothing there. Without a matcher each other
+// selector reads every path but a file wsproto.IsNamedOnlyInput reports, which
+// a selector reads only when its extension lists the file: a task wrongly left
+// out is a gate that never ran.
+func (idx *taskIndex) selectorsRead(task *indexedTask, project *Project, dir, rel string) bool {
 	for _, selector := range task.selectors {
+		if !idx.mayPlan(selector.job, project) {
+			continue
+		}
 		if idx.inputs == nil {
 			if !wsproto.IsNamedOnlyInput(rel) {
 				return true
@@ -566,9 +599,34 @@ func (idx *taskIndex) selectorsRead(task *indexedTask, dir, rel string) bool {
 	return false
 }
 
+// mayPlan reports MayPlanJob for job in project, once per pair. A selector of
+// a task with no command job takes part in every project.
+func (idx *taskIndex) mayPlan(job *extension.JobDefinition, project *Project) bool {
+	if job == nil {
+		return true
+	}
+	key := plannedKey{job: job, project: project.ID}
+	memo := idx.planned
+	memo.mu.Lock()
+	defer memo.mu.Unlock()
+	if planned, ok := memo.answers[key]; ok {
+		return planned
+	}
+	if memo.projectRoots == nil {
+		memo.projectRoots = make(map[string]bool, len(idx.ws.Projects))
+		for _, p := range idx.ws.Projects {
+			memo.projectRoots[filepath.Clean(filepath.Join(idx.ws.Root, filepath.FromSlash(p.Path)))] = true
+		}
+	}
+	planned := MayPlanJob(project, job, filepath.Join(idx.ws.Root, filepath.FromSlash(project.Path)), memo.projectRoots)
+	memo.answers[key] = planned
+	return planned
+}
+
 // PrimeChangedPaths asks the extensions once for every input selector the
 // tasks name in each project a changed path falls in, before the impact pass
-// reads them path by path.
+// reads them path by path. It asks for no selector in a project the planner
+// cannot run its command in.
 func (idx *taskIndex) PrimeChangedPaths(paths []string) {
 	if idx.inputs == nil {
 		return
@@ -584,7 +642,9 @@ func (idx *taskIndex) PrimeChangedPaths(paths []string) {
 		dir := filepath.Join(idx.ws.Root, projects[id].Path)
 		for _, scope := range idx.every {
 			for _, selector := range idx.tasks[scope].selectors {
-				queries = append(queries, selectorQuery(selector, dir))
+				if idx.mayPlan(selector.job, projects[id]) {
+					queries = append(queries, selectorQuery(selector, dir))
+				}
 			}
 		}
 	}
