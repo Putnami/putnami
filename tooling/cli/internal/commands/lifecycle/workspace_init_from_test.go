@@ -150,9 +150,9 @@ func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
 	t.Cleanup(func() {
 		syncInitProjects, previewInitSync, initIsTerminal, initPromptInput, removeInitExtension = origSync, origPreview, origTerminal, origInput, origRemove
 	})
-	removeInitExtension = func(_ string, before *wsproto.Config, name string) error {
-		if before == nil || !slices.Contains(before.Extensions.Names(), name) {
-			t.Errorf("removed %s, which the config before did not declare", name)
+	removeInitExtension = func(_ string, cfg *wsproto.Config, name string) error {
+		if cfg != nil && slices.Contains(cfg.Extensions.Names(), name) {
+			t.Errorf("removed %s, which the config still declares", name)
 		}
 		calls.removed = append(calls.removed, name)
 		return nil
@@ -841,5 +841,26 @@ func TestALeaveOfImportRemovesTheExtensionsNoProjectNames(t *testing.T) {
 		return WorkspaceInit(context.Background(), dir, []string{"--from", "moon", "--mode", "delegate", "--apply"}, LifecycleEnv{})
 	}); err != nil || len(calls.removed) != 0 {
 		t.Errorf("a workspace already delegated removes nothing: err %v, removed %v", err, calls.removed)
+	}
+}
+
+func TestNamedExtensionsResolvesAPathEntryByItsManifest(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-leaving-import-removes-its-extensions", "a-switch-to-delegate-removes-the-extensions-no-project-names")
+	dir := t.TempDir()
+	for file, content := range map[string]string{
+		"exts/ts/putnami.extension.json": `{"name": "@putnami/typescript"}`,
+		"apps/api/putnami.json":          `{"extensions": ["/exts/ts"]}`,
+		".hidden/putnami.json":           `{"extensions": ["@putnami/go"]}`,
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, file)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	named, err := namedExtensions(dir)
+	if err != nil || !named["@putnami/typescript"] || named["@putnami/go"] {
+		t.Errorf("named = %v, %v; want the path entry's name and nothing under a hidden directory", named, err)
 	}
 }

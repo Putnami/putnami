@@ -68,8 +68,10 @@ func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testin
 	}{
 		// api's tsc -b is no package.json build script, so its build keeps
 		// running through moon (D-070); its Vitest test and ESLint lint move.
-		"apps/api":         {"@putnami/moon,@putnami/typescript", []string{"/packages/pricing"}, []string{"@putnami/moon:lint", "@putnami/moon:test", "@putnami/typescript:build"}},
-		"packages/pricing": {"@putnami/rust", nil, []string{"lint"}},
+		"apps/api": {"@putnami/moon,@putnami/typescript", []string{"/packages/pricing"}, []string{"@putnami/moon:lint", "@putnami/moon:test", "@putnami/typescript:build"}},
+		// pricing's cargo test stays on moon: the Rust extension tests with
+		// nextest, which runs no doctest.
+		"packages/pricing": {"@putnami/moon,@putnami/rust", nil, []string{"lint", "@putnami/moon:build", "@putnami/rust:test"}},
 		"apps/web":         {"@putnami/moon", nil, []string{"build", "test"}},
 	} {
 		p := readProject(t, root, dir)
@@ -95,15 +97,15 @@ func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testin
 	ran := strings.Split(strings.TrimSpace(string(data)), "\n")
 	slices.Sort(ran)
 	want := []string{
-		"@putnami/rust build pricing", "@putnami/rust test pricing",
+		"@putnami/rust build pricing",
 		"@putnami/typescript lint api", "@putnami/typescript test api",
 	}
 	if !slices.Equal(ran, want) {
 		t.Errorf("the language extensions ran %v, want %v\n%s", ran, want, out)
 	}
 	// web, in JavaScript, has no Putnami extension: it stays on moon, and
-	// runs its one task, lint, through it; api's tsc build runs through moon
-	// too.
+	// runs its one task, lint, through it; api's tsc build and pricing's
+	// cargo test run through moon too.
 	data, err = os.ReadFile(moonLog)
 	if err != nil {
 		t.Fatalf("moon ran nothing: %v\n%s", err, out)
@@ -115,7 +117,7 @@ func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testin
 		}
 	}
 	slices.Sort(runs)
-	if !slices.Equal(runs, []string{"api:build", "web:lint"}) {
-		t.Errorf("moon ran %v, want api:build and web:lint\n%s", runs, out)
+	if !slices.Equal(runs, []string{"api:build", "pricing:unit", "web:lint"}) {
+		t.Errorf("moon ran %v, want api:build, pricing:unit and web:lint\n%s", runs, out)
 	}
 }

@@ -193,23 +193,24 @@ func (d *detector) describe(p *project, inherited []taskFile) Project {
 			tasks[name] = Task{Tags: t.Tags, Command: t.commandLine()}
 		}
 	} else {
+		settingsOf := map[string]map[string]any{}
 		for _, f := range inherited {
 			if !f.inheritedBy(out) {
 				continue
 			}
 			for name, settings := range f.tasks {
-				tasks[name] = Task{Tags: stringsOf(settings["tags"]), Command: commandLine(settings)}
+				settingsOf[name] = settings
 			}
 		}
-		tasks = cfg.inheritance.apply(tasks)
+		settingsOf = inherit(cfg.inheritance, settingsOf)
 		for name, settings := range cfg.tasks {
-			task := Task{Tags: stringsOf(settings["tags"]), Command: commandLine(settings)}
-			if inheritedTask, ok := tasks[name]; ok && task.Command == "" {
-				// A project's task that states only args runs the command it
-				// inherits with them, as moon merges args by default.
-				task.Command = strings.TrimSpace(inheritedTask.Command + " " + strings.Join(stringsOf(settings["args"]), " "))
+			if base, ok := settingsOf[name]; ok {
+				settings = mergeTask(base, settings)
 			}
-			tasks[name] = task
+			settingsOf[name] = settings
+		}
+		for name, settings := range settingsOf {
+			tasks[name] = Task{Tags: stringsOf(settings["tags"]), Command: commandLine(settings)}
 		}
 	}
 	for name, task := range tasks {
@@ -305,7 +306,13 @@ func readInheritance(settings map[string]any) inheritance {
 
 // apply keeps the included tasks less the excluded ones, then renames them.
 func (in inheritance) apply(tasks map[string]Task) map[string]Task {
-	out := map[string]Task{}
+	return inherit(in, tasks)
+}
+
+// inherit keeps the included tasks less the excluded ones, then renames
+// them, whatever a task holds.
+func inherit[T any](in inheritance, tasks map[string]T) map[string]T {
+	out := map[string]T{}
 	for name, task := range tasks {
 		if in.include != nil && !slices.Contains(in.include, name) || slices.Contains(in.exclude, name) {
 			continue
@@ -316,6 +323,51 @@ func (in inheritance) apply(tasks map[string]Task) map[string]Task {
 		out[name] = task
 	}
 	return out
+}
+
+// mergeTask merges a project's settings of a task over the settings it
+// inherits, as moon merges them by default: the project's command, script
+// and tags win, and its args follow the inherited ones, unless its
+// options.mergeArgs says replace or prepend.
+func mergeTask(base, own map[string]any) map[string]any {
+	merged := map[string]any{}
+	for key, value := range base {
+		merged[key] = value
+	}
+	for key, value := range own {
+		if key != "args" {
+			merged[key] = value
+		}
+	}
+	if _, ok := own["command"]; ok {
+		// A project's command replaces the inherited script.
+		if _, scripted := own["script"]; !scripted {
+			delete(merged, "script")
+		}
+	}
+	ownArgs, set := own["args"]
+	if !set {
+		return merged
+	}
+	options, _ := own["options"].(map[string]any)
+	inheritedArgs := stringsOf(base["args"])
+	var args []string
+	switch options["mergeArgs"] {
+	case "replace":
+		args = stringsOf(ownArgs)
+	case "prepend":
+		args = stringsOf(ownArgs)
+		args = append(args, inheritedArgs...)
+	default:
+		args = inheritedArgs
+		args = append(args, stringsOf(ownArgs)...)
+	}
+	list := make([]any, len(args))
+	for i, a := range args {
+		list[i] = a
+	}
+	merged["args"] = list
+	return merged
 }
 
 // commandLine is the command line a task's settings state: its script, else

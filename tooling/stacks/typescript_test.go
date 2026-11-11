@@ -20,6 +20,10 @@ func TestTypeScriptRunsTheToolOfTheScript(t *testing.T) {
 		{TaskTest, "jest --ci", true},
 		{TaskTest, "bun test", true},
 		{TaskTest, "mocha", false},
+		{TaskTest, "jest --config jest.ci.config.js", false},
+		{TaskTest, "vitest run --project unit", false},
+		{TaskTest, "bun test test/unit", false},
+		{TaskTest, "npx vitest run --coverage", true},
 		{TaskTest, "", false},
 		{TaskLint, "eslint .", true},
 		{TaskLint, "eslint --max-warnings 0 src", false},
@@ -49,6 +53,7 @@ func TestTypeScriptUnmappedReasonSaysWhy(t *testing.T) {
 		"eslint . && prettier .":      "chains another command",
 		"eslint --max-warnings 0 src": "takes arguments",
 		"mocha":                       `not "mocha"`,
+		"jest --config ci.js":         `takes arguments ("--config ci.js")`,
 	} {
 		task := TaskTest
 		if strings.Contains(script, "eslint") {

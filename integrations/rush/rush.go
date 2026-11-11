@@ -2,10 +2,13 @@
 // in the mode its workspace chose (D-064). In delegate mode it is a delegated
 // stack on go.putnami.dev/tooling/stacks: each Rush project is a Putnami
 // project whose tasks run rush on that project at the workspace root, and
-// Rush keeps its build cache. In import mode its probe claims no project: the
-// sync writes each Rush project as a TypeScript project, which Putnami's
-// runner, installer and cache serve. Both read rush.json and the projects'
-// package.json files with the Rush detector of putnami observe.
+// Rush keeps its build cache. In import mode the sync writes each Rush
+// project as a TypeScript project, which Putnami's runner, installer and
+// cache serve, and keeps on Rush each script whose tool the TypeScript
+// extension does not run (D-070): the probe claims only the projects that
+// keep one, whose tasks run rushx in the project's directory. Both read
+// rush.json and the projects' package.json files with the Rush detector of
+// putnami observe.
 package rush
 
 import (

@@ -51,7 +51,45 @@ func TypeScriptRuns(task, script string) bool {
 	if task == TaskLint && strings.Contains(script, "eslint") {
 		return slices.Contains(ESLintScripts, strings.Join(strings.Fields(script), " "))
 	}
+	if task == TaskTest && TestArgumentsDropped(script) != "" {
+		return false
+	}
 	return runsProgram(script, TypeScriptPrograms[task])
+}
+
+// testFlags are the arguments of a test script the TypeScript extension's
+// test runs the same without: they choose no configuration and no subset of
+// the suite. Any other argument, such as --config, --project or a path,
+// changes what the runner checks, and the extension passes none of the
+// script's arguments (ADR 0008 of typescript/extension).
+var testFlags = map[string]bool{
+	"run": true, "--run": true, "--coverage": true, "--passWithNoTests": true, "--silent": true,
+	"--ci": true, "--runInBand": true, "-i": true, "--detectOpenHandles": true, "--forceExit": true,
+}
+
+// TestArgumentsDropped answers the arguments of a Vitest, Jest or bun test
+// script that the TypeScript extension's test would drop, or "" when it
+// takes none of them or the script runs another program.
+func TestArgumentsDropped(script string) string {
+	fields := strings.Fields(script)
+	if len(fields) > 0 && fields[0] == "npx" {
+		fields = fields[1:]
+	}
+	switch {
+	case len(fields) > 1 && fields[0] == "bun" && fields[1] == "test":
+		fields = fields[2:]
+	case len(fields) > 0 && (fields[0] == "vitest" || fields[0] == "jest"):
+		fields = fields[1:]
+	default:
+		return ""
+	}
+	var dropped []string
+	for _, f := range fields {
+		if !testFlags[f] {
+			dropped = append(dropped, f)
+		}
+	}
+	return strings.Join(dropped, " ")
 }
 
 // TypeScriptBuildsWithBun reports whether the TypeScript extension builds a
@@ -90,6 +128,8 @@ func TypeScriptUnmappedReason(task, script, keeps string) string {
 		return fmt.Sprintf("its script chains another command (%q), which %s does not run: %s", script, TypeScriptExtension, keeps)
 	case task == TaskLint && strings.Contains(script, "eslint"):
 		return fmt.Sprintf("its ESLint takes arguments (%q) that %s would drop: move them to the ESLint configuration; %s", script, TypeScriptExtension, keeps)
+	case task == TaskTest && TestArgumentsDropped(script) != "":
+		return fmt.Sprintf("its test runner takes arguments (%q) that %s would drop: move them to the runner's configuration; %s", TestArgumentsDropped(script), TypeScriptExtension, keeps)
 	}
 	runs := TypeScriptPrograms[task]
 	if task == TaskBuild {

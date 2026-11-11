@@ -112,7 +112,7 @@ func ExtensionsRemove(wsRoot string, cfg *wsproto.Config, args []string) error {
 
 // ExtensionsRemoveUndeclared removes from the lock and the disk an extension
 // the caller removed from the workspace config, with each dependency no
-// remaining declaration requires; cfg is the config as it was before.
+// remaining declaration requires; cfg is the config without it.
 func ExtensionsRemoveUndeclared(wsRoot string, cfg *wsproto.Config, name string) error {
 	ops := extensionOps(wsRoot)
 	ops.configEdited = true

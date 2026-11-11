@@ -134,15 +134,28 @@ func TestATaskCommandLineReadsItsScriptOrItsCommandAndArgs(t *testing.T) {
 			t.Errorf("commandLine(%v) = %q, want %q", settings, got, want)
 		}
 	}
-	// A project task that states only args runs the command it inherits.
+	// A project task merges over the task it inherits, as moon does: args
+	// append unless mergeArgs says otherwise, and a command keeps the
+	// inherited args.
 	root := tree(t, map[string]string{
 		".moon/workspace.yml":   "projects:\n  - 'apps/*'\n",
-		".moon/tasks.yml":       "tasks:\n  lint:\n    command: 'eslint'\n",
-		"apps/api/moon.yml":     "tasks:\n  lint:\n    args: ['src']\n",
+		".moon/tasks.yml":       "tasks:\n  lint:\n    command: 'eslint'\n    args: ['src']\n  test:\n    command: 'jest'\n    args: ['--ci']\n  build:\n    script: 'tsc && cp a b'\n",
+		"apps/api/moon.yml":     "tasks:\n  lint:\n    args: ['lib']\n  test:\n    args: ['--coverage']\n    options:\n      mergeArgs: 'replace'\n  build:\n    command: 'tsc'\n",
 		"apps/api/package.json": `{"name": "@demo/api"}`,
+		"apps/web/moon.yml":     "tasks:\n  lint:\n    command: 'biome'\n",
+		"apps/web/package.json": `{"name": "@demo/web"}`,
 	})
 	got := Detect(root, Options{})
-	if len(got.Projects) != 1 || !reflect.DeepEqual(got.Projects[0].Tasks, []Task{{Name: "lint", Command: "eslint src"}}) {
+	want := map[string][]Task{
+		"api": {{Name: "build", Command: "tsc"}, {Name: "lint", Command: "eslint src lib"}, {Name: "test", Command: "jest --coverage"}},
+		"web": {{Name: "build", Command: "tsc && cp a b"}, {Name: "lint", Command: "biome src"}, {Name: "test", Command: "jest --ci"}},
+	}
+	if len(got.Projects) != 2 {
 		t.Fatalf("projects %+v", got.Projects)
+	}
+	for _, p := range got.Projects {
+		if !reflect.DeepEqual(p.Tasks, want[p.ID]) {
+			t.Errorf("%s tasks %+v, want %+v", p.ID, p.Tasks, want[p.ID])
+		}
 	}
 }

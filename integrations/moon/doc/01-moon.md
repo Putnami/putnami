@@ -44,14 +44,18 @@ its `command` and `args`:
 
 | Language | Tools the extension runs |
 |---|---|
-| TypeScript | `bun build`, or `tsc` alone when it is the `build` script of `package.json`; `bun test`, Vitest or Jest; Biome or a bare `eslint` |
-| Go | `go build`, `go test`, `golangci-lint` |
-| Rust | `cargo build`; `cargo test`, `cargo nextest` or `cargo llvm-cov`; `cargo clippy` |
+| TypeScript | `bun build`, or `tsc` alone when it is the `build` script of `package.json`; `bun test`, Vitest or Jest without an argument that picks a configuration or a subset; Biome or a bare `eslint` |
+| Go | `go build`, `go test` |
+| Rust | `cargo build`; `cargo nextest` or `cargo llvm-cov nextest` |
 | Python | `pytest`, `ruff` |
 | Ruby | `rspec`, `rubocop` |
 | PHP | `phpunit`, `phpstan` |
 
-A runner prefix such as `bundle exec`, `uv run` or `npx`, or a path such as
+A Go or Rust lint stays on moon, since the extension's lint checks more than
+the task did (staticcheck beside golangci-lint, `cargo fmt --check` beside
+clippy), and so does a `cargo test`, since the Rust extension tests with
+nextest, which runs no doctest. A TypeScript test records its runner, `bun`
+included. A runner prefix such as `bundle exec`, `uv run` or `npx`, or a path such as
 `vendor/bin/`, does not change the tool. A task chained with another command
 stays on moon. A TypeScript task also stays when the project's `package.json`
 scripts would lead `@putnami/typescript` to another tool: a Bun build beside a

@@ -17,15 +17,18 @@ import (
 // project moves to the extension only when it runs one of them, alone
 // (ADR 0017 of tooling/stacks); TypeScript reads the shared rule instead.
 var languagePrograms = map[string]map[string][]string{
+	// The Go lint runs golangci-lint with staticcheck and the docs-links
+	// check beside it, and the Rust lint cargo fmt --check before clippy -D
+	// warnings: a lint task of either moves to no extension, since the
+	// extension's lint checks more than the task did. The Rust test runs
+	// nextest, which runs no doctest, so a cargo test stays on moon too.
 	"go": {
 		stacks.TaskBuild: {"go build"},
 		stacks.TaskTest:  {"go test"},
-		stacks.TaskLint:  {"golangci-lint"},
 	},
 	"rust": {
 		stacks.TaskBuild: {"cargo build"},
-		stacks.TaskTest:  {"cargo test", "cargo nextest", "cargo llvm-cov"},
-		stacks.TaskLint:  {"cargo clippy"},
+		stacks.TaskTest:  {"cargo nextest", "cargo llvm-cov nextest"},
 	},
 	"python": {
 		stacks.TaskTest: {"pytest"},
@@ -99,8 +102,8 @@ func moves(root string, p detect.Project, command, line string) (bool, string) {
 // typescript/extension), so a task moves only when those scripts lead it to
 // the same tool: a tsc build only as the build script, a Bun build only when
 // the build script runs no tsc, a Biome lint only when the lint script runs
-// no ESLint. A Vitest or Jest test records its runner, so it moves whatever
-// the test script runs; bun test only when that script runs neither.
+// no ESLint. A test records its runner, bun, vitest or jest, so it moves
+// whatever the test script runs.
 func typeScriptMoves(root, dir, command, line, keeps string) (bool, string) {
 	if !stacks.TypeScriptRuns(command, line) {
 		return false, stacks.TypeScriptUnmappedReason(command, line, keeps)
@@ -111,8 +114,6 @@ func typeScriptMoves(root, dir, command, line, keeps string) (bool, string) {
 		return false, fmt.Sprintf("%s compiles the tsc of the package.json build script, and %q is another command: %s", stacks.TypeScriptExtension, line, keeps)
 	case command == stacks.TaskBuild && !tscscript.Runs(line) && tscscript.Runs(script):
 		return false, fmt.Sprintf("the package.json build script runs tsc, which %s would compile instead of %q: %s", stacks.TypeScriptExtension, line, keeps)
-	case command == stacks.TaskTest && stacks.TestRunner(line) == "" && stacks.TestRunner(script) != "":
-		return false, fmt.Sprintf("the package.json test script runs %s, which %s would run instead of %q: %s", stacks.TestRunner(script), stacks.TypeScriptExtension, line, keeps)
 	case command == stacks.TaskLint && !strings.Contains(line, "eslint") && strings.Contains(firstCommand(script), "eslint"):
 		return false, fmt.Sprintf("the package.json lint script runs ESLint, which %s would run instead of %q: %s", stacks.TypeScriptExtension, line, keeps)
 	}
@@ -195,7 +196,12 @@ func planImport(root string, p detect.Project, mapped map[string]string) importP
 		}
 		switch command {
 		case stacks.TaskTest:
+			// The runner is recorded even for bun test: the extension would
+			// otherwise read it from the package.json test script.
 			plan.runner = stacks.TestRunner(line)
+			if plan.runner == "" {
+				plan.runner = "bun"
+			}
 		case stacks.TaskLint:
 			plan.eslint = stacks.LintsWithESLint(line)
 		case stacks.TaskBuild:

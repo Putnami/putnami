@@ -24,7 +24,9 @@ tool:
   runs the same tool as the target. For TypeScript, that is a script that
   runs `bun build` or `tsc` alone, `bun test`, Vitest or Jest, Biome or a bare
   `eslint`, with no other command chained to it. A Vitest or Jest suite keeps
-  its runner and configuration, and an ESLint lint its configuration.
+  its runner and configuration, and an ESLint lint its configuration; a test
+  script whose arguments pick another configuration or a subset of the suite
+  stays on the tool, since the extension would drop them.
 - Every other target, such as a webpack build, a Mocha test or an ESLint with
   arguments, keeps running as the repository defines it, through the tool.
   The sync lists it as not mapped, with its reason, and rewrites no script.
@@ -467,14 +469,17 @@ only when the extension runs the same tool:
 
 | Language | Tools the extension runs |
 |---|---|
-| TypeScript | `bun build` or `tsc` alone, the `build` script of `package.json` for `tsc`; `bun test`, Vitest or Jest; Biome or a bare `eslint` |
-| Go | `go build`, `go test`, `golangci-lint` |
-| Rust | `cargo build`; `cargo test`, `cargo nextest` or `cargo llvm-cov`; `cargo clippy` |
+| TypeScript | `bun build` or `tsc` alone, the `build` script of `package.json` for `tsc`; `bun test`, Vitest or Jest without an argument that picks a configuration or a subset; Biome or a bare `eslint` |
+| Go | `go build`, `go test` |
+| Rust | `cargo build`; `cargo nextest` or `cargo llvm-cov nextest` |
 | Python | `pytest`, `ruff` |
 | Ruby | `rspec`, `rubocop` |
 | PHP | `phpunit`, `phpstan` |
 
-A project that keeps a task, such as a `go vet` lint or a Mocha test, names
+A Go or Rust lint stays on moon, since the extension's lint checks more than
+the task did, and so does a `cargo test`, since the Rust extension tests with
+nextest, which runs no doctest. A project that keeps a task, such as a
+`go vet` lint or a Mocha test, names
 `@putnami/moon` beside its language extension, and `disable.jobs` names the
 extension that does not run each command: `@putnami/moon:test` for a test
 that moved, `@putnami/go:lint` for a lint that stays. The kept task runs

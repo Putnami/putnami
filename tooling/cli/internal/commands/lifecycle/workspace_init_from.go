@@ -15,7 +15,6 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/cmderr"
-	"go.putnami.dev/tooling/cli/internal/commands/extensions"
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/jsonutil"
@@ -427,11 +426,6 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 	return nil
 }
 
-// removeInitExtension removes from the lock and the disk an extension init
-// removed from the workspace config; cfg is the config before. Swapped in
-// tests.
-var removeInitExtension = extensions.ExtensionsRemoveUndeclared
-
 // dropImportExtensions removes from the workspace config, the lock and the
 // disk each extension of candidates that no putnami.json of the workspace
 // names after the sync, and keeps, with a note, each one a project still
@@ -455,12 +449,12 @@ func dropImportExtensions(wsRoot string, candidates []string) error {
 	if len(drop) == 0 {
 		return nil
 	}
-	before := wsproto.Load(wsRoot)
 	if err := undeclareExtensions(wsRoot, drop); err != nil {
 		return err
 	}
 	for _, e := range drop {
-		if err := removeInitExtension(wsRoot, before, e); err != nil {
+		// Each removal reads the config as the previous ones left it.
+		if err := removeInitExtension(wsRoot, wsproto.Load(wsRoot), e); err != nil {
 			return fmt.Errorf("%s: %w", e, err)
 		}
 	}
@@ -486,7 +480,12 @@ func namedExtensions(wsRoot string) (map[string]bool, error) {
 			return nil
 		}
 		if cfg := wsproto.LoadProjectConfig(filepath.Dir(p)); cfg != nil {
+			// A path entry names the extension its manifest states.
+			list := map[string]string{}
 			for _, e := range cfg.Extensions {
+				list[e] = ""
+			}
+			for _, e := range initDeclaredNames(wsRoot, &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: list}}) {
 				named[e] = true
 			}
 		}

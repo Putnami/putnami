@@ -472,6 +472,9 @@ func importReason(declared, isTS bool, task string, target detect.Target) string
 	if strings.ContainsAny(runs, "&|;") {
 		return fmt.Sprintf("its script chains another command (%q), which @putnami/typescript does not run: %s keeps running through nx run", runs, task)
 	}
+	if task == "test" && stacks.TestArgumentsDropped(runs) != "" {
+		return fmt.Sprintf("its test runner takes arguments (%q) that @putnami/typescript would drop: move them to the runner's configuration; %s keeps running through nx run", stacks.TestArgumentsDropped(runs), task)
+	}
 	if task == "lint" && (target.Executor == eslintExecutor || strings.Contains(runs, "eslint")) {
 		return fmt.Sprintf("its ESLint takes arguments or options (%q) that @putnami/typescript would drop: move them to the ESLint configuration; %s keeps running through nx run", runs, task)
 	}
@@ -582,6 +585,11 @@ func coveredByTypeScript(root, dir, task string, target detect.Target) bool {
 	}
 	command := strings.TrimSpace(target.Command)
 	if task == "lint" && strings.Contains(command, "eslint") {
+		return false
+	}
+	if task == "test" && stacks.TestArgumentsDropped(command) != "" {
+		// The extension passes none of the script's arguments: one that
+		// chooses a configuration or a subset changes what the runner checks.
 		return false
 	}
 	return runsOnly(command, typeScriptCommands[task])
