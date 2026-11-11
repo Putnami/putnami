@@ -30,27 +30,36 @@ from Nx that Putnami's cache does not give, and stays on Nx all the same.
 ## Decision
 
 - The sync maps an `@nx/js:tsc` `build` target when, its options merged as
-  Nx merges them (the `targetDefaults` entry of its executor, else of its
-  name, then the target, then its `defaultConfiguration`, with
-  `{projectRoot}`, `{workspaceRoot}` and `{projectName}` replaced), the tsc
-  build writes exactly what the executor writes:
+  Nx merges them, the tsc build writes exactly what the executor writes. The
+  target lies over the `targetDefaults` entry of its executor, else of its
+  name, else of the first glob key that matches its name, and an entry with
+  another executor applies to none; the target's executor,
+  `defaultConfiguration`, options and each configuration's options win key
+  by key; the options of the default configuration apply last; and
+  `{projectRoot}`, `{workspaceRoot}` and `{projectName}` are replaced, a
+  leading `{workspaceRoot}/` removed. Then:
   - no `assets`, no `transformers`, and `generatePackageJson` set to
     `false`; every other option is one the executor reads only to write the
-    `package.json` it no longer writes, or `main`, `clean` and `watch`; any
-    other option keeps the target on Nx;
+    `package.json` it no longer writes, or `main`, `clean` and `watch`. Any
+    other option keeps the target on Nx, among them `external` and
+    `externalBuildTargets`, with which the executor inlines dependencies into
+    its `outputPath` and rewrites their imports;
   - `tsConfig` names the config the tsc build compiles: the one the
     project's `build` script names, which must run `tsc` alone, else
     `tsconfig.lib.json`, else `tsconfig.json`;
-  - `outputPath` is that config's `outDir`, and `rootDir`, else the project
-    root, the `rootDir` the config declares; a config that declares none
-    lets `tsc` compute it from the sources, which the sync does not;
+  - `outputPath` is that config's `outDir`, inside the project, where the
+    tsc build owns and restores its output (ADR 0009), and `rootDir`, else
+    the project root, the `rootDir` the config declares; a config that
+    declares none lets `tsc` compute it from the sources, which the sync
+    does not;
   - the build writes no `.tsbuildinfo`, or the config names it with
     `tsBuildInfoFile`.
 - For a mapped target the sync writes `options["@putnami/typescript"].compiler
   = "tsc"` in the project's `putnami.json` when the project sets none, since
   no `build` script selects the tsc build, records that in
   `options["@putnami/nx"].typescriptCompiler`, and removes only a value it
-  wrote once the target no longer maps.
+  wrote once the target no longer maps. A project that sets another
+  compiler keeps the target on Nx, since the tsc build would not run.
 - Every other `@nx/js:tsc` target keeps running through Nx, listed with the
   first condition it fails.
 - The sync reads the `tsconfig` chain with the reader `@putnami/typescript`
@@ -77,5 +86,10 @@ from Nx that Putnami's cache does not give, and stays on Nx all the same.
 - The reason a target stays names the option to change, so a team moves a
   library by editing its `project.json` or `tsconfig`, and the next sync
   maps it.
+- Two differences remain outside a successful compile. The executor
+  compiles with `noEmitOnError`, so a type error leaves its `outputPath`
+  empty, where the tsc build emits and then fails the task. With `clean`
+  `false` the executor keeps files a source no longer emits, which the tsc
+  build removes.
 - A change of the executor's behaviour in a later Nx release that reaches
   these options needs this mapping revisited.

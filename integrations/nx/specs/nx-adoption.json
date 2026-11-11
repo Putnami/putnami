@@ -58,11 +58,11 @@
     },
     {
       "id": "import-maps-a-tsc-build-target",
-      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone, or when it is an @nx/js:tsc target import-maps-an-nx-js-tsc-build-target maps. Any other tsc target keeps running through Nx and is listed with its reason."
+      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone, or when it is an @nx/js:tsc target that import-maps-an-nx-js-tsc-build-target maps. Any other tsc target keeps running through Nx and is listed with its reason."
     },
     {
       "id": "import-maps-an-nx-js-tsc-build-target",
-      "text": "An @nx/js:tsc build target maps when, with nx.json targetDefaults and its default configuration applied, it copies no assets, sets generatePackageJson false and no other emit option, its tsConfig is the config the tsc build compiles, its outputPath that config's outDir, its rootDir (else the project root) the config's rootDir, and the build writes no .tsbuildinfo the config does not name. The sync then owns options[\"@putnami/typescript\"].compiler tsc. Another stays on Nx with its reason."
+      "text": "An @nx/js:tsc build maps when, with nx.json targetDefaults and its default configuration applied, it sets no assets, external or other emit option and generatePackageJson false, its tsConfig is the config the tsc build compiles, its outputPath that config's outDir, inside the project, its rootDir (else the project root) the config's rootDir, and no .tsbuildinfo goes unnamed. The sync then owns options[\"@putnami/typescript\"].compiler tsc unless the project sets another. Others stay on Nx with their reason."
     }
   ],
   "decisions": [
