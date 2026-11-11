@@ -48,7 +48,7 @@ func typeCheckDiagnostics(t *testing.T, ctx *pctx.Context) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := build.RunTypeCheck(bun, filepath.Join(ctx.WorkspaceRoot, "webapp"), t.TempDir())
+	result, err := build.RunTypeCheck(bun, filepath.Join(ctx.WorkspaceRoot, "webapp"), t.TempDir(), false)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -16,8 +16,9 @@ Putnami adopts a tool in one of two modes:
   What an import maps depends on the tool: every Rush project, each moon
   project whose language has a Putnami extension, and in Nx and Turborepo
   only a TypeScript project's targets whose script already runs `bun build`,
-  `bun test` or Biome, and a `build` that runs `tsc` alone. Each tool's
-  section below gives the exact scope.
+  Biome, a test runner Putnami runs: `bun test`, Vitest or Jest, or a
+  `build` that runs `tsc` alone. Each tool's section below gives the exact
+  scope.
 
 | Tool | Mode | Command |
 |---|---|---|
@@ -219,12 +220,14 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
 `--mode delegate`.
 
 - **Import**: a TypeScript project's `build`, `test` and `lint` whose script
-  already runs `bun build`, `bun test` or Biome run as `@putnami/typescript`
-  tasks, under Putnami's runner and cache. So does a `build` whose script
-  runs `tsc` alone: Putnami compiles it with that `tsc`, into its `outDir`.
-  Every other target, a `jest` test, an `@nx/js:tsc` or an
-  `@nx/webpack:webpack` build for example, keeps running through Nx, so no
-  target changes the tool that checks it.
+  already runs `bun build`, `bun test`, `vitest`, `jest` or Biome run as
+  `@putnami/typescript` tasks, under Putnami's runner and cache, and so does a
+  test target of the `@nx/vite:test` or `@nx/jest:jest` executor. A Vitest or
+  Jest test keeps its runner and its configuration. So does a `build` whose
+  script runs `tsc` alone: Putnami compiles it with that `tsc`, into its
+  `outDir`. Every other target, an `@nx/js:tsc` or `@nx/webpack:webpack` build
+  or an `eslint` lint for example, keeps running through Nx, so no target
+  changes the tool that checks it.
 - **Delegate**: you keep Nx and its cache, local or Nx Cloud. Each task runs
   `nx run <project>:<target>` on one affected project, and Putnami caches
   nothing for it.
@@ -268,11 +271,13 @@ the extension, the projects it depends on, and the jobs it disables:
 
 A project with no `lint` target has `lint` disabled. In import mode a
 TypeScript project's `extensions` also names `@putnami/typescript`, and its
-`disable.jobs` names the extension that does not run each target: `@putnami/nx:test` when a `bun test` script moves to
+`disable.jobs` names the extension that does not run each target:
+`@putnami/nx:test` when a `bun test`, `vitest` or `jest` test moves to
 `@putnami/typescript`, `@putnami/typescript:build` when a
-`@nx/webpack:webpack` build keeps running through Nx. The sync owns these
-entries. The output lists each target Putnami does not run itself, such as
-`serve`, `e2e` or a `jest` test, with the reason.
+`@nx/webpack:webpack` build keeps running through Nx. A Vitest or Jest test
+also records its runner in `options["@putnami/typescript:test"].runner`. The
+sync owns these entries. The output lists each target Putnami does not run
+itself, such as `serve`, `e2e` or a `mocha` test, with the reason.
 
 In import mode, `@putnami/typescript`'s workspace install keeps the
 repository's package manager: it lists the projects where that manager reads
@@ -460,12 +465,12 @@ the result.
 Turborepo adopts in either mode:
 
 - **Import**: a TypeScript package's task whose script already runs
-  `bun build`, `bun test` or `biome` runs the `@putnami/typescript` task,
-  with Putnami's cache, and so does a `build` script that runs `tsc` alone,
-  which Putnami compiles with that `tsc` into its `outDir`. Every other task,
-  such as a bundler build or a `vitest`, `jest` or `eslint` script, keeps
-  running through Turborepo: moving it would change the tool that checks the
-  code. Import mode also declares `@putnami/typescript`,
+  `bun build`, `bun test`, `vitest`, `jest` or `biome` runs the
+  `@putnami/typescript` task, with Putnami's cache; a Vitest or Jest test keeps
+  its runner and its configuration, and a `build` script that runs `tsc` alone
+  compiles with that `tsc` into its `outDir`. Every other task, such as a
+  bundler build or an `eslint` script, keeps running through Turborepo: moving
+  it would change the tool that checks the code. Import mode also declares `@putnami/typescript`,
   whose setup adds its devDependencies to the root `package.json`, lists the
   packages where the repository's package manager reads its members, writes a
   root `tsconfig.json` and `biome.json` when they are missing, and installs
@@ -511,7 +516,8 @@ In a terminal, `init` asks the mode:
 records the mode in `putnami.workspace.json`, installs the extensions and
 synchronizes the projects. The sync reads the package manifests and
 `turbo.json`, and writes in each package's `putnami.json` the extension that
-runs it and the packages it depends on:
+runs it and the packages it depends on. In delegate mode, a package of the
+demo reads:
 
 ```json
 {
@@ -525,11 +531,11 @@ runs it and the packages it depends on:
 
 A package with no `build`, `lint` or `test` task, that is no script of that
 name or no task of that name in `turbo.json`, has it disabled. The sync then
-lists what it does not map, which keeps running through Turborepo:
+lists what it does not map, which keeps running through Turborepo; in delegate
+mode:
 
 ```text
 Not mapped, kept on Turborepo:
-  @demo/api#test: @putnami/typescript runs bun test, not "vitest run": it keeps running through Turborepo, with turbo run test
   dev: no Putnami task maps it: it keeps running through Turborepo, with turbo run dev
 Test result from the exit code alone, no JUnit report named: apps/api, packages/pricing
 ```

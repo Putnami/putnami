@@ -175,7 +175,7 @@ func Sync(root string, opts Options) (Result, error) {
 			default:
 				m.disabled = append(m.disabled, TypeScriptExtension+":"+task)
 				unmapped[p.SourceName+"#"+task] = fmt.Sprintf("%s runs %s, not %q: it keeps running through Turborepo, with turbo run %s",
-					TypeScriptExtension, strings.Join(typeScriptCommands[task], " or "), script, task)
+					TypeScriptExtension, typeScriptRuns(task), script, task)
 			}
 		}
 		members = append(members, m)
@@ -376,14 +376,24 @@ func ownedJob(job string) bool {
 
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs. A script that runs one keeps its tool when the extension
-// takes the task over, and so does a build script that runs tsc alone, which
-// the extension compiles with that tsc. Any other tsc, vitest, jest or eslint
-// script stays on Turborepo, because moving it would change the tool that
-// checks the code.
+// takes the task over: the test task runs the vitest or jest a test script
+// runs, and a build script that runs tsc alone compiles with that tsc. Any
+// other tsc script, or an eslint script, stays on Turborepo, because moving
+// it would change the tool that checks the code.
 var typeScriptCommands = map[string][]string{
-	stacks.TaskBuild: {"bun build", "tsc alone"},
-	stacks.TaskTest:  {"bun test"},
+	stacks.TaskBuild: {"bun build"},
+	stacks.TaskTest:  {"bun test", "vitest", "jest", "npx vitest", "npx jest"},
 	stacks.TaskLint:  {"biome", "bunx biome", "bunx @biomejs/biome"},
+}
+
+// typeScriptRuns names what the TypeScript extension's task runs, for the
+// reason a task stays on Turborepo.
+func typeScriptRuns(task string) string {
+	runs := typeScriptCommands[task]
+	if task == stacks.TaskBuild {
+		runs = append(slices.Clone(runs), "tsc alone")
+	}
+	return strings.Join(runs, " or ")
 }
 
 // runsTypeScriptTask reports whether a package script runs what the

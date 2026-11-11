@@ -336,9 +336,15 @@
         "**/*.test.ts",
         "**/*.spec.ts",
         "**/*.test.tsx",
-        "**/*.spec.tsx"
+        "**/*.spec.tsx",
+        "**/__tests__/**/*.ts",
+        "**/__tests__/**/*.tsx"
       ],
       "flags": {
+        "runner": {
+          "type": "string",
+          "description": "Test runner: bun, vitest or jest. Default: the runner the project's package.json test script runs, else bun"
+        },
         "timeout": {
           "type": "number",
           "default": 5000,
@@ -1438,7 +1444,7 @@
       }
     },
     "build-tsc": {
-      "description": "Compile a project with the tsc its package.json build script runs, into the outDir its tsconfig names, where the packages that depend on it resolve its main and exports (ADR 0008). The task resolves the compiler itself: a project that compiles with Bun compiles nothing here and reports no output. It refuses an outDir that is unset, outside the project, not ignored by Git or holding a tracked file, empties its outputs, since the engine empties no pathFrom output, and runs node_modules/typescript/bin/tsc with Bun. tsc -b on a config with references runs as tsc -p: Putnami builds or restores each reference first, through ^tsc and readByDependents, and tsc -b would rebuild a restored reference in place, because a restored file keeps the time its blob was stored. The key reads the project's files Git does not ignore, so the ignored output never keys its own build, and the top-level JSON and tsconfig files of the dependency closure, a shared configuration package or a reference's config included.",
+      "description": "Compile a project with the tsc its package.json build script runs, into the outDir its tsconfig names, where the packages that depend on it resolve its main and exports (ADR 0009). The task resolves the compiler itself: a project that compiles with Bun compiles nothing here and reports no output. It refuses an outDir that is unset, outside the project, not ignored by Git or holding a tracked file, empties its outputs, since the engine empties no pathFrom output, and runs node_modules/typescript/bin/tsc with Bun. tsc -b on a config with references runs as tsc -p: Putnami builds or restores each reference first, through ^tsc and readByDependents, and tsc -b would rebuild a restored reference in place, because a restored file keeps the time its blob was stored. The key reads the project's files Git does not ignore, so the ignored output never keys its own build, and the top-level JSON and tsconfig files of the dependency closure, a shared configuration package or a reference's config included.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -2196,6 +2202,9 @@
             "tsconfig.base.json"
           ]
         },
+        "runner": {
+          "from": "params"
+        },
         "extensionVersion": {
           "from": "runtime"
         }
@@ -2239,7 +2248,10 @@
           "from": "project",
           "files": [
             "test/**/*.ts",
-            "test/**/*.tsx"
+            "test/**/*.tsx",
+            "**/__tests__/**/*.ts",
+            "**/__tests__/**/*.tsx",
+            "!node_modules/**"
           ]
         },
         "config": {
@@ -2248,10 +2260,25 @@
             "package.json"
           ]
         },
+        "runnerConfig": {
+          "from": "project",
+          "files": [
+            "vitest.config.*",
+            "vite.config.*",
+            "vitest.setup.*",
+            "jest.config.*",
+            "jest.setup.*",
+            "babel.config.*",
+            "tsconfig*.json"
+          ]
+        },
         "DATABASE_TEST_BINDINGS": {
           "from": "env"
         },
         "test-verbose": {
+          "from": "params"
+        },
+        "runner": {
           "from": "params"
         },
         "workspaceConfig": {

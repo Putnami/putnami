@@ -5,7 +5,7 @@ TypeScript extension for Putnami — provides build, test, lint, serve, run, and
 ## Features
 
 - **Build** — 4-phase pipeline (generate, transpile, types, compile) with independent caching
-- **Test** — Bun test runner with JUnit reports and LCOV coverage
+- **Test** — Bun, Vitest or Jest, with JUnit reports and LCOV coverage
 - **Lint** — Biome formatting and linting with zero-config defaults
 - **Validate** — a stable package's public API cannot break without a breaking-change marker
 - **Serve** — Development server with hot-reload, debugger, and structured log forwarding
@@ -51,7 +51,7 @@ putnami build my-app --compile    # With standalone binary
 | Command | Purpose | Key Flags |
 |---------|---------|-----------|
 | `putnami build` | Compile TypeScript to JS, types, and executables | `--compile`, `--target`, `--bundle`, `--release` |
-| `putnami test` | Run tests with Bun's test runner | `--watch`, `--coverage`, `--coverage-threshold`, `--bail`, `--timeout`, `--timeout-budget` |
+| `putnami test` | Run tests with the project's test runner: Bun, Vitest or Jest | `--runner`, `--watch`, `--coverage`, `--coverage-threshold`, `--bail`, `--timeout`, `--timeout-budget` |
 | `putnami lint` | Format and lint with Biome | `--fix`, `--diagnostic-level` |
 | `putnami validate` | Fail an incompatible API change of a stable package without a breaking-change marker | — |
 | `putnami serve` | Start dev server with hot-reload | `--port`, `--debug`, `--inspect` |

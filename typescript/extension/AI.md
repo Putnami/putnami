@@ -29,7 +29,7 @@ tsc / tsc-auto              (a library whose build script runs tsc alone)
 
 `build-tsc` compiles such a library with its own `tsc` into the `outDir` its
 `tsconfig` names, a `pathFrom` output its dependents read
-([ADR 0008](doc/adr/0008-a-tsc-build-declares-its-outdir-through-pathfrom.md)).
+([ADR 0009](doc/adr/0009-a-tsc-build-declares-its-outdir-through-pathfrom.md)).
 It empties that output itself, since the engine empties no `pathFrom` output,
 and runs `tsc -b` on a config with references as `tsc -p`. The rule of what
 "runs tsc alone" is lives in the SDK's `tscscript` package, which the Nx and

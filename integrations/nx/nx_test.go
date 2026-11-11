@@ -283,8 +283,8 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, TypeScriptExtension)
 	// pricing's scripts already run what @putnami/typescript runs: they move
-	// to it. The api keeps jest, a webpack build and an eslint lint, which
-	// stay on Nx.
+	// to it, and so does the api's jest test. The api keeps a webpack build and
+	// an eslint lint, which stay on Nx.
 	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "bun build src/index.ts --outdir dist", "test": "bun test", "lint": "biome check ."}}`)
 	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"build": {"executor": "@nx/webpack:webpack"}, "lint": {"executor": "@nx/eslint:lint"}}}`)
 	result := sync(t, root, SyncOptions{})
@@ -295,7 +295,7 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	if got, want := jobs("packages/pricing"), []any{"@putnami/nx:build", "@putnami/nx:lint", "@putnami/nx:test"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("pricing jobs = %v, want %v", got, want)
 	}
-	if got, want := jobs("apps/api"), []any{"@putnami/typescript:build", "@putnami/typescript:lint", "@putnami/typescript:test"}; !reflect.DeepEqual(got, want) {
+	if got, want := jobs("apps/api"), []any{"@putnami/nx:test", "@putnami/typescript:build", "@putnami/typescript:lint"}; !reflect.DeepEqual(got, want) {
 		t.Errorf("api jobs = %v, want %v", got, want)
 	}
 	// A putnami.json that names extensions is claimed by those alone: each
@@ -305,13 +305,13 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 			t.Errorf("%s extensions = %v, want %v", dir, got, want)
 		}
 	}
-	// A test the TypeScript extension runs carries no Nx reports; one that
-	// stays on Nx does.
+	// A test the TypeScript extension runs carries no Nx reports, and a bun
+	// test no runner.
 	if _, ok := readProjectFile(t, root, "packages/pricing")["options"]; ok {
-		t.Errorf("an imported test carries no Nx reports")
+		t.Errorf("an imported bun test carries no options")
 	}
-	if _, ok := readProjectFile(t, root, "apps/api")["options"]; !ok {
-		t.Errorf("a test that stays on Nx carries its reports")
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": "jest"}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("api options = %v, want %v", got, want)
 	}
 
 	// Without @putnami/typescript in the workspace, import runs every target
@@ -329,11 +329,77 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	}
 }
 
+func TestImportMapsVitestAndJestTestTargetsToTheTypeScriptTest(t *testing.T) {
+	spectest.Proves(t, feature, "import-maps-vitest-and-jest-tests", "import-maps-vitest-and-jest-test-targets-to-the-typescript-test")
+	d := readDemo(t)
+	cases := []struct {
+		name, projectJSON, script, runner string
+	}{
+		{"vitest script", "", "vitest run", "vitest"},
+		{"npx jest script", "", "npx jest --ci", "jest"},
+		{"@nx/vite:test", `{"name": "@demo/api", "targets": {"test": {"executor": "@nx/vite:test"}}}`, "", "vitest"},
+		{"@nx/jest:jest", `{"name": "@demo/api", "targets": {"test": {"executor": "@nx/jest:jest", "options": {"jestConfig": "apps/api/jest.config.js"}}}}`, "", "jest"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := repository(t, d, ModeImport, TypeScriptExtension)
+			if tc.script != "" {
+				writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "scripts": {"test": "`+tc.script+`"}}`)
+			}
+			if tc.projectJSON != "" {
+				writeFile(t, root, "apps/api/project.json", tc.projectJSON)
+			}
+			result := sync(t, root, SyncOptions{})
+			api := readProjectFile(t, root, "apps/api")
+			jobs := api["disable"].(map[string]any)["jobs"].([]any)
+			if !slices.Contains(jobs, any("@putnami/nx:test")) || slices.Contains(jobs, any("@putnami/typescript:test")) {
+				t.Errorf("jobs = %v, want the test on @putnami/typescript", jobs)
+			}
+			if got, want := api["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": tc.runner}}; !reflect.DeepEqual(got, want) {
+				t.Errorf("options = %v, want %v", got, want)
+			}
+			if slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool { return u.Project == "@demo/api" && u.Target == "test" }) {
+				t.Errorf("unmapped = %+v, want the test mapped", result.Unmapped)
+			}
+		})
+	}
+}
+
+func TestTheSyncOwnsTheTestRunnerOption(t *testing.T) {
+	spectest.Proves(t, feature, "import-maps-vitest-and-jest-tests", "the-sync-owns-the-test-runner-option")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	writeFile(t, root, "apps/api/putnami.json", `{"options": {"@putnami/typescript:test": {"timeout": 9000}}}`)
+	sync(t, root, SyncOptions{})
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": "jest", "timeout": float64(9000)}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("options = %v, want the runner beside the kept member", got)
+	}
+	// The test no longer runs jest: the runner goes, the other member stays.
+	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "scripts": {"test": "bun test"}}`)
+	sync(t, root, SyncOptions{})
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"timeout": float64(9000)}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("options = %v, want the runner removed", got)
+	}
+	// A former project loses the runner it was given.
+	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "scripts": {"test": "jest"}}`)
+	sync(t, root, SyncOptions{})
+	if err := os.Rename(filepath.Join(root, "apps/api"), filepath.Join(root, "old-api")); err != nil {
+		t.Fatal(err)
+	}
+	if result := sync(t, root, SyncOptions{}); !slices.Contains(result.Retracted, "old-api/putnami.json") {
+		t.Fatalf("retracted = %v, want the former project", result.Retracted)
+	}
+	if got := readProjectFile(t, root, "old-api")["options"]; !reflect.DeepEqual(got, map[string]any{TypeScriptExtension + ":test": map[string]any{"timeout": float64(9000)}}) {
+		t.Fatalf("former project options = %v, want the runner retracted", got)
+	}
+}
+
 func TestAnUnmappedTargetIsListedWithItsReason(t *testing.T) {
 	spectest.Proves(t, feature, "unmapped-targets-are-listed", "an-unmapped-target-is-listed-with-its-reason")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, TypeScriptExtension)
 	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"build": {"executor": "@nx/webpack:webpack"}}}`)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "tsc -p tsconfig.json", "test": "mocha"}}`)
 	result := sync(t, root, SyncOptions{})
 	reasons := map[string]string{}
 	for _, u := range result.Unmapped {
@@ -342,12 +408,14 @@ func TestAnUnmappedTargetIsListedWithItsReason(t *testing.T) {
 	for key, want := range map[string]string{
 		"@demo/api:start":    "nx run @demo/api:start",
 		"@demo/api:build":    "@nx/webpack:webpack",
-		"@demo/api:test":     `not "jest"`,
-		"@demo/pricing:test": `not "jest"`,
+		"@demo/pricing:test": `not "mocha"`,
 	} {
 		if !strings.Contains(reasons[key], want) {
 			t.Errorf("%s reason = %q, want %q (all: %v)", key, reasons[key], want, reasons)
 		}
+	}
+	if reason, ok := reasons["@demo/api:test"]; ok {
+		t.Errorf("the api's jest test is listed as unmapped: %s", reason)
 	}
 
 	// pricing's tsc -p build script moves to @putnami/typescript.

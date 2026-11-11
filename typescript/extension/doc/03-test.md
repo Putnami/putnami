@@ -1,6 +1,6 @@
 # Test
 
-The test command discovers and runs tests using Bun's built-in test runner. It produces JUnit XML reports and optional LCOV coverage output.
+The test command discovers and runs a project's tests with its test runner: Bun's built-in runner by default, or the project's Vitest or Jest. Every runner produces the same JUnit XML report and optional LCOV coverage output.
 
 ## Overview
 
@@ -64,6 +64,40 @@ putnami test . --rerun-each 3
 putnami test . --concurrent
 ```
 
+## Test runner
+
+A project keeps the runner it already uses. Its runner is, in order:
+
+1. the `runner` parameter of the test command, `bun`, `vitest` or `jest`: `--runner` on the command line, or `runner` in the test layer of the project's `putnami.json`;
+2. the runner its `package.json` `test` script runs: the first command that starts `vitest`, `jest` or `bun test`, also after `npx`, `pnpm exec`, `dotenv --` or an environment assignment, through `node <path to the runner's entry>`, and into another script it runs with `npm run`, `bun run`, `pnpm` or `yarn`;
+3. Bun.
+
+```json
+{
+  "options": {
+    "@putnami/typescript:test": { "runner": "vitest" }
+  }
+}
+```
+
+`options.test.runner` sets it as well. The parameter is an input of the test task's cache key.
+
+Vitest and Jest run the JavaScript entry the `bin` field of their package names, from `node_modules` of the project or of a directory above it up to the workspace root, with the `node` on `PATH`. Add the runner to the project's `devDependencies` and run `putnami install`. Without `node`, the test task fails and names it: install Node.js, or choose `bun`. A Bun project needs no `node`.
+
+The runner keeps reading its own configuration. Its configuration and setup files (`vitest.config.*`, `vite.config.*`, `vitest.setup.*`, `jest.config.*`, `jest.setup.*`, `babel.config.*`, `tsconfig*.json`), the project's `src/` and `test/` sources and every `__tests__` directory are inputs of the task's cache key. A test file is a `*.test.*` or `*.spec.*` file, or, as Jest's default `testMatch` reads it, any `.ts`, `.tsx`, `.js` or `.jsx` file under a `__tests__` directory. A test elsewhere, in `tests/` for example, runs, but an edit to it does not invalidate the cached result: keep tests in `src/`, `test/` or `__tests__/`. Putnami passes only the flags that place the reports and select what you asked for:
+
+| Runner | Command | Reports |
+|---|---|---|
+| Bun | `bun test` | `--reporter=junit`, and `--coverage-reporter=lcov` with coverage |
+| Vitest | `node <vitest entry> run` | its `junit` reporter, and with coverage its `lcovonly` coverage reporter |
+| Jest | `node <jest entry> --json --testLocationInResults` | its JSON result, which the task converts to JUnit, so no reporter package is needed; with coverage its `lcovonly` coverage reporter |
+
+`--test`, `--bail`, `--update-snapshots` and `--pass-with-no-tests` reach every runner. The per-test `--timeout` reaches Bun alone: a Vitest or Jest project sets its `testTimeout` in its configuration. `--concurrent`, `--parallel`, `--only`, `--todo` and `--rerun-each` are Bun options.
+
+Vitest instruments coverage through a provider package: with coverage on and neither `@vitest/coverage-v8` nor `@vitest/coverage-istanbul` installed, the run reports no coverage and says so, and `--coverage-threshold` fails for lack of data. Jest needs no extra package.
+
+The summary, the test cases and `--enforce-coverage` read the reports the same way whatever the runner. The `types` step checks a Vitest or Jest project with its own tsconfig's compiler options, its strictness, module system and `types` included, where the runner's globals are declared, instead of the Bun defaults of `build~types`.
+
 ## Execution Flow
 
 ```text
@@ -73,7 +107,7 @@ generate ──→ discover ──→ run ──→ parse
 
 1. **Generate** — runs the build generate phase to ensure `.gen/` is current. It writes the same `.gen/` tree as the `generate` step of `build`, so in a run such as `putnami lint,test,build` the planner orders the two: one never starts while the other, or a step that reads its output, still runs
 2. **Discover** — scans the project for test files matching `**/*.{test,spec}.{ts,tsx,js,jsx}` (excludes `node_modules`, `.gen`, and `dist` directories)
-3. **Run** — executes `bun test` with discovered files and configured options
+3. **Run** — executes the project's [test runner](#test-runner) with the configured options
 4. **Parse** — reads JUnit XML and optional LCOV output, extracts failures and metrics
 
 If no test files are found, the command returns `SKIP` (exit 0) unless `--pass-with-no-tests` is `false`.
@@ -304,4 +338,4 @@ mechanics.
 - **Scope**: Discovering and running tests, producing reports (JUnit, LCOV)
 - **Out of scope**: Test file generation, mocking frameworks, test environment setup. Use Bun's built-in test utilities (`bun:test`) for assertions and mocks.
 - **Dependencies**: Requires Bun runtime with `bun:test` support
-- **Extension points**: None. Test configuration is controlled entirely through CLI flags and Bun's built-in test runner options.
+- **Extension points**: None. Test configuration is controlled through CLI flags and the configuration of the project's test runner.

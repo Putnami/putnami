@@ -51,6 +51,20 @@
           }
         },
         {
+          "id": "import-maps-vitest-and-jest-tests",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "import-maps-vitest-and-jest-test-targets-to-the-typescript-test",
+              "the-sync-owns-the-test-runner-option"
+            ]
+          }
+        },
+        {
           "id": "delegate-imports-listed-projects",
           "stage": "coded",
           "evidenceKinds": [

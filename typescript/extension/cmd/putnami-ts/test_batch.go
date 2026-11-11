@@ -63,18 +63,13 @@ func runTestBatch(ctx *pctx.Context, emit *jsonl.Emitter) (string, map[string]an
 		return "FAILED", nil, fmt.Errorf("test batch requires at least one selected project")
 	}
 
-	bunBin, err := resolveBunBin()
-	if err != nil {
-		return "FAILED", nil, err
-	}
-
 	// Every batch-mate resolved identical effective params (the scheduler folds
 	// them into the batch key), so a single resolution is correct for all.
 	params := testParamsFromContext(ctx)
 
 	results := make([]testBatchProjectResult, 0, len(projects))
 	for _, proj := range projects {
-		results = append(results, runProjectTestSuite(ctx, emit, proj, bunBin, params))
+		results = append(results, runProjectTestSuite(ctx, emit, proj, params))
 	}
 	return "OK", map[string]any{"batchResults": results}, nil
 }
@@ -87,7 +82,6 @@ func runProjectTestSuite(
 	ctx *pctx.Context,
 	emit *jsonl.Emitter,
 	proj pctx.ProjectRef,
-	bunBin string,
 	params testjob.TestParams,
 ) testBatchProjectResult {
 	result := testBatchProjectResult{ProjectID: proj.ID, Status: "OK"}
@@ -101,6 +95,16 @@ func runProjectTestSuite(
 	if !hasTests {
 		// Matches the solo contract for an empty project: OK with no payload.
 		return result
+	}
+
+	// Each member runs its own runner: the batch shares parameters, not the
+	// runner a project chose.
+	command, err := resolveTestCommand(projectPath, ctx.WorkspaceRoot, params.Runner)
+	if err != nil {
+		return failTestBatchProject(result, proj.Name, "Test runner unavailable", err, errs.CodeTestsFailed.String())
+	}
+	if params.Coverage && command.CoverageUnavailable != "" {
+		result.Diagnostics = append(result.Diagnostics, testBatchDiagnostic{Severity: "warning", Description: command.CoverageUnavailable})
 	}
 
 	// bun's lcov reporter leaves per-worker shards next to the merged lcov.info.
@@ -122,7 +126,7 @@ func runProjectTestSuite(
 		params.SpecFragmentsDir = fragmentsDir
 	}
 
-	success, logs, runErr := runProjectBunTestWithRetry(bunBin, projectPath, outputPath, params)
+	success, logs, runErr := runProjectSuiteWithRetry(command, projectPath, outputPath, params)
 	emitTestTranscript(emit, logs, params.Verbose, proj.ID)
 	if runErr != nil {
 		// A crash (failed to spawn / timed out) survived one respawn: isolate it
@@ -199,24 +203,24 @@ func projectBatchOutputPath(ctx *pctx.Context, proj pctx.ProjectRef) string {
 	return filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", proj.Path, ctx.Job.Name)
 }
 
-// runProjectBunTestWithRetry runs one project's bun test suite, retrying once
-// only when RunTests returns an error: bun failed to start, so no test ran. A
+// runProjectSuiteWithRetry runs one project's test suite, retrying once only
+// when RunSuite returns an error: the runner failed to start, so no test ran. A
 // suite that exits, crashes or is killed at its timeout returns a result, not
 // an error, and is never retried. A failing or flaky test therefore fails the
 // run; retrying it would hide the failure.
-func runProjectBunTestWithRetry(bunBin, projectPath, outputPath string, params testjob.TestParams) (bool, string, error) {
-	success, logs, err := runProjectBunTest(bunBin, projectPath, outputPath, params)
+func runProjectSuiteWithRetry(command testjob.Command, projectPath, outputPath string, params testjob.TestParams) (bool, string, error) {
+	success, logs, err := runProjectSuite(command, projectPath, outputPath, params)
 	if err == nil {
 		return success, logs, nil
 	}
-	return runProjectBunTest(bunBin, projectPath, outputPath, params)
+	return runProjectSuite(command, projectPath, outputPath, params)
 }
 
-// runProjectBunTest is the single-attempt suite runner. It is a package
-// variable so batch isolation (crash/hung) can be unit-tested without a real
-// bun; production code always calls testjob.RunTests, whose wall-clock timeout
+// runProjectSuite is the single-attempt suite runner. It is a package variable
+// so batch isolation (crash/hung) can be unit-tested without a real runner;
+// production code always calls testjob.RunSuite, whose wall-clock timeout
 // bounds a hung suite.
-var runProjectBunTest = testjob.RunTests
+var runProjectSuite = testjob.RunSuite
 
 // specVerificationCategory tags diagnostics from the spec-verification merge,
 // mirroring the Go extension's batch category.

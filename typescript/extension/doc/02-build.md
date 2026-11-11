@@ -428,7 +428,7 @@ A library whose `package.json` `build` script runs `tsc` alone keeps that
 `tsc` and gains Putnami's cache: Putnami runs the script's command into the
 `outDir` its `tsconfig` names, where the packages that depend on it resolve
 its `main` and `exports`, instead of transpiling with Bun
-([ADR 0008](adr/0008-a-tsc-build-declares-its-outdir-through-pathfrom.md)).
+([ADR 0009](adr/0009-a-tsc-build-declares-its-outdir-through-pathfrom.md)).
 
 The `compiler` parameter chooses, in `options["@putnami/typescript"].compiler`
 of the project's `putnami.json` or with `--compiler`:

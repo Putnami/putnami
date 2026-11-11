@@ -31,12 +31,6 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	}
 
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
-
-	bunBin, err := resolveBunBin()
-	if err != nil {
-		return "FAILED", nil, err
-	}
-
 	params := testParamsFromContext(ctx)
 
 	// Phase 1: Discover
@@ -56,6 +50,15 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	}
 	emit.Log("info", "Test files found")
 	emit.PhaseEnd("discover", "success")
+
+	command, err := resolveTestCommand(projectPath, ctx.WorkspaceRoot, params.Runner)
+	if err != nil {
+		return "FAILED", nil, err
+	}
+	emit.Log("info", "Test runner: "+string(command.Runner))
+	if params.Coverage && command.CoverageUnavailable != "" {
+		emit.Log("warn", command.CoverageUnavailable)
+	}
 
 	// bun's lcov reporter leaves per-worker .lcov.info.*.tmp shards in the
 	// output dir alongside the merged lcov.info. Since the output dir is what the
@@ -85,7 +88,7 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	// Phase 2: Run
 	emit.Progress(2, 3, "Running tests")
 	emit.PhaseStart("run")
-	success, logs, err := testjob.RunTests(bunBin, projectPath, ctx.OutputPath, params)
+	success, logs, err := testjob.RunSuite(command, projectPath, ctx.OutputPath, params)
 	if err != nil {
 		emit.PhaseEnd("run", "failed")
 		return "FAILED", nil, err
@@ -209,6 +212,16 @@ func runTest(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 	return "OK", resultData, nil
 }
 
+// resolveTestCommand resolves the runner of the project at projectPath, from
+// the runner parameter or its test script, and the programs that start it.
+func resolveTestCommand(projectPath, workspaceRoot, runnerParam string) (testjob.Command, error) {
+	runner, err := testjob.ResolveRunner(projectPath, runnerParam)
+	if err != nil {
+		return testjob.Command{}, err
+	}
+	return testjob.ResolveCommand(runner, resolveBunBin, projectPath, workspaceRoot)
+}
+
 // testParamsFromContext resolves the test job parameters from the job context.
 // Solo and batched dispatch share it verbatim so a batched suite always runs
 // with the exact parameters its solo run would use (the scheduler additionally
@@ -246,6 +259,7 @@ func testParamsFromContext(ctx *pctx.Context) testjob.TestParams {
 		Concurrent:        ctx.Params.String("concurrent"),
 		Parallel:          ctx.Params.String("parallel"),
 		PassWithNoTests:   ctx.Params.Bool("pass-with-no-tests", true, "passWithNoTests"),
+		Runner:            ctx.Params.String("runner"),
 		Verbose:           ctx.Params.Bool("test-verbose", false, "testVerbose"),
 		DatabaseBinding:   provisionedDatabaseBinding(ctx),
 	}

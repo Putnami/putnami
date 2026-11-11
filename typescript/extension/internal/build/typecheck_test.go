@@ -7,6 +7,7 @@ import (
 	"slices"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/exec"
 )
 
@@ -32,7 +33,7 @@ func TestRunTypeCheck_SkipsAProjectWithNothingToCheck(t *testing.T) {
 		return &exec.Result{Success: true}, nil
 	})
 
-	result, err := RunTypeCheck("bun", dir, "")
+	result, err := RunTypeCheck("bun", dir, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +61,7 @@ func TestRunTypeCheck_ChecksEveryProjectFileWithoutEmitting(t *testing.T) {
 		return &exec.Result{Success: false, Stdout: "test/index.test.ts(1,1): error TS2578: Unused '@ts-expect-error' directive.\n"}, nil
 	})
 
-	result, err := RunTypeCheck("bun", dir, scratch)
+	result, err := RunTypeCheck("bun", dir, scratch, false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +118,7 @@ func TestRunTypeCheck_WithoutATsconfigExtendsNothing(t *testing.T) {
 		return &exec.Result{Success: true}, nil
 	})
 
-	result, err := RunTypeCheck("bun", dir, "")
+	result, err := RunTypeCheck("bun", dir, "", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -145,7 +146,7 @@ func TestRunTypeCheck_IncludesTheFilesUnderADotDirectory(t *testing.T) {
 		return &exec.Result{Success: true}, nil
 	})
 
-	if _, err := RunTypeCheck("bun", dir, ""); err != nil {
+	if _, err := RunTypeCheck("bun", dir, "", false); err != nil {
 		t.Fatal(err)
 	}
 	anchored := func(pattern string) any { return filepath.ToSlash(filepath.Join(dir, pattern)) }
@@ -184,6 +185,32 @@ func TestIsTypeCheckFile(t *testing.T) {
 	} {
 		if got := isTypeCheckFile(name); got != want {
 			t.Errorf("isTypeCheckFile(%q) = %v, want %v", name, got, want)
+		}
+	}
+}
+
+func TestRunTypeCheck_ProjectTypesKeepTheProjectsCompilerOptions(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-runner-choice", "a-vitest-or-jest-project-type-checks-with-its-own-compiler-options")
+	dir := t.TempDir()
+	writeProjectFiles(t, dir, "tsconfig.json", "src/sum.test.ts")
+	var args []string
+	withMockExec(t, func(_ string, a []string, _ ...exec.Option) (*exec.Result, error) {
+		args = a
+		return &exec.Result{Success: true}, nil
+	})
+	for _, projectTypes := range []bool{false, true} {
+		if _, err := RunTypeCheck("bun", dir, "", projectTypes); err != nil {
+			t.Fatal(err)
+		}
+		for _, flag := range []string{"--types", "--strict", "--module", "--moduleResolution", "--lib"} {
+			if got := slices.Contains(args, flag); got == projectTypes {
+				t.Errorf("projectTypes %v: args %v, %s present = %v", projectTypes, args, flag, got)
+			}
+		}
+		for _, flag := range []string{"--noEmit", "--skipLibCheck", "--pretty"} {
+			if !slices.Contains(args, flag) {
+				t.Errorf("projectTypes %v: args %v lack %s", projectTypes, args, flag)
+			}
 		}
 	}
 }

@@ -482,6 +482,37 @@
           }
         },
         {
+          "id": "test-runner-choice",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-runner-is-the-option-else-the-test-script-else-bun",
+              "vitest-and-jest-run-from-node-modules-bin-with-node",
+              "a-missing-node-fails-the-task-and-names-node",
+              "a-vitest-or-jest-project-type-checks-with-its-own-compiler-options"
+            ]
+          }
+        },
+        {
+          "id": "test-runner-reports",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "vitest-writes-junit-and-lcov-into-the-task-output",
+              "jest-json-results-convert-to-junit",
+              "runner-configuration-files-are-cache-inputs"
+            ]
+          }
+        },
+        {
           "id": "structured-reports",
           "stage": "coded",
           "evidenceKinds": [

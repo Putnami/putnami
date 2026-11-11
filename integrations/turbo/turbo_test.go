@@ -163,9 +163,8 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 	root := repository(t, d)
 
 	// Without a recorded mode the sync imports: both packages hold
-	// TypeScript sources, so they declare both extensions. Their tsc -p build
-	// moves to @putnami/typescript, and their vitest scripts stay on
-	// Turborepo.
+	// TypeScript sources, so they declare both extensions; their tsc -p build
+	// scripts and their vitest scripts move to the TypeScript extension.
 	result, err := Sync(root, Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -179,7 +178,7 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 		"extensions":   []any{ExtensionName, TypeScriptExtension},
 		"dependencies": []any{"/packages/pricing"},
 		"tags":         []any{"turbo"},
-		"disable":      map[string]any{"jobs": []any{"lint", "@putnami/typescript:test", "@putnami/turbo:build"}},
+		"disable":      map[string]any{"jobs": []any{"lint", "@putnami/turbo:test", "@putnami/turbo:build"}},
 	}
 	if !reflect.DeepEqual(api, want) {
 		t.Errorf("api putnami.json = %v, want %v", api, want)
@@ -255,6 +254,31 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 	}
 }
 
+func TestImportMapsVitestAndJestTestScriptsToTheTypeScriptTest(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-package-graph", "import-maps-vitest-and-jest-test-scripts-to-the-typescript-test")
+	d := readDemo(t)
+	for _, script := range []string{"vitest run --coverage", "vitest", "jest --ci", "npx jest"} {
+		t.Run(script, func(t *testing.T) {
+			root := repository(t, d)
+			writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "tsup src/index.ts", "test": "`+script+`"}}`)
+			result, err := Sync(root, Options{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			jobs := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"]
+			if !reflect.DeepEqual(jobs, []any{"lint", "@putnami/turbo:test", "@putnami/typescript:build"}) {
+				t.Errorf("pricing jobs = %v, want the test on @putnami/typescript", jobs)
+			}
+			if slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool { return u.Task == "@demo/pricing#test" }) {
+				t.Errorf("unmapped = %+v, want the test mapped", result.Unmapped)
+			}
+			if slices.Contains(result.Unreported, "packages/pricing") {
+				t.Errorf("unreported = %v: a test the TypeScript extension runs writes its own reports", result.Unreported)
+			}
+		})
+	}
+}
+
 func TestADryRunSyncPrintsTheDiffAndWritesNothing(t *testing.T) {
 	spectest.Proves(t, feature, "sync-previews-a-diff", "a-dry-run-sync-prints-the-diff-and-writes-nothing")
 	d := readDemo(t)
@@ -325,8 +349,9 @@ func TestTheSyncListsTheTasksItCannotMap(t *testing.T) {
 		t.Errorf("report:\n%s", lines)
 	}
 
-	// In import mode, a vitest script stays on Turborepo and is listed with
+	// In import mode, a mocha script stays on Turborepo and is listed with
 	// the tool @putnami/typescript would run instead; the tsc -p build moves.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "tsc -p tsconfig.json", "test": "mocha"}}`)
 	result, err = Sync(root, Options{Mode: ModeImport})
 	if err != nil {
 		t.Fatal(err)
@@ -335,7 +360,7 @@ func TestTheSyncListsTheTasksItCannotMap(t *testing.T) {
 	for _, u := range result.Unmapped {
 		reasons[u.Task] = u.Reason
 	}
-	if got := reasons["@demo/pricing#test"]; !strings.Contains(got, `runs bun test, not "vitest run"`) {
+	if got := reasons["@demo/pricing#test"]; !strings.Contains(got, `runs bun test or vitest or jest or npx vitest or npx jest, not "mocha"`) {
 		t.Errorf("pricing test reason = %q, unmapped %+v", got, result.Unmapped)
 	}
 	if _, listed := reasons["@demo/pricing#build"]; listed || !reflect.DeepEqual(result.Unreported, []string{"packages/pricing"}) {

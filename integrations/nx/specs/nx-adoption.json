@@ -26,7 +26,11 @@
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets that run bun build, bun test or biome, or a tsc build as import-maps-a-tsc-build-target says, run as that extension's task, and @putnami/nx:<task> is disabled. Any other build, test or lint target, such as jest or eslint, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets that run what that extension runs (bun build or tsc alone, see import-maps-a-tsc-build-target; bun test, vitest or jest; biome) run as its task, and @putnami/nx:<task> is disabled. Any other target, such as eslint or an Nx executor, stays on Nx, is listed with its reason, and @putnami/typescript:<task> is off."
+    },
+    {
+      "id": "import-maps-vitest-and-jest-tests",
+      "text": "In import mode, the test target of a TypeScript project whose script runs vitest or jest, or whose Nx executor is @nx/vite:test or @nx/jest:jest, runs as @putnami/typescript:test, and the sync writes that runner in options[\"@putnami/typescript:test\"].runner of its putnami.json. The sync owns that member: it removes it from a project whose test target no longer maps to Vitest or Jest, and from a former project."
     },
     {
       "id": "delegate-imports-listed-projects",
@@ -61,6 +65,6 @@
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
     "integrations/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md",
     "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
-    "typescript/extension/doc/adr/0008-a-tsc-build-declares-its-outdir-through-pathfrom.md"
+    "typescript/extension/doc/adr/0009-a-tsc-build-declares-its-outdir-through-pathfrom.md"
   ]
 }

@@ -1,4 +1,4 @@
-# ADR 0008 — A tsc build declares its outDir through pathFrom
+# ADR 0009 — A tsc build declares its outDir through pathFrom
 
 - **Status**: accepted
 - **Scope**: `@putnami/typescript` (`typescript/extension`), the `build-tsc`
