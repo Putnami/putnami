@@ -470,13 +470,18 @@ With `tsc`:
 - The key reads the project's files Git does not ignore, the top-level JSON
   and `tsconfig` files of each project it depends on, such as a shared
   configuration package, the root `tsconfig` files and lockfiles, and each
-  dependency's `tsc` key. `putnami test` plans the same step, so a dependent's
-  tests run against its libraries' compiled output.
-- `putnami package` refuses the project (`typescript-tsc-package-unsupported`):
-  its compiled code is in its `outDir`, not in the output `package` packs.
+  dependency's `tsc` key. `putnami test` plans the same step for each project
+  it tests, so a run that tests a library and its dependent runs the
+  dependent's tests after the library's `tsc`. A run that tests the dependent
+  alone, such as when the library has no tests, reads the `outDir` an earlier
+  build left: build first.
+- The npm packager, `putnami package --npm`, refuses the project
+  (`typescript-tsc-package-unsupported`): its compiled code is in its
+  `outDir`, not in the output the packager packs.
 
 The build refuses, before `tsc` runs, a config Putnami cannot own the emit
-of:
+of. The two Git checks apply in a Git work tree, which the build's key needs
+anyway:
 
 | Code | Cause |
 |---|---|

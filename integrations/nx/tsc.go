@@ -54,24 +54,28 @@ func tscBuild(root, dir string, target detect.Target) (covered, compiler bool, r
 }
 
 // nxJsTscBuild maps an @nx/js:tsc build target whose emit @putnami/typescript
-// reproduces: it copies no assets, compiles the config tsc -p compiles by
-// default, and writes into that config's outDir.
+// reproduces: it copies no assets, and it sets neither outputPath nor rootDir,
+// with which the executor overrides where the config emits, so the config
+// alone decides. It compiles the config tsc -p compiles by default, and the
+// project has no build script other than one that runs tsc alone, which the
+// tsc compiler would refuse.
 func nxJsTscBuild(root, dir string) (bool, bool, string) {
 	abs := filepath.Join(root, filepath.FromSlash(dir))
 	options := buildOptions(abs)
 	if assets, ok := options["assets"].([]any); ok && len(assets) > 0 {
 		return false, false, "@nx/js:tsc copies assets, which @putnami/typescript does not reproduce: build keeps running through nx run"
 	}
+	for _, option := range []string{"outputPath", "rootDir"} {
+		if value, _ := options[option].(string); value != "" {
+			return false, false, fmt.Sprintf("@nx/js:tsc sets %s %s, which overrides where the tsconfig emits, and @putnami/typescript compiles the tsconfig as written: build keeps running through nx run", option, nxPath(value, dir))
+		}
+	}
 	config := path.Join(dir, tscscript.DefaultConfig(abs))
 	if tsConfig, _ := options["tsConfig"].(string); tsConfig != "" && nxPath(tsConfig, dir) != config {
 		return false, false, fmt.Sprintf("@nx/js:tsc compiles %s, and @putnami/typescript compiles %s: build keeps running through nx run", nxPath(tsConfig, dir), config)
 	}
-	if outputPath, _ := options["outputPath"].(string); outputPath != "" {
-		outDir, ok := tscscript.OwnOutDir(filepath.Join(root, filepath.FromSlash(config)))
-		rel, err := filepath.Rel(root, outDir)
-		if !ok || err != nil || filepath.ToSlash(rel) != nxPath(outputPath, dir) {
-			return false, false, fmt.Sprintf("@nx/js:tsc writes to %s, not the outDir of %s, where @putnami/typescript compiles: build keeps running through nx run", nxPath(outputPath, dir), config)
-		}
+	if script, ok := buildScript(abs); ok && !tscscript.Runs(script) {
+		return false, false, fmt.Sprintf("the package.json build script %q does not run tsc alone, and @putnami/typescript would compile it: build keeps running through nx run", script)
 	}
 	return true, true, ""
 }

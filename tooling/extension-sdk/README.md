@@ -55,8 +55,8 @@ the author's-eye version, with the CLI-side behavior, is
 
 The `tscscript` package states when a `package.json` build script runs the
 TypeScript compiler alone (`tsc`, `tsc -b` or `tsc -p` with at most one
-config, plus `--pretty` or `--verbose`), the config `tsc -p` compiles for a
-project with no build script, and the `outDir` a config sets itself.
+config, plus `--pretty` or `--verbose`), and the config `tsc -p` compiles for
+a project with no build script.
 `@putnami/typescript` compiles such a project with that `tsc`, and the Nx and
 Turborepo imports move such a build to it, so the three read one rule.
 
