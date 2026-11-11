@@ -163,8 +163,9 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 	root := repository(t, d)
 
 	// Without a recorded mode the sync imports: both packages hold
-	// TypeScript sources, so they declare both extensions, and their tsc and
-	// vitest scripts stay on Turborepo.
+	// TypeScript sources, so they declare both extensions. Their tsc -p build
+	// moves to @putnami/typescript, and their vitest scripts stay on
+	// Turborepo.
 	result, err := Sync(root, Options{})
 	if err != nil {
 		t.Fatal(err)
@@ -178,7 +179,7 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 		"extensions":   []any{ExtensionName, TypeScriptExtension},
 		"dependencies": []any{"/packages/pricing"},
 		"tags":         []any{"turbo"},
-		"disable":      map[string]any{"jobs": []any{"lint", "@putnami/typescript:test", "@putnami/typescript:build"}},
+		"disable":      map[string]any{"jobs": []any{"lint", "@putnami/typescript:test", "@putnami/turbo:build"}},
 	}
 	if !reflect.DeepEqual(api, want) {
 		t.Errorf("api putnami.json = %v, want %v", api, want)
@@ -186,7 +187,7 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 
 	// A script that already runs what the TypeScript extension runs moves
 	// to it: the Turborepo job of that task is disabled.
-	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "tsc", "test": "bun test --coverage"}}`)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "tsc && cp README.md dist", "test": "bun test --coverage"}}`)
 	if _, err := Sync(root, Options{}); err != nil {
 		t.Fatal(err)
 	}
@@ -324,8 +325,8 @@ func TestTheSyncListsTheTasksItCannotMap(t *testing.T) {
 		t.Errorf("report:\n%s", lines)
 	}
 
-	// In import mode, a vitest or tsc script stays on Turborepo and is
-	// listed with the tool @putnami/typescript would run instead.
+	// In import mode, a vitest script stays on Turborepo and is listed with
+	// the tool @putnami/typescript would run instead; the tsc -p build moves.
 	result, err = Sync(root, Options{Mode: ModeImport})
 	if err != nil {
 		t.Fatal(err)
@@ -337,7 +338,7 @@ func TestTheSyncListsTheTasksItCannotMap(t *testing.T) {
 	if got := reasons["@demo/pricing#test"]; !strings.Contains(got, `runs bun test, not "vitest run"`) {
 		t.Errorf("pricing test reason = %q, unmapped %+v", got, result.Unmapped)
 	}
-	if _, listed := reasons["@demo/pricing#build"]; !listed || !reflect.DeepEqual(result.Unreported, []string{"packages/pricing"}) {
+	if _, listed := reasons["@demo/pricing#build"]; listed || !reflect.DeepEqual(result.Unreported, []string{"packages/pricing"}) {
 		t.Errorf("import: unmapped %+v, unreported %v", result.Unmapped, result.Unreported)
 	}
 }
@@ -586,5 +587,44 @@ func TestDelegateModeImportsThePackagesTheImportListSelects(t *testing.T) {
 	workspace("packages/[")
 	if _, err := Sync(root, Options{}); err == nil {
 		t.Error("a malformed entry passed")
+	}
+}
+
+func TestImportMapsABuildScriptThatRunsTscAlone(t *testing.T) {
+	spectest.Proves(t, feature, "import-maps-a-tsc-build-script", "a-tsc-alone-build-script-is-imported")
+	spectest.Proves(t, feature, "import-maps-a-tsc-build-script", "a-tsc-script-with-another-argument-stays-on-turborepo")
+	d := readDemo(t)
+	root := repository(t, d)
+	for script, mapped := range map[string]bool{
+		"tsc":                      true,
+		"tsc -b":                   true,
+		"tsc --build --verbose":    true,
+		"tsc -p tsconfig.lib.json": true,
+		"tsc --watch":              false,
+		"tsc -b --force":           false,
+		"tsc && cp README.md dist": false,
+		"NODE_ENV=production tsc":  false,
+		"tsup src/index.ts":        false,
+	} {
+		writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "`+script+`", "test": "bun test"}}`)
+		result, err := Sync(root, Options{Mode: ModeImport})
+		if err != nil {
+			t.Fatal(err)
+		}
+		reasons := map[string]string{}
+		for _, u := range result.Unmapped {
+			reasons[u.Task] = u.Reason
+		}
+		disabled := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"].([]any)
+		if mapped {
+			if _, listed := reasons["@demo/pricing#build"]; listed || !slices.Contains(disabled, any(ExtensionName+":build")) {
+				t.Errorf("%q: build listed %v, disabled %v; want it moved to %s", script, listed, disabled, TypeScriptExtension)
+			}
+			continue
+		}
+		reason := reasons["@demo/pricing#build"]
+		if !strings.Contains(reason, "tsc alone") || !strings.Contains(reason, script) || !slices.Contains(disabled, any(TypeScriptExtension+":build")) {
+			t.Errorf("%q: reason %q, disabled %v; want it kept on Turborepo with its reason", script, reason, disabled)
+		}
 	}
 }

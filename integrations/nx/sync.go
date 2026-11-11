@@ -354,6 +354,9 @@ type projectPlan struct {
 	disabled   []string
 	reports    map[string]any
 	unmapped   []Unmapped
+	// compiler reports an @nx/js:tsc build the TypeScript extension compiles
+	// with tsc, for which the sync writes the tsc compiler.
+	compiler bool
 }
 
 // planProject maps the targets of one project in the mode.
@@ -374,20 +377,33 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 	plan.typeScript = isTS
 	for _, task := range lifecycleTasks {
 		target, ok := targets[task]
+		covered := ok && isTS && coveredByTypeScript(task, target)
+		reason := ""
+		if ok && task == "build" && !covered {
+			// A tsc build moves when the TypeScript extension compiles it
+			// with that tsc (ADR 0008 of @putnami/typescript).
+			var tscCovered, compiler bool
+			tscCovered, compiler, reason = tscBuild(root, p.Path, target)
+			covered = isTS && tscCovered
+			plan.compiler = covered && compiler
+		}
+		if reason == "" && ok {
+			reason = importReason(typeScript, isTS, task, target)
+		}
 		switch {
 		case !ok:
 			plan.disabled = append(plan.disabled, task)
-		case isTS && coveredByTypeScript(task, target):
+		case covered:
 			plan.disabled = append(plan.disabled, ExtensionName+":"+task)
 		case typeScript && hasManifest(root, p.Path):
 			// The TypeScript extension claims the project too: the target
 			// runs through Nx alone.
 			plan.disabled = append(plan.disabled, TypeScriptExtension+":"+task)
 			if mode == ModeImport {
-				plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: importReason(typeScript, isTS, task, target)})
+				plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: reason})
 			}
 		case mode == ModeImport:
-			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: importReason(typeScript, isTS, task, target)})
+			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: reason})
 		}
 	}
 	if test, ok := targets["test"]; ok && !slices.Contains(plan.disabled, ExtensionName+":test") {
@@ -436,8 +452,8 @@ func hasManifest(root, dir string) bool {
 
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs: a target whose script runs one keeps its runner when the
-// extension takes it over. A jest, eslint or tsc target, or one an Nx
-// executor runs, stays on Nx.
+// extension takes it over. A build that runs tsc alone moves too (tscBuild).
+// A jest or eslint target, or one another Nx executor runs, stays on Nx.
 var typeScriptCommands = map[string][]string{
 	"build": {"bun build"},
 	"test":  {"bun test"},
@@ -646,6 +662,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 
 	setDisabled(doc, plan.disabled)
 	setReports(doc, plan.reports)
+	setCompiler(doc, plan.typeScript && plan.compiler)
 
 	if existing != nil && reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
@@ -667,6 +684,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, components) }))
 	setDisabled(doc, nil)
 	setReports(doc, nil)
+	setCompiler(doc, false)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
 	}

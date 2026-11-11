@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/tscscript"
 	"go.putnami.dev/tooling/observe/detect/nodeworkspace"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -375,10 +376,12 @@ func ownedJob(job string) bool {
 
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs. A script that runs one keeps its tool when the extension
-// takes the task over; a tsc, vitest, jest or eslint script stays on
-// Turborepo, because moving it would change the tool that checks the code.
+// takes the task over, and so does a build script that runs tsc alone, which
+// the extension compiles with that tsc. Any other tsc, vitest, jest or eslint
+// script stays on Turborepo, because moving it would change the tool that
+// checks the code.
 var typeScriptCommands = map[string][]string{
-	stacks.TaskBuild: {"bun build"},
+	stacks.TaskBuild: {"bun build", "tsc alone"},
 	stacks.TaskTest:  {"bun test"},
 	stacks.TaskLint:  {"biome", "bunx biome", "bunx @biomejs/biome"},
 }
@@ -386,6 +389,9 @@ var typeScriptCommands = map[string][]string{
 // runsTypeScriptTask reports whether a package script runs what the
 // TypeScript extension's task runs.
 func runsTypeScriptTask(task, script string) bool {
+	if task == stacks.TaskBuild && tscscript.Runs(script) {
+		return true
+	}
 	script = strings.TrimSpace(script)
 	for _, program := range typeScriptCommands[task] {
 		if script == program || strings.HasPrefix(script, program+" ") {

@@ -316,10 +316,11 @@ func TestAnImportedTurborepoMovesOnlyTheTasksTypeScriptRunsAndListsTheOthers(t *
 	}
 
 	// The import, as init --apply writes it: pricing's test script already
-	// runs bun test, so @putnami/typescript takes that task over; every tsc
-	// and vitest script stays on Turborepo and is listed.
+	// runs bun test, and api's build script runs tsc alone, so
+	// @putnami/typescript takes those tasks over; the tsup bundle and every
+	// vitest script stay on Turborepo and are listed.
 	clitest.WriteFile(t, filepath.Join(root, "packages/pricing/package.json"),
-		`{"name": "@demo/pricing", "version": "1.0.0", "type": "module", "main": "dist/index.js", "scripts": {"build": "tsc -p tsconfig.json", "test": "bun test"}, "dependencies": {"zod": "3.23.8"}}`)
+		`{"name": "@demo/pricing", "version": "1.0.0", "type": "module", "main": "dist/index.js", "scripts": {"build": "tsup src/index.ts", "test": "bun test"}, "dependencies": {"zod": "3.23.8"}}`)
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"),
 		`{"name": "shop", "extensions": ["/turbo-extension"], "includes": [], "options": {"@putnami/turbo": {"mode": "import"}}}`)
 	code, out = clitest.RunGateArgs(t, root, "projects", "sync")
@@ -329,7 +330,7 @@ func TestAnImportedTurborepoMovesOnlyTheTasksTypeScriptRunsAndListsTheOthers(t *
 	for _, want := range []string{
 		"dev: no Putnami task maps it",
 		`@demo/api#test: @putnami/typescript runs bun test, not "vitest run"`,
-		`@demo/pricing#build: @putnami/typescript runs bun build, not "tsc -p tsconfig.json"`,
+		`@demo/pricing#build: @putnami/typescript runs bun build or tsc alone, not "tsup src/index.ts"`,
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the sync lists %q:\n%s", want, out)
@@ -342,7 +343,7 @@ func TestAnImportedTurborepoMovesOnlyTheTasksTypeScriptRunsAndListsTheOthers(t *
 		deps     []string
 		disabled []string
 	}{
-		"apps/api":         {[]string{"/packages/pricing"}, []string{"lint", "@putnami/typescript:test", "@putnami/typescript:build"}},
+		"apps/api":         {[]string{"/packages/pricing"}, []string{"lint", "@putnami/typescript:test", "@putnami/turbo:build"}},
 		"packages/pricing": {nil, []string{"lint", "@putnami/turbo:test", "@putnami/typescript:build"}},
 	} {
 		doc := readProject(t, root, dir)
