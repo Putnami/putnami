@@ -997,9 +997,8 @@ func TestTheSyncJobReadsTheImportParameter(t *testing.T) {
 
 func TestImportMapsATscBuildTarget(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "a-tsc-alone-build-script-target-is-imported")
-	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "an-nx-js-tsc-target-is-imported")
-	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "an-nx-js-tsc-target-writing-outside-the-project-stays-on-nx")
-	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "an-nx-js-tsc-target-with-assets-stays-on-nx")
+	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "another-tsc-target-stays-on-nx")
+	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "an-nx-js-tsc-target-stays-on-nx")
 	d := readDemo(t)
 	cases := []struct {
 		name, packageJSON, projectJSON string
@@ -1010,18 +1009,8 @@ func TestImportMapsATscBuildTarget(t *testing.T) {
 		{"tsc --watch script", `{"name": "@demo/pricing", "scripts": {"build": "tsc --watch"}}`, "", false, `not "tsc --watch"`},
 		{"run-commands tsc", `{"name": "@demo/pricing"}`,
 			`{"name": "@demo/pricing", "targets": {"build": {"executor": "nx:run-commands", "options": {"command": "tsc -b"}}}}`, false, "nx:run-commands"},
-		{"@nx/js:tsc with outputPath", `{"name": "@demo/pricing"}`,
-			`{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "options": {"tsConfig": "{projectRoot}/tsconfig.lib.json", "outputPath": "packages/pricing/dist"}}}}`, false, "sets outputPath packages/pricing/dist"},
-		{"@nx/js:tsc with rootDir", `{"name": "@demo/pricing"}`,
-			`{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "options": {"rootDir": "packages/pricing"}}}}`, false, "sets rootDir"},
-		{"@nx/js:tsc beside another build script", `{"name": "@demo/pricing", "scripts": {"build": "nx build"}}`,
-			`{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc"}}}`, false, `"nx build" does not run tsc alone`},
-		{"@nx/js:tsc without outputPath", `{"name": "@demo/pricing"}`,
-			`{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "options": {"tsConfig": "packages/pricing/tsconfig.lib.json"}}}}`, true, ""},
-		{"@nx/js:tsc into dist/packages", `{"name": "@demo/pricing"}`,
-			`{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "options": {"tsConfig": "packages/pricing/tsconfig.lib.json", "outputPath": "dist/packages/pricing"}}}}`, false, "sets outputPath dist/packages/pricing"},
-		{"@nx/js:tsc with assets", `{"name": "@demo/pricing"}`,
-			`{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "options": {"assets": ["packages/pricing/*.md"]}}}}`, false, "copies assets"},
+		{"@nx/js:tsc", `{"name": "@demo/pricing", "scripts": {"build": "tsc -b"}}`,
+			`{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "options": {"tsConfig": "{projectRoot}/tsconfig.lib.json", "outputPath": "dist/packages/pricing"}}}}`, false, "@nx/js:tsc compiles with rootDir at the project root"},
 	}
 	for _, c := range cases {
 		root := repository(t, d, ModeImport, TypeScriptExtension)
@@ -1047,49 +1036,6 @@ func TestImportMapsATscBuildTarget(t *testing.T) {
 		if !strings.Contains(reason, c.reason) || !slices.Contains(jobs, any(TypeScriptExtension+":build")) {
 			t.Errorf("%s: reason %q, jobs %v; want it on Nx with %q", c.name, reason, jobs, c.reason)
 		}
-	}
-}
-
-func TestImportWritesTheTscCompilerOfAnNxJsTscTarget(t *testing.T) {
-	spectest.Proves(t, feature, "import-writes-the-tsc-compiler", "an-imported-nx-js-tsc-target-gets-the-tsc-compiler")
-	spectest.Proves(t, feature, "import-writes-the-tsc-compiler", "the-sync-removes-only-the-compiler-it-wrote")
-	d := readDemo(t)
-	root := repository(t, d, ModeImport, TypeScriptExtension)
-	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing"}`)
-	writeFile(t, root, "packages/pricing/tsconfig.json", `{"compilerOptions": {"outDir": "dist"}}`)
-	executor := `{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc"}}}`
-	writeFile(t, root, "packages/pricing/project.json", executor)
-	options := func() map[string]any {
-		o, _ := readProjectFile(t, root, "packages/pricing")["options"].(map[string]any)
-		return o
-	}
-
-	sync(t, root, SyncOptions{})
-	if got := options()[TypeScriptExtension]; !reflect.DeepEqual(got, map[string]any{"compiler": "tsc"}) {
-		t.Fatalf("typescript options = %v, want compiler tsc", got)
-	}
-	// The target stops mapping: the compiler the sync wrote goes away.
-	writeFile(t, root, "packages/pricing/project.json", `{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/webpack:webpack"}}}`)
-	sync(t, root, SyncOptions{})
-	if got, ok := options()[TypeScriptExtension]; ok {
-		t.Errorf("typescript options = %v after the target stopped mapping, want none", got)
-	}
-	if nx, _ := options()[ExtensionName].(map[string]any); nx[compilerRecord] != nil {
-		got := nx[compilerRecord]
-		t.Errorf("the record of the written compiler survives: %v", got)
-	}
-
-	// A compiler the project wrote stays, whatever the target does.
-	project := readProjectFile(t, root, "packages/pricing")
-	project["options"] = map[string]any{TypeScriptExtension: map[string]any{"compiler": "tsc"}}
-	data, _ := json.Marshal(project)
-	writeFile(t, root, "packages/pricing/putnami.json", string(data))
-	writeFile(t, root, "packages/pricing/project.json", executor)
-	sync(t, root, SyncOptions{})
-	writeFile(t, root, "packages/pricing/project.json", `{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/webpack:webpack"}}}`)
-	sync(t, root, SyncOptions{})
-	if got := options()[TypeScriptExtension]; !reflect.DeepEqual(got, map[string]any{"compiler": "tsc"}) {
-		t.Errorf("typescript options = %v, want the project's compiler kept", got)
 	}
 }
 
