@@ -43,6 +43,19 @@ func runRun(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[
 		return "FAILED", nil, err
 	}
 
+	runtime, err := workloadRuntime(ctx)
+	if err != nil {
+		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, errs.CodeOf(err).String())
+		return "FAILED", nil, nil
+	}
+	var nodeBin string
+	if runtime == project.RuntimeNode {
+		if nodeBin, err = serve.LookNode(); err != nil {
+			emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, errs.CodeOf(err).String())
+			return "FAILED", nil, nil
+		}
+	}
+
 	emit.PhaseStart("resolve-entrypoint")
 	entrypoint, err := resolveRunEntrypoint(projectPath, ctx.Params.String("entrypoint"))
 	if err != nil {
@@ -60,7 +73,24 @@ func runRun(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[
 
 	emit.PhaseStart("run")
 	emit.Log("debug", "Running "+ctx.Project.Name+" ("+entrypoint+") once...")
-	exitCode := runBunOnceFunc(emit, bunBin, projectPath, entrypoint, port, extraArgs)
+	var exitCode int
+	if runtime == project.RuntimeNode {
+		built, bundleErrors, err := nodeBundler(bunBin, projectPath, nodeBundleDir(ctx, "run"), entrypoint)()
+		if err != nil {
+			bundleErrors = append(bundleErrors, err.Error())
+		}
+		if len(bundleErrors) > 0 {
+			for _, message := range bundleErrors {
+				emit.DiagnosticWithCode("error", message, "", 0, 0, errs.CodeCompileError.String())
+			}
+			emit.PhaseEnd("run", "failed")
+			return "FAILED", nil, nil
+		}
+		nodeArgs := append([]string{"--enable-source-maps", built.Entry}, extraArgs...)
+		exitCode = runOnceFunc(emit, nodeBin, nodeArgs, projectPath, port)
+	} else {
+		exitCode = runBunOnceFunc(emit, bunBin, projectPath, entrypoint, port, extraArgs)
+	}
 
 	data := map[string]any{runExitCodeKey: exitCode}
 	if exitCode == 0 {
@@ -101,8 +131,18 @@ func runBunOnce(emit *jsonl.Emitter, bunBin, projectPath, entrypoint string, por
 	bunArgs := make([]string, 0, 2+len(extraArgs))
 	bunArgs = append(bunArgs, "run", entrypoint)
 	bunArgs = append(bunArgs, extraArgs...)
+	return runOnceFunc(emit, bunBin, bunArgs, projectPath, port)
+}
 
-	cmd := exec.Command(bunBin, bunArgs...) //nolint:gosec // args are constructed programmatically, not from user input
+// runOnceFunc is the function a node run uses to execute the workload; tests
+// replace it.
+var runOnceFunc = runOnce
+
+// runOnce runs bin with args once in projectPath, streaming its output as
+// JSONL events and forwarding termination signals to the whole process group.
+// It returns the child's exit code (130 for a clean SIGINT-driven shutdown).
+func runOnce(emit *jsonl.Emitter, bin string, args []string, projectPath string, port int) int {
+	cmd := exec.Command(bin, args...) //nolint:gosec // args are constructed programmatically, not from user input
 	cmd.Dir = projectPath
 	cmd.Stdin = os.Stdin
 

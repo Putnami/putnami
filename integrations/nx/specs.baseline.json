@@ -6,6 +6,7 @@
     "monorepo/nx-adoption#import-keeps-eslint",
     "monorepo/nx-adoption#import-maps-typescript-targets",
     "monorepo/nx-adoption#import-maps-vitest-and-jest-tests",
+    "monorepo/nx-adoption#import-marks-the-node-runtime",
     "monorepo/nx-adoption#manifest-follows-the-profile",
     "monorepo/nx-adoption#projects-become-projects",
     "monorepo/nx-adoption#reports-from-project-options",

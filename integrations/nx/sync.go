@@ -360,6 +360,9 @@ type projectPlan struct {
 	// eslint reports a lint target the TypeScript extension takes over that
 	// runs ESLint: the project's putnami.json then names eslint as its linter.
 	eslint bool
+	// nodeRuntime reports an imported TypeScript project that runs on Node:
+	// its putnami.json declares the node runtime.
+	nodeRuntime bool
 }
 
 // planProject maps the targets of one project in the mode.
@@ -378,6 +381,7 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 	}
 	isTS := mode == ModeImport && typeScript && isTypeScriptProject(root, p.Path)
 	plan.typeScript = isTS
+	plan.nodeRuntime = isTS && (targets["serve"].Executor == nodeExecutor || startScriptRunsNode(filepath.Join(root, filepath.FromSlash(p.Path))))
 	for _, task := range lifecycleTasks {
 		target, ok := targets[task]
 		switch {
@@ -431,6 +435,54 @@ func importReason(declared, isTS bool, task string, target detect.Target) string
 		return fmt.Sprintf("its ESLint takes arguments or options (%q) that @putnami/typescript would drop: move them to the ESLint configuration; %s keeps running through nx run", runs, task)
 	}
 	return fmt.Sprintf("@putnami/typescript runs %s, not %q: %s keeps running through nx run", strings.Join(typeScriptCommands[task], " or "), runs, task)
+}
+
+// nodeExecutor is the Nx executor that serves a project with node.
+const nodeExecutor = "@nx/js:node"
+
+// nodeRuntimeOption is the member of options["@putnami/typescript"] that
+// names the runtime of a project's workload.
+const nodeRuntimeOption = "runtime"
+
+// startScriptRunsNode reports whether the start script of the package.json in
+// dir runs node: its first word, after any NAME=value assignments, is node.
+func startScriptRunsNode(dir string) bool {
+	data, err := os.ReadFile(filepath.Join(dir, "package.json")) //nolint:gosec // a member manifest under the workspace root
+	if err != nil {
+		return false
+	}
+	var m struct {
+		Scripts map[string]string `json:"scripts"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return false
+	}
+	for _, word := range strings.Fields(m.Scripts["start"]) {
+		if strings.Contains(word, "=") && !strings.HasPrefix(word, "-") {
+			continue
+		}
+		return word == "node"
+	}
+	return false
+}
+
+// markNodeRuntime sets options["@putnami/typescript"].runtime to node in a
+// putnami.json document that declares no runtime, and keeps any runtime it
+// declares.
+func markNodeRuntime(doc map[string]any) {
+	options, _ := doc["options"].(map[string]any)
+	if options == nil {
+		options = map[string]any{}
+		doc["options"] = options
+	}
+	layer, _ := options[TypeScriptExtension].(map[string]any)
+	if layer == nil {
+		layer = map[string]any{}
+		options[TypeScriptExtension] = layer
+	}
+	if _, declared := layer[nodeRuntimeOption]; !declared {
+		layer[nodeRuntimeOption] = "node"
+	}
 }
 
 // isTypeScriptProject reports whether a project directory holds package.json
@@ -849,6 +901,9 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	setReports(doc, plan.reports)
 	setRunner(doc, plan.runner)
 	setLinter(doc, plan.eslint)
+	if plan.nodeRuntime {
+		markNodeRuntime(doc)
+	}
 
 	if existing != nil && reflect.DeepEqual(clone(doc), before) {
 		return nil, nil

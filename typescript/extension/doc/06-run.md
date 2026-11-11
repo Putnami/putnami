@@ -10,7 +10,8 @@ Jobs (a migration runner, a batch worker, a CLI) end-to-end locally.
 ## Overview
 
 - Runs `bun run <entrypoint>` once — Bun transpiles on the fly, so this is the
-  "build for the host" step
+  "build for the host" step; a project on the Node runtime runs its Node
+  bundle with `node` instead (see below)
 - Streams the workload's stdout/stderr live as it runs
 - Passes the ambient environment through to the child (`NODE_ENV=development`
   is defaulted only when unset)
@@ -30,6 +31,16 @@ When `--entrypoint` is not provided, `run` resolves the entrypoint in order:
 3. `src/main.ts`
 
 If none resolve, the job fails with `NO_RUN_ENTRYPOINT`.
+
+## On the Node runtime
+
+A project that declares `"runtime": "node"` under
+`options["@putnami/typescript"]` in its `putnami.json` runs on Node: Bun
+bundles the entrypoint for Node into `.putnami/out/<project>/run/node/`, as the
+compile step does (see [Build](02-build.md#the-node-runtime)), and the command
+starts `node --enable-source-maps <bundle> <args>` once. The exit code is
+forwarded the same way. `node` must be on `PATH`; otherwise run fails with
+`typescript.node_not_found`.
 
 ## Usage
 
@@ -66,7 +77,7 @@ reads `--args --gate` as two flags. See
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--entrypoint <path>` | `./run` export → `main` → `src/main.ts` | File Bun should run |
+| `--entrypoint <path>` | `./run` export → `main` → `src/main.ts` | File to run |
 | `--port <n>` | — | Sets the `PORT` environment variable when provided |
 | `--args <string>` | — | Extra arguments passed to the program, split on whitespace |
 

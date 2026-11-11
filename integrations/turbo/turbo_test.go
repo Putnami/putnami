@@ -180,6 +180,8 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 		"dependencies": []any{"/packages/pricing"},
 		"tags":         []any{"turbo"},
 		"disable":      map[string]any{"jobs": []any{"lint", "@putnami/turbo:test", "@putnami/typescript:build"}},
+		// The api starts with node: it declares the node runtime.
+		"options": map[string]any{TypeScriptExtension: map[string]any{"runtime": "node"}},
 	}
 	if !reflect.DeepEqual(api, want) {
 		t.Errorf("api putnami.json = %v, want %v", api, want)
@@ -678,5 +680,38 @@ func TestDelegateModeImportsThePackagesTheImportListSelects(t *testing.T) {
 	workspace("packages/[")
 	if _, err := Sync(root, Options{}); err == nil {
 		t.Error("a malformed entry passed")
+	}
+}
+
+func TestImportMarksTheNodeRuntime(t *testing.T) {
+	spectest.Proves(t, feature, "import-marks-the-node-runtime", "a-node-start-script-marks-the-node-runtime")
+	d := readDemo(t)
+	root := repository(t, d)
+	// The demo's api starts with node dist/server.js; pricing has no start
+	// script.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "bun build src/index.ts --outdir dist"}}`)
+	if _, err := Sync(root, Options{Mode: ModeImport}); err != nil {
+		t.Fatal(err)
+	}
+	runtime := func(dir string) any {
+		options, _ := readProjectFile(t, root, dir)["options"].(map[string]any)
+		layer, _ := options[TypeScriptExtension].(map[string]any)
+		return layer["runtime"]
+	}
+	if got := runtime("apps/api"); got != "node" {
+		t.Errorf("a node start script: runtime = %v, want node", got)
+	}
+	if got := runtime("packages/pricing"); got != nil {
+		t.Errorf("a package without a node start script: runtime = %v, want none", got)
+	}
+
+	// A delegated package keeps no runtime: Turborepo alone runs it.
+	root = repository(t, d)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"start": "node dist/main.js"}}`)
+	if _, err := Sync(root, Options{Mode: ModeDelegate}); err != nil {
+		t.Fatal(err)
+	}
+	if got := runtime("packages/pricing"); got != nil {
+		t.Errorf("a delegated package: runtime = %v, want none", got)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/typescript/extension/internal/build"
 	"go.putnami.dev/typescript/extension/internal/errs"
+	"go.putnami.dev/typescript/extension/internal/project"
 )
 
 // checkBunAPIsOnNode runs the node-target check after a transpile built with
@@ -51,16 +52,33 @@ func checkBunAPIsOnNode(bunBin, projectPath string, params build.TranspileParams
 var checkBunAPIsOnNodeFunc = build.CheckBunAPIsOnNode
 
 // transpileParams reads the transpile parameters of a build invocation, the
-// same for the solo build, the transpile command and its batch.
-func transpileParams(ctx *pctx.Context) build.TranspileParams {
+// same for the solo build, the transpile command and its batch. The target is
+// the one the command names, else node for a project on the node runtime, else
+// bun. A runtime that is neither bun nor node is an error.
+func transpileParams(ctx *pctx.Context) (build.TranspileParams, error) {
+	runtime, err := workloadRuntime(ctx)
+	if err != nil {
+		return build.TranspileParams{}, err
+	}
+	target := ctx.Params.String("target")
+	if target == "" {
+		target = runtime
+	}
 	return build.TranspileParams{
-		Target:    ctx.Params.String("target", "bun"),
+		Target:    target,
 		Bundle:    ctx.Params.String("bundle", "none"),
 		Sourcemap: ctx.Params.String("sourcemap", "external"),
 		Minify:    ctx.Params.Bool("minify", true),
 		Splitting: ctx.Params.Bool("splitting", true),
 		Metafile:  ctx.Params.Bool("metafile", false),
-	}
+	}, nil
+}
+
+// workloadRuntime is the runtime the project declares as
+// options["@putnami/typescript"].runtime, which reaches the job as its runtime
+// parameter: bun when it declares none.
+func workloadRuntime(ctx *pctx.Context) (string, error) {
+	return project.ResolveRuntime(ctx.Params.String("runtime"))
 }
 
 // emitDiagnostics emits each diagnostic as a solo build reports it, and says

@@ -99,7 +99,10 @@ func runBuildTranspileBatch(ctx *pctx.Context) (string, map[string]any, error) {
 	if err != nil {
 		return "FAILED", nil, err
 	}
-	params := transpileParams(ctx)
+	params, err := transpileParams(ctx)
+	if err != nil {
+		return "FAILED", nil, err
+	}
 
 	results := make([]buildBatchProjectResult, 0, len(projects))
 	for _, proj := range projects {
@@ -207,13 +210,6 @@ func runBuildCompileBatch(ctx *pctx.Context) (string, map[string]any, error) {
 	if err != nil {
 		return "FAILED", nil, err
 	}
-	// One resolved target set for the whole batch: a batch is one subprocess for
-	// projects the scheduler grouped by IDENTICAL resolved params, so every
-	// member's set is the same one solo would resolve.
-	targets, err := compileTargets(ctx)
-	if err != nil {
-		return "FAILED", nil, err
-	}
 
 	results := make([]buildBatchProjectResult, 0, len(projects))
 	for _, proj := range projects {
@@ -227,22 +223,23 @@ func runBuildCompileBatch(ctx *pctx.Context) (string, map[string]any, error) {
 			continue
 		}
 
+		// A batch is one subprocess for projects the scheduler grouped by
+		// IDENTICAL resolved params, so every member resolves the runtime and
+		// the target set solo would resolve.
 		compileOutput := filepath.Join(batchOutputPath(ctx, proj), "compile")
-		files, compileErrors, err := build.RunCompile(bunBin, projectPath, compileOutput, entrypoint, targets)
-		if err != nil || len(compileErrors) > 0 {
+		outcome, err := compileProject(ctx, bunBin, projectPath, compileOutput, entrypoint)
+		if err != nil || len(outcome.errors) > 0 {
 			res.Status = "FAILED"
-			// The compiler's words are the row's only explanation — a FAILED
-			// member with no diagnostic reaches CI as a bare "task failed"
-			// (a large consumer workspace's identity/libs/oauth, five runs of
-			// silence). Carry the infra error and every collected compile
-			// error exactly as the generate branch below carries its
-			// diagnostics.
+			// The compiler's words are the row's only explanation: a FAILED
+			// member with no diagnostic reaches CI as a bare "task failed".
+			// Carry the infra error and every collected compile error exactly
+			// as the generate branch below carries its diagnostics.
 			if err != nil {
 				res.Diagnostics = append(res.Diagnostics, buildBatchDiagnostic{
 					Category: "compile", Severity: "error", Description: err.Error(),
 				})
 			}
-			for _, message := range compileErrors {
+			for _, message := range outcome.errors {
 				res.Diagnostics = append(res.Diagnostics, buildBatchDiagnostic{
 					Category: "compile", Severity: "error", Description: message,
 				})
@@ -251,7 +248,7 @@ func runBuildCompileBatch(ctx *pctx.Context) (string, map[string]any, error) {
 			continue
 		}
 		res.Metrics = append(res.Metrics, buildBatchMetric{
-			Name: "compiled-executables", Value: float64(len(files)), Unit: "count",
+			Name: outcome.metric, Value: float64(outcome.count), Unit: "count",
 		})
 		results = append(results, res)
 	}

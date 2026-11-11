@@ -143,6 +143,19 @@
               "the-manifest-conforms-to-the-stack-core"
             ]
           }
+        },
+        {
+          "id": "import-marks-the-node-runtime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-node-start-script-marks-the-node-runtime"
+            ]
+          }
         }
       ]
     }

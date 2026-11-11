@@ -285,7 +285,8 @@ workspace/git-derived versions remain unchanged.
 
 ### What It Does
 
-1. Locates compiled binary from build output matching the target platform
+1. Locates compiled binary from build output matching the target platform,
+   or on the Node runtime the Node bundle (see [Node Images](#node-images))
 2. Copies `.gen/public/` assets next to the binary (if present)
 3. Computes the image **content hash** (assembly spec + binary + staged assets)
 4. Stages a content stamp (`putnami-buildinfo.json` with `name` + `contentHash`)
@@ -346,6 +347,49 @@ from `@putnami/utils` reads it at runtime and overlays the deploy-injected
 identity environment — deployed containers report both their content hash and
 the published release id.
 
+### Node Images
+
+A project on the Node runtime (`"runtime": "node"` under
+`options["@putnami/typescript"]`, see
+[Build](02-build.md#the-node-runtime)) packages its Node bundle instead of a
+Bun executable:
+
+```dockerfile
+FROM gcr.io/distroless/nodejs<major>-debian12@sha256:<pinned>
+COPY <production dependencies> /app/node_modules/
+COPY <node bundle> /app/            # src/main.js, its map, package.json
+COPY .gen /app/.gen                 # Only if .gen/public/ exists
+WORKDIR /app
+ENV NODE_ENV=production
+ENV PORT=<port>
+ENV PWD=/app
+EXPOSE <port>
+ENTRYPOINT ["/nodejs/bin/node", "--enable-source-maps", "/app/<bundle entrypoint>"]
+COPY putnami-buildinfo.json /app/.gen/version.json
+```
+
+- **Node major** — read from the project's `package.json` `engines.node`,
+  else `.nvmrc` or `.node-version` in the project, then at the workspace root.
+  The first number of the declaration is the major (`>=22`, `^22.11.0`,
+  `v22.11.0` and `22.x` are all Node 22). The extension pins one nonroot base
+  per major: Node 20, 22 and 24. A project that declares no version, or a
+  major with no pinned base, fails with `typescript.node_version_undeclared`;
+  `--docker-base-image` overrides the base and skips the lookup.
+- **Production dependencies** — copied from the `node_modules` the workspace
+  install resolved, with no install and no network: the project's
+  `dependencies` and `optionalDependencies`, then each package's
+  `dependencies`, `optionalDependencies` and installed `peerDependencies`,
+  each resolved from the directory of the package that depends on it, the
+  way Node resolves it. A package lands at `/app/node_modules/<name>` unless
+  another version holds that name, and nests under the package that depends
+  on it otherwise. A `devDependency` never ships, and neither does a workspace
+  project: the bundle includes it, and the packages it depends on ship like
+  the project's own. A dependency that is not installed fails
+  with `typescript.dependency_not_installed`, which names `putnami install`.
+  A native addon ships as the install built it, for the build host's
+  platform. See ADR
+  [0009](adr/0009-a-node-image-ships-the-installed-production-dependencies.md).
+
 ### Caching
 
 The `package-docker` cache key depends only on source inputs, so unchanged
@@ -354,7 +398,9 @@ time no layer upload. The OCI layout lives inside the task output, so a cache
 restore brings the pushable image itself, not just a manifest pointing at a
 daemon image that may not exist locally. The pinned base is cached once per
 digest under `.putnami/cache/oci-base` (packaging is offline after first
-use).
+use). The key also holds the project's runtime and `.nvmrc` and
+`.node-version`, at the workspace root directly and in the project through
+the compile step's key, which choose a Node image's base.
 
 ### Platform Mapping
 

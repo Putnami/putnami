@@ -553,7 +553,7 @@ func TestSuperviseServe_NaturalExit(t *testing.T) {
 	doneCh <- sentinel
 	sigCh := make(chan os.Signal, 1)
 
-	got, stopped := superviseServe(nil, sigCh, doneCh, terminateGrace)
+	got, stopped := superviseServe(nil, sigCh, doneCh)
 	if !errors.Is(got, sentinel) {
 		t.Errorf("expected the natural wait error to be returned, got %v", got)
 	}
@@ -593,7 +593,7 @@ func TestSuperviseServe_SignalForwardsToBunOnly(t *testing.T) {
 		doneCh <- nil
 	}()
 
-	got, stopped := superviseServe(proc, sigCh, doneCh, terminateGrace)
+	got, stopped := superviseServe(proc, sigCh, doneCh)
 	if got != nil {
 		t.Errorf("expected nil wait error after graceful shutdown, got %v", got)
 	}

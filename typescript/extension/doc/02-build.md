@@ -419,6 +419,32 @@ imports one of them fails.
 
 Output is written to `output/lib/`.
 
+#### The Node runtime
+
+A project whose workload runs on Node declares it in its `putnami.json`:
+
+```json
+{
+  "options": { "@putnami/typescript": { "runtime": "node" } }
+}
+```
+
+`runtime` is `bun` (the default) or `node`; any other value fails the job with
+`typescript.invalid_runtime`. Bun still builds the project. On `node`:
+
+- the transpile phase targets Node unless the command names `--target`, so
+  the [Node.js target](#nodejs-target) check runs on every build;
+- the compile phase writes a Node bundle instead of Bun executables (see
+  [Phase 4](#phase-4-compile));
+- `serve`, `run` and `package --docker` start and ship that bundle with
+  `node` (see [Serve](05-serve.md#on-the-node-runtime),
+  [Run](06-run.md#on-the-node-runtime) and
+  [Package](07-package.md#node-images)).
+
+The `@putnami/nx` and `@putnami/turbo` import modes declare `node` for an
+imported package whose `start` script runs `node`, or whose Nx `serve` target
+runs `@nx/js:node`.
+
 ### Phase 3: Types
 
 Invokes `tsc` to generate TypeScript declaration files (`.d.ts` + `.d.ts.map`).
@@ -467,6 +493,16 @@ executable. Both deciding inputs are plan-time parameters that participate in
 the phase's cache key.
 
 Output is written to `output/compile/`.
+
+On the [Node runtime](#the-node-runtime), the phase writes a Node bundle in
+place of the executables: `bun build --target node --format esm` of the same
+entrypoint, with the project's own modules and the workspace projects it
+imports bundled, every installed package that the project or one of those
+workspace projects depends on left as an import, and
+a linked source map (`--sourcemap=linked`, which `node --enable-source-maps`
+reads). `output/compile/` then holds the bundle under the entrypoint's path
+with a `.js` extension, a `package.json` that makes its `.js` files ES modules,
+and `putnami-node.json`, which names the module node starts.
 
 Bun runs from a temporary directory under `output/compile/`, not from the
 project. Bun writes each executable to a temporary file in its working
@@ -599,7 +635,7 @@ When no phase flag is set, generate + transpile + types run by default. Setting 
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--target` | `string` | `bun` | Build target platform: `bun`, `node`, or `browser`. A `node` build fails when its graph reaches a Bun API (see [Node.js target](#nodejs-target)) |
+| `--target` | `string` | the runtime | Build target platform: `bun`, `node`, or `browser`. Without it, the project's [runtime](#the-node-runtime): `bun` unless it declares `node`. A `node` build fails when its graph reaches a Bun API (see [Node.js target](#nodejs-target)) |
 | `--bundle` | `string` | `none` | Bundle mode. `none`: externalize deps. `bundled`: inline everything. `local`: externalize only non-workspace deps |
 | `--sourcemap` | `string` | `external` | Sourcemap generation: `external` (separate `.map` files), `inline` (embedded), or `none` |
 | `--minify` | `boolean` | `true` | Minify output JavaScript |

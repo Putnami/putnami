@@ -52,7 +52,11 @@ func runBuild(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 	if flags.RunTranspile {
 		emit.PhaseStart("transpile")
 		libOutput := filepath.Join(ctx.OutputPath, "lib")
-		params := transpileParams(ctx)
+		params, err := transpileParams(ctx)
+		if err != nil {
+			emit.PhaseEnd("transpile", "failed")
+			return "FAILED", nil, err
+		}
 		files, errors, err := build.RunTranspile(bunBin, projectPath, libOutput, params)
 		if err != nil {
 			emit.PhaseEnd("transpile", "failed")
@@ -108,25 +112,24 @@ func runBuild(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, ma
 			emit.Log("debug", "No compile entrypoint found — skipping compile phase.")
 			emit.PhaseEnd("compile", "success")
 		} else {
-			targets, err := compileTargets(ctx)
+			outcome, err := compileProject(ctx, bunBin, projectPath, compileOutput, entrypoint)
 			if err != nil {
-				emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, errs.CodeCompileError.String())
+				if errs.CodeOf(err) == errs.CodeUnknown {
+					emit.PhaseEnd("compile", "failed")
+					return "FAILED", nil, err
+				}
+				emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, errs.CodeOf(err).String())
 				emit.PhaseEnd("compile", "failed")
 				return "FAILED", nil, nil
 			}
-			files, errors, err := build.RunCompile(bunBin, projectPath, compileOutput, entrypoint, targets)
-			if err != nil {
-				emit.PhaseEnd("compile", "failed")
-				return "FAILED", nil, err
-			}
-			if len(errors) > 0 {
-				for _, e := range errors {
+			if len(outcome.errors) > 0 {
+				for _, e := range outcome.errors {
 					emit.DiagnosticWithCode("error", e, "", 0, 0, errs.CodeCompileError.String())
 				}
 				emit.PhaseEnd("compile", "failed")
 				return "FAILED", nil, nil
 			}
-			emit.Metric("compiled-executables", len(files), "count")
+			emit.Metric(outcome.metric, outcome.count, "count")
 			emit.PhaseEnd("compile", "success")
 		}
 	}
@@ -146,7 +149,11 @@ func runBuildTranspile(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (s
 
 	emit.PhaseStart("transpile")
 	libOutput := filepath.Join(ctx.OutputPath, "lib")
-	params := transpileParams(ctx)
+	params, err := transpileParams(ctx)
+	if err != nil {
+		emit.PhaseEnd("transpile", "failed")
+		return "FAILED", nil, err
+	}
 	files, errors, err := build.RunTranspile(bunBin, projectPath, libOutput, params)
 	if err != nil {
 		emit.PhaseEnd("transpile", "failed")
@@ -240,32 +247,56 @@ func runBuildCompile(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (str
 		return "OK", nil, nil
 	}
 
-	targets, err := compileTargets(ctx)
-	if err != nil {
-		return "FAILED", nil, err
-	}
-
 	emit.PhaseStart("compile")
 	compileOutput := filepath.Join(ctx.OutputPath, "compile")
-	files, errors, err := build.RunCompile(bunBin, projectPath, compileOutput, entrypoint, targets)
+	outcome, err := compileProject(ctx, bunBin, projectPath, compileOutput, entrypoint)
 	if err != nil {
 		emit.PhaseEnd("compile", "failed")
 		return "FAILED", nil, err
 	}
-	if len(errors) > 0 {
+	if len(outcome.errors) > 0 {
 		// The compiler's own words are the verdict's only explanation: a failed
 		// task with no diagnostic leaves CI (and its failure digest) naming a
 		// key with no cause. Emit every collected error before failing, exactly
 		// as the batched path reports per-project rows.
-		for _, message := range errors {
+		for _, message := range outcome.errors {
 			emit.Diagnostic("error", message, "", 0)
 		}
 		emit.PhaseEnd("compile", "failed")
 		return "FAILED", nil, nil
 	}
-	emit.Metric("compiled-executables", len(files), "count")
+	emit.Metric(outcome.metric, outcome.count, "count")
 	emit.PhaseEnd("compile", "success")
 	return "OK", nil, nil
+}
+
+// compileOutcome is what one project's compile step produced: the count of
+// its artifacts under metric, or the errors that failed it.
+type compileOutcome struct {
+	metric string
+	count  int
+	errors []string
+}
+
+// compileProject runs the compile step of one project into compileOutput: a
+// Node bundle of the entrypoint for a project on the node runtime, the Bun
+// executables of the invocation's targets otherwise. The solo build, the
+// compile command and its batch all run it.
+func compileProject(ctx *pctx.Context, bunBin, projectPath, compileOutput, entrypoint string) (compileOutcome, error) {
+	runtime, err := workloadRuntime(ctx)
+	if err != nil {
+		return compileOutcome{}, err
+	}
+	if runtime == project.RuntimeNode {
+		_, bundleErrors, err := build.RunNodeBundle(bunBin, projectPath, compileOutput, entrypoint)
+		return compileOutcome{metric: "node-bundles", count: 1, errors: bundleErrors}, err
+	}
+	targets, err := compileTargets(ctx)
+	if err != nil {
+		return compileOutcome{}, errs.Wrap(err, errs.CodeCompileError)
+	}
+	files, compileErrors, err := build.RunCompile(bunBin, projectPath, compileOutput, entrypoint, targets)
+	return compileOutcome{metric: "compiled-executables", count: len(files), errors: compileErrors}, err
 }
 
 // compileTargets resolves the bun targets this invocation compiles, from

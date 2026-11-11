@@ -104,6 +104,7 @@ package, and writes in each package's `putnami.json`:
 | `dependencies` | The project ID of each workspace package it depends on, such as `/packages/pricing`; a dependency on a project that is no package is kept |
 | `tags` | `turbo`, which marks the packages the sync owns |
 | `disable.jobs` | Each of `build`, `lint` and `test` the package has no task for: no script of that name in its `package.json`, or no task of that name, or `<package>#<task>`, in `turbo.json`. In import mode, or for a TypeScript package on the import list, for each task the job of the extension that does not run it: `@putnami/turbo:<task>` when `@putnami/typescript` runs it, `@putnami/typescript:<task>` otherwise. The sync owns these entries, bare and qualified |
+| `options.@putnami/typescript.runtime` | `node` for a TypeScript package in import mode or on the import list whose `package.json` `start` script runs `node`, so `putnami serve`, `run` and `package --docker` run it on Node. The sync writes it when the package declares no runtime and never changes one it declares |
 
 It keeps every other member, and rewrites a file only when a member it owns
 changes, with two-space indentation and sorted keys. A package that left the

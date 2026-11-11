@@ -6,7 +6,8 @@
     "A TypeScript project builds, type-checks, tests, lints, serves and packages without a per-project bundler, runner or formatter configuration",
     "Building many projects in one invocation produces exactly what building each of them alone produces, and one project's failure does not change another project's output",
     "A workspace pins one version per shared dependency, and a freshly scaffolded project installs against that pin without editing the workspace root by hand",
-    "An npm tarball or Docker image loads under the same loader rules the workspace used, so a packaged project does not fail at import time in a consumer's runtime"
+    "An npm tarball or Docker image loads under the same loader rules the workspace used, so a packaged project does not fail at import time in a consumer's runtime",
+    "A Node service declares the Node runtime and runs on Node from serve to its container image, while Bun keeps building it"
   ],
   "nonGoals": [
     "Replacing Bun as the task runtime, linting with a tool other than Biome or ESLint, formatting with a tool other than Biome, or exposing the configuration surface of Bun, Biome, ESLint, Vitest or Jest as Putnami configuration: a project chooses its test runner and its linter, which keep reading their own configuration files, and the installer is the package manager the repository declares, never a Putnami option",
@@ -81,7 +82,7 @@
     },
     {
       "id": "no-node-on-the-host",
-      "text": "Build and serve, the test of a project whose test runner is Bun, and the lint of one whose linter is Biome need Bun and no node program on the host. Lint starts the native Biome executable of the platform package installed for the host, @biomejs/cli-<os>-<arch> and its -musl variant on a musl host, on every operating system and in a hoisted or an isolated install. Without that platform package, lint starts Biome's JavaScript launcher with the task's Bun, never with a node from PATH."
+      "text": "Build, the serve of a project on the Bun runtime, a test run by Bun and a lint run by Biome need Bun and no node program on the host. Lint starts the native Biome executable of the host's platform package, @biomejs/cli-<os>-<arch> or its -musl variant on a musl host, on every operating system and in a hoisted or an isolated install. Without that package, lint starts Biome's JavaScript launcher with the task's Bun, never with a node from PATH."
     },
     {
       "id": "workspace-biome-default",
@@ -222,6 +223,30 @@
     {
       "id": "the-packager-refuses-a-nameless-manifest",
       "text": "The npm packager refuses to publish an extension manifest without a name, a hook-only one included, before it stamps a contract, and leaves the staged manifest as staged."
+    },
+    {
+      "id": "node-workload-runtime",
+      "text": "A project declares the runtime of its workload as options[\"@putnami/typescript\"].runtime in its putnami.json, bun or node, and runs on bun when it declares none; any other value fails the job with typescript.invalid_runtime, naming both values. On node, build transpiles with the node target unless the command names a target."
+    },
+    {
+      "id": "node-compile-bundle",
+      "text": "On node, the compile step writes a Node bundle in place of a Bun executable: the compile entrypoint as an ES module with the project's own modules and its workspace dependencies bundled, its installed packages left as imports, and a linked source map."
+    },
+    {
+      "id": "node-serve",
+      "text": "On node, serve bundles the serve entrypoint, the ./serve export else the run entrypoint, as compile does, and starts node --enable-source-maps on it with the environment, port and log forwarding of a Bun serve. The bundle resolves packages from the project's node_modules. With watch on, it rebuilds when a file the bundle was built from changes and restarts node; a rebuild that fails reports its errors and keeps the running process and its bundle."
+    },
+    {
+      "id": "node-run",
+      "text": "On node, run bundles the run entrypoint once and starts node --enable-source-maps on it, and putnami run exits with the program's exit code. With no node on PATH, serve and run fail with typescript.node_not_found, naming node."
+    },
+    {
+      "id": "node-docker-image",
+      "text": "On node, package --docker assembles the image from the Node bundle and the production dependencies the project's installed node_modules resolve: its dependencies and optionalDependencies and theirs, never a devDependency, under /app/node_modules. A dependency that is not installed fails the task, naming it and putnami install. The container starts node --enable-source-maps on the bundle."
+    },
+    {
+      "id": "node-docker-base",
+      "text": "The base of a Node image is the digest-pinned distroless Node image of the major the project declares: package.json engines.node, else .nvmrc or .node-version in the project, then at the workspace root. A project that declares none fails with typescript.node_version_undeclared, naming those three fields, and a major with no pinned base fails naming the majors that have one."
     }
   ],
   "decisions": [
@@ -233,6 +258,7 @@
     "typescript/extension/doc/adr/0006-a-node-build-reads-its-whole-graph-for-bun-apis.md",
     "typescript/extension/doc/adr/0007-the-repository-chooses-its-package-manager.md",
     "typescript/extension/doc/adr/0008-a-project-keeps-its-test-runner.md",
+    "typescript/extension/doc/adr/0009-a-node-image-ships-the-installed-production-dependencies.md",
     "tooling/extension-sdk/doc/adr/0003-every-packager-ships-agent-content-through-one-step.md",
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",

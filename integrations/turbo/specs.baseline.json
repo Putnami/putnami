@@ -4,6 +4,7 @@
   "executableRequirements": [
     "monorepo/turbo-adoption#delegate-imports-listed-packages",
     "monorepo/turbo-adoption#import-keeps-eslint",
+    "monorepo/turbo-adoption#import-marks-the-node-runtime",
     "monorepo/turbo-adoption#manifest-follows-the-profile",
     "monorepo/turbo-adoption#packages-become-projects",
     "monorepo/turbo-adoption#reports-from-the-package-options",

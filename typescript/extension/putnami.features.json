@@ -7,7 +7,7 @@
       "id": "typescript/typescript-project-toolchain",
       "type": "feature",
       "name": "TypeScript project toolchain",
-      "outcome": "A TypeScript project builds, tests, lints, serves, runs and packages on Bun and Biome through independently cached phases, installs its workspace dependencies with the package manager the repository declares, from one shared version catalog where that manager reads one, and ships an npm or Docker artifact that loads exactly as it did in the workspace",
+      "outcome": "A TypeScript project builds, tests and lints on Bun and Biome through independently cached phases, serves, runs and packages its workload on Bun or on Node, installs its workspace dependencies with the package manager the repository declares, from one shared version catalog where that manager reads one, and ships an npm or Docker artifact that loads exactly as it did in the workspace",
       "owner": "typescript",
       "target": "modeled",
       "requirements": [
@@ -832,6 +832,91 @@
             "kind": "acceptance",
             "checks": [
               "the-npm-packager-refuses-a-nameless-manifest"
+            ]
+          }
+        },
+        {
+          "id": "node-workload-runtime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-runtime-defaults-to-bun",
+              "an-unknown-runtime-fails-naming-bun-and-node",
+              "a-node-project-transpiles-for-node-unless-the-command-names-a-target"
+            ]
+          }
+        },
+        {
+          "id": "node-compile-bundle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-node-compile-writes-a-node-bundle"
+            ]
+          }
+        },
+        {
+          "id": "node-serve",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "node-serve-answers-on-the-port-and-restarts-after-an-edit",
+              "a-failed-rebuild-keeps-the-running-process"
+            ]
+          }
+        },
+        {
+          "id": "node-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "node-run-forwards-the-exit-code",
+              "serve-and-run-without-node-fail-naming-node"
+            ]
+          }
+        },
+        {
+          "id": "node-docker-image",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-image-ships-the-bundle-and-the-production-dependencies",
+              "a-missing-dependency-fails-naming-putnami-install"
+            ]
+          }
+        },
+        {
+          "id": "node-docker-base",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-base-follows-the-declared-node-major",
+              "no-declared-major-fails-naming-the-fields",
+              "an-unpinned-major-fails-naming-the-pinned-majors"
             ]
           }
         }

@@ -36,6 +36,9 @@ type DockerParams struct {
 	BaseDigest            string
 	Load                  bool
 	DryRun                bool
+	// Runtime is the project's workload runtime: node assembles a Node image
+	// from the Node bundle, anything else a Bun executable image.
+	Runtime string
 }
 
 // PackageDocker assembles a Docker image from the compile output — in
@@ -56,10 +59,15 @@ func PackageDocker(workspaceRoot, projectName, projectPath string, params Docker
 		platform = "linux/amd64"
 	}
 
-	// Find the correct binary for the target platform
-	binaryName, err := findBinaryForPlatform(compileOutput, platform)
-	if err != nil {
-		return nil, fmt.Errorf("no binary found for %s: %w", projectName, err)
+	node := params.Runtime == project.RuntimeNode
+	var binaryName string
+	if !node {
+		// Find the correct binary for the target platform
+		name, err := findBinaryForPlatform(compileOutput, platform)
+		if err != nil {
+			return nil, fmt.Errorf("no binary found for %s: %w", projectName, err)
+		}
+		binaryName = name
 	}
 
 	// Copy .gen/public into the compile output so it ships with the image. When
@@ -86,12 +94,24 @@ func PackageDocker(workspaceRoot, projectName, projectPath string, params Docker
 	// derives the release id from its own session.
 	publishVersion := resolveDockerVersion(wsVersion, versionInfo)
 
-	baseRef := params.BaseImage
-	if baseRef == "" {
-		baseRef = dockerBaseImagePinned
-	}
 	stampPath := filepath.Join(compileOutput, contentStampFile)
-	spec, err := dockerSpec(baseRef, platform, compileOutput, binaryName, projectName, stampPath, params.Port, hasAssets)
+	var spec oci.Spec
+	var err error
+	if node {
+		baseRef := params.BaseImage
+		if baseRef == "" {
+			if baseRef, err = NodeBaseImage(filepath.Join(workspaceRoot, projectPath), workspaceRoot); err != nil {
+				return nil, err
+			}
+		}
+		spec, err = nodeDockerSpec(baseRef, platform, filepath.Join(workspaceRoot, projectPath), compileOutput, stampPath, params.Port, hasAssets)
+	} else {
+		baseRef := params.BaseImage
+		if baseRef == "" {
+			baseRef = dockerBaseImagePinned
+		}
+		spec, err = dockerSpec(baseRef, platform, compileOutput, binaryName, projectName, stampPath, params.Port, hasAssets)
+	}
 	if err != nil {
 		return nil, err
 	}

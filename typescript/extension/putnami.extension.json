@@ -155,8 +155,7 @@
         "target": {
           "type": "string",
           "short": "-p",
-          "default": "bun",
-          "description": "Build target platform"
+          "description": "Build target platform: bun, node or browser (default: the project's runtime, bun unless options[\"@putnami/typescript\"].runtime is node)"
         },
         "compile-target": {
           "type": "string",
@@ -1201,6 +1200,9 @@
         "target": {
           "from": "params"
         },
+        "runtime": {
+          "from": "params"
+        },
         "bundle": {
           "from": "params"
         },
@@ -1369,7 +1371,9 @@
           "files": [
             "tsconfig.json",
             "tsconfig.app.json",
-            "package.json"
+            "package.json",
+            ".nvmrc",
+            ".node-version"
           ]
         },
         "generateResult": {
@@ -1377,6 +1381,9 @@
           "optional": true
         },
         "target": {
+          "from": "params"
+        },
+        "runtime": {
           "from": "params"
         },
         "compile-target": {
@@ -2334,7 +2341,16 @@
         "gen"
       ],
       "cache": {
-        "versionAware": true
+        "versionAware": true,
+        "key": {
+          "params": [
+            "runtime"
+          ],
+          "workspaceFiles": [
+            ".nvmrc",
+            ".node-version"
+          ]
+        }
       },
       "declares": {
         "outputs": {

@@ -43,6 +43,22 @@ const (
 	// evaluation. The run changes nothing in the committed schema/http-routes.json.
 	CodeHTTPRoutesUnavailable Code = "HTTP_ROUTES_UNAVAILABLE"
 
+	// CodeInvalidRuntime fails a job of a project whose
+	// options["@putnami/typescript"].runtime is neither bun nor node.
+	CodeInvalidRuntime Code = "typescript.invalid_runtime"
+
+	// CodeNodeNotFound fails a serve or run of a project on the node runtime
+	// when no node program is on PATH.
+	CodeNodeNotFound Code = "typescript.node_not_found"
+
+	// CodeNodeVersionUndeclared fails the Docker packaging of a project on the
+	// node runtime that declares no Node major, or one with no pinned base.
+	CodeNodeVersionUndeclared Code = "typescript.node_version_undeclared"
+
+	// CodeDependencyNotInstalled fails the Docker packaging of a project on
+	// the node runtime when a production dependency is not installed.
+	CodeDependencyNotInstalled Code = "typescript.dependency_not_installed"
+
 	// Run / serve resolution codes.
 	CodeNoRunEntrypoint Code = "NO_RUN_ENTRYPOINT"
 	CodeNoServeExport   Code = "NO_SERVE_EXPORT"

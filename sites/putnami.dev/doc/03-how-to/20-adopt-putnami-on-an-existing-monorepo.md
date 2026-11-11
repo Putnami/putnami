@@ -282,6 +282,15 @@ also records its runner in `options["@putnami/typescript:test"].runner`. The
 sync owns these entries. The output lists each target Putnami does not run
 itself, such as `serve`, `e2e` or a `mocha` test, with the reason.
 
+A Node service keeps running on Node. In import mode, a TypeScript project
+whose `start` script runs `node`, or whose `serve` target runs the
+`@nx/js:node` executor, gets `"runtime": "node"` under
+`options["@putnami/typescript"]`: `putnami serve` and `putnami run` start it
+with `node --enable-source-maps` on a Node bundle Bun builds, and
+`putnami package . --docker` ships that bundle and its production dependencies
+on a distroless Node image of the major `engines.node`, `.nvmrc` or
+`.node-version` declares.
+
 In import mode, `@putnami/typescript`'s workspace install keeps the
 repository's package manager: it lists the projects where that manager reads
 its members, `pnpm-workspace.yaml` for pnpm and the root `package.json`
@@ -543,6 +552,10 @@ Not mapped, kept on Turborepo:
   dev: no Putnami task maps it: it keeps running through Turborepo, with turbo run dev
 Test result from the exit code alone, no JUnit report named: apps/api, packages/pricing
 ```
+
+A TypeScript package that is imported and whose `start` script runs `node`
+gets `"runtime": "node"` under `options["@putnami/typescript"]`, so
+`putnami serve`, `run` and `package --docker` run it on Node, as for Nx above.
 
 Add `.putnami/` and `.gen/` to `.gitignore`, then commit the files. Run
 `putnami projects sync` again after a change to the dependencies between

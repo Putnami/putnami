@@ -1,6 +1,7 @@
 package turbo
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
@@ -87,6 +88,9 @@ type member struct {
 	extensions []string
 	deps       []string
 	disabled   []string
+	// nodeRuntime reports an imported TypeScript package whose start script
+	// runs node: its putnami.json declares the node runtime.
+	nodeRuntime bool
 }
 
 // Sync writes the package graph of the Turborepo repository at root into each
@@ -154,6 +158,7 @@ func Sync(root string, opts Options) (Result, error) {
 		}
 		if imported {
 			m.extensions = append(m.extensions, TypeScriptExtension)
+			m.nodeRuntime = startScriptRunsNode(dir)
 		}
 		for _, dep := range p.Dependencies {
 			if dep != wsproto.ProbeRootPath {
@@ -309,6 +314,9 @@ func applyMember(root string, doc map[string]any, m member, owned map[string]boo
 	} else {
 		doc["disable"] = disable
 	}
+	if m.nodeRuntime {
+		markNodeRuntime(doc)
+	}
 }
 
 // retract removes from the putnami.json of a former package what the sync
@@ -427,4 +435,49 @@ func runsTypeScriptTask(task, script string) bool {
 		}
 	}
 	return false
+}
+
+// nodeRuntimeOption is the member of options["@putnami/typescript"] that
+// names the runtime of a project's workload.
+const nodeRuntimeOption = "runtime"
+
+// startScriptRunsNode reports whether the start script of the package.json in
+// dir runs node: its first word, after any NAME=value assignments, is node.
+func startScriptRunsNode(dir string) bool {
+	data, err := os.ReadFile(filepath.Join(dir, "package.json")) //nolint:gosec // a member manifest under the workspace root
+	if err != nil {
+		return false
+	}
+	var m struct {
+		Scripts map[string]string `json:"scripts"`
+	}
+	if json.Unmarshal(data, &m) != nil {
+		return false
+	}
+	for _, word := range strings.Fields(m.Scripts["start"]) {
+		if strings.Contains(word, "=") && !strings.HasPrefix(word, "-") {
+			continue
+		}
+		return word == "node"
+	}
+	return false
+}
+
+// markNodeRuntime sets options["@putnami/typescript"].runtime to node in a
+// putnami.json document that declares no runtime, and keeps any runtime it
+// declares.
+func markNodeRuntime(doc map[string]any) {
+	options, _ := doc["options"].(map[string]any)
+	if options == nil {
+		options = map[string]any{}
+		doc["options"] = options
+	}
+	layer, _ := options[TypeScriptExtension].(map[string]any)
+	if layer == nil {
+		layer = map[string]any{}
+		options[TypeScriptExtension] = layer
+	}
+	if _, declared := layer[nodeRuntimeOption]; !declared {
+		layer[nodeRuntimeOption] = "node"
+	}
 }

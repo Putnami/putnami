@@ -54,6 +54,10 @@
     {
       "id": "manifest-follows-the-profile",
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the turbo:lint, turbo:test and turbo:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task sets cache.enabled to false."
+    },
+    {
+      "id": "import-marks-the-node-runtime",
+      "text": "In import mode, an imported TypeScript package whose package.json start script runs node gets options[\"@putnami/typescript\"].runtime node in its putnami.json. The sync never changes a runtime the package already declares."
     }
   ],
   "decisions": [

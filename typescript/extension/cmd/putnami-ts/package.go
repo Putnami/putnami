@@ -110,7 +110,12 @@ func runPackageDocker(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (st
 		}
 	}
 
+	runtime, err := workloadRuntime(ctx)
+	if err != nil {
+		return "FAILED", nil, err
+	}
 	params := pkg.DockerParams{
+		Runtime: runtime,
 		// No Registry: an output target is a publish decision. Local packaging
 		// never consumed the docker-registry parameter, so reading it here only
 		// carried a value nothing acted on.

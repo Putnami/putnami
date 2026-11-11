@@ -59,6 +59,60 @@ The entrypoint is resolved in this order:
 
 If no entrypoint is found, the command fails with an error.
 
+### On the Node runtime
+
+A project that declares `"runtime": "node"` under
+`options["@putnami/typescript"]` in its `putnami.json` serves on Node instead
+of Bun:
+
+```json
+{
+  "options": { "@putnami/typescript": { "runtime": "node" } }
+}
+```
+
+```text
+generate ──→ resolve entrypoint ──→ bundle for node ──→ start node --enable-source-maps
+```
+
+1. **Entrypoint** — `--entrypoint`, else the `./serve` export, else the
+   [run entrypoint](06-run.md#entrypoint-resolution): `./run`, `main`,
+   `src/main.ts`.
+2. **Bundle** — Bun bundles the entrypoint for Node, as the compile step does
+   (see [Build](02-build.md#the-node-runtime)), into the command's output
+   directory, `.putnami/out/<project>/serve/node/`. The bundle resolves the
+   packages it leaves as imports from the project's `node_modules`.
+3. **Start** — `node --enable-source-maps <bundle>`, with the environment, the
+   port (`PORT`) and the log forwarding below. `--inspect`, `--inspect-wait`
+   and `--inspect-brk` pass to node.
+4. **Watch** — on by default outside production. Every half second the command
+   reads the files the bundle was built from, as bun's metafile lists them,
+   and the project's `package.json`; files under `node_modules` are not read.
+   A workspace library the bundle includes is watched like the project's own
+   sources, and a file the workload writes at run time, such as a database,
+   a log or an upload, restarts nothing. After a change it bundles again into
+   a staging directory and restarts node on the new bundle. A change that does
+   not bundle is reported, and node keeps serving the previous bundle, which
+   stays in place. When node exits on its own, the next change that bundles
+   starts it again. Node stays in the job's process group, so ending the job
+   ends it. A restart stops node alone: SIGTERM, then SIGKILL after 3
+   seconds. Once node exited, the command waits at most 2 seconds more for
+   its output, so a process node started that keeps that output open holds
+   no restart, and what that process writes afterwards is not forwarded.
+
+The bundle resolves the packages it leaves as imports through
+`node_modules` in the bundle directory, a link (a junction on Windows) to the
+project's `node_modules`, then through each directory above it up to the
+workspace root. A package that only a workspace library depends on, and that
+the install placed under that library's own `node_modules` (pnpm does), is
+not found there.
+
+`node` must be on `PATH`; otherwise serve fails with
+`typescript.node_not_found`. The Putnami server framework
+(`@putnami/application` and the packages built on it) calls Bun APIs and stays
+on Bun: a Node workload brings its own server, such as Express, Fastify or
+NestJS.
+
 ### Port Resolution
 
 The port is resolved in this order:
@@ -117,5 +171,5 @@ The serve command forwards `SIGINT` and `SIGTERM` to the child process. Signal e
 
 - **Scope**: Starting a development server, port management, log forwarding, debugger integration
 - **Out of scope**: Building the project (handled by the build pipeline dependency), hot module replacement (Bun handles this natively), multi-service orchestration (handled by the SDK scheduler)
-- **Dependencies**: Requires Bun runtime. The project must have a `./serve` export in `package.json` or use `--entrypoint`.
+- **Dependencies**: Requires Bun, and on the Node runtime also `node` on `PATH`. A project on Bun must have a `./serve` export in `package.json` or use `--entrypoint`.
 - **Extension points**: None. Serve behavior is controlled through CLI flags and environment variables.

@@ -11,7 +11,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 
@@ -227,34 +226,7 @@ func RunBunServe(emit *jsonl.Emitter, bunBin, projectPath, entrypoint string, po
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	defer signal.Stop(sigCh)
 
-	cmd := serveCommand(bunBin, args, projectPath, env)
-
-	stdoutPipe, err := cmd.StdoutPipe()
-	if err != nil {
-		return false, fmt.Errorf("stdout pipe: %w", err)
-	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		return false, fmt.Errorf("stderr pipe: %w", err)
-	}
-
-	if err := cmd.Start(); err != nil {
-		return false, fmt.Errorf("starting bun: %w", err)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go jsonl.ForwardPipe(emit, stdoutPipe, "info", &wg)
-	go jsonl.ForwardPipe(emit, stderrPipe, "warn", &wg)
-
-	doneCh := make(chan error, 1)
-	go func() {
-		wg.Wait()
-		doneCh <- cmd.Wait()
-	}()
-
-	waitErr, stopped := superviseServe(cmd.Process, sigCh, doneCh, terminateGrace)
-	return classifyServeExit(waitErr, stopped)
+	return superviseProcess(emit, serveCommand(bunBin, args, projectPath, env), sigCh)
 }
 
 // serveCommand is the bun process a serve job supervises. It stays in the
@@ -272,16 +244,16 @@ func serveCommand(bunBin string, args []string, dir string, env []string) *exec.
 
 // superviseServe waits for the served process to exit on its own, or for a
 // termination signal. On signal it forwards SIGTERM to bun, escalating to
-// SIGKILL after grace, then returns the process's eventual wait error. Bun's
+// SIGKILL after terminateGrace, then returns the process's eventual wait error. Bun's
 // descendants share the job's process group, which the launcher signals.
 // stopped reports that the exit followed a termination signal.
 //
 // It is decoupled from RunBunServe (taking sigCh/doneCh as parameters) so it
 // can be unit-tested without delivering real OS signals to the test process.
-func superviseServe(proc *os.Process, sigCh <-chan os.Signal, doneCh <-chan error, grace time.Duration) (waitErr error, stopped bool) {
+func superviseServe(proc *os.Process, sigCh <-chan os.Signal, doneCh <-chan error) (waitErr error, stopped bool) {
 	select {
 	case <-sigCh:
-		return terminate(proc, doneCh, grace, signalProcess), true
+		return terminate(proc, doneCh, terminateGrace, signalProcess), true
 	case waitErr := <-doneCh:
 		return waitErr, false
 	}
