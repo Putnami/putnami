@@ -257,8 +257,9 @@ that Git ignores beneath `.gen`, `node_modules`, `.putnami` or a declared
 generated output, naming its task and path. Change impact and planned-write
 reach read the listed files and the paths the basis selects. Change impact
 reads a selector only in a project the planner may run the command that names
-it in: the project uses the command's extension and holds one of its
-activation files. A text file in a Go project is then read by no Dart
+it in: any project for a workspace-once command, otherwise one that uses the
+command's extension and, when the command names activation files, holds one of
+them. A text file in a Go project is then read by no Dart
 selector, even though Dart cannot answer for that project. The Go
 extension's `go-embed:build` and `go-embed:test` are described in
 [its build documentation](../../../go/extension/doc/build.md#input-resolution-for-goembed).
