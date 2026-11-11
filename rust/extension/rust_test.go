@@ -23,10 +23,14 @@ import (
 const feature = "rust/stack-extension"
 
 // fixture writes a Cargo workspace: api depends on pricing, both members of
-// the root workspace, and gen is a crate of its own outside it.
+// the root workspace, and gen is a crate of its own outside it. Its root is a
+// resolved path, the one the stub cargo logs as $PWD.
 func fixture(t *testing.T) string {
 	t.Helper()
-	root := t.TempDir()
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
 	stackstest.WriteFile(t, root, "Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n\n[workspace.dependencies]\npricing = { path = \"crates/pricing\" }\n")
 	stackstest.WriteFile(t, root, "Cargo.lock", "version = 3\n")
 	stackstest.WriteFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
