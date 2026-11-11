@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W3",
+  "statement": "workspace hooks run through sh -c on every platform; on Windows, sh from Git for Windows is a documented prerequisite and the CLI names it when missing",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

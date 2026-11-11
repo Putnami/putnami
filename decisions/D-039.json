@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-039",
+  "statement": "an external spec file in a market format (OpenSpec, Spec Kit, Kiro, Gherkin) can be the one home of a feature's outcomes, non-goals and requirement texts; a reader projects it in memory into the native spec, and no command commits that projection as JSON",
+  "settled": "2026-11-04",
+  "settledBy": "fdumay",
+  "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+  "reviewOnly": true
+}

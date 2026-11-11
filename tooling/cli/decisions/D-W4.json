@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W4",
+  "statement": "workspaces check out with LF line endings through a .gitattributes the scaffold writes and doctor checks; the content hasher never normalizes line endings",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

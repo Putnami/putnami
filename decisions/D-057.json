@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-057",
+  "statement": "a requirement name maps to an ID through NFKD less combining marks, then each run of characters other than ASCII letters and digits becomes one hyphen; a name with nothing left or over 128 bytes takes requirement-<ordinal> and is unanchored",
+  "settled": "2026-11-05",
+  "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
+  "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",
+  "reviewOnly": true
+}

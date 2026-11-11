@@ -464,7 +464,7 @@ project contributes to when the declaration lives elsewhere:
 `go.putnami.dev/{openapi,proto}` both serve the `go/api-contracts` outcome
 declared by `go.putnami.dev/api`.
 
-A protocol module owns the feature of its contract (D-026 in `decisions.json`).
+A protocol module owns the feature of its contract (`decisions/D-026.json`).
 Its spec states what every implementation must do, and each project that
 implements the protocol depends on it and proves those requirements in its own
 tests, under a check of its own. A protocol that still carries `none` keeps it

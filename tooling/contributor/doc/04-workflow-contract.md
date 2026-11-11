@@ -114,8 +114,8 @@ a unit still at `building`, still publishes with its non-closing task
 reference. It names no ready unit and produces no receipt, and the unit keeps
 its stage. The hosted checks never stand for a unit's native proof.
 
-A change that carries no feature requirement, such as an ADR with
-`decisions.json`, names no source, and its unit lists no requirement. That unit
+A change that carries no feature requirement, such as an ADR with a
+`decisions/<id>.json` file, names no source, and its unit lists no requirement. That unit
 is current: it passes every final check of a current unit (stage at least
 `candidate`, no unresolved decision, no stage blocker, its required receipt)
 and needs no producer proof. The hosted checks advance it to ready, and a

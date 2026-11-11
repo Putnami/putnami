@@ -84,7 +84,7 @@ After it installs the declared extensions, and after the starter project when
 `--project` is given, `init` looks for the markers of the declared languages,
 by the walk of point 7. When it finds one, it runs `putnami projects sync`,
 then installs the extensions the sync declared, as `init --from` does
-([D-064](../../../../decisions.json)). A language whose markers are absent is
+([D-064](../../../../decisions/D-064.json)). A language whose markers are absent is
 declared and installed, and nothing is synchronized.
 
 ### 5. Without `--extension`, `init` proposes what it detects

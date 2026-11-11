@@ -179,6 +179,21 @@
           }
         },
         {
+          "id": "one-file-per-decision",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-decision-file-is-strict-and-named-by-its-id",
+              "a-scope-reads-one-file-per-decision",
+              "a-scope-holds-one-registry-form"
+            ]
+          }
+        },
+        {
           "id": "external-spec-reference",
           "stage": "coded",
           "evidenceKinds": [

@@ -223,7 +223,7 @@ targets:
 
 `install.sh` and `install.ps1` refuse any other platform before they download
 anything, and name what they detected. The release does not build
-`windows/arm64` (decision D-W1 in [`tooling/cli/decisions.json`](tooling/cli/decisions.json)).
+`windows/arm64` (decision [D-W1](tooling/cli/decisions/D-W1.json)).
 
 Windows support covers people who install the published CLI, extensions, and
 templates. Contributors to this repository work on macOS or Linux, because

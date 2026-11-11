@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W11",
+  "statement": "Windows support is proven on an on-demand Windows VM created for each QA run and deleted after it; the contributor gate runs GOOS=windows go vet on every go.work module",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

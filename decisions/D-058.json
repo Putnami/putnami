@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-058",
+  "statement": "a workflow unit with no requirement is current, passes every final check without a producer proof and closes its task; it is refused when the change edits a spec or a feature manifest",
+  "settled": "2026-11-05",
+  "settledBy": "the epic session, under the owner's delegation of 2026-11-05",
+  "adr": "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md",
+  "reviewOnly": true
+}

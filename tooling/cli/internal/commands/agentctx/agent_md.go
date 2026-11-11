@@ -46,7 +46,7 @@ func writeAgentEntrypoints(wsRoot string, force bool) (guidanceWriteReport, erro
 	// owns one delimited block inside each; every other byte belongs to whoever
 	// wrote it.
 	gate := gateTasksForWorkspace(wsRoot)
-	// The line that names the decisions.json files travels with the gate: both
+	// The line that names where the decisions are travels with the gate: both
 	// are derived from committed documents, both are read once, and both are
 	// guidance about THIS workspace rather than a hardcoded sentence.
 	decisions := decisionsGuidanceForWorkspace(wsRoot)
@@ -117,11 +117,11 @@ const guidanceBlockTemplate = "This is a Putnami workspace.\n" +
 	"- Discover code through the CLI, then grep: `putnami projects list|describe|owner|deps|why` for the project graph, `putnami context map|pack` to orient on the workspace or a project, and `putnami <verb> --impacted --dry-run` for what a change affects. Use grep for literal text.\n" +
 	"- Skills and agents that an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami. To customize one, copy it under another name; edited managed files are preserved and reported, never overwritten.\n" +
 	"- Read `.agents/constraints.md` when it exists.\n" +
-	// One line that names the decisions.json files of THIS workspace, or
-	// nothing at all. A workspace with no decisions.json renders no line here,
-	// so its block stays exactly the block it had before the decisions registry
-	// existed. The decisions themselves are not in the block: the files hold
-	// them.
+	// One line that names where THIS workspace records its decisions, or
+	// nothing at all. A workspace with no decision registry renders no line
+	// here, so its block stays exactly the block it had before the decisions
+	// registry existed. The decisions themselves are not in the block: the
+	// files hold them.
 	decisionsPlaceholder
 
 // guidanceBlock is the delimited block for a workspace's gate and decisions.

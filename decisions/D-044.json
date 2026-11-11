@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-044",
+  "statement": "only doc/adr/*.md links are decisions; design.md and plan.md are context, never decision links",
+  "settled": "2026-11-04",
+  "settledBy": "fdumay",
+  "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+  "reviewOnly": true
+}

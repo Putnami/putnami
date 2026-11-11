@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-033",
+  "statement": "an issue carries type/, priority/ (urgent, high, normal, low) and scope/ labels, and workflow/<profile> selects a workflow profile; P1 to P3 name review finding severity only",
+  "settled": "2026-10-28",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+  "reviewOnly": true
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-062",
+  "statement": "architecture import writes only with --apply and then only adds manifests, projects, exports, imports and bindings; it never changes or removes an existing entry, so a hand edit survives a rerun",
+  "settled": "2026-11-07",
+  "settledBy": "the owner, approving the Structurizr import plan",
+  "adr": "tooling/sdd-extension/doc/adr/0005-a-structurizr-model-is-an-authored-architecture.md",
+  "reviewOnly": true
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-006",
+  "statement": "the core CLI declares no development verb: build, test, lint, serve, run, format, package, publish, deploy, generate and validate come from @putnami/dev, which the language extensions depend on",
+  "settled": "2026-10-14",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

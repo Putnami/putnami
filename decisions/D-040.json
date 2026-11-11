@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-040",
+  "statement": "a feature exists only through its declaration in putnami.features.json or Module.Feature; its putnami.features.json entry names its external spec by format and path, and a spec folder never creates a feature",
+  "settled": "2026-11-04",
+  "settledBy": "fdumay",
+  "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+  "reviewOnly": true
+}

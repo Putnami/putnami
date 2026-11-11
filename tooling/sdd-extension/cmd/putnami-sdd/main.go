@@ -17,7 +17,7 @@
 //	specs-validate                    Validate one project's specs against the features they detail
 //	specs-ratchet-validate            Compare the enforced-spec floor against the committed baseline
 //	architecture-validate             Validate the workspace's ARC/DARC declarations and project graph
-//	decisions-validate                Prove the workspace's committed decisions.json registries against the worktree
+//	decisions-validate                Prove the workspace's committed decision registries against the worktree
 //	recipes-validate                  Check every <lang>/samples/recipes.json against the worktree
 //	codeowners-sync                   Write .github/CODEOWNERS from the owners each putnami.json declares
 //	docs-links-validate               Check the links of every README.md file and doc/ tree of the workspace

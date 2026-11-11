@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-029",
+  "statement": "the slices of one issue run in sequence in the main session; parallel work means several issues of an epic, and by default only review runs in a subagent",
+  "settled": "2026-10-28",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+  "reviewOnly": true
+}

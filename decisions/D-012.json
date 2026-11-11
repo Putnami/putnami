@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-012",
+  "statement": "@putnami/dev does not depend on @putnami/contributor, which installs only on explicit request: a workspace receives the contributor skills and agents only when someone asks for @putnami/contributor",
+  "settled": "2026-10-18",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

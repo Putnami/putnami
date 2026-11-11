@@ -214,8 +214,9 @@ func runSpecsRatchetValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string)
 }
 
 // runDecisionsValidate is the third step of the workspace-scoped
-// `validate-workspace` command: every committed decisions.json — the root one
-// and each project's — and the files each of their checks names.
+// `validate-workspace` command: every committed decision registry — the root
+// one and each project's, a decisions/ directory or one decisions.json — and
+// the files each of their checks names.
 //
 // A check's read set is whatever its own `files` globs name, and those globs
 // are authored per repository, so no narrow task-input pattern can cover them.

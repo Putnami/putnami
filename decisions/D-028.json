@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-028",
+  "statement": "an issue is delivered by one pull request with no line or time cap; several pull requests mean several issues, grouped in an epic that orders them",
+  "settled": "2026-10-28",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+  "reviewOnly": true
+}

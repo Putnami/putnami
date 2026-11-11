@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-008",
+  "statement": "putnami init --extension <language> installs that language extension, and its dependencies bring the rest",
+  "settled": "2026-10-14",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

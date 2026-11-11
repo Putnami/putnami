@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W8",
+  "statement": "on Windows, LongPathsEnabled and Git core.longpaths are prerequisites that doctor checks; the store layout is not shortened for Windows",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

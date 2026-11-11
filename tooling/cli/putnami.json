@@ -32,6 +32,8 @@
         "../*/putnami.json",
         "../../decisions.json",
         "../../**/decisions.json",
+        "../../decisions/*.json",
+        "../../**/decisions/*.json",
         "../../typescript/samples/recipes.json",
         "../../go/samples/recipes.json",
         "../../python/samples/recipes.json",

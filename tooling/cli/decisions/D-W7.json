@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W7",
+  "statement": "the Putnami home resolves through os.UserHomeDir on every platform, which is the non-roaming %USERPROFILE%\\.putnami on Windows",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

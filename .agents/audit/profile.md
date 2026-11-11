@@ -41,7 +41,8 @@ Role labels come from the project tags and the scope:
 | scope `go`, `typescript`, `python` or `protocols`, no extension or sample tag | `role/framework` |
 | scope `sites`, no other role tag | `role/site` |
 
-Issue types use the `type/` labels that `decisions.json` allows:
+Issue types use the `type/` labels that decision D-033 (`decisions/D-033.json`)
+allows:
 
 | Issue | Label |
 | --- | --- |
@@ -62,7 +63,7 @@ Issue types use the `type/` labels that `decisions.json` allows:
   orchestrator session per (scope, typology) on the `tooling` and
   `typescript` scopes. Worker tiers follow the model equivalence in
   `.agents/constraints.md`. Prune commit messages follow decisions D-002 and
-  D-003 in `decisions.json`.
+  D-003 in `decisions/`.
 
 ## Properties in this repository
 

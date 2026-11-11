@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-067",
+  "statement": "putnami init without --extension, --from or --project proposes the languages whose markers it finds, asked in a terminal with all preselected; without a terminal, or on a monorepo tool marker, it declares nothing and names the command to run",
+  "settled": "2026-11-10",
+  "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0086-init-declares-the-languages-a-repository-holds.md",
+  "reviewOnly": true
+}

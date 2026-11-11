@@ -667,7 +667,7 @@ These platform differences are decisions, recorded in
   in the reviewed [`putnami.support.json`](../../../putnami.support.json).
 - **Scope**: consumers who install published Putnami artifacts on
   `windows/amd64`, on Windows 10 version 1803 or later or on Windows 11
-  ([D-W1](../decisions.json)), with the
+  ([D-W1](../decisions/D-W1.json)), with the
   [prerequisites](#prerequisites) above: Git for Windows for `sh` (D-W3),
   `LongPathsEnabled` and Git `core.longpaths` (D-W8), LF checkouts (D-W4),
   and the Visual C++ runtime that Biome needs (D-W12).

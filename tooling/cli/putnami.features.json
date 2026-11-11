@@ -571,7 +571,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-block-names-the-decision-files-and-lists-no-decision"
+              "the-block-names-the-decision-files-and-lists-no-decision",
+              "the-block-line-follows-the-registry-form"
             ]
           }
         },

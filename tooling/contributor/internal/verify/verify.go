@@ -307,10 +307,11 @@ func treeFingerprint(root string) (string, error) {
 
 // policyPaths lists the policy files that exist in the tree, sorted.
 func (r *verifyRun) policyPaths() []string {
-	// Every decision registry binds: the root one binds every project, a
-	// project's own binds that project.
+	// Every decision binds: the root registry binds every project, a project's
+	// own binds that project, whether it is a decisions/ directory of
+	// <id>.json files or one decisions.json.
 	registries := r.fileList("ls-files", "-z", "**/putnami.architecture.json", "putnami.architecture.json",
-		"**/decisions.json", "decisions.json")
+		"**/decisions.json", "decisions.json", "**/decisions/*.json", "decisions/*.json")
 	names := append([]string{"AGENTS.md", "CLAUDE.md", ".agents/constraints.md",
 		"putnami.ci.json", "putnami.workspace.json", "putnami.lock.json"}, registries...)
 	kept := []string{}

@@ -299,7 +299,7 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   [the validation jobs](doc/02-validation-jobs.md#verdict-policy-validate--cached-on-the-policy-and-layout-files).
 - `decisions-validate`, `recipes-validate`, `codeowners-sync`,
   `docs-links-validate` and `feature-coverage-validate` read files no narrow
-  pattern names: the globs a repository authors in its `decisions.json`, the
+  pattern names: the globs a repository authors in its decisions, the
   sample directories an index names, every `putnami.json` above a project, any
   file a link names, and the feature manifest and specs of every project. Each
   reads the repository's Git candidate cut and nothing else: the tracked files
@@ -338,11 +338,13 @@ A task may be cacheable only when its declared inputs COVER what it reads.
 
 ### The decision gate
 
-`decisions-validate` proves every committed `decisions.json` against this
+`decisions-validate` proves every committed decision registry against this
 worktree: the one at the workspace root, for decisions every project follows,
-and the one in each project directory, for that project's own. A project
-registry's globs and `adr` link are relative to its directory, so it judges
-only its own files. Ids are unique across all registries.
+and the one in each project directory, for that project's own. A registry is a
+`decisions/` directory with one `<id>.json` file per decision, or one
+`decisions.json`; a scope that holds both fails. A project registry's globs and
+`adr` link are relative to its directory, so it judges only its own files. Ids
+are unique across all registries, ignoring case.
 
 Each entry states a settled value with a stable id, the date it was settled and
 who settled it, and carries either a `json-value` check or the `reviewOnly`
@@ -351,7 +353,7 @@ registry — so the way out is to change the decision, not the code:
 
 ```
 decision D-001 "serverless workloads scale to zero when idle" is violated by sites/putnami.dev/infra/requirements.json: scaling.minInstances = 1
-Settled 2026-09-03 by fdumay. To change it, change the decision in decisions.json, not the code.
+Settled 2026-09-03 by fdumay. To change it, change the decision in decisions/D-001.json, not the code.
 ```
 
 An absent registry is adoption, never a failure; an unusable one fails closed

@@ -18,13 +18,15 @@ import (
 
 // The decision gate of `validate-workspace`.
 //
-// A workspace states what it has settled in decisions.json registries: the
-// one at the root for decisions every project follows, and one per project
-// directory for that project's own. This engine reads every registry, proves
-// every decision that carries a check against the files the check's own globs
-// name inside the registry's directory, and fails the task naming the decision
-// — its id, its statement, the date it was settled and the registry that holds
-// it — rather than emitting a lint message a reader cannot act on.
+// A workspace states what it has settled in decision registries: the one at
+// the root for decisions every project follows, and one per project directory
+// for that project's own. A registry is a decisions/ directory with one
+// <id>.json file per decision, or one decisions.json file
+// (featureproto.ReadScopeDecisions reads both). This engine reads every
+// registry, proves every decision that carries a check against the files the
+// check's own globs name inside the scope directory, and fails the task naming
+// the decision — its id, its statement, the date it was settled and the file
+// that holds it — rather than emitting a lint message a reader cannot act on.
 //
 // Two properties of the verdict are deliberate.
 //
@@ -98,7 +100,8 @@ type DecisionsSummary struct {
 type DecisionFinding struct {
 	// Decision is the violated decision's stable id.
 	Decision string `json:"decision"`
-	// Registry is the workspace-relative registry that holds the decision.
+	// Registry is the workspace-relative file that holds the decision: a
+	// decisions/<id>.json file or a decisions.json registry.
 	Registry string `json:"registry"`
 	// Path is the workspace-relative file that violates it.
 	Path string `json:"path"`
@@ -106,15 +109,6 @@ type DecisionFinding struct {
 	Detail string `json:"detail"`
 	// Message is the whole sentence published as a diagnostic.
 	Message string `json:"message"`
-}
-
-// scopedDecisionRegistry is one parsed registry and the directory it governs.
-type scopedDecisionRegistry struct {
-	// scope is the slash-separated workspace-relative directory, "" for the
-	// workspace root.
-	scope    string
-	path     string
-	registry *featureproto.DecisionRegistry
 }
 
 // decisionScopes lists the directories a registry may sit in: the workspace
@@ -138,24 +132,16 @@ func decisionScopes(ws *workspace.Workspace) []string {
 	return scopes
 }
 
-// readCommittedDecisions loads one scope's registry. Absence is
-// (nil, false, nil): adoption, with nothing settled in that scope yet.
-func readCommittedDecisions(tree *worktree, registryPath string) (*featureproto.DecisionRegistry, bool, []diag.Diagnostic) {
-	data, err := tree.readRegular(registryPath)
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, true, []diag.Diagnostic{diag.Errorf(featureproto.ErrorCodeDecisionsUnreadable,
-			registryPath, "read committed decision registry: %v", err)}
-	}
-	registry, findings := featureproto.ParseAndValidateDecisionRegistry(data)
-	sourced := make([]diag.Diagnostic, 0, len(findings))
-	for _, finding := range findings {
-		finding.Field = documentField(registryPath, finding.Field)
-		sourced = append(sourced, finding)
-	}
-	return registry, true, sourced
+// decisionFiles reads a scope's registry, in either form, through the
+// worktree: the candidate cut inside a Git work tree, the disk outside one.
+type decisionFiles struct{ tree *worktree }
+
+func (f decisionFiles) ReadFile(name string) ([]byte, error) {
+	return f.tree.readRegular(name)
+}
+
+func (f decisionFiles) ReadDir(dir string) ([]string, error) {
+	return f.tree.regularFilesIn(dir)
 }
 
 // documentField anchors a diagnostic on the committed document it came from,
@@ -170,7 +156,7 @@ func documentField(document, member string) string {
 
 func unusableDecisions(report DecisionsReport) (DecisionsReport, error) {
 	return report, protocolcli.WithResultData(protocolcli.Classify(
-		fmt.Errorf("decisions: a committed %s is unusable", featureproto.DecisionsFilename),
+		errors.New("decisions: a committed decision registry is unusable"),
 		protocolcli.ErrInvalidConfig), report)
 }
 
@@ -188,55 +174,63 @@ func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 	if err != nil {
 		return report, fmt.Errorf("decisions: %w", err)
 	}
-	var registries []scopedDecisionRegistry
+	var registries []featureproto.ScopeDecisions
 	for _, scope := range decisionScopes(ws) {
-		registryPath := featureproto.DecisionRegistryPath(scope)
-		registry, present, findings := readCommittedDecisions(tree, registryPath)
+		scoped, findings := featureproto.ReadScopeDecisions(decisionFiles{tree: tree}, scope)
 		report.Diagnostics = append(report.Diagnostics, findings...)
-		if !present {
+		if !scoped.Present {
 			continue
 		}
 		report.RegistryPresent = true
-		report.Registries = append(report.Registries, registryPath)
-		if registry != nil {
-			registries = append(registries, scopedDecisionRegistry{scope: scope, path: registryPath, registry: registry})
-		}
+		report.Registries = append(report.Registries, scoped.Location)
+		registries = append(registries, scoped)
 	}
 	sort.Strings(report.Registries)
 	if diag.HasErrors(report.Diagnostics) {
+		sortDiagnostics(report.Diagnostics)
 		return unusableDecisions(report)
 	}
 
 	// An id is what a failure message and a pull request cite, so two
-	// registries answering to the same id make the citation ambiguous. The
-	// first registry in scope order keeps the id; every later one is named.
-	owner := make(map[string]string)
+	// decisions answering to the same id make the citation ambiguous. An id
+	// that differs from another only in case is refused too: it names a
+	// decision file that collides with the other one on a case-insensitive
+	// file system. The first decision in scope order keeps the id; every later
+	// one is named.
+	owner := make(map[string]featureproto.SourcedDecision)
 	for _, scoped := range registries {
-		for _, decision := range scoped.registry.Decisions {
-			if first, taken := owner[decision.ID]; taken {
-				report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeInvalidDecisionRegistry,
-					documentField(scoped.path, decision.ID+".id"),
-					"decision id %s is already settled in %s; ids are unique across every registry of a workspace", decision.ID, first))
+		for _, sourced := range scoped.Decisions {
+			id := sourced.Decision.ID
+			if first, taken := owner[strings.ToLower(id)]; taken {
+				field := documentField(sourced.Source, decisionMember(sourced, "id"))
+				if first.Decision.ID == id {
+					report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeInvalidDecisionRegistry, field,
+						"decision id %s is already settled in %s; ids are unique across every registry of a workspace", id, first.Source))
+				} else {
+					report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeInvalidDecisionRegistry, field,
+						"decision id %s differs only in case from %s, settled in %s; ids are unique, ignoring case, across every registry of a workspace",
+						id, first.Decision.ID, first.Source))
+				}
 				continue
 			}
-			owner[decision.ID] = scoped.path
+			owner[strings.ToLower(id)] = sourced
 		}
 	}
 
 	// An `adr` link is justification, and a link that resolves to nothing is
 	// justification nobody can read. It is a filesystem fact, so it is checked
-	// here rather than in the protocol validator, relative to the registry.
+	// here rather than in the protocol validator, relative to the scope.
 	for _, scoped := range registries {
-		report.Summary.Decisions += len(scoped.registry.Decisions)
-		for _, decision := range scoped.registry.Decisions {
-			if decision.ADR == "" {
+		report.Summary.Decisions += len(scoped.Decisions)
+		for _, sourced := range scoped.Decisions {
+			if sourced.Decision.ADR == "" {
 				continue
 			}
-			link := path.Join(scoped.scope, decision.ADR)
+			link := path.Join(scoped.Scope, sourced.Decision.ADR)
 			if !tree.isRegular(link) {
 				report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeInvalidDecisionRegistry,
-					documentField(scoped.path, decision.ID+".adr"),
-					"decision %s links %s, which is not a file in this worktree", decision.ID, link))
+					documentField(sourced.Source, decisionMember(sourced, "adr")),
+					"decision %s links %s, which is not a file in this worktree", sourced.Decision.ID, link))
 			}
 		}
 	}
@@ -248,7 +242,8 @@ func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 	var files []string
 	checked := make(map[string]bool)
 	for _, scoped := range registries {
-		for _, decision := range scoped.registry.Decisions {
+		for _, sourced := range scoped.Decisions {
+			decision := sourced.Decision
 			if decision.IsReviewOnly() {
 				report.Summary.ReviewOnly++
 				continue
@@ -262,7 +257,7 @@ func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 				files, walkFindings = listDecisionFiles(tree)
 				report.Diagnostics = append(report.Diagnostics, walkFindings...)
 			}
-			matched, matchFindings := matchDecisionFiles(files, scoped, decision)
+			matched, matchFindings := matchDecisionFiles(files, scoped.Scope, sourced)
 			report.Diagnostics = append(report.Diagnostics, matchFindings...)
 			for _, relative := range matched {
 				checked[relative] = true
@@ -271,13 +266,13 @@ func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 					// Unreadable is fail-closed for the same reason unparseable
 					// is: a decision must not be defeated by making its evidence
 					// unavailable.
-					report.Findings = append(report.Findings, decisionFinding(scoped.path, decision, relative,
+					report.Findings = append(report.Findings, decisionFinding(sourced.Source, decision, relative,
 						fmt.Sprintf("the file could not be read: %v", err)))
 					continue
 				}
 				outcome := featureproto.EvaluateDecisionCheck(decision.Check, data)
 				if outcome.Violated {
-					report.Findings = append(report.Findings, decisionFinding(scoped.path, decision, relative, outcome.Detail))
+					report.Findings = append(report.Findings, decisionFinding(sourced.Source, decision, relative, outcome.Detail))
 				}
 			}
 		}
@@ -308,6 +303,16 @@ func BuildDecisionsResult(ws *workspace.Workspace) (DecisionsReport, error) {
 	return report, nil
 }
 
+// decisionMember names member of one decision inside the file that holds it:
+// "<id>.<member>" in a decisions.json registry, "<member>" in a decision file
+// of a decisions/ directory, which holds that one decision.
+func decisionMember(sourced featureproto.SourcedDecision, member string) string {
+	if path.Base(path.Dir(sourced.Source)) == featureproto.DecisionsDirname {
+		return member
+	}
+	return sourced.Decision.ID + "." + member
+}
+
 func decisionFinding(registry string, decision featureproto.Decision, path, detail string) DecisionFinding {
 	return DecisionFinding{
 		Decision: decision.ID,
@@ -319,7 +324,7 @@ func decisionFinding(registry string, decision featureproto.Decision, path, deta
 }
 
 // matchDecisionFiles selects the workspace files one decision's globs name
-// inside its registry's directory, as sorted workspace-relative paths with no
+// inside its scope directory, as sorted workspace-relative paths with no
 // duplicate, so two runs over the same tree read the same files in the same
 // order and report the same findings in the same sequence.
 //
@@ -327,10 +332,11 @@ func decisionFinding(registry string, decision featureproto.Decision, path, deta
 // cannot violate the decision, and turning "nothing to check" into a failure
 // would make the shared format unusable outside the repository that authored
 // the glob.
-func matchDecisionFiles(files []string, scoped scopedDecisionRegistry, decision featureproto.Decision) ([]string, []diag.Diagnostic) {
+func matchDecisionFiles(files []string, scope string, sourced featureproto.SourcedDecision) ([]string, []diag.Diagnostic) {
+	decision := sourced.Decision
 	matched := make([]string, 0)
 	for _, relative := range files {
-		inScope, ok := featureproto.DecisionScopeRelative(scoped.scope, relative)
+		inScope, ok := featureproto.DecisionScopeRelative(scope, relative)
 		if !ok {
 			continue
 		}
@@ -343,7 +349,7 @@ func matchDecisionFiles(files []string, scoped scopedDecisionRegistry, decision 
 	}
 	if len(matched) > maximumDecisionMatches {
 		return nil, []diag.Diagnostic{diag.Errorf(featureproto.ErrorCodeInvalidDecisionRegistry,
-			documentField(scoped.path, decision.ID+".check.files"),
+			documentField(sourced.Source, decisionMember(sourced, "check.files")),
 			"decision %s matches %d files, beyond the bounded limit of %d; narrow its globs",
 			decision.ID, len(matched), maximumDecisionMatches)}
 	}

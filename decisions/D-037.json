@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-037",
+  "statement": "a child issue stacks on at most one unmerged parent whose proposal is ready, and after the parent's squash merge rebases with git rebase --onto <base> <parent's last head>",
+  "settled": "2026-11-02",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md",
+  "reviewOnly": true
+}

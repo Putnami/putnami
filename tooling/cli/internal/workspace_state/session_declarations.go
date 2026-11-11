@@ -23,7 +23,7 @@ import (
 const declarationDigestHeader = "putnami-declarations/1\n"
 
 // declarationFilenames are the declaration files a directory can hold beside
-// its specs/ directory.
+// its declarationDirectories.
 var declarationFilenames = []string{
 	features.ManifestFilename,
 	features.DecisionsFilename,
@@ -32,10 +32,18 @@ var declarationFilenames = []string{
 	architecture.BaselineFilename,
 }
 
+// declarationDirectories are the directories whose `*.json` files are
+// declarations: one spec per file, and one decision per file.
+var declarationDirectories = []string{
+	features.SpecDirectory,
+	features.DecisionsDirname,
+}
+
 // DeclarationDigest digests, by content, the declaration files the declared
 // checks read: in the workspace root, in every project directory and in every
 // directory between the two, the files named by declarationFilenames and every
-// `specs/*.json`. projectPaths are slash-separated and relative to root.
+// `specs/*.json` and `decisions/*.json`. projectPaths are slash-separated and
+// relative to root.
 //
 // A missing file is not a declaration; any other read failure returns an
 // error, so a caller records no digest rather than one over a partial set.
@@ -45,13 +53,15 @@ func DeclarationDigest(root string, projectPaths []string) (*cli.SessionDeclarat
 		for _, name := range declarationFilenames {
 			files[path.Join(dir, name)] = struct{}{}
 		}
-		specs, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(path.Join(dir, features.SpecDirectory))))
-		if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
-			return nil, err
-		}
-		for _, entry := range specs {
-			if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".json") {
-				files[path.Join(dir, features.SpecDirectory, entry.Name())] = struct{}{}
+		for _, documents := range declarationDirectories {
+			entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(path.Join(dir, documents))))
+			if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
+				return nil, err
+			}
+			for _, entry := range entries {
+				if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".json") {
+					files[path.Join(dir, documents, entry.Name())] = struct{}{}
+				}
 			}
 		}
 	}

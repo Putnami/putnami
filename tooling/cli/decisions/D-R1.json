@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-R1",
+  "statement": "from a task's first debug line to its task:end, the session reporter's upload holds every task:event of that task, so a failed task's lines keep their order and its info, warn and diagnostic events leave at its end",
+  "settled": "2026-10-28",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

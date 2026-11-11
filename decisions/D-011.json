@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-011",
+  "statement": "@putnami/contributor ships a compiled executable and owns change verify|finalize|language",
+  "settled": "2026-10-18",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

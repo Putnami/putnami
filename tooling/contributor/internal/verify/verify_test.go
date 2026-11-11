@@ -999,14 +999,16 @@ func TestVerifierSnapshotNeverVerifiesPendingWork(t *testing.T) {
 	f.verify("missing evidence reference")
 }
 
-// Every tracked decision registry is a policy binding: the root one binds every
-// project, a project's own binds that project.
+// Every tracked decision is a policy binding: the root registry binds every
+// project, a project's own binds that project, in either registry form.
 func TestVerifierSnapshotBindsEveryDecisionRegistry(t *testing.T) {
 	t.Parallel()
 	f := newVerifyFixture(t)
 	f.write("decisions.json", "{}\n")
 	f.write("tooling/app/decisions.json", "{}\n")
-	f.git("add", "decisions.json", "tooling/app/decisions.json")
+	f.write("decisions/cache-trust.json", "{}\n")
+	f.write("tooling/lib/decisions/D-001.json", "{}\n")
+	f.git("add", "decisions.json", "tooling/app/decisions.json", "decisions/cache-trust.json", "tooling/lib/decisions/D-001.json")
 	snapshot := f.invoke("--snapshot", "--base", f.head)
 	if snapshot.err != nil {
 		t.Fatalf("snapshot: %v: %s", snapshot.err, snapshot.out)
@@ -1016,7 +1018,7 @@ func TestVerifierSnapshotBindsEveryDecisionRegistry(t *testing.T) {
 	for _, policy := range policies {
 		paths = append(paths, fxAt(policy, "path").(string))
 	}
-	for _, want := range []string{"decisions.json", "tooling/app/decisions.json"} {
+	for _, want := range []string{"decisions.json", "tooling/app/decisions.json", "decisions/cache-trust.json", "tooling/lib/decisions/D-001.json"} {
 		if !slices.Contains(paths, want) {
 			t.Fatalf("policies = %q, want %s among them", paths, want)
 		}

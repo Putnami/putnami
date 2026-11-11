@@ -457,7 +457,7 @@ func TestContributorBuildLoopPushesDeclarationsBeforeCode(t *testing.T) {
 	section := strings.Join(strings.Fields(markdownSection(t, read("references/show.md"), "Intent first")), " ")
 	for _, want := range []string{
 		"`putnami.features.json`", "`specs/*.json`", "`specs.baseline.json`",
-		"`putnami.architecture.json`", "`decisions.json`", "decision record (ADR)",
+		"`putnami.architecture.json`", "`decisions/<id>.json`", "decision record (ADR)",
 		"commit them alone", "before any implementation commit",
 		"without waiting for an approval",
 		"`proposals status`", "`proposals comments`", "`proposals review`",

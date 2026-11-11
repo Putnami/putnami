@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-014",
+  "statement": "an extension command calls the collaboration providers through an RPC call to the core, made with an SDK client",
+  "settled": "2026-10-16",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

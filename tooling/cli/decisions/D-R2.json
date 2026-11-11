@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-R2",
+  "statement": "the session reporter's upload holds at most 1,000,000 records; past it, the task that holds the most releases them and sends live from then on",
+  "settled": "2026-10-28",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

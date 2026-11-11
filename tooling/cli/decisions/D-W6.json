@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W6",
+  "statement": "Windows uses directory junctions where Unix uses directory symlinks, with no Developer Mode requirement; replacing a link is remove-then-create under the lock",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

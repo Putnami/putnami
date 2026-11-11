@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W2",
+  "statement": "Putnami's release archives stay .tar.gz, the Windows binary at compiled/<name>.exe, and the CLI reads them as tar.gz only; a toolchain archive the lock pins may be tar.gz or zip; the CLI's release may also publish raw executables that self-update installs",
+  "settled": "2026-10-22",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

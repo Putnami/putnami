@@ -1021,11 +1021,13 @@ extensions the workspace declares by path and opts into, and nothing else. It
 writes no host configuration file. `install` and `upgrade` remove the `.mcp.json`
 entry that an earlier Putnami wrote.
 
-The block holds the rules and the gate line. It names the `decisions.json` files
-in one line and lists no decision. The line appears with a registry's first
-decision and goes with its last, and those two changes regenerate the block; any
-other decision change leaves both files as they were. The `decisions.json`
-files hold the decisions in full.
+The block holds the rules and the gate line. It names the decision registries
+in one line and lists no decision. The line follows the registry form the
+workspace holds: `decisions/<id>.json` files, `decisions.json` files, or both
+across different scopes. The line appears with a registry's first decision and
+goes with its last, and those two changes regenerate the block; any other
+decision change leaves both files as they were. The registries hold the
+decisions in full.
 
 #### `context pack`
 
