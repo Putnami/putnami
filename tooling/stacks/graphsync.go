@@ -38,8 +38,14 @@ type GraphPackage struct {
 	// Extension is the extension the package runs, one of the sync's
 	// Extension and Extensions; empty is the sync's Extension.
 	Extension string
+	// Also are the other extensions of the sync's Extension and Extensions
+	// the package runs beside Extension, such as the tool's extension for an
+	// imported project that keeps a target on the tool (ADR 0017).
+	Also []string
 	// Disabled are the jobs, among the sync's Jobs, the package runs none
-	// of, such as a command its tool has no task for.
+	// of, such as a command its tool has no task for, and the jobs qualified
+	// by one of the package's extensions, such as @putnami/typescript:test,
+	// that this extension does not run.
 	Disabled []string
 	// Edit, when set, writes the members of the package's putnami.json the
 	// stack owns beyond the sync's, after them, and is called on every write.
@@ -443,9 +449,12 @@ func (g GraphSync) writeProject(root, file string, deps []string, p GraphPackage
 	if extension == "" {
 		extension = g.Extension
 	}
-	extensions := slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return e != extension && g.owns(e) })
-	if !slices.Contains(extensions, extension) {
-		extensions = append(extensions, extension)
+	runs := append([]string{extension}, p.Also...)
+	extensions := slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return !slices.Contains(runs, e) && g.owns(e) })
+	for _, e := range runs {
+		if !slices.Contains(extensions, e) {
+			extensions = append(extensions, e)
+		}
 	}
 	doc["extensions"] = extensions
 	if g.Tag != "" {
@@ -480,12 +489,12 @@ func (g GraphSync) writeProject(root, file string, deps []string, p GraphPackage
 }
 
 // setDisabled writes the jobs the sync owns in disable.jobs: those of
-// disabled, after every job the sync does not own, kept in its place.
+// disabled, after every job the sync does not own, kept in its place. The
+// sync owns its jobs, bare and qualified by an extension it owns: the bare
+// ones come first, in the order of its jobs, then the qualified ones, by
+// extension then job.
 func (g GraphSync) setDisabled(doc map[string]any, disabled []string) {
-	owned := g.Jobs
-	if owned == nil {
-		owned = []string{"test"}
-	}
+	owned := g.ownedJobs()
 	disable, _ := doc["disable"].(map[string]any)
 	if disable == nil {
 		disable = map[string]any{}
@@ -502,6 +511,25 @@ func (g GraphSync) setDisabled(doc map[string]any, disabled []string) {
 	} else {
 		doc["disable"] = disable
 	}
+}
+
+// ownedJobs are the disable.jobs entries the sync owns, in the order it
+// writes them: its jobs, then each qualified by the sync's extension and by
+// each of its other extensions, sorted.
+func (g GraphSync) ownedJobs() []string {
+	bare := g.Jobs
+	if bare == nil {
+		return []string{"test"}
+	}
+	owned := slices.Clone(bare)
+	others := slices.Clone(g.Extensions)
+	slices.Sort(others)
+	for _, e := range append([]string{g.Extension}, others...) {
+		for _, j := range bare {
+			owned = append(owned, e+":"+j)
+		}
+	}
+	return owned
 }
 
 // commit writes doc at file, or in a dry run answers the change it would

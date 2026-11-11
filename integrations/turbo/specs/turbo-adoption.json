@@ -12,7 +12,7 @@
     "Caching a Turborepo result in Putnami's cache, or putting Putnami's cache over Turborepo's",
     "Mapping a turbo.json task other than build, test and lint: it keeps running through Turborepo",
     "Installing or switching a Turborepo version: turbo must be on PATH",
-    "Rewriting turbo.json or a package.json in the sync, or changing the tool that checks a task: a prettier task or an eslint task with arguments stays on Turborepo, and a build that runs tsc moves only with that tsc"
+    "Rewriting turbo.json, or a package.json beyond the exports an import adds (D-066), or changing the tool that checks a task: a prettier task or an eslint task with arguments stays on Turborepo, and a build that runs tsc moves only with that tsc"
   ],
   "requirements": [
     {
@@ -62,11 +62,16 @@
     {
       "id": "import-maps-a-tsc-build-script",
       "text": "In import mode, a TypeScript package's build task whose package.json script runs tsc alone, as @putnami/typescript's compiler choice reads it, moves to @putnami/typescript, which compiles it with that tsc. A build script that runs tsc with another argument or a shell operator keeps running through Turborepo and is listed with its reason."
+    },
+    {
+      "id": "import-adopts-typescript-conventions",
+      "text": "In import mode, an imported TypeScript project gets the conventions of D-066: exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json that declares no exports, names a file outside src/, holds src/index.ts and is private, when its build moves to the Bun build; a tsconfig.json extending the root's when it holds no tsconfig*.json. The sync lists each write and each manifest it does not edit, and a dry sync shows each diff."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
     "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
-    "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md"
+    "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
+    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
   ]
 }

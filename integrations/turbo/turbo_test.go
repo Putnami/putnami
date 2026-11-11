@@ -758,3 +758,55 @@ func TestImportMarksTheNodeRuntime(t *testing.T) {
 		t.Errorf("a delegated package: runtime = %v, want none", got)
 	}
 }
+
+func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
+	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
+	d := readDemo(t)
+	root := repository(t, d)
+	// pricing builds with Bun, so its main names an output nothing writes in
+	// the package; api builds with tsc, which writes the output its main
+	// names, and holds its own tsconfig.build.json.
+	pricing := "{\n  \"name\": \"@demo/pricing\",\n  \"private\": true,\n  \"main\": \"dist/index.js\",\n  \"scripts\": {\"build\": \"bun build src/index.ts --outdir dist\", \"test\": \"bun test\"}\n}\n"
+	api := "{\n  \"name\": \"@demo/api\",\n  \"private\": true,\n  \"main\": \"dist/index.js\",\n  \"scripts\": {\"build\": \"tsc -p tsconfig.build.json\"},\n  \"dependencies\": {\"@demo/pricing\": \"workspace:*\"}\n}\n"
+	writeFile(t, root, "packages/pricing/package.json", pricing)
+	writeFile(t, root, "apps/api/package.json", api)
+	writeFile(t, root, "apps/api/tsconfig.build.json", "{}\n")
+	writeFile(t, root, "apps/api/src/index.ts", "export {}\n")
+
+	dry, err := Sync(root, Options{Mode: ModeImport, DryRun: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "packages/pricing/package.json")); string(data) != pricing {
+		t.Errorf("a dry sync wrote pricing's package.json")
+	}
+	joined := strings.Join(Report(dry, true), "\n")
+	if !strings.Contains(joined, "+++ b/packages/pricing/package.json") || !strings.Contains(joined, "+++ b/packages/pricing/tsconfig.json") {
+		t.Errorf("the preview shows no convention diff:\n%s", joined)
+	}
+	result, err := Sync(root, Options{Mode: ModeImport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "packages/pricing/package.json")); !strings.Contains(string(data), `"exports": {`) {
+		t.Errorf("pricing package.json = %s", data)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "apps/api/package.json")); string(data) != api {
+		t.Errorf("a tsc build's package.json changed: %s", data)
+	}
+	if _, err := os.Stat(filepath.Join(root, "apps/api/tsconfig.json")); !os.IsNotExist(err) {
+		t.Errorf("api, which holds a tsconfig.build.json, got a tsconfig.json: %v", err)
+	}
+	if !slices.ContainsFunc(result.Conventions, func(n string) bool { return strings.HasPrefix(n, "packages/pricing/package.json: exports") }) {
+		t.Errorf("conventions = %v", result.Conventions)
+	}
+	if again, err := Sync(root, Options{Mode: ModeImport, DryRun: true}); err != nil || len(again.Diffs) != 0 {
+		t.Errorf("a second sync shows %v, %v", again.Diffs, err)
+	}
+	// Delegate mode adopts no convention.
+	root = repository(t, d)
+	writeFile(t, root, "packages/pricing/package.json", pricing)
+	if result, err := Sync(root, Options{Mode: ModeDelegate}); err != nil || len(result.Conventions) != 0 {
+		t.Errorf("delegate mode: %v %v", result.Conventions, err)
+	}
+}

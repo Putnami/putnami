@@ -4,13 +4,15 @@
 // observe, in the mode the workspace adopted it in. In delegate mode every
 // task runs moon on one project, and moon keeps its own cache: the manifest
 // disables Putnami's. In import mode a project whose language has a Putnami
-// extension runs that extension instead, and every other project stays
-// delegated to moon.
+// extension runs that extension instead, for each task it runs with the same
+// tool, and every other task and project stays delegated to moon.
 package moon
 
 import (
 	_ "embed"
 	"fmt"
+	"path/filepath"
+	"slices"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -84,8 +86,9 @@ func ExtensionFor(mode string, p detect.Project) string {
 // Detect names the moon projects among the candidate paths that run
 // @putnami/moon in the workspace's mode: each named by its moon project id,
 // with the workspace root for stack root and moon's edges. A project the mode
-// imports into a language extension is left to that extension, and a
-// candidate that is no moon project is not answered.
+// imports into a language extension is left to that extension, unless its
+// putnami.json names @putnami/moon too: it keeps a task on moon (ADR 0017 of
+// tooling/stacks). A candidate that is no moon project is not answered.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	if !detect.IsWorkspace(root) {
 		return nil, nil
@@ -102,7 +105,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	var out []stacks.Component
 	for _, dir := range request.Paths {
 		p, ok := projects[dir]
-		if !ok || ExtensionFor(mode, p) != ExtensionName {
+		if !ok || (ExtensionFor(mode, p) != ExtensionName && !keepsTasks(root, dir)) {
 			continue
 		}
 		var deps []string
@@ -121,4 +124,11 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		})
 	}
 	return out, detection.Diagnostics
+}
+
+// keepsTasks reports whether the putnami.json of the project at dir names
+// the extension: an import keeps one of its tasks on moon.
+func keepsTasks(root, dir string) bool {
+	cfg := wsproto.LoadProjectConfig(filepath.Join(root, filepath.FromSlash(dir)))
+	return cfg != nil && slices.Contains(cfg.Extensions, ExtensionName)
 }

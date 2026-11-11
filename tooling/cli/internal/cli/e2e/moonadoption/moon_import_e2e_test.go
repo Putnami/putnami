@@ -56,7 +56,7 @@ func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testin
 		t.Fatalf("init --apply exit %d:\n%s", code, out)
 	}
 	// The unmapped task is listed, and keeps running through moon.
-	if !strings.Contains(out, "api:dev") {
+	if !strings.Contains(out, "api:dev") || !strings.Contains(out, "api:build") {
 		t.Errorf("the sync lists no unmapped task:\n%s", out)
 	}
 	// The project graph is the one observe reads from the demo: api depends
@@ -66,12 +66,16 @@ func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testin
 		deps      []string
 		disabled  []string
 	}{
-		"apps/api":         {"@putnami/typescript", []string{"/packages/pricing"}, nil},
-		"packages/pricing": {"@putnami/rust", nil, []string{"lint"}},
+		// api's tsc -b is no package.json build script, so its build keeps
+		// running through moon (D-070); its Vitest test and ESLint lint move.
+		"apps/api": {"@putnami/moon,@putnami/typescript", []string{"/packages/pricing"}, []string{"@putnami/moon:lint", "@putnami/moon:test", "@putnami/typescript:build"}},
+		// pricing's cargo test stays on moon: the Rust extension tests with
+		// nextest, which runs no doctest.
+		"packages/pricing": {"@putnami/moon,@putnami/rust", nil, []string{"lint", "@putnami/moon:build", "@putnami/rust:test"}},
 		"apps/web":         {"@putnami/moon", nil, []string{"build", "test"}},
 	} {
 		p := readProject(t, root, dir)
-		if !slices.Equal(p.Extensions, []string{want.extension}) || !slices.Equal(p.Dependencies, want.deps) || !slices.Equal(p.Disable.Jobs, want.disabled) || !slices.Equal(p.Tags, []string{"moon"}) {
+		if !slices.Equal(p.Extensions, strings.Split(want.extension, ",")) || !slices.Equal(p.Dependencies, want.deps) || !slices.Equal(p.Disable.Jobs, want.disabled) || !slices.Equal(p.Tags, []string{"moon"}) {
 			t.Errorf("%s putnami.json = %+v, want %+v", dir, p, want)
 		}
 	}
@@ -93,14 +97,15 @@ func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testin
 	ran := strings.Split(strings.TrimSpace(string(data)), "\n")
 	slices.Sort(ran)
 	want := []string{
-		"@putnami/rust build pricing", "@putnami/rust test pricing",
-		"@putnami/typescript build api", "@putnami/typescript lint api", "@putnami/typescript test api",
+		"@putnami/rust build pricing",
+		"@putnami/typescript lint api", "@putnami/typescript test api",
 	}
 	if !slices.Equal(ran, want) {
 		t.Errorf("the language extensions ran %v, want %v\n%s", ran, want, out)
 	}
 	// web, in JavaScript, has no Putnami extension: it stays on moon, and
-	// runs its one task, lint, through it.
+	// runs its one task, lint, through it; api's tsc build and pricing's
+	// cargo test run through moon too.
 	data, err = os.ReadFile(moonLog)
 	if err != nil {
 		t.Fatalf("moon ran nothing: %v\n%s", err, out)
@@ -111,7 +116,8 @@ func TestInitFromMoonInImportModeMapsTheProjectsAndPassesLintTestBuild(t *testin
 			runs = append(runs, call)
 		}
 	}
-	if !slices.Equal(runs, []string{"web:lint"}) {
-		t.Errorf("moon ran %v, want web:lint alone\n%s", runs, out)
+	slices.Sort(runs)
+	if !slices.Equal(runs, []string{"api:build", "pricing:unit", "web:lint"}) {
+		t.Errorf("moon ran %v, want api:build, pricing:unit and web:lint\n%s", runs, out)
 	}
 }

@@ -66,6 +66,16 @@ type initSource struct {
 	// importList reports that the extension reads options import, the
 	// projects a delegated workspace imports, which --import adds to.
 	importList bool
+	// syncExtensions are the extensions the tool's sync declares in import
+	// mode, beside importExtensions: the language extensions moon maps
+	// projects to.
+	syncExtensions []string
+}
+
+// importDeclared are the extensions an import declares: those init declares
+// for import mode, and those the sync declares.
+func (s initSource) importDeclared() []string {
+	return append(slices.Clone(s.importExtensions), s.syncExtensions...)
 }
 
 // initSources are the tools --from accepts, by name.
@@ -82,9 +92,10 @@ var initSources = map[string]initSource{
 	// sync declares the ones the projects need, and init installs them after
 	// it.
 	"moon": {
-		starter: initExtensionConfig{packageName: "@putnami/moon"},
-		markers: []string{".moon/workspace.yml"},
-		modes:   []string{initModeImport, initModeDelegate},
+		starter:        initExtensionConfig{packageName: "@putnami/moon"},
+		markers:        []string{".moon/workspace.yml"},
+		modes:          []string{initModeImport, initModeDelegate},
+		syncExtensions: []string{"@putnami/go", "@putnami/php", "@putnami/python", "@putnami/ruby", "@putnami/rust", "@putnami/typescript"},
 	},
 	"pants": {starter: initExtensionConfig{packageName: "@putnami/pants"}, markers: []string{"pants.toml"}, modes: []string{initModeDelegate}},
 	// Turborepo's import mode moves a TypeScript package's task to
@@ -124,6 +135,11 @@ func initSourceNames() string {
 	sort.Strings(names)
 	return strings.Join(names, ", ")
 }
+
+// removeInitExtension removes from the lock and the disk an extension init
+// removed from the workspace config; cfg is the config as it now stands.
+// Swapped in tests.
+var removeInitExtension = extensions.ExtensionsRemoveUndeclared
 
 // installExtension is swapped in tests so init tests never perform a real
 // registry install (slow and environment-dependent). Its progress lines go to

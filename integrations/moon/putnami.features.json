@@ -7,7 +7,7 @@
       "id": "monorepo/moon-adoption",
       "type": "feature",
       "name": "Adopt a moon repository by import or by delegation",
-      "outcome": "A team with a moon repository reaches Putnami's runner and verdict in the mode it picks: its moon projects become Putnami projects with their edges, and each task runs either the Putnami extension of the project's language or moon itself, which then keeps its own cache",
+      "outcome": "A team with a moon repository reaches Putnami's runner and verdict in the mode it picks: its moon projects become Putnami projects with their edges, and each task runs either the Putnami extension of the project's language, when it runs the task's own tool, or moon itself, which then keeps its own cache",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -47,6 +47,32 @@
             "kind": "acceptance",
             "checks": [
               "import-mode-maps-a-project-to-its-language-extension"
+            ]
+          }
+        },
+        {
+          "id": "import-keeps-the-tool-that-checks-the-code",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-that-runs-another-tool-keeps-running-through-moon"
+            ]
+          }
+        },
+        {
+          "id": "import-adopts-typescript-conventions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-adds-source-exports-and-a-tsconfig"
             ]
           }
         },

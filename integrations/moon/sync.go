@@ -103,6 +103,7 @@ func synchronize(_ context.Context, root string, dry bool, given string) (SyncRe
 	result := SyncResult{Mode: mode}
 	extensions := map[string]bool{}
 	var packages []stacks.GraphPackage
+	var conventions []stacks.ConventionProject
 	for _, p := range detection.Projects {
 		if p.Dir == wsproto.ProbeRootPath {
 			continue
@@ -119,25 +120,37 @@ func synchronize(_ context.Context, root string, dry bool, given string) (SyncRe
 		}
 		for _, t := range p.Tasks {
 			if !slices.Contains(slices.Collect(maps.Values(mapped)), t.Name) {
-				result.Unmapped = append(result.Unmapped, Unmapped{Project: p.ID, Task: t.Name, Reason: fmt.Sprintf("neither named nor tagged %s; it keeps running through moon run %s:%s", strings.Join(Commands, ", "), p.ID, t.Name)})
+				result.Unmapped = append(result.Unmapped, Unmapped{Project: p.ID, Task: t.Name, Reason: fmt.Sprintf("it is neither named nor tagged %s: it keeps running through moon run %s:%s", strings.Join(Commands, ", "), p.ID, t.Name)})
 			}
 		}
 		delegated := extension == ExtensionName
 		if delegated && mapped["test"] != "" && !namesReports(root, p.Dir) {
 			result.Unreported = append(result.Unreported, p.ID)
 		}
-		if !delegated {
-			extensions[extension] = true
-		}
 		pkg := stacks.GraphPackage{
 			Dir:       p.Dir,
 			DependsOn: p.DependsOn,
 			Extension: extension,
 			Disabled:  disabled,
-			Edit:      editSteps(mapped, delegated),
+			Edit:      editSteps(mapped, delegated, typeScriptOptions(p, "", false)),
 		}
 		if delegated {
 			pkg.Inputs = rootInputs(root, p.Dir)
+			packages = append(packages, pkg)
+			continue
+		}
+		// An imported project: each task its extension runs moves, every
+		// other one keeps running through moon (ADR 0017 of tooling/stacks).
+		extensions[extension] = true
+		plan := planImport(root, p, mapped)
+		pkg.Extension, pkg.Also, pkg.Disabled = plan.extension, plan.also, plan.disabled
+		pkg.Edit = editSteps(plan.kept, true, typeScriptOptions(p, plan.runner, plan.eslint))
+		if len(plan.kept) > 0 {
+			pkg.Inputs = rootInputs(root, p.Dir)
+		}
+		result.Unmapped = append(result.Unmapped, plan.unmapped...)
+		if p.Language == "typescript" {
+			conventions = append(conventions, stacks.ConventionProject{Dir: p.Dir, Name: p.ID, BunBuild: plan.bunBuild, PublishedBy: stacks.PackagePublished(root, p.Dir)})
 		}
 		packages = append(packages, pkg)
 	}
@@ -152,6 +165,19 @@ func synchronize(_ context.Context, root string, dry bool, given string) (SyncRe
 		result.Export = detect.DefaultGraphFile
 	}
 	result.Extensions = slices.Sorted(maps.Keys(extensions))
+	if !graph.EmptyExport && len(conventions) > 0 {
+		writes, warnings, err := stacks.ImportConventions(root, conventions)
+		if err != nil {
+			return SyncResult{}, err
+		}
+		changes, notes, err := stacks.ApplyConventions(root, writes, dry)
+		if err != nil {
+			return SyncResult{}, err
+		}
+		result.Changes = append(result.Changes, changes...)
+		result.Warnings = append(result.Warnings, notes...)
+		result.Warnings = append(result.Warnings, warnings...)
+	}
 	if !graph.EmptyExport {
 		changed, change, err := declareExtensions(root, result.Extensions, dry)
 		if err != nil {
@@ -184,14 +210,12 @@ func TaskFor(p detect.Project, command string) string {
 	return ""
 }
 
-// stepsKey is the member of a task override that holds its steps.
-const stepsKey = "steps"
-
-// editSteps writes, for a delegated project, the steps of each command whose
-// moon task is not named after it, under the project's override of the moon
-// profile, and removes every other steps override of the commands: the
-// profile's own step runs a task of the command's name.
-func editSteps(mapped map[string]string, delegated bool) func(map[string]any) {
+// editSteps writes, for a project whose commands run moon, the steps of
+// each command whose moon task is not named after it, under the project's
+// override of the moon profile, and removes every other steps override of
+// the commands: the profile's own step runs a task of the command's name.
+// Then then, when set, writes the members of the project's own extension.
+func editSteps(mapped map[string]string, delegated bool, then func(map[string]any)) func(map[string]any) {
 	return func(doc map[string]any) {
 		steps := map[string][][]string{}
 		if delegated {
@@ -201,69 +225,34 @@ func editSteps(mapped map[string]string, delegated bool) func(map[string]any) {
 				}
 			}
 		}
-		setSteps(doc, steps)
+		moonSteps.Apply(doc, steps)
+		if then != nil {
+			then(doc)
+		}
+	}
+}
+
+// typeScriptOptions writes, for a TypeScript project, the test runner and
+// the ESLint linter its moved tasks run, and removes those it does not.
+func typeScriptOptions(p detect.Project, runner string, eslint bool) func(map[string]any) {
+	if p.Language != "typescript" {
+		return nil
+	}
+	return func(doc map[string]any) {
+		stacks.SetTypeScriptRunner(doc, runner)
+		stacks.SetTypeScriptLinter(doc, eslint)
 	}
 }
 
 // retractSteps removes the steps overrides the sync wrote from a former
 // project's putnami.json.
 func retractSteps(doc map[string]any) {
-	setSteps(doc, nil)
+	moonSteps.Apply(doc, nil)
 }
 
-// setSteps writes the steps of options["@putnami/moon"].tasks.<command> for
-// each command, removes those of the other commands, and removes each object
-// left empty, so the project's own members, such as its reports, stay.
-func setSteps(doc map[string]any, steps map[string][][]string) {
-	options, _ := doc["options"].(map[string]any)
-	layer, _ := options[ExtensionName].(map[string]any)
-	tasks, _ := layer["tasks"].(map[string]any)
-	if len(steps) == 0 && tasks == nil {
-		return
-	}
-	if options == nil {
-		options = map[string]any{}
-	}
-	if layer == nil {
-		layer = map[string]any{}
-	}
-	if tasks == nil {
-		tasks = map[string]any{}
-	}
-	for _, command := range Commands {
-		task, _ := tasks[command].(map[string]any)
-		if !syncShaped(task[stepsKey]) {
-			// The project's own steps win: the sync never writes over them.
-			continue
-		}
-		if s, ok := steps[command]; ok {
-			if task == nil {
-				task = map[string]any{}
-			}
-			list := make([]any, len(s))
-			for i, step := range s {
-				args := make([]any, len(step))
-				for j, a := range step {
-					args[j] = a
-				}
-				list[i] = args
-			}
-			task[stepsKey] = list
-			tasks[command] = task
-			continue
-		}
-		if task == nil {
-			continue
-		}
-		delete(task, stepsKey)
-		if len(task) == 0 {
-			delete(tasks, command)
-		}
-	}
-	setMember(layer, "tasks", tasks)
-	setMember(options, ExtensionName, layer)
-	setMember(doc, "options", options)
-}
+// moonSteps are the steps overrides the sync owns: moon run on the task a
+// command maps to by tag.
+var moonSteps = stacks.StepsOverride{Extension: ExtensionName, Tasks: Commands, Synced: syncShaped}
 
 // syncShaped reports whether steps are absent or the one step the sync
 // writes: moon run {component}:<task>.
@@ -281,15 +270,6 @@ func syncShaped(steps any) bool {
 	}
 	arg, _ := step[2].(string)
 	return strings.HasPrefix(arg, "{component}:")
-}
-
-// setMember sets the object at key, or removes it when it is empty.
-func setMember(doc map[string]any, key string, value map[string]any) {
-	if len(value) == 0 {
-		delete(doc, key)
-		return
-	}
-	doc[key] = value
 }
 
 // namesReports reports whether the project's putnami.json names a report
@@ -507,7 +487,10 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 		emit.Info(summary(result))
 	}
 	for _, u := range result.Unmapped {
-		emit.DiagnosticWithCode("warning", fmt.Sprintf("moon task %s:%s is %s", u.Project, u.Task, u.Reason), "", 0, 0, CodeTaskUnmapped)
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("moon task %s:%s: %s", u.Project, u.Task, u.Reason), "", 0, 0, CodeTaskUnmapped)
+	}
+	for _, warning := range result.Warnings {
+		emit.Diagnostic("warning", warning, "", 0)
 	}
 	if len(result.Unreported) > 0 {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("the test task of %s names no report under options[%q].tasks.test.reports: its result is moon's exit code alone", strings.Join(result.Unreported, ", "), ExtensionName), "", 0, 0, CodeReportsUnnamed)

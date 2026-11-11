@@ -201,11 +201,24 @@ func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
 	root := importWorkspace(t, buildRuntime(t))
 
-	// A rush on PATH that any call fails: an import runs no task through Rush.
+	// api builds with Bun and tests with Mocha, which @putnami/typescript
+	// does not run: its test keeps running with rushx (D-070). pricing builds
+	// with Bun, and web lints with Biome.
+	setScripts(t, root, "apps/api", `"build": "bun build src/index.ts --outdir lib", "test": "mocha"`)
+	setScripts(t, root, "libs/pricing", `"build": "bun build src/index.ts --outdir lib"`)
+	setScripts(t, root, "apps/web", `"lint": "biome check ."`)
+
+	// A rush on PATH that answers the version check and fails any other call,
+	// and a rushx that logs: an import runs Rush on no task, and rushx on the
+	// script it keeps.
 	bin := t.TempDir()
-	clitest.WriteFile(t, filepath.Join(bin, "rush"), "#!/bin/sh\necho \"rush $*\" >&2\nexit 9\n")
-	if err := os.Chmod(filepath.Join(bin, "rush"), 0o755); err != nil {
-		t.Fatal(err)
+	rushxLog := filepath.Join(t.TempDir(), "rushx.log")
+	clitest.WriteFile(t, filepath.Join(bin, "rush"), "#!/bin/sh\nif [ \"$1\" = \"--help\" ]; then echo 'Rush Multi-Project Build Tool 5.140.0 - https://rushjs.io'; exit 0; fi\necho \"rush $*\" >&2\nexit 9\n")
+	clitest.WriteFile(t, filepath.Join(bin, "rushx"), "#!/bin/sh\necho \"$(basename \"$(pwd)\") rushx $*\" >> '"+rushxLog+"'\n")
+	for _, name := range []string{"rush", "rushx"} {
+		if err := os.Chmod(filepath.Join(bin, name), 0o755); err != nil {
+			t.Fatal(err)
+		}
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 
@@ -213,12 +226,17 @@ func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *
 	if code != 0 {
 		t.Fatalf("projects sync exit %d:\n%s", code, out)
 	}
-	if !strings.Contains(out, "not mapped: rush deploy") {
-		t.Errorf("the sync lists no unmapped command:\n%s", out)
+	if !strings.Contains(out, "not mapped: rush deploy") || !strings.Contains(out, "not mapped: the test script of @demo/api") {
+		t.Errorf("the sync lists no unmapped command or script:\n%s", out)
 	}
 	// Each project is a TypeScript project with the edges observe reads:
-	// api depends on pricing, web and pricing on nothing.
-	for dir, want := range map[string][]string{"apps/api": {"/libs/pricing"}, "apps/web": nil, "libs/pricing": nil} {
+	// api depends on pricing, web and pricing on nothing. api also names the
+	// Rush extension, which runs the script it keeps.
+	for dir, want := range map[string]struct{ extensions, deps []string }{
+		"apps/api":     {[]string{"@putnami/rush", "@putnami/typescript"}, []string{"/libs/pricing"}},
+		"apps/web":     {[]string{"@putnami/typescript"}, nil},
+		"libs/pricing": {[]string{"@putnami/typescript"}, nil},
+	} {
 		var project struct {
 			Extensions   []string `json:"extensions"`
 			Dependencies []string `json:"dependencies"`
@@ -227,9 +245,12 @@ func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *
 		if err != nil || json.Unmarshal(data, &project) != nil {
 			t.Fatalf("the sync wrote no putnami.json for %s: %v\n%s", dir, err, data)
 		}
-		if !slices.Equal(project.Extensions, []string{"@putnami/typescript"}) || !slices.Equal(project.Dependencies, want) {
-			t.Errorf("%s putnami.json = %s, want @putnami/typescript and %v", dir, data, want)
+		if !slices.Equal(project.Extensions, want.extensions) || !slices.Equal(project.Dependencies, want.deps) {
+			t.Errorf("%s putnami.json = %s, want %v and %v", dir, data, want.extensions, want.deps)
 		}
+	}
+	if code, out := clitest.RunGateArgs(t, root, "validate", "--all"); code != 0 {
+		t.Errorf("validate after the sync exit %d:\n%s", code, out)
 	}
 
 	// Putnami installs: the root package.json lists the projects.
@@ -263,4 +284,39 @@ func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *
 	if data, err := os.ReadFile(filepath.Join(root, "libs/pricing/package.json")); err != nil || !strings.Contains(string(data), `"exports": {`) {
 		t.Errorf("pricing gained no source exports: %s %v", data, err)
 	}
+	// api's Mocha test ran with rushx in its directory, its script as the
+	// repository wrote it.
+	if data, err := os.ReadFile(rushxLog); err != nil || strings.TrimSpace(string(data)) != "api rushx test" {
+		t.Errorf("rushx ran %q (%v), want api's test\n%s", data, err, out)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "apps/api/package.json")); !strings.Contains(string(data), `"test": "mocha"`) {
+		t.Errorf("the import rewrote api's scripts: %s", data)
+	}
+
+	// A script that changes the tool it runs leaves the graph stale: validate
+	// fails in import mode too.
+	setScripts(t, root, "apps/web", `"lint": "biome check .", "test": "mocha"`)
+	if code, out := clitest.RunGateArgs(t, root, "validate", "--all"); code == 0 || !strings.Contains(out, "rush.sync_stale") {
+		t.Errorf("validate on a stale graph exit %d:\n%s", code, out)
+	}
+}
+
+// setScripts gives the package.json of the project at dir the scripts, a
+// JSON object's members, after its name.
+func setScripts(t *testing.T, root, dir, scripts string) {
+	t.Helper()
+	file := filepath.Join(root, dir, "package.json")
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest map[string]json.RawMessage
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest["scripts"] = json.RawMessage("{" + scripts + "}")
+	if data, err = json.MarshalIndent(manifest, "", "  "); err != nil {
+		t.Fatal(err)
+	}
+	clitest.WriteFile(t, file, string(data)+"\n")
 }

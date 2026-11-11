@@ -257,8 +257,14 @@ func TestTheSyncWritesEachProjectPutnamiJSONInBothModes(t *testing.T) {
 	before, _ := os.ReadFile(filepath.Join(root, "apps/api/putnami.json"))
 	writeFile(t, root, "putnami.workspace.json", `{"name": "shop", "extensions": ["@putnami/nx", "@putnami/typescript"], "options": {"@putnami/nx": {"mode": "delegate"}}}`)
 	dry := sync(t, root, SyncOptions{Mode: ModeImport, DryRun: true})
-	if dry.Mode != ModeImport || len(dry.Changes) != 2 {
-		t.Fatalf("dry run = %+v", dry)
+	var changed []string
+	for _, c := range dry.Changes {
+		changed = append(changed, c.File)
+	}
+	// Each putnami.json, then the tsconfig.json D-066 gives each TypeScript
+	// project that holds no tsconfig*.json.
+	if dry.Mode != ModeImport || !reflect.DeepEqual(changed, []string{"apps/api/putnami.json", "packages/pricing/putnami.json", "apps/api/tsconfig.json", "packages/pricing/tsconfig.json"}) {
+		t.Fatalf("dry run changes %v", changed)
 	}
 	if after, _ := os.ReadFile(filepath.Join(root, "apps/api/putnami.json")); string(after) != string(before) {
 		t.Errorf("a dry run wrote %s", after)
@@ -1228,4 +1234,51 @@ func TestImportMarksTheNodeRuntime(t *testing.T) {
 	if got := runtime("packages/pricing"); got != nil {
 		t.Errorf("a bun start script: runtime = %v, want none", got)
 	}
+}
+
+func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
+	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	// pricing builds with Bun, so its main names an output nothing writes in
+	// the project; api builds with webpack, which writes it, and holds its
+	// own tsconfig.app.json.
+	pricing := "{\n  \"name\": \"@demo/pricing\",\n  \"private\": true,\n  \"main\": \"dist/index.js\",\n  \"scripts\": {\"build\": \"bun build src/index.ts --outdir dist\"}\n}\n"
+	writeFile(t, root, "packages/pricing/package.json", pricing)
+	writeFile(t, root, "packages/pricing/src/index.ts", "export {}\n")
+	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"build": {"executor": "@nx/webpack:webpack"}}}`)
+	writeFile(t, root, "apps/api/tsconfig.app.json", "{}\n")
+
+	dry := sync(t, root, SyncOptions{DryRun: true})
+	if data, _ := os.ReadFile(filepath.Join(root, "packages/pricing/package.json")); string(data) != pricing {
+		t.Errorf("a dry sync wrote pricing's package.json")
+	}
+	result := sync(t, root, SyncOptions{})
+	if !reflect.DeepEqual(changeFiles(dry), changeFiles(result)) {
+		t.Errorf("the preview changes %v, the sync %v", changeFiles(dry), changeFiles(result))
+	}
+	data, _ := os.ReadFile(filepath.Join(root, "packages/pricing/package.json"))
+	if !strings.Contains(string(data), "\"exports\": {\n    \".\": \"./src/index.ts\"\n  },") {
+		t.Errorf("pricing package.json = %s", data)
+	}
+	if _, err := os.Stat(filepath.Join(root, "packages/pricing/tsconfig.json")); err != nil {
+		t.Errorf("pricing gets no tsconfig.json: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "apps/api/tsconfig.json")); !os.IsNotExist(err) {
+		t.Errorf("api, which holds a tsconfig.app.json, got a tsconfig.json: %v", err)
+	}
+	if !slices.ContainsFunc(result.Conventions, func(n string) bool { return strings.HasPrefix(n, "packages/pricing/package.json: exports") }) {
+		t.Errorf("conventions = %v", result.Conventions)
+	}
+	if again := sync(t, root, SyncOptions{DryRun: true}); len(again.Changes) != 0 {
+		t.Errorf("a second sync changes %v", changeFiles(again))
+	}
+}
+
+func changeFiles(r SyncResult) []string {
+	var out []string
+	for _, c := range r.Changes {
+		out = append(out, c.File)
+	}
+	return out
 }

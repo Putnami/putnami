@@ -2,6 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "monorepo/moon-adoption#import-adopts-typescript-conventions",
+    "monorepo/moon-adoption#import-keeps-the-tool-that-checks-the-code",
     "monorepo/moon-adoption#import-maps-to-language-extensions",
     "monorepo/moon-adoption#manifest-follows-the-profile",
     "monorepo/moon-adoption#projects-and-tasks-are-read",

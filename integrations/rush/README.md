@@ -7,7 +7,9 @@
   its build cache. It is a delegated stack extension on
   [`tooling/stacks`](../../tooling/stacks/doc/01-design.md#delegated-stacks).
 - **Import**: each Rush project becomes a `@putnami/typescript` project with
-  its edges, which Putnami builds, tests, lints, installs and caches.
+  its edges, which Putnami installs and caches. A `build`, `test` or `lint`
+  script moves to Putnami only when `@putnami/typescript` runs its tool; any
+  other script keeps running with `rushx` (D-070).
 
 Both read `rush.json` and each project's `package.json` with the Rush detector
 of `putnami observe`, and a workspace sync task writes each project's

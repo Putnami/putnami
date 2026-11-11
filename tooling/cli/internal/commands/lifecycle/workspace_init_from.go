@@ -333,6 +333,17 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 		}
 	}
 	modeChanges := source.offersBothModes() && recorded != mode
+	// A workspace that leaves import mode, with no import list, drops the
+	// extensions the import declared once no project names them (ADR 0017
+	// of tooling/stacks). A workspace that records no mode imported.
+	var leaving []string
+	if modeChanges && mode == initModeDelegate && len(imports) == 0 && slices.Contains(declared, ext) {
+		for _, e := range source.importDeclared() {
+			if slices.Contains(declared, e) {
+				leaving = append(leaving, e)
+			}
+		}
+	}
 
 	iox.Fprintln(os.Stdout)
 	iox.Fprintf(os.Stdout, "  This place is already a Putnami workspace: %s\n", wsRoot)
@@ -349,6 +360,9 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 	}
 	for _, e := range missing {
 		iox.Fprintf(os.Stdout, "  %s: extensions + %s\n", wsproto.WorkspaceConfigFilename, e)
+	}
+	for _, e := range leaving {
+		iox.Fprintf(os.Stdout, "  %s: extensions - %s, unless a putnami.json still names it after the sync\n", wsproto.WorkspaceConfigFilename, e)
 	}
 	// The preview's sync reads the list --apply would record; without
 	// --import it reads the recorded one.
@@ -404,9 +418,124 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 	if err := installSyncDeclaredExtensions(ctx, wsRoot, before, env); err != nil {
 		return err
 	}
+	if err := dropImportExtensions(wsRoot, leaving); err != nil {
+		return protocolcli.WithNext(fmt.Errorf("remove the extensions the import declared: %w", err), "putnami extensions remove")
+	}
 	iox.Fprintln(os.Stdout)
 	iox.Fprintf(os.Stdout, "  ✓ Adopted in %s mode\n", mode)
 	return nil
+}
+
+// dropImportExtensions removes from the workspace config, the lock and the
+// disk each extension of candidates that no putnami.json of the workspace
+// names after the sync, and keeps, with a note, each one a project still
+// names.
+func dropImportExtensions(wsRoot string, candidates []string) error {
+	if len(candidates) == 0 {
+		return nil
+	}
+	named, err := namedExtensions(wsRoot)
+	if err != nil {
+		return err
+	}
+	var drop []string
+	for _, e := range candidates {
+		if named[e] {
+			iox.Fprintf(os.Stdout, "  %s stays declared: a putnami.json still names it\n", e)
+			continue
+		}
+		drop = append(drop, e)
+	}
+	if len(drop) == 0 {
+		return nil
+	}
+	if err := undeclareExtensions(wsRoot, drop); err != nil {
+		return err
+	}
+	for _, e := range drop {
+		// Each removal reads the config as the previous ones left it.
+		if err := removeInitExtension(wsRoot, wsproto.Load(wsRoot), e); err != nil {
+			return fmt.Errorf("%s: %w", e, err)
+		}
+	}
+	iox.Fprintf(os.Stdout, "  ✓ %s: extensions - %s\n", wsproto.WorkspaceConfigFilename, strings.Join(drop, ", "))
+	return nil
+}
+
+// namedExtensions are the extensions the putnami.json files of the
+// workspace name, outside hidden directories and node_modules.
+func namedExtensions(wsRoot string) (map[string]bool, error) {
+	named := map[string]bool{}
+	err := filepath.WalkDir(wsRoot, func(p string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if p != wsRoot && (strings.HasPrefix(d.Name(), ".") || d.Name() == "node_modules") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Name() != wsproto.ConfigFilename {
+			return nil
+		}
+		if cfg := wsproto.LoadProjectConfig(filepath.Dir(p)); cfg != nil {
+			// A path entry names the extension its manifest states.
+			list := map[string]string{}
+			for _, e := range cfg.Extensions {
+				list[e] = ""
+			}
+			for _, e := range initDeclaredNames(wsRoot, &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: list}}) {
+				named[e] = true
+			}
+		}
+		return nil
+	})
+	return named, err
+}
+
+// undeclareExtensions removes the extensions from the workspace config's
+// extensions, in the list or object form it uses, an entry that is a path
+// by the name its manifest states, keeping every other member and its order.
+func undeclareExtensions(wsRoot string, names []string) error {
+	file := wsproto.ResolveFile(wsRoot, wsproto.WorkspaceConfigFilename)
+	raw, err := jsonutil.ReadFile(file)
+	if err != nil {
+		return err
+	}
+	drops := func(entry string) bool {
+		if slices.Contains(names, entry) {
+			return true
+		}
+		cfg := &wsproto.Config{Extensions: wsproto.ExtensionsConfig{List: map[string]string{entry: ""}}}
+		for _, name := range initDeclaredNames(wsRoot, cfg) {
+			if slices.Contains(names, name) {
+				return true
+			}
+		}
+		return false
+	}
+	value, _ := raw.Get("extensions")
+	switch declared := value.(type) {
+	case *jsonutil.OrderedMap:
+		for _, key := range declared.Keys() {
+			if drops(key) {
+				declared.Delete(key)
+			}
+		}
+	case []any:
+		kept := make([]any, 0, len(declared))
+		for _, entry := range declared {
+			if s, ok := entry.(string); ok && drops(s) {
+				continue
+			}
+			kept = append(kept, entry)
+		}
+		raw.Set("extensions", kept)
+	default:
+		return nil
+	}
+	return jsonutil.WriteFile(file, raw)
 }
 
 // initDeclaredNames are the names of the extensions the workspace

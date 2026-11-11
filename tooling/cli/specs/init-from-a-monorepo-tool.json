@@ -46,6 +46,10 @@
       "text": "Rerun in a workspace that already exists, putnami init --from <tool> runs the workspace sync tasks as a dry run with the mode it resolves and the extensions --apply would declare, which each reads as declared, so it prints what --apply would change and the mode change, and writes nothing. With --apply it records the mode and runs putnami projects sync."
     },
     {
+      "id": "init-leaving-import-removes-its-extensions",
+      "text": "Rerun with --mode delegate in a workspace that imported, with no import list, putnami init --from <tool> names in its preview each extension the import declared, @putnami/typescript or the language extensions moon's sync declares, and with --apply removes from the workspace config, the lock and the disk each one no putnami.json names after the sync, keeping with a note each one a project still names (D-070)."
+    },
+    {
       "id": "nx-impact-runs-through-nx",
       "text": "On the Nx fixture of the putnami observe detector, after putnami init --from nx --mode delegate --apply with a stub nx on PATH, putnami test after a change to one project runs nx run <project>:test at the workspace root on that project and each project that depends on it, never on one it depends on, stores no Putnami cache entry and records delegatedTo nx."
     },
@@ -55,7 +59,7 @@
     },
     {
       "id": "moon-import-runs-the-language-extensions",
-      "text": "On the moon fixture of the putnami observe detector, putnami init --from moon --mode import --apply writes the project graph observe reads, maps each moon project whose language has a Putnami extension to it, delegates the others to @putnami/moon, lists an unmapped task in its output, and putnami lint,test,build then pass."
+      "text": "On the moon fixture of the putnami observe detector, putnami init --from moon --mode import --apply writes the project graph observe reads, moves to its language's extension each moon task that extension runs with the same tool, keeps every other task and each project of a language without an extension on @putnami/moon, lists each task it keeps in its output, and putnami lint,test,build then pass."
     },
     {
       "id": "moon-delegate-runs-through-moon",
@@ -87,7 +91,7 @@
     },
     {
       "id": "rush-import-runs-through-putnami",
-      "text": "On the Rush fixture of the putnami observe detector, an import writes each Rush project as a TypeScript project whose dependencies are the edges putnami observe reads, then putnami lint,test,build passes and no task runs rush. A command-line.json bulk command whose name is not build, test or lint appears in the output as unmapped."
+      "text": "On the Rush fixture of the putnami observe detector, an import writes each Rush project as a TypeScript project whose dependencies are the edges putnami observe reads, keeps a script whose tool @putnami/typescript does not run on rushx and lists it, then putnami lint,test,build passes and no task runs rush. A command-line.json bulk command whose name is not build, test or lint appears as unmapped, and validate fails with rush.sync_stale once a script changes."
     },
     {
       "id": "rush-impact-runs-through-rush",
@@ -95,6 +99,7 @@
     }
   ],
   "decisions": [
-    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md"
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
+    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
   ]
 }

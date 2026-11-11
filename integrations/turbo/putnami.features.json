@@ -170,6 +170,19 @@
               "a-tsc-script-with-another-argument-stays-on-turborepo"
             ]
           }
+        },
+        {
+          "id": "import-adopts-typescript-conventions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-adds-source-exports-and-a-tsconfig"
+            ]
+          }
         }
       ]
     }

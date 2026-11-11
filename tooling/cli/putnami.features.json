@@ -14,25 +14,35 @@
         {
           "id": "optional-placement",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["absent-provider-runs-once-locally"]
+            "checks": [
+              "absent-provider-runs-once-locally"
+            ]
           }
         },
         {
           "id": "immutable-source",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["captured-worktree-bytes-survive-later-edits"]
+            "checks": [
+              "captured-worktree-bytes-survive-later-edits"
+            ]
           }
         },
         {
           "id": "portable-request",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -46,7 +56,9 @@
         {
           "id": "commit-request",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -59,7 +71,9 @@
         {
           "id": "isolated-execution",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -73,7 +87,9 @@
         {
           "id": "durable-lifecycle",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -93,7 +109,9 @@
         {
           "id": "input-admission",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -116,13 +134,126 @@
       "owner": "tooling",
       "target": "modeled",
       "requirements": [
-        { "id": "engine-lifecycle", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["live-events-and-finalized-success-failure-cancellation", "stream-subscribers-leave-recorded-bytes-unchanged", "a-killed-subscriber-keeps-the-verdict-and-records-partial-evidence", "reporting-capabilities-deliver-and-fail-independently", "plan-precedes-every-other-frame", "an-omitted-plan-leaves-delivery-and-the-verdict-unchanged"] } },
-        { "id": "durable-replay", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["outage-retains-identical-frame-and-replay-runs-no-workload", "replay-resumes-only-undelivered-capabilities", "replay-sends-an-undelivered-plan-first", "a-checkpoint-without-a-plan-cursor-stays-valid", "a-crash-mid-plan-resumes-at-its-pending-frame"] } },
-        { "id": "credential-boundary", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["explicit-secret-is-withheld-from-hooks-and-tasks", "each-token-reaches-only-its-own-provider", "hosted-run-ignores-reporter-tokens"] } },
-        { "id": "bounded-transport", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["writes-reads-retries-and-finalization-are-bounded", "pending-retention-honors-session-policy-and-active-locks", "live-chunks-wait-for-a-full-frame-or-the-interval", "log-reporter-chunks-wait-for-a-full-frame-or-two-seconds", "plan-is-bounded-and-omitted-past-its-bound"] } },
-        { "id": "spec-verification-record", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["spec-verification-leaves-last-after-the-events-final-marker", "the-engine-writes-spec-verification-before-reporting-ends", "an-omitted-spec-verification-leaves-delivery-complete", "spec-verification-is-bounded-and-omitted-past-its-bound", "a-checkpoint-without-a-spec-verification-cursor-stays-valid"] } },
-        { "id": "trimmed-upload", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["progress-events-and-the-debug-lines-of-a-passing-task-are-not-sent", "a-failing-task-sends-its-held-lines-in-order-before-its-end", "a-shared-batch-line-leaves-at-its-first-failing-member", "a-record-split-across-raw-frames-is-decided-once", "session-end-and-the-final-marker-release-what-is-held", "held-records-past-the-cap-release-the-task-that-holds-the-most", "view-frames-keep-their-bytes-after-a-retry-a-reporter-restart-and-an-engine-restart", "the-view-final-marker-reads-delivered", "a-version-1-checkpoint-that-sent-events-keeps-raw-framing", "the-log-reporter-sends-the-raw-stream"] } },
-        { "id": "unavailable-provider", "stage": "coded", "evidenceKinds": ["attestation"], "verification": { "kind": "acceptance", "checks": ["an-unloaded-selected-provider-is-named", "an-unavailable-provider-echoes-no-other-cause"] } }
+        {
+          "id": "engine-lifecycle",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "live-events-and-finalized-success-failure-cancellation",
+              "stream-subscribers-leave-recorded-bytes-unchanged",
+              "a-killed-subscriber-keeps-the-verdict-and-records-partial-evidence",
+              "reporting-capabilities-deliver-and-fail-independently",
+              "plan-precedes-every-other-frame",
+              "an-omitted-plan-leaves-delivery-and-the-verdict-unchanged"
+            ]
+          }
+        },
+        {
+          "id": "durable-replay",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "outage-retains-identical-frame-and-replay-runs-no-workload",
+              "replay-resumes-only-undelivered-capabilities",
+              "replay-sends-an-undelivered-plan-first",
+              "a-checkpoint-without-a-plan-cursor-stays-valid",
+              "a-crash-mid-plan-resumes-at-its-pending-frame"
+            ]
+          }
+        },
+        {
+          "id": "credential-boundary",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "explicit-secret-is-withheld-from-hooks-and-tasks",
+              "each-token-reaches-only-its-own-provider",
+              "hosted-run-ignores-reporter-tokens"
+            ]
+          }
+        },
+        {
+          "id": "bounded-transport",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "writes-reads-retries-and-finalization-are-bounded",
+              "pending-retention-honors-session-policy-and-active-locks",
+              "live-chunks-wait-for-a-full-frame-or-the-interval",
+              "log-reporter-chunks-wait-for-a-full-frame-or-two-seconds",
+              "plan-is-bounded-and-omitted-past-its-bound"
+            ]
+          }
+        },
+        {
+          "id": "spec-verification-record",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "spec-verification-leaves-last-after-the-events-final-marker",
+              "the-engine-writes-spec-verification-before-reporting-ends",
+              "an-omitted-spec-verification-leaves-delivery-complete",
+              "spec-verification-is-bounded-and-omitted-past-its-bound",
+              "a-checkpoint-without-a-spec-verification-cursor-stays-valid"
+            ]
+          }
+        },
+        {
+          "id": "trimmed-upload",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "progress-events-and-the-debug-lines-of-a-passing-task-are-not-sent",
+              "a-failing-task-sends-its-held-lines-in-order-before-its-end",
+              "a-shared-batch-line-leaves-at-its-first-failing-member",
+              "a-record-split-across-raw-frames-is-decided-once",
+              "session-end-and-the-final-marker-release-what-is-held",
+              "held-records-past-the-cap-release-the-task-that-holds-the-most",
+              "view-frames-keep-their-bytes-after-a-retry-a-reporter-restart-and-an-engine-restart",
+              "the-view-final-marker-reads-delivered",
+              "a-version-1-checkpoint-that-sent-events-keeps-raw-framing",
+              "the-log-reporter-sends-the-raw-stream"
+            ]
+          }
+        },
+        {
+          "id": "unavailable-provider",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unloaded-selected-provider-is-named",
+              "an-unavailable-provider-echoes-no-other-cause"
+            ]
+          }
+        }
       ]
     },
     {
@@ -329,7 +460,9 @@
         {
           "id": "change-shape-report",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -828,7 +961,9 @@
         {
           "id": "git-candidate-inputs",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -1214,7 +1349,9 @@
         {
           "id": "go-embed-cache-inputs",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -1231,7 +1368,9 @@
         {
           "id": "clientgen-key-reads-no-run-written-tree",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -2390,10 +2529,17 @@
         {
           "id": "user-scope-skills",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["a-user-scope-install-writes-only-the-named-skills", "a-user-scope-reinstall-writes-nothing", "a-user-scope-collision-writes-nothing", "a-user-scope-remove-removes-what-it-wrote"]
+            "checks": [
+              "a-user-scope-install-writes-only-the-named-skills",
+              "a-user-scope-reinstall-writes-nothing",
+              "a-user-scope-collision-writes-nothing",
+              "a-user-scope-remove-removes-what-it-wrote"
+            ]
           }
         }
       ]
@@ -3100,7 +3246,9 @@
         {
           "id": "explicit-binding",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3114,7 +3262,9 @@
         {
           "id": "capability-discovery",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3126,7 +3276,9 @@
         {
           "id": "one-route-two-entry-paths",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3139,7 +3291,9 @@
         {
           "id": "host-only-operations",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3151,7 +3305,9 @@
         {
           "id": "contract-names-never-shadow-commands",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3172,7 +3328,9 @@
         {
           "id": "one-contributor-extension",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3184,25 +3342,35 @@
         {
           "id": "explicit-only-invocation",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["explicit-only-skills-declare-it-on-both-hosts"]
+            "checks": [
+              "explicit-only-skills-declare-it-on-both-hosts"
+            ]
           }
         },
         {
           "id": "canonical-entry-points",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["only-canonical-entry-points-and-active-utilities"]
+            "checks": [
+              "only-canonical-entry-points-and-active-utilities"
+            ]
           }
         },
         {
           "id": "provider-neutral-content",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3214,7 +3382,9 @@
         {
           "id": "repository-policy",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3225,7 +3395,9 @@
         {
           "id": "intent-first-publication",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3236,7 +3408,9 @@
         {
           "id": "intent-first-validation",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3247,7 +3421,9 @@
         {
           "id": "change-finalize-parity",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3258,7 +3434,9 @@
         {
           "id": "canonical-consumer-migration",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3270,73 +3448,107 @@
         {
           "id": "one-contribution-loop",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["build-is-a-short-core-and-one-reference-per-stage"]
+            "checks": [
+              "build-is-a-short-core-and-one-reference-per-stage"
+            ]
           }
         },
         {
           "id": "workflow-profiles",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["workflow-profiles-replace-tiers-and-workers"]
+            "checks": [
+              "workflow-profiles-replace-tiers-and-workers"
+            ]
           }
         },
         {
           "id": "review-cycle",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-review-cycle-blocks-on-p1-and-p2"]
+            "checks": [
+              "the-review-cycle-blocks-on-p1-and-p2"
+            ]
           }
         },
         {
           "id": "epic-orchestration",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-epic-skill-launches-children-and-never-codes"]
+            "checks": [
+              "the-epic-skill-launches-children-and-never-codes"
+            ]
           }
         },
         {
           "id": "external-spec-authoring",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-spec-skill-edits-the-external-spec-it-resolves"]
+            "checks": [
+              "the-spec-skill-edits-the-external-spec-it-resolves"
+            ]
           }
         },
         {
           "id": "user-scope-skills",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-user-scope-list-names-the-workspace-free-skills", "each-user-scope-skill-defers-to-the-workspace-copy", "build-check-and-design-stop-without-a-workspace"]
+            "checks": [
+              "the-user-scope-list-names-the-workspace-free-skills",
+              "each-user-scope-skill-defers-to-the-workspace-copy",
+              "build-check-and-design-stop-without-a-workspace"
+            ]
           }
         },
         {
           "id": "context-without-a-workspace",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-context-skill-reads-observe-without-a-workspace"]
+            "checks": [
+              "the-context-skill-reads-observe-without-a-workspace"
+            ]
           }
         },
         {
           "id": "spec-without-a-workspace",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-spec-skill-writes-the-repository-format-without-a-workspace"]
+            "checks": [
+              "the-spec-skill-writes-the-repository-format-without-a-workspace"
+            ]
           }
         }
       ]
@@ -3352,7 +3564,9 @@
         {
           "id": "powershell-installer-trust",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3364,16 +3578,22 @@
         {
           "id": "windows-shells-get-the-powershell-installer",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
-            "checks": ["install-sh-sends-a-windows-shell-to-install-ps1"]
+            "checks": [
+              "install-sh-sends-a-windows-shell-to-install-ps1"
+            ]
           }
         },
         {
           "id": "one-binary-switch-on-windows",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3388,7 +3608,9 @@
         {
           "id": "windows-executables-by-name",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3402,7 +3624,9 @@
         {
           "id": "lf-checkout-policy",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3415,7 +3639,9 @@
         {
           "id": "windows-release-smoke",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3432,7 +3658,9 @@
         {
           "id": "windows-prerequisites-are-named",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3445,7 +3673,9 @@
         {
           "id": "providers-run-the-prepared-runtime",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3458,7 +3688,9 @@
         {
           "id": "powershell-installer-run-form",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3488,7 +3720,9 @@
         {
           "id": "providers-are-opt-in",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3503,7 +3737,9 @@
         {
           "id": "one-provider-or-none",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3515,7 +3751,9 @@
         {
           "id": "bearer-only-for-its-hosts",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3526,7 +3764,9 @@
         {
           "id": "refusal-never-falls-back",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3548,7 +3788,9 @@
         {
           "id": "credential-on-a-descriptor",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3564,7 +3806,9 @@
         {
           "id": "providers-receive-it-over-rpc",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3578,7 +3822,9 @@
         {
           "id": "fetch-before-repository-code",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3592,7 +3838,9 @@
         {
           "id": "hostile-process-finds-nothing",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3608,7 +3856,9 @@
         {
           "id": "source-built-providers",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3623,7 +3873,9 @@
         {
           "id": "needed-provider-only-on-a-path-extension",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3634,7 +3886,9 @@
         {
           "id": "cold-install-leaves-locks-unchanged",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3646,7 +3900,9 @@
         {
           "id": "flag-off-changes-nothing",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3668,7 +3924,9 @@
         {
           "id": "one-channel-choice",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3682,7 +3940,9 @@
         {
           "id": "every-resolution-reads-the-channel",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3699,7 +3959,9 @@
         {
           "id": "no-choice-is-unchanged",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3711,7 +3973,9 @@
         {
           "id": "projects-create-takes-a-channel",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3724,7 +3988,9 @@
         {
           "id": "the-workspace-pins-no-channel",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3737,7 +4003,9 @@
         {
           "id": "release-smokes-hand-the-channel-to-init",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3749,7 +4017,9 @@
         {
           "id": "templates-test-builds-the-rendered-project",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3773,7 +4043,9 @@
         {
           "id": "pasted-block-reaches-the-command",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3784,7 +4056,9 @@
         {
           "id": "first-use-smoke-machine",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3797,7 +4071,9 @@
         {
           "id": "first-use-smoke-legs",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3810,7 +4086,9 @@
         {
           "id": "first-use-smoke-stop",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3823,7 +4101,9 @@
         {
           "id": "init-lists-members-once",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3835,7 +4115,9 @@
         {
           "id": "no-install-provider-nothing-to-install",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3859,7 +4141,9 @@
         {
           "id": "ancestry-is-read-before-repository-code",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3876,7 +4160,9 @@
         {
           "id": "gate-only-launches-no-publication",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3890,7 +4176,9 @@
         {
           "id": "open-credential-release-through-one-provider",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3906,7 +4194,9 @@
         {
           "id": "uploads-go-to-the-credential-provider",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3934,7 +4224,9 @@
         {
           "id": "bound-requests-publish-through-the-provider",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3956,7 +4248,9 @@
         {
           "id": "no-source-claim",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3970,7 +4264,9 @@
         {
           "id": "source-state-keys-the-cache",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3983,7 +4279,9 @@
         {
           "id": "bare-run-covers-every-project",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -3996,7 +4294,9 @@
         {
           "id": "git-history-is-refused-in-one-line",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4022,7 +4322,9 @@
         {
           "id": "one-pass-verdict",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4043,7 +4345,9 @@
         {
           "id": "plan-coverage",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4067,7 +4371,9 @@
         {
           "id": "one-projection",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4078,7 +4384,9 @@
         {
           "id": "pinned-revisions",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4092,7 +4400,9 @@
         {
           "id": "named-commands",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4106,7 +4416,9 @@
         {
           "id": "one-structured-result",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4128,7 +4440,9 @@
         {
           "id": "install-resolves-the-graph",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4140,7 +4454,9 @@
         {
           "id": "what-satisfies-a-dependency",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4154,7 +4470,9 @@
         {
           "id": "an-explicit-channel-flows-down",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4167,7 +4485,9 @@
         {
           "id": "the-lock-wins-while-it-satisfies-the-graph",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4180,7 +4500,9 @@
         {
           "id": "an-unmet-range-fails",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4193,7 +4515,9 @@
         {
           "id": "the-order-is-deterministic",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4207,7 +4531,9 @@
         {
           "id": "the-graph-loads",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4220,7 +4546,9 @@
         {
           "id": "restore-follows-the-lock",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4232,7 +4560,9 @@
         {
           "id": "agent-content-may-name-a-dependency",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4243,7 +4573,9 @@
         {
           "id": "a-dependency-serves-no-reserved-provider",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4254,7 +4586,9 @@
         {
           "id": "update-moves-the-graph",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4267,7 +4601,9 @@
         {
           "id": "a-channel-never-moves-a-pin-backwards",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4289,7 +4625,9 @@
         {
           "id": "remove-keeps-the-graph-whole",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4301,7 +4639,9 @@
         {
           "id": "hosted-installs-the-locked-graph",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4312,7 +4652,9 @@
         {
           "id": "the-user-scope-takes-no-dependency",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4323,7 +4665,9 @@
         {
           "id": "an-older-cli-refuses-a-dependent",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4344,7 +4688,9 @@
         {
           "id": "serve-env-reaches-only-serve-steps",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4358,7 +4704,9 @@
         {
           "id": "a-manifest-env-conflict-is-refused",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4371,7 +4719,9 @@
         {
           "id": "ready-claims-are-never-elided",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4383,7 +4733,9 @@
         {
           "id": "a-supervised-serve-run-splits-its-output",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4396,7 +4748,9 @@
         {
           "id": "a-serve-step-names-its-process-group",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4407,7 +4761,9 @@
         {
           "id": "an-ephemeral-port-waits-on-the-announced-port",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4418,7 +4774,9 @@
         {
           "id": "a-lost-supervisor-stops-the-run",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4441,7 +4799,9 @@
         {
           "id": "init-from-pants",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4452,7 +4812,9 @@
         {
           "id": "pants-impact-runs-through-pants",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4463,7 +4825,9 @@
         {
           "id": "init-from-bazel",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4474,7 +4838,9 @@
         {
           "id": "bazel-impact-runs-through-bazel",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4485,7 +4851,9 @@
         {
           "id": "init-from-nx",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4496,7 +4864,9 @@
         {
           "id": "init-asks-the-mode",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4507,7 +4877,9 @@
         {
           "id": "init-rerun-shows-a-diff",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4516,9 +4888,24 @@
           }
         },
         {
+          "id": "init-leaving-import-removes-its-extensions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-switch-to-delegate-removes-the-extensions-no-project-names"
+            ]
+          }
+        },
+        {
           "id": "nx-impact-runs-through-nx",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4568,7 +4955,9 @@
         {
           "id": "init-from-turbo",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4579,7 +4968,9 @@
         {
           "id": "turbo-delegate-impact",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4590,7 +4981,9 @@
         {
           "id": "turbo-import-graph",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4601,7 +4994,9 @@
         {
           "id": "init-import-adds-projects",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -4612,7 +5007,9 @@
         {
           "id": "delegate-import-runs-one-project-on-putnami",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": [
+            "attestation"
+          ],
           "verification": {
             "kind": "acceptance",
             "checks": [

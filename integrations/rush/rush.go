@@ -2,16 +2,21 @@
 // in the mode its workspace chose (D-064). In delegate mode it is a delegated
 // stack on go.putnami.dev/tooling/stacks: each Rush project is a Putnami
 // project whose tasks run rush on that project at the workspace root, and
-// Rush keeps its build cache. In import mode its probe claims no project: the
-// sync writes each Rush project as a TypeScript project, which Putnami's
-// runner, installer and cache serve. Both read rush.json and the projects'
-// package.json files with the Rush detector of putnami observe.
+// Rush keeps its build cache. In import mode the sync writes each Rush
+// project as a TypeScript project, which Putnami's runner, installer and
+// cache serve, and keeps on Rush each script whose tool the TypeScript
+// extension does not run (D-070): the probe claims only the projects that
+// keep one, whose tasks run rushx in the project's directory. Both read
+// rush.json and the projects' package.json files with the Rush detector of
+// putnami observe.
 package rush
 
 import (
 	_ "embed"
 	"fmt"
 	"path"
+	"path/filepath"
+	"slices"
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -23,7 +28,7 @@ import (
 const ExtensionName = "@putnami/rush"
 
 // TypeScriptExtension is the extension an import writes into each project.
-const TypeScriptExtension = "@putnami/typescript"
+const TypeScriptExtension = stacks.TypeScriptExtension
 
 // The adoption modes, as putnami init records them under
 // options.@putnami/rush.mode of putnami.workspace.json.
@@ -61,7 +66,9 @@ func Mode(root string) (string, error) {
 // rush receives, with the workspace root for stack root and an edge to each
 // Rush project its package.json depends on; any other candidate that holds a
 // package.json, such as an autoinstaller, is bare and runs no task. In import
-// mode it names none, so the TypeScript extension runs the projects.
+// mode it names only the projects whose putnami.json names the extension,
+// which keep a target on Rush (ADR 0017 of tooling/stacks): the TypeScript
+// extension runs every other target.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	detection := detect.Detect(root)
 	if len(detection.Projects) == 0 && len(detection.Diagnostics) == 0 {
@@ -70,9 +77,6 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	mode, err := Mode(root)
 	if err != nil {
 		return nil, []diag.Diagnostic{diag.Errorf(stacks.CodeAdoptionModeInvalid, "", "%v", err)}
-	}
-	if mode == ModeImport {
-		return nil, nil
 	}
 	projects := make(map[string]detect.Project, len(detection.Projects))
 	for _, p := range detection.Projects {
@@ -84,6 +88,9 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			continue
 		}
 		p, ok := projects[dir]
+		if mode == ModeImport && (!ok || !keepsTargets(root, dir)) {
+			continue
+		}
 		if !ok {
 			out = append(out, stacks.Component{Path: dir, Name: dir, SourceFile: path.Join(dir, "package.json"), Bare: true})
 			continue
@@ -99,4 +106,11 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		})
 	}
 	return out, detection.Diagnostics
+}
+
+// keepsTargets reports whether the putnami.json of the project at dir names
+// the extension: an import keeps one of its targets on Rush.
+func keepsTargets(root, dir string) bool {
+	cfg := wsproto.LoadProjectConfig(filepath.Join(root, filepath.FromSlash(dir)))
+	return cfg != nil && slices.Contains(cfg.Extensions, ExtensionName)
 }

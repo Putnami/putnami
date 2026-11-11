@@ -13,7 +13,6 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/tscscript"
 	"go.putnami.dev/tooling/observe/detect/nodeworkspace"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -76,6 +75,9 @@ type Result struct {
 	Imported []string
 	// Unmatched are the entries of the import list that select no package.
 	Unmatched []string
+	// Conventions list each file an import rewrote to adopt Putnami's
+	// TypeScript conventions, and each manifest it did not (D-066).
+	Conventions []string
 }
 
 // Stale reports the files a sync would change.
@@ -133,6 +135,7 @@ func Sync(root string, opts Options) (Result, error) {
 	noteUnmapped(rootTasks, unmapped)
 
 	var members []member
+	var conventions []stacks.ConventionProject
 	current := map[string]bool{}
 	for _, p := range detection.Projects {
 		if p.Path == wsproto.ProbeRootPath {
@@ -166,6 +169,7 @@ func Sync(root string, opts Options) (Result, error) {
 				m.deps = append(m.deps, wsproto.ProjectIDFromPath(dep))
 			}
 		}
+		bunBuild := false
 		for _, task := range MappedTasks {
 			declared := rootTasks[task] || rootTasks[p.SourceName+"#"+task] || own[task]
 			script, scripted := run[task]
@@ -173,14 +177,18 @@ func Sync(root string, opts Options) (Result, error) {
 			case !scripted || !declared:
 				m.disabled = append(m.disabled, task)
 			case !imported:
-			case runsTypeScriptTask(task, script):
+			case stacks.TypeScriptRuns(task, script):
 				// One extension runs each task: the TypeScript extension's
 				// task already runs what the script runs.
 				m.disabled = append(m.disabled, ExtensionName+":"+task)
+				bunBuild = bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
 			default:
 				m.disabled = append(m.disabled, TypeScriptExtension+":"+task)
 				unmapped[p.SourceName+"#"+task] = unmappedReason(task, script)
 			}
+		}
+		if imported {
+			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.SourceName, BunBuild: bunBuild, PublishedBy: stacks.PackagePublished(root, p.Path)})
 		}
 		members = append(members, m)
 		current[p.Path] = true
@@ -252,6 +260,20 @@ func Sync(root string, opts Options) (Result, error) {
 			result.Retracted = append(result.Retracted, rel)
 		}
 	}
+	// The convention writes come after the putnami.json files, whose diffs
+	// Diffs holds first, in the order of Stale.
+	writes, warnings, err := stacks.ImportConventions(root, conventions)
+	if err != nil {
+		return Result{}, err
+	}
+	_, notes, err := stacks.ApplyConventions(root, writes, opts.DryRun)
+	if err != nil {
+		return Result{}, err
+	}
+	for _, w := range writes {
+		result.Diffs = append(result.Diffs, UnifiedDiff(w.File, w.Before, w.After))
+	}
+	result.Conventions = append(append(result.Conventions, notes...), warnings...)
 	return result, nil
 }
 
@@ -381,75 +403,10 @@ func ownedJob(job string) bool {
 	return false
 }
 
-// typeScriptCommands are the programs the TypeScript extension's task of the
-// same name runs. A script that runs one keeps its tool when the extension
-// takes the task over: the test task runs the vitest or jest a test script
-// runs, a build script that runs tsc alone compiles with that tsc, and a bare
-// eslint lint script moves to the TypeScript lint, which lints with ESLint
-// because the script runs it. Any other tsc script, or a prettier script,
-// stays on Turborepo, because moving it would change the tool that checks the
-// code.
-var typeScriptCommands = map[string][]string{
-	stacks.TaskBuild: {"bun build"},
-	stacks.TaskTest:  {"bun test", "vitest", "jest", "npx vitest", "npx jest"},
-	stacks.TaskLint:  {"biome", "bunx biome", "bunx @biomejs/biome", "eslint"},
-}
-
-// eslintScripts are the lint scripts that run ESLint the way the TypeScript
-// lint does: over the package, with no argument the TypeScript lint would
-// drop, plainly or through a package runner.
-var eslintScripts = []string{
-	"eslint", "eslint .",
-	"npx eslint", "npx eslint .",
-	"bunx eslint", "bunx eslint .",
-	"pnpm exec eslint", "pnpm exec eslint .",
-	"yarn eslint", "yarn eslint .",
-}
-
 // unmappedReason says why a script of a TypeScript package keeps running
 // through Turborepo in import mode.
 func unmappedReason(task, script string) string {
-	keeps := fmt.Sprintf("it keeps running through Turborepo, with turbo run %s", task)
-	switch {
-	case strings.ContainsAny(script, "&|;"):
-		return fmt.Sprintf("its script chains another command (%q), which %s does not run: %s", script, TypeScriptExtension, keeps)
-	case task == stacks.TaskLint && strings.Contains(script, "eslint"):
-		return fmt.Sprintf("its ESLint takes arguments (%q) that %s would drop: move them to the ESLint configuration; %s", script, TypeScriptExtension, keeps)
-	}
-	return fmt.Sprintf("%s runs %s, not %q: %s", TypeScriptExtension, typeScriptRuns(task), script, keeps)
-}
-
-// typeScriptRuns names what the TypeScript extension's task runs, for the
-// reason a task stays on Turborepo.
-func typeScriptRuns(task string) string {
-	runs := typeScriptCommands[task]
-	if task == stacks.TaskBuild {
-		runs = append(slices.Clone(runs), "tsc alone")
-	}
-	return strings.Join(runs, " or ")
-}
-
-// runsTypeScriptTask reports whether a package script runs what the
-// TypeScript extension's task runs, and nothing else: a script that chains or
-// pipes another command, such as eslint . && prettier --check ., runs a tool
-// the TypeScript extension does not.
-func runsTypeScriptTask(task, script string) bool {
-	if task == stacks.TaskBuild && tscscript.Runs(script) {
-		return true
-	}
-	script = strings.TrimSpace(script)
-	if strings.ContainsAny(script, "&|;") {
-		return false
-	}
-	if task == stacks.TaskLint && strings.Contains(script, "eslint") {
-		return slices.Contains(eslintScripts, strings.Join(strings.Fields(script), " "))
-	}
-	for _, program := range typeScriptCommands[task] {
-		if script == program || strings.HasPrefix(script, program+" ") {
-			return true
-		}
-	}
-	return false
+	return stacks.TypeScriptUnmappedReason(task, script, fmt.Sprintf("it keeps running through Turborepo, with turbo run %s", task))
 }
 
 // nodeRuntimeOption is the member of options["@putnami/typescript"] that

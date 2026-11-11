@@ -265,10 +265,12 @@ func TestAnImportWritesTypeScriptProjectsAndRetractsNone(t *testing.T) {
 	if len(result.Retracted) != 0 {
 		t.Errorf("an import retracted %v", result.Retracted)
 	}
+	// The demo's projects declare no script: each task is disabled.
 	if api := readProjectFile(t, root, "apps/api"); !reflect.DeepEqual(api, map[string]any{
 		"$schema":      stacks.ProjectSchema,
 		"extensions":   []any{TypeScriptExtension},
 		"dependencies": []any{"/libs/pricing"},
+		"disable":      map[string]any{"jobs": []any{"test", "lint", "build"}},
 	}) {
 		t.Errorf("apps/api = %v, want a TypeScript project with its edge", api)
 	}
@@ -355,10 +357,18 @@ func TestAStaleRushGraphFailsValidate(t *testing.T) {
 		t.Errorf("the check wrote apps/web/putnami.json")
 	}
 
-	// In import mode Putnami owns the graph: the check passes.
+	// In import mode too: a script that changes the tool it runs is stale.
 	root = repository(t, d, ModeImport, true)
-	if status, _, err := RunCheck(&pctx.Context{WorkspaceRoot: root}, jsonl.New(), nil); status != "OK" || err != nil {
-		t.Errorf("check in import mode: %s %v", status, err)
+	ctx = &pctx.Context{WorkspaceRoot: root}
+	if status, _, err := RunSync(ctx, jsonl.New(), nil); status != "OK" || err != nil {
+		t.Fatalf("sync in import mode: %s %v", status, err)
+	}
+	if status, _, err := RunCheck(ctx, jsonl.New(), nil); status != "OK" || err != nil {
+		t.Errorf("check after the import: %s %v", status, err)
+	}
+	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "scripts": {"test": "mocha"}}`)
+	if status, _, err := RunCheck(ctx, jsonl.New(), nil); status != "FAILED" || err == nil || err.Error() != CodeSyncStale {
+		t.Errorf("check in import mode on a changed script: %s %v", status, err)
 	}
 }
 
@@ -577,7 +587,14 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, false)
-	// web keeps its own tsconfig and declares exports; api names no main.
+	// pricing builds with Bun, so its main names an output nothing writes in
+	// the project; web keeps its own tsconfig and declares exports; api
+	// names no main.
+	pricingManifest := strings.Replace(d["base"]["libs/pricing/package.json"], `"main": "lib/index.js",`, `"main": "lib/index.js",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir lib"
+  },`, 1)
+	stackstest.WriteFile(t, root, "libs/pricing/package.json", pricingManifest)
 	stackstest.WriteFile(t, root, "apps/web/tsconfig.json", `{"compilerOptions": {"strict": true}}`)
 	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "main": "lib/index.js", "exports": "./lib/index.js"}`)
 
@@ -620,7 +637,7 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wantPricing := strings.Replace(d["base"]["libs/pricing/package.json"], `"main": "lib/index.js",`, `"main": "lib/index.js",
+	wantPricing := strings.Replace(pricingManifest, `"main": "lib/index.js",`, `"main": "lib/index.js",
   "exports": {
     ".": "./src/index.ts"
   },`, 1)
@@ -638,6 +655,22 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 		t.Errorf("a second import writes %v %v, %v", again.Written, again.Changes, err)
 	}
 
+	// A tsc build writes the output its main names: the entry stays. So
+	// does a project's own tsconfig*.json, which its tools read.
+	root = repository(t, d, ModeImport, false)
+	tscManifest := strings.Replace(pricingManifest, "bun build src/index.ts --outdir lib", "tsc -p tsconfig.lib.json", 1)
+	stackstest.WriteFile(t, root, "libs/pricing/package.json", tscManifest)
+	stackstest.WriteFile(t, root, "libs/pricing/tsconfig.lib.json", `{"compilerOptions": {"outDir": "lib"}}`)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "libs/pricing/package.json")); string(data) != tscManifest {
+		t.Errorf("a tsc build's package.json changed:\n%s", data)
+	}
+	if _, err := os.Stat(filepath.Join(root, "libs/pricing/tsconfig.json")); !os.IsNotExist(err) {
+		t.Errorf("a project with a tsconfig.lib.json got a tsconfig.json: %v", err)
+	}
+
 	// Delegate mode rewrites no package.json and writes no tsconfig.
 	root = repository(t, d, ModeDelegate, false)
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
@@ -651,54 +684,21 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 	}
 }
 
-func TestSourceExportsKeepAManifestTheyCannotEdit(t *testing.T) {
-	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
-	dir := t.TempDir()
-	stackstest.WriteFile(t, dir, "src/index.ts", "export {}\n")
-	for name, manifest := range map[string]string{
-		"a main under src": `{"name": "a", "main": "src/index.ts"}`,
-		"no main":          `{"name": "a"}`,
-		"exports":          `{"name": "a", "main": "lib/index.js", "exports": "./lib/index.js"}`,
-	} {
-		if got, reason, err := withSourceExports(dir, []byte(manifest)); err != nil || got != nil || reason != "" {
-			t.Errorf("%s: %s %q, %v", name, got, reason, err)
-		}
-	}
-	for name, c := range map[string]struct{ manifest, reason string }{
-		"one line": {`{"name": "a", "main": "lib/index.js"}`, "its entry is on its last line"},
-		"shared":   {"{\n  \"name\": \"a\", \"main\": \"lib/index.js\"\n}\n", "shares its line"},
-		"CRLF":     {"{\r\n  \"main\": \"lib/index.js\"\r\n}\r\n", "CRLF"},
-	} {
-		if got, reason, err := withSourceExports(dir, []byte(c.manifest)); err != nil || got != nil || !strings.Contains(reason, c.reason) {
-			t.Errorf("%s: %s %q, %v, want the reason %q", name, got, reason, err, c.reason)
-		}
-	}
-	got, _, err := withSourceExports(dir, []byte("{\n\t\"name\": \"a\",\n\t\"types\": \"dist/index.d.ts\"\n}\n"))
-	if err != nil || string(got) != "{\n\t\"name\": \"a\",\n\t\"types\": \"dist/index.d.ts\",\n\t\"exports\": {\n\t\t\".\": \"./src/index.ts\"\n\t}\n}\n" {
-		t.Errorf("a last types member: %q, %v", got, err)
-	}
-	// A nested main before the top-level one stays as it is.
-	nested := "{\n  \"publishConfig\": {\n    \"main\": \"dist/index.js\"\n  },\n  \"main\": \"lib/index.js\",\n  \"name\": \"a\"\n}\n"
-	got, _, err = withSourceExports(dir, []byte(nested))
-	want := "{\n  \"publishConfig\": {\n    \"main\": \"dist/index.js\"\n  },\n  \"main\": \"lib/index.js\",\n  \"exports\": {\n    \".\": \"./src/index.ts\"\n  },\n  \"name\": \"a\"\n}\n"
-	if err != nil || string(got) != want {
-		t.Errorf("a nested main:\n%s\nwant\n%s (%v)", got, want, err)
-	}
-	if _, _, err := withSourceExports(dir, []byte("not json")); err == nil {
-		t.Error("a manifest that is no JSON passes")
-	}
-}
-
 func TestAnImportKeepsTheEntryOfAProjectRushPublishes(t *testing.T) {
 	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, false)
 	stackstest.WriteFile(t, root, "rush.json", strings.Replace(d["base"]["rush.json"], `"shouldPublish": false`, `"shouldPublish": true`, 1))
+	manifest := strings.Replace(d["base"]["libs/pricing/package.json"], `"main": "lib/index.js",`, `"main": "lib/index.js",
+  "scripts": {
+    "build": "bun build src/index.ts --outdir lib"
+  },`, 1)
+	stackstest.WriteFile(t, root, "libs/pricing/package.json", manifest)
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if data, _ := os.ReadFile(filepath.Join(root, "libs/pricing/package.json")); string(data) != d["base"]["libs/pricing/package.json"] {
+	if data, _ := os.ReadFile(filepath.Join(root, "libs/pricing/package.json")); string(data) != manifest {
 		t.Errorf("a published project's package.json changed:\n%s", data)
 	}
 	if !slices.ContainsFunc(result.Warnings, func(w string) bool { return strings.Contains(w, "rush.json publishes @demo/pricing") }) {
@@ -718,7 +718,7 @@ func TestASwitchOfModeDropsTheOtherModesExtension(t *testing.T) {
 		t.Fatal(err)
 	}
 	api := readProjectFile(t, root, "apps/api")
-	if !reflect.DeepEqual(api["extensions"], []any{TypeScriptExtension}) || api["disable"] != nil || api["options"] != nil {
+	if !reflect.DeepEqual(api["extensions"], []any{TypeScriptExtension}) || api["options"] != nil {
 		t.Errorf("after an import apps/api = %v, want the TypeScript extension alone", api)
 	}
 	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
@@ -727,5 +727,95 @@ func TestASwitchOfModeDropsTheOtherModesExtension(t *testing.T) {
 	}
 	if api := readProjectFile(t, root, "apps/api"); !reflect.DeepEqual(api["extensions"], []any{ExtensionName}) {
 		t.Errorf("after a delegation apps/api extensions = %v, want the Rush extension alone", api["extensions"])
+	}
+}
+
+// stubRushx puts first on PATH a rushx that logs its working directory and
+// arguments to $STUB_LOG.
+func stubRushx(t *testing.T) {
+	t.Helper()
+	bin := t.TempDir()
+	stackstest.WriteFile(t, bin, "rushx", "#!/bin/sh\necho \"$(pwd -P) rushx $*\" >> \"$STUB_LOG\"\n")
+	if err := os.Chmod(filepath.Join(bin, "rushx"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-the-tool-that-checks-the-code", "a-target-that-runs-another-tool-keeps-running-with-rushx")
+	d := readDemo(t)
+	stubRush(t)
+	stubRushx(t)
+	root := repository(t, d, ModeImport, false)
+	// api bundles with webpack and tests with Mocha, which @putnami/typescript
+	// does not run, and lints with a bare ESLint, which it does; pricing
+	// builds with tsc and tests with Jest, and its ESLint takes arguments.
+	stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "private": true, "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"build": "webpack", "test": "mocha", "lint": "eslint ."}}`)
+	stackstest.WriteFile(t, root, "libs/pricing/package.json", `{"name": "@demo/pricing", "version": "1.2.0", "private": true, "scripts": {"build": "tsc", "test": "jest", "lint": "eslint --max-warnings 0 src"}}`)
+
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	keptSteps := func(task string) any {
+		return map[string]any{"steps": []any{[]any{"rushx", task}}, "dir": "project"}
+	}
+	if api := readProjectFile(t, root, "apps/api"); !reflect.DeepEqual(api, map[string]any{
+		"$schema":      stacks.ProjectSchema,
+		"extensions":   []any{ExtensionName, TypeScriptExtension},
+		"dependencies": []any{"/libs/pricing"},
+		"disable":      map[string]any{"jobs": []any{"@putnami/rush:lint", "@putnami/typescript:test", "@putnami/typescript:build"}},
+		"options":      map[string]any{ExtensionName: map[string]any{"tasks": map[string]any{"build": keptSteps("build"), "test": keptSteps("test")}}},
+	}) {
+		t.Errorf("apps/api = %v", api)
+	}
+	if pricing := readProjectFile(t, root, "libs/pricing"); !reflect.DeepEqual(pricing["disable"], map[string]any{"jobs": []any{"@putnami/rush:test", "@putnami/rush:build", "@putnami/typescript:lint"}}) {
+		t.Errorf("libs/pricing disable = %v", pricing["disable"])
+	}
+	// web declares no script: the TypeScript extension alone, every task
+	// disabled.
+	if web := readProjectFile(t, root, "apps/web"); !reflect.DeepEqual(web["extensions"], []any{TypeScriptExtension}) {
+		t.Errorf("apps/web extensions = %v", web["extensions"])
+	}
+	for _, want := range []string{
+		`not mapped: the build script of @demo/api: @putnami/typescript runs bun build or tsc alone, not "webpack": it keeps running through Rush, with rushx build`,
+		`not mapped: the test script of @demo/api: @putnami/typescript runs bun test or vitest or jest or npx vitest or npx jest, not "mocha": it keeps running through Rush, with rushx test`,
+		`not mapped: the lint script of @demo/pricing: its ESLint takes arguments ("eslint --max-warnings 0 src") that @putnami/typescript would drop: move them to the ESLint configuration; it keeps running through Rush, with rushx lint`,
+	} {
+		if !slices.Contains(result.Warnings, want) {
+			t.Errorf("warnings = %v, want %q", result.Warnings, want)
+		}
+	}
+	// The scripts keep running as the repository defines them.
+	if data, _ := os.ReadFile(filepath.Join(root, "apps/api/package.json")); !strings.Contains(string(data), `"test": "mocha"`) {
+		t.Errorf("the import rewrote api's scripts: %s", data)
+	}
+
+	// The probe claims api, which keeps targets on Rush, and not web.
+	var claimed []string
+	for _, p := range probe(t, root).Projects {
+		claimed = append(claimed, p.Path)
+	}
+	if !slices.Contains(claimed, "apps/api") || slices.Contains(claimed, "apps/web") {
+		t.Errorf("an import claims %v, want apps/api and not apps/web", claimed)
+	}
+	apiReal, _ := filepath.EvalSymlinks(filepath.Join(root, "apps/api"))
+	if status, data, events := runJob(t, root, "apps/api", stacks.TaskTest); status != "OK" || data["delegatedTo"] != "rush" {
+		t.Errorf("the kept test: %s %v %s", status, data, events)
+	}
+	if log := stubLog(t); len(log) != 1 || log[0] != apiReal+" rushx test" {
+		t.Errorf("the kept test ran %q, want rushx test in %s", log, apiReal)
+	}
+
+	// Back to delegate mode, the rushx steps leave.
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	api := readProjectFile(t, root, "apps/api")
+	layer, _ := api["options"].(map[string]any)[ExtensionName].(map[string]any)
+	if !reflect.DeepEqual(api["extensions"], []any{ExtensionName}) || layer["tasks"] != nil {
+		t.Errorf("after a delegation apps/api = %v", api)
 	}
 }

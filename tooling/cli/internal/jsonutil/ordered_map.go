@@ -25,6 +25,11 @@ func New() *OrderedMap {
 	return &OrderedMap{values: make(map[string]any)}
 }
 
+// Keys returns the keys, in their order.
+func (m *OrderedMap) Keys() []string {
+	return append([]string(nil), m.keys...)
+}
+
 // Get returns the value for key and whether it exists.
 func (m *OrderedMap) Get(key string) (any, bool) {
 	v, ok := m.values[key]

@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "monorepo/nx-adoption#delegate-imports-listed-projects",
+    "monorepo/nx-adoption#import-adopts-typescript-conventions",
     "monorepo/nx-adoption#import-keeps-eslint",
     "monorepo/nx-adoption#import-maps-a-tsc-build-target",
     "monorepo/nx-adoption#import-maps-an-nx-js-tsc-build-target",

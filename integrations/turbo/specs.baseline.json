@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "monorepo/turbo-adoption#delegate-imports-listed-packages",
+    "monorepo/turbo-adoption#import-adopts-typescript-conventions",
     "monorepo/turbo-adoption#import-keeps-eslint",
     "monorepo/turbo-adoption#import-maps-a-tsc-build-script",
     "monorepo/turbo-adoption#import-marks-the-node-runtime",
