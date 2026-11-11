@@ -21,6 +21,7 @@ var commands = map[string]cli.JobFunc{
 	"build-transpile": runBuildTranspile,
 	"build-types":     runBuildTypes,
 	"build-compile":   runBuildCompile,
+	"build-tsc":       runBuildTsc,
 	"build-infra":     buildInfra(),
 	"config-extract":  runConfigExtract,
 	// The documentation link check is the SDK's shared task body, so a broken

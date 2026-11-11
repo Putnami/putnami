@@ -106,6 +106,10 @@ func runBuildTranspileBatch(ctx *pctx.Context) (string, map[string]any, error) {
 		projectPath := filepath.Join(ctx.WorkspaceRoot, proj.Path)
 		libOutput := filepath.Join(batchOutputPath(ctx, proj), "lib")
 		res := buildBatchProjectResult{ProjectID: proj.ID, Status: "OK"}
+		if compilesWithTsc(ctx, projectPath) {
+			results = append(results, res)
+			continue
+		}
 
 		files, transErrors, err := build.RunTranspile(bunBin, projectPath, libOutput, params)
 		if err != nil {
@@ -159,6 +163,10 @@ func runBuildTypesBatch(ctx *pctx.Context) (string, map[string]any, error) {
 		typesOutput := filepath.Join(batchOutputPath(ctx, proj), "types")
 		buildInfoDir := typesBuildInfoDir(ctx.CacheRoot, filepath.Base(ctx.OutputPath), proj.Path)
 		res := buildBatchProjectResult{ProjectID: proj.ID, Status: "OK"}
+		if compilesWithTsc(ctx, projectPath) {
+			results = append(results, res)
+			continue
+		}
 
 		typesResult, err := build.RunTypes(bunBin, projectPath, typesOutput, buildInfoDir)
 		if err != nil {

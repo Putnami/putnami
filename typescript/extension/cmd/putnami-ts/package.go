@@ -1,17 +1,27 @@
 package main
 
 import (
+	"path/filepath"
+
 	"fmt"
 
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/imagepkg"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/releaseset"
+	"go.putnami.dev/typescript/extension/internal/build"
 	"go.putnami.dev/typescript/extension/internal/git"
 	"go.putnami.dev/typescript/extension/internal/pkg"
 )
 
 func runPackageNpm(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
+	// A project that compiles with tsc builds into its outDir, not into the
+	// output this packager packs: refuse it rather than ship a tarball
+	// without its compiled code.
+	if compilesWithTsc(ctx, filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)) {
+		emit.DiagnosticWithCode("error", "the project compiles with tsc, and package packs only a project that compiles with Bun: publish it with its own tooling, or set compiler to bun", "package.json", 0, 0, build.CodeTscPackageRefusal)
+		return "FAILED", nil, nil
+	}
 	stable := ctx.Params.Bool("stable", false)
 	dryRun := ctx.Params.Bool("dry-run", false, "dryRun")
 

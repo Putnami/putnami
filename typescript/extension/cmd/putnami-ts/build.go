@@ -139,6 +139,10 @@ func runBuildTranspile(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (s
 		return runBuildTranspileBatch(ctx)
 	}
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
+	if compilesWithTsc(ctx, projectPath) {
+		emit.Info("the project compiles with tsc in the tsc step")
+		return "OK", nil, nil
+	}
 	bunBin, err := resolveBunBin()
 	if err != nil {
 		return "FAILED", nil, err
@@ -173,6 +177,10 @@ func runBuildTypes(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (strin
 		return runBuildTypesBatch(ctx)
 	}
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
+	if compilesWithTsc(ctx, projectPath) {
+		emit.Info("the project compiles with tsc in the tsc step")
+		return "OK", nil, nil
+	}
 	bunBin, err := resolveBunBin()
 	if err != nil {
 		return "FAILED", nil, err
