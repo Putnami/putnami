@@ -71,6 +71,7 @@ path directly.
 ```text
 generate ──→ transpile ──→ types
          └──→ compile
+tsc / tsc-auto              (a library whose build script runs tsc alone)
 ```
 
 ### Lint Pipeline

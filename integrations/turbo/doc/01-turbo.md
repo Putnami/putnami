@@ -38,14 +38,16 @@ to write them.
 
 | | Import | Delegate |
 |---|---|---|
-| A TypeScript package's task whose script runs `bun build`, `bun test` or `biome` | Runs the `@putnami/typescript` task: Putnami's runner and cache | Runs `turbo run` on it |
-| Any other task, such as a `tsc`, `vitest`, `jest` or `eslint` script | Runs `turbo run` on it | Runs `turbo run` on it |
+| A TypeScript package's task whose script runs `bun build`, `bun test` or `biome`, or a `build` script that runs `tsc` alone | Runs the `@putnami/typescript` task: Putnami's runner and cache | Runs `turbo run` on it |
+| Any other task, such as a bundler build or a `vitest`, `jest` or `eslint` script | Runs `turbo run` on it | Runs `turbo run` on it |
 | Cache | Putnami's for the tasks `@putnami/typescript` runs, Turborepo's for the others | Turborepo's, local and remote |
 
 Import mode moves a task to `@putnami/typescript` only when its script
-already runs what that extension's task runs: moving a
-`tsc`, `vitest`, `jest` or `eslint` task would change the tool that checks the
-code. Each task that stays on Turborepo is listed with the reason. One
+already runs what that extension's task runs: moving a `vitest`, `jest` or
+`eslint` task would change the tool that checks the code. A `build` script
+that runs `tsc` alone (`tsc`, `tsc -b` or `tsc -p` with one config) moves
+with that `tsc`, which Putnami runs into the package's `outDir` (see
+[A library built with tsc](../../../typescript/extension/doc/02-build.md#a-library-built-with-tsc)). Each task that stays on Turborepo is listed with the reason. One
 extension runs each task, so no Putnami cache sits over Turborepo's.
 
 A package is TypeScript when it holds a `tsconfig.json`, or a TypeScript

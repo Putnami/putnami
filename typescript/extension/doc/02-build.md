@@ -5,7 +5,9 @@ The build command compiles TypeScript projects through a 5-phase pipeline: **gen
 ## Overview
 
 - Generates code artifacts and version metadata before compilation
-- Transpiles TypeScript to JavaScript using Bun's bundler
+- Transpiles TypeScript to JavaScript using Bun's bundler, or compiles a
+  library whose build script runs `tsc` alone with that `tsc` (see
+  [A library built with tsc](#a-library-built-with-tsc))
 - Produces TypeScript declaration files (`.d.ts`) using `tsc`
 - Optionally compiles to standalone executables for cross-platform deployment
 - Caches each phase independently with content-hash-based cache keys
@@ -65,6 +67,7 @@ putnami build . --skip-package-json --skip-artifacts
 ```text
 generate ──→ transpile ──→ types ──→ infra
          └──→ compile  (parallel with transpile/types)
+tsc / tsc-auto ──────────────────→ infra   (a library built with tsc)
 ```
 
 ### Phase Selection Logic
@@ -419,6 +422,70 @@ imports one of them fails.
 
 Output is written to `output/lib/`.
 
+### A library built with tsc
+
+A library whose `package.json` `build` script runs `tsc` alone keeps that
+`tsc` and gains Putnami's cache: Putnami runs the script's command into the
+`outDir` its `tsconfig` names, where the packages that depend on it resolve
+its `main` and `exports`, instead of transpiling with Bun
+([ADR 0008](adr/0008-a-tsc-build-declares-its-outdir-through-pathfrom.md)).
+
+The `compiler` parameter chooses, in `options["@putnami/typescript"].compiler`
+of the project's `putnami.json` or with `--compiler`:
+
+| Value | Compiler |
+|---|---|
+| `auto` (default) | `tsc` when the `build` script runs `tsc` alone, Bun otherwise |
+| `tsc` | `tsc`: the `build` script's command, or `tsc -p tsconfig.lib.json`, else `tsconfig.json`, when the project has no `build` script |
+| `bun` | Bun's transpile and types steps, whatever the script runs |
+
+A script runs `tsc` alone when it is `tsc`, `tsc -b` or `tsc --build` with
+at most one config, or `tsc -p` or `tsc --project` with one config, plus at
+most `--pretty` and `--verbose`, with no shell operator, environment
+assignment or other argument. `tsc && cp README.md dist`, `tsc --watch` or a
+bundler (`tsup`, `vite`, `webpack`, `rollup`, `esbuild`) is not: under `auto`
+such a project compiles with Bun, and an explicit `tsc` fails naming the
+script. Set the option in `options["@putnami/typescript"]`, not
+`options["@putnami/typescript:build"]`: `test` and `package` read it too.
+
+With `tsc`:
+
+- The `tsc` and `tsc-auto` steps run `build-tsc` in place of `transpile` and
+  `types`. `tsc-auto` is planned only for a project whose `package.json`
+  contains `tsc`, so a Bun project keeps its plan.
+- Bun runs the compiler of the workspace's `typescript` package, the first
+  `node_modules/typescript/bin/tsc` from the project up to the workspace
+  root, so no `node` is needed and nothing is downloaded. A missing one
+  fails with `typescript-tsc-missing`.
+- The build declares the `outDir`, and the `declarationDir` and
+  `.tsbuildinfo` when they lie outside it (a config beside a `rootDir` of
+  `src` writes `tsconfig.tsbuildinfo` next to itself), as its outputs. It
+  empties them before `tsc` starts, a cache hit restores them in place, and
+  every job of a project that depends on the library runs after it.
+- `tsc -b` on a config that declares `references` runs as `tsc -p` on that
+  config. Putnami builds or restores each referenced project first, in
+  dependency order; a restored file keeps the time it was stored, so `tsc -b`
+  would find the reference older than its sources and rebuild it in another
+  project's directory.
+- The key reads the project's files Git does not ignore, the top-level JSON
+  and `tsconfig` files of each project it depends on, such as a shared
+  configuration package, the root `tsconfig` files and lockfiles, and each
+  dependency's `tsc` key. `putnami test` plans the same step, so a dependent's
+  tests run against its libraries' compiled output.
+- `putnami package` refuses the project (`typescript-tsc-package-unsupported`):
+  its compiled code is in its `outDir`, not in the output `package` packs.
+
+The build refuses, before `tsc` runs, a config Putnami cannot own the emit
+of:
+
+| Code | Cause |
+|---|---|
+| `typescript-tsc-unsupported-script` | An explicit `tsc` with a `build` script that does not run `tsc` alone |
+| `typescript-tsc-outdir` | No `outDir`, an `outFile`, `noEmit`, or an output outside the project or equal to it |
+| `typescript-tsc-output-not-ignored` | An output Git does not ignore: add it to `.gitignore`, or the emitted files would key their own build |
+| `typescript-tsc-tracked-output` | An output that holds a file Git tracks, which emptying it would delete |
+| `typescript-tsc-config` | The config the command names does not exist |
+
 ### Phase 3: Types
 
 Invokes `tsc` to generate TypeScript declaration files (`.d.ts` + `.d.ts.map`).
@@ -549,6 +616,7 @@ Every output has exactly one owning task:
 | `build-transpile` | `lib/` | per-command output dir |
 | `build-types` | `types/` | per-command output dir |
 | `build-compile` | `compile/` | per-command output dir |
+| `build-tsc` | The `outDir` of the compiled config, and its `declarationDir` and `.tsbuildinfo` outside it, through the `outDir`, `declarationDir` and `buildInfo` ports; the projects that depend on it read the `outDir` and `declarationDir` | project dir |
 | `test-run` | `lcov.info`, `results.junit.xml` | per-command output dir |
 | `package-npm` | `npm/` | per-command output dir |
 | `package-docker` | `docker/` | per-command output dir |
@@ -595,6 +663,12 @@ ordinary declared capture
 
 When no phase flag is set, generate + transpile + types run by default. Setting any phase flag switches to selective mode.
 
+#### Compiler
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--compiler` | `string` | `auto` | `auto`, `bun` or `tsc`; `test` and `package` take it too (see [A library built with tsc](#a-library-built-with-tsc)) |
+
 #### Transpile Options
 
 | Flag | Type | Default | Description |
@@ -632,5 +706,5 @@ When no phase flag is set, generate + transpile + types run by default. Setting 
 
 - **Scope**: Compiling TypeScript projects into distributable JavaScript, type declarations, and standalone executables
 - **Out of scope**: Publishing (see [Package](./07-package.md)), running tests (see [Test](./03-test.md)), code quality (see [Lint](./04-lint.md))
-- **Dependencies**: Requires Bun runtime. Uses `tsc` from `node_modules` for type generation.
+- **Dependencies**: Requires Bun runtime. Uses `tsc` from `node_modules` for type generation, and to compile a library built with `tsc`.
 - **Extension points**: Pre-build hooks allow dependencies to inject generated code and register exports. Configure via `putnami.extension.json` `hooks.preBuild`.

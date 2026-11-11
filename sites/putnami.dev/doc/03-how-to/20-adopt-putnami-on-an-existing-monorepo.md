@@ -16,7 +16,8 @@ Putnami adopts a tool in one of two modes:
   What an import maps depends on the tool: every Rush project, each moon
   project whose language has a Putnami extension, and in Nx and Turborepo
   only a TypeScript project's targets whose script already runs `bun build`,
-  `bun test` or Biome. Each tool's section below gives the exact scope.
+  `bun test` or Biome, and a `build` that runs `tsc` alone. Each tool's
+  section below gives the exact scope.
 
 | Tool | Mode | Command |
 |---|---|---|
@@ -219,9 +220,11 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
 
 - **Import**: a TypeScript project's `build`, `test` and `lint` whose script
   already runs `bun build`, `bun test` or Biome run as `@putnami/typescript`
-  tasks, under Putnami's runner and cache. Every other target, a `jest` test
-  or an `@nx/webpack:webpack` build for example, keeps running through Nx, so
-  no target changes the tool that checks it.
+  tasks, under Putnami's runner and cache. So does a `build` whose script
+  runs `tsc` alone, or whose executor is `@nx/js:tsc` writing inside the
+  project: Putnami compiles it with that `tsc`, into its `outDir`. Every
+  other target, a `jest` test or an `@nx/webpack:webpack` build for example,
+  keeps running through Nx, so no target changes the tool that checks it.
 - **Delegate**: you keep Nx and its cache, local or Nx Cloud. Each task runs
   `nx run <project>:<target>` on one affected project, and Putnami caches
   nothing for it.
@@ -458,9 +461,11 @@ Turborepo adopts in either mode:
 
 - **Import**: a TypeScript package's task whose script already runs
   `bun build`, `bun test` or `biome` runs the `@putnami/typescript` task,
-  with Putnami's cache. Every other task, such as a `tsc`, `vitest`, `jest` or
-  `eslint` script, keeps running through Turborepo: moving it would change the
-  tool that checks the code. Import mode also declares `@putnami/typescript`,
+  with Putnami's cache, and so does a `build` script that runs `tsc` alone,
+  which Putnami compiles with that `tsc` into its `outDir`. Every other task,
+  such as a bundler build or a `vitest`, `jest` or `eslint` script, keeps
+  running through Turborepo: moving it would change the tool that checks the
+  code. Import mode also declares `@putnami/typescript`,
   whose setup adds its devDependencies to the root `package.json`, lists the
   packages where the repository's package manager reads its members, writes a
   root `tsconfig.json` and `biome.json` when they are missing, and installs
