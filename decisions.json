@@ -541,10 +541,11 @@
     },
     {
       "id": "D-066",
-      "statement": "an import adopts Putnami's TypeScript conventions: a project Rush does not publish whose main names a build output gains exports ./src/index.ts, a project without tsconfig.json gets one extending the root, and each rewrite is listed",
+      "statement": "an import adopts Putnami's TypeScript conventions: an unpublished project whose main names a build output and whose build moves to Bun's gains exports ./src/index.ts, one with no tsconfig*.json gets one extending the root; each rewrite is listed",
       "settled": "2026-11-09",
       "settledBy": "fdumay",
-      "reviewOnly": true
+      "reviewOnly": true,
+      "adr": "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
     },
     {
       "id": "D-067",
@@ -568,6 +569,14 @@
       "settled": "2026-11-11",
       "settledBy": "fdumay",
       "adr": "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-070",
+      "statement": "an import never changes the tool that checks the code: a project moves to its language's extension, a build, test or lint target moves only when that extension runs the same tool, every other target stays on the tool and is listed as not mapped",
+      "settled": "2026-11-11",
+      "settledBy": "fdumay",
+      "adr": "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md",
       "reviewOnly": true
     }
   ]
