@@ -203,9 +203,18 @@ document (version 3, see `protocols/ci`) declares those `commands`, the rules
 that name the channels a branch publishes and the environments that follow them
 (`main` publishes the `canary` channel, and `prod` follows it). It carries no
 job and no credential input, so a pull request is gated on exactly what you can
-run locally. No rule matches a pull request, so its run stops after those
-commands: packaging and publication run on `main` only. The generated agent
-guidance derives its gate line from the same document.
+run locally. A green pull request run publishes the members it changed, and
+their dependents, into its own channel `pr-<number>`. Its first push measures
+them against `canary`, which it reads and never moves; each later push measures
+against the pull request's own head. The channel is retracted when the pull
+request closes or merges, and no environment follows it, so nothing is
+deployed from a pull request. After the merge, the `main` run can release into
+`canary` the artifacts the pull request's reviewed final head published,
+instead of building them again
+([ADR 0066](tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md)).
+`putnami cloud ci explain --event pull_request --pr <number> --branch <branch>`
+shows what a pull request run would publish. The generated agent guidance
+derives its gate line from the same document.
 
 On `main`, the same run continues into `putnami deploy --all` with a run-bound
 Cloud capability. Deploy participation is an explicit opt-in: the workspace sets
