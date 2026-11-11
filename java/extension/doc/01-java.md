@@ -313,6 +313,10 @@ plugin then downloads the platforms and build tools on the first task that
 needs them. The extension pins 22.0 because from 23.0 `sdkmanager` hands over
 to the Android CLI, which downloads itself unchecked and accepts no license.
 
+The SDK's location does not reach a task's key; the option does, as every
+key of the extension's block of the workspace's options does, so turning it on
+reruns the Java tasks once.
+
 Without the option, a task of an Android component on a machine with no SDK
 fails with `stacks.toolchain_missing`, and the message names the option; a
 task of another project of the build is left to Gradle. Offline, a task

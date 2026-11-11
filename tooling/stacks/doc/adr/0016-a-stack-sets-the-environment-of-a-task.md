@@ -46,5 +46,7 @@ SDK's licenses.
   in one place for every step of every task and job, overrides included.
 - The workspace's options reach the hook from the job context, so the stack
   reads the policy the orchestrator loaded.
-- The options do not reach the cache key: the variables locate a tool, as the
-  toolchain's home does, and do not change what a step builds.
+- The entries `Env` answers do not reach the cache key: they locate a tool, as
+  the toolchain's home does. The extension's block of the workspace's options
+  also reaches its tasks as parameters, which the key folds, so a change to
+  the block reruns the extension's tasks once.
