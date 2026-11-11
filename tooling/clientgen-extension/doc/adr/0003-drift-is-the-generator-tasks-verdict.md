@@ -1,7 +1,8 @@
 # ADR 0003 — Drift is the generator task's verdict; the guard reads committed inputs
 
 - **Status**: accepted, amended by
-  [ADR 0006](0006-the-guard-reads-and-keys-on-the-git-candidate-cut.md)
+  [ADR 0006](0006-the-guard-reads-and-keys-on-the-git-candidate-cut.md);
+  decisions 1, 2 and 4 replaced by [ADR 0007](0007-a-generated-client-is-built-not-committed.md)
 - **Scope**: `@putnami/clientgen` (`tooling/clientgen-extension`), the client
   outputs of `@putnami/go` `build-describe` and `@putnami/typescript`
   `build-generate`

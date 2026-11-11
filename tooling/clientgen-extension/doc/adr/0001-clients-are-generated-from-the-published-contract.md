@@ -1,7 +1,8 @@
 # ADR 0001 — Provider contracts drive generated service clients
 
 - **Status**: accepted, amended by
-  [CLI ADR 0068](../../../cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md) (the cache-key invariant)
+  [CLI ADR 0068](../../../cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md) (the cache-key invariant), and by
+  [ADR 0007](0007-a-generated-client-is-built-not-committed.md) (no committed client; code names no target; sync and adopt removed)
 - **Scope**: `@putnami/clientgen` (`tooling/clientgen-extension`)
 
 ## Context

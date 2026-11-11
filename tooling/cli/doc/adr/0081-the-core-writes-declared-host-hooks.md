@@ -1,6 +1,7 @@
 # ADR 0081 — The core writes the host hooks an extension declares
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0087](0087-a-fresh-worktree-restores-its-generated-clients.md) (a core-owned SessionStart hook restores generated clients)
 - **Amended**: 2026-10-28, by
   [ADR 0082](0082-putnami-serves-no-mcp-server.md): hooks no longer share a
   launcher with an MCP server, which the core no longer serves

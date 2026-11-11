@@ -216,6 +216,23 @@
             "unrelated-areas-warn-unless-an-epic-declares-them"
           ]
         }
+      },
+      {
+        "id": "a-client-binds-from-generated-from",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-binding-reads-generated-from-at-load",
+            "the-identity-folds-the-providers-load-time-contract-digest",
+            "an-implementation-change-keeps-every-client-key",
+            "an-unresolved-service-folds-a-fixed-marker",
+            "the-contract-edge-orders-no-job"
+          ]
+        }
       }
     ]
   }

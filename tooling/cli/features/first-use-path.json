@@ -97,6 +97,21 @@
             "a-failed-install-records-no-install-marker"
           ]
         }
+      },
+      {
+        "id": "a-fresh-worktree-restores-generated-clients",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-first-run-pass-runs-client-generate-cached",
+            "install-writes-the-restore-hook-when-a-client-exists",
+            "install-removes-the-restore-hook-when-no-client-remains"
+          ]
+        }
       }
     ]
   }
