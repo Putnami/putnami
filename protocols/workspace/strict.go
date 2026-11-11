@@ -158,6 +158,7 @@ func ValidateProjectConfig(c *ProjectConfig) []diag.Diagnostic {
 	diags = append(diags, validateDistribution(c.Distribution)...)
 	diags = append(diags, validateRegistries(c.Registries)...)
 	diags = append(diags, validateProjectFeatureAuthority(c)...)
+	diags = append(diags, validateGeneratedFrom(c.GeneratedFrom)...)
 	diags = append(diags, ValidateProjectTaskTuning(c)...)
 
 	return diags
@@ -231,6 +232,57 @@ func validateProjectFeatureAuthority(c *ProjectConfig) []diag.Diagnostic {
 	}
 	return nil
 }
+
+// validateGeneratedFrom checks a generated client's binding. A Go-only option
+// on a TypeScript client is refused rather than ignored: it would read as a
+// setting that changes the output, and it changes nothing.
+func validateGeneratedFrom(from *GeneratedFrom) []diag.Diagnostic {
+	if from == nil {
+		return nil
+	}
+	var diags []diag.Diagnostic
+	if strings.TrimSpace(from.Service) == "" {
+		diags = append(diags, diag.Errorf("required-field", "generatedFrom.service",
+			"generatedFrom.service is required: the x-putnami-client service id the provider's committed contract declares"))
+	}
+	switch from.Language {
+	case GeneratedLanguageGo:
+		if from.PackageName != "" && !goIdentifier.MatchString(from.PackageName) {
+			diags = append(diags, diag.Errorf("invalid-value", "generatedFrom.packageName",
+				"generatedFrom.packageName %q is not a Go package name", from.PackageName))
+		}
+		if from.ClientName != "" && !goIdentifier.MatchString(from.ClientName) {
+			diags = append(diags, diag.Errorf("invalid-value", "generatedFrom.clientName",
+				"generatedFrom.clientName %q is not a Go identifier", from.ClientName))
+		}
+		for i, op := range from.OmitOperations {
+			if strings.TrimSpace(op) == "" {
+				diags = append(diags, diag.Errorf("invalid-value", fmt.Sprintf("generatedFrom.omitOperations[%d]", i),
+					"generatedFrom.omitOperations[%d] is blank; name an operation id", i))
+			}
+		}
+	case GeneratedLanguageTypeScript:
+		for _, option := range []struct {
+			field string
+			set   bool
+		}{
+			{"clientName", from.ClientName != ""},
+			{"omitOperations", len(from.OmitOperations) > 0},
+			{"packageName", from.PackageName != ""},
+		} {
+			if option.set {
+				diags = append(diags, diag.Errorf("invalid-value", "generatedFrom."+option.field,
+					"generatedFrom.%s is a Go option; a ts client takes its package name from its package.json", option.field))
+			}
+		}
+	default:
+		diags = append(diags, diag.Errorf("invalid-value", "generatedFrom.language",
+			"generatedFrom.language is %q; want %q or %q", from.Language, GeneratedLanguageGo, GeneratedLanguageTypeScript))
+	}
+	return diags
+}
+
+var goIdentifier = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 
 // ValidateProjectTaskTuning validates the execution-only `tasks` block.
 //

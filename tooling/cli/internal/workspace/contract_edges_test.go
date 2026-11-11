@@ -6,9 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
-)
 
-const testContractDigest = "1111111111111111111111111111111111111111111111111111111111111111"
+	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
+)
 
 func writeContractFile(t *testing.T, root, rel, body string) {
 	t.Helper()
@@ -21,58 +22,95 @@ func writeContractFile(t *testing.T, root, rel, body string) {
 	}
 }
 
-func clientManifestBody(serviceID, digest string) string {
-	return `{"protocolVersion":1,"generatedBy":"@putnami/clientgen","language":"ts",` +
-		`"service":{"id":"` + serviceID + `","audience":"api://` + serviceID + `"},` +
-		`"contractSha256":"` + digest + `"}`
-}
-
 func contractBody(serviceID string) string {
 	return `{"openapi":"3.1.0","x-putnami-client":{"protocolVersion":1,` +
 		`"service":{"id":"` + serviceID + `","audience":"api://` + serviceID + `"}},"paths":{}}`
 }
 
-// TestResolveContractBindings_ReadsTheCommittedTree pins both ends of the
-// derivation: a client manifest committed at a project's root, and the provider
-// identity the provider's committed contract sidecar declares.
-func TestResolveContractBindings_ReadsTheCommittedTree(t *testing.T) {
+func contractDigest(body string) string {
+	sum := sha256.Sum256([]byte(body))
+	return hex.EncodeToString(sum[:])
+}
+
+// clientProject is a project whose putnami.json declares `generatedFrom`.
+func clientProject(id, path string, from wsproto.GeneratedFrom) *Project {
+	return &Project{ID: id, Name: filepath.Base(path), Path: path, Config: &wsproto.ProjectConfig{GeneratedFrom: &from}}
+}
+
+// TestResolveContractBindings_ReadsGeneratedFrom pins both ends of the
+// derivation: the `generatedFrom` a client's putnami.json declares, and the
+// provider identity, path and digest the provider's committed contract states.
+func TestResolveContractBindings_ReadsGeneratedFrom(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-client-binds-from-generated-from",
+		"the-binding-reads-generated-from-at-load")
 	root := t.TempDir()
-	writeContractFile(t, root, "services/catalog/schema/openapi.json", contractBody("catalog.items"))
-	writeContractFile(t, root, "clients/ts/client.putnami.json", clientManifestBody("catalog.items", testContractDigest))
+	body := contractBody("catalog.items")
+	writeContractFile(t, root, "services/catalog/schema/openapi.json", body)
 
 	provider := &Project{ID: "/services/catalog", Name: "catalog", Path: "services/catalog"}
-	client := &Project{ID: "/clients/ts", Name: "ts", Path: "clients/ts"}
+	client := clientProject("/clients/go", "clients/go", wsproto.GeneratedFrom{
+		Service: "catalog.items", Language: "go", PackageName: "itemsclient", ClientName: "ItemsClient",
+		OmitOperations: []string{"b", "a", "b"},
+	})
 	projects := []*Project{provider, client}
 
 	resolveContractBindings(root, projects)
 
-	if provider.ContractServiceID != "catalog.items" {
-		t.Errorf("provider ContractServiceID = %q, want catalog.items", provider.ContractServiceID)
+	if provider.ContractServiceID != "catalog.items" ||
+		provider.ContractPath != "services/catalog/schema/openapi.json" ||
+		provider.ContractSHA256 != contractDigest(body) {
+		t.Errorf("provider contract = %q at %q sha256 %q, want catalog.items at services/catalog/schema/openapi.json",
+			provider.ContractServiceID, provider.ContractPath, provider.ContractSHA256)
 	}
-	// The path and digest come from the same read: the digest is the one
-	// clientgen records as contractSha256, over the file's exact bytes.
-	sum := sha256.Sum256([]byte(contractBody("catalog.items")))
-	if provider.ContractPath != "services/catalog/schema/openapi.json" ||
-		provider.ContractSHA256 != hex.EncodeToString(sum[:]) {
-		t.Errorf("provider contract = %q sha256 %q, want services/catalog/schema/openapi.json sha256 %x",
-			provider.ContractPath, provider.ContractSHA256, sum)
+	want := GeneratedClientBinding{
+		ServiceID:      "catalog.items",
+		Language:       "go",
+		Options:        `{"packageName":"itemsclient","clientName":"ItemsClient","omitOperations":["a","b"]}`,
+		ProviderID:     "/services/catalog",
+		ContractPath:   "services/catalog/schema/openapi.json",
+		ContractSHA256: contractDigest(body),
 	}
-	if client.ContractPath != "" || client.ContractSHA256 != "" {
-		t.Errorf("client contract = %q sha256 %q, want none: it commits no contract", client.ContractPath, client.ContractSHA256)
+	if client.GeneratedClient == nil || *client.GeneratedClient != want {
+		t.Errorf("binding = %+v, want %+v", client.GeneratedClient, want)
 	}
-	if client.GeneratedClient == nil {
-		t.Fatal("the committed client manifest produced no binding")
-	}
-	if client.GeneratedClient.ServiceID != "catalog.items" ||
-		client.GeneratedClient.ContractSHA256 != testContractDigest ||
-		client.GeneratedClient.Language != "ts" ||
-		client.GeneratedClient.ManifestPath != "clients/ts/client.putnami.json" {
-		t.Errorf("binding = %+v, want the manifest's own words", client.GeneratedClient)
+	if provider.GeneratedClient != nil {
+		t.Errorf("provider took a binding it does not declare: %+v", provider.GeneratedClient)
 	}
 
 	ws := NewWorkspace(root, nil, projects)
-	if got := ws.Graph.ContractProviderOf("/clients/ts"); got != "/services/catalog" {
+	if got := ws.Graph.ContractProviderOf("/clients/go"); got != "/services/catalog" {
 		t.Errorf("ContractProviderOf = %q, want /services/catalog", got)
+	}
+}
+
+// TestResolveContractBindings_AnUnresolvedServiceFoldsAFixedMarker pins that a
+// service no project declares, and one two projects declare, both bind with
+// the fixed marker and no provider: the key never depends on project order.
+func TestResolveContractBindings_AnUnresolvedServiceFoldsAFixedMarker(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-client-binds-from-generated-from",
+		"an-unresolved-service-folds-a-fixed-marker")
+	root := t.TempDir()
+	writeContractFile(t, root, "services/a/schema/openapi.json", contractBody("shared"))
+	writeContractFile(t, root, "services/b/schema/openapi.json", contractBody("shared"))
+
+	missing := clientProject("/clients/missing", "clients/missing", wsproto.GeneratedFrom{Service: "nobody", Language: "ts"})
+	ambiguous := clientProject("/clients/shared", "clients/shared", wsproto.GeneratedFrom{Service: "shared", Language: "ts"})
+	projects := []*Project{
+		{ID: "/services/a", Name: "a", Path: "services/a"},
+		{ID: "/services/b", Name: "b", Path: "services/b"},
+		missing, ambiguous,
+	}
+
+	resolveContractBindings(root, projects)
+
+	for _, client := range []*Project{missing, ambiguous} {
+		binding := client.GeneratedClient
+		if binding == nil {
+			t.Fatalf("%s: no binding", client.ID)
+		}
+		if binding.ContractSHA256 != UnresolvedContractDigest || binding.ProviderID != "" || binding.ContractPath != "" {
+			t.Errorf("%s: binding = %+v, want the unresolved marker and no provider", client.ID, binding)
+		}
 	}
 }
 
@@ -83,10 +121,9 @@ func TestResolveContractBindings_ReadsTheCommittedTree(t *testing.T) {
 func TestResolveContractBindings_IgnoresTheBuiltTree(t *testing.T) {
 	root := t.TempDir()
 	writeContractFile(t, root, "services/catalog/.gen/schema/openapi.json", contractBody("catalog.items"))
-	writeContractFile(t, root, "clients/ts/client.putnami.json", clientManifestBody("catalog.items", testContractDigest))
 
 	provider := &Project{ID: "/services/catalog", Name: "catalog", Path: "services/catalog"}
-	client := &Project{ID: "/clients/ts", Name: "ts", Path: "clients/ts"}
+	client := clientProject("/clients/ts", "clients/ts", wsproto.GeneratedFrom{Service: "catalog.items", Language: "ts"})
 	projects := []*Project{provider, client}
 
 	resolveContractBindings(root, projects)
@@ -101,26 +138,9 @@ func TestResolveContractBindings_IgnoresTheBuiltTree(t *testing.T) {
 	}
 }
 
-// TestResolveContractBindings_ReadsTheManifestAtTheProjectRootOnly pins that a
-// manifest deeper in the tree is another project's binding. A provider that
-// generates into its own tree is not a client of itself.
-func TestResolveContractBindings_ReadsTheManifestAtTheProjectRootOnly(t *testing.T) {
-	root := t.TempDir()
-	writeContractFile(t, root, "services/catalog/schema/openapi.json", contractBody("catalog.items"))
-	writeContractFile(t, root, "services/catalog/clients/ts/client.putnami.json",
-		clientManifestBody("catalog.items", testContractDigest))
-
-	provider := &Project{ID: "/services/catalog", Name: "catalog", Path: "services/catalog"}
-	resolveContractBindings(root, []*Project{provider})
-
-	if provider.GeneratedClient != nil {
-		t.Errorf("provider took a nested manifest as its own binding: %+v", provider.GeneratedClient)
-	}
-}
-
 // TestCheckedInGeneratedClientsCarryAContractEdge is this repository's own
-// inventory of the relation: every project that commits a generated client
-// manifest resolves to the provider its manifest names, on the checked-in
+// inventory of the relation: every project whose putnami.json declares
+// `generatedFrom` resolves to the provider its service names, on the checked-in
 // workspace rather than a fixture. The cross-language samples are the ones that
 // have it — a Go client of a TypeScript provider, a TypeScript client of a Go
 // provider — and neither language's module graph can express it.
@@ -146,24 +166,25 @@ func TestCheckedInGeneratedClientsCarryAContractEdge(t *testing.T) {
 	}
 	for clientID, providerID := range got {
 		if providerID == "" {
-			t.Errorf("%s commits a generated client manifest whose service no provider declares", clientID)
+			t.Errorf("%s declares a generatedFrom service no provider declares", clientID)
 			continue
 		}
-		// The loader's digest of the provider's committed contract is the
-		// digest clientgen recorded when it generated the client, byte for
-		// byte: the trace names the same value a regenerated manifest states.
+		// The binding folds the loader's digest of the provider's committed
+		// contract, the value every key of the client asks for.
 		provider := ws.ProjectByID(providerID)
 		client := ws.ProjectByID(clientID)
-		if provider.ContractSHA256 != client.GeneratedClient.ContractSHA256 {
-			t.Errorf("%s records contractSha256 %s, but %s's committed contract %s hashes to %s",
-				clientID, client.GeneratedClient.ContractSHA256, providerID, provider.ContractPath, provider.ContractSHA256)
+		if provider.ContractSHA256 != client.GeneratedClient.ContractSHA256 ||
+			provider.ContractPath != client.GeneratedClient.ContractPath {
+			t.Errorf("%s binds %s at %s, but %s's committed contract %s hashes to %s", clientID,
+				client.GeneratedClient.ContractSHA256, client.GeneratedClient.ContractPath,
+				providerID, provider.ContractPath, provider.ContractSHA256)
 		}
 	}
 }
 
 // TestResolveContractBindings_SkipsProviderScanWithoutAClient pins the cost
-// rule: with no committed client manifest anywhere, no contract is read, so a
-// workspace that generates no client pays nothing for the relation.
+// rule: with no `generatedFrom` anywhere, no contract is read, so a workspace
+// that generates no client pays nothing for the relation.
 func TestResolveContractBindings_SkipsProviderScanWithoutAClient(t *testing.T) {
 	root := t.TempDir()
 	writeContractFile(t, root, "services/catalog/schema/openapi.json", contractBody("catalog.items"))
@@ -184,14 +205,68 @@ func TestResolveContractBindings_SkipsProviderScanWithoutAClient(t *testing.T) {
 func TestResolveContractBindings_AContractWithoutAServiceIsNoContract(t *testing.T) {
 	root := t.TempDir()
 	writeContractFile(t, root, "services/catalog/schema/openapi.json", `{"openapi":"3.1.0","paths":{}}`)
-	writeContractFile(t, root, "clients/ts/client.putnami.json", clientManifestBody("catalog.items", testContractDigest))
 
 	provider := &Project{ID: "/services/catalog", Name: "catalog", Path: "services/catalog"}
-	client := &Project{ID: "/clients/ts", Name: "ts", Path: "clients/ts"}
+	client := clientProject("/clients/ts", "clients/ts", wsproto.GeneratedFrom{Service: "catalog.items", Language: "ts"})
 	resolveContractBindings(root, []*Project{provider, client})
 
 	if provider.ContractServiceID != "" || provider.ContractPath != "" || provider.ContractSHA256 != "" {
 		t.Errorf("contract = %q at %q (sha256 %q), want none for an unmarked document",
 			provider.ContractServiceID, provider.ContractPath, provider.ContractSHA256)
+	}
+}
+
+// loadClientWorkspace writes a provider that commits a contract and source, a
+// client of it with the given generatedFrom members, and loads the workspace.
+func loadClientWorkspace(t *testing.T, root, contract, source, generatedFrom string) *Workspace {
+	t.Helper()
+	writeFileAt(t, filepath.Join(root, "putnami.workspace.json"), `{"includes":["services/catalog","clients/ts"]}`)
+	writeFileAt(t, filepath.Join(root, "services", "catalog", "putnami.json"), `{"name":"catalog"}`)
+	writeContractFile(t, root, "services/catalog/schema/openapi.json", contract)
+	writeFileAt(t, filepath.Join(root, "services", "catalog", "src", "main.ts"), source)
+	writeFileAt(t, filepath.Join(root, "clients", "ts", "putnami.json"),
+		`{"name":"catalog-client","generatedFrom":{`+generatedFrom+`}}`)
+	InvalidateLoadCache(root)
+	t.Cleanup(func() { InvalidateLoadCache(root) })
+	ws, err := Load(root)
+	if err != nil {
+		t.Fatalf("load workspace: %v", err)
+	}
+	return ws
+}
+
+// TestMetadataDigest_TheClientFoldsItsProvidersLoadTimeContract pins the
+// client's provider-side identity at load: an edit to the provider's committed
+// contract moves the client's digest, an edit to the provider's implementation
+// does not, and a generation option moves it as the contract does.
+func TestMetadataDigest_TheClientFoldsItsProvidersLoadTimeContract(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-client-binds-from-generated-from",
+		"the-identity-folds-the-providers-load-time-contract-digest")
+	spectest.Proves(t, "cli/workspace-discovery-selection", "a-client-binds-from-generated-from",
+		"an-implementation-change-keeps-every-client-key")
+	const from = `"service":"catalog.items","language":"ts"`
+	clientDigest := func(ws *Workspace) string {
+		t.Helper()
+		client := ws.ProjectByID("/clients/ts")
+		if client == nil || client.GeneratedClient == nil {
+			t.Fatalf("the client did not bind: %+v", client)
+		}
+		return ws.MetadataDigestFor(client)
+	}
+
+	root := t.TempDir()
+	base := clientDigest(loadClientWorkspace(t, root, contractBody("catalog.items"), "export {}\n", from))
+
+	if got := clientDigest(loadClientWorkspace(t, root, contractBody("catalog.items"), "export const x = 1\n", from)); got != base {
+		t.Errorf("a provider implementation change moved the client digest from %s to %s", base, got)
+	}
+	moved := `{"openapi":"3.1.0","x-putnami-client":{"protocolVersion":1,` +
+		`"service":{"id":"catalog.items","audience":"api://catalog.items"}},"paths":{"/items":{}}}`
+	if got := clientDigest(loadClientWorkspace(t, root, moved, "export {}\n", from)); got == base {
+		t.Errorf("a contract change left the client digest at %s", base)
+	}
+	optioned := from + `,"packageName":"items"`
+	if got := clientDigest(loadClientWorkspace(t, root, contractBody("catalog.items"), "export {}\n", optioned)); got == base {
+		t.Errorf("a generation option change left the client digest at %s", base)
 	}
 }

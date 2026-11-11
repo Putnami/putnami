@@ -28,6 +28,13 @@ func visibilityFixture(t *testing.T, mode string, libsVisibility string, extraIn
 
 func loadVisibilityFixture(t *testing.T, root, mode, libsVisibility string, extraIncludes ...string) *Workspace {
 	t.Helper()
+	return loadVisibilityFixtureWithCore(t, root, mode, libsVisibility, "", extraIncludes...)
+}
+
+// loadVisibilityFixtureWithCore loads the fixture with coreMembers, a list of
+// JSON members, appended to libs/core's putnami.json.
+func loadVisibilityFixtureWithCore(t *testing.T, root, mode, libsVisibility, coreMembers string, extraIncludes ...string) *Workspace {
+	t.Helper()
 	options := ""
 	if mode != "" {
 		options = `,"options":{"workspace":{"visibility":"` + mode + `"}}`
@@ -46,7 +53,7 @@ func loadVisibilityFixture(t *testing.T, root, mode, libsVisibility string, extr
 		visibility = `,"visibility":"` + libsVisibility + `"`
 	}
 	writeFileAt(t, filepath.Join(root, "libs", "core", "putnami.json"),
-		`{"name":"acme/core"`+visibility+`}`)
+		`{"name":"acme/core"`+visibility+coreMembers+`}`)
 	writeFileAt(t, filepath.Join(root, "libs", "core", "go.mod"), "module acme/core\n\ngo 1.25\n")
 	writeFileAt(t, filepath.Join(root, "apps", "api", "putnami.json"), `{"name":"acme/api"}`)
 	writeFileAt(t, filepath.Join(root, "apps", "api", "go.mod"),
@@ -124,10 +131,10 @@ func TestSynchronizeAcceptsACrossScopeImportOfAGeneratedClient(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "import-visibility-check", "the-check-runs-on-the-synchronized-graph")
 	root := t.TempDir()
 	// libs/core is a generated client of the service libs/svc commits.
-	writeContractFile(t, root, "libs/core/client.putnami.json", clientManifestBody("acme.svc", testContractDigest))
 	writeContractFile(t, root, "libs/svc/schema/openapi.json", contractBody("acme.svc"))
 	writeFileAt(t, filepath.Join(root, "libs", "svc", "putnami.json"), `{"name":"acme/svc"}`)
-	ws := loadVisibilityFixture(t, root, "", "", "libs/svc")
+	ws := loadVisibilityFixtureWithCore(t, root, "", "",
+		`,"generatedFrom":{"service":"acme.svc","language":"go"}`, "libs/svc")
 
 	outcome, err := Synchronize(SyncRequest{
 		Workspace: ws, Providers: visibilityProvider(t), Reason: wsproto.ProbeReasonLoad,

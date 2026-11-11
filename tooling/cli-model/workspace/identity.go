@@ -104,13 +104,13 @@ func ProbePathOf(projectPath string) string {
 //     answer can depend on them and a key that ignored them would serve a stale
 //     hit after a `bin`/`exports` edit. Canonicalization is what keeps a provider's own
 //     re-ordering of its JSON object keys from moving the key.
-//   - For a generated client target, its CONTRACT BINDING: the service it was
-//     generated from and the digest of the contract bytes it was generated at.
-//     That digest is the target's whole provider-side identity — the contract
-//     edge is an ordering relation and carries no upstream key — so without it
-//     a moved contract would leave every key of the client where it was. A
-//     project with no committed client manifest folds nothing here and keeps
-//     the digest it had.
+//   - For a generated client, its CONTRACT BINDING: the service, language and
+//     options its `generatedFrom` names, and the digest of its provider's
+//     committed contract as the workspace loaded it. That digest is the
+//     client's whole provider-side identity — the contract edge carries no
+//     upstream key — so without it a moved contract would leave every key of
+//     the client where it was. A project with no `generatedFrom` folds
+//     nothing here and keeps the digest it had.
 //
 // Deterministic by construction: every input is sorted or canonically encoded,
 // and none carries a timestamp, an absolute path, or a stat value.
@@ -158,6 +158,7 @@ func ProjectMetadataDigest(
 		writeIdentityField(h, contract.ServiceID)
 		writeIdentityField(h, contract.ContractSHA256)
 		writeIdentityField(h, contract.Language)
+		writeIdentityField(h, contract.Options)
 	}
 	return identityDigestFormat + ":" + hex.EncodeToString(h.Sum(nil))
 }

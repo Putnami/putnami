@@ -71,10 +71,10 @@ func declaredEdgeFixture(t *testing.T) *Workspace {
 		Config:            &wsproto.ProjectConfig{Name: "acme/catalog-client", Dependencies: []string{"acme/catalog"}},
 		Dependencies:      []string{"acme/catalog"},
 		DependencySources: map[string]wsproto.DependencySource{"acme/catalog": wsproto.DependencySourceDeclared},
-		GeneratedClient:   &GeneratedClientBinding{ServiceID: "catalog", ManifestPath: "clients/catalog-go/client.putnami.json"}}
-	// Class 4: a committed client manifest no provider answers to.
+		GeneratedClient:   &GeneratedClientBinding{ServiceID: "catalog"}}
+	// Class 4: a generatedFrom no provider answers to.
 	orphan := &Project{ID: "/clients/orders-go", Name: "acme/orders-client", Path: "clients/orders-go",
-		GeneratedClient: &GeneratedClientBinding{ServiceID: "orders", ManifestPath: "clients/orders-go/client.putnami.json"}}
+		GeneratedClient: &GeneratedClientBinding{ServiceID: "orders"}}
 
 	return NewWorkspace(root, nil, []*Project{
 		core, kit, catalog, api, worker, ui, tool, reader, delegated, unattributed, client, orphan})
@@ -112,7 +112,7 @@ func TestEveryDeclarationWithoutAnImportIsReported(t *testing.T) {
 		t.Errorf("TypeScript manifest class = %+v", packageJSON)
 	}
 	orphan := findingFor(t, findings, "acme/orders-client")
-	if orphan.Class != DeclaredEdgeOrphanClient || orphan.File != "clients/orders-go/client.putnami.json" {
+	if orphan.Class != DeclaredEdgeOrphanClient || orphan.File != "clients/orders-go/putnami.json" {
 		t.Errorf("orphan manifest class = %+v", orphan)
 	}
 	if orphan.Target != "" {

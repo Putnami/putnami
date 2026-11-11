@@ -3,26 +3,28 @@ package workspace
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
+	"sort"
 
 	clientcontract "go.putnami.dev/protocol/clientcontract"
 	wsproto "go.putnami.dev/protocol/workspace"
 )
 
-// The contract edge: a generated client target and the provider whose contract
-// it was generated from.
+// The contract edge: a generated client and the provider whose contract it is
+// generated from.
 //
-// Both ends are COMMITTED Putnami artifacts, never a built one. A generated
-// target commits `client.putnami.json` at its root and a provider commits its
-// OpenAPI contract at `schema/openapi.json`; whatever a build last wrote under
-// `.gen` describes some other run's tree, so reading it would make the graph
-// disagree between a cold clone and a warm checkout. Every project this
-// resolves reads two committed files at most, and nothing is read at all in a
-// workspace that commits no generated client.
+// Both ends are COMMITTED files, never a built one. A client names its
+// provider's service in the `generatedFrom` member of its putnami.json, and a
+// provider commits its OpenAPI contract at `schema/openapi.json`; whatever a
+// build last wrote under `.gen` describes some other run's tree, so reading it
+// would make the graph disagree between a cold clone and a warm checkout.
+// Nothing beyond putnami.json is read in a workspace that declares no client.
 //
-// This is core reading a PROTOCOL artifact, not a language manifest: the two
-// files are defined by `protocols/clientcontract` and decoded by it, the way
+// The contract is core reading a PROTOCOL artifact, not a language manifest:
+// it is defined by `protocols/clientcontract` and decoded by it, the way
 // `putnami.json` is defined by `protocols/workspace`. No language adapter can
 // answer this edge, because a client and its provider are routinely written in
 // different languages and neither module graph contains the other.
@@ -30,26 +32,26 @@ import (
 // committedContractFile is the provider's contract sidecar, project-relative.
 const committedContractFile = "schema/openapi.json"
 
-// resolveContractBindings fills each project's generated-client binding and
-// contract service identity from the committed tree, with the path and digest
-// of the contract that declares the identity.
+// resolveContractBindings fills each project's contract service identity from
+// its committed contract, and each client's binding from its `generatedFrom`,
+// resolved against those identities.
 //
-// The provider scan is skipped entirely when no project commits a client
-// manifest: with no client to place, a service identity answers no question,
-// and a workspace of hundreds of providers pays nothing for a relation it does
-// not use.
+// The provider scan is skipped entirely when no project declares a client: with
+// no client to bind, a service identity answers no question, and a workspace of
+// hundreds of providers pays nothing for a relation it does not use.
 func resolveContractBindings(root string, projects []*Project) {
 	clients := false
 	for _, project := range projects {
 		if project == nil {
 			continue
 		}
-		project.GeneratedClient = readGeneratedClientBinding(root, project)
-		clients = clients || project.GeneratedClient != nil
+		project.GeneratedClient = nil
+		clients = clients || generatedFromOf(project) != nil
 	}
 	if !clients {
 		return
 	}
+	providers := map[string][]*Project{}
 	for _, project := range projects {
 		if project == nil {
 			continue
@@ -58,29 +60,66 @@ func resolveContractBindings(root string, projects []*Project) {
 		project.ContractServiceID = contract.serviceID
 		project.ContractPath = contract.path
 		project.ContractSHA256 = contract.sha256
+		if contract.serviceID != "" {
+			providers[contract.serviceID] = append(providers[contract.serviceID], project)
+		}
+	}
+	for _, project := range projects {
+		if project == nil {
+			continue
+		}
+		if from := generatedFromOf(project); from != nil {
+			project.GeneratedClient = bindGeneratedClient(from, providers[from.Service])
+		}
 	}
 }
 
-// readGeneratedClientBinding reads the generated client manifest committed at a
-// project's own root. A manifest deeper in the tree belongs to another project
-// — the one whose root holds it — and is that project's binding, not this
-// one's.
-func readGeneratedClientBinding(root string, project *Project) *GeneratedClientBinding {
-	rel := projectRelativePath(project, clientcontract.GeneratedManifestFile)
-	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(rel)))
-	if err != nil {
+// generatedFromOf returns the `generatedFrom` member a project declares, or nil.
+func generatedFromOf(project *Project) *wsproto.GeneratedFrom {
+	if project.Config == nil || project.Config.GeneratedFrom == nil {
 		return nil
 	}
-	reference, ok := clientcontract.DecodeGeneratedClientReference(data)
-	if !ok {
+	if project.Config.GeneratedFrom.Service == "" {
 		return nil
 	}
-	return &GeneratedClientBinding{
-		ServiceID:      reference.ServiceID,
-		ContractSHA256: reference.ContractSHA256,
-		Language:       string(reference.Language),
-		ManifestPath:   rel,
+	return project.Config.GeneratedFrom
+}
+
+// bindGeneratedClient builds a client's binding from its `generatedFrom` and
+// the projects whose committed contract declares its service. Exactly one
+// provider resolves the binding; none or several leave it unresolved, with the
+// fixed UnresolvedContractDigest, so the key does not depend on which of
+// several ambiguous providers was read.
+func bindGeneratedClient(from *wsproto.GeneratedFrom, providers []*Project) *GeneratedClientBinding {
+	binding := &GeneratedClientBinding{
+		ServiceID:      from.Service,
+		Language:       from.Language,
+		Options:        canonicalGenerationOptions(from),
+		ContractSHA256: UnresolvedContractDigest,
 	}
+	if len(providers) == 1 {
+		provider := providers[0]
+		binding.ProviderID = provider.ID
+		binding.ContractPath = provider.ContractPath
+		binding.ContractSHA256 = provider.ContractSHA256
+	}
+	return binding
+}
+
+// canonicalGenerationOptions encodes the options that decide emitted bytes
+// besides the contract: the Go package and client names, and the omitted
+// operations, sorted and deduplicated so their order in putnami.json moves no
+// key. Encoding a struct of strings and a string slice cannot fail.
+func canonicalGenerationOptions(from *wsproto.GeneratedFrom) string {
+	omitted := append([]string(nil), from.OmitOperations...)
+	sort.Strings(omitted)
+	omitted = slices.Compact(omitted)
+	data, _ := json.Marshal(struct {
+		PackageName    string   `json:"packageName,omitempty"`
+		ClientName     string   `json:"clientName,omitempty"`
+		OmitOperations []string `json:"omitOperations,omitempty"`
+	}{from.PackageName, from.ClientName, omitted})
+	return string(data)
 }
 
 // committedContract is a provider's committed contract: the service identity

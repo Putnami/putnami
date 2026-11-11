@@ -39,8 +39,12 @@ type Project = model.Project
 // ScopeContribution is what the breadcrumb chain contributes to a project.
 type ScopeContribution = model.ScopeContribution
 
-// GeneratedClientBinding is a generated client target's end of a contract edge.
+// GeneratedClientBinding is a generated client's end of a contract edge.
 type GeneratedClientBinding = model.GeneratedClientBinding
+
+// UnresolvedContractDigest is the digest a client folds when no single provider
+// declares its service.
+const UnresolvedContractDigest = model.UnresolvedContractDigest
 
 // VisibilityViolation is one import edge a project's declared boundary refuses.
 type VisibilityViolation = model.VisibilityViolation

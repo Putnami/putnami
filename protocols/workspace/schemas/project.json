@@ -201,9 +201,53 @@
         { "required": ["dependents"] },
         { "required": ["provider"] }
       ]
+    },
+    "generatedFrom": {
+      "$ref": "#/definitions/generatedFrom"
     }
   },
   "definitions": {
+    "generatedFrom": {
+      "type": "object",
+      "description": "Makes this project a generated client and names the provider it is generated from. The client generates itself from the provider's committed schema/openapi.json.",
+      "additionalProperties": false,
+      "required": [
+        "service",
+        "language"
+      ],
+      "properties": {
+        "service": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The provider's x-putnami-client service id, as its committed schema/openapi.json declares it."
+        },
+        "language": {
+          "enum": [
+            "go",
+            "ts"
+          ],
+          "description": "The emitted language."
+        },
+        "packageName": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "Go only: the package name of the generated file. The import path is the client's own go.mod module."
+        },
+        "clientName": {
+          "type": "string",
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "description": "Go only: the client type name."
+        },
+        "omitOperations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "Go only: provider operation ids the client leaves out."
+        }
+      }
+    },
     "taskTuning": {
       "type": "object",
       "description": "Execution tuning for one task in this project.",

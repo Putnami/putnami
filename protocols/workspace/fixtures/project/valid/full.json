@@ -19,5 +19,12 @@
     "lint": { "cpuWeight": 4 },
     "lint~golangci-lint": { "timeoutMs": 900000 }
   },
-  "disable": { "jobs": ["serve"] }
+  "disable": { "jobs": ["serve"] },
+  "generatedFrom": {
+    "service": "items",
+    "language": "go",
+    "packageName": "itemsclient",
+    "clientName": "ItemsClient",
+    "omitOperations": ["deleteItem"]
+  }
 }

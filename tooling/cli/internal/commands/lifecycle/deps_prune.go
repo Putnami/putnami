@@ -228,7 +228,7 @@ func pruneVerb(route pruneRoute) string {
 func pruneSummary(entry routedFinding) string {
 	finding := entry.finding
 	if finding.Class == workspace.DeclaredEdgeOrphanClient {
-		return fmt.Sprintf("%s [%s] service %q — delete %s",
+		return fmt.Sprintf("%s [%s] service %q — remove generatedFrom from %s",
 			finding.ProjectName, finding.Class, finding.Entry, finding.File)
 	}
 	summary := fmt.Sprintf("%s → %s [%s] in %s",

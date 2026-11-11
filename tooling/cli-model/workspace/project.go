@@ -64,9 +64,9 @@ type Project struct {
 	Metadata map[string]json.RawMessage
 
 	// GeneratedClient is this project's end of a contract edge, read from the
-	// generated client manifest committed at its root. Non-nil exactly for a
-	// project that IS a generated client target. BuildGraph resolves its
-	// ServiceID against the providers' ContractServiceID to derive the edge.
+	// `generatedFrom` member of its putnami.json. Non-nil exactly for a
+	// project that IS a generated client. BuildGraph resolves its ServiceID
+	// against the providers' ContractServiceID to derive the edge.
 	GeneratedClient *GeneratedClientBinding
 	// ContractServiceID is the provider service identity this project's
 	// COMMITTED contract declares. Empty for a project that commits none, which
@@ -80,9 +80,9 @@ type Project struct {
 	// edge fires only when this file is one of the changed files.
 	ContractPath string
 	// ContractSHA256 is the lowercase hex sha256 of ContractPath's bytes as
-	// the workspace loaded them, the digest a client generated from that
-	// contract records as its contractSha256. It is trace evidence only: no
-	// identity and no cache key reads it.
+	// the workspace loaded them. The identity of every client generated from
+	// this contract folds it (GeneratedClientBinding.ContractSHA256), so a
+	// provider change that leaves its contract alone moves no client key.
 	ContractSHA256 string
 
 	// ActivatedScope is true when this project is a scope (has includes) that
@@ -102,26 +102,37 @@ type Project struct {
 	Scope ScopeContribution
 }
 
-// GeneratedClientBinding is a generated client target's end of a contract
-// edge: the provider service its code was generated from, and the exact
-// contract bytes it was generated at.
+// GeneratedClientBinding is a generated client's end of a contract edge: the
+// provider service it is generated from, as its putnami.json `generatedFrom`
+// names it, and the provider's committed contract as the workspace loaded it.
 //
 // The contract digest is the WHOLE provider-side identity of a generated
-// target. Its provider's sources are read by no action of it, so they never
+// client. Its provider's sources are read by no action of it, so they never
 // reach its cache key; the contract does, and it moves exactly when the
 // generated code has to.
 type GeneratedClientBinding struct {
-	// ServiceID is the provider service identity the manifest names.
+	// ServiceID is the provider service identity `generatedFrom` names.
 	ServiceID string
-	// ContractSHA256 is the digest of the contract bytes the target was
-	// generated at.
-	ContractSHA256 string
-	// Language is the target language the manifest declares ("go", "ts").
+	// Language is the target language `generatedFrom` declares ("go", "ts").
 	Language string
-	// ManifestPath is the committed manifest, workspace-relative and
-	// slash-separated.
-	ManifestPath string
+	// Options is the canonical encoding of the generation options
+	// `generatedFrom` declares, which decide emitted bytes as the contract does.
+	Options string
+	// ProviderID is the project whose committed contract declares ServiceID.
+	// Empty when no project, or more than one, declares it.
+	ProviderID string
+	// ContractPath is the provider's committed contract, workspace-relative and
+	// slash-separated. Empty exactly when ProviderID is.
+	ContractPath string
+	// ContractSHA256 is the provider's ContractSHA256, or
+	// UnresolvedContractDigest when no single provider declares ServiceID.
+	ContractSHA256 string
 }
+
+// UnresolvedContractDigest is the contract digest a client folds when no single
+// provider declares its service. It is fixed, so an unresolved client keeps one
+// key until a provider appears, and its generation fails naming the service.
+const UnresolvedContractDigest = "unresolved"
 
 // ScopeContribution is what the breadcrumb chain contributes to a project.
 type ScopeContribution struct {

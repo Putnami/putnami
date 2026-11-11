@@ -47,7 +47,7 @@ func declaredEdgeWorkspace(t *testing.T) (root string, ws *workspace.Workspace) 
 	orphan := &workspace.Project{
 		ID: "/clients/orders", Name: "acme/orders-client", Path: "clients/orders",
 		GeneratedClient: &workspace.GeneratedClientBinding{
-			ServiceID: "orders", ManifestPath: "clients/orders/client.putnami.json",
+			ServiceID: "orders",
 		},
 	}
 	return root, workspace.NewWorkspace(root, nil, []*workspace.Project{core, kept, tool, orphan})
@@ -75,8 +75,8 @@ func TestDepsPruneDryRunListsEveryClassAndChangesNothing(t *testing.T) {
 	if !strings.Contains(listing, "prune acme/tool → acme/core") {
 		t.Errorf("dry run did not list the putnami.json entry: %q", listing)
 	}
-	if !strings.Contains(listing, "keep") || !strings.Contains(listing, "client.putnami.json") {
-		t.Errorf("dry run did not list the orphan manifest as kept: %q", listing)
+	if !strings.Contains(listing, "keep") || !strings.Contains(listing, "remove generatedFrom from clients/orders/putnami.json") {
+		t.Errorf("dry run did not list the orphan generatedFrom as kept: %q", listing)
 	}
 	if strings.Contains(listing, "acme/kept") {
 		t.Errorf("dry run listed an edge a real import backs: %q", listing)
@@ -96,9 +96,9 @@ func TestDepsPruneRemovesTheDeclaredEntryAndRefusesTheOrphanManifest(t *testing.
 	var out bytes.Buffer
 	err := prunePlan(context.Background(), root, ws, nil, "", false, &out, LifecycleEnv{})
 	if err == nil {
-		t.Fatal("prune reported success while an orphan client manifest was left behind")
+		t.Fatal("prune reported success while an orphan generatedFrom was left behind")
 	}
-	if !strings.Contains(err.Error(), "clients/orders/client.putnami.json") {
+	if !strings.Contains(err.Error(), "clients/orders/putnami.json") {
 		t.Errorf("the refusal does not name the file to delete: %v", err)
 	}
 

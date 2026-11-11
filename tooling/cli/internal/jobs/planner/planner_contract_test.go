@@ -56,7 +56,6 @@ func contractPlan(t *testing.T, providerDependsOnClient bool) []*jobmodel.Schedu
 			ServiceID:      "catalog.items",
 			ContractSHA256: "1111111111111111111111111111111111111111111111111111111111111111",
 			Language:       "ts",
-			ManifestPath:   "clients/catalog/client.putnami.json",
 		},
 	}
 	projects := []*workspace.Project{provider, client}
@@ -218,7 +217,6 @@ func clientTreePlan(t *testing.T, fixture clientTreeFixture) []*jobmodel.Schedul
 			ServiceID:      "catalog.items",
 			ContractSHA256: "1111111111111111111111111111111111111111111111111111111111111111",
 			Language:       "ts",
-			ManifestPath:   fixture.clientPath + "/client.putnami.json",
 		},
 	}
 	consumer := &workspace.Project{

@@ -154,7 +154,6 @@ func TestVisibilityViolationsAllowsAContractEdgeAcrossScopes(t *testing.T) {
 		ServiceID:      "catalog.items",
 		ContractSHA256: "2222222222222222222222222222222222222222222222222222222222222222",
 		Language:       "go",
-		ManifestPath:   "tooling/clients/catalog/client.putnami.json",
 	}
 	ws := NewWorkspace("/ws", nil, []*Project{provider, client})
 
@@ -198,7 +197,6 @@ func clientWorkspace(visibility wsproto.Visibility, withProvider bool) *Workspac
 		ServiceID:      "identity.api",
 		ContractSHA256: "3333333333333333333333333333333333333333333333333333333333333333",
 		Language:       "go",
-		ManifestPath:   "identity/api/clients/go/client.putnami.json",
 	}
 	provider := scoped("/identity/api", "identity-api", "identity/api", "identity/putnami.json")
 	if withProvider {

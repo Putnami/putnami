@@ -847,7 +847,7 @@ Four classes, one per file a phantom lives in:
 |---|---|---|
 | `putnami-json` | a `dependencies` entry of the project's own `putnami.json` | `putnami deps prune` rewrites the file |
 | `manifest` | the project's own language manifest states the edge and its sources do not read it: a `require` or `replace` of a workspace module no `.go` file imports, a `workspace:` dependency (or a `putnami.dependencies` entry) no source file imports | `putnami deps prune` hands it to the `deps-edit` job of the project's extension, which for a Go module drops the requirement and tidies the module; a project with no such job is reported with the manifest its workspace provider read the project from — remove the dependency there and run `putnami deps install` |
-| `client-manifest` | a committed `client.putnami.json` whose `service.id` no provider declares any more | reported; delete the generated target, or restore the provider's contract |
+| `generated-from` | a `putnami.json` `generatedFrom` whose service no single provider declares | reported; remove `generatedFrom` (or the client project), or restore the provider's contract |
 
 An edge is also backed — and never reported — when the dependent declares a
 file input that reads inside the dependency: `options.<layer>.filePatterns`,

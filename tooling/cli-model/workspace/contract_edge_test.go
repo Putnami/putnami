@@ -24,7 +24,6 @@ func contractWorkspace(contractDigest string) *Workspace {
 				ServiceID:      "catalog.items",
 				ContractSHA256: contractDigest,
 				Language:       "ts",
-				ManifestPath:   "clients/catalog-ts/client.putnami.json",
 			},
 		},
 		{
