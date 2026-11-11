@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"golang.org/x/mod/modfile"
+	"golang.org/x/mod/semver"
 
 	"go.putnami.dev/go/extension/internal/parse"
 	"go.putnami.dev/go/extension/internal/platform"
@@ -181,14 +182,30 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 					if len(restored) > 0 {
 						emit.Log("debug", "failed go mod tidy had written "+strings.Join(restored, ", ")+"; restored pre-tidy content")
 					}
-				} else if added := tidyAddedWorkspaceRequirements(snap, ctx.Project.FullPath, toolchain.WorkspaceGoModules(ctx.WorkspaceRoot)); len(added) > 0 {
-					// A successful tidy that grew the committed require set is a
-					// drift the release-set plan cannot see: the probe derived the
-					// member's dependencies from the go.mod that was checked in,
-					// so `package~go` refuses a module whose tidied go.mod names
-					// a workspace module the plan does not. Say so here, at the
-					// step that made the change, not at publish time.
-					emit.Diagnostic("warning", tidyDriftMessage(ctx.Project.FullPath, added), "go.mod", 0)
+				} else {
+					if added := tidyAddedWorkspaceRequirements(snap, ctx.Project.FullPath, toolchain.WorkspaceGoModules(ctx.WorkspaceRoot)); len(added) > 0 {
+						// A successful tidy that grew the committed require set is a
+						// drift the release-set plan cannot see: the probe derived the
+						// member's dependencies from the go.mod that was checked in,
+						// so `package~go` refuses a module whose tidied go.mod names
+						// a workspace module the plan does not. Say so here, at the
+						// step that made the change, not at publish time.
+						emit.Diagnostic("warning", tidyDriftMessage(ctx.Project.FullPath, added), "go.mod", 0)
+					}
+					// A tidy that looked up a package or raised a requirement
+					// picked a version from what the module proxy publishes, not
+					// from the tree: the same tree tidies differently once a new
+					// release appears. Such an outcome must not answer a later
+					// run from the cache, so it ends as the uncacheable SKIP a
+					// failed tidy ends as. Its output is kept: it is what the
+					// diagnostic tells the developer to commit.
+					lookups := tidyPackageLookups(tidyOut.String())
+					raised := tidyRaisedRequirements(snap, ctx.Project.FullPath)
+					if len(lookups) > 0 || len(raised) > 0 {
+						emit.Diagnostic("warning", tidyProxyResolutionMessage(ctx.Project.FullPath, lookups, raised), "go.mod", 0)
+						tidyResult = "SKIP"
+						tidyPhaseStatus = "skipped"
+					}
 				}
 			}
 			emit.PhaseEnd("setup", tidyPhaseStatus)
@@ -882,6 +899,126 @@ func tidyDriftMessage(projectDir string, added []string) string {
 	}
 	return fmt.Sprintf("go mod tidy added workspace requirement(s) [%s] to %s: commit go.mod and run `putnami projects sync`, or the release-set plan built from the committed tree will not carry them and `package~go` refuses the module",
 		strings.Join(added, ", "), module)
+}
+
+// tidyLookup is one package `go mod tidy` had to find a module for, because no
+// module go.mod requires provides it at the required version. Module and
+// Version are what tidy picked, empty when its output did not say.
+type tidyLookup struct {
+	Package string
+	Module  string
+	Version string
+}
+
+// tidyRaise is one requirement go.mod already named that `go mod tidy` moved
+// to a higher version.
+type tidyRaise struct {
+	Module string
+	From   string
+	To     string
+}
+
+// tidyPackageLookups reads the packages a `go mod tidy` looked up from its
+// output: each `go: finding module for package <pkg>` line, with the module and
+// version of the matching `go: found <pkg> in <module> <version>` line. Such a
+// lookup is a version query against the module proxy, so its answer changes
+// when a new release is published. Ordered as tidy printed them, each package
+// once.
+func tidyPackageLookups(output string) []tidyLookup {
+	var lookups []tidyLookup
+	index := map[string]int{}
+	for _, line := range strings.Split(output, "\n") {
+		line = strings.TrimSpace(line)
+		if pkg, ok := strings.CutPrefix(line, "go: finding module for package "); ok {
+			pkg = strings.TrimSpace(pkg)
+			if _, seen := index[pkg]; !seen && pkg != "" {
+				index[pkg] = len(lookups)
+				lookups = append(lookups, tidyLookup{Package: pkg})
+			}
+			continue
+		}
+		rest, ok := strings.CutPrefix(line, "go: found ")
+		if !ok {
+			continue
+		}
+		fields := strings.Fields(rest)
+		if len(fields) != 4 || fields[1] != "in" {
+			continue
+		}
+		pkg := fields[0]
+		i, seen := index[pkg]
+		if !seen {
+			i = len(lookups)
+			index[pkg] = i
+			lookups = append(lookups, tidyLookup{Package: pkg})
+		}
+		lookups[i].Module = fields[2]
+		lookups[i].Version = fields[3]
+	}
+	return lookups
+}
+
+// tidyRaisedRequirements names the requirements of the snapshotted go.mod that
+// a successful `go mod tidy` moved to a higher version, sorted by module. Nil
+// when the snapshot did not observe go.mod, either file fails to parse, or no
+// requirement moved up.
+func tidyRaisedRequirements(snap modSnapshot, dir string) []tidyRaise {
+	before, ok := snap.files["go.mod"]
+	if !ok || !before.exists {
+		return nil
+	}
+	after, err := os.ReadFile(filepath.Join(dir, "go.mod"))
+	if err != nil || bytes.Equal(before.content, after) {
+		return nil
+	}
+	beforeFile, err := modfile.ParseLax("go.mod", before.content, nil)
+	if err != nil {
+		return nil
+	}
+	afterFile, err := modfile.ParseLax("go.mod", after, nil)
+	if err != nil {
+		return nil
+	}
+	required := make(map[string]string, len(beforeFile.Require))
+	for _, require := range beforeFile.Require {
+		required[require.Mod.Path] = require.Mod.Version
+	}
+	var raised []tidyRaise
+	reported := map[string]bool{}
+	for _, require := range afterFile.Require {
+		path := require.Mod.Path
+		from, known := required[path]
+		if !known || reported[path] || semver.Compare(require.Mod.Version, from) <= 0 {
+			continue
+		}
+		reported[path] = true
+		raised = append(raised, tidyRaise{Module: path, From: from, To: require.Mod.Version})
+	}
+	sort.Slice(raised, func(i, j int) bool { return raised[i].Module < raised[j].Module })
+	return raised
+}
+
+// tidyProxyResolutionMessage names what a tidy resolved through the module
+// proxy and the remedy: commit go.mod and go.sum, so the requirement is pinned
+// by the tree and the next tidy looks nothing up.
+func tidyProxyResolutionMessage(projectDir string, lookups []tidyLookup, raised []tidyRaise) string {
+	module := toolchain.GoModModulePath(filepath.Join(projectDir, "go.mod"))
+	if module == "" {
+		module = filepath.Base(projectDir)
+	}
+	var parts []string
+	for _, lookup := range lookups {
+		if lookup.Module == "" {
+			parts = append(parts, "looked up package "+lookup.Package)
+			continue
+		}
+		parts = append(parts, fmt.Sprintf("looked up package %s and picked %s %s", lookup.Package, lookup.Module, lookup.Version))
+	}
+	for _, raise := range raised {
+		parts = append(parts, fmt.Sprintf("raised %s from %s to %s", raise.Module, raise.From, raise.To))
+	}
+	return fmt.Sprintf("go mod tidy for %s %s: the committed go.mod does not pin these versions, so the result depends on what the module proxy publishes and is not cached: commit go.mod and go.sum",
+		module, strings.Join(parts, "; "))
 }
 
 // modFileNames are the module files `go mod tidy` may rewrite. They are also
