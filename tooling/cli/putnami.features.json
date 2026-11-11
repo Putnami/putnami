@@ -1222,7 +1222,8 @@
               "portable-inputs-bind-a-listed-file-and-fail-on-its-deletion",
               "a-failed-answer-fails-the-key",
               "a-failed-selector-fails-the-task-before-execution",
-              "go-embed-selector-selects-changed-and-deleted-targets"
+              "go-embed-selector-selects-changed-and-deleted-targets",
+              "a-selector-reads-nothing-in-a-project-its-extension-cannot-plan"
             ]
           }
         },

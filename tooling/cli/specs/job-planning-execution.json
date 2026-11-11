@@ -183,7 +183,7 @@
     },
     {
       "id": "go-embed-cache-inputs",
-      "text": "A task input that names an input selector keys the exact bytes of every file the extension that lists the selector answers through __putnami input-resolve, so an edit to a listed file moves the key and its dependents' keys and an older entry cannot restore. A failed call, a rejected or error answer, or an unlisted selector fails the task before cache restore or execution; portable admission fails on a deleted listed file. Change impact reads the listed files and the paths the answer's basis selects."
+      "text": "A task input that names an input selector keys the exact bytes of every file the extension that lists the selector answers through __putnami input-resolve, so a listed file edit moves the key and its dependents' keys and an older entry cannot restore. A failed call, a rejected or error answer or an unlisted selector fails the task before restore or execution; portable admission fails on a deleted listed file. Change impact reads them and the answer's basis only where the extension may plan the project."
     },
     {
       "id": "clientgen-key-reads-no-run-written-tree",
