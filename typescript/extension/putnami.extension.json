@@ -244,6 +244,7 @@
           "id": "tsc-auto",
           "task": "build-tsc",
           "dependsOn": [
+            "generate",
             "^tsc",
             "^tsc-auto"
           ],
@@ -258,6 +259,7 @@
           "id": "tsc",
           "task": "build-tsc",
           "dependsOn": [
+            "generate",
             "^tsc",
             "^tsc-auto"
           ],
@@ -443,6 +445,7 @@
           "id": "tsc-auto",
           "task": "build-tsc",
           "dependsOn": [
+            "generate",
             "^tsc",
             "^tsc-auto"
           ],
@@ -457,6 +460,7 @@
           "id": "tsc",
           "task": "build-tsc",
           "dependsOn": [
+            "generate",
             "^tsc",
             "^tsc-auto"
           ],
@@ -1506,7 +1510,11 @@
           "description": "Project-relative .tsbuildinfo, reported when it lies outside the outDir"
         }
       },
+      "writes": [
+        "tsc-output"
+      ],
       "reads": [
+        "gen",
         "sources"
       ],
       "cache": {

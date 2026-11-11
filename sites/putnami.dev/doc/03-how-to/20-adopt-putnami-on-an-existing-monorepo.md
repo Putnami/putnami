@@ -227,9 +227,9 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
   under Putnami's runner and cache. A Vitest or Jest test keeps its runner and
   its configuration, and an ESLint lint target writes
   `options["@putnami/typescript"].lint.linter: "eslint"`, so the project keeps
-  its ESLint configuration. So does a `build` whose script runs `tsc` alone, or
-  whose executor is `@nx/js:tsc` writing inside the project: Putnami compiles
-  it with that `tsc`, into its `outDir`. Every other target, an
+  its ESLint configuration. So does a `build` whose script runs `tsc` alone,
+  or whose executor is `@nx/js:tsc` with no `outputPath`: Putnami compiles it
+  with that `tsc`, into its `outDir`. Every other target, an
   `@nx/webpack:webpack` build, an ESLint with `--max-warnings` or a lint
   chained with `prettier` for example, keeps running through Nx, so no target
   changes the tool that checks it. Move such ESLint arguments to the ESLint

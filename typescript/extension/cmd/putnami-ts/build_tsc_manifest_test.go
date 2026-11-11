@@ -35,6 +35,8 @@ type tscManifest struct {
 			Files []string `json:"files"`
 		} `json:"inputs"`
 		Outputs  map[string]any `json:"outputs"`
+		Writes   []any          `json:"writes"`
+		Reads    []any          `json:"reads"`
 		Declares struct {
 			Outputs map[string]struct {
 				Kind             string `json:"kind"`
@@ -91,6 +93,12 @@ func TestTscStepsArePlannedOnlyForATscProject(t *testing.T) {
 		if explicit.Task != "build-tsc" || explicit.If != "params.compiler == 'tsc'" || explicit.Activation != nil {
 			t.Errorf("%s~tsc = %+v, want build-tsc under tsc with no gate", command, explicit)
 		}
+		// tsc reads what generate writes into the project.
+		for _, step := range []tscManifestStep{auto, explicit} {
+			if !slices.Contains(step.DependsOn, "generate") {
+				t.Errorf("%s~%s depends on %v, want its project's generate", command, step.ID, step.DependsOn)
+			}
+		}
 	}
 	build := steps(m, "build")
 	for _, id := range []string{"transpile", "types"} {
@@ -111,6 +119,11 @@ func TestTscOutputsRestoreWhereDependentsReadThem(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "tsc-output-restores-at-outdir", "a-cache-hit-restores-a-deleted-outdir")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "tsc-output-restores-at-outdir", "a-dependent-builds-after-its-tsc-library")
 	task := readTscManifest(t).Tasks["build-tsc"]
+	// build~tsc and test~tsc of one project write the same outDir: the write
+	// resource runs them one after the other.
+	if !slices.Equal(task.Writes, []any{"tsc-output"}) || !slices.Equal(task.Reads, []any{"gen", "sources"}) {
+		t.Errorf("build-tsc writes %v and reads %v, want tsc-output, and gen and sources", task.Writes, task.Reads)
+	}
 	want := map[string]struct {
 		kind string
 		read bool
