@@ -49,8 +49,10 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    that choose no configuration and no subset of the suite (`vitest run`,
    `--coverage`, `--ci`, `--passWithNoTests` and the like), as an ESLint
    script moves only bare. A `bun build` script moves whatever its
-   arguments: the Bun build chooses its own entry and output, and D-066
-   points the project's dependents at its sources. Turborepo, Rush and moon
+   arguments: the Bun build reads no script argument, takes its entry from
+   `package.json` (`exports`, `bin`, then `main`, which D-066 points at the
+   sources) and writes under Putnami's output, so a script whose entry
+   differs from `main` builds another entry once moved. Turborepo, Rush and moon
    read it; Nx reads it beside its executors.
 3. **A project runs both extensions.** A project that keeps one target on
    the tool names the tool's extension and the language extension in its
@@ -73,17 +75,18 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    (race detection on the changed Go packages, nextest's `ci` profile, which
    the repository defines, the `src` and `tests` paths of phpstan and
    phpunit): `go build` or `go test`;
-   `cargo build`, `cargo nextest` or `cargo llvm-cov nextest`; `pytest` or
-   `ruff`; `rspec` or `rubocop`; `phpunit` or `phpstan`. Since the extension
+   `cargo build`, `cargo nextest` or `cargo llvm-cov nextest`; `pytest`;
+   `rspec` or `rubocop`; `phpunit` or `phpstan`. Since the extension
    drops the task's own arguments, the task moves only with arguments that
    choose the whole project or only change the output, such as `./...`,
-   `-v`, `--locked` or `ruff check .`; one that selects build tags, a
-   release profile, a package or a subset of the suite, such as
-   `go test -tags integration ./...`, `cargo build --release` or
-   `pytest tests/unit`, keeps the task on moon. A Go or Rust lint
+   `-v` or `--locked`; one that selects build tags, a release profile, a
+   package or a subset of the suite, such as
+   `go test -tags integration ./...`, `go test .`, `cargo build --release`
+   or `pytest tests/unit`, keeps the task on moon. A Go, Rust or Python lint
    stays on moon, since the extension's lint checks more than the task did
    (staticcheck and the documentation links beside golangci-lint,
-   `cargo fmt --check` and `-D warnings` beside clippy), and so does a
+   `cargo fmt --check` and `-D warnings` beside clippy, `ruff format
+   --check` beside `ruff check`), and so does a
    `cargo test`, since the Rust extension tests with nextest, which runs no
    doctest.
 6. **D-066 follows the build.** An import rewrites the entry of a project
