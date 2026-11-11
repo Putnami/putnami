@@ -46,10 +46,12 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    the extension SDK), `bun test`, Vitest or Jest for `test`, Biome or a bare
    ESLint for `lint`, with no other command chained. The extension passes
    none of a script's arguments, so a test script moves only with arguments
-   that choose no configuration and no subset of the suite (`run`,
+   that choose no configuration and no subset of the suite (`vitest run`,
    `--coverage`, `--ci`, `--passWithNoTests` and the like), as an ESLint
-   script moves only bare. Turborepo, Rush and moon read it; Nx reads it
-   beside its executors.
+   script moves only bare. A `bun build` script moves whatever its
+   arguments: the Bun build chooses its own entry and output, and D-066
+   points the project's dependents at its sources. Turborepo, Rush and moon
+   read it; Nx reads it beside its executors.
 3. **A project runs both extensions.** A project that keeps one target on
    the tool names the tool's extension and the language extension in its
    `putnami.json`, and `disable.jobs` names the extension that does not run
@@ -72,7 +74,13 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    the repository defines, the `src` and `tests` paths of phpstan and
    phpunit): `go build` or `go test`;
    `cargo build`, `cargo nextest` or `cargo llvm-cov nextest`; `pytest` or
-   `ruff`; `rspec` or `rubocop`; `phpunit` or `phpstan`. A Go or Rust lint
+   `ruff`; `rspec` or `rubocop`; `phpunit` or `phpstan`. Since the extension
+   drops the task's own arguments, the task moves only with arguments that
+   choose the whole project or only change the output, such as `./...`,
+   `-v`, `--locked` or `ruff check .`; one that selects build tags, a
+   release profile, a package or a subset of the suite, such as
+   `go test -tags integration ./...`, `cargo build --release` or
+   `pytest tests/unit`, keeps the task on moon. A Go or Rust lint
    stays on moon, since the extension's lint checks more than the task did
    (staticcheck and the documentation links beside golangci-lint,
    `cargo fmt --check` and `-D warnings` beside clippy), and so does a

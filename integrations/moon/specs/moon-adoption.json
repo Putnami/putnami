@@ -27,7 +27,7 @@
     },
     {
       "id": "import-keeps-the-tool-that-checks-the-code",
-      "text": "In import mode, a moon task moves to the project's language extension only when that extension runs its program, under its own flags: for TypeScript the shared rule, led by the package.json scripts, with the test runner and the ESLint linter recorded; go build or go test; cargo build or nextest; pytest or ruff; rspec or rubocop; phpunit or phpstan. Any other task, a Go or Rust lint and a cargo test included, keeps running through moon run, its project naming @putnami/moon too, and the sync lists it."
+      "text": "In import mode, a moon task moves to its language extension only when that extension runs its program, with no argument it would drop: for TypeScript the shared rule, with the test runner and the ESLint linter recorded; go build or go test; cargo build or nextest; pytest or ruff; rspec or rubocop; phpunit or phpstan. A task with tags, a profile or a subset, a Go or Rust lint and a cargo test keep running through moon run, the project naming @putnami/moon too, and the sync lists them."
     },
     {
       "id": "import-adopts-typescript-conventions",
