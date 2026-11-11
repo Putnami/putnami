@@ -998,7 +998,6 @@ func TestTheSyncJobReadsTheImportParameter(t *testing.T) {
 func TestImportMapsATscBuildTarget(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "a-tsc-alone-build-script-target-is-imported")
 	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "another-tsc-target-stays-on-nx")
-	spectest.Proves(t, feature, "import-maps-a-tsc-build-target", "an-nx-js-tsc-target-stays-on-nx")
 	d := readDemo(t)
 	cases := []struct {
 		name, packageJSON, projectJSON string
@@ -1009,8 +1008,6 @@ func TestImportMapsATscBuildTarget(t *testing.T) {
 		{"tsc --watch script", `{"name": "@demo/pricing", "scripts": {"build": "tsc --watch"}}`, "", false, `not "tsc --watch"`},
 		{"run-commands tsc", `{"name": "@demo/pricing"}`,
 			`{"name": "@demo/pricing", "targets": {"build": {"executor": "nx:run-commands", "options": {"command": "tsc -b"}}}}`, false, "nx:run-commands"},
-		{"@nx/js:tsc", `{"name": "@demo/pricing", "scripts": {"build": "tsc -b"}}`,
-			`{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "options": {"tsConfig": "{projectRoot}/tsconfig.lib.json", "outputPath": "dist/packages/pricing"}}}}`, false, "@nx/js:tsc compiles with rootDir at the project root"},
 	}
 	for _, c := range cases {
 		root := repository(t, d, ModeImport, TypeScriptExtension)
@@ -1019,14 +1016,7 @@ func TestImportMapsATscBuildTarget(t *testing.T) {
 		if c.projectJSON != "" {
 			writeFile(t, root, "packages/pricing/project.json", c.projectJSON)
 		}
-		result := sync(t, root, SyncOptions{})
-		reason := ""
-		for _, u := range result.Unmapped {
-			if u.Project == "@demo/pricing" && u.Target == "build" {
-				reason = u.Reason
-			}
-		}
-		jobs, _ := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"].([]any)
+		reason, jobs := buildMapping(t, root, sync(t, root, SyncOptions{}))
 		if c.mapped {
 			if reason != "" || !slices.Contains(jobs, any(ExtensionName+":build")) {
 				t.Errorf("%s: reason %q, jobs %v; want build moved to %s", c.name, reason, jobs, TypeScriptExtension)
@@ -1036,6 +1026,166 @@ func TestImportMapsATscBuildTarget(t *testing.T) {
 		if !strings.Contains(reason, c.reason) || !slices.Contains(jobs, any(TypeScriptExtension+":build")) {
 			t.Errorf("%s: reason %q, jobs %v; want it on Nx with %q", c.name, reason, jobs, c.reason)
 		}
+	}
+}
+
+// buildMapping returns the reason the pricing build stays on Nx, empty when
+// it moved, and the disabled jobs of pricing.
+func buildMapping(t *testing.T, root string, result SyncResult) (string, []any) {
+	t.Helper()
+	reason := ""
+	for _, u := range result.Unmapped {
+		if u.Project == "@demo/pricing" && u.Target == "build" {
+			reason = u.Reason
+		}
+	}
+	jobs, _ := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"].([]any)
+	return reason, jobs
+}
+
+// nxJsTscLibrary is the pricing library built by @nx/js:tsc with options
+// that repeat its tsconfig.lib.json: it emits dist/index.js from src.
+const (
+	libraryConfig  = `{"compilerOptions": {"rootDir": "src", "outDir": "dist", "declaration": true}, "include": ["src"]}`
+	libraryOptions = `"main": "{projectRoot}/src/index.ts", "tsConfig": "{projectRoot}/tsconfig.lib.json", "outputPath": "{projectRoot}/dist", "rootDir": "{projectRoot}/src", "generatePackageJson": false`
+)
+
+func nxJsTscProject(options string) string {
+	return `{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "options": {` + options + `}}}}`
+}
+
+func TestImportMapsAnNxJsTscTargetWhoseEmitTheTscBuildReproduces(t *testing.T) {
+	spectest.Proves(t, feature, "import-maps-an-nx-js-tsc-build-target", "an-nx-js-tsc-target-whose-emit-matches-is-imported")
+	spectest.Proves(t, feature, "import-maps-an-nx-js-tsc-build-target", "an-nx-js-tsc-target-whose-emit-differs-stays-on-nx")
+	d := readDemo(t)
+	cases := []struct {
+		name     string
+		nxJSON   string
+		project  string
+		config   string
+		script   string
+		reason   string
+		compiler bool
+	}{
+		{name: "options that repeat the tsconfig", project: nxJsTscProject(libraryOptions), compiler: true},
+		{name: "outputPath from targetDefaults",
+			nxJSON:  `{"targetDefaults": {"@nx/js:tsc": {"options": {"outputPath": "{projectRoot}/dist", "generatePackageJson": false}}}}`,
+			project: nxJsTscProject(`"main": "{projectRoot}/src/index.ts", "tsConfig": "{projectRoot}/tsconfig.lib.json", "rootDir": "{projectRoot}/src"`), compiler: true},
+		{name: "a tsc-alone script on the same config", project: nxJsTscProject(libraryOptions), script: "tsc -p tsconfig.lib.json", compiler: true},
+		{name: "the legacy outputPath at the workspace root",
+			project: nxJsTscProject(`"main": "{projectRoot}/src/index.ts", "tsConfig": "{projectRoot}/tsconfig.lib.json", "outputPath": "dist/packages/pricing", "rootDir": "{projectRoot}/src", "generatePackageJson": false`),
+			reason:  "writes into the outputPath dist/packages/pricing, and packages/pricing/tsconfig.lib.json names the outDir packages/pricing/dist"},
+		{name: "rootDir at the project root",
+			project: nxJsTscProject(`"main": "{projectRoot}/src/index.ts", "tsConfig": "{projectRoot}/tsconfig.lib.json", "outputPath": "{projectRoot}/dist", "generatePackageJson": false`),
+			reason:  "compiles with the rootDir packages/pricing, and packages/pricing/tsconfig.lib.json declares the rootDir packages/pricing/src"},
+		{name: "a config with no rootDir", project: nxJsTscProject(libraryOptions), config: `{"compilerOptions": {"outDir": "dist"}}`,
+			reason: "declares none, so tsc computes it from the sources"},
+		{name: "the package.json it writes",
+			project: nxJsTscProject(`"main": "{projectRoot}/src/index.ts", "tsConfig": "{projectRoot}/tsconfig.lib.json", "outputPath": "{projectRoot}/dist", "rootDir": "{projectRoot}/src"`),
+			reason:  "writes a package.json into its outputPath unless generatePackageJson is false"},
+		{name: "assets", project: nxJsTscProject(libraryOptions + `, "assets": ["{projectRoot}/README.md"]`), reason: "sets assets"},
+		{name: "dependencies it inlines", project: nxJsTscProject(libraryOptions + `, "external": "none"`), reason: "sets external"},
+		{name: "an option it does not reproduce", project: nxJsTscProject(libraryOptions + `, "outputFileExtensionForCjs": ".cjs"`), reason: "sets outputFileExtensionForCjs"},
+		{name: "assets of the default configuration",
+			project: `{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "defaultConfiguration": "production", "options": {` + libraryOptions + `}, "configurations": {"production": {"assets": ["{projectRoot}/README.md"]}}}}}`,
+			reason:  "sets assets"},
+		{name: "another config", project: nxJsTscProject(strings.Replace(libraryOptions, "tsconfig.lib.json", "tsconfig.build.json", 1)),
+			reason: "compiles packages/pricing/tsconfig.build.json, and @putnami/typescript compiles packages/pricing/tsconfig.lib.json"},
+		{name: "a script that runs more than tsc", project: nxJsTscProject(libraryOptions), script: "tsc && cp a b", reason: "does not run tsc alone"},
+		{name: "an incremental config with no tsBuildInfoFile", project: nxJsTscProject(libraryOptions),
+			config: `{"compilerOptions": {"rootDir": "src", "outDir": "dist", "incremental": true}}`, reason: "sets no tsBuildInfoFile"},
+		{name: "an incremental config that names its tsBuildInfoFile", project: nxJsTscProject(libraryOptions),
+			config: `{"compilerOptions": {"rootDir": "src", "outDir": "dist", "incremental": true, "tsBuildInfoFile": "dist/.tsbuildinfo"}}`, compiler: true},
+	}
+	for _, c := range cases {
+		root := repository(t, d, ModeImport, TypeScriptExtension)
+		if c.nxJSON != "" {
+			writeFile(t, root, "nx.json", c.nxJSON)
+		}
+		pkg := `{"name": "@demo/pricing"}`
+		if c.script != "" {
+			pkg = `{"name": "@demo/pricing", "scripts": {"build": "` + c.script + `"}}`
+		}
+		writeFile(t, root, "packages/pricing/package.json", pkg)
+		config := c.config
+		if config == "" {
+			config = libraryConfig
+		}
+		writeFile(t, root, "packages/pricing/tsconfig.lib.json", config)
+		writeFile(t, root, "packages/pricing/project.json", c.project)
+		reason, jobs := buildMapping(t, root, sync(t, root, SyncOptions{}))
+		options, _ := readProjectFile(t, root, "packages/pricing")["options"].(map[string]any)
+		ts, _ := options[TypeScriptExtension].(map[string]any)
+		if c.reason == "" {
+			if reason != "" || !slices.Contains(jobs, any(ExtensionName+":build")) {
+				t.Errorf("%s: reason %q, jobs %v; want build moved to %s", c.name, reason, jobs, TypeScriptExtension)
+			}
+			if c.compiler && ts["compiler"] != "tsc" {
+				t.Errorf("%s: options %v, want the tsc compiler", c.name, options)
+			}
+			continue
+		}
+		if !strings.Contains(reason, c.reason) || !strings.HasPrefix(reason, "@nx/js:tsc ") || !slices.Contains(jobs, any(TypeScriptExtension+":build")) {
+			t.Errorf("%s: reason %q, jobs %v; want it on Nx with %q", c.name, reason, jobs, c.reason)
+		}
+		if ts["compiler"] != nil {
+			t.Errorf("%s: the sync wrote a compiler for a target on Nx: %v", c.name, options)
+		}
+	}
+}
+
+func TestTheSyncOwnsTheTscCompilerItWrites(t *testing.T) {
+	spectest.Proves(t, feature, "import-maps-an-nx-js-tsc-build-target", "the-sync-owns-the-tsc-compiler-option")
+	root := repository(t, readDemo(t), ModeImport, TypeScriptExtension)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing"}`)
+	writeFile(t, root, "packages/pricing/tsconfig.lib.json", libraryConfig)
+	writeFile(t, root, "packages/pricing/project.json", nxJsTscProject(libraryOptions))
+	options := func() map[string]any {
+		o, _ := readProjectFile(t, root, "packages/pricing")["options"].(map[string]any)
+		return o
+	}
+
+	sync(t, root, SyncOptions{})
+	if got, want := options(), map[string]any{
+		TypeScriptExtension: map[string]any{"compiler": "tsc"},
+		ExtensionName:       map[string]any{"typescriptCompiler": "tsc"},
+	}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("options = %v, want %v", got, want)
+	}
+	// The target stops mapping: the sync removes what it wrote.
+	writeFile(t, root, "packages/pricing/project.json", nxJsTscProject(libraryOptions+`, "assets": ["{projectRoot}/README.md"]`))
+	sync(t, root, SyncOptions{})
+	if got := options(); got != nil {
+		t.Fatalf("options = %v once the target stays on Nx, want none", got)
+	}
+	// A compiler the project sets is the project's: the sync neither records
+	// nor removes it.
+	file := filepath.Join(root, "packages/pricing/putnami.json")
+	doc := readProjectFile(t, root, "packages/pricing")
+	doc["options"] = map[string]any{TypeScriptExtension: map[string]any{"compiler": "tsc"}}
+	data, _ := json.Marshal(doc)
+	if err := os.WriteFile(file, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "packages/pricing/project.json", nxJsTscProject(libraryOptions))
+	sync(t, root, SyncOptions{})
+	writeFile(t, root, "packages/pricing/project.json", nxJsTscProject(libraryOptions+`, "assets": ["{projectRoot}/README.md"]`))
+	sync(t, root, SyncOptions{})
+	if got, want := options(), map[string]any{TypeScriptExtension: map[string]any{"compiler": "tsc"}}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("options = %v, want the project's own compiler kept", got)
+	}
+	// A project that sets another compiler keeps its build on Nx: the tsc
+	// build would not run.
+	doc = readProjectFile(t, root, "packages/pricing")
+	doc["options"] = map[string]any{TypeScriptExtension: map[string]any{"compiler": "bun"}}
+	data, _ = json.Marshal(doc)
+	if err := os.WriteFile(file, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "packages/pricing/project.json", nxJsTscProject(libraryOptions))
+	reason, jobs := buildMapping(t, root, sync(t, root, SyncOptions{}))
+	if !strings.Contains(reason, "sets the compiler bun") || !slices.Contains(jobs, any(TypeScriptExtension+":build")) {
+		t.Fatalf("a project on bun: reason %q, jobs %v; want its build on Nx", reason, jobs)
 	}
 }
 

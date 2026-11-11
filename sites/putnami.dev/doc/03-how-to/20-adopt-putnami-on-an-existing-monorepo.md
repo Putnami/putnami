@@ -228,12 +228,14 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
   its configuration, and an ESLint lint target writes
   `options["@putnami/typescript"].lint.linter: "eslint"`, so the project keeps
   its ESLint configuration. So does a `build` whose script runs `tsc` alone:
-  Putnami compiles it with that `tsc`, into its `outDir`. Every other target,
-  an `@nx/js:tsc` or an `@nx/webpack:webpack` build, an ESLint with
-  `--max-warnings` or a lint chained with `prettier` for example, keeps
-  running through Nx, so no target changes the tool that checks it. Move such
-  ESLint arguments to the ESLint configuration, then rerun `putnami projects
-  sync`.
+  Putnami compiles it with that `tsc`, into its `outDir`, and an `@nx/js:tsc`
+  build whose options repeat its `tsconfig` (`outputPath` its `outDir`,
+  `rootDir` its `rootDir`, no `assets`, `generatePackageJson` `false`). Every
+  other target, another `@nx/js:tsc` or an `@nx/webpack:webpack` build, an
+  ESLint with `--max-warnings` or a lint chained with `prettier` for example,
+  keeps running through Nx, listed with its reason, so no target changes the
+  tool that checks it. Move such ESLint arguments to the ESLint configuration,
+  then rerun `putnami projects sync`.
 - **Delegate**: you keep Nx and its cache, local or Nx Cloud. Each task runs
   `nx run <project>:<target>` on one affected project, and Putnami caches
   nothing for it.
