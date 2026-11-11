@@ -12,7 +12,7 @@
     "Caching a Turborepo result in Putnami's cache, or putting Putnami's cache over Turborepo's",
     "Mapping a turbo.json task other than build, test and lint: it keeps running through Turborepo",
     "Installing or switching a Turborepo version: turbo must be on PATH",
-    "Rewriting turbo.json or a package.json in the sync, or changing the tool that checks a task: a tsc, vitest, jest or eslint task stays on Turborepo"
+    "Rewriting turbo.json or a package.json in the sync, or changing the tool that checks a task: a vitest, jest or eslint task stays on Turborepo, and a build that runs tsc moves only with that tsc"
   ],
   "requirements": [
     {
@@ -50,10 +50,15 @@
     {
       "id": "manifest-follows-the-profile",
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the turbo:lint, turbo:test and turbo:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task sets cache.enabled to false."
+    },
+    {
+      "id": "import-maps-a-tsc-build-script",
+      "text": "In import mode, a TypeScript package's build task whose package.json script runs tsc alone, as @putnami/typescript's compiler choice reads it, moves to @putnami/typescript, which compiles it with that tsc. A build script that runs tsc with another argument or a shell operator keeps running through Turborepo and is listed with its reason."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
-    "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md"
+    "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
+    "typescript/extension/doc/adr/0008-a-tsc-build-declares-its-outdir-through-pathfrom.md"
   ]
 }

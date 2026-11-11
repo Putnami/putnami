@@ -6,10 +6,11 @@
     "A TypeScript project builds, type-checks, tests, lints, serves and packages without a per-project bundler, runner or formatter configuration",
     "Building many projects in one invocation produces exactly what building each of them alone produces, and one project's failure does not change another project's output",
     "A workspace pins one version per shared dependency, and a freshly scaffolded project installs against that pin without editing the workspace root by hand",
-    "An npm tarball or Docker image loads under the same loader rules the workspace used, so a packaged project does not fail at import time in a consumer's runtime"
+    "An npm tarball or Docker image loads under the same loader rules the workspace used, so a packaged project does not fail at import time in a consumer's runtime",
+    "A library whose build script runs tsc alone keeps that tsc and gains Putnami's cache: its output lands and is restored where the packages that depend on it resolve its main and exports"
   ],
   "nonGoals": [
-    "Replacing Bun as the task runtime or Biome with a configurable toolchain choice, or exposing their configuration surface as Putnami configuration; the installer is the package manager the repository declares, never a Putnami option",
+    "Replacing Bun as the task runtime or Biome with a configurable toolchain choice, or exposing their configuration surface as Putnami configuration; the installer is the package manager the repository declares, never a Putnami option; a library whose build script runs tsc alone is the one place a project's compiler is chosen, and Bun runs that tsc",
     "Owning application framework behaviour — routing, rendering, persistence and DI belong to the @putnami/* packages this extension builds",
     "Publishing to a registry: package prepares the tarball or image and records channels, publish uploads them",
     "Promising compatibility across every pre-1.0 minor release, which RELEASE.md governs"
@@ -17,7 +18,7 @@
   "requirements": [
     {
       "id": "phase-isolation",
-      "text": "Build runs as independently cached phases — generate, transpile and types, plus compile — and each project in a batched phase writes only into its own output directory, including the type-checker's incremental build-info state."
+      "text": "Build runs as independently cached phases — generate, transpile and types or tsc, plus compile — and each project in a batched phase writes only into its own output directory, including the type-checker's incremental build-info state. A tsc phase writes only the outputs its project's tsconfig names, never a referenced project's."
     },
     {
       "id": "batch-equals-solo",
@@ -206,6 +207,26 @@
     {
       "id": "the-packager-refuses-a-nameless-manifest",
       "text": "The npm packager refuses to publish an extension manifest without a name, a hook-only one included, before it stamps a contract, and leaves the staged manifest as staged."
+    },
+    {
+      "id": "tsc-compiler-choice",
+      "text": "A project's compiler is the compiler parameter of build, test and package, set by options[\"@putnami/typescript\"].compiler or --compiler: bun, tsc or auto, the default. Under auto it is tsc when the package.json build script runs tsc alone (tsc, tsc -b or tsc -p with at most one config, plus --pretty or --verbose, and nothing else), else bun. A tsc project runs no Bun transpile or types step; an explicit tsc whose build script is something else fails naming it."
+    },
+    {
+      "id": "tsc-build-runs-the-installed-tsc",
+      "text": "With tsc, build runs the compiler of the first node_modules/typescript from the project directory up to the workspace root with the task's Bun, never node, and never downloads one; a missing tsc fails naming typescript. It runs the build script's tsc command, except that tsc -b on a config with references runs as tsc -p, since Putnami builds or restores each reference first. With no build script it runs tsc -p on tsconfig.lib.json, else tsconfig.json."
+    },
+    {
+      "id": "tsc-output-restores-at-outdir",
+      "text": "With tsc, build declares the config's outDir, and its declarationDir and .tsbuildinfo where they lie outside the outDir, as its outputs. A run empties them before tsc starts, a cache hit restores them in place, and every job of a project that depends on it runs after it. An outDir that is unset, outside the project, the project itself, not ignored by Git, or holding a file Git tracks fails the build before tsc runs, naming the setting."
+    },
+    {
+      "id": "tsc-key-follows-what-tsc-reads",
+      "text": "The key of a tsc build reads every file of the project Git does not ignore, the JSON configuration files at the top of each project of its dependency closure and its tsconfig files, the root tsconfig files and lockfiles, and the key of each dependency's tsc build. test plans the same tsc step, so a dependent's tests run against its dependencies' compiled output and their keys move with it."
+    },
+    {
+      "id": "tsc-project-does-not-package",
+      "text": "package refuses a project that compiles with tsc, naming it, rather than packing a tarball without its compiled code."
     }
   ],
   "decisions": [
@@ -220,6 +241,7 @@
     "tooling/extension-sdk/doc/adr/0004-a-publication-job-packs-and-the-engine-uploads.md",
     "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
     "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md",
-    "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md"
+    "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md",
+    "typescript/extension/doc/adr/0008-a-tsc-build-declares-its-outdir-through-pathfrom.md"
   ]
 }

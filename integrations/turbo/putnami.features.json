@@ -127,6 +127,20 @@
               "the-manifest-conforms-to-the-stack-core"
             ]
           }
+        },
+        {
+          "id": "import-maps-a-tsc-build-script",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-tsc-alone-build-script-is-imported",
+              "a-tsc-script-with-another-argument-stays-on-turborepo"
+            ]
+          }
         }
       ]
     }

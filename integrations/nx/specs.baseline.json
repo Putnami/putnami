@@ -3,7 +3,9 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "monorepo/nx-adoption#delegate-imports-listed-projects",
+    "monorepo/nx-adoption#import-maps-a-tsc-build-target",
     "monorepo/nx-adoption#import-maps-typescript-targets",
+    "monorepo/nx-adoption#import-writes-the-tsc-compiler",
     "monorepo/nx-adoption#manifest-follows-the-profile",
     "monorepo/nx-adoption#projects-become-projects",
     "monorepo/nx-adoption#reports-from-project-options",

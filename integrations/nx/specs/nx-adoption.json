@@ -26,7 +26,7 @@
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets whose script already runs bun build, bun test or biome run as that extension's task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as jest, eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets that run bun build, bun test or biome, or a tsc build as import-maps-a-tsc-build-target says, run as that extension's task, and @putnami/nx:<task> is disabled. Any other build, test or lint target, such as jest or eslint, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is disabled."
     },
     {
       "id": "delegate-imports-listed-projects",
@@ -51,11 +51,20 @@
     {
       "id": "manifest-follows-the-profile",
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the nx:lint, nx:test and nx:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task, the graph task included, sets cache.enabled to false."
+    },
+    {
+      "id": "import-maps-a-tsc-build-target",
+      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone, or when its executor is @nx/js:tsc with no assets, a tsConfig of tsconfig.lib.json, else tsconfig.json, and no outputPath or one equal to that config's outDir. Any other tsc target keeps running through Nx and is listed with its reason."
+    },
+    {
+      "id": "import-writes-the-tsc-compiler",
+      "text": "For an imported @nx/js:tsc target, the sync writes compiler tsc in options[\"@putnami/typescript\"] of the project's putnami.json when that key is absent, and records in options[\"@putnami/nx\"] that it wrote it. When the target no longer maps, it removes only a compiler it recorded, and a value the project wrote stays."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
     "integrations/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md",
-    "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md"
+    "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
+    "typescript/extension/doc/adr/0008-a-tsc-build-declares-its-outdir-through-pathfrom.md"
   ]
 }
