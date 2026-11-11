@@ -2,6 +2,8 @@
 
 - **Status**: accepted
 - **Date**: 2026-10-23
+- **Amended**: 2026-11-11, §5: change impact reads a selector only in a
+  project the planner may run the command that names it in.
 - **Scope**: `@putnami/cli` (`internal/jobs/inputresolve`,
   `internal/jobs/cachekey`, `internal/jobs/scheduler`, `internal/store`,
   `internal/workspace`, `internal/engine`, `internal/runnerprovider`), CLI
@@ -44,8 +46,12 @@ The Go extension answers that call for its two selectors.
    phase prepares it, so the call starts the prepared executable. A resolver
    that meets an unprepared extension prepares it on its first call.
 5. **Every consumer reads one answer.** The cache key, portable admission and
-   the batch guard read the files. Change impact reads the files and the
-   paths the basis selects, and an input it cannot answer selects every path.
+   the batch guard read the files. Change impact reads a selector only in a
+   project the planner may run the command that names it in: any project for
+   a workspace-once command, otherwise one that uses the command's extension
+   and, when the command names activation files, holds one of them. There it
+   reads the files and the paths the basis selects, and an input it cannot
+   answer selects every path.
    A planned write that reaches a listed file or a path the basis selects
    reaches the selection; one that reaches the basis, through a content or a
    listing set, can change the answer, so the selection widens. Unkeyed

@@ -1,8 +1,6 @@
 package planner
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -82,79 +80,7 @@ func hasActivationFiles(projRoot string, patterns []string, cache *planCache) bo
 }
 
 func hasActivationFilesUncached(projRoot string, patterns []string, projectRoots map[string]bool) bool {
-	for _, pattern := range patterns {
-		if strings.Contains(pattern, "**") {
-			if matchDoubleStarGlob(projRoot, pattern, projectRoots) {
-				return true
-			}
-		} else {
-			matches, _ := filepath.Glob(filepath.Join(projRoot, pattern))
-			if len(matches) > 0 {
-				return true
-			}
-		}
-	}
-	return false
-}
-
-// matchDoubleStarGlob handles glob patterns containing ** (recursive match).
-// Go's filepath.Glob does not support **. This function walks the directory
-// tree within the owning project and matches each file against the non-**
-// suffix of the pattern.
-func matchDoubleStarGlob(root, pattern string, projectRoots map[string]bool) bool {
-	root = filepath.Clean(root)
-	// Split on "**/" or "**" to get the suffix pattern.
-	// e.g. "**/*.test.ts" → suffix "*.test.ts"
-	// e.g. "src/**/*.go"  → prefix "src", suffix "*.go"
-	parts := strings.SplitN(pattern, "**", 2)
-	prefix := strings.TrimSuffix(parts[0], string(filepath.Separator))
-	suffix := strings.TrimPrefix(parts[1], string(filepath.Separator))
-	// Also handle forward slashes (JSON manifests use them)
-	suffix = strings.TrimPrefix(suffix, "/")
-
-	searchRoot := root
-	if prefix != "" {
-		searchRoot = filepath.Join(root, prefix)
-	}
-	// A static prefix cannot start inside a nested declared project.
-	for dir := searchRoot; dir != root; dir = filepath.Dir(dir) {
-		if projectRoots[dir] {
-			return false
-		}
-		if filepath.Dir(dir) == dir {
-			break
-		}
-	}
-
-	found := false
-	_ = filepath.WalkDir(searchRoot, func(path string, d os.DirEntry, err error) error {
-		if err != nil || found {
-			if found {
-				return filepath.SkipAll
-			}
-			return nil
-		}
-		if d.IsDir() {
-			// Keep the starting project's own root eligible; a prefix may
-			// start the walk directly at a different project's root.
-			if path != root && projectRoots[filepath.Clean(path)] {
-				return filepath.SkipDir
-			}
-			// Skip common non-project directories for performance
-			if cachekey.ProjectWalkExcludedDirs[d.Name()] {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		// Match the filename against the suffix pattern
-		matched, _ := filepath.Match(suffix, d.Name())
-		if matched {
-			found = true
-			return filepath.SkipAll
-		}
-		return nil
-	})
-	return found
+	return workspace.HasActivationFiles(projRoot, patterns, projectRoots)
 }
 
 // mergeCommandParams builds the full resolved params for plan-time `if` evaluation.

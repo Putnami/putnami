@@ -4,7 +4,6 @@ import (
 	"path/filepath"
 	"sort"
 
-	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -79,11 +78,8 @@ func matchJobs(
 			matchedActivationFiles = true
 		}
 
-		// Check extension dependency: the project must list the extension in its
-		// dependencies or extensions, unless activation files matched or the
-		// project IS the extension (self-publish)
-		// or the command has workspace activation.
-		if !isProjectExtensionDep(proj, job, matchedActivationFiles) {
+		// The project must use the job's extension (workspace.UsesJobExtension).
+		if !workspace.UsesJobExtension(proj, job, matchedActivationFiles) {
 			continue
 		}
 
@@ -190,52 +186,6 @@ func matchWorkspaceOnceJobs(
 		return a.Name < b.Name
 	})
 	return valid
-}
-
-// isProjectExtensionDep returns true if the project should use jobs from the
-// given extension. A project qualifies if:
-//  1. The command has workspace activation (activates for all projects), OR
-//  2. The command's activation files matched the project, OR
-//  3. The extension is listed in the project's Dependencies or Extensions, OR
-//  4. The project IS the extension itself and the command's traits declare
-//     injectPublishChannels: an extension packages and publishes itself.
-func isProjectExtensionDep(proj *workspace.Project, job *extension.JobDefinition, matchedActivationFiles bool) bool {
-	extName := job.ExtensionName
-	extID := ""
-	if job.ExtensionPath != "" {
-		extID = wsproto.ProjectIDFromPath(job.ExtensionPath)
-	}
-	cmdName := job.Name
-
-	// Workspace-activated commands skip the dependency check
-	if job.Activation == "workspace" || job.Activation == workspaceOnceActivation {
-		return true
-	}
-
-	if matchedActivationFiles && cmdName == "config-extract" {
-		return true
-	}
-
-	// Self-publish: an extension project runs its own extension's packaging
-	// and publishing commands, the ones that receive publish channels.
-	if proj.Name == extName && job.Traits.InjectPublishChannels {
-		return true
-	}
-
-	// Check explicit dependencies and extensions.
-	// Match against both the extension's publish name and its /path ID.
-	for _, dep := range proj.Dependencies {
-		if dep == extName || (extID != "" && dep == extID) {
-			return true
-		}
-	}
-	for _, ext := range proj.Extensions {
-		if ext == extName || (extID != "" && ext == extID) {
-			return true
-		}
-	}
-
-	return false
 }
 
 // extensionActivatesForProject checks whether an extension has any command

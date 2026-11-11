@@ -254,9 +254,7 @@ func (r *Resolver) holds(key string) bool {
 // names that file (wsproto.SelectsPath); a listed file is read whatever its
 // name. A query the resolver cannot answer selects every path but such a file:
 // the extension reads one only when it lists it, and a failed answer lists
-// nothing. This matters because the task index merges the selectors of every
-// extension per task, so a selector of another language, which cannot answer
-// for the project, takes part in every query.
+// nothing.
 func (r *Resolver) SelectsInput(query store.InputQuery, rel string) bool {
 	expansion, err := r.ResolveInput(query)
 	if err != nil {
