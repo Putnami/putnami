@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -751,6 +752,79 @@ func TestToolsReachThePathOfTheTask(t *testing.T) {
 	}
 	if status, _, rec := runTask(t, s, root, TaskLint); status != statusFailed || !strings.Contains(strings.Join(rec.diags, " "), "no archive") {
 		t.Errorf("status %s: %v", status, rec.diags)
+	}
+}
+
+func TestEnvSetsTheEnvironmentOfTheTask(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	t.Setenv("DEMO_HOME", "/machine")
+	stubTools(t, "1.82.0", junitPass)
+	s := testProfileWithLcov(t)
+	task := s.Profile.Tasks[TaskLint]
+	task.Steps = [][]string{{"sh", "-c", "echo \"$DEMO_HOME\" > \"$STUB_ROOT/env\""}}
+	s.Profile.Tasks[TaskLint] = task
+	s.Env = func(_ context.Context, request EnvRequest) ([]string, error) {
+		if request.Root != root || request.Offline {
+			return nil, fmt.Errorf("request %+v", request)
+		}
+		return []string{"DEMO_HOME=/pinned/" + request.Meta.Component + "/" + request.Task}, nil
+	}
+	if status, _, rec := runTask(t, s, root, TaskLint); status != statusOK {
+		t.Fatalf("status %s: %v", status, rec.diags)
+	}
+	if got, _ := os.ReadFile(filepath.Join(root, "env")); strings.TrimSpace(string(got)) != "/pinned/api/lint" {
+		t.Errorf("the step read DEMO_HOME=%q", got)
+	}
+	for _, entries := range [][]string{{"NOEQUALS"}, nil} {
+		failing := entries
+		s.Env = func(context.Context, EnvRequest) ([]string, error) {
+			if failing == nil {
+				return nil, errors.New("no SDK")
+			}
+			return failing, nil
+		}
+		if status, _, rec := runTask(t, s, root, TaskLint); status != statusFailed || !strings.Contains(strings.Join(rec.diags, " "), CodeToolchainMissing) {
+			t.Errorf("%v: status %s: %v", entries, status, rec.diags)
+		}
+	}
+}
+
+func TestEnvReadsTheWorkspaceOptionsOfItsExtensionAndRunsOffline(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
+	stubTools(t, "1.82.0", junitPass)
+	s := testStack(t)
+	var seen EnvRequest
+	s.Env = func(_ context.Context, request EnvRequest) ([]string, error) {
+		seen = request
+		return []string{"DEMO_HOME=/offline"}, nil
+	}
+	meta, _ := json.Marshal(Metadata{Component: "api", Root: "."})
+	ctx := &pctx.Context{
+		WorkspaceRoot: root,
+		Workspace: pctx.Workspace{Options: map[string]json.RawMessage{
+			s.Extension:      json.RawMessage(`{"sdk":true}`),
+			"@putnami/other": json.RawMessage(`{"sdk":false}`),
+		}},
+		Project: pctx.Project{FullPath: filepath.Join(root, "crates/api"), Metadata: map[string]json.RawMessage{s.Extension: meta}},
+	}
+	selected, err := s.Selected(ctx, jsonl.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(seen.Options) != `{"sdk":true}` || !seen.Offline || seen.Task != "" || seen.Meta.Component != "api" {
+		t.Errorf("the hook read %+v", seen)
+	}
+	if !slices.Contains(selected.Env, "DEMO_HOME=/offline") {
+		t.Errorf("the job's environment misses the entry: %v", selected.Env)
 	}
 }
 

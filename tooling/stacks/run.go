@@ -80,6 +80,7 @@ func (s Stack) runWith(task string, extra func(ctx *pctx.Context, root RootStep,
 			workspaceRoot: ctx.WorkspaceRoot,
 			projectAbs:    ctx.Project.FullPath,
 			metadata:      ctx.Project.Metadata[s.Extension],
+			options:       ctx.Workspace.Options[s.Extension],
 			outputRoot:    output,
 			stdout:        os.Stderr,
 		}, emit)
@@ -110,6 +111,9 @@ type runInput struct {
 	workspaceRoot string
 	projectAbs    string
 	metadata      json.RawMessage
+	// options is the extension's block of the workspace's options, which
+	// Stack.Env reads.
+	options json.RawMessage
 	// outputRoot is the command-output directory; the task writes under
 	// outputRoot/<task>.
 	outputRoot string
@@ -268,6 +272,19 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 			selected.Env = appendPath(selected.Env, dir)
 		}
 	}
+	if s.Env != nil {
+		entries, err := s.Env(ctx, EnvRequest{Task: in.task, Root: in.workspaceRoot, Meta: meta, Env: selected.Env, Options: in.options, Offline: offline, Info: emit.Info})
+		if err != nil {
+			return Selection{}, failWith(emit, CodeToolchainMissing, "prepare the environment of the %s task: %v", in.task, err)
+		}
+		for _, entry := range entries {
+			name, value, ok := strings.Cut(entry, "=")
+			if !ok || name == "" {
+				return Selection{}, failWith(emit, CodeToolchainMissing, "the environment of the %s task names no variable in %q", in.task, entry)
+			}
+			selected.Env = setEnv(selected.Env, name, value)
+		}
+	}
 	return selected, nil
 }
 
@@ -323,7 +340,7 @@ type RootStep struct {
 // check, then step under the root's lock.
 func (s Stack) RootJob(step func(context.Context, RootStep, *jsonl.Emitter) error) cli.JobFunc {
 	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-		in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension]}
+		in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension], options: ctx.Workspace.Options[s.Extension]}
 		if err := s.atRoot(context.Background(), in, step, emit); err != nil {
 			return statusFailed, nil, err
 		}
@@ -383,7 +400,7 @@ func (s Stack) rootStep(ctx context.Context, in runInput, emit *jsonl.Emitter) (
 // stack's build, then runs what it built, builds under the lock and releases
 // it before it runs, so it never shares the build directory with a task.
 func (s Stack) Locked(ctx *pctx.Context, emit *jsonl.Emitter, step func(context.Context, RootStep, *jsonl.Emitter) error) error {
-	in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension]}
+	in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension], options: ctx.Workspace.Options[s.Extension]}
 	return s.atRoot(context.Background(), in, step, emit)
 }
 
@@ -391,7 +408,7 @@ func (s Stack) Locked(ctx *pctx.Context, emit *jsonl.Emitter, step func(context.
 // of its stack root held: a process the user keeps running must not block the
 // other tasks of the root.
 func (s Stack) Selected(ctx *pctx.Context, emit *jsonl.Emitter) (RootStep, error) {
-	in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension]}
+	in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: ctx.Project.FullPath, metadata: ctx.Project.Metadata[s.Extension], options: ctx.Workspace.Options[s.Extension]}
 	root, _, _, err := s.rootStep(context.Background(), in, emit)
 	return root, err
 }
@@ -427,7 +444,7 @@ func (s Stack) WorkspaceRootJob(missing MissingToolchain, step func(context.Cont
 					return inner(ctx, root, emit)
 				}
 			}
-			in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(c.Path)), metadata: c.Metadata}
+			in := runInput{workspaceRoot: ctx.WorkspaceRoot, projectAbs: filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(c.Path)), metadata: c.Metadata, options: ctx.Workspace.Options[s.Extension]}
 			if missing == WarnOnMissingToolchain && s.toolchainMissing(background, in) {
 				emit.DiagnosticWithCode("warning", fmt.Sprintf("%s is left out: the %s toolchain is not on this machine", c.Path, s.Profile.ID), "", 0, 0, CodeToolchainMissing)
 				continue

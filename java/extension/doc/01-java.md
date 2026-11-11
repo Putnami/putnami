@@ -281,6 +281,46 @@ and fails when the JDK, Gradle or Maven it runs is missing.
 [ADR 0004](https://github.com/Putnami/putnami/blob/main/java/extension/doc/adr/0004-a-blank-machine-builds-after-putnami-install.md) records
 these choices.
 
+### An Android build
+
+The Android Gradle plugin reads the Android SDK from `ANDROID_HOME`,
+`ANDROID_SDK_ROOT` or `sdk.dir` in the build's `local.properties`, and
+downloads the platforms and build tools the build declares only into an SDK
+whose licenses are accepted. A machine that names an SDK keeps it. On a
+machine that names none, the extension installs one only when the workspace's
+owner accepts the Android SDK licenses on the team's behalf, in
+`putnami.workspace.json`:
+
+```json
+{
+  "options": {
+    "@putnami/java": {
+      "android": { "acceptSdkLicenses": true }
+    }
+  }
+}
+```
+
+With the option, a task of a Gradle build that applies the Android plugin, in
+the build file of its root or of one of its projects, and `putnami install`,
+install the Android SDK command-line tools 22.0 under `toolchains/android` of
+the Putnami home, checked by SHA-256, for Linux on x64, macOS on x64 and
+arm64, and Windows on x64. They accept the licenses with
+`sdkmanager --licenses`, run on the pinned JDK 21, into the SDK
+`toolchains/android/sdk`, which every build of the machine shares, and run
+the task with it as `ANDROID_HOME` and `ANDROID_SDK_ROOT`. The Android Gradle
+plugin then downloads the platforms and build tools on the first task that
+needs them. The extension pins 22.0 because from 23.0 `sdkmanager` hands over
+to the Android CLI, which downloads itself unchecked and accepts no license.
+
+Without the option, a task of an Android component on a machine with no SDK
+fails with `stacks.toolchain_missing`, and the message names the option; a
+task of another project of the build is left to Gradle. Offline, a task
+installs nothing: it uses the SDK an earlier task or `putnami install`
+installed.
+[ADR 0005](https://github.com/Putnami/putnami/blob/main/java/extension/doc/adr/0005-an-android-build-gets-the-sdk-the-workspace-accepts.md)
+records these choices.
+
 ## Prepare a machine
 
 `putnami install` runs the extension's `workspace-install` once per stack root
@@ -291,6 +331,8 @@ command run it again. It installs:
 
 1. The JDK `.java-version` accepts, as a task installs it, and the pinned JDKs
    the build's Gradle toolchains ask for.
+   An Android build whose workspace accepts the Android SDK licenses also
+   gets the SDK's command-line tools and its accepted licenses.
 2. The build tool: a Gradle build runs `gradlew --version`, so the wrapper
    downloads its distribution, or installs the pinned Gradle; a Maven build
    installs the Maven its wrapper states, or Maven 3.9.11 when the machine
@@ -487,9 +529,9 @@ declare. The design of the stack core is in
   dependencies a plugin resolves only when it runs. `putnami install` runs
   that code on the machine it prepares, and Gradle and Maven download what
   the build needs when its tasks run, over the network the runner allows.
-- The Android SDK is not installed: installing it accepts its licenses on the
-  team's behalf, which needs a decision of the workspace's owner. An Android
-  build needs `ANDROID_HOME` or `sdk.dir` in `local.properties`.
+- The Android SDK is installed only once the workspace accepts its licenses,
+  and Linux on arm64 gets none: Google publishes its build tools for x64
+  only. The platforms and build tools are left to the Android Gradle plugin.
 - Credentials for a private Maven or Gradle repository are the build's own:
   `~/.m2/settings.xml`, `~/.gradle/gradle.properties` or the environment the
   build reads. The extension passes none.

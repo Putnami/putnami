@@ -231,6 +231,8 @@ done
 		}
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	// The stub machine holds an Android SDK, as a developer's does.
+	t.Setenv(envAndroidHome, filepath.Join(bin, "android-sdk"))
 	return log
 }
 

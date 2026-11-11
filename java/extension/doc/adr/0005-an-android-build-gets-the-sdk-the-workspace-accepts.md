@@ -29,13 +29,19 @@ workspace's owner, so the extension cannot take it by default.
   ([ADR 0016 of the stack core](../../../../tooling/stacks/doc/adr/0016-a-stack-sets-the-environment-of-a-task.md)).
 - **What the extension installs.** With the option, a task of a Gradle build
   that applies the Android plugin, and the `workspace-install` of its stack
-  root, install the Android SDK command-line tools 23.0 (build 16111833) under
+  root, install the Android SDK command-line tools 22.0 (build 15859902) under
   `toolchains/android` of the Putnami home, checked by the SHA-256 of the
   archive for Linux, macOS on x64 and arm64, and Windows, and accept the
   licenses with `sdkmanager --licenses`, run on the pinned JDK 21. The SDK is
   `toolchains/android/sdk`, shared by the machine's builds; the tasks get it as
   `ANDROID_HOME` and `ANDROID_SDK_ROOT`. The Android Gradle plugin then
   downloads the platforms and build tools the build declares.
+- **Why 22.0.** From 23.0, `sdkmanager` hands over to the Android CLI: the
+  `android` binary downloads itself into `~/.android` with no digest the
+  extension can check, collects usage metrics, and `--licenses` writes no
+  license. The Android Gradle plugin 9.5.1 still reads the licenses from the
+  SDK's `licenses` directory and refuses to install a platform without them.
+  22.0 ships the `android` binary too, which the extension never runs.
 - **The machine's SDK first.** `ANDROID_HOME`, `ANDROID_SDK_ROOT` or `sdk.dir`
   in the stack root's `local.properties` keeps the machine's SDK, with or
   without the option.
@@ -50,6 +56,8 @@ workspace's owner, so the extension cannot take it by default.
 
 ## Rejected alternatives
 
+- **The newest command-line tools.** 23.0 accepts no license and runs a
+  download the extension cannot check; see "Why 22.0".
 - **Write the license files.** Writing the license hashes into
   `sdk/licenses` accepts licenses no one read, and breaks when Google changes
   the text; `sdkmanager --licenses` accepts the licenses the tools state.
@@ -62,11 +70,16 @@ workspace's owner, so the extension cannot take it by default.
 ## Consequences
 
 - A blank machine builds an Android project after `putnami install`, once the
-  workspace's owner set the option.
-- The SDK's platforms and build tools download on the first task that needs
-  them, or during `putnami install`, whose Gradle resolution configures the
-  build.
+  workspace's owner set the option. The extension's checks installed the
+  pinned tools from Google's archive, accepted the licenses with its
+  `sdkmanager`, and built a debug APK with the Android Gradle plugin 9.5.1 on
+  Gradle 9.8.2, which downloaded the platform, build tools and platform tools
+  into that SDK; the same build on an SDK with no license fails with "some
+  licences have not been accepted".
+- `putnami install` installs the command-line tools and accepts the
+  licenses; the platforms and build tools download on the first task whose
+  Gradle tasks need them.
 - Linux on arm64 gets no command-line tools: Google publishes the build tools
   for x64 only.
 - A new release of the command-line tools is a change of the extension, with
-  its SHA-256.
+  its SHA-256; moving past 22.0 needs another way to accept the licenses.
