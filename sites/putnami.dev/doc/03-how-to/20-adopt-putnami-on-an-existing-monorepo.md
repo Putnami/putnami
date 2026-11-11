@@ -221,10 +221,10 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
 - **Import**: a TypeScript project's `build`, `test` and `lint` whose script
   already runs `bun build`, `bun test` or Biome run as `@putnami/typescript`
   tasks, under Putnami's runner and cache. So does a `build` whose script
-  runs `tsc` alone, or whose executor is `@nx/js:tsc` with no `outputPath`:
-  Putnami compiles it with that `tsc`, into its `outDir`. Every
-  other target, a `jest` test or an `@nx/webpack:webpack` build for example,
-  keeps running through Nx, so no target changes the tool that checks it.
+  runs `tsc` alone: Putnami compiles it with that `tsc`, into its `outDir`.
+  Every other target, a `jest` test, an `@nx/js:tsc` or an
+  `@nx/webpack:webpack` build for example, keeps running through Nx, so no
+  target changes the tool that checks it.
 - **Delegate**: you keep Nx and its cache, local or Nx Cloud. Each task runs
   `nx run <project>:<target>` on one affected project, and Putnami caches
   nothing for it.
