@@ -22,7 +22,9 @@ terminal, in CI or from an agent, it imports unless `--mode delegate` is
 given; `--mode import` or `--mode delegate` skips the question. `init` writes
 a workspace that declares `@putnami/moon` with the mode under
 `options["@putnami/moon"].mode`, installs it, runs `putnami projects sync`,
-then installs the language extensions the sync declared.
+then installs the language extensions the sync declared. A TypeScript project
+then installs with the package manager the repository declares, npm, pnpm,
+Yarn or Bun, which keeps its lockfile.
 
 Rerun in a workspace, `init --from moon` prints the diff of what the sync
 would write and changes nothing; `--apply` writes it.

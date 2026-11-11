@@ -77,9 +77,12 @@ as `mode` does, so a preview reads the list it would record.
 
 Import mode declares `@putnami/typescript` in the workspace, and its own
 workspace setup then runs: it adds its devDependencies to the root
-`package.json`, writes there the `workspaces` list of the members, and writes
-a root `tsconfig.json`, `biome.json` and `bun.lock` when they are missing.
-Delegate mode declares only `@putnami/turbo` and changes none of them.
+`package.json`, lists the members where the repository's package manager reads
+them (`pnpm-workspace.yaml` for pnpm, the root `package.json` `workspaces`
+otherwise), writes a root `tsconfig.json` and `biome.json` when they are
+missing, and installs with that manager, which keeps its lockfile: no
+`bun.lock` is written. Delegate mode declares only `@putnami/turbo` and changes
+none of them.
 
 ## What the sync writes
 

@@ -1,6 +1,7 @@
 # Workspace Install
 
-The workspace-install command runs `bun install` at the workspace root to install all dependencies.
+The workspace-install command installs all dependencies at the workspace root
+with the package manager the repository declares: Bun, npm, pnpm or Yarn.
 
 ## Overview
 
@@ -19,12 +20,46 @@ putnami workspace-install
 putnami workspace-install --force
 ```
 
+## Which package manager installs
+
+The repository chooses its installer, so a Node repository that adopts Putnami
+keeps its lockfile:
+
+1. The `packageManager` field of the root `package.json`, such as
+   `pnpm@10.26.1`, names it: `bun`, `npm`, `pnpm` or `yarn`. Any other name
+   fails the install.
+2. Without that field, a file at the workspace root names it, looked for in
+   this order: `bun.lock` or `bun.lockb` (Bun), `pnpm-lock.yaml` or
+   `pnpm-workspace.yaml` (pnpm), `yarn.lock` (Yarn), `package-lock.json` or
+   `npm-shrinkwrap.json` (npm). After the Bun locks, this is the order the
+   Nx, Turborepo and moon probes read, so an import and the install name the
+   same manager.
+3. With none, the install runs Bun. A workspace `putnami init` creates
+   installs with Bun.
+
+Yarn is Yarn 2 or later when the declared version is, or, without a version,
+when the root holds a `.yarnrc.yml` or a `yarn.lock` in the Yarn 2 format.
+
+npm, pnpm and Yarn run from `PATH`, through Corepack (`corepack enable`) or a
+global install. The CLI provisions only Bun; when `PATH` holds no npm, pnpm or
+Yarn the workspace declares, the install fails with a message that names it.
+
+The installer only installs. Bun runs every TypeScript task (`bun test`,
+`bun build`, the type check and Biome) whatever the installer, so the Bun of
+the next section is needed in every TypeScript workspace. A Yarn 2 or later
+workspace sets `nodeLinker: node-modules` in `.yarnrc.yml`: Bun resolves
+packages from `node_modules`, which Plug'n'Play does not write.
+
+Every manager's lockfile and `pnpm-workspace.yaml` are inputs of the TypeScript
+tasks and install inputs of the workspace: a change to the lockfile in use
+invalidates the tasks' cache and makes `putnami` install again.
+
 ## Which Bun runs
 
 The extension installs no Bun. `putnami install` provisions the Bun release
 the workspace lock pins under the Putnami home, and every job, workspace-install
-and workspace-fetch included, runs the bun the CLI resolved for the extension's
-task runtime. The task runtime takes the first of these candidates that reports
+and workspace-fetch of a Bun workspace included, runs the bun the CLI resolved
+for the extension's task runtime. The task runtime takes the first of these candidates that reports
 the pinned release:
 
 1. `bun` on `PATH`.
@@ -75,16 +110,23 @@ the release on `PATH`.
 
 The command performs these steps:
 
-1. **Create the root `package.json`** — when the file is missing, writes `{"name": <workspace name>, "private": true, "workspaces": []}`. The name is the `name` in `putnami.workspace.json`, else the name of the workspace root directory. An existing file is never touched. `putnami projects sync` still creates no root `package.json`, so a Go-only or Python-only workspace gets none.
+1. **Create the root `package.json`** — when the file is missing, writes `{"name": <workspace name>, "private": true, "workspaces": []}`, without `workspaces` for pnpm, which lists its members in `pnpm-workspace.yaml`. The name is the `name` in `putnami.workspace.json`, else the name of the workspace root directory. An existing file is never touched. `putnami projects sync` still creates no root `package.json`, so a Go-only or Python-only workspace gets none.
 2. **Ensure workspace devDependencies** — adds required devDependencies (`@biomejs/biome`, `@types/bun`, `typescript`) to the workspace root `package.json` if they are not already present. Existing versions are never overridden. Biome is added at the exact release that the `$schema` of the shipped Biome rules names, never as a range.
-3. **List the workspace members** — writes the root `package.json` `workspaces` from the workspace membership, as `putnami projects sync` does: every member with a `package.json`, the workspace root excluded. A project created after the last `projects sync` is therefore installed, and a list that already matches is not rewritten. If the list cannot be read or written, the install fails before `bun install` runs.
-4. **Seed catalog entries** — for any package a member references with Bun's `catalog:` protocol but that is missing from the root catalog, an entry is added (pinned to `latest`) so `bun install` can resolve it. `@putnami/*` framework packages scaffolded by the templates are seeded this way; `putnami upgrade --deps` later pins them to an exact release. Existing catalog entries — Putnami or otherwise — are never overwritten.
-   When the install receives a channel other than `latest` through the `putnami-channel` job option, which `putnami init` sets for the channel it resolves on, a missing `@putnami/*` entry is the exact version that channel's dist-tag names for the package on the registry the workspace declares, never the channel name. A package the channel does not name fails the install before `bun install` runs; the seed does not read `latest` instead.
-5. **Declare the bun version** — when the root `package.json` has no `packageManager` field, the command runs `bun --version` with the bun it runs (see [Which Bun runs](#which-bun-runs)) and writes `"packageManager": "bun@<version>"`. `putnami install` pins the lock's bun toolchain from that field, and TypeScript tasks then run only with a bun of that exact version. An existing field is never changed. A bun whose version is not a plain release, such as a canary build, is not declared.
+3. **List the workspace members** — writes the workspace membership where the package manager reads it, as `putnami projects sync` does: the `packages` list of `pnpm-workspace.yaml` for pnpm, keeping every other line of the file, and the root `package.json` `workspaces` otherwise. It lists every member with a `package.json`, the workspace root excluded, as exact paths in place of the patterns the file held: a workspace package that is no Putnami project leaves the manager's workspace, and the monorepo tool's, so every package of an imported repository is a Putnami project. A project created after the last `projects sync` is therefore installed, and a list that already matches is not rewritten. If the list cannot be read or written, the install fails before the package manager runs.
+4. **Seed catalog entries** — with Bun or pnpm, the managers that read the `catalog:` protocol, for any package a member references through it but that is missing from the catalog, an entry is added (pinned to `latest`) so the install can resolve it: in the root `package.json` for Bun, and in the `catalog` or `catalogs` of `pnpm-workspace.yaml` for pnpm. npm and Yarn read no catalog and get no entry. `@putnami/*` framework packages scaffolded by the templates are seeded this way; `putnami upgrade --deps` later pins them to an exact release. Existing catalog entries — Putnami or otherwise — are never overwritten.
+   When the install receives a channel other than `latest` through the `putnami-channel` job option, which `putnami init` sets for the channel it resolves on, a missing `@putnami/*` entry is the exact version that channel's dist-tag names for the package on the registry the workspace declares, never the channel name. A package the channel does not name fails the install before the package manager runs; the seed does not read `latest` instead.
+5. **Declare the bun version** — in a workspace that installs with Bun, when the root `package.json` has no `packageManager` field, the command runs `bun --version` with the bun it runs (see [Which Bun runs](#which-bun-runs)) and writes `"packageManager": "bun@<version>"`. `putnami install` pins the lock's bun toolchain from that field, and TypeScript tasks then run only with a bun of that exact version. An existing field is never changed. A bun whose version is not a plain release, such as a canary build, is not declared.
 6. **Refresh the private-registry credential** — see below.
-7. **Run `bun install`** — executes `bun install` in the workspace root directory. Bun resolves all `workspace:*` and `catalog:` references and creates symlinks between workspace packages.
+7. **Install** — runs the package manager's install in the workspace root directory: `bun install`, `npm install`, `pnpm install` or `yarn install` (`--non-interactive` on Yarn 1). The manager resolves the `workspace:` and `catalog:` references, links the workspace packages, and writes its own lockfile; no other manager's lockfile is written.
 
-When `--force` is not set, Bun skips installation if `bun.lock` is already up to date.
+`--force` adds the manager's own reinstall flag: `--force` for Bun, npm, pnpm
+and Yarn 1. Yarn 2 and later has none and runs a plain install.
+
+`putnami upgrade --deps` pins the `@putnami/*` versions in the catalog the
+workspace declares, the root `package.json` one, else the `pnpm-workspace.yaml`
+one, in place, else in the root `dependencies`. It then reinstalls with the same
+package manager and its reinstall flag, and a failed install restores the root
+`package.json`, `pnpm-workspace.yaml` and that manager's lockfiles.
 
 Downloaded packages are shared across repositories and worktrees through Bun's
 machine-global cache. For a Bun the machine holds, that is
@@ -99,7 +141,7 @@ rather than `node_modules`.
 
 ## Private registries: credentials at install time
 
-`@putnami/*` packages live on a private registry. Before `bun install` runs, the
+`@putnami/*` packages live on a private registry. Before the install runs, the
 extension asks `@putnami/cloud` to write your npm credential for that registry:
 
 1. It reads the `@putnami:registry=` line from the workspace `.npmrc` — the line
@@ -127,48 +169,88 @@ On a hosted run, no process the repository controls can read a registry
 credential. A package's install script is such a process, so the download and
 the install are two jobs:
 
-1. **`workspace-fetch`** downloads what the committed `bun.lock` names into
-   bun's cache. It is the only job the engine hands the read credential to.
+1. **`workspace-fetch`** downloads what the committed lockfile names into the
+   package manager's cache. It is the only job the engine hands the read
+   credential to.
 2. **`workspace-install`** then installs from that cache. The engine marks every
    job of a hosted run with `PUTNAMI_OFFLINE_DEPENDENCIES=1`; with that mark the
-   install runs `bun install --frozen-lockfile` (plus `--force` when asked) and
-   refreshes no credential. Outside a hosted run it keeps the steps above
-   unchanged.
+   install runs frozen, and offline where the manager can, and refreshes no
+   credential. Outside a hosted run it keeps the steps above unchanged.
+
+| Manager | Hosted install |
+|---------|----------------|
+| Bun | `bun install --frozen-lockfile`, plus `--force` when asked |
+| npm | `npm ci --offline` |
+| pnpm | `pnpm install --frozen-lockfile --offline`, plus `--force` when asked |
+| Yarn 1 | `yarn install --non-interactive --frozen-lockfile --offline`, plus `--force` when asked |
+| Yarn 2 and later | `yarn install --immutable`, with `YARN_ENABLE_NETWORK=0` |
 
 On a hosted run, neither command shapes the workspace manifests (steps 1 to 5
 above, `tsconfig.json`, `biome.json` and the `.npmrc` scopes): both read the
 committed files as they are, so the install finds the manifests the fetch
 downloaded for, and no committed file changes. A manifest the committed
-`bun.lock` does not match fails the frozen install; run `putnami install`
+lockfile does not match fails the frozen install; run `putnami install`
 locally and commit the result.
 
 `workspace-fetch` works as follows:
 
 1. It reads the credential from the descriptor the engine hands it, before it
    starts any process, so no process inherits that descriptor.
-2. It requires a committed `bun.lock`. Without one it fails with "a hosted run
-   installs from a committed bun.lock; run `putnami install` locally and commit
-   it". It never writes the lock: a manifest the lock no longer matches fails
-   the fetch.
-3. It copies what a frozen install reads into a private temporary directory:
-   the root and member `package.json` files, `bun.lock`, `bunfig.toml`, the
-   patch files `patchedDependencies` names, the local `file:` dependencies,
-   and the workspace `.npmrc`. When a credential is handed, the copied
-   `.npmrc` loses its `_authToken`, `_auth` and `_password` lines, which would
-   otherwise replace the handed bearer. A `link:` dependency, or a local
-   dependency or patch outside the workspace, fails the fetch: a hosted run
-   fetches only what the workspace holds.
-4. It writes `//<host>/:_authToken=<bearer>` for each host of the credential in
-   a `.npmrc` (mode 0600) in a private home, points `HOME` and
-   `XDG_CONFIG_HOME` there, and sets `NPM_CONFIG_USERCONFIG` and
-   `npm_config_userconfig` to that file, so a user configuration the job's
-   environment names elsewhere does not replace it. The bearer is in that file
-   only, never in an environment variable.
-5. It runs `bun install --ignore-scripts --frozen-lockfile` in the copy, with
-   `BUN_INSTALL_CACHE_DIR` set to the cache `bun pm cache` reports for the
-   workspace, which is the cache `workspace-install` reads. No package script
-   runs, and the workspace gets no `node_modules`.
-6. It removes the copy and the private home when bun exits, also when the
+2. It runs no code the repository holds. A package manager inside the
+   workspace fails the fetch before any process starts, and so does, for
+   Yarn, a `.yarnrc.yml` or `.yarnrc` at the root or in a directory above it
+   (the home excepted) that mentions `yarnPath`, `yarn-path` or `plugins`, in
+   any letter case and even in a comment, or holds a backslash; and, for pnpm,
+   a `pnpm-workspace.yaml` or `.npmrc` that mentions `configDependencies` or a
+   pnpmfile, or holds a backslash. The check reads the text, so no quoted,
+   escaped or indented spelling of a key slips past it. Every process the
+   fetch starts, its cache probes in the workspace root included, also runs
+   with `YARN_IGNORE_PATH=1` or `npm_config_ignore_pnpmfile=true`, with
+   `COREPACK_ENV_FILE=0`, so a Corepack shim reads no `.corepack.env` from the
+   workspace, and without `COREPACK_ENABLE_UNSAFE_CUSTOM_URLS`. Declare the Yarn release in
+   `packageManager` instead of `yarnPath`; Corepack provides it.
+3. It requires the committed lockfile of the package manager: `bun.lock` for
+   Bun, `pnpm-lock.yaml`, `yarn.lock`, or `package-lock.json` or
+   `npm-shrinkwrap.json`. Without it the fetch fails with "a hosted run installs
+   from a committed <lockfile>; run `putnami install` locally and commit it".
+   It never writes the lock: a manifest the lock no longer matches fails the
+   fetch.
+4. It copies what a frozen install reads into a private temporary directory:
+   the root and member `package.json` files, the lockfile, the manager's
+   configuration (`bunfig.toml`, `pnpm-workspace.yaml` or `.yarnrc`), the
+   patch files the workspace names (`patchedDependencies` for Bun and pnpm,
+   `.yarn/patches` for Yarn 2 and later), the local `file:` dependencies, and
+   the workspace `.npmrc` and `.yarnrc.yml`. The members are those the
+   workspace lists and those the lockfile records. When a credential is
+   handed, the copied `.npmrc` loses its `_authToken`, `_auth` and `_password`
+   lines, and the copied `.yarnrc.yml` every line that mentions `npmAuthToken`
+   or `npmAuthIdent`, which would otherwise replace the handed bearer. A local dependency
+   or patch outside the workspace fails the fetch, and so does a `link:`
+   dependency of a Bun workspace: a hosted run fetches only what the workspace
+   holds.
+5. It writes `//<host>/:_authToken=<bearer>` for each host of the credential in
+   a `.npmrc` (mode 0600) in a private home, and for Yarn 2 and later the same
+   hosts as `npmRegistries` entries of a `.yarnrc.yml` there, since that Yarn
+   reads no `.npmrc`. It points `HOME` and `XDG_CONFIG_HOME` there, and sets
+   `NPM_CONFIG_USERCONFIG` and `npm_config_userconfig` to that `.npmrc`, so a
+   user configuration the job's environment names elsewhere does not replace
+   it. `COREPACK_HOME` keeps naming the user's Corepack folder, so the release
+   Corepack runs is not downloaded again. The bearer is in those files only,
+   never in an environment variable.
+6. It runs a frozen install with no lifecycle script in the copy, writing into
+   the cache the manager reports for the workspace, which is the cache
+   `workspace-install` reads:
+
+   | Manager | Scratch install | Cache |
+   |---------|-----------------|-------|
+   | Bun | `bun install --ignore-scripts --frozen-lockfile` | `BUN_INSTALL_CACHE_DIR` from `bun pm cache` |
+   | npm | `npm ci --ignore-scripts --no-audit --no-fund` | `--cache` from `npm config get cache` |
+   | pnpm | `pnpm fetch --ignore-scripts`, which reads only the lock, so a pnpmfile checksum it records needs no pnpmfile | `--store-dir` from `pnpm store path` |
+   | Yarn 1 | `yarn install --frozen-lockfile --ignore-scripts --non-interactive` | `--cache-folder` from `yarn cache dir` |
+   | Yarn 2 and later | `yarn install --immutable --mode=skip-build` (`--skip-builds` on Yarn 2), with `YARN_ENABLE_SCRIPTS=0` | `YARN_CACHE_FOLDER`, `YARN_GLOBAL_FOLDER` and `YARN_ENABLE_GLOBAL_CACHE` from `yarn config get` |
+
+   No package script runs, and the workspace gets no `node_modules`.
+7. It removes the copy and the private home when the install exits, also when the
    install fails or the job is stopped with SIGINT or SIGTERM. A SIGKILL leaves
    them in the temporary directory.
 
@@ -178,6 +260,9 @@ On a hosted run whose credential-provider holds no read credential, or that has
 no credential-provider, the engine hands a descriptor without one. The fetch then uses the credentials the machine
 already has and refreshes none: it starts no `putnami cloud registry-token`,
 which would run a CLI that does not hold the run credential.
+
+The hosted runner rewrites the registry URLs of `bun.lock` only; a hosted run of
+another manager reaches the registries its lockfile names.
 
 The fetch runs in a copy because bun 1.4 has no offline install: it accepts
 `--offline` and ignores it. An `--ignore-scripts` install in the workspace would
@@ -190,13 +275,15 @@ install scripts would never run.
 
 | Flag | Type | Default | Description |
 |------|------|---------|-------------|
-| `--force` | `boolean` | `false` | Force reinstall even if `bun.lock` is current |
+| `--force` | `boolean` | `false` | Force a reinstall with the package manager's own flag, even when the lockfile is current |
 
 ## Boundaries
 
-- **Scope**: Running `bun install` at workspace root, and on a hosted run
-  fetching the locked packages into bun's cache first
+- **Scope**: Running the install of the package manager the repository
+  declares at the workspace root, and on a hosted run fetching the locked
+  packages into that manager's cache first
 - **Out of scope**: Per-project dependency management, lockfile generation, package resolution
-- **Dependencies**: None on the machine. `putnami install` provisions Bun under
-  the Putnami home; the command installs none
+- **Dependencies**: Bun, which `putnami install` provisions under the Putnami
+  home, and the npm, pnpm or Yarn the repository declares, on `PATH`; the
+  command installs none
 - **Extension points**: None

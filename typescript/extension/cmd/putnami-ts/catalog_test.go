@@ -277,7 +277,7 @@ func TestEnsureWorkspaceCatalog_SeedsMissing(t *testing.T) {
 	}`)
 
 	ctx := &pctx.Context{WorkspaceRoot: dir}
-	if err := ensureWorkspaceCatalog(ctx, jsonl.New()); err != nil {
+	if err := ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager); err != nil {
 		t.Fatalf("ensureWorkspaceCatalog: %v", err)
 	}
 
@@ -306,7 +306,7 @@ func TestEnsureWorkspaceCatalog_NewTopLevelKeyAppended(t *testing.T) {
 	}`)
 
 	ctx := &pctx.Context{WorkspaceRoot: dir}
-	if err := ensureWorkspaceCatalog(ctx, jsonl.New()); err != nil {
+	if err := ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager); err != nil {
 		t.Fatalf("ensureWorkspaceCatalog: %v", err)
 	}
 
@@ -337,7 +337,7 @@ func TestEnsureWorkspaceCatalog_PreservesExisting(t *testing.T) {
 	}`)
 
 	ctx := &pctx.Context{WorkspaceRoot: dir}
-	if err := ensureWorkspaceCatalog(ctx, jsonl.New()); err != nil {
+	if err := ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager); err != nil {
 		t.Fatalf("ensureWorkspaceCatalog: %v", err)
 	}
 
@@ -373,7 +373,7 @@ func TestEnsureWorkspaceCatalog_SeedsNamedCatalogRefs(t *testing.T) {
 	}`)
 
 	ctx := &pctx.Context{WorkspaceRoot: dir}
-	if err := ensureWorkspaceCatalog(ctx, jsonl.New()); err != nil {
+	if err := ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager); err != nil {
 		t.Fatalf("ensureWorkspaceCatalog: %v", err)
 	}
 
@@ -412,7 +412,7 @@ func TestEnsureWorkspaceCatalog_NoRefsCreatesNothing(t *testing.T) {
 	}`)
 
 	ctx := &pctx.Context{WorkspaceRoot: dir}
-	if err := ensureWorkspaceCatalog(ctx, jsonl.New()); err != nil {
+	if err := ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager); err != nil {
 		t.Fatalf("ensureWorkspaceCatalog: %v", err)
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, "package.json"))

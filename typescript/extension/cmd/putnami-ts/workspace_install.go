@@ -12,8 +12,10 @@ import (
 	"time"
 
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/registrycred"
+	"go.putnami.dev/typescript/extension/internal/pnpmworkspace"
 	"go.putnami.dev/typescript/extension/internal/toolchain"
 )
 
@@ -21,9 +23,17 @@ func runWorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) 
 	force := ctx.Params.Bool("force", false)
 	hosted := registrycred.OfflineDependencies()
 
-	// The job installs no Bun: it runs the one the CLI resolved, which the
-	// CLI provisions under the Putnami home when the host holds none.
-	bunBin, err := resolveBunBin()
+	// The repository chooses the installer: its packageManager, else its root
+	// lockfile, else Bun.
+	manager, err := detectPackageManager(ctx.WorkspaceRoot)
+	if err != nil {
+		return "FAILED", nil, err
+	}
+
+	// The job installs no package manager: it runs the bun the CLI resolved,
+	// which the CLI provisions under the Putnami home when the host holds
+	// none, or the npm, pnpm or yarn the repository puts on PATH.
+	managerBin, err := resolveManagerBin(manager)
 	if err != nil {
 		return "FAILED", nil, err
 	}
@@ -31,23 +41,31 @@ func runWorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) 
 	// A hosted run installs the committed manifests as they are: it writes no
 	// file the repository commits, and workspace-fetch downloaded for these.
 	if !hosted {
-		if err := shapeWorkspaceManifests(ctx, emit, bunBin); err != nil {
+		if err := shapeWorkspaceManifests(ctx, emit, manager, managerBin); err != nil {
 			return "FAILED", nil, err
 		}
 	}
 
 	// Refresh the user's credential for the private registries the scope
-	// lines name, before bun goes and reads from them. A hosted run installs
-	// from the cache workspace-fetch filled, and a credential file in the
-	// user's home is what a lifecycle script could read.
+	// lines name, before the manager goes and reads from them. A hosted run
+	// installs from the cache workspace-fetch filled, and a credential file in
+	// the user's home is what a lifecycle script could read.
 	if !hosted {
 		refreshPutnamiNpmCredential(ctx, emit)
 	}
 
-	installArgs := workspaceInstallArgs(force, hosted)
+	if force && manager.Name == managerYarn && manager.Berry {
+		emit.Log("info", "yarn 2 and later have no forced reinstall: running a plain yarn install")
+	}
+	install := workspaceInstallInvocation(manager, force, hosted)
+	label := manager.Name + " install"
 
 	emit.PhaseStart("install")
-	result, err := runBunWithTimeout("bun install", bunBin, installArgs, ctx.WorkspaceRoot, bunNetworkTimeout)
+	var opts []exec.Option
+	if len(install.env) > 0 {
+		opts = append(opts, exec.Env(install.env))
+	}
+	result, err := runBunWithin(context.Background(), label, managerBin, install.args, ctx.WorkspaceRoot, bunNetworkTimeout, opts...)
 	if err != nil {
 		emit.PhaseEnd("install", "failed")
 		return "FAILED", nil, err
@@ -56,12 +74,12 @@ func runWorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) 
 	if !result.Success {
 		emit.PhaseEnd("install", "failed")
 		reportRegistryRefusal(emit, result.Stderr)
-		emit.Log("error", "bun install failed: "+result.Stderr)
+		emit.Log("error", label+" failed: "+result.Stderr)
 		return "FAILED", nil, nil
 	}
 
 	emit.PhaseEnd("install", "success")
-	emit.Log("info", "Workspace dependencies installed")
+	emit.Log("info", "Workspace dependencies installed with "+manager.label())
 
 	return "OK", nil, nil
 }
@@ -84,20 +102,19 @@ func workspaceInstallArgs(force, hosted bool) []string {
 	return args
 }
 
-// shapeWorkspaceManifests brings every workspace file bun reads to the state
-// an install uses: the extension's devDependencies, the member list, the
-// catalog entries, the packageManager declaration, tsconfig.json, biome.json
-// and the .npmrc scope lines. workspace-fetch and workspace-install both call
-// it, so the fetch downloads for exactly the manifests the install reads. Each
-// step writes only what is missing or stale, so a second call rewrites
-// nothing. A failure to create the root package.json, to list the members or
-// to materialize biome.json is returned; the other steps log a warning and
-// continue.
-func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin string) error {
+// shapeWorkspaceManifests brings every workspace file the package manager
+// reads to the state an install uses: the extension's devDependencies, the
+// member list, the catalog entries, the packageManager declaration of a Bun
+// workspace, tsconfig.json, biome.json and the .npmrc scope lines. Each step
+// writes only what is missing or stale, so a second call rewrites nothing. A
+// failure to create the root package.json, to list the members or to
+// materialize biome.json is returned; the other steps log a warning and
+// continue. managerBin is the executable of manager.
+func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, manager packageManager, managerBin string) error {
 	// Create the root package.json when it is missing, so every step below
 	// finds the file it shapes. A workspace with a TypeScript install has
 	// asked for it.
-	if err := ensureRootManifest(ctx, emit); err != nil {
+	if err := ensureRootManifest(ctx, emit, manager); err != nil {
 		return err
 	}
 
@@ -106,10 +123,10 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin stri
 		emit.Log("warn", "failed to ensure workspace devDependencies: "+err.Error())
 	}
 
-	// List every member in the root workspaces before bun reads it, so a
-	// project created since the last `projects sync` is installed too. The
+	// List every member where the manager reads them before it installs, so
+	// a project created since the last `projects sync` is installed too. The
 	// catalog seeding below reads the members from the same list.
-	if err := ensureWorkspaceMembership(ctx, emit); err != nil {
+	if err := ensureWorkspaceMembership(ctx, emit, manager); err != nil {
 		return err
 	}
 
@@ -117,17 +134,20 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin stri
 	// freshly scaffolded catalog-first workspace installs before its first
 	// `putnami upgrade --deps`. A seed on a channel the caller chose fails the
 	// install when it fails.
-	if err := ensureWorkspaceCatalog(ctx, emit); err != nil {
+	if err := ensureWorkspaceCatalog(ctx, emit, manager); err != nil {
 		if catalogSeedChannel(ctx) != defaultCatalogSeedChannel {
 			return fmt.Errorf("seed the workspace catalog: %w", err)
 		}
 		emit.Log("warn", "failed to ensure workspace catalog: "+err.Error())
 	}
 
-	// Declare the bun this install runs with, so the lock written after the
-	// installers pins the bun the task runtime probes.
-	if err := ensureWorkspacePackageManager(ctx, emit, bunBin); err != nil {
-		emit.Log("warn", "failed to declare the workspace packageManager: "+err.Error())
+	// Declare the bun a Bun workspace installs with, so the lock written after
+	// the installers pins the bun the task runtime probes. A workspace on
+	// another manager already declares it, or names it by its lockfile.
+	if manager.Name == managerBun {
+		if err := ensureWorkspacePackageManager(ctx, emit, managerBin); err != nil {
+			emit.Log("warn", "failed to declare the workspace packageManager: "+err.Error())
+		}
 	}
 
 	// Ensure workspace tsconfig.json exists.
@@ -151,10 +171,11 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, bunBin stri
 // ensureRootManifest writes the root package.json, as a private package named
 // after the workspace with an empty member list, when the file is missing. The
 // name is the workspace name of the job context, which core read from
-// putnami.workspace.json, else the root directory's name.
+// putnami.workspace.json, else the root directory's name. A pnpm workspace
+// lists its members in pnpm-workspace.yaml, so its manifest has no workspaces.
 // An existing file is never touched, so a second call rewrites nothing. The
 // membership step fills the list.
-func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter) error {
+func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter, manager packageManager) error {
 	pkgPath := filepath.Join(ctx.WorkspaceRoot, "package.json")
 	if _, err := os.Stat(pkgPath); err == nil {
 		return nil
@@ -166,11 +187,15 @@ func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter) error {
 		return fmt.Errorf("marshal the workspace name: %w", err)
 	}
 	pkg := map[string]json.RawMessage{
-		"name":       name,
-		"private":    json.RawMessage("true"),
-		"workspaces": json.RawMessage("[]"),
+		"name":    name,
+		"private": json.RawMessage("true"),
 	}
-	if err := writeRootManifest(pkgPath, pkg, []string{"name", "private", "workspaces"}); err != nil {
+	order := []string{"name", "private"}
+	if !manager.listsMembersInPNPMWorkspace() {
+		pkg["workspaces"] = json.RawMessage("[]")
+		order = append(order, "workspaces")
+	}
+	if err := writeRootManifest(pkgPath, pkg, order); err != nil {
 		return err
 	}
 	emit.Log("info", "created package.json for the workspace "+string(name))
@@ -186,18 +211,18 @@ func workspaceManifestName(ctx *pctx.Context) string {
 	return filepath.Base(ctx.WorkspaceRoot)
 }
 
-// ensureWorkspaceMembership writes the root package.json `workspaces` from the
-// complete workspace membership in the job context, with the workspace-sync
-// task's own code, so it writes the list `projects sync` writes. A context
-// without the membership leaves the manifest alone: an unknown membership
-// never rewrites the list. An unchanged list is not rewritten.
-func ensureWorkspaceMembership(ctx *pctx.Context, emit *jsonl.Emitter) error {
+// ensureWorkspaceMembership writes the complete workspace membership in the
+// job context where manager reads it, with the workspace-sync task's own code,
+// so it writes the list `projects sync` writes. A context without the
+// membership leaves the files alone: an unknown membership never rewrites the
+// list. An unchanged list is not rewritten.
+func ensureWorkspaceMembership(ctx *pctx.Context, emit *jsonl.Emitter, manager packageManager) error {
 	if len(ctx.WorkspaceProjects) == 0 {
 		return nil
 	}
-	change, err := syncRootWorkspaces(ctx.WorkspaceRoot, typeScriptMembers(ctx.WorkspaceRoot, ctx.WorkspaceProjects), false)
+	change, err := syncWorkspaceMembers(ctx.WorkspaceRoot, manager, typeScriptMembers(ctx.WorkspaceRoot, ctx.WorkspaceProjects), false)
 	if err != nil {
-		return fmt.Errorf("write the workspace members to package.json: %w", err)
+		return fmt.Errorf("write the workspace members: %w", err)
 	}
 	if change != nil {
 		emit.Log("info", fmt.Sprintf("%s: %s %s → %s", change.Path, change.Field, change.Before, change.After))
@@ -278,63 +303,58 @@ func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 		return nil
 	}
 
-	// Read workspace package.json, which ensureRootManifest has created.
+	// Read workspace package.json, which ensureRootManifest has created, with
+	// the order of its top-level keys.
 	pkgPath := filepath.Join(ctx.WorkspaceRoot, "package.json")
-	pkgData, err := os.ReadFile(pkgPath)
-	if err != nil {
+	if _, err := os.Stat(pkgPath); err != nil {
 		return fmt.Errorf("read package.json: %w", err)
 	}
-
-	var pkg map[string]json.RawMessage
-	if err := json.Unmarshal(pkgData, &pkg); err != nil {
-		return fmt.Errorf("parse package.json: %w", err)
+	pkg, order, err := readRootManifest(pkgPath)
+	if err != nil {
+		return err
 	}
 
-	// Parse existing devDependencies.
-	devDeps := make(map[string]string)
+	// Parse existing devDependencies, with the order of their keys.
+	devDeps := make(map[string]json.RawMessage)
+	var devOrder []string
 	if raw, ok := pkg["devDependencies"]; ok {
 		if err := json.Unmarshal(raw, &devDeps); err != nil {
 			return fmt.Errorf("parse devDependencies: %w", err)
 		}
-	}
-
-	// Add missing dependencies.
-	var added []string
-	for name, version := range manifest.WorkspaceDevDeps {
-		if _, exists := devDeps[name]; !exists {
-			devDeps[name] = version
-			added = append(added, name)
+		if devOrder, err = topLevelKeyOrder(raw); err != nil {
+			return fmt.Errorf("parse devDependencies key order: %w", err)
 		}
 	}
 
+	// Add missing dependencies, after the existing ones, in name order.
+	var added []string
+	for name := range manifest.WorkspaceDevDeps {
+		if _, exists := devDeps[name]; !exists {
+			added = append(added, name)
+		}
+	}
 	if len(added) == 0 {
 		return nil
 	}
-
 	sort.Strings(added)
 	for _, name := range added {
-		emit.Log("info", "adding workspace devDependency: "+name+"@"+devDeps[name])
+		version, err := json.Marshal(manifest.WorkspaceDevDeps[name])
+		if err != nil {
+			return fmt.Errorf("marshal devDependency %s: %w", name, err)
+		}
+		devDeps[name] = version
+		devOrder = append(devOrder, name)
+		emit.Log("info", "adding workspace devDependency: "+name+"@"+manifest.WorkspaceDevDeps[name])
 	}
 
-	// Write back devDependencies.
-	devDepsJSON, err := json.Marshal(devDeps)
+	// Write back devDependencies; the root manifest and the devDependencies
+	// keep the key order they were read in.
+	devDepsJSON, err := json.Marshal(orderedRawObject{keys: manifestKeyOrder(devDeps, devOrder), values: devDeps})
 	if err != nil {
 		return fmt.Errorf("marshal devDependencies: %w", err)
 	}
 	pkg["devDependencies"] = devDepsJSON
-
-	// Write package.json with 2-space indent.
-	out, err := json.MarshalIndent(pkg, "", "  ")
-	if err != nil {
-		return fmt.Errorf("marshal package.json: %w", err)
-	}
-	out = append(out, '\n')
-
-	if err := os.WriteFile(pkgPath, out, 0644); err != nil {
-		return fmt.Errorf("write package.json: %w", err)
-	}
-
-	return nil
+	return writeRootManifest(pkgPath, pkg, order)
 }
 
 // ensureWorkspaceNpmrc renders the workspace .npmrc scope lines from the
@@ -531,10 +551,12 @@ func catalogSeedChannel(ctx *pctx.Context) string {
 
 // ensureWorkspaceCatalog seeds the workspace catalog with any @putnami/* package
 // that a member references through the "catalog:" protocol but that is missing
-// from the referenced catalog. Bun fails the install when a catalog dependency
-// has no catalog entry, so this keeps freshly scaffolded catalog-first packages
-// installable before the first `putnami upgrade --deps`. Existing catalog
-// entries (including non-Putnami ones such as react) are never touched.
+// from the referenced catalog: in the root package.json for Bun, and in
+// pnpm-workspace.yaml for pnpm (ensurePNPMWorkspaceCatalog). Both fail the
+// install when a catalog dependency has no catalog entry, so this keeps freshly
+// scaffolded catalog-first packages installable before the first `putnami
+// upgrade --deps`. npm and Yarn read no catalog and get no seed. Existing
+// catalog entries (including non-Putnami ones such as react) are never touched.
 //
 // On latest, a missing entry is seeded with the "latest" dist-tag; deps-upgrade
 // later pins it to the resolved release. On any other channel
@@ -543,10 +565,16 @@ func catalogSeedChannel(ctx *pctx.Context) string {
 // declares, never with the channel name: the workspace then installs that
 // release and follows no channel. A package the channel does not name fails
 // the seed, and nothing is written; the seed never reads latest instead.
-func ensureWorkspaceCatalog(ctx *pctx.Context, emit *jsonl.Emitter) error {
+func ensureWorkspaceCatalog(ctx *pctx.Context, emit *jsonl.Emitter, manager packageManager) error {
+	if !manager.readsCatalogs() {
+		return nil
+	}
 	refs := collectCatalogPutnamiRefs(ctx.WorkspaceRoot)
 	if len(refs) == 0 {
 		return nil
+	}
+	if manager.Name == managerPNPM {
+		return ensurePNPMWorkspaceCatalog(ctx, emit, refs)
 	}
 
 	pkgPath := filepath.Join(ctx.WorkspaceRoot, "package.json")
@@ -686,4 +714,57 @@ func catalogNameFromSpec(spec string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimPrefix(spec, catalogProtocol), true
+}
+
+// ensurePNPMWorkspaceCatalog seeds each missing reference of refs in
+// pnpm-workspace.yaml, where pnpm reads its catalogs: the default `catalog` for
+// a bare catalog: and `catalogs.<name>` for catalog:<name>. The seed is the one
+// catalogSeedVersions picks for Bun. Every other line of the file is kept, and
+// a file that holds every reference is not rewritten.
+func ensurePNPMWorkspaceCatalog(ctx *pctx.Context, emit *jsonl.Emitter, refs []catalogPutnamiRef) error {
+	path := pnpmWorkspaceFile(ctx.WorkspaceRoot)
+	data, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return fmt.Errorf("read %s: %w", pnpmworkspace.File, err)
+	}
+	cats, err := pnpmworkspace.ReadCatalogs(string(data))
+	if err != nil {
+		return err
+	}
+	var missing []catalogPutnamiRef
+	for _, ref := range refs {
+		selected := cats.Default
+		if ref.catalog != "" {
+			selected = cats.Named[ref.catalog]
+		}
+		if _, ok := selected[ref.name]; !ok {
+			missing = append(missing, ref)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+
+	seeds, err := catalogSeedVersions(ctx, emit, missing, catalogSeedChannel(ctx))
+	if err != nil {
+		return err
+	}
+	entries := make([]pnpmworkspace.Seed, 0, len(missing))
+	added := make([]string, 0, len(missing))
+	for _, ref := range missing {
+		entries = append(entries, pnpmworkspace.Seed{Catalog: ref.catalog, Name: ref.name, Version: seeds[ref.name]})
+		added = append(added, ref.label()+"@"+seeds[ref.name])
+	}
+	updated, err := pnpmworkspace.AddCatalogEntries(string(data), entries)
+	if err != nil {
+		return err
+	}
+	sort.Strings(added)
+	for _, entry := range added {
+		emit.Log("info", "seeding "+pnpmworkspace.File+" catalog entry: "+entry)
+	}
+	if err := os.WriteFile(path, []byte(updated), 0644); err != nil {
+		return fmt.Errorf("write %s: %w", pnpmworkspace.File, err)
+	}
+	return nil
 }

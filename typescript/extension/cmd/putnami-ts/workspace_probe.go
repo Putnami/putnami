@@ -54,10 +54,15 @@ const workspaceMarkerFile = "package.json"
 const workspaceDocumentFile = "putnami.json"
 
 // typeScriptWorkspaceRootFiles are the dependency-resolution inputs shared by
-// every package in the Bun workspace. They ride the existing per-project
-// watchedFiles member so newer providers stay readable by strict v1 cores while
-// core still learns no TypeScript-specific filename vocabulary.
-var typeScriptWorkspaceRootFiles = []string{"bun.lock", "bun.lockb", workspaceMarkerFile, "putnami.workspace.json"}
+// every package in the workspace: the lockfile of each package manager the
+// workspace install runs, pnpm-workspace.yaml, the root package.json and the
+// workspace document. They ride the existing per-project watchedFiles member
+// so newer providers stay readable by strict v1 cores while core still learns
+// no TypeScript-specific filename vocabulary.
+var typeScriptWorkspaceRootFiles = []string{
+	"bun.lock", "bun.lockb", "npm-shrinkwrap.json", "package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock",
+	workspaceMarkerFile, "putnami.workspace.json",
+}
 
 // probeManifest is the subset of package.json this probe reads. It is
 // deliberately NOT strict: a package.json carries dozens of members this
