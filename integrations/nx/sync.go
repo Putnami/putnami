@@ -357,6 +357,9 @@ type projectPlan struct {
 	// vitest or jest, or "" when it records none.
 	runner   string
 	unmapped []Unmapped
+	// compiler reports an @nx/js:tsc build the TypeScript extension compiles
+	// with tsc, for which the sync writes the tsc compiler (ADR 0003).
+	compiler bool
 }
 
 // planProject maps the targets of one project in the mode.
@@ -382,9 +385,10 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 		if ok && task == "build" && !covered {
 			// A tsc build moves when the TypeScript extension compiles it
 			// with that tsc (ADR 0009 of @putnami/typescript).
-			var tscCovered bool
-			tscCovered, reason = tscBuild(root, p.Path, target)
+			var tscCovered, compiler bool
+			tscCovered, compiler, reason = tscBuild(root, p.Path, target)
 			covered = isTS && tscCovered
+			plan.compiler = covered && compiler
 		}
 		if reason == "" && ok {
 			reason = importReason(typeScript, isTS, task, target)
@@ -659,9 +663,11 @@ func ownedJobs() []string {
 // workspace-relative file and writes it when a member the sync owns changes:
 // the extension, @putnami/typescript for an imported TypeScript project, the
 // dependencies on Nx projects, the entries of disable.jobs it owns,
-// options["@putnami/nx"].tasks.test.reports and
-// options["@putnami/typescript:test"].runner. Every other member is kept as
-// it is. It returns the change, or nil when the file is current.
+// options["@putnami/nx"].tasks.test.reports,
+// options["@putnami/typescript:test"].runner, and
+// options["@putnami/typescript"].compiler as setCompiler owns it. Every other
+// member is kept as it is. It returns the change, or nil when the file is
+// current.
 func writeProject(root, file string, plan projectPlan, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)
@@ -692,6 +698,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	setDisabled(doc, plan.disabled)
 	setReports(doc, plan.reports)
 	setRunner(doc, plan.runner)
+	setCompiler(doc, plan.typeScript && plan.compiler)
 
 	if existing != nil && reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
@@ -714,6 +721,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	setDisabled(doc, nil)
 	setReports(doc, nil)
 	setRunner(doc, "")
+	setCompiler(doc, false)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
 	}

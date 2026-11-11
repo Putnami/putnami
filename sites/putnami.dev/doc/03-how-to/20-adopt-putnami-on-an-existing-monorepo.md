@@ -225,9 +225,12 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
   test target of the `@nx/vite:test` or `@nx/jest:jest` executor. A Vitest or
   Jest test keeps its runner and its configuration. So does a `build` whose
   script runs `tsc` alone: Putnami compiles it with that `tsc`, into its
-  `outDir`. Every other target, an `@nx/js:tsc` or `@nx/webpack:webpack` build
-  or an `eslint` lint for example, keeps running through Nx, so no target
-  changes the tool that checks it.
+  `outDir`, and an `@nx/js:tsc` build whose options repeat its `tsconfig`
+  (`outputPath` its `outDir`, `rootDir` its `rootDir`, no `assets`,
+  `generatePackageJson` `false`). Every other target, another `@nx/js:tsc`
+  or an `@nx/webpack:webpack` build or an `eslint` lint for example, keeps
+  running through Nx, listed with its reason, so no target changes the tool
+  that checks it.
 - **Delegate**: you keep Nx and its cache, local or Nx Cloud. Each task runs
   `nx run <project>:<target>` on one affected project, and Putnami caches
   nothing for it.
