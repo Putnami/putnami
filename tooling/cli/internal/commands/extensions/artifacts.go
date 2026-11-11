@@ -310,6 +310,10 @@ type artifactOps struct {
 	// at an exact version, named in a hint. Empty means
 	// "putnami <plural> install" (installCmd).
 	installCommand string
+	// configEdited reports a removal whose caller already removed the
+	// artifact from the workspace config, so removeExtension prints no note
+	// asking to.
+	configEdited bool
 
 	// localPlatform is the "os/arch" lock key this process installs for. Its
 	// digest may only ever come from locally downloaded, hashed and verified

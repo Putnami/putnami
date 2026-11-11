@@ -749,6 +749,8 @@ func removeExtension(wsRoot string, cfg *wsproto.Config, args []string, ops arti
 	for _, dep := range pruned {
 		iox.Fprintf(os.Stdout, "  ✓ Removed %s, which no declared extension requires any more\n", dep)
 	}
-	iox.Fprintf(os.Stdout, "  Note: update putnami.workspace.json %s field manually\n", ops.plural)
+	if !ops.configEdited {
+		iox.Fprintf(os.Stdout, "  Note: update putnami.workspace.json %s field manually\n", ops.plural)
+	}
 	return nil
 }

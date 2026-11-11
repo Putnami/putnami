@@ -134,6 +134,8 @@ type initFromCalls struct {
 	declares [][]string
 	// imports are the import lists each preview was given, nil for none.
 	imports [][]string
+	// removed are the extensions --apply removed from the lock and the disk.
+	removed []string
 }
 
 func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
@@ -144,10 +146,17 @@ func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
 		calls.installed = append(calls.installed, args...)
 		return nil
 	}
-	origSync, origPreview, origTerminal, origInput := syncInitProjects, previewInitSync, initIsTerminal, initPromptInput
+	origSync, origPreview, origTerminal, origInput, origRemove := syncInitProjects, previewInitSync, initIsTerminal, initPromptInput, removeInitExtension
 	t.Cleanup(func() {
-		syncInitProjects, previewInitSync, initIsTerminal, initPromptInput = origSync, origPreview, origTerminal, origInput
+		syncInitProjects, previewInitSync, initIsTerminal, initPromptInput, removeInitExtension = origSync, origPreview, origTerminal, origInput, origRemove
 	})
+	removeInitExtension = func(_ string, before *wsproto.Config, name string) error {
+		if before == nil || !slices.Contains(before.Extensions.Names(), name) {
+			t.Errorf("removed %s, which the config before did not declare", name)
+		}
+		calls.removed = append(calls.removed, name)
+		return nil
+	}
 	syncInitProjects = func(_ context.Context, _ string, cfg *wsproto.Config, _ LifecycleEnv) error {
 		calls.synced = cfg
 		return nil
@@ -351,9 +360,11 @@ func TestInitFromRerunPreviewsAndWritesOnlyWithApply(t *testing.T) {
 	if err != nil || calls.synced == nil || len(calls.previewed) != 0 {
 		t.Fatalf("err %v, calls %+v\n%s", err, calls, out)
 	}
+	// No putnami.json names @putnami/typescript any more: the extension the
+	// import declared leaves.
 	cfg := readInitConfig(t, dir)
-	if cfg.Options["@putnami/nx"].Mode != "delegate" || !slices.Equal(cfg.Extensions, []string{"@putnami/nx", "@putnami/typescript"}) || cfg.Name != "shop" {
-		t.Errorf("workspace config = %+v", cfg)
+	if cfg.Options["@putnami/nx"].Mode != "delegate" || !slices.Equal(cfg.Extensions, []string{"@putnami/nx"}) || cfg.Name != "shop" || !slices.Equal(calls.removed, []string{"@putnami/typescript"}) {
+		t.Errorf("workspace config = %+v, removed %v", cfg, calls.removed)
 	}
 
 	// Back to import from a delegate-only workspace: --apply declares and
@@ -757,5 +768,78 @@ func TestInitFromImportAddsProjectsToTheListAndPreviewsWithoutApply(t *testing.T
 	}
 	if want := []string{"@putnami/turbo", "@putnami/typescript"}; !slices.Equal(cfg.Extensions, want) || !slices.Equal(calls.installed, want) {
 		t.Errorf("extensions %v, installed %v, want %v", cfg.Extensions, calls.installed, want)
+	}
+}
+
+func TestALeaveOfImportRemovesTheExtensionsNoProjectNames(t *testing.T) {
+	spectest.Proves(t, initFromFeature, "init-leaving-import-removes-its-extensions", "a-switch-to-delegate-removes-the-extensions-no-project-names")
+	dir := t.TempDir()
+	t.Chdir(dir)
+	for file, content := range map[string]string{
+		".moon/workspace.yml":           "projects: ['apps/*']\n",
+		wsproto.WorkspaceConfigFilename: `{"name": "shop", "extensions": {"@putnami/moon": "", "@putnami/go": "", "@putnami/typescript": "^0.3.0"}, "options": {"@putnami/moon": {"mode": "import"}}}`,
+		// After the sync, a project the team owns still runs Go.
+		"tools/gen/putnami.json":      `{"extensions": ["@putnami/go"]}`,
+		"node_modules/x/putnami.json": `{"extensions": ["@putnami/typescript"]}`,
+		"apps/web/putnami.json":       `{"extensions": ["@putnami/moon"]}`,
+	} {
+		if err := os.MkdirAll(filepath.Dir(filepath.Join(dir, file)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, file), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The preview names each candidate, and writes nothing.
+	calls := stubInitFrom(t, false, "")
+	out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "moon", "--mode", "delegate"}, LifecycleEnv{})
+	})
+	if err != nil || len(calls.removed) != 0 {
+		t.Fatalf("err %v, removed %v\n%s", err, calls.removed, out)
+	}
+	for _, e := range []string{"@putnami/go", "@putnami/typescript"} {
+		if !strings.Contains(out, "extensions - "+e+", unless a putnami.json still names it") {
+			t.Errorf("the preview names %s:\n%s", e, out)
+		}
+	}
+
+	calls = stubInitFrom(t, false, "")
+	out, err = captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "moon", "--mode", "delegate", "--apply"}, LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("err %v\n%s", err, out)
+	}
+	if !slices.Equal(calls.removed, []string{"@putnami/typescript"}) || !strings.Contains(out, "@putnami/go stays declared") {
+		t.Errorf("removed %v\n%s", calls.removed, out)
+	}
+	data, _ := os.ReadFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename))
+	var doc struct {
+		Extensions map[string]string `json:"extensions"`
+	}
+	if err := json.Unmarshal(data, &doc); err != nil || !maps.Equal(doc.Extensions, map[string]string{"@putnami/moon": "", "@putnami/go": ""}) {
+		t.Errorf("extensions = %v (%v)\n%s", doc.Extensions, err, data)
+	}
+
+	// A workspace that records no mode imported: it leaves import too.
+	calls = stubInitFrom(t, false, "")
+	if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(`{"name": "shop", "extensions": ["@putnami/moon", "@putnami/typescript"]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "moon", "--mode", "delegate", "--apply"}, LifecycleEnv{})
+	}); err != nil || !slices.Equal(calls.removed, []string{"@putnami/typescript"}) {
+		t.Errorf("a workspace that records no mode imported: err %v, removed %v", err, calls.removed)
+	}
+	if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(`{"name": "shop", "extensions": ["@putnami/moon", "@putnami/typescript"], "options": {"@putnami/moon": {"mode": "delegate"}}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	calls = stubInitFrom(t, false, "")
+	if _, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), dir, []string{"--from", "moon", "--mode", "delegate", "--apply"}, LifecycleEnv{})
+	}); err != nil || len(calls.removed) != 0 {
+		t.Errorf("a workspace already delegated removes nothing: err %v, removed %v", err, calls.removed)
 	}
 }

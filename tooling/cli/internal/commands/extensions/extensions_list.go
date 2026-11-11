@@ -110,6 +110,15 @@ func ExtensionsRemove(wsRoot string, cfg *wsproto.Config, args []string) error {
 	return removeExtension(wsRoot, cfg, args, extensionOps(wsRoot))
 }
 
+// ExtensionsRemoveUndeclared removes from the lock and the disk an extension
+// the caller removed from the workspace config, with each dependency no
+// remaining declaration requires; cfg is the config as it was before.
+func ExtensionsRemoveUndeclared(wsRoot string, cfg *wsproto.Config, name string) error {
+	ops := extensionOps(wsRoot)
+	ops.configEdited = true
+	return removeExtension(wsRoot, cfg, []string{name}, ops)
+}
+
 func extensionListEntries(extMap map[string]string, lockFile *lockfile.LockFile, discovered []*extension.ExtensionDescription, rows []artifactListEntry) []artifactListEntry {
 	var entries []artifactListEntry
 	for _, name := range sortedStringKeys(extMap) {
