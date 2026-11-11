@@ -47,6 +47,9 @@ func tscBuild(root, dir string, target detect.Target) (covered, compiler bool, r
 			return false, false, fmt.Sprintf("@putnami/typescript compiles the tsc of the package.json build script, not the nx:run-commands command %q: build keeps running through nx run", command)
 		}
 	case nxJsTsc:
+		if compiler := projectCompiler(root, dir); compiler != "" && compiler != "tsc" {
+			return false, false, fmt.Sprintf("@nx/js:tsc compiles with tsc, and the project's putnami.json sets the compiler %s: build keeps running through nx run", compiler)
+		}
 		if reason := nxJsTscDiffers(root, dir, target.Options); reason != "" {
 			return false, false, "@nx/js:tsc " + reason + ", which @putnami/typescript does not reproduce: build keeps running through nx run"
 		}
@@ -58,10 +61,12 @@ func tscBuild(root, dir string, target detect.Target) (covered, compiler bool, r
 // nxJsTscOptions are the @nx/js:tsc options the tsc build reproduces once the
 // executor copies no assets, runs no transformers and writes no package.json:
 // the ones that decide what it compiles and where, and the ones it reads only
-// to write the package.json, to clean or to watch.
+// to write the package.json, to clean or to watch. external and
+// externalBuildTargets are not among them: set, they make the executor inline
+// dependencies into its outputPath and rewrite their imports.
 var nxJsTscOptions = []string{
 	"additionalEntryPoints", "assets", "buildableProjectDepsInPackageJsonType",
-	"clean", "external", "externalBuildTargets", "generateExportsField",
+	"clean", "generateExportsField",
 	"generatePackageJson", "main", "outputPath", "rootDir", "transformers",
 	"tsConfig", "updateBuildableProjectDepsInPackageJson", "watch",
 }
@@ -134,7 +139,7 @@ func nxJsTscDiffers(root, dir string, options map[string]any) string {
 	}
 	if writesBuildInfo := buildMode || chain.True("incremental") || chain.True("composite"); writesBuildInfo {
 		if _, ok := chain.Path("tsBuildInfoFile", configDir); !ok {
-			return fmt.Sprintf("places the .tsbuildinfo of %s, which sets no tsBuildInfoFile, where the tsc build does not", configRel)
+			return fmt.Sprintf("places the .tsbuildinfo of %s, which sets no tsBuildInfoFile, by its own rule, which the tsc build may not follow", configRel)
 		}
 	}
 	return ""
@@ -164,6 +169,23 @@ func tscConfig(abs string) (config string, buildMode bool, reason string) {
 		return "", false, fmt.Sprintf("is the build, and the config %s the tsc build would compile does not exist", filepath.ToSlash(rel))
 	}
 	return config, buildMode, ""
+}
+
+// projectCompiler returns the compiler the project's putnami.json sets in
+// options["@putnami/typescript"].compiler, or "" when it sets none.
+func projectCompiler(root, dir string) string {
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(dir), "putnami.json")) //nolint:gosec // a manifest of the project
+	if err != nil {
+		return ""
+	}
+	var doc struct {
+		Options map[string]map[string]any `json:"options"`
+	}
+	if json.Unmarshal(data, &doc) != nil {
+		return ""
+	}
+	compiler, _ := doc.Options[TypeScriptExtension]["compiler"].(string)
+	return compiler
 }
 
 // buildScript returns the build script of the project's package.json.

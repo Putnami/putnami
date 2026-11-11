@@ -136,11 +136,12 @@ type Target struct {
 	Outputs []string `json:"outputs,omitempty"`
 	// Test reports whether the target runs tests.
 	Test bool `json:"test,omitempty"`
-	// Options are the options nx run passes the executor: the targetDefaults
-	// of nx.json for its executor, else its name, overlaid by the target's
-	// options, then by those of its defaultConfiguration, with
-	// {projectRoot}, {workspaceRoot} and {projectName} replaced in each
-	// string.
+	// Options are the options nx run passes the executor: the target laid
+	// over its nx.json targetDefaults entry, its executor's, else its name's,
+	// else a glob's that matches its name, then its defaultConfiguration's
+	// options, with {projectRoot}, {workspaceRoot} and {projectName} replaced
+	// in each string. Executor is the one the entry gives a target that names
+	// none.
 	Options map[string]any `json:"options,omitempty"`
 }
 
@@ -825,14 +826,15 @@ func (d *detector) metadata(name, source, root string, targets map[string]nxTarg
 				outputs = byExecutor.Outputs
 			}
 		}
-		test := isTestTarget(targetName, target)
-		described := Target{Name: targetName, Executor: target.Executor, Command: targetCommand(target), Test: test,
-			Options: effectiveOptions(targetName, target, defaults, root, name)}
+		effective := withDefaults(targetName, target, defaults)
+		test := isTestTarget(targetName, effective)
+		described := Target{Name: targetName, Executor: effective.Executor, Command: targetCommand(target), Test: test,
+			Options: effectiveOptions(effective, root, name)}
 		if script, ok := target.Options["script"].(string); ok && described.Command == "" && target.Executor == "nx:run-script" {
 			described.Command = d.script(root, script)
 		}
 		for _, output := range outputs {
-			resolved, ok := resolveOutput(output, root, name, target.Options)
+			resolved, ok := resolveOutput(output, root, name, effectiveOptions(effective, root, name))
 			if !ok {
 				continue
 			}
@@ -851,54 +853,115 @@ func (d *detector) metadata(name, source, root string, targets map[string]nxTarg
 	return data
 }
 
-// effectiveOptions merges the options nx run passes a target's executor: the
-// targetDefaults entry of its executor, else of its name, then the target's
-// own options, then those of its defaultConfiguration, each key replacing the
-// one before it. The tokens {projectRoot}, {workspaceRoot} and {projectName}
-// are replaced in each string, and each string of a list. It returns nil when
-// no layer sets an option.
-func effectiveOptions(targetName string, target nxTarget, defaults map[string]nxTarget, root, name string) map[string]any {
-	var layers []map[string]any
-	if byExecutor, ok := defaults[target.Executor]; ok && target.Executor != "" {
-		layers = append(layers, byExecutor.Options)
-	} else if byName, ok := defaults[targetName]; ok {
-		layers = append(layers, byName.Options)
+// withDefaults lays a target over its nx.json targetDefaults entry as Nx
+// does: the entry of its executor, else of its name, else of the first glob
+// key, in sorted order, that matches its name; an entry whose executor
+// differs from the target's applies to none. The target's executor, options,
+// defaultConfiguration and each configuration's options win over the entry's,
+// key by key.
+func withDefaults(targetName string, target nxTarget, defaults map[string]nxTarget) nxTarget {
+	entry, ok := defaultsFor(targetName, target.Executor, defaults)
+	if !ok {
+		return target
 	}
-	layers = append(layers, target.Options)
-	if target.DefaultConfiguration != "" {
-		layers = append(layers, target.Configurations[target.DefaultConfiguration])
+	merged := target
+	if merged.Executor == "" {
+		merged.Executor = entry.Executor
+	}
+	if merged.DefaultConfiguration == "" {
+		merged.DefaultConfiguration = entry.DefaultConfiguration
+	}
+	merged.Options = overlay(entry.Options, target.Options)
+	if len(entry.Configurations) > 0 {
+		merged.Configurations = map[string]map[string]any{}
+		for name, options := range entry.Configurations {
+			merged.Configurations[name] = overlay(options, nil)
+		}
+		for name, options := range target.Configurations {
+			merged.Configurations[name] = overlay(merged.Configurations[name], options)
+		}
+	}
+	return merged
+}
+
+// defaultsFor finds the targetDefaults entry of a target (see withDefaults).
+func defaultsFor(targetName, executor string, defaults map[string]nxTarget) (nxTarget, bool) {
+	compatible := func(entry nxTarget) bool {
+		return entry.Executor == "" || executor == "" || entry.Executor == executor
+	}
+	if entry, ok := defaults[executor]; ok && executor != "" {
+		return entry, true
+	}
+	if entry, ok := defaults[targetName]; ok {
+		return entry, compatible(entry)
+	}
+	keys := make([]string, 0, len(defaults))
+	for key := range defaults {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if strings.ContainsAny(key, "*?[") && !strings.Contains(key, ":") {
+			if matched, _ := path.Match(key, targetName); matched {
+				return defaults[key], compatible(defaults[key])
+			}
+		}
+	}
+	return nxTarget{}, false
+}
+
+// overlay returns the keys of base replaced by those of top, or nil when
+// neither holds one.
+func overlay(base, top map[string]any) map[string]any {
+	if len(base) == 0 && len(top) == 0 {
+		return nil
+	}
+	merged := make(map[string]any, len(base)+len(top))
+	for key, value := range base {
+		merged[key] = value
+	}
+	for key, value := range top {
+		merged[key] = value
+	}
+	return merged
+}
+
+// effectiveOptions returns the options nx run passes the executor of a target
+// already laid over its defaults: its options, then those of its
+// defaultConfiguration. The tokens {projectRoot}, {workspaceRoot} and
+// {projectName} are replaced in each string, at any depth, a leading
+// {workspaceRoot}/ removed as Nx does. It returns nil when neither sets one.
+func effectiveOptions(target nxTarget, root, name string) map[string]any {
+	merged := overlay(target.Options, target.Configurations[target.DefaultConfiguration])
+	if merged == nil {
+		return nil
 	}
 	projectRoot := root
 	if projectRoot == workspace.ProbeRootPath {
 		projectRoot = "."
 	}
 	replacer := strings.NewReplacer("{projectRoot}", projectRoot, "{workspaceRoot}", ".", "{projectName}", name)
-	var merged map[string]any
-	for _, layer := range layers {
-		for key, value := range layer {
-			if merged == nil {
-				merged = map[string]any{}
-			}
-			merged[key] = replaceTokens(value, replacer)
-		}
+	for key, value := range merged {
+		merged[key] = replaceTokens(value, replacer)
 	}
 	return merged
 }
 
-// replaceTokens replaces the tokens of a string option, and of each string of
-// a list option; any other value is kept as it is.
+// replaceTokens replaces the tokens of every string in an option value.
 func replaceTokens(value any, replacer *strings.Replacer) any {
 	switch v := value.(type) {
 	case string:
-		return replacer.Replace(v)
+		return replacer.Replace(strings.TrimPrefix(v, "{workspaceRoot}/"))
 	case []any:
 		out := make([]any, len(v))
 		for i, item := range v {
-			if text, ok := item.(string); ok {
-				out[i] = replacer.Replace(text)
-			} else {
-				out[i] = item
-			}
+			out[i] = replaceTokens(item, replacer)
+		}
+		return out
+	case map[string]any:
+		out := make(map[string]any, len(v))
+		for key, item := range v {
+			out[key] = replaceTokens(item, replacer)
 		}
 		return out
 	}

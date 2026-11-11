@@ -919,6 +919,7 @@ func TestImportMapsAnNxJsTscTargetWhoseEmitTheTscBuildReproduces(t *testing.T) {
 			project: nxJsTscProject(`"main": "{projectRoot}/src/index.ts", "tsConfig": "{projectRoot}/tsconfig.lib.json", "outputPath": "{projectRoot}/dist", "rootDir": "{projectRoot}/src"`),
 			reason:  "writes a package.json into its outputPath unless generatePackageJson is false"},
 		{name: "assets", project: nxJsTscProject(libraryOptions + `, "assets": ["{projectRoot}/README.md"]`), reason: "sets assets"},
+		{name: "dependencies it inlines", project: nxJsTscProject(libraryOptions + `, "external": "none"`), reason: "sets external"},
 		{name: "an option it does not reproduce", project: nxJsTscProject(libraryOptions + `, "outputFileExtensionForCjs": ".cjs"`), reason: "sets outputFileExtensionForCjs"},
 		{name: "assets of the default configuration",
 			project: `{"name": "@demo/pricing", "targets": {"build": {"executor": "@nx/js:tsc", "defaultConfiguration": "production", "options": {` + libraryOptions + `}, "configurations": {"production": {"assets": ["{projectRoot}/README.md"]}}}}}`,
@@ -1007,5 +1008,18 @@ func TestTheSyncOwnsTheTscCompilerItWrites(t *testing.T) {
 	sync(t, root, SyncOptions{})
 	if got, want := options(), map[string]any{TypeScriptExtension: map[string]any{"compiler": "tsc"}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("options = %v, want the project's own compiler kept", got)
+	}
+	// A project that sets another compiler keeps its build on Nx: the tsc
+	// build would not run.
+	doc = readProjectFile(t, root, "packages/pricing")
+	doc["options"] = map[string]any{TypeScriptExtension: map[string]any{"compiler": "bun"}}
+	data, _ = json.Marshal(doc)
+	if err := os.WriteFile(file, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "packages/pricing/project.json", nxJsTscProject(libraryOptions))
+	reason, jobs := buildMapping(t, root, sync(t, root, SyncOptions{}))
+	if !strings.Contains(reason, "sets the compiler bun") || !slices.Contains(jobs, any(TypeScriptExtension+":build")) {
+		t.Fatalf("a project on bun: reason %q, jobs %v; want its build on Nx", reason, jobs)
 	}
 }
