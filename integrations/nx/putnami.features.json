@@ -200,6 +200,19 @@
               "the-sync-owns-the-tsc-compiler-option"
             ]
           }
+        },
+        {
+          "id": "import-adopts-typescript-conventions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-adds-source-exports-and-a-tsconfig"
+            ]
+          }
         }
       ]
     }

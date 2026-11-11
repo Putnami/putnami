@@ -10,7 +10,7 @@
     "The sync lists every target it does not map, with the reason, and a stale graph fails putnami validate"
   ],
   "nonGoals": [
-    "Rewriting nx.json, project.json or package.json files",
+    "Rewriting nx.json or project.json, or a package.json beyond the exports an import adds (D-066)",
     "Installing or switching a Nx version: the toolchain check compares and never installs",
     "Caching a delegated Nx result in Putnami's cache",
     "Mapping a target other than build, test and lint to a Putnami task"
@@ -71,6 +71,10 @@
     {
       "id": "import-maps-an-nx-js-tsc-build-target",
       "text": "An @nx/js:tsc build maps when, with nx.json targetDefaults and its default configuration applied, it sets no assets, external or other emit option and generatePackageJson false, its tsConfig is the config the tsc build compiles, its outputPath that config's outDir, inside the project, its rootDir (else the project root) the config's rootDir, and no .tsbuildinfo goes unnamed. The sync then owns options[\"@putnami/typescript\"].compiler tsc unless the project sets another. Others stay on Nx with their reason."
+    },
+    {
+      "id": "import-adopts-typescript-conventions",
+      "text": "In import mode, an imported TypeScript project gets the conventions of D-066: exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json that declares no exports, names a file outside src/, holds src/index.ts and is private, when its build moves to the Bun build; a tsconfig.json extending the root's when it holds no tsconfig*.json. The sync lists each write and each manifest it does not edit, and a dry sync shows each diff."
     }
   ],
   "decisions": [
@@ -78,6 +82,7 @@
     "integrations/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md",
     "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
     "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
-    "integrations/nx/doc/adr/0004-an-nx-js-tsc-build-moves-when-the-tsc-build-reproduces-its-emit.md"
+    "integrations/nx/doc/adr/0004-an-nx-js-tsc-build-moves-when-the-tsc-build-reproduces-its-emit.md",
+    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
   ]
 }
