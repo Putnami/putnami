@@ -124,178 +124,14 @@ func TestManifestVersionDispatchRefusesTheForwardField(t *testing.T) {
 	}
 }
 
-func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
-	// Splitting the version constant must not migrate committed manifests
-	// wholesale: the repository still reads byte-identical version 1 documents,
-	// and a manifest moves to version 2 only when its project starts declaring
-	// executable criteria: migrating a manifest is a reviewed decision that
-	// lands HERE, not a side effect of touching a file.
+func TestEveryCommittedManifestIsOnTheCriteriaWire(t *testing.T) {
+	// Every committed manifest is version 2 and validates. Version 1 stays
+	// readable (the dispatch tests above cover it), but no committed manifest
+	// uses it, so a new or edited manifest on version 1 fails here. The test
+	// names no path: adding a project with a features manifest edits nothing
+	// under protocols/features.
 	//
-	// The first four are the original pilots — the Go pilots and
-	// the TypeScript/Python producer-parity fixtures (both in
-	// report mode). The rest are the first Go framework rollout wave, each
-	// enforced with every spec requirement bound to a protecting test.
-	migrated := map[string]bool{
-		filepath.Join("go", "framework", "logger", ManifestFilename):          true,
-		filepath.Join("go", "framework", "parallel", ManifestFilename):        true,
-		filepath.Join("typescript", "framework", "runtime", ManifestFilename): true,
-		filepath.Join("python", "samples", "library", ManifestFilename):       true,
-
-		filepath.Join("go", "framework", "app", ManifestFilename):                     true,
-		filepath.Join("go", "framework", "cache", ManifestFilename):                   true,
-		filepath.Join("go", "framework", "config", ManifestFilename):                  true,
-		filepath.Join("go", "framework", "ctxutil", ManifestFilename):                 true,
-		filepath.Join("go", "framework", "database", ManifestFilename):                true,
-		filepath.Join("go", "framework", "errors", ManifestFilename):                  true,
-		filepath.Join("go", "framework", "events", ManifestFilename):                  true,
-		filepath.Join("go", "framework", "inject", ManifestFilename):                  true,
-		filepath.Join("go", "framework", "migration", "migratecli", ManifestFilename): true,
-		filepath.Join("go", "framework", "security", ManifestFilename):                true,
-		filepath.Join("go", "framework", "storage", ManifestFilename):                 true,
-
-		filepath.Join("go", "framework", "api", ManifestFilename):       true,
-		filepath.Join("go", "framework", "grpc", ManifestFilename):      true,
-		filepath.Join("go", "framework", "http", ManifestFilename):      true,
-		filepath.Join("go", "framework", "platform", ManifestFilename):  true,
-		filepath.Join("go", "framework", "schema", ManifestFilename):    true,
-		filepath.Join("go", "framework", "telemetry", ManifestFilename): true,
-
-		filepath.Join("typescript", "framework", "analytics", ManifestFilename):    true,
-		filepath.Join("typescript", "framework", "cli-protocol", ManifestFilename): true,
-		filepath.Join("typescript", "framework", "database", ManifestFilename):     true,
-		filepath.Join("typescript", "framework", "utils", ManifestFilename):        true,
-
-		filepath.Join("go", "framework", "client", ManifestFilename):              true,
-		filepath.Join("go", "framework", "keyringstore", ManifestFilename):        true,
-		filepath.Join("go", "framework", "migration", ManifestFilename):           true,
-		filepath.Join("go", "extension", ManifestFilename):                        true,
-		filepath.Join("tooling", "cli", ManifestFilename):                         true,
-		filepath.Join("tooling", "cli-documents", ManifestFilename):               true,
-		filepath.Join("tooling", "cli-model", ManifestFilename):                   true,
-		filepath.Join("tooling", "evidence-readers", ManifestFilename):            true,
-		filepath.Join("tooling", "sdd-extension", ManifestFilename):               true,
-		filepath.Join("protocols", "architecture", ManifestFilename):              true,
-		filepath.Join("protocols", "clientcontract", ManifestFilename):            true,
-		filepath.Join("protocols", "i18n", ManifestFilename):                      true,
-		filepath.Join("java", "extension", ManifestFilename):                      true,
-		filepath.Join("integrations", "nx", ManifestFilename):                     true,
-		filepath.Join("integrations", "rush", ManifestFilename):                   true,
-		filepath.Join("python", "extension", ManifestFilename):                    true,
-		filepath.Join("dart", "extension", ManifestFilename):                      true,
-		filepath.Join("php", "extension", ManifestFilename):                       true,
-		filepath.Join("ruby", "extension", ManifestFilename):                      true,
-		filepath.Join("dotnet", "extension", ManifestFilename):                    true,
-		filepath.Join("rust", "extension", ManifestFilename):                      true,
-		filepath.Join("sites", "telemetry.putnami.dev", ManifestFilename):         true,
-		filepath.Join("sites", "putnami.dev", ManifestFilename):                   true,
-		filepath.Join("swift", "extension", ManifestFilename):                     true,
-		filepath.Join("tooling", "clientgen-extension", ManifestFilename):         true,
-		filepath.Join("tooling", "extension-sdk", ManifestFilename):               true,
-		filepath.Join("tooling", "github-collaboration", ManifestFilename):        true,
-		filepath.Join("tooling", "gitlab-collaboration", ManifestFilename):        true,
-		filepath.Join("tooling", "jira-collaboration", ManifestFilename):          true,
-		filepath.Join("tooling", "linear-collaboration", ManifestFilename):        true,
-		filepath.Join("tooling", "memory-store", ManifestFilename):                true,
-		filepath.Join("integrations", "bazel", ManifestFilename):                  true,
-		filepath.Join("integrations", "moon", ManifestFilename):                   true,
-		filepath.Join("integrations", "pants", ManifestFilename):                  true,
-		filepath.Join("integrations", "turbo", ManifestFilename):                  true,
-		filepath.Join("tooling", "scaffold", ManifestFilename):                    true,
-		filepath.Join("typescript", "extension", ManifestFilename):                true,
-		filepath.Join("typescript", "framework", "application", ManifestFilename): true,
-		filepath.Join("typescript", "framework", "client", ManifestFilename):      true,
-		filepath.Join("typescript", "framework", "document", ManifestFilename):    true,
-		filepath.Join("typescript", "framework", "events", ManifestFilename):      true,
-		filepath.Join("typescript", "framework", "migration", ManifestFilename):   true,
-		filepath.Join("typescript", "framework", "storage", ManifestFilename):     true,
-		filepath.Join("typescript", "framework", "ui", ManifestFilename):          true,
-		filepath.Join("typescript", "framework", "web", ManifestFilename):         true,
-		filepath.Join("typescript", "framework", "spectest", ManifestFilename):    true,
-
-		// The Cloud CLI extension names the acceptance check of its archive
-		// publication in the verification block.
-		filepath.Join("cloud", "extension", ManifestFilename): true,
-
-		// The contributor executable names the acceptance checks of its change
-		// commands in the verification block.
-		filepath.Join("tooling", "contributor", ManifestFilename): true,
-
-		// The observe extension names the acceptance checks of its CI
-		// detection, diff base, reports and evidence document in the
-		// verification block.
-		filepath.Join("tooling", "observe", ManifestFilename): true,
-
-		// The development verb vocabulary names the acceptance checks of its
-		// manifest and its runtime in the verification block.
-		filepath.Join("tooling", "dev", ManifestFilename): true,
-
-		// The two client-matrix samples author their checks in the verification
-		// block, which only exists from version 2.
-		filepath.Join("go", "samples", "service-to-service", ManifestFilename):            true,
-		filepath.Join("typescript", "samples", "10-service-to-service", ManifestFilename): true,
-
-		// The TypeScript templates name the acceptance checks their template
-		// proof observes in the verification block.
-		filepath.Join("typescript", "templates", "typescript-library", ManifestFilename): true,
-		filepath.Join("typescript", "templates", "typescript-server", ManifestFilename):  true,
-		filepath.Join("typescript", "templates", "typescript-web", ManifestFilename):     true,
-
-		// The Go templates name the acceptance checks their template proof
-		// observes in the verification block.
-		filepath.Join("go", "templates", "go-library", ManifestFilename): true,
-		filepath.Join("go", "templates", "go-server", ManifestFilename):  true,
-
-		// The Cloud runtimes and the area detector name the acceptance checks
-		// their own tests observe in the verification block.
-		filepath.Join("cloud", "runtime", "go", ManifestFilename):         true,
-		filepath.Join("cloud", "runtime", "typescript", ManifestFilename): true,
-		filepath.Join("intelligence", "areas", ManifestFilename):          true,
-
-		// These protocols name the acceptance checks of their contracts, which
-		// their own tests and their implementers observe, in the verification
-		// block.
-		filepath.Join("protocols", "agentcontext", ManifestFilename):  true,
-		filepath.Join("protocols", "analytics", ManifestFilename):     true,
-		filepath.Join("protocols", "cache", ManifestFilename):         true,
-		filepath.Join("protocols", "capabilities", ManifestFilename):  true,
-		filepath.Join("protocols", "ci", ManifestFilename):            true,
-		filepath.Join("protocols", "cli", ManifestFilename):           true,
-		filepath.Join("protocols", "codehost", ManifestFilename):      true,
-		filepath.Join("protocols", "collaboration", ManifestFilename): true,
-		filepath.Join("protocols", "config", ManifestFilename):        true,
-		filepath.Join("protocols", "contracts", ManifestFilename):     true,
-		filepath.Join("protocols", "database", ManifestFilename):      true,
-		filepath.Join("protocols", "diagnostic", ManifestFilename):    true,
-		filepath.Join("protocols", "distribution", ManifestFilename):  true,
-		filepath.Join("protocols", "doctor", ManifestFilename):        true,
-		filepath.Join("protocols", "events", ManifestFilename):        true,
-		filepath.Join("protocols", "evidence", ManifestFilename):      true,
-		filepath.Join("protocols", "extension", ManifestFilename):     true,
-		filepath.Join("protocols", "features", ManifestFilename):      true,
-		filepath.Join("protocols", "gomod", ManifestFilename):         true,
-		filepath.Join("protocols", "grpc-services", ManifestFilename): true,
-		filepath.Join("protocols", "http-routes", ManifestFilename):   true,
-		filepath.Join("protocols", "identity", ManifestFilename):      true,
-		filepath.Join("protocols", "infra", ManifestFilename):         true,
-		filepath.Join("protocols", "job", ManifestFilename):           true,
-		filepath.Join("protocols", "keyring", ManifestFilename):       true,
-		filepath.Join("protocols", "migration", ManifestFilename):     true,
-		filepath.Join("protocols", "oci", ManifestFilename):           true,
-		filepath.Join("protocols", "platform", ManifestFilename):      true,
-		filepath.Join("protocols", "put", ManifestFilename):           true,
-		filepath.Join("protocols", "qualify", ManifestFilename):       true,
-		filepath.Join("protocols", "registry", ManifestFilename):      true,
-		filepath.Join("protocols", "runner", ManifestFilename):        true,
-		filepath.Join("protocols", "runtime", ManifestFilename):       true,
-		filepath.Join("protocols", "sitecontent", ManifestFilename):   true,
-		filepath.Join("protocols", "storage", ManifestFilename):       true,
-		filepath.Join("protocols", "support", ManifestFilename):       true,
-		filepath.Join("protocols", "telemetry", ManifestFilename):     true,
-		filepath.Join("protocols", "template", ManifestFilename):      true,
-		filepath.Join("protocols", "transaction", ManifestFilename):   true,
-		filepath.Join("protocols", "workspace", ManifestFilename):     true,
-	}
-	// Gitignored roots are skipped too. A developer worktree legitimately holds
+	// The walk skips gitignored roots. A developer worktree legitimately holds
 	// whole checkouts under .context (agent scratch) and .putnami (materialized
 	// artifacts); those manifests are not this repository's committed state, and
 	// reading them makes the check fail on facts the branch does not own. Same
@@ -305,7 +141,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		"compiled": true, "dist": true, "node_modules": true, "vendor": true,
 	}
 	root := filepath.Join("..", "..")
-	checked, pilots := 0, 0
+	checked := 0
 	err := filepath.WalkDir(root, func(name string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -328,17 +164,12 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		if relErr != nil {
 			return relErr
 		}
-		wantVersion := MinimumManifestProtocolVersion
-		if migrated[relative] {
-			wantVersion = ManifestCriteriaProtocolVersion
-			pilots++
-		}
 		manifest, findings := ParseAndValidateManifest(data)
 		switch {
 		case manifest == nil || diag.HasErrors(findings):
-			t.Errorf("committed manifest %s no longer validates: %v", name, findings)
-		case manifest.ProtocolVersion != wantVersion:
-			t.Errorf("committed manifest %s is version %d, want %d", name, manifest.ProtocolVersion, wantVersion)
+			t.Errorf("committed manifest %s no longer validates: %v", relative, findings)
+		case manifest.ProtocolVersion != ManifestCriteriaProtocolVersion:
+			t.Errorf("committed manifest %s is version %d, want %d", relative, manifest.ProtocolVersion, ManifestCriteriaProtocolVersion)
 		}
 		checked++
 		return nil
@@ -347,10 +178,7 @@ func TestCommittedRepositoryContentStaysOnTheLegacyManifestWire(t *testing.T) {
 		t.Fatal(err)
 	}
 	if checked == 0 {
-		t.Fatal("no committed manifest was reached; the compatibility check is vacuous")
-	}
-	if pilots != len(migrated) {
-		t.Fatalf("reached %d of the %d sanctioned v2 pilot manifests; the allowlist no longer matches the tree", pilots, len(migrated))
+		t.Fatal("no committed manifest was reached; the check is vacuous")
 	}
 }
 
