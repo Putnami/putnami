@@ -54,6 +54,7 @@
     "go/go-project-toolchain#probe-graph-fidelity",
     "go/go-project-toolchain#probe-purity",
     "go/go-project-toolchain#project-scoped-coverage",
+    "go/go-project-toolchain#proxy-dependent-tidy-is-reported-and-uncached",
     "go/go-project-toolchain#publish-tasks-declare-their-channels",
     "go/go-project-toolchain#race-on-touched-packages",
     "go/go-project-toolchain#registries-drive-go-origin",
