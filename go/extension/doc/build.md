@@ -388,6 +388,20 @@ those bytes.
      that only exists after tidy is absent from the release-set plan and
      `package~go` refuses the module. The remedy is to commit `go.mod` and run
      `putnami projects sync` so every dependent's replace closure follows.
+   - Reports a `warning` diagnostic when tidy had to look up a package
+     (`go: finding module for package`) or raised a requirement `go.mod`
+     already names. This happens when the version `go.mod` requires lacks an
+     imported package, even though `go.work` selects a version that has it:
+     tidy runs in module mode and asks the module proxy for the latest
+     version that provides the package. The answer changes when a release is
+     published. A raise with no lookup comes from the selection over the
+     dependencies' own `go.mod` files, which the committed `go.mod` does not
+     record either. The diagnostic names the module, each package with the
+     module and version tidy picked, and each raised requirement, and the task
+     ends as an uncacheable skip. A package a directory `replace` resolves is
+     no lookup, even though tidy prints `go: found` for it. Tidy's rewrite of
+     `go.mod` and `go.sum` is kept: commit it, and the next tidy looks
+     nothing up and caches as usual.
    - Syncs `go.mod` dependencies back to `putnami.json`
 2. **Generate**:
    - Parses non-test Go sources

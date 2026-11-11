@@ -300,7 +300,10 @@ func TestModuleAwareCachedTasksKeyWorkspaceGraphFiles(t *testing.T) {
 // failed reports a skip, and the orchestrator caches a skip only for a task that
 // declares `cache.deterministic` (IsCacheableResult in
 // tooling/cli/internal/jobs/cachekey/executor.go), so a transient network
-// failure is never recorded. Declaring determinism here would cache it.
+// failure is never recorded. A tidy that looked a package up through the proxy,
+// or raised a requirement go.mod names, reports the same skip, so a version the
+// tree does not pin is never recorded either. Declaring determinism here would
+// cache both.
 func TestTidyKeysOnTheProxyAndCachesNoFailedRun(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "offline-tidy-is-a-cacheable-no-op",
 		"goproxy-is-a-declared-cache-key-input")
@@ -327,7 +330,7 @@ func TestTidyKeysOnTheProxyAndCachesNoFailedRun(t *testing.T) {
 		t.Fatalf("build-tidy cache = %+v, want enabled: the offline no-op has nowhere to land", task.Cache)
 	}
 	if task.Cache.Deterministic {
-		t.Error("build-tidy declares cache.deterministic, which would cache the skip a transient tidy failure reports")
+		t.Error("build-tidy declares cache.deterministic, which would cache the skip a transient tidy failure or a proxy lookup reports")
 	}
 }
 

@@ -76,6 +76,10 @@
       "text": "A build whose environment disables module downloads (GOPROXY=off) runs no `go mod tidy`: tidy resolves a module graph wider than the build list an install warms, so the phase reports a no-op the next build of the same tree reuses from the cache, and go.mod and go.sum keep the content it found. GOPROXY keys the task, so that entry never answers a run that can resolve modules; a tidy that ran and failed stays an uncacheable skip, so a transient failure is never recorded."
     },
     {
+      "id": "proxy-dependent-tidy-is-reported-and-uncached",
+      "text": "A tidy that queries the proxy for a package (`go: finding module for package`) or raises a requirement go.mod names picks a version the committed go.mod does not pin. It warns, naming the module, each queried package with the module and version picked, and each raise, and says to commit go.mod. It is an uncacheable skip. A package resolved through a replace is no query. Once go.mod pins every version tidy selects, cached and uncached runs leave the same files."
+    },
+    {
       "id": "a-check-run-writes-no-source",
       "text": "With CI set, lint and build schedule no step that writes sources: lint runs golangci-lint without --fix and build checks go.mod and go.sum with `go mod tidy -diff` instead of tidying them. A fixable lint finding or an untidy module fails, and the failure names the command that applies the fix: `putnami lint --fix` or `putnami build --tidy`. Without CI, both commands fix by default."
     },
