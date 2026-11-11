@@ -33,7 +33,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-sync-writes-each-package-putnami-json-in-the-chosen-mode"
+              "the-sync-writes-each-package-putnami-json-in-the-chosen-mode",
+              "import-maps-vitest-and-jest-test-scripts-to-the-typescript-test"
             ]
           }
         },

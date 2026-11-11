@@ -38,14 +38,17 @@ to write them.
 
 | | Import | Delegate |
 |---|---|---|
-| A TypeScript package's task whose script runs `bun build`, `bun test` or `biome` | Runs the `@putnami/typescript` task: Putnami's runner and cache | Runs `turbo run` on it |
-| Any other task, such as a `tsc`, `vitest`, `jest` or `eslint` script | Runs `turbo run` on it | Runs `turbo run` on it |
+| A TypeScript package's task whose script runs `bun build`, `bun test`, `vitest`, `jest` or `biome` | Runs the `@putnami/typescript` task: Putnami's runner and cache | Runs `turbo run` on it |
+| Any other task, such as a `tsc` or `eslint` script | Runs `turbo run` on it | Runs `turbo run` on it |
 | Cache | Putnami's for the tasks `@putnami/typescript` runs, Turborepo's for the others | Turborepo's, local and remote |
 
 Import mode moves a task to `@putnami/typescript` only when its script
-already runs what that extension's task runs: moving a
-`tsc`, `vitest`, `jest` or `eslint` task would change the tool that checks the
-code. Each task that stays on Turborepo is listed with the reason. One
+already runs what that extension's task runs: moving a `tsc` or `eslint` task
+would change the tool that checks the code. A test script that runs `vitest`
+or `jest` moves, because the test task runs the project's own runner with its
+own configuration, as
+[the test command](https://github.com/Putnami/putnami/blob/main/typescript/extension/doc/03-test.md#test-runner)
+describes. Each task that stays on Turborepo is listed with the reason. One
 extension runs each task, so no Putnami cache sits over Turborepo's.
 
 A package is TypeScript when it holds a `tsconfig.json`, or a TypeScript

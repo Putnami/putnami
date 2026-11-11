@@ -375,11 +375,12 @@ func ownedJob(job string) bool {
 
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs. A script that runs one keeps its tool when the extension
-// takes the task over; a tsc, vitest, jest or eslint script stays on
-// Turborepo, because moving it would change the tool that checks the code.
+// takes the task over: the test task runs the vitest or jest a test script
+// runs. A tsc or eslint script stays on Turborepo, because moving it would
+// change the tool that checks the code.
 var typeScriptCommands = map[string][]string{
 	stacks.TaskBuild: {"bun build"},
-	stacks.TaskTest:  {"bun test"},
+	stacks.TaskTest:  {"bun test", "vitest", "jest", "npx vitest", "npx jest"},
 	stacks.TaskLint:  {"biome", "bunx biome", "bunx @biomejs/biome"},
 }
 

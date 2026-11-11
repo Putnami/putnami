@@ -76,8 +76,13 @@ func HasTests(projectPath string) (bool, error) {
 
 var testFileRe = regexp.MustCompile(`\.(test|spec)\.(ts|tsx|js|jsx)$`)
 
+// testsDirRe matches a file under a __tests__ directory, which Jest's default
+// testMatch treats as a test whatever its name.
+var testsDirRe = regexp.MustCompile(`(^|/)__tests__/.+\.(ts|tsx|js|jsx)$`)
+
 func matchTestFile(path string) bool {
-	return testFileRe.MatchString(path)
+	path = filepath.ToSlash(path)
+	return testFileRe.MatchString(path) || testsDirRe.MatchString(path)
 }
 
 // buildTestArgs builds the bun test args from parameters.
@@ -270,6 +275,9 @@ type TestParams struct {
 	// already parallelizes across projects.
 	Parallel        string
 	PassWithNoTests bool
+	// Runner is the runner parameter of the test command: bun, vitest, jest,
+	// or "" to read the project's test script.
+	Runner string
 	// Verbose changes transcript event visibility only. It never reaches Bun's
 	// command line, so summaries, verdicts, exits and test selection are stable.
 	Verbose bool

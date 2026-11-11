@@ -42,7 +42,12 @@ type TypeCheckResult struct {
 // buildInfoDir, when non-empty, is a persistent scratch directory that holds
 // the scratch tsconfig and tsc's incremental build info, so a later run
 // re-checks only what changed.
-func RunTypeCheck(bunBin, projectPath, buildInfoDir string) (*TypeCheckResult, error) {
+//
+// projectTypes checks with the project's own compiler options: tsc reads its
+// tsconfig, strictness, module system and types included, so the globals of a
+// Vitest or Jest suite resolve and the check judges the code as the project's
+// own tsc does. Without it the check applies the types phase's Bun defaults.
+func RunTypeCheck(bunBin, projectPath, buildInfoDir string, projectTypes bool) (*TypeCheckResult, error) {
 	scope, err := typeCheckScope(projectPath)
 	if err != nil {
 		return nil, err
@@ -74,7 +79,12 @@ func RunTypeCheck(bunBin, projectPath, buildInfoDir string) (*TypeCheckResult, e
 		return nil, err
 	}
 	fsRoot := filepath.VolumeName(absProject) + string(filepath.Separator)
-	args := append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, tscCompilerFlags(typeScriptIgnoreDeprecations(projectPath))...)
+	ignoreDeprecations := typeScriptIgnoreDeprecations(projectPath)
+	flags := tscCompilerFlags(ignoreDeprecations)
+	if projectTypes {
+		flags = projectCompilerFlags(ignoreDeprecations)
+	}
+	args := append([]string{"x", "tsc", "--noEmit", "--rootDir", fsRoot}, flags...)
 	if buildInfoDir != "" {
 		args = append(args, "--incremental", "--tsBuildInfoFile", filepath.Join(buildInfoDir, "typecheck.tsbuildinfo"))
 	}
@@ -193,4 +203,14 @@ func isTypeScriptFile(name string) bool {
 		return true
 	}
 	return false
+}
+
+// projectCompilerFlags are the flags of a check that keeps the project's own
+// compiler options: it skips declaration files and prints plain diagnostics.
+func projectCompilerFlags(ignoreDeprecations string) []string {
+	flags := []string{"--skipLibCheck", "true"}
+	if ignoreDeprecations != "" {
+		flags = append(flags, "--ignoreDeprecations", ignoreDeprecations)
+	}
+	return append(flags, "--pretty", "false")
 }

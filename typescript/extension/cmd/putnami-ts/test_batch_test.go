@@ -230,10 +230,10 @@ func TestRunTestBatchCrashIsolationRetriesAndDoesNotMaskPeers(t *testing.T) {
 	mockBunResolution(t)
 	ctx, _ := makeTestBatchContext(t)
 
-	orig := runProjectBunTest
-	t.Cleanup(func() { runProjectBunTest = orig })
+	orig := runProjectSuite
+	t.Cleanup(func() { runProjectSuite = orig })
 	var aCalls int
-	runProjectBunTest = func(_ /*bunBin*/, projectPath, outputPath string, _ testjob.TestParams) (bool, string, error) {
+	runProjectSuite = func(_ testjob.Command, projectPath, outputPath string, _ testjob.TestParams) (bool, string, error) {
 		if strings.Contains(projectPath, filepath.Join("packages", "a")) {
 			aCalls++
 			// Non-graceful crash: no parseable result written.
@@ -298,9 +298,9 @@ func TestRunTestBatchSurfacesUnhandledErrors(t *testing.T) {
 	mockBunResolution(t)
 	ctx, _ := makeTestBatchContext(t)
 
-	orig := runProjectBunTest
-	t.Cleanup(func() { runProjectBunTest = orig })
-	runProjectBunTest = func(_ /*bunBin*/, projectPath, outputPath string, _ testjob.TestParams) (bool, string, error) {
+	orig := runProjectSuite
+	t.Cleanup(func() { runProjectSuite = orig })
+	runProjectSuite = func(_ testjob.Command, projectPath, outputPath string, _ testjob.TestParams) (bool, string, error) {
 		if err := os.MkdirAll(outputPath, 0o755); err != nil {
 			return false, "", err
 		}
@@ -465,23 +465,23 @@ func readTestRunBatchable(t *testing.T, manifestPath string) manifestBatchable {
 // TestRunProjectBunTestWithRetryNeverRetriesAFailedSuite pins that test runs
 // never retry a failing test: only a suite bun could not start runs twice.
 func TestRunProjectBunTestWithRetryNeverRetriesAFailedSuite(t *testing.T) {
-	orig := runProjectBunTest
-	t.Cleanup(func() { runProjectBunTest = orig })
+	orig := runProjectSuite
+	t.Cleanup(func() { runProjectSuite = orig })
 	calls := 0
-	runProjectBunTest = func(string, string, string, testjob.TestParams) (bool, string, error) {
+	runProjectSuite = func(testjob.Command, string, string, testjob.TestParams) (bool, string, error) {
 		calls++
 		return false, "1 fail", nil
 	}
-	if success, _, err := runProjectBunTestWithRetry("bun", "p", "o", testjob.TestParams{}); success || err != nil || calls != 1 {
+	if success, _, err := runProjectSuiteWithRetry(testjob.Command{Program: "bun"}, "p", "o", testjob.TestParams{}); success || err != nil || calls != 1 {
 		t.Fatalf("a failed suite: success=%v err=%v calls=%d, want one failed run", success, err, calls)
 	}
 
 	calls = 0
-	runProjectBunTest = func(string, string, string, testjob.TestParams) (bool, string, error) {
+	runProjectSuite = func(testjob.Command, string, string, testjob.TestParams) (bool, string, error) {
 		calls++
 		return false, "", errors.New("executing bun: no such file")
 	}
-	if _, _, err := runProjectBunTestWithRetry("bun", "p", "o", testjob.TestParams{}); err == nil || calls != 2 {
+	if _, _, err := runProjectSuiteWithRetry(testjob.Command{Program: "bun"}, "p", "o", testjob.TestParams{}); err == nil || calls != 2 {
 		t.Fatalf("a suite that did not start: err=%v calls=%d, want an error after two attempts", err, calls)
 	}
 }

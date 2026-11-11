@@ -293,9 +293,15 @@
         "**/*.test.ts",
         "**/*.spec.ts",
         "**/*.test.tsx",
-        "**/*.spec.tsx"
+        "**/*.spec.tsx",
+        "**/__tests__/**/*.ts",
+        "**/__tests__/**/*.tsx"
       ],
       "flags": {
+        "runner": {
+          "type": "string",
+          "description": "Test runner: bun, vitest or jest. Default: the runner the project's package.json test script runs, else bun"
+        },
         "timeout": {
           "type": "number",
           "default": 5000,
@@ -1999,6 +2005,9 @@
             "tsconfig.base.json"
           ]
         },
+        "runner": {
+          "from": "params"
+        },
         "extensionVersion": {
           "from": "runtime"
         }
@@ -2042,7 +2051,10 @@
           "from": "project",
           "files": [
             "test/**/*.ts",
-            "test/**/*.tsx"
+            "test/**/*.tsx",
+            "**/__tests__/**/*.ts",
+            "**/__tests__/**/*.tsx",
+            "!node_modules/**"
           ]
         },
         "config": {
@@ -2051,10 +2063,25 @@
             "package.json"
           ]
         },
+        "runnerConfig": {
+          "from": "project",
+          "files": [
+            "vitest.config.*",
+            "vite.config.*",
+            "vitest.setup.*",
+            "jest.config.*",
+            "jest.setup.*",
+            "babel.config.*",
+            "tsconfig*.json"
+          ]
+        },
         "DATABASE_TEST_BINDINGS": {
           "from": "env"
         },
         "test-verbose": {
+          "from": "params"
+        },
+        "runner": {
           "from": "params"
         },
         "workspaceConfig": {
