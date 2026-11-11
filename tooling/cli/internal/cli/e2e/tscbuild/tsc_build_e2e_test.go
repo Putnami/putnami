@@ -139,6 +139,9 @@ func TestATscLibraryBuildsBeforeItsDependentAndItsOutDirRestoresFromTheCache(t *
 		}
 	}
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	// A store of its own: the first build compiles, whatever another run of
+	// this test, such as the race run, stored before.
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
 	root := writeWorkspace(t)
 
 	code, out := clitest.RunGateArgs(t, root, "build", "--all")
