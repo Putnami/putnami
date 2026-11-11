@@ -9,7 +9,7 @@
     "An npm tarball or Docker image loads under the same loader rules the workspace used, so a packaged project does not fail at import time in a consumer's runtime"
   ],
   "nonGoals": [
-    "Replacing Bun as the task runtime or Biome with a configurable toolchain choice, or exposing the configuration surface of Bun, Biome, Vitest or Jest as Putnami configuration: a project chooses its test runner, which keeps reading its own configuration files, and the installer is the package manager the repository declares, never a Putnami option",
+    "Replacing Bun as the task runtime, linting with a tool other than Biome or ESLint, formatting with a tool other than Biome, or exposing the configuration surface of Bun, Biome, ESLint, Vitest or Jest as Putnami configuration: a project chooses its test runner and its linter, which keep reading their own configuration files, and the installer is the package manager the repository declares, never a Putnami option",
     "Owning application framework behaviour — routing, rendering, persistence and DI belong to the @putnami/* packages this extension builds",
     "Publishing to a registry: package prepares the tarball or image and records channels, publish uploads them",
     "Promising compatibility across every pre-1.0 minor release, which RELEASE.md governs"
@@ -72,8 +72,16 @@
       "text": "The lint command and its tasks cover every project file Biome can rewrite and never read or rewrite a file under a nested project root (a subdirectory with its own putnami.json, outside a symbolic link and the directories the cache key skips), resolve the workspace configuration from the config root while keeping an external configuration anchored at the project root, and bind the scheduler's CPU budget without overriding an explicit thread setting."
     },
     {
+      "id": "lint-chooses-the-linter",
+      "text": "A project's linter is options[\"@putnami/typescript\"].lint.linter, biome or eslint, else eslint when its package.json lint script runs eslint, else Biome; a configuration file present never chooses, and another value fails lint with typescript.lint_linter_unknown. An ESLint project runs no Biome formatter, and a batch lints each project with its own linter, its ESLint members in parallel."
+    },
+    {
+      "id": "lint-runs-eslint",
+      "text": "ESLint lint runs the nearest node_modules/.bin/eslint, from the project up to the workspace, with the Node on PATH, over . from the project directory, outside nested projects; the lint script's arguments are not run, and lint warns naming them. Each message becomes a diagnostic with file, line, column and rule; --fix applies fixes, --fix false only reports. Configuration and ignore files and the file types ESLint plugins lint are cache inputs. A missing eslint or node fails naming it."
+    },
+    {
       "id": "no-node-on-the-host",
-      "text": "Lint, build and serve, and the test of a project whose test runner is Bun, need Bun and no node program on the host. Lint starts the native Biome executable of the platform package installed for the host, @biomejs/cli-<os>-<arch> and its -musl variant on a musl host, on every operating system and in a hoisted or an isolated install. When no platform package is installed for the host, lint starts Biome's JavaScript launcher with the task's Bun, never with a node from PATH."
+      "text": "Build and serve, the test of a project whose test runner is Bun, and the lint of one whose linter is Biome need Bun and no node program on the host. Lint starts the native Biome executable of the platform package installed for the host, @biomejs/cli-<os>-<arch> and its -musl variant on a musl host, on every operating system and in a hoisted or an isolated install. Without that platform package, lint starts Biome's JavaScript launcher with the task's Bun, never with a node from PATH."
     },
     {
       "id": "workspace-biome-default",

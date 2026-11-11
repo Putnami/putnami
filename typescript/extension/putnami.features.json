@@ -232,6 +232,44 @@
           }
         },
         {
+          "id": "lint-chooses-the-linter",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-project-option-chooses-the-linter",
+              "an-eslint-lint-script-chooses-eslint",
+              "a-configuration-file-alone-never-chooses",
+              "an-unknown-linter-fails-lint",
+              "an-eslint-project-runs-no-biome-formatter",
+              "a-batch-lints-each-project-with-its-own-linter",
+              "a-batch-runs-its-eslint-members-in-parallel"
+            ]
+          }
+        },
+        {
+          "id": "lint-runs-eslint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "eslint-runs-from-node-modules-bin-with-the-node-on-path",
+              "an-eslint-violation-fails-with-file-line-and-rule",
+              "fix-applies-eslint-fixes-and-fix-false-only-reports",
+              "eslint-skips-nested-projects",
+              "eslint-configuration-ignore-and-plugin-files-are-cache-inputs",
+              "a-missing-eslint-or-node-is-named",
+              "ignored-lint-script-arguments-are-named"
+            ]
+          }
+        },
+        {
           "id": "no-node-on-the-host",
           "stage": "coded",
           "evidenceKinds": [

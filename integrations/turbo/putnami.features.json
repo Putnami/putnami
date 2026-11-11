@@ -39,6 +39,21 @@
           }
         },
         {
+          "id": "import-keeps-eslint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-eslint-lint-script-maps-to-the-typescript-lint",
+              "a-chained-lint-script-stays-on-turborepo",
+              "eslint-with-other-arguments-stays-on-turborepo"
+            ]
+          }
+        },
+        {
           "id": "delegate-imports-listed-packages",
           "stage": "coded",
           "evidenceKinds": [

@@ -37,7 +37,9 @@ every later `putnami projects sync` rewrites the projects' `putnami.json`.
   `@putnami/typescript:<task>` otherwise. One extension runs each task, so
   no Putnami cache sits over Nx's, and no target changes runner: a jest,
   eslint or tsc target, or one an Nx executor runs, stays on Nx and is
-  listed.
+  listed (amended by [ADR 0003](0003-an-eslint-lint-target-moves-to-the-typescript-lint.md):
+  a bare eslint lint target, or `@nx/eslint:lint` without other options,
+  moves to the TypeScript lint).
 - A rerun of `init` without `--apply` runs the workspace sync tasks with
   `dryRun`, prints what they would change, and writes nothing. It passes the
   extensions `--apply` would declare in a `declaredExtensions` parameter,
@@ -59,7 +61,8 @@ every later `putnami projects sync` rewrites the projects' `putnami.json`.
 
 - Import mode moves to Putnami only the targets whose runner is already the
   TypeScript extension's. Moving a jest, eslint or tsc target would change
-  the tool that checks the code, which needs its own decision.
+  the tool that checks the code, which needs its own decision; ADR 0003 is
+  that decision for an eslint lint target.
 - The sync owns the `build`, `test` and `lint` entries of `disable.jobs`
   and their qualified forms, as the Pants sync owns `test`: an entry a team
   writes there by hand is replaced at the next sync.
