@@ -47,8 +47,9 @@ The Go extension answers that call for its two selectors.
    that meets an unprepared extension prepares it on its first call.
 5. **Every consumer reads one answer.** The cache key, portable admission and
    the batch guard read the files. Change impact reads a selector only in a
-   project the planner may run the command that names it in: the command's
-   activation files match there and the project uses its extension. There it
+   project the planner may run the command that names it in: any project for
+   a workspace-once command, otherwise one that uses the command's extension
+   and, when the command names activation files, holds one of them. There it
    reads the files and the paths the basis selects, and an input it cannot
    answer selects every path.
    A planned write that reaches a listed file or a path the basis selects
