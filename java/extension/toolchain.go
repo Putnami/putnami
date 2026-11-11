@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -164,21 +163,18 @@ func pinnedVersions() string {
 // acceptedBy returns the releases expected accepts, oldest first. A version no
 // file states accepts every release.
 func acceptedBy(toolchain stacks.Toolchain, candidates []jdk, expected stacks.Expected) []jdk {
-	return slices.DeleteFunc(slices.Clone(candidates), func(r jdk) bool {
-		return toolchain.CompareWith(expected, r.version, matchesJava).Fail
+	return stacks.Accepted(candidates, jdk.release, func(version string) bool {
+		return !toolchain.CompareWith(expected, version, matchesJava).Fail
 	})
 }
 
+// release is the version of the JDK.
+func (r jdk) release() string { return r.version }
+
+// choose picks among accepted releases, oldest first: the committed one, else
+// the default one, else the newest.
 func choose(accepted []jdk, committed string) (jdk, bool) {
-	if len(accepted) == 0 {
-		return jdk{}, false
-	}
-	for _, version := range []string{committed, defaultVersion} {
-		if i := slices.IndexFunc(accepted, func(r jdk) bool { return r.version == version }); i >= 0 {
-			return accepted[i], true
-		}
-	}
-	return accepted[len(accepted)-1], true
+	return stacks.Choose(accepted, jdk.release, committed, defaultVersion)
 }
 
 // jdkOfMajor answers the newest release the extension pins of a Java major.

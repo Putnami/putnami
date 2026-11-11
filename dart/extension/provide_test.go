@@ -8,17 +8,19 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // publisher is a local stand-in for the dart-archive and the Flutter release
@@ -26,6 +28,9 @@ import (
 type publisher struct {
 	files    map[string][]byte
 	requests []string
+	// table is the SDK release table the extension pins while the publisher
+	// serves; usePublisher points its Flutter manifests at the server.
+	table sdkReleases
 }
 
 func (p *publisher) serve(t *testing.T) *httptest.Server {
@@ -97,13 +102,16 @@ func flutterArchive(t *testing.T, version, dart string) []byte {
 func usePublisher(t *testing.T, p *publisher) {
 	t.Helper()
 	server := p.serve(t)
-	saved := []string{dartArchiveURL, dartReleaseListURL, flutterReleasesURL, hostPlatform}
+	savedURL, savedPlatform, savedTable := dartArchiveURL, hostPlatform, shipped
 	dartArchiveURL = server.URL + "/dart-archive/channels/stable/release"
-	dartReleaseListURL = server.URL + "/list?prefix=x"
-	flutterReleasesURL = server.URL + "/flutter"
 	hostPlatform = "linux/amd64"
+	shipped = p.table
+	for system, m := range shipped.Flutter {
+		m.BaseURL = server.URL + "/flutter"
+		shipped.Flutter[system] = m
+	}
 	t.Cleanup(func() {
-		dartArchiveURL, dartReleaseListURL, flutterReleasesURL, hostPlatform = saved[0], saved[1], saved[2], saved[3]
+		dartArchiveURL, hostPlatform, shipped = savedURL, savedPlatform, savedTable
 	})
 	t.Setenv(putnamihome.Env, t.TempDir())
 }
@@ -111,17 +119,14 @@ func usePublisher(t *testing.T, p *publisher) {
 func dartPublisher(t *testing.T, versions ...string) *publisher {
 	t.Helper()
 	p := &publisher{files: map[string][]byte{}}
-	var prefixes []string
 	for _, v := range versions {
-		prefixes = append(prefixes, "channels/stable/release/"+v+"/")
 		archive := dartArchive(t, v)
-		path := "/dart-archive/channels/stable/release/" + v + "/sdk/dartsdk-linux-x64-release.zip"
-		p.files[path] = archive
-		p.files[path+".sha256sum"] = []byte(digest(archive) + " *dartsdk-linux-x64-release.zip\n")
+		p.files["/dart-archive/channels/stable/release/"+v+"/sdk/dartsdk-linux-x64-release.zip"] = archive
+		p.table.Dart = append(p.table.Dart, struct {
+			Version string            `json:"version"`
+			Digests map[string]string `json:"digests"`
+		}{Version: v, Digests: map[string]string{"linux-x64": digest(archive)}})
 	}
-	prefixes = append(prefixes, "channels/stable/release/latest/", "channels/stable/release/29803/")
-	list, _ := json.Marshal(map[string]any{"prefixes": prefixes})
-	p.files["/list"] = list
 	return p
 }
 
@@ -157,14 +162,14 @@ func TestATaskInstallsTheSDKTheConstraintAdmits(t *testing.T) {
 	if err != nil || again.Executable != provided.Executable || len(p.requests) != 0 {
 		t.Errorf("an earlier install that passes is reused offline: %+v %v %v", again, err, p.requests)
 	}
-	if _, err := Provide(context.Background(), tc, []stacks.Expected{{Version: "^5.0.0", Source: "pubspec.yaml"}}, func(string) {}); err == nil || !strings.Contains(err.Error(), "no stable Dart SDK") {
+	if _, err := Provide(context.Background(), tc, []stacks.Expected{{Version: "^5.0.0", Source: "pubspec.yaml"}}, func(string) {}); err == nil || !strings.Contains(err.Error(), "no Dart SDK the extension pins") {
 		t.Errorf("a constraint no release meets: %v", err)
 	}
 	broken := dartPublisher(t, "3.9.0")
-	broken.files["/dart-archive/channels/stable/release/3.9.0/sdk/dartsdk-linux-x64-release.zip.sha256sum"] = []byte(strings.Repeat("0", 64) + "\n")
+	broken.table.Dart[0].Digests["linux-x64"] = strings.Repeat("0", 64)
 	usePublisher(t, broken)
 	if _, err := Provide(context.Background(), tc, []stacks.Expected{{Version: "^3.9.0", Source: "pubspec.yaml"}}, func(string) {}); err == nil || !strings.Contains(err.Error(), "SHA-256") {
-		t.Errorf("an archive whose SHA-256 is not the publisher's is refused: %v", err)
+		t.Errorf("an archive whose SHA-256 is not the pinned one is refused: %v", err)
 	}
 	hostPlatform = "plan9/amd64"
 	if _, err := Provide(context.Background(), tc, []stacks.Expected{{}}, func(string) {}); err == nil || !strings.Contains(err.Error(), "put dart on PATH") {
@@ -175,18 +180,17 @@ func TestATaskInstallsTheSDKTheConstraintAdmits(t *testing.T) {
 func TestAFlutterReleaseMustBundleADartInTheSDKConstraint(t *testing.T) {
 	spectest.Proves(t, feature, "installs-the-sdk", "a-task-installs-the-sdk-the-constraint-admits-when-the-machine-has-none")
 	p := &publisher{files: map[string][]byte{}}
-	var releases []map[string]string
+	var releases []flutterRelease
 	for _, r := range []struct{ version, dart, channel string }{
 		{"3.27.4", "3.6.2", "stable"}, {"3.29.2", "3.7.2", "stable"}, {"3.32.0", "3.8.0", "stable"}, {"3.33.0-0.1.pre", "3.9.0", "beta"},
 	} {
 		archive := flutterArchive(t, r.version, r.dart)
 		name := "stable/linux/flutter_linux_" + r.version + "-stable.tar.gz"
 		p.files["/flutter/"+name] = archive
-		releases = append(releases, map[string]string{"channel": r.channel, "version": r.version, "dart_sdk_version": r.dart, "dart_sdk_arch": "x64", "archive": name, "sha256": digest(archive)})
+		releases = append(releases, flutterRelease{Channel: r.channel, Version: r.version, Dart: r.dart, Arch: "x64", Archive: name, SHA256: digest(archive)})
 	}
+	p.table.Flutter = map[string]flutterManifest{"linux": {Releases: releases}}
 	usePublisher(t, p)
-	manifest, _ := json.Marshal(map[string]any{"base_url": flutterReleasesURL, "releases": releases})
-	p.files["/flutter/releases_linux.json"] = manifest
 	tc := dartToolchain(t, VariantFlutter)
 	expected := []stacks.Expected{{Version: ">=3.29.0", Source: "apps/mobile/pubspec.yaml"}, {Version: ">=3.7.0 <3.8.0", Source: "apps/mobile/pubspec.yaml"}}
 	provided, err := Provide(context.Background(), tc, expected, func(string) {})
@@ -203,7 +207,7 @@ func TestAFlutterReleaseMustBundleADartInTheSDKConstraint(t *testing.T) {
 	if again, err := Provide(context.Background(), tc, expected, func(string) {}); err != nil || again.Executable != provided.Executable || len(p.requests) != 0 {
 		t.Errorf("an earlier Flutter install is reused offline: %+v %v %v", again, err, p.requests)
 	}
-	if _, err := Provide(context.Background(), tc, []stacks.Expected{{Version: ">=3.40.0"}, {}}, func(string) {}); err == nil || !strings.Contains(err.Error(), "no stable Flutter SDK") {
+	if _, err := Provide(context.Background(), tc, []stacks.Expected{{Version: ">=3.40.0"}, {}}, func(string) {}); err == nil || !strings.Contains(err.Error(), "no Flutter SDK the extension pins") {
 		t.Errorf("a constraint no release meets: %v", err)
 	}
 	hostPlatform = "linux/arm64"
@@ -220,7 +224,7 @@ func TestATaskWithNoSDKOnPathRunsTheOneItInstalls(t *testing.T) {
 	bin := t.TempDir()
 	log := filepath.Join(bin, "tools.log")
 	for _, tool := range []string{"tojunit", "format_coverage"} {
-		writeFile(t, bin, tool, "#!/bin/sh\necho \"$0 $*\" >> "+log+"\n")
+		stackstest.WriteFile(t, bin, tool, "#!/bin/sh\necho \"$0 $*\" >> "+log+"\n")
 		_ = os.Chmod(filepath.Join(bin, tool), 0o755)
 	}
 	// No dart on PATH: the task installs one, then runs its steps with it.
@@ -242,8 +246,8 @@ func TestTheTestTaskActivatesTojunitAndFormatCoverageInItsOwnPubCache(t *testing
 	bin := t.TempDir()
 	log := filepath.Join(bin, "dart.log")
 	version := filepath.Join(bin, "version")
-	writeFile(t, bin, "version", "3.7.2")
-	writeFile(t, bin, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then read v < "+version+"; echo \"Dart SDK version: $v (stable)\"; exit 0; fi\necho \"PUB_CACHE=$PUB_CACHE $*\" >> "+log+"\n")
+	stackstest.WriteFile(t, bin, "version", "3.7.2")
+	stackstest.WriteFile(t, bin, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then read v < "+version+"; echo \"Dart SDK version: $v (stable)\"; exit 0; fi\necho \"PUB_CACHE=$PUB_CACHE $*\" >> "+log+"\n")
 	if err := os.Chmod(filepath.Join(bin, "dart"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -276,7 +280,7 @@ func TestTheTestTaskActivatesTojunitAndFormatCoverageInItsOwnPubCache(t *testing
 	if dirs, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{}, []string{"PATH=" + dirs[0] + string(os.PathListSeparator) + bin}, func(string) {}); err != nil || dirs != nil {
 		t.Errorf("tools already on PATH need nothing: %v %v", dirs, err)
 	}
-	writeFile(t, bin, "version", "3.9.1")
+	stackstest.WriteFile(t, bin, "version", "3.9.1")
 	other, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{}, env, func(string) {})
 	if err != nil || len(other) != 1 || other[0] == dirs[0] {
 		t.Fatalf("another SDK version gets its own tools: %v %v", other, err)
@@ -296,12 +300,12 @@ func TestAFlutterTestTaskActivatesTheToolsWithTheFlutterSDKsDart(t *testing.T) {
 	standalone, sdk := t.TempDir(), t.TempDir()
 	log := filepath.Join(sdk, "dart.log")
 	for dir, version := range map[string]string{standalone: "3.9.0", sdk: "3.7.2"} {
-		writeFile(t, dir, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'Dart SDK version: "+version+" (stable)'; exit 0; fi\necho \""+dir+" $PUB_CACHE $*\" >> "+log+"\n")
+		stackstest.WriteFile(t, dir, "dart", "#!/bin/sh\nif [ \"$1\" = --version ]; then echo 'Dart SDK version: "+version+" (stable)'; exit 0; fi\necho \""+dir+" $PUB_CACHE $*\" >> "+log+"\n")
 		if err := os.Chmod(filepath.Join(dir, "dart"), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	writeFile(t, sdk, "flutter", "#!/bin/sh\n")
+	stackstest.WriteFile(t, sdk, "flutter", "#!/bin/sh\n")
 	if err := os.Chmod(filepath.Join(sdk, "flutter"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -321,5 +325,32 @@ func TestAFlutterTestTaskActivatesTheToolsWithTheFlutterSDKsDart(t *testing.T) {
 	}
 	if _, err := Tools(context.Background(), stacks.TaskTest, stacks.Metadata{Variant: VariantFlutter}, []string{"PATH=" + standalone}, func(string) {}); err == nil {
 		t.Error("no flutter: no dart to activate the tools with")
+	}
+}
+
+func TestTheShippedTablePinsEveryReleaseItLists(t *testing.T) {
+	table := mustDecodeReleases(sdkReleasesJSON)
+	if len(table.Dart) == 0 || len(table.Flutter["linux"].Releases) == 0 {
+		t.Fatalf("the shipped table pins nothing: %d Dart, %d Flutter", len(table.Dart), len(table.Flutter["linux"].Releases))
+	}
+	for i, r := range table.Dart {
+		if i > 0 && len(r.Digests) < len(table.Dart[i-1].Digests) {
+			t.Errorf("Dart %s pins %d platforms, fewer than %s's %d: a read failed", r.Version, len(r.Digests), table.Dart[i-1].Version, len(table.Dart[i-1].Digests))
+		}
+		for platform, d := range r.Digests {
+			if !slices.Contains(slices.Collect(maps.Values(dartPlatforms)), platform) || len(d) != 64 {
+				t.Errorf("Dart %s %s: %q", r.Version, platform, d)
+			}
+		}
+	}
+	for system, m := range table.Flutter {
+		if !strings.HasPrefix(m.BaseURL, "https://") {
+			t.Errorf("%s base_url %q", system, m.BaseURL)
+		}
+		for _, r := range m.Releases {
+			if r.Channel != "stable" || len(r.SHA256) != 64 || r.Archive == "" {
+				t.Errorf("%s Flutter %+v", system, r)
+			}
+		}
 	}
 }

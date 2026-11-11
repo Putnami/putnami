@@ -66,7 +66,11 @@ func Stale(ctx context.Context, root string, stderr io.Writer) (SyncResult, erro
 }
 
 func synchronize(ctx context.Context, root string, stderr io.Writer, dry bool) (SyncResult, error) {
-	return synchronizeIn(ctx, root, stderr, Mode(root), dry)
+	mode, err := Mode(root)
+	if err != nil {
+		return SyncResult{}, err
+	}
+	return synchronizeIn(ctx, root, stderr, mode, dry)
 }
 
 // synchronizeIn is the sync in the mode, which a rerun of putnami init
@@ -316,7 +320,7 @@ var checkJobs = stacks.GraphJobs{
 	GraphFile:     detect.Config,
 	ExportCommand: "rush init",
 	Sync: func(ctx context.Context, root string, stderr io.Writer, dry bool) (stacks.GraphResult, error) {
-		if Mode(root) == ModeImport {
+		if mode, err := Mode(root); err == nil && mode == ModeImport {
 			if _, err := os.Stat(filepath.Join(root, detect.Config)); err == nil {
 				return stacks.GraphResult{Export: detect.Config}, nil
 			}
@@ -335,7 +339,11 @@ const ModeParam = "mode"
 // one, or with the dryRun param the diff it would write.
 func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	jobs := syncJobs
-	if mode := ctx.Params.String(ModeParam); mode == ModeImport || mode == ModeDelegate {
+	if given := ctx.Params.String(ModeParam); given != "" {
+		mode, err := stacks.CheckAdoptionMode(given)
+		if err != nil {
+			return "FAILED", nil, err
+		}
 		jobs.Sync = func(c context.Context, root string, stderr io.Writer, dry bool) (stacks.GraphResult, error) {
 			return synchronizeIn(c, root, stderr, mode, dry)
 		}

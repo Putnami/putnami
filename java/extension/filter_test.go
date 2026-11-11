@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // filterFixture is the Gradle fixture with a component of each variant that
@@ -21,11 +22,11 @@ import (
 func filterFixture(t *testing.T) string {
 	t.Helper()
 	g := gradleFixture(t)
-	writeFile(t, g, "settings.gradle.kts", "rootProject.name = \"shop\"\ninclude(\":app\", \":api\", \":pricing\", \":libs:model\", \":bom\", \":catalog\", \":plain\", \":droid\")\n")
-	writeFile(t, g, "plain/build.gradle.kts", "plugins {\n    `java-library`\n}\n")
-	writeFile(t, g, "plain/src/test/java/com/acme/plain/PlainTest.java", "class PlainTest {}\n")
-	writeFile(t, g, "droid/build.gradle.kts", "plugins {\n    alias(libs.plugins.android.library)\n}\n")
-	writeFile(t, g, "droid/src/test/kotlin/com/acme/droid/DroidTest.kt", "class DroidTest\n")
+	stackstest.WriteFile(t, g, "settings.gradle.kts", "rootProject.name = \"shop\"\ninclude(\":app\", \":api\", \":pricing\", \":libs:model\", \":bom\", \":catalog\", \":plain\", \":droid\")\n")
+	stackstest.WriteFile(t, g, "plain/build.gradle.kts", "plugins {\n    `java-library`\n}\n")
+	stackstest.WriteFile(t, g, "plain/src/test/java/com/acme/plain/PlainTest.java", "class PlainTest {}\n")
+	stackstest.WriteFile(t, g, "droid/build.gradle.kts", "plugins {\n    alias(libs.plugins.android.library)\n}\n")
+	stackstest.WriteFile(t, g, "droid/src/test/kotlin/com/acme/droid/DroidTest.kt", "class DroidTest\n")
 	return g
 }
 
@@ -170,12 +171,12 @@ func TestAComponentInWhichTheFilterSelectsNoTestPasses(t *testing.T) {
 		t.Errorf("maven: %s %v %v", status, err, data)
 	}
 	// An unfiltered run that writes no report still fails.
-	writeFile(t, g, "gradlew", "#!/bin/sh\nexit 0\n")
+	stackstest.WriteFile(t, g, "gradlew", "#!/bin/sh\nexit 0\n")
 	if status, _, err := runFiltered(t, g, "api", ""); status != "FAILED" || err == nil {
 		t.Errorf("an unfiltered run without a report: %s %v", status, err)
 	}
 	// So does a filtered step that fails.
-	writeFile(t, g, "gradlew", "#!/bin/sh\nexit 1\n")
+	stackstest.WriteFile(t, g, "gradlew", "#!/bin/sh\nexit 1\n")
 	if status, _, err := runFiltered(t, g, "api", "NoSuch"); status != "FAILED" || err == nil || err.Error() != stacks.CodeStepFailed {
 		t.Errorf("a failed filtered step: %s %v", status, err)
 	}

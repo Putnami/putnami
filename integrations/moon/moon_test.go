@@ -66,29 +66,18 @@ func readDemo(t *testing.T) demo {
 	return out
 }
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // repository writes the demo's base files, .prototools and a workspace
 // config in the mode, and the export when withExport.
 func repository(t *testing.T, d demo, mode string, withExport bool) string {
 	t.Helper()
 	root := t.TempDir()
 	for rel, content := range d["base"] {
-		writeFile(t, root, rel, content)
+		stackstest.WriteFile(t, root, rel, content)
 	}
-	writeFile(t, root, ".prototools", "moon = \""+version+"\"\n")
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "demo", "extensions": ["@putnami/moon"], "options": {"@putnami/moon": {"mode": "`+mode+`"}}}`+"\n")
+	stackstest.WriteFile(t, root, ".prototools", "moon = \""+version+"\"\n")
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "demo", "extensions": ["@putnami/moon"], "options": {"@putnami/moon": {"mode": "`+mode+`"}}}`+"\n")
 	if withExport {
-		writeFile(t, root, detect.DefaultGraphFile, d["ci"][detect.DefaultGraphFile])
+		stackstest.WriteFile(t, root, detect.DefaultGraphFile, d["ci"][detect.DefaultGraphFile])
 	}
 	return root
 }
@@ -118,10 +107,18 @@ func stack(t *testing.T) stacks.Stack {
 func probe(t *testing.T, root string) map[string]wsproto.ProbeProject {
 	t.Helper()
 	s := stack(t)
-	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension,
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, DependencySources: true,
 		Paths: []string{".", "apps/api", "apps/web", "packages/pricing", "docs"}})
 	if err != nil {
 		t.Fatal(err)
+	}
+	// Each edge is moon's own: its project graph states it.
+	for _, p := range result.Projects {
+		for _, dep := range p.Dependencies {
+			if p.DependencySources[dep] != wsproto.DependencySourceBuildGraph {
+				t.Errorf("%s edge %s source = %q", p.Path, dep, p.DependencySources[dep])
+			}
+		}
 	}
 	if len(result.Diagnostics) != 0 {
 		t.Errorf("diagnostics = %v", result.Diagnostics)
@@ -182,8 +179,8 @@ func TestTheSyncWritesEachMoonProjectPutnamiJSON(t *testing.T) {
 	d := readDemo(t)
 	root := repository(t, d, ModeDelegate, false)
 	// A former project keeps its own members; api keeps its reports.
-	writeFile(t, root, "tools/legacy/putnami.json", `{"name": "legacy", "tags": ["moon", "team"], "extensions": ["@putnami/moon", "@acme/lint"], "dependencies": ["/packages/pricing", "@acme/design"], "options": {"@putnami/moon": {"tasks": {"test": {"steps": [["moon", "run", "{component}:check"]]}}}}}`+"\n")
-	writeFile(t, root, "apps/api/putnami.json", `{"name": "api", "options": {"@putnami/moon": {"tasks": {"test": {"reports": {"junit": ["reports/junit.xml"]}}}}}}`+"\n")
+	stackstest.WriteFile(t, root, "tools/legacy/putnami.json", `{"name": "legacy", "tags": ["moon", "team"], "extensions": ["@putnami/moon", "@acme/lint"], "dependencies": ["/packages/pricing", "@acme/design"], "options": {"@putnami/moon": {"tasks": {"test": {"steps": [["moon", "run", "{component}:check"]]}}}}}`+"\n")
+	stackstest.WriteFile(t, root, "apps/api/putnami.json", `{"name": "api", "options": {"@putnami/moon": {"tasks": {"test": {"reports": {"junit": ["reports/junit.xml"]}}}}}}`+"\n")
 
 	result, err := Sync(context.Background(), root)
 	if err != nil {
@@ -199,13 +196,16 @@ func TestTheSyncWritesEachMoonProjectPutnamiJSON(t *testing.T) {
 		t.Errorf("unreported %v, mode %s, extensions %v", result.Unreported, result.Mode, result.Extensions)
 	}
 
-	marked := map[string]any{ExtensionName: map[string]any{"graphSync": true}}
+	// A change to the workspace's moon configuration selects every project moon
+	// runs.
+	inputs := []any{"../../.moon/workspace.yml", "../../.prototools", "../../.moon/tasks/**"}
+	marked := map[string]any{ExtensionName: map[string]any{"graphSync": true, "filePatterns": inputs}}
 	want := map[string]map[string]any{
 		"apps/api": {"$schema": nil, "name": "api", "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "dependencies": []any{"/packages/pricing"},
-			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "tasks": map[string]any{"test": map[string]any{"reports": map[string]any{"junit": []any{"reports/junit.xml"}}}}}}},
+			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "filePatterns": inputs, "tasks": map[string]any{"test": map[string]any{"reports": map[string]any{"junit": []any{"reports/junit.xml"}}}}}}},
 		"apps/web": {"$schema": stacks.ProjectSchema, "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "disable": map[string]any{"jobs": []any{"build", "test"}}, "options": marked},
 		"packages/pricing": {"$schema": stacks.ProjectSchema, "tags": []any{"moon"}, "extensions": []any{ExtensionName}, "disable": map[string]any{"jobs": []any{"lint"}},
-			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "tasks": map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}}},
+			"options": map[string]any{ExtensionName: map[string]any{"graphSync": true, "filePatterns": inputs, "tasks": map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}}}},
 		"tools/legacy": {"name": "legacy", "tags": []any{"team"}, "extensions": []any{"@acme/lint"}, "dependencies": []any{"@acme/design"}},
 	}
 	for dir, doc := range want {
@@ -257,7 +257,11 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 		if !reflect.DeepEqual(doc["extensions"], []any{ext}) || !reflect.DeepEqual(doc["tags"], []any{"moon"}) {
 			t.Errorf("%s = %v, want %s", dir, doc, ext)
 		}
-		if !reflect.DeepEqual(doc["options"], map[string]any{ExtensionName: map[string]any{"graphSync": true}}) {
+		want := map[string]any{"graphSync": true}
+		if ext == ExtensionName {
+			want["filePatterns"] = []any{"../../.moon/workspace.yml", "../../.prototools", "../../.moon/tasks/**"}
+		}
+		if !reflect.DeepEqual(doc["options"], map[string]any{ExtensionName: want}) {
 			t.Errorf("%s holds a moon step: %v", dir, doc["options"])
 		}
 	}
@@ -279,7 +283,7 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 
 	// Back to delegate mode, every project runs moon again; the language
 	// extensions stay declared in the workspace.
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": ["@putnami/moon", "@putnami/rust", "@putnami/typescript"], "options": {"@putnami/moon": {"mode": "delegate"}}}`)
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": ["@putnami/moon", "@putnami/rust", "@putnami/typescript"], "options": {"@putnami/moon": {"mode": "delegate"}}}`)
 	if _, err := Sync(context.Background(), root); err != nil {
 		t.Fatal(err)
 	}
@@ -288,8 +292,10 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 			t.Errorf("%s = %v", dir, doc)
 		}
 	}
-	if Mode(t.TempDir()) != ModeDelegate {
-		t.Error("a workspace without a mode delegates")
+	// A workspace that records no mode imports, as putnami init does without
+	// a terminal (D-064).
+	if mode, err := Mode(t.TempDir()); err != nil || mode != ModeImport {
+		t.Errorf("a workspace without a mode: %s %v", mode, err)
 	}
 }
 
@@ -306,7 +312,7 @@ case "$1" in --version) echo "moon ${STUB_VERSION:-` + version + `}"; exit 0;; e
 if [ -n "$STUB_JUNIT" ]; then mkdir -p "$(dirname "$STUB_JUNIT")"; printf '%s' '<testsuites><testsuite name="api" tests="2" failures="0"><testcase classname="api" name="a"/><testcase classname="api" name="b"/></testsuite></testsuites>' > "$STUB_JUNIT"; fi
 exit "${STUB_EXIT:-0}"
 `
-	writeFile(t, bin, "moon", script)
+	stackstest.WriteFile(t, bin, "moon", script)
 	if err := os.Chmod(filepath.Join(bin, "moon"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +391,7 @@ func TestTheTestTaskReadsTheReportsTheProjectOptionsName(t *testing.T) {
 	d := readDemo(t)
 	stubMoon(t)
 	root := repository(t, d, ModeDelegate, false)
-	writeFile(t, root, "apps/api/putnami.json", `{"options": {"@putnami/moon": {"tasks": {"test": {"reports": {"junit": ["{root}/apps/api/reports/junit.xml"]}}}}}}`+"\n")
+	stackstest.WriteFile(t, root, "apps/api/putnami.json", `{"options": {"@putnami/moon": {"tasks": {"test": {"reports": {"junit": ["{root}/apps/api/reports/junit.xml"]}}}}}}`+"\n")
 	if _, err := Sync(context.Background(), root); err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +423,7 @@ func TestAStaleMoonGraphFailsValidate(t *testing.T) {
 		t.Errorf("the validate job after the sync: %s %v", status, err)
 	}
 	// web now depends on api: moon's edges changed, and putnami.json did not.
-	writeFile(t, root, "apps/web/moon.yml", "dependsOn: ['api']\n")
+	stackstest.WriteFile(t, root, "apps/web/moon.yml", "dependsOn: ['api']\n")
 	before, _ := os.ReadFile(filepath.Join(root, "apps/web/putnami.json"))
 	if status, _, err := RunCheck(ctx, jsonl.New(), nil); status != "FAILED" || err == nil || err.Error() != CodeSyncStale {
 		t.Errorf("the validate job on a stale graph: %s %v", status, err)
@@ -449,7 +455,7 @@ func TestTheSyncKeepsTheWorkspaceConfigOrder(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
 	root := t.TempDir()
 	file := filepath.Join(root, wsproto.WorkspaceConfigFilename)
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, "{\n  \"name\": \"demo\",\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}},\n  \"extensions\": [\"@putnami/moon\"]\n}\n")
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, "{\n  \"name\": \"demo\",\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}},\n  \"extensions\": [\"@putnami/moon\"]\n}\n")
 	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || !changed {
 		t.Fatalf("declare: %v %v", changed, err)
 	}
@@ -461,7 +467,7 @@ func TestTheSyncKeepsTheWorkspaceConfigOrder(t *testing.T) {
 	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
 		t.Errorf("a declared extension changes nothing: %v %v", changed, err)
 	}
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, "[]")
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, "[]")
 	if _, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err == nil {
 		t.Error("a config that is no object fails")
 	}
@@ -473,8 +479,8 @@ func TestTheSyncKeepsTheWorkspaceConfigOrder(t *testing.T) {
 func TestAnExtensionLoadedFromTheWorkspaceIsDeclared(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
 	root := t.TempDir()
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": ["/moon-extension", "./tools/go", "/missing"]}`)
-	writeFile(t, root, "tools/go/putnami.extension.json", `{"name": "@putnami/go"}`)
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": ["/moon-extension", "./tools/go", "/missing"]}`)
+	stackstest.WriteFile(t, root, "tools/go/putnami.extension.json", `{"name": "@putnami/go"}`)
 	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
 		t.Errorf("an extension the workspace loads by path is declared: %v %v", changed, err)
 	}
@@ -527,7 +533,7 @@ func TestTheSyncKeepsTheProjectOwnSteps(t *testing.T) {
 	d := readDemo(t)
 	root := repository(t, d, ModeDelegate, false)
 	own := `{"options": {"@putnami/moon": {"tasks": {"test": {"steps": [["moon", "ci", "pricing:unit"]]}}}}}`
-	writeFile(t, root, "packages/pricing/putnami.json", own)
+	stackstest.WriteFile(t, root, "packages/pricing/putnami.json", own)
 	if _, err := Sync(context.Background(), root); err != nil {
 		t.Fatal(err)
 	}
@@ -540,12 +546,12 @@ func TestTheSyncKeepsTheProjectOwnSteps(t *testing.T) {
 		t.Errorf("a project's own steps are no drift: %v %v", stale.Written, err)
 	}
 	// A step the sync wrote is the sync's: it goes once the task is named.
-	writeFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/moon": {"tasks": {"test": {"steps": [["moon", "run", "{component}:unit"]]}}}}}`)
-	writeFile(t, root, "packages/pricing/moon.yml", "language: 'rust'\ntasks:\n  test:\n    command: 'cargo test'\n")
+	stackstest.WriteFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/moon": {"tasks": {"test": {"steps": [["moon", "run", "{component}:unit"]]}}}}}`)
+	stackstest.WriteFile(t, root, "packages/pricing/moon.yml", "language: 'rust'\ntasks:\n  test:\n    command: 'cargo test'\n")
 	if _, err := Sync(context.Background(), root); err != nil {
 		t.Fatal(err)
 	}
-	if doc := readProjectFile(t, root, "packages/pricing"); !reflect.DeepEqual(doc["options"], map[string]any{ExtensionName: map[string]any{"graphSync": true}}) {
+	if doc := readProjectFile(t, root, "packages/pricing"); !reflect.DeepEqual(doc["options"], map[string]any{ExtensionName: map[string]any{"graphSync": true, "filePatterns": []any{"../../.moon/workspace.yml", "../../.prototools", "../../.moon/tasks/**"}}}) {
 		t.Errorf("pricing options = %v", doc["options"])
 	}
 }
@@ -554,7 +560,7 @@ func TestImportDeclaresIntoTheObjectFormOfExtensions(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, false)
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, "{\n  \"extensions\": {\"@putnami/moon\": \"^0.1.0\"},\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}}\n}\n")
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, "{\n  \"extensions\": {\"@putnami/moon\": \"^0.1.0\"},\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}}\n}\n")
 	if _, err := Sync(context.Background(), root); err != nil {
 		t.Fatal(err)
 	}
@@ -566,7 +572,7 @@ func TestImportDeclaresIntoTheObjectFormOfExtensions(t *testing.T) {
 	if stale, err := Stale(context.Background(), root); err != nil || len(stale.Written) != 0 {
 		t.Errorf("after the sync nothing is stale: %v %v", stale.Written, err)
 	}
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": 3, "options": {"@putnami/moon": {"mode": "import"}}}`)
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": 3, "options": {"@putnami/moon": {"mode": "import"}}}`)
 	if _, err := Sync(context.Background(), root); err == nil || !strings.Contains(err.Error(), "neither a list") {
 		t.Errorf("extensions of another form fails the sync: %v", err)
 	}
@@ -576,11 +582,15 @@ func TestAnUnknownRecordedModeFailsTheSync(t *testing.T) {
 	spectest.Proves(t, feature, "sync-writes-each-project", "the-sync-writes-each-moon-project-putnami-json")
 	d := readDemo(t)
 	root := repository(t, d, "mirror", false)
-	if _, err := Sync(context.Background(), root); err == nil || !strings.Contains(err.Error(), `unknown mode "mirror"`) {
+	if _, err := Sync(context.Background(), root); err == nil || !strings.Contains(err.Error(), "unknown adoption mode mirror") {
 		t.Errorf("err = %v", err)
 	}
-	if Mode(root) != ModeDelegate {
-		t.Error("the probe delegates a workspace whose mode is unknown")
+	if _, err := Mode(root); err == nil {
+		t.Error("an unknown mode delegates")
+	}
+	_, diags := Detect(root, wsproto.ProbeRequest{Paths: []string{"."}})
+	if len(diags) != 1 || diags[0].Code != stacks.CodeAdoptionModeInvalid {
+		t.Errorf("the probe of an unknown mode: %v", diags)
 	}
 }
 
@@ -610,7 +620,7 @@ func TestTheDryRunOfASwitchToImportPreviewsWhatTheApplyWrites(t *testing.T) {
 	}
 
 	// --apply records the mode, then synchronizes in the recorded mode.
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "demo", "extensions": ["@putnami/moon"], "options": {"@putnami/moon": {"mode": "import"}}}`+"\n")
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "demo", "extensions": ["@putnami/moon"], "options": {"@putnami/moon": {"mode": "import"}}}`+"\n")
 	applied, err := Sync(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)

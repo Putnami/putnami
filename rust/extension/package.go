@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/imageload"
 )
 
 // The channels of package, as params and the publish field of a project name
@@ -33,7 +34,6 @@ const (
 
 const (
 	defaultDockerPlatform = "linux/amd64"
-	defaultPort           = 3000
 	// linuxGlibc is the glibc of the image base. cargo zigbuild reads it from
 	// the suffix of a Linux target.
 	linuxGlibc = ".2.36"
@@ -93,6 +93,11 @@ func findPlatform(name string) (pkgmeta.ArchivePlatform, error) {
 // publish field of the project, which the plan unions the same way.
 func hasChannel(ctx *pctx.Context, channel string) bool {
 	return ctx.Params.Bool(channel, false) || slices.Contains(ctx.PublishChannels(), channel)
+}
+
+// dryRun reports whether the package plans its work and writes nothing.
+func dryRun(ctx *pctx.Context) bool {
+	return ctx.Params.Bool("dry-run", false, "dryRun")
 }
 
 // dockerPlatform is the one Linux platform of the image.
@@ -199,6 +204,13 @@ func packageCompile(stack stacks.Stack) cli.JobFunc {
 			emit.Info(ctx.Project.Name + " is a library: it has no binary to compile")
 			return "OK", nil, nil
 		}
+		if dryRun(ctx) {
+			if _, err := compilePlatforms(ctx); err != nil {
+				return "FAILED", nil, err
+			}
+			emit.Info("dry run: would compile " + ctx.Project.Name + " for each platform it packages")
+			return "OK", nil, nil
+		}
 		return stack.RootJob(func(c context.Context, root stacks.RootStep, emit *jsonl.Emitter) error {
 			return compile(c, ctx, root, emit)
 		})(ctx, emit, args)
@@ -218,7 +230,7 @@ func compile(c context.Context, ctx *pctx.Context, root stacks.RootStep, emit *j
 	if err != nil {
 		return err
 	}
-	binary, targetDir, err := crateBinary(c, tools, root)
+	binary, targetDir, err := crateBinary(c, tools, root, ctx.Params.String("entrypoint"))
 	if err != nil {
 		return err
 	}
@@ -247,9 +259,9 @@ func compile(c context.Context, ctx *pctx.Context, root stacks.RootStep, emit *j
 	return nil
 }
 
-// crateBinary is the binary of the crate, and the build directory of its
-// Cargo workspace.
-func crateBinary(c context.Context, tools compiler, root stacks.RootStep) (string, string, error) {
+// crateBinary is the binary of the crate, the one entrypoint names when it is
+// not empty, and the build directory of its Cargo workspace.
+func crateBinary(c context.Context, tools compiler, root stacks.RootStep, entrypoint string) (string, string, error) {
 	cmd := exec.CommandContext(c, tools.cargo, "metadata", "--no-deps", "--format-version", "1") //nolint:gosec // the pinned tool
 	cmd.Dir = root.Dir
 	cmd.Env = tools.env
@@ -284,6 +296,10 @@ func crateBinary(c context.Context, tools compiler, root stacks.RootStep) (strin
 			}
 		}
 		switch {
+		case entrypoint != "" && slices.Contains(bins, entrypoint):
+			return entrypoint, metadata.TargetDirectory, nil
+		case entrypoint != "":
+			return "", "", fmt.Errorf("%s has no binary %s: its binaries are %s", pkg.Name, entrypoint, strings.Join(bins, ", "))
 		case pkg.DefaultRun != "":
 			return pkg.DefaultRun, metadata.TargetDirectory, nil
 		case len(bins) == 1:
@@ -293,7 +309,7 @@ func crateBinary(c context.Context, tools compiler, root stacks.RootStep) (strin
 		case len(bins) == 0:
 			return "", "", fmt.Errorf("%s has no binary target to package", pkg.Name)
 		default:
-			return "", "", fmt.Errorf("%s has %d binaries (%s): state package.default-run in its Cargo.toml", pkg.Name, len(bins), strings.Join(bins, ", "))
+			return "", "", fmt.Errorf("%s has %d binaries (%s): name one with --entrypoint or state package.default-run in its Cargo.toml", pkg.Name, len(bins), strings.Join(bins, ", "))
 		}
 	}
 	return "", "", fmt.Errorf("cargo metadata names no package %s", root.Component)
@@ -338,6 +354,16 @@ func packageArchives(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string
 	}
 	artifact := artifactName(ctx.Project.Name)
 	dir := pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, channelArchives)
+	if dryRun(ctx) {
+		emit.Info(fmt.Sprintf("dry run: would write %d archives of %s", len(platforms), artifact))
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return "FAILED", nil, err
+		}
+		if err := pkgmeta.WriteChannelRecord(dir, pkgmeta.ChannelRecord{Version: version, Artifact: artifact, Channels: []string{channelArchives}}); err != nil {
+			return "FAILED", nil, err
+		}
+		return "OK", nil, nil
+	}
 	if err := os.RemoveAll(dir); err != nil {
 		return "FAILED", nil, err
 	}
@@ -405,11 +431,36 @@ func packageDocker(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, 
 		emit.Info(ctx.Project.Name + " is a library: it has no program to put in an image")
 		return "OK", nil, nil
 	}
+	if dryRun(ctx) {
+		return dryRunImage(ctx, emit)
+	}
 	data, err := assembleImage(ctx, emit)
 	if err != nil {
 		return "FAILED", nil, err
 	}
 	return "OK", data, nil
+}
+
+// dryRunImage checks the image's platform and writes the channel record, and
+// assembles nothing.
+func dryRunImage(ctx *pctx.Context, emit *jsonl.Emitter) (string, map[string]any, error) {
+	version, err := releaseVersion(ctx)
+	if err != nil {
+		return "FAILED", nil, err
+	}
+	if _, err := dockerPlatform(ctx); err != nil {
+		return "FAILED", nil, err
+	}
+	image := stacks.ImageName(ctx.Project.Name)
+	emit.Info("dry run: would assemble an image of " + image)
+	dir := pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, channelDocker)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "FAILED", nil, err
+	}
+	if err := pkgmeta.WriteChannelRecord(dir, pkgmeta.ChannelRecord{Version: version, Artifact: image, Channels: []string{channelDocker}}); err != nil {
+		return "FAILED", nil, err
+	}
+	return "OK", nil, nil
 }
 
 func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, error) {
@@ -425,11 +476,14 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 	if err != nil {
 		return nil, err
 	}
-	base := ctx.Params.String("docker-base-image")
+	base := ctx.Params.String("docker-base-image", "dockerBaseImage")
 	if base == "" {
 		base = imageBase
 	}
-	port := ctx.Params.Int("port", defaultPort)
+	port, err := strconv.Atoi(stacks.ImagePort(ctx, nil))
+	if err != nil {
+		return nil, err
+	}
 	plan, err := oci.NewImagePlan(oci.Spec{
 		BaseRef:      base,
 		Platform:     platformName(platform),
@@ -456,11 +510,11 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 	image := stacks.ImageName(ctx.Project.Name)
 	content := image + ":c-" + contentHash
 	tags := []string{content}
-	if tag := ctx.Params.String("docker-tag"); tag != "" {
+	if tag := ctx.Params.String("docker-tag", "dockerTag"); tag != "" {
 		tags = append(tags, image+":"+tag)
 	}
-	if ctx.Params.Bool("docker-load", false) {
-		if err := loadImage(ctx, filepath.Join(dir, "oci"), content, tags[1:], emit); err != nil {
+	if ctx.Params.Bool("docker-load", false, "dockerLoad") {
+		if err := imageload.Load(filepath.Join(dir, "oci"), tags, emit); err != nil {
 			return nil, err
 		}
 	}
@@ -478,32 +532,4 @@ func assembleImage(ctx *pctx.Context, emit *jsonl.Emitter) (map[string]any, erro
 	}
 	emit.Info("assembled " + content)
 	return map[string]any{"image": content, "contentHash": contentHash, "digest": digest}, nil
-}
-
-// loadImage puts the image in the local docker daemon, with its other tags.
-func loadImage(ctx *pctx.Context, layout, ref string, aliases []string, emit *jsonl.Emitter) error {
-	tarball := filepath.Join(pkgmeta.PackageOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, channelDocker), "load.tar")
-	defer func() { _ = os.Remove(tarball) }()
-	if err := oci.WriteDockerTarball(layout, ref, tarball); err != nil {
-		return fmt.Errorf("write the docker tarball: %w", err)
-	}
-	background := context.Background()
-	run := func(args ...string) error {
-		timed, cancel := context.WithTimeout(background, 5*time.Minute)
-		defer cancel()
-		cmd := exec.CommandContext(timed, "docker", args...) //nolint:gosec // fixed verbs with the task's own tags
-		if err := runForwarding(cmd, emit, nil); err != nil {
-			return fmt.Errorf("docker %s: %w", args[0], err)
-		}
-		return nil
-	}
-	if err := run("load", "-i", tarball); err != nil {
-		return err
-	}
-	for _, alias := range aliases {
-		if err := run("tag", ref, alias); err != nil {
-			return err
-		}
-	}
-	return nil
 }

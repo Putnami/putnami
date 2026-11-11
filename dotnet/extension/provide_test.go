@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // sdkArchive is a tar.gz that holds a dotnet that prints version for
@@ -103,8 +104,9 @@ func releaseServer(t *testing.T, log, corrupt string) *atomic.Int32 {
 		return map[string]any{"version": version, "files": []file{{Name: name + "-linux-x64.tar.gz", RID: "linux-x64", URL: srv.URL + "/sdk/" + name + "-" + version + ".tar.gz", Hash: hex.EncodeToString(sum[:])}}}
 	}
 	var index []map[string]string
+	table := shippedReleases{Channels: map[string]channelReleases{}}
 	for ch, versions := range channels {
-		index = append(index, map[string]string{"channel-version": ch, "support-phase": phases[ch], "releases.json": srv.URL + "/" + ch + "/releases.json"})
+		index = append(index, map[string]string{"channel-version": ch, "support-phase": phases[ch], "releases.json": ch})
 		var releases []map[string]any
 		rt := ch + ".7"
 		releases = append(releases, map[string]any{
@@ -125,10 +127,16 @@ func releaseServer(t *testing.T, log, corrupt string) *atomic.Int32 {
 			}}}})
 		}
 		body, _ := json.Marshal(map[string]any{"channel-version": ch, "releases": releases})
-		mux.HandleFunc("/"+ch+"/releases.json", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(body) })
+		var decoded channelReleases
+		if err := json.Unmarshal(body, &decoded); err != nil {
+			t.Fatal(err)
+		}
+		table.Channels[ch] = decoded
 	}
 	indexBody, _ := json.Marshal(map[string]any{"releases-index": index})
-	mux.HandleFunc("/releases-index.json", func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write(indexBody) })
+	if err := json.Unmarshal(indexBody, &table.releasesIndex); err != nil {
+		t.Fatal(err)
+	}
 	mux.HandleFunc("/sdk/", func(w http.ResponseWriter, r *http.Request) {
 		v := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/sdk/"), ".tar.gz")
 		data, ok := archives[v]
@@ -139,10 +147,10 @@ func releaseServer(t *testing.T, log, corrupt string) *atomic.Int32 {
 		downloads.Add(1)
 		_, _ = w.Write(data)
 	})
-	oldBase, oldPlatform, oldClient, oldMusl := metadataBase, hostPlatform, httpClient, hostMusl
-	t.Cleanup(func() { metadataBase, hostPlatform, httpClient, hostMusl = oldBase, oldPlatform, oldClient, oldMusl })
+	oldTable, oldPlatform, oldClient, oldMusl := shipped, hostPlatform, httpClient, hostMusl
+	t.Cleanup(func() { shipped, hostPlatform, httpClient, hostMusl = oldTable, oldPlatform, oldClient, oldMusl })
 	hostMusl = func() bool { return false }
-	metadataBase, hostPlatform, httpClient = srv.URL, "linux/amd64", srv.Client()
+	shipped, hostPlatform, httpClient = table, "linux/amd64", srv.Client()
 	t.Setenv(putnamihome.Env, t.TempDir())
 	// The release server stands in for the network, so the run may install.
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
@@ -169,14 +177,14 @@ func TestTheSDKToInstallFollowsTheRollForwardPolicy(t *testing.T) {
 			if policy != "" {
 				doc = `{"sdk": {"version": "` + stated + `", "rollForward": "` + policy + `"}}`
 			}
-			writeFile(t, root, "global.json", doc)
-			plan, err := planInstall(context.Background(), stacks.Expected{Version: stated, Source: "global.json", Root: root}, "linux-x64")
+			stackstest.WriteFile(t, root, "global.json", doc)
+			plan, err := planInstall(stacks.Expected{Version: stated, Source: "global.json", Root: root}, "linux-x64")
 			if err != nil || plan.sdk.Version != want {
 				t.Errorf("%s with rollForward %q: %s %v, want %s", stated, policy, plan.sdk.Version, err, want)
 			}
 		}
 	}
-	plan, err := planInstall(context.Background(), stacks.Expected{}, "linux-x64")
+	plan, err := planInstall(stacks.Expected{}, "linux-x64")
 	if err != nil || plan.sdk.Version != "10.0.103" {
 		t.Fatalf("with no global.json, the latest of the default channel: %s %v", plan.sdk.Version, err)
 	}
@@ -185,8 +193,8 @@ func TestTheSDKToInstallFollowsTheRollForwardPolicy(t *testing.T) {
 	if got := strings.Join(plan.runtimeVersions(), " "); !sameWords(got, "10.0.7 8.0.7 9.0.7") {
 		t.Errorf("runtimes = %s", got)
 	}
-	writeFile(t, root, "global.json", `{"sdk": {"version": "7.0.100", "rollForward": "disable"}}`)
-	if _, err := planInstall(context.Background(), stacks.Expected{Version: "7.0.100", Source: "global.json", Root: root}, "linux-x64"); err == nil {
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "7.0.100", "rollForward": "disable"}}`)
+	if _, err := planInstall(stacks.Expected{Version: "7.0.100", Source: "global.json", Root: root}, "linux-x64"); err == nil {
 		t.Errorf("an SDK no channel lists is an error")
 	}
 }
@@ -202,7 +210,7 @@ func TestProvideInstallsTheSDKWithItsRuntimesOnceAndChecksItsHash(t *testing.T) 
 	log := filepath.Join(t.TempDir(), "log")
 	downloads := releaseServer(t, log, "9.0.300")
 	root := t.TempDir()
-	writeFile(t, root, "global.json", `{"sdk": {"version": "8.0.404"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "8.0.404"}}`)
 	expected := stacks.Expected{Version: "8.0.404", Source: "global.json", Root: root}
 	var infos []string
 	provided, err := Provide(context.Background(), expected, func(s string) { infos = append(infos, s) })
@@ -223,9 +231,10 @@ func TestProvideInstallsTheSDKWithItsRuntimesOnceAndChecksItsHash(t *testing.T) 
 		t.Errorf("downloads = %d, want the SDK and the ASP.NET Core runtime", downloads.Load())
 	}
 
-	// An installed SDK the statement accepts is reused with no network.
-	metadataBase = "https://127.0.0.1:1"
-	writeFile(t, root, "global.json", `{"sdk": {"version": "8.0.400"}}`)
+	// An installed SDK the statement accepts is reused without the pinned
+	// metadata.
+	shipped = shippedReleases{}
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "8.0.400"}}`)
 	if again, err := Provide(context.Background(), stacks.Expected{Version: "8.0.400", Source: "global.json", Root: root}, func(string) {}); err != nil || again.Executable != provided.Executable || len(infos) != 1 {
 		t.Errorf("a second call reuses the SDK: %+v %v, infos %v", again, err, infos)
 	}
@@ -244,7 +253,7 @@ func TestProvideInstallsTheSDKWithItsRuntimesOnceAndChecksItsHash(t *testing.T) 
 func TestAnArchiveWhoseHashDiffersIsRefused(t *testing.T) {
 	releaseServer(t, filepath.Join(t.TempDir(), "log"), "9.0.300")
 	root := t.TempDir()
-	writeFile(t, root, "global.json", `{"sdk": {"version": "9.0.300", "rollForward": "disable"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "9.0.300", "rollForward": "disable"}}`)
 	_, err := Provide(context.Background(), stacks.Expected{Version: "9.0.300", Source: "global.json", Root: root}, func(string) {})
 	if err == nil || !strings.Contains(err.Error(), "SHA-512") {
 		t.Errorf("an archive whose hash differs is refused: %v", err)
@@ -280,7 +289,7 @@ func TestATaskRunsTheInstalledSDKWhenTheMachineOneIsRefused(t *testing.T) {
 	log := filepath.Join(t.TempDir(), "log")
 	releaseServer(t, log, "")
 	root := fixture(t)
-	writeFile(t, root, "global.json", `{"sdk": {"version": "8.0.404"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "8.0.404"}}`)
 	if status, _, _, err := runJob(t, root, "src/Api", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Fatalf("build: %s %v", status, err)
 	}
@@ -298,10 +307,10 @@ func TestAnInstalledSDKIsPickedAsThePublishedOneWouldBe(t *testing.T) {
 			_ = os.RemoveAll(filepath.Join(base, e.Name()))
 		}
 		for _, v := range versions {
-			writeFile(t, base, sdkFolder(v, "linux-x64")+"/"+installedMarker, "")
+			stackstest.WriteFile(t, base, sdkFolder(v, "linux-x64")+"/"+installedMarker, "")
 		}
 		// Another platform's install is never reused.
-		writeFile(t, base, sdkFolder("8.0.499", "linux-musl-x64")+"/"+installedMarker, "")
+		stackstest.WriteFile(t, base, sdkFolder("8.0.499", "linux-musl-x64")+"/"+installedMarker, "")
 	}
 	for _, c := range []struct {
 		policy    string
@@ -319,7 +328,7 @@ func TestAnInstalledSDKIsPickedAsThePublishedOneWouldBe(t *testing.T) {
 		if c.policy != "" {
 			doc = `{"sdk": {"version": "8.0.400", "rollForward": "` + c.policy + `"}}`
 		}
-		writeFile(t, root, "global.json", doc)
+		stackstest.WriteFile(t, root, "global.json", doc)
 		if got, ok := installedSDK(base, stacks.Expected{Version: "8.0.400", Source: "global.json", Root: root}, "linux-x64"); !ok || got != c.want {
 			t.Errorf("rollForward %q over %v: %s, want %s", c.policy, c.installed, got, c.want)
 		}
@@ -387,10 +396,40 @@ func TestMuslIsTheCLibraryTheShellRunsOn(t *testing.T) {
 		}
 	}
 	notELF := filepath.Join(t.TempDir(), "sh")
-	writeFile(t, filepath.Dir(notELF), "sh", "#!/bin/true\n")
+	stackstest.WriteFile(t, filepath.Dir(notELF), "sh", "#!/bin/true\n")
 	for _, path := range []string{notELF, filepath.Join(t.TempDir(), "none")} {
 		if musl, known := muslProgram(path); musl || known {
 			t.Errorf("%s says nothing of the C library: %v %v", path, musl, known)
 		}
 	}
+}
+
+func TestTheShippedMetadataPinsAnHTTPSArchiveAndASHA512ForEachFile(t *testing.T) {
+	table := mustDecodeReleases(sdkReleasesJSON)
+	if len(table.Channels) == 0 || len(table.releasesIndex.Channels) != len(table.Channels) {
+		t.Fatalf("index %d channels, metadata %d", len(table.releasesIndex.Channels), len(table.Channels))
+	}
+	for _, ch := range table.releasesIndex.Channels {
+		releases, ok := table.Channels[ch.Version]
+		if !ok || ch.ReleasesJSON != ch.Version {
+			t.Errorf("channel %s: %+v", ch.Version, ch)
+			continue
+		}
+		for _, r := range releases.Releases {
+			for _, p := range append(slices.Clone(r.SDKs), deref(r.SDK), deref(r.ASPNET)) {
+				for _, f := range p.Files {
+					if len(f.Hash) != 128 || !strings.HasPrefix(f.URL, "https://") {
+						t.Errorf("%s %s: %+v", ch.Version, p.Version, f)
+					}
+				}
+			}
+		}
+	}
+}
+
+func deref(p *published) published {
+	if p == nil {
+		return published{}
+	}
+	return *p
 }

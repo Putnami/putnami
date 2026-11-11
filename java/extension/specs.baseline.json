@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "java/stack-extension#android-sdk-is-provided",
     "java/stack-extension#checks-documentation-links",
     "java/stack-extension#components-become-projects",
     "java/stack-extension#filters-the-tests",

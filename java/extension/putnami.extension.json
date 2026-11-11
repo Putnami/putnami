@@ -99,7 +99,11 @@
       "target",
       ".gradle"
     ],
-    "language": "java"
+    "language": "java",
+    "installInputs": [
+      "gradle.lockfile",
+      "settings-gradle.lockfile"
+    ]
   },
   "commands": {
     "lint": {
@@ -187,6 +191,10 @@
           "type": "number",
           "default": 3000,
           "description": "Port for the server, set as PORT and SERVER_PORT"
+        },
+        "args": {
+          "type": "string",
+          "description": "Arguments passed to the server program"
         }
       },
       "run": [
@@ -248,6 +256,11 @@
           "type": "boolean",
           "default": false,
           "description": "Plan the image without assembling it"
+        },
+        "port": {
+          "type": "number",
+          "default": 8080,
+          "description": "Port the image exposes and sets as PORT"
         }
       },
       "run": [
@@ -357,7 +370,7 @@
       },
       "outputs": {
         "data": {
-          "description": "The task result: the test and coverage totals of a test task."
+          "description": "The task result: the lint findings of the component."
         }
       },
       "cache": {
@@ -526,7 +539,7 @@
       },
       "outputs": {
         "data": {
-          "description": "The task result: the test and coverage totals of a test task."
+          "description": "The task result: the outcome of the component's build."
         }
       },
       "cache": {
@@ -589,7 +602,7 @@
       "declares": {}
     },
     "workspace-install-exec": {
-      "description": "At each stack root of the workspace's Gradle and Maven builds, except the projects disable.tags excludes: install the Temurin JDK .java-version accepts and the pinned JDKs the build's Gradle toolchains ask for; install its Gradle, the wrapper's distribution through gradlew --version or the pinned Gradle of a build without a wrapper, or its Maven, the release its Maven wrapper states, else the mvn on PATH, else the pinned Maven; then fill the dependency cache: Gradle with an init script that resolves every resolvable configuration of every project, a configuration it cannot resolve whole being a warning, and Maven with dependency:go-offline, best effort, with a warning that names what it misses. The force flag refreshes the dependencies. With offline dependencies it installs nothing: a stack root whose JDK, Gradle or Maven is missing is left out with a warning, and the resolution runs offline.",
+      "description": "At each stack root of the workspace's Gradle and Maven builds, except the projects disable.tags excludes: install the Temurin JDK .java-version accepts and the pinned JDKs the build's Gradle toolchains ask for; install its Gradle, the wrapper's distribution through gradlew --version or the pinned Gradle of a build without a wrapper, or its Maven, the release its Maven wrapper states, else the mvn on PATH, else the pinned Maven; then fill the dependency cache: Gradle with an init script that resolves every resolvable configuration of every project, a configuration it cannot resolve whole being a warning, and Maven with dependency:go-offline, best effort, with a warning that names what it misses. A Gradle build that applies the Android plugin gets the Android SDK command-line tools and their accepted licenses when options[\"@putnami/java\"].android.acceptSdkLicenses is true, and fails naming that option when the machine has no SDK. The force flag refreshes the dependencies. With offline dependencies it installs nothing: a stack root whose JDK, Gradle or Maven is missing is left out with a warning, and the resolution runs offline.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

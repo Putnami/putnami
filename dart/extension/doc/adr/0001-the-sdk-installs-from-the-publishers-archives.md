@@ -1,6 +1,6 @@
 # ADR 0001 — The SDK installs from the publisher's archives
 
-- **Status**: accepted
+- **Status**: accepted; amended by [ADR 0003](0003-the-extension-pins-the-sdk-releases-it-installs.md)
 - **Date**: 2026-11-08
 - **Scope**: `@putnami/dart`, the toolchain check of every task and the test
   tools

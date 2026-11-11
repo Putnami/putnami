@@ -178,9 +178,11 @@ cargo locks its own build directory. They are jobs of `@putnami/rust`, not
 profile tasks, so a crate's `putnami.json` does not override them.
 
 `putnami run` starts a binary crate once. `--args` reaches the program,
-`--port` sets `PORT`, and the command exits with the exit code of the program.
-`putnami serve` starts it with `PORT` set from `--port`, 3000 by default and a
-free port for 0, and runs it until you stop it. It announces the server ready
+`--port` sets `PORT`, `--entrypoint` names one of the crate's binaries (`cargo
+run --bin <name>`), and the command exits with the exit code of the program.
+`putnami serve` starts it, with the same `--args` and `--entrypoint`, and with
+`PORT` set from `--port`, 3000 by default and a free port for 0, and runs it
+until you stop it. It announces the server ready
 once the port accepts connections. A program that exits on its own fails the
 serve with its exit code. `serve` does not restart the program when a source
 changes.
@@ -211,9 +213,13 @@ The first `package` of a machine installs the pinned zig, about 100 MB, and
 the targets it needs. An offline run fails and names what is missing.
 
 The image holds the binary at `/app` on a digest-pinned `cc-debian12` base, with
-no docker daemon. `--port` sets `PORT` and the exposed port, `--docker-tag` adds
-a tag, `--docker-base-image` replaces the base and `--docker-load` loads the
-image into the local daemon. The image name is the project name in lowercase;
+no docker daemon. `--port` sets `PORT` and the exposed port, 8080 by default,
+`--entrypoint` names the binary among several, `--docker-tag` adds a tag,
+`--docker-base-image` replaces the base and `--docker-load` loads the image
+into the local daemon. `--dry-run` checks the platforms and writes the channel
+record, and builds no archive and no image; a crate is still staged, for
+`cargo publish --dry-run` to check. Every flag of `package` and `publish` is
+also read in its camelCase form, such as `dockerTag`, in `putnami.json`. The image name is the project name in lowercase;
 an archive keeps the project name as it is written.
 
 `--crates` copies the stack root without `target`, `.git`, `.putnami` and

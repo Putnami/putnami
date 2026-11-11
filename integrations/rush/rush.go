@@ -28,8 +28,8 @@ const TypeScriptExtension = "@putnami/typescript"
 // The adoption modes, as putnami init records them under
 // options.@putnami/rush.mode of putnami.workspace.json.
 const (
-	ModeImport   = "import"
-	ModeDelegate = "delegate"
+	ModeImport   = stacks.AdoptionImport
+	ModeDelegate = stacks.AdoptionDelegate
 )
 
 //go:embed profile.json
@@ -50,15 +50,10 @@ func Stack() (stacks.Stack, error) {
 
 // Mode answers the adoption mode of the workspace at root: the mode
 // options.@putnami/rush.mode of putnami.workspace.json names, and import
-// without one, as putnami init --from imports without a terminal (D-064).
-func Mode(root string) string {
-	cfg := wsproto.Load(root)
-	if cfg != nil {
-		if mode, _ := cfg.Options[ExtensionName]["mode"].(string); mode == ModeDelegate {
-			return ModeDelegate
-		}
-	}
-	return ModeImport
+// without one, as putnami init --from imports without a terminal (D-064). A
+// value that names no mode is an error.
+func Mode(root string) (string, error) {
+	return stacks.AdoptionMode(root, ExtensionName)
 }
 
 // Detect names the Rush projects among the candidate paths. In delegate mode
@@ -72,7 +67,11 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	if len(detection.Projects) == 0 && len(detection.Diagnostics) == 0 {
 		return nil, nil
 	}
-	if Mode(root) == ModeImport {
+	mode, err := Mode(root)
+	if err != nil {
+		return nil, []diag.Diagnostic{diag.Errorf(stacks.CodeAdoptionModeInvalid, "", "%v", err)}
+	}
+	if mode == ModeImport {
 		return nil, nil
 	}
 	projects := make(map[string]detect.Project, len(detection.Projects))
@@ -96,6 +95,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			SourceFile:   path.Join(p.Folder, "package.json"),
 			Root:         wsproto.ProbeRootPath,
 			Dependencies: p.DependsOn,
+			EdgeSource:   wsproto.DependencySourceBuildGraph,
 		})
 	}
 	return out, detection.Diagnostics

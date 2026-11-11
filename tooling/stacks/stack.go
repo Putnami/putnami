@@ -113,6 +113,15 @@ type Stack struct {
 	// of the component's. A tool already on the PATH of env needs no
 	// directory. Nil means the stack installs no tool.
 	Tools func(ctx context.Context, task string, meta Metadata, env []string, info func(string)) ([]string, error)
+	// Env sets environment entries for the steps of one task of a component,
+	// beyond its toolchain and tools: NAME=VALUE entries, each replacing the
+	// task's own value of NAME, such as the home of an SDK the build reads
+	// from the environment. The jobs of the extension that select the
+	// component's toolchain, such as a workspace install, a serve or a
+	// package, call it too. It runs offline too, so the stack decides what it
+	// may provide without the network. Its error fails the task with
+	// stacks.toolchain_missing. Nil sets none.
+	Env func(ctx context.Context, request EnvRequest) ([]string, error)
 	// Step adapts each step of a component's task before it runs, with its
 	// placeholders expanded and the task's toolchain selected: it answers the
 	// step to run, which may name another program, such as the release of a
@@ -154,6 +163,28 @@ type Provided struct {
 	Executable string
 	// Env holds NAME=VALUE entries the steps of the task also receive.
 	Env []string
+}
+
+// EnvRequest is what Stack.Env reads for one task of a component.
+type EnvRequest struct {
+	// Task is the task the steps run for; empty for a job of the extension,
+	// such as a workspace install, a serve or a package.
+	Task string
+	// Root is the workspace root's absolute path.
+	Root string
+	// Meta is the component's metadata, its variant and stack root included.
+	Meta Metadata
+	// Env is the task's environment, its toolchain and tools included.
+	Env []string
+	// Options is the extension's block of the workspace's options, the
+	// options of putnami.workspace.json under the extension's name; nil when
+	// the workspace sets none.
+	Options json.RawMessage
+	// Offline reports a run that must not reach the network
+	// (PUTNAMI_OFFLINE_DEPENDENCIES).
+	Offline bool
+	// Info reports a progress line.
+	Info func(string)
 }
 
 // Metadata is what the probe records about a project under

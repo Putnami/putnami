@@ -32,11 +32,13 @@ import (
 
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 const testVersion = "1.2.3-20260902173000-8e6fb533"
@@ -73,8 +75,8 @@ func stubCompiler(t *testing.T, root, metadata string) string {
 	if metadata == "" {
 		metadata = `{"target_directory":"` + root + `/target","packages":[{"name":"gen","default_run":null,"targets":[{"name":"gen","kind":["bin"]}]}]}`
 	}
-	writeFile(t, dir, "cargo", "#!/bin/sh\ncat <<'JSON'\n"+metadata+"\nJSON\n")
-	writeFile(t, dir, "cargo-zigbuild", `#!/bin/sh
+	stackstest.WriteFile(t, dir, "cargo", "#!/bin/sh\ncat <<'JSON'\n"+metadata+"\nJSON\n")
+	stackstest.WriteFile(t, dir, "cargo-zigbuild", `#!/bin/sh
 echo "$*" >> "`+log+`"
 prev=""
 for a in "$@"; do
@@ -200,7 +202,8 @@ func TestPackageRefusesWhatItCannotCompile(t *testing.T) {
 		"unknown platform": {map[string]any{"archives": true, "platforms": "plan9/amd64"}, "", "does not know the platform"},
 		"not linux":        {map[string]any{"docker": true, "platform": "darwin/arm64"}, "", "an image runs on Linux"},
 		"unknown image":    {map[string]any{"docker": true, "platform": "plan9/amd64"}, "", "does not know the platform"},
-		"two binaries":     {map[string]any{"docker": true}, two, "state package.default-run"},
+		"two binaries":     {map[string]any{"docker": true}, two, "name one with --entrypoint or state package.default-run"},
+		"unknown binary":   {map[string]any{"docker": true, "entrypoint": "gone"}, two, "has no binary gone"},
 		"no binary":        {map[string]any{"docker": true}, `{"packages":[{"name":"gen","targets":[{"name":"gen","kind":["lib"]}]}]}`, "no binary target"},
 		"no package":       {map[string]any{"docker": true}, `{"packages":[]}`, "names no package"},
 		"not json":         {map[string]any{"docker": true}, "nope", "cargo metadata"},
@@ -222,6 +225,13 @@ func TestPackageChoosesTheDefaultRunOfSeveralBinaries(t *testing.T) {
 		t.Fatal(err)
 	}
 	if logged, _ := os.ReadFile(log); !strings.Contains(string(logged), "--bin b ") { //nolint:gosec // the test's own log
+		t.Errorf("zigbuild ran %s", logged)
+	}
+	// --entrypoint names another binary than the default-run one.
+	if _, err := runCompile(t, root, packageContext(t, root, rawParams(t, map[string]any{"docker": true, "entrypoint": "a"}))); err != nil {
+		t.Fatal(err)
+	}
+	if logged, _ := os.ReadFile(log); !strings.Contains(string(logged), "--bin a ") { //nolint:gosec // the test's own log
 		t.Errorf("zigbuild ran %s", logged)
 	}
 }
@@ -371,7 +381,7 @@ func writeBinaries(t *testing.T, root string, suffixes ...string) {
 		if strings.HasPrefix(suffix, "windows") {
 			name = "gen.exe"
 		}
-		writeFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), suffix+"/"+name, "binary "+suffix)
+		stackstest.WriteFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), suffix+"/"+name, "binary "+suffix)
 	}
 }
 
@@ -445,8 +455,8 @@ func TestPackageArchivesFailsWithoutACompiledBinaryOrAVersion(t *testing.T) {
 	if _, _, err := packageArchives(ctx, jsonl.New(), nil); err == nil || !strings.Contains(err.Error(), "no binary for linux/amd64") {
 		t.Errorf("err = %v", err)
 	}
-	writeFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), "linux-x64/a", "")
-	writeFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), "linux-x64/b", "")
+	stackstest.WriteFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), "linux-x64/a", "")
+	stackstest.WriteFile(t, pkgmeta.PackageOutputDir(root, "tools/gen", "bin"), "linux-x64/b", "")
 	if _, _, err := packageArchives(ctx, jsonl.New(), nil); err == nil || !strings.Contains(err.Error(), "want the one binary") {
 		t.Errorf("err = %v", err)
 	}
@@ -497,7 +507,7 @@ func TestPackageAssemblesAnImageForThePlatform(t *testing.T) {
 	base, _ := baseImage(t)
 	log := filepath.Join(t.TempDir(), "docker.log")
 	stubs := t.TempDir()
-	writeFile(t, stubs, "docker", "#!/bin/sh\necho \"$*\" >> \""+log+"\"\n")
+	stackstest.WriteFile(t, stubs, "docker", "#!/bin/sh\necho \"$*\" >> \""+log+"\"\n")
 	if err := os.Chmod(filepath.Join(stubs, "docker"), 0o755); err != nil { //nolint:gosec // a test script
 		t.Fatal(err)
 	}
@@ -572,5 +582,34 @@ func TestPackageDockerFailsWithAnUnknownPlatformOrNoBinary(t *testing.T) {
 	ctx.Version = nil
 	if _, _, err := packageDocker(ctx, jsonl.New(), nil); err == nil {
 		t.Error("no version was accepted")
+	}
+}
+
+func TestADryRunPackageWritesTheChannelRecordAndBuildsNothing(t *testing.T) {
+	spectest.Proves(t, feature, "package-dry-run-builds-nothing", "a-dry-run-package-writes-the-channel-record-and-builds-nothing")
+	root := fixture(t)
+	ctx := packageContext(t, root, rawParams(t, map[string]any{"docker": true, "archives": true, "dry-run": true}))
+	for name, job := range map[string]cli.JobFunc{"docker": packageDocker, "archives": packageArchives} {
+		if status, _, err := job(ctx, jsonl.New(), nil); status != "OK" || err != nil {
+			t.Errorf("%s: %s %v", name, status, err)
+		}
+	}
+	for _, channel := range []string{channelDocker, channelArchives} {
+		entries, _ := os.ReadDir(pkgmeta.PackageOutputDir(root, "tools/gen", channel))
+		var names []string
+		for _, e := range entries {
+			names = append(names, e.Name())
+		}
+		if len(names) != 1 {
+			t.Errorf("a dry run of %s wrote %v, want the channel record alone", channel, names)
+		}
+	}
+	// The flags are checked: a platform the image cannot run on fails.
+	bad := packageContext(t, root, rawParams(t, map[string]any{"docker": true, "platform": "darwin/arm64", "dry-run": true}))
+	if status, _, err := packageDocker(bad, jsonl.New(), nil); status != "FAILED" || err == nil {
+		t.Errorf("a dry run on a foreign platform: %s %v", status, err)
+	}
+	if status, _, err := packageCompile(stack(t))(packageContext(t, root, rawParams(t, map[string]any{"archives": true, "platforms": "plan9/amd64", "dry-run": true})), jsonl.New(), nil); status != "FAILED" || err == nil {
+		t.Errorf("a dry run compile of an unknown platform: %s %v", status, err)
 	}
 }

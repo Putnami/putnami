@@ -161,7 +161,7 @@ The Rust reference profile:
 | `tasks.<task>.steps` | The commands the task runs in order, each an argument vector run in the directory `dir` names, with no shell. `{root}` is the stack root, `{component}` the build's name for the component (`Component.Ref`, or its name), `{manifest}` the absolute path of the manifest the detector read it from, `{output}` the task's output directory under the project, `{target}` one of the task's targets. |
 | `tasks.<task>.inputs` | The input sets the task reads. `lint` reads fewer than `test`: a lockfile change does not rerun it. |
 | `tasks.<task>.reportSteps` | Steps that run after the task's steps whatever their outcome, such as a converter that writes the JUnit report a failing test runner leaves to it, so the failed cases name the failure. They name no `{target}`, and may name `{runtime}`. |
-| `tasks.<task>.reports` | The JUnit (`junit`) and TRX (`trx`) test reports and the coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when` and `optional` say when a report is expected. |
+| `tasks.<task>.reports` | The JUnit (`junit`) and TRX (`trx`) test reports and the coverage reports the task reads back, with the coverage format. The core copies each into `{output}` as soon as the task ends. `when`, `optional` and `warnWhenMissing` say when a report is expected. |
 | `tasks.<task>.targets` | What a step that names `{target}` runs on, listed in the project directory when the task runs: a `name`, or one target per file an `each` pattern matches, named by its base name without extension; `when` lists paths that must all exist, `hosts` the systems (`linux`, `darwin`, `windows`) that build it. A step that names `{target}` runs once per target, and not at all when there is none; it needs the task to declare targets, and each target's paths are in the task's inputs. |
 | `tasks.<task>.artifacts` | The files the task copies into `{output}/artifacts` after its steps, so a cache hit restores them: patterns under the project or the stack root that may name `{component}`. The file a pattern with no wildcard names is removed before the steps, unless its path leads outside the project or the stack root or the inputs of one of the component's tasks select it, so only what the steps write is copied. A pattern with a wildcard is only copied, and copies whatever it matches, a file an earlier build left included. A component name that is no single path segment keeps no artifact. A pattern that matches nothing copies nothing. |
 | `variants.<name>` | A part of the profile one build runs, applied before the project's override. |
@@ -256,7 +256,11 @@ may be empty so the project keeps its directory's name.
 
 A task's `reports.when` names project files: when none exists, the task
 expects no report, so a module without tests passes. A coverage report marked
-`optional` is read when it exists and fails nothing when it does not.
+`optional` is read when it exists and fails nothing when it does not, and the
+summary carries no coverage. One that only the project's own setup produces,
+such as Coverlet's or SimpleCov's, also declares `warnWhenMissing`, and its
+absence warns with `stacks.coverage_unavailable`
+([ADR 0015](adr/0015-the-stack-extensions-share-one-command-surface.md)).
 
 ### Nested markers, excluded directories and runtime commands
 
@@ -432,13 +436,33 @@ it may name another program, such as the release of a build tool the build
 states, and add arguments; its error fails the task with
 `stacks.toolchain_missing`, and `RunWith` and `RunFiltered` read the adapted
 last step
-([ADR 0014](adr/0014-a-stack-adapts-each-step-of-a-task.md)). `Stack.Selected`,
+([ADR 0014](adr/0014-a-stack-adapts-each-step-of-a-task.md)). `Stack.Env`
+answers `NAME=VALUE` entries for the steps of a task and of the extension's
+jobs that select the component's toolchain, offline too, such as the home of
+an SDK the build reads from the environment. It reads an `EnvRequest`: the
+task, the workspace root, the component's metadata, the task's environment,
+the extension's block of the workspace's options and whether the run is
+offline. Its error, or an entry that names no variable, fails the task with
+`stacks.toolchain_missing`
+([ADR 0016](adr/0016-a-stack-sets-the-environment-of-a-task.md)). `Stack.Selected`,
 `RunForeground`, `AnnounceReady` and `FreePort` serve a stack's `run` and
-`serve` commands. `ImageName` and `ImageMember` serve a stack that packages an
-image: the image is the project's name as one lowercase path segment, the name
-the shared Docker publisher expects, so a project named `userService` packages
-`userservice`; `ImageMember` declares that image as a release-set member when
-the project's `putnami.json` publishes it.
+`serve` commands. `ImageName`, `ImageMember` and `ImagePort` serve a stack
+that packages an image: the image is the project's name as one lowercase path segment, the
+name the shared Docker publisher expects, so a project named `userService`
+packages `userservice`; `ImageMember` declares that image as a release-set
+member when the project's `putnami.json` publishes it; `ImagePort` reads the
+port its image listens on, 8080 by default. Its `imageload`
+package loads the image into the local Docker daemon under each of its tags;
+only the stacks that package an image import it.
+`LockedToolsHome`, `ExecutableSuffix`, `CompareVersions`, `Accepted` and
+`Choose` serve a stack that installs its toolchain, and
+`ServeToolchainResolve` one that pins it in the workspace lock. The test kit
+`stackstest` gives every stack extension `CheckManifest`, `CheckSurface`, which
+holds a language stack's manifest to the command surface the stacks share
+([ADR 0015](adr/0015-the-stack-extensions-share-one-command-surface.md)), with
+a named exemption for each stated reason, and `WriteFile`, and
+its `imagetest` package `Registry`, an in-memory registry that serves a
+two-platform base image.
 
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
@@ -551,9 +575,8 @@ tool, so no Putnami cache sits over the tool's.
 - **Serve, run, package and publish in the profile.** No profile declares
   these tasks or a workload: each stack starts its programs and ships its
   artifacts its own way, so each extension adds them as jobs in its own code.
-  All seven stacks serve and run their applications; Rust, Ruby, PHP and Dart
-  do so on helpers the core shares (`RunForeground`, `AnnounceReady`,
-  `FreePort`). `serve` reports the server ready once its port accepts
+  All seven stacks serve and run their applications on helpers the core
+  shares (`RunForeground`, `AnnounceReady`, `FreePort`). `serve` reports the server ready once its port accepts
   connections, so `putnami qualify` and compose can wait on it. Rust, Java,
   Swift, .NET, Ruby and PHP package an application's image and publish it
   through the shared Docker publisher, and Rust also packages release

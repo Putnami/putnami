@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/protocol/job"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 func TestTestPassesTheFilterToPHPUnitAndKeysTheTaskOnIt(t *testing.T) {
@@ -59,7 +60,7 @@ func TestTestPassesTheFilterToPHPUnitAndKeysTheTaskOnIt(t *testing.T) {
 	}
 
 	// An overridden step answers for its own program, wherever it stands.
-	writeFile(t, root, "tools/phpunit", "#!/bin/sh\nexit 0\n")
+	stackstest.WriteFile(t, root, "tools/phpunit", "#!/bin/sh\nexit 0\n")
 	if err := os.Chmod(filepath.Join(root, "tools/phpunit"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -67,7 +68,7 @@ func TestTestPassesTheFilterToPHPUnitAndKeysTheTaskOnIt(t *testing.T) {
 	if got := testFilter(override, selected, []string{filepath.Join(root, "tools/phpunit")}); !slices.Equal(got, []string{"--filter", "x"}) {
 		t.Errorf("a program whose help lists no option: %q", got)
 	}
-	writeFile(t, root, "tools/phpunit", "#!/bin/sh\necho "+emptySuiteOption+"\n")
+	stackstest.WriteFile(t, root, "tools/phpunit", "#!/bin/sh\necho "+emptySuiteOption+"\n")
 	if err := os.Remove(filepath.Join(root, "vendor/bin/phpunit")); err != nil {
 		t.Fatal(err)
 	}

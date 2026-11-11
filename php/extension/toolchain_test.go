@@ -7,6 +7,8 @@ import (
 
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 func resolved(t *testing.T, root, platform, committed string) *wsproto.LockToolchainEntry {
@@ -15,7 +17,7 @@ func resolved(t *testing.T, root, platform, committed string) *wsproto.LockToolc
 	if committed != "" {
 		request.Locked = map[string]wsproto.LockToolchainEntry{LockIdentity: {Version: committed}}
 	}
-	result := answerToolchainResolve(root, request, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(root, request, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if resolution, ok := result.Toolchains[LockIdentity]; ok {
 		return resolution.Pin
 	}
@@ -48,9 +50,9 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			root := t.TempDir()
-			writeFile(t, root, "composer.json", c.composer)
+			stackstest.WriteFile(t, root, "composer.json", c.composer)
 			if c.phpVersion != "" {
-				writeFile(t, root, ".php-version", c.phpVersion)
+				stackstest.WriteFile(t, root, ".php-version", c.phpVersion)
 			}
 			if got := version(resolved(t, root, "linux/amd64", c.committed)); got != c.want {
 				t.Errorf("pin = %s, want %s", got, c.want)
@@ -59,22 +61,22 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 	}
 
 	nested := t.TempDir()
-	writeFile(t, nested, "services/api/composer.json", `{"require": {"php": "~8.3.0"}}`)
+	stackstest.WriteFile(t, nested, "services/api/composer.json", `{"require": {"php": "~8.3.0"}}`)
 	if got := version(resolved(t, nested, "linux/amd64", "")); got != "8.3.32" {
 		t.Errorf("a component's statement narrows the pin: %s", got)
 	}
-	writeFile(t, nested, "services/web/composer.json", `{"require": {"php": ">=8.5"}}`)
+	stackstest.WriteFile(t, nested, "services/web/composer.json", `{"require": {"php": ">=8.5"}}`)
 	if got := version(resolved(t, nested, "linux/amd64", "")); got != "8.4.23" {
 		t.Errorf("components with no common release leave the root's choice: %s", got)
 	}
 
 	root := t.TempDir()
-	writeFile(t, root, "vendor/acme/composer.json", `{}`)
+	stackstest.WriteFile(t, root, "vendor/acme/composer.json", `{}`)
 	if pin := resolved(t, root, "linux/amd64", ""); pin != nil {
 		t.Errorf("a composer.json under vendor/ pins nothing: %v", pin.Version)
 	}
 
-	writeFile(t, root, "composer.json", `{}`)
+	stackstest.WriteFile(t, root, "composer.json", `{}`)
 	if pin := resolved(t, root, "windows/arm64", ""); pin != nil {
 		t.Errorf("a platform with no archive pins nothing: %v", pin.Version)
 	}
@@ -86,7 +88,7 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 		Locked:     map[string]wsproto.LockToolchainEntry{LockIdentity: *pin},
 		Platform:   "windows/arm64",
 	}
-	result := answerToolchainResolve(root, request, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(root, request, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if kept := result.Toolchains[LockIdentity].Pin; kept == nil || !reflect.DeepEqual(*kept, *pin) {
 		t.Errorf("a platform with no archive keeps the committed pin as committed: %+v", kept)
 	}
@@ -120,7 +122,7 @@ func TestTheExtensionPinsAPHPReleaseTheRepositoryAccepts(t *testing.T) {
 }
 
 func TestToolchainResolveRefusesAnIdentityItDoesNotPin(t *testing.T) {
-	result := answerToolchainResolve(t.TempDir(), wsproto.ToolchainResolveRequest{Identities: []string{"go"}, Platform: "linux/amd64"}, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(t.TempDir(), wsproto.ToolchainResolveRequest{Identities: []string{"go"}, Platform: "linux/amd64"}, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if result.Toolchains["go"].Problem == nil {
 		t.Errorf("another identity is a problem: %+v", result)
 	}

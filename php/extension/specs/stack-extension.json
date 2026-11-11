@@ -88,7 +88,7 @@
     },
     {
       "id": "packages-an-application-image",
-      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: a layer of composer install --no-dev --no-scripts --optimize-autoloader, a layer of its files, and an Apache configuration serving public/. The base is the official php:<pinned>-apache image pinned by digest, or a digest-pinned base the project names; a base with no digest fails. It runs as www-data and holds no auth.json, local environment file or decryption key. A library packages nothing."
+      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: a composer install --no-dev --no-scripts --optimize-autoloader layer, a layer of its files, and Apache serving public/ on the port flag, 8080 by default. The base is the official php:<pinned>-apache image pinned by digest, or a digest-pinned base the project names; a base with no digest fails. It runs as www-data and holds no auth.json, local environment file or decryption key. A library packages nothing."
     },
     {
       "id": "publishes-an-application-image",

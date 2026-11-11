@@ -21,6 +21,7 @@ import (
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/observe/detect/dotnet"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/imageload"
 )
 
 const (
@@ -38,11 +39,10 @@ const (
 )
 
 const (
-	dockerChannel    = "docker"
-	imageAppDir      = "/app"
-	imageUser        = "app"
-	defaultImagePort = "8080"
-	defaultPlatform  = "linux/amd64"
+	dockerChannel   = "docker"
+	imageAppDir     = "/app"
+	imageUser       = "app"
+	defaultPlatform = "linux/amd64"
 )
 
 // runtimeBases are the official .NET images, pinned by digest, by runtime
@@ -169,7 +169,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 	if base, err = baseImage(props.Web, framework, named); err != nil {
 		return fail(CodeBaseNotPinned, err)
 	}
-	spec, err := imageSpec(published, props, base, platform)
+	spec, err := imageSpec(published, props, base, platform, stacks.ImagePort(ctx, flags))
 	if err != nil {
 		return fail(CodeImageFailed, err)
 	}
@@ -190,7 +190,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 		tags = append(tags, name+":"+tag)
 	}
 	if cli.FlagBool(flags, "docker-load", ctx.Params.Bool("docker-load", false, "dockerLoad")) {
-		if err := loadImage(filepath.Join(output, "oci"), tags); err != nil {
+		if err := imageload.Load(filepath.Join(output, "oci"), tags, emit); err != nil {
 			return fail(CodeImageFailed, err)
 		}
 	}
@@ -330,7 +330,7 @@ func baseImage(web bool, framework, named string) (string, error) {
 
 // imageSpec describes the application's image: the published files of its
 // dependencies, then its own, under /app.
-func imageSpec(published string, p projectProperties, base, platform string) (oci.Spec, error) {
+func imageSpec(published string, p projectProperties, base, platform, port string) (oci.Spec, error) {
 	own := func(rel string) bool {
 		name := filepath.Base(rel)
 		return strings.HasPrefix(name, p.AssemblyName+".") || strings.HasPrefix(name, "appsettings") ||
@@ -365,8 +365,8 @@ func imageSpec(published string, p projectProperties, base, platform string) (oc
 		User:       imageUser,
 	}
 	if p.Web {
-		spec.Env = []string{"ASPNETCORE_HTTP_PORTS=" + defaultImagePort, "PORT=" + defaultImagePort}
-		spec.ExposedPorts = []string{defaultImagePort + "/tcp"}
+		spec.Env = []string{"ASPNETCORE_HTTP_PORTS=" + port, "PORT=" + port}
+		spec.ExposedPorts = []string{port + "/tcp"}
 	}
 	return spec, nil
 }
@@ -397,31 +397,4 @@ func imageFiles(published string, keep func(rel string) bool) ([]oci.File, error
 		return nil
 	})
 	return files, err
-}
-
-// loadImage loads the assembled image into the local Docker daemon under its
-// tags.
-func loadImage(layout string, tags []string) error {
-	archive, err := os.CreateTemp("", "putnami-dotnet-image-*.tar")
-	if err != nil {
-		return err
-	}
-	_ = archive.Close()
-	defer func() { _ = os.Remove(archive.Name()) }()
-	if err := oci.WriteDockerTarball(layout, tags[0], archive.Name()); err != nil {
-		return err
-	}
-	load := exec.Command("docker", "load", "-i", archive.Name()) //nolint:gosec // fixed program, a path from CreateTemp
-	load.Stderr = os.Stderr
-	if err := load.Run(); err != nil {
-		return errors.New("docker load failed for " + tags[0])
-	}
-	for _, alias := range tags[1:] {
-		tag := exec.Command("docker", "tag", tags[0], alias) //nolint:gosec // fixed program
-		tag.Stderr = os.Stderr
-		if err := tag.Run(); err != nil {
-			return errors.New("docker tag failed for " + alias)
-		}
-	}
-	return nil
 }

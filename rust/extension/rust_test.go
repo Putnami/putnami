@@ -22,32 +22,21 @@ import (
 
 const feature = "rust/stack-extension"
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // fixture writes a Cargo workspace: api depends on pricing, both members of
 // the root workspace, and gen is a crate of its own outside it.
 func fixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	writeFile(t, root, "Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n\n[workspace.dependencies]\npricing = { path = \"crates/pricing\" }\n")
-	writeFile(t, root, "Cargo.lock", "version = 3\n")
-	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
-	writeFile(t, root, "crates/pricing/Cargo.toml", "[package]\nname = \"pricing\"\nversion = \"0.1.0\"\n")
-	writeFile(t, root, "crates/pricing/src/lib.rs", "pub fn price() -> u32 { 1 }\n")
-	writeFile(t, root, "crates/api/Cargo.toml", "[package]\nname = \"api\"\nversion = \"0.1.0\"\n\n[dependencies]\npricing = { workspace = true }\n")
-	writeFile(t, root, "crates/api/src/lib.rs", "pub fn serve() {}\n")
-	writeFile(t, root, "crates/api/tests/http.rs", "#[test]\nfn serves() {}\n")
-	writeFile(t, root, "tools/gen/Cargo.toml", "[package]\nname = \"gen\"\nversion = \"0.1.0\"\n")
-	writeFile(t, root, "tools/gen/src/main.rs", "fn main() {}\n")
+	stackstest.WriteFile(t, root, "Cargo.toml", "[workspace]\nmembers = [\"crates/*\"]\n\n[workspace.dependencies]\npricing = { path = \"crates/pricing\" }\n")
+	stackstest.WriteFile(t, root, "Cargo.lock", "version = 3\n")
+	stackstest.WriteFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	stackstest.WriteFile(t, root, "crates/pricing/Cargo.toml", "[package]\nname = \"pricing\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "crates/pricing/src/lib.rs", "pub fn price() -> u32 { 1 }\n")
+	stackstest.WriteFile(t, root, "crates/api/Cargo.toml", "[package]\nname = \"api\"\nversion = \"0.1.0\"\n\n[dependencies]\npricing = { workspace = true }\n")
+	stackstest.WriteFile(t, root, "crates/api/src/lib.rs", "pub fn serve() {}\n")
+	stackstest.WriteFile(t, root, "crates/api/tests/http.rs", "#[test]\nfn serves() {}\n")
+	stackstest.WriteFile(t, root, "tools/gen/Cargo.toml", "[package]\nname = \"gen\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "tools/gen/src/main.rs", "fn main() {}\n")
 	return root
 }
 
@@ -124,8 +113,8 @@ func stubTools(t *testing.T, root, version, junit string) string {
 	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
 	bin := t.TempDir()
 	log := filepath.Join(bin, "cargo.log")
-	writeFile(t, bin, "rustc", "#!/bin/sh\necho 'rustc "+version+" (stub 2024-10-15)'\n")
-	writeFile(t, bin, "cargo", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "rustc", "#!/bin/sh\necho 'rustc "+version+" (stub 2024-10-15)'\n")
+	stackstest.WriteFile(t, bin, "cargo", `#!/bin/sh
 echo "$PWD: cargo $*" >> "`+log+`"
 echo "$PWD: cargo $1 CARGO_NET_OFFLINE=${CARGO_NET_OFFLINE-unset} CARGO_HOME=${CARGO_HOME-unset} RUSTC_WRAPPER=${RUSTC_WRAPPER-unset} RUSTC_WORKSPACE_WRAPPER=${RUSTC_WORKSPACE_WRAPPER-unset} RUSTC=${RUSTC-unset}" >> "`+log+`.env"
 case "$*" in *--help*)
@@ -319,8 +308,8 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		t.Fatalf("lint inputs = %+v", got)
 	}
 
-	writeFile(t, root, "crates/api/fixtures/routes.json", "{}")
-	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {
+	stackstest.WriteFile(t, root, "crates/api/fixtures/routes.json", "{}")
+	stackstest.WriteFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {
 	  "inputs": {"sources": ["src/**", "fixtures/**"]},
 	  "tasks": {"lint": {"steps": [["cargo", "clippy", "--package", "{component}"]]}}
 	}}}`)
@@ -336,7 +325,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		t.Errorf("a step override is honored: %q", ran)
 	}
 
-	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"tasks": {"lint": {"stepz": []}}}}}`)
+	stackstest.WriteFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"tasks": {"lint": {"stepz": []}}}}}`)
 	if status, _, _, err := runJob(t, root, "crates/api", stacks.TaskLint); status != "FAILED" || err == nil {
 		t.Errorf("an invalid override fails the task: %s %v", status, err)
 	}
@@ -372,6 +361,7 @@ func TestThePackageCompileAlwaysFollowsItsDependencies(t *testing.T) {
 func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	spectest.Proves(t, feature, "manifest-follows-the-profile", "the-manifest-conforms-to-the-stack-core")
 	stackstest.CheckManifest(t, "putnami.extension.json", stack(t))
+	stackstest.CheckSurface(t, "putnami.extension.json")
 	if got := stack(t).Selectors(); !slices.Equal(got, []string{"rust:build", "rust:lint", "rust:package", "rust:test"}) {
 		t.Errorf("selectors = %v", got)
 	}
@@ -380,9 +370,9 @@ func TestTheManifestConformsToTheStackCore(t *testing.T) {
 func TestLintDoesNotReadTheLockfileOrTheNextestConfiguration(t *testing.T) {
 	spectest.Proves(t, feature, "inputs-are-per-task", "lint-does-not-read-the-lockfile-or-the-nextest-configuration")
 	root := fixture(t)
-	writeFile(t, root, "crates/api/Cargo.lock", "version = 3\n")
-	writeFile(t, root, "crates/api/rustfmt.toml", "edition = \"2021\"\n")
-	writeFile(t, root, "crates/api/benches/load.rs", "fn main() {}\n")
+	stackstest.WriteFile(t, root, "crates/api/Cargo.lock", "version = 3\n")
+	stackstest.WriteFile(t, root, "crates/api/rustfmt.toml", "edition = \"2021\"\n")
+	stackstest.WriteFile(t, root, "crates/api/benches/load.rs", "fn main() {}\n")
 	s := stack(t)
 	files := map[string][]string{}
 	for _, task := range stacks.TaskNames {
@@ -476,7 +466,7 @@ func TestEachCoverageFileGoesToTheCrateThatHoldsIt(t *testing.T) {
 	spectest.Proves(t, feature, "coverage-is-attributed", "each-coverage-file-goes-to-the-crate-that-holds-it")
 	root := fixture(t)
 	lcov := filepath.Join(t.TempDir(), "lcov.info")
-	writeFile(t, filepath.Dir(lcov), "lcov.info", "SF:"+filepath.Join(root, "crates/api/src/lib.rs")+"\nDA:1,1\nDA:2,0\nend_of_record\n"+
+	stackstest.WriteFile(t, filepath.Dir(lcov), "lcov.info", "SF:"+filepath.Join(root, "crates/api/src/lib.rs")+"\nDA:1,1\nDA:2,0\nend_of_record\n"+
 		"SF:tests/http.rs\nDA:1,1\nend_of_record\n"+
 		"SF:"+filepath.Join(root, "crates/pricing/src/lib.rs")+"\nDA:1,1\nDA:2,1\nDA:3,1\nend_of_record\n"+
 		"SF:/opt/cargo/registry/src/itoa/lib.rs\nDA:1,1\nend_of_record\n")
@@ -504,16 +494,16 @@ func TestEachCoverageFileGoesToTheCrateThatHoldsIt(t *testing.T) {
 func nestedFixture(t *testing.T) string {
 	t.Helper()
 	root := fixture(t)
-	writeFile(t, root, "services/billing/Cargo.toml", "[workspace]\nmembers = [\"core\", \"http\"]\n\n[workspace.dependencies]\nbilling-core = { path = \"core\" }\n")
-	writeFile(t, root, "services/billing/Cargo.lock", "version = 3\n")
-	writeFile(t, root, "services/billing/.config/nextest.toml", "[profile.ci.junit]\npath = \"junit.xml\"\n")
-	writeFile(t, root, "services/billing/core/Cargo.toml", "[package]\nname = \"billing-core\"\nversion = \"0.1.0\"\n")
-	writeFile(t, root, "services/billing/core/src/lib.rs", "pub fn bill() {}\n")
-	writeFile(t, root, "services/billing/http/Cargo.toml", "[package]\nname = \"http\"\nversion = \"0.1.0\"\n\n[dependencies]\nbilling-core = { workspace = true }\n")
-	writeFile(t, root, "services/billing/http/src/lib.rs", "")
-	writeFile(t, root, "apps/cli/Cargo.toml", "[package]\nname = \"cli\"\nversion = \"0.1.0\"\n\n[workspace]\nmembers = [\"plugin\"]\n\n[dependencies]\nplugin = { path = \"plugin\" }\n")
-	writeFile(t, root, "apps/cli/src/main.rs", "fn main() {}\n")
-	writeFile(t, root, "apps/cli/plugin/Cargo.toml", "[package]\nname = \"plugin\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "services/billing/Cargo.toml", "[workspace]\nmembers = [\"core\", \"http\"]\n\n[workspace.dependencies]\nbilling-core = { path = \"core\" }\n")
+	stackstest.WriteFile(t, root, "services/billing/Cargo.lock", "version = 3\n")
+	stackstest.WriteFile(t, root, "services/billing/.config/nextest.toml", "[profile.ci.junit]\npath = \"junit.xml\"\n")
+	stackstest.WriteFile(t, root, "services/billing/core/Cargo.toml", "[package]\nname = \"billing-core\"\nversion = \"0.1.0\"\n")
+	stackstest.WriteFile(t, root, "services/billing/core/src/lib.rs", "pub fn bill() {}\n")
+	stackstest.WriteFile(t, root, "services/billing/http/Cargo.toml", "[package]\nname = \"http\"\nversion = \"0.1.0\"\n\n[dependencies]\nbilling-core = { workspace = true }\n")
+	stackstest.WriteFile(t, root, "services/billing/http/src/lib.rs", "")
+	stackstest.WriteFile(t, root, "apps/cli/Cargo.toml", "[package]\nname = \"cli\"\nversion = \"0.1.0\"\n\n[workspace]\nmembers = [\"plugin\"]\n\n[dependencies]\nplugin = { path = \"plugin\" }\n")
+	stackstest.WriteFile(t, root, "apps/cli/src/main.rs", "fn main() {}\n")
+	stackstest.WriteFile(t, root, "apps/cli/plugin/Cargo.toml", "[package]\nname = \"plugin\"\nversion = \"0.1.0\"\n")
 	return root
 }
 

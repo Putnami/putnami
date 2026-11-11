@@ -16,6 +16,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 const pharBody = "<?php // the stub Composer\n"
@@ -81,7 +82,7 @@ func composerStub(t *testing.T, version string) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "composer.log")
-	writeFile(t, bin, "php", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "php", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "PHP `+version+` (cli)"; exit 0; fi
 if [ "$1" = "-r" ]; then echo "${STUB_PHP_MINOR:-8.4}"; exit 0; fi
 echo "$PWD: $*" >> "`+log+`"
@@ -127,7 +128,7 @@ func TestTheInstallStepInstallsEachStackRootWithThePinnedComposer(t *testing.T) 
 	}
 
 	// A changed manifest installs again, with the phar it holds.
-	writeFile(t, root, "composer.lock", `{"packages": [{"name": "demo/new"}]}`)
+	stackstest.WriteFile(t, root, "composer.lock", `{"packages": [{"name": "demo/new"}]}`)
 	if status, err := runInstall(t, root, "."); status != "OK" || err != nil {
 		t.Fatalf("install: %s %v", status, err)
 	}
@@ -179,7 +180,7 @@ func TestAFailedInstallLeavesNoRecordOfTheLastOne(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "composer.lock", `{"packages": [{"name": "demo/branch"}]}`)
+	stackstest.WriteFile(t, root, "composer.lock", `{"packages": [{"name": "demo/branch"}]}`)
 	t.Setenv("STUB_COMPOSER_FAILS", "1")
 	if status, _ := runInstall(t, root, "."); status != "FAILED" {
 		t.Fatalf("install on the changed lock: %s", status)
@@ -204,7 +205,7 @@ func TestASuccessfulInstallWithAnotherVendorDirectoryStaysGreen(t *testing.T) {
 	t.Setenv("PUTNAMI_HOME", t.TempDir())
 	composerServer(t)
 	bin := t.TempDir()
-	writeFile(t, bin, "php", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "php", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "PHP 8.4.10 (cli)"; exit 0; fi
 mkdir -p lib
 `)
@@ -229,7 +230,7 @@ func TestAPinnedWindowsPHPIsPreparedEvenWhenNothingInstalls(t *testing.T) {
 	}
 
 	pinnedDir := t.TempDir()
-	writeFile(t, pinnedDir, "php", "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"PHP 8.4.23 (cli)\"; exit 0; fi\nexit 9\n")
+	stackstest.WriteFile(t, pinnedDir, "php", "#!/bin/sh\nif [ \"$1\" = \"--version\" ]; then echo \"PHP 8.4.23 (cli)\"; exit 0; fi\nexit 9\n")
 	pinned := filepath.Join(pinnedDir, "php")
 	if err := os.Chmod(pinned, 0o755); err != nil {
 		t.Fatal(err)

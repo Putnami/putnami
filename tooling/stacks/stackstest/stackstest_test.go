@@ -214,3 +214,12 @@ func TestCheckManifestHoldsEveryVariant(t *testing.T) {
 		}
 	}
 }
+
+func TestWriteFileCreatesTheDirectories(t *testing.T) {
+	root := t.TempDir()
+	WriteFile(t, root, "a/b/c.txt", "hello")
+	got, err := os.ReadFile(filepath.Join(root, "a", "b", "c.txt"))
+	if err != nil || string(got) != "hello" {
+		t.Errorf("%q %v", got, err)
+	}
+}

@@ -6,6 +6,7 @@
     "Each Gradle project, Android included, and each Maven module that packages code is a Putnami project, with an edge to each component it depends on in the same build, whether the build sits at the workspace root or in a subdirectory",
     "putnami lint, test and build run the steps of the component's build, Gradle wrapper or Maven, in its directory, and a second run over an unchanged tree is a cache hit",
     "A machine with no JDK, Gradle or Maven builds right after git clone: putnami install installs the pinned Eclipse Temurin JDKs the build asks for, through .java-version and its Gradle toolchains, its Gradle or Maven, each checked by SHA-256, and its dependencies, and each task installs what it still lacks",
+    "An Android build gets the Android SDK on a blank machine once the workspace's owner accepts its licenses in putnami.workspace.json, and a machine's own SDK stays in use",
     "The test task reads the JUnit reports and the JaCoCo report the build writes into the test and coverage summary",
     "A change to a lockfile reruns test and build, never lint",
     "putnami test --test runs the tests a filter names, and a component in which it selects none passes; putnami lint also checks the documentation links",
@@ -19,10 +20,10 @@
     "Publishing a library to a Maven repository: Gradle or Maven publishes it",
     "An application image for a build other than the Gradle application plugin and Spring Boot",
     "A workspace-fetch that fills a dependency cache ahead of a hosted run without running repository code: resolving a Gradle build's dependencies evaluates its settings and build scripts, which run their plugins' code, through the repository's own wrapper jar, and Maven's dependency:go-offline loads the build's extensions and misses the dependencies a plugin resolves when it runs",
-    "Installing the Android SDK: it accepts the SDK's licenses on the team's behalf, which needs a decision of the workspace's owner",
     "Credentials for a private Maven or Gradle repository: the build reads its own settings",
     "A deps-upgrade: a Gradle or Maven build moves its versions with its own tools",
-    "Running the Maven wrapper script mvnw: the release its properties name runs instead"
+    "Running the Maven wrapper script mvnw: the release its properties name runs instead",
+    "Installing an Android SDK the workspace's owner did not accept the licenses of, or the platforms and build tools ahead of the Android Gradle plugin: it downloads the ones the build declares"
   ],
   "requirements": [
     {
@@ -44,6 +45,10 @@
     {
       "id": "gradle-toolchains-are-provided",
       "text": "Each Gradle step reads the Java majors the build's toolchains ask for: JavaLanguageVersion.of(N) and jvmToolchain(N), as a number, a string, a JavaVersion constant or a libs catalog version, in its build files, script plugins, buildSrc and build-logic, and the daemon JVM criteria. For each major but the one running Gradle, it installs the pinned JDK, unless offline, and appends -Porg.gradle.java.installations.paths=<homes>."
+    },
+    {
+      "id": "android-sdk-is-provided",
+      "text": "A task or workspace-install of a Gradle build that applies the Android plugin keeps ANDROID_HOME, ANDROID_SDK_ROOT or sdk.dir in local.properties. Else, when options[\"@putnami/java\"].android.acceptSdkLicenses is true, it installs the pinned command-line tools by SHA-256, accepts the licenses with sdkmanager and sets ANDROID_HOME and ANDROID_SDK_ROOT. Else an Android component's task fails naming the option. Offline, it installs nothing."
     },
     {
       "id": "gradle-without-a-wrapper",
@@ -79,7 +84,7 @@
     },
     {
       "id": "serve-runs-the-application",
-      "text": "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) under its stack root's lock, copies it aside, and runs the copy with PORT and SERVER_PORT set to the port flag, until the user stops it; it reports the server ready once the port accepts connections. A library runs nothing."
+      "text": "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) under its stack root's lock, copies it aside, and runs the copy with the words of --args as its arguments and PORT and SERVER_PORT set to the port flag, until the user stops it; it reports the server ready once the port accepts connections. A library runs nothing."
     },
     {
       "id": "run-runs-the-application-once",
@@ -87,7 +92,7 @@
     },
     {
       "id": "package-assembles-an-image",
-      "text": "putnami package --docker assembles, with no Docker daemon, the OCI image of an application: its runnable form on the Eclipse Temurin JRE of its Java major, pinned by digest, or on a base the project pins by digest, run as a non-root user with PORT and SERVER_PORT set to 8080. A library packages nothing."
+      "text": "putnami package --docker assembles, with no Docker daemon, the OCI image of an application: its runnable form on the Eclipse Temurin JRE of its Java major, pinned by digest, or on a base the project pins by digest, run as a non-root user with PORT and SERVER_PORT set to the port flag, 8080 by default. A library packages nothing."
     },
     {
       "id": "publish-pushes-the-image",
@@ -111,9 +116,11 @@
     "tooling/stacks/doc/adr/0005-profile-variants-for-a-stack-with-several-builds.md",
     "tooling/stacks/doc/adr/0006-a-pinned-toolchain-sets-its-home-and-tools-know-the-component.md",
     "tooling/stacks/doc/adr/0014-a-stack-adapts-each-step-of-a-task.md",
+    "tooling/stacks/doc/adr/0016-a-stack-sets-the-environment-of-a-task.md",
     "java/extension/doc/adr/0001-the-extension-installs-a-pinned-jdk.md",
     "java/extension/doc/adr/0002-an-application-image-copies-onto-the-temurin-jre.md",
     "java/extension/doc/adr/0003-a-test-filter-reaches-gradle-through-an-init-script.md",
-    "java/extension/doc/adr/0004-a-blank-machine-builds-after-putnami-install.md"
+    "java/extension/doc/adr/0004-a-blank-machine-builds-after-putnami-install.md",
+    "java/extension/doc/adr/0005-an-android-build-gets-the-sdk-the-workspace-accepts.md"
   ]
 }

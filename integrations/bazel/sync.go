@@ -77,7 +77,7 @@ func synchronize(ctx context.Context, root string, stderr io.Writer, dry bool) (
 		if _, err := exec.LookPath("bazel"); err != nil {
 			return SyncResult{}, nil
 		}
-		file, cleanup, err := query(ctx, root, stderr)
+		file, cleanup, err := stacks.ExportGraph(ctx, root, profileID, "bazel", queryArgs, detect.GraphFile, stderr)
 		if err != nil {
 			return SyncResult{}, err
 		}
@@ -152,41 +152,6 @@ var graphSync = stacks.GraphSync{
 	Extension:      ExtensionName,
 	HoldsBuildFile: func(root, dir string) bool { return detect.BuildFile(root, dir) != "" },
 	SkippedDirs:    []string{"bazel-bin", "bazel-out", "bazel-testlogs"},
-}
-
-// query runs the query in root and writes its output to a temporary file.
-func query(ctx context.Context, root string, stderr io.Writer) (string, func(), error) {
-	// Bazel serves one command at a time per workspace, so the query waits
-	// for the tasks of the stack root, under the lock they hold.
-	lock, err := stacks.LockRoot(root, profileID, wsproto.ProbeRootPath)
-	if err != nil {
-		return "", nil, err
-	}
-	defer func() { _ = lock.Release() }()
-	dir, err := os.MkdirTemp("", "putnami-bazel-query-")
-	if err != nil {
-		return "", nil, err
-	}
-	cleanup := func() { _ = os.RemoveAll(dir) }
-	file := filepath.Join(dir, detect.GraphFile)
-	out, err := os.Create(file) //nolint:gosec // a file in a directory this call created
-	if err != nil {
-		cleanup()
-		return "", nil, err
-	}
-	cmd := exec.CommandContext(ctx, "bazel", queryArgs...)
-	cmd.Dir = root
-	cmd.Stdout = out
-	cmd.Stderr = stderr
-	runErr := cmd.Run()
-	if err := out.Close(); err != nil && runErr == nil {
-		runErr = err
-	}
-	if runErr != nil {
-		cleanup()
-		return "", nil, fmt.Errorf("bazel %s: %w", strings.Join(queryArgs, " "), runErr)
-	}
-	return file, cleanup, nil
 }
 
 // graphJobs are the workspace sync task and the validate task of the Bazel

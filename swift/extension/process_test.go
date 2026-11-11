@@ -2,19 +2,16 @@ package swift
 
 import (
 	"encoding/json"
-	"io"
-	"net"
 	"os"
 	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
-	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 const serverManifest = `// swift-tools-version:5.9
@@ -34,8 +31,8 @@ let package = Package(
 func TestAnExecutablePackageServesAndRuns(t *testing.T) {
 	spectest.Proves(t, feature, "applications-serve-and-run", "an-executable-package-serves-and-runs")
 	root := fixture(t)
-	writeFile(t, root, "Packages/Server/Package.swift", serverManifest)
-	writeFile(t, root, "Packages/Server/Sources/Server/main.swift", "print(\"up\")\n")
+	stackstest.WriteFile(t, root, "Packages/Server/Package.swift", serverManifest)
+	stackstest.WriteFile(t, root, "Packages/Server/Sources/Server/main.swift", "print(\"up\")\n")
 	s := stubTools(t)
 	st := stack(t)
 	types := map[string]string{}
@@ -51,12 +48,12 @@ func TestAnExecutablePackageServesAndRuns(t *testing.T) {
 	if status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
-	status, _, _, err = runJobWith(t, root, "Packages/Server", "serve", ServeJob(st), job.Params{"port": json.RawMessage(`8081`)})
+	status, _, _, err = runJobWith(t, root, "Packages/Server", "serve", ServeJob(st), job.Params{"port": json.RawMessage(`8081`), "args": json.RawMessage(`"--verbose"`)})
 	if status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
 	ports, _ := os.ReadFile(filepath.Join(s.dir, "run.log"))
-	if string(ports) != "PORT=3000\nPORT=8081\n" || !strings.Contains(s.ran(t), server+": swift run --force-resolved-versions Server\n") {
+	if string(ports) != "PORT=3000\nPORT=8081\n" || !strings.Contains(s.ran(t), server+": swift run --force-resolved-versions Server\n") || !strings.Contains(s.ran(t), server+": swift run --force-resolved-versions Server -- --verbose\n") {
 		t.Errorf("serve ran %q, %s", ports, s.ran(t))
 	}
 
@@ -71,7 +68,7 @@ func TestAnExecutablePackageServesAndRuns(t *testing.T) {
 	t.Setenv("STUB_RUN_EXIT", "0")
 
 	// A package with several executables names one with --entrypoint.
-	writeFile(t, root, "Packages/Server/Package.swift", strings.Replace(serverManifest, "    targets: [\n",
+	stackstest.WriteFile(t, root, "Packages/Server/Package.swift", strings.Replace(serverManifest, "    targets: [\n",
 		"    products: [.executable(name: \"admin\", targets: [\"Admin\"]), .executable(name: \"Server\", targets: [\"Server\"])],\n    targets: [\n", 1))
 	if status, _, _, err := runJobWith(t, root, "Packages/Server", "run", RunJob(st), nil); status != "FAILED" || err == nil || !strings.Contains(err.Error(), CodeNoExecutable) {
 		t.Errorf("several executables need --entrypoint: %s %v", status, err)
@@ -107,33 +104,5 @@ targets: [.executableTarget(name: "Tool"), .executableTarget(name: "server")]`))
 	}
 	if got := ExecutableProducts([]byte(`targets: [.executableTarget(name: "server"), .executableTarget(name: "Tool")]`)); !reflect.DeepEqual(got, []string{"Tool", "server"}) {
 		t.Errorf("with no product, the executable targets: %v", got)
-	}
-}
-
-func TestServeAnnouncesAServerThatAcceptsConnections(t *testing.T) {
-	port, err := freePort()
-	if err != nil || port == 0 {
-		t.Fatalf("freePort: %d %v", port, err)
-	}
-	listener, err := net.Listen("tcp", net.JoinHostPort("127.0.0.1", strconv.Itoa(port)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer listener.Close()
-	read, write, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stdout := os.Stdout
-	os.Stdout = write
-	defer func() { os.Stdout = stdout }()
-	announceReady(t.Context(), jsonl.New(), port)
-	write.Close()
-	output, err := io.ReadAll(read)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(string(output), `"port":`+strconv.Itoa(port)) || !strings.Contains(string(output), "ready") {
-		t.Errorf("output = %s", output)
 	}
 }

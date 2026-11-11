@@ -65,26 +65,15 @@ func readDemo(t *testing.T) demo {
 	return out
 }
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // repository writes the demo's base files, and the export when withExport.
 func repository(t *testing.T, d demo, withExport bool) string {
 	t.Helper()
 	root := t.TempDir()
 	for rel, content := range d["base"] {
-		writeFile(t, root, rel, content)
+		stackstest.WriteFile(t, root, rel, content)
 	}
 	if withExport {
-		writeFile(t, root, "pants-graph.json", d["ci"]["pants-graph.json"])
+		stackstest.WriteFile(t, root, "pants-graph.json", d["ci"]["pants-graph.json"])
 	}
 	return root
 }
@@ -97,7 +86,7 @@ func stubPants(t *testing.T, d demo) {
 	t.Helper()
 	bin, reports := t.TempDir(), t.TempDir()
 	for rel, content := range d["ci"] {
-		writeFile(t, reports, rel, content)
+		stackstest.WriteFile(t, reports, rel, content)
 	}
 	script := `#!/bin/sh
 set -e
@@ -115,7 +104,7 @@ case " $* " in
     exit "${STUB_TEST_EXIT:-0}";;
 esac
 `
-	writeFile(t, bin, "pants", script)
+	stackstest.WriteFile(t, bin, "pants", script)
 	if err := os.Chmod(filepath.Join(bin, "pants"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -205,14 +194,14 @@ func TestTheProbeAttributesThePantsEdgesToTheBuildGraph(t *testing.T) {
 	}
 	// An edge the author keeps on a directory with no BUILD file is no Pants
 	// edge: the core judges it as a declaration.
-	writeFile(t, root, "docs/README.md", "")
+	stackstest.WriteFile(t, root, "docs/README.md", "")
 	doc := readProjectFile(t, root, "src/python/api")
 	doc["dependencies"] = append(doc["dependencies"].([]any), "/docs")
 	data, err := json.Marshal(doc)
 	if err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "src/python/api/putnami.json", string(data))
+	stackstest.WriteFile(t, root, "src/python/api/putnami.json", string(data))
 
 	s := stack(t)
 	request := wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, DependencySources: true,
@@ -309,7 +298,7 @@ func TestTheSyncWritesEachPackagePutnamiJSONFromTheExport(t *testing.T) {
 
 	// With the export: each package gets the extension and its edges.
 	root = repository(t, d, true)
-	writeFile(t, root, "src/python/web/putnami.json", `{"name": "storefront", "dependencies": ["/src/python/api", "@acme/design"], "disable": {"jobs": ["test", "publish"]}}`+"\n")
+	stackstest.WriteFile(t, root, "src/python/web/putnami.json", `{"name": "storefront", "dependencies": ["/src/python/api", "@acme/design"], "disable": {"jobs": ["test", "publish"]}}`+"\n")
 	result, err = Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
 		t.Fatal(err)
@@ -347,7 +336,7 @@ func TestTheSyncWritesEachPackagePutnamiJSONFromTheExport(t *testing.T) {
 		return strings.HasPrefix(target["address"].(string), "src/python/web") && strings.HasSuffix(target["target_type"].(string), "tests")
 	})
 	export, _ := json.Marshal(targets)
-	writeFile(t, root, "pants-graph.json", string(export))
+	stackstest.WriteFile(t, root, "pants-graph.json", string(export))
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
@@ -384,7 +373,7 @@ func TestTheSyncRunsPantsPeekWithoutAnExport(t *testing.T) {
 		t.Errorf("a current graph is not stale: %+v %v", stale, err)
 	}
 	before, _ := os.ReadFile(filepath.Join(root, "src/python/web/putnami.json"))
-	writeFile(t, root, "src/python/web/putnami.json", `{"extensions": ["@putnami/pants"]}`)
+	stackstest.WriteFile(t, root, "src/python/web/putnami.json", `{"extensions": ["@putnami/pants"]}`)
 	stale, err := Stale(context.Background(), root, &bytes.Buffer{})
 	if err != nil || !reflect.DeepEqual(stale.Written, []string{"src/python/web/putnami.json"}) {
 		t.Errorf("a drifted package is stale: %+v %v", stale, err)
@@ -392,10 +381,10 @@ func TestTheSyncRunsPantsPeekWithoutAnExport(t *testing.T) {
 	if after, _ := os.ReadFile(filepath.Join(root, "src/python/web/putnami.json")); string(after) != `{"extensions": ["@putnami/pants"]}` {
 		t.Errorf("the check wrote %s", after)
 	}
-	writeFile(t, root, "src/python/web/putnami.json", string(before))
+	stackstest.WriteFile(t, root, "src/python/web/putnami.json", string(before))
 
 	// An export that lists no package retracts nothing.
-	writeFile(t, root, "pants-graph.json", "[]")
+	stackstest.WriteFile(t, root, "pants-graph.json", "[]")
 	empty, err := Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil || !empty.EmptyExport || len(empty.Retracted) != 0 {
 		t.Errorf("an empty export writes nothing: %+v %v", empty, err)
@@ -406,7 +395,7 @@ func TestTheSyncRunsPantsPeekWithoutAnExport(t *testing.T) {
 
 	// An export that is no export fails the sync and writes nothing.
 	root = repository(t, d, false)
-	writeFile(t, root, "pants-graph.json", "not json")
+	stackstest.WriteFile(t, root, "pants-graph.json", "not json")
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "cannot be read") {
 		t.Errorf("an unreadable export fails the sync: %v", err)
 	}
@@ -486,7 +475,7 @@ func TestThePantsReportsBecomeTheTestAndCoverageSummary(t *testing.T) {
 	root := repository(t, d, true)
 	// A report another package's run left under dist/ is never read as this
 	// one's.
-	writeFile(t, root, "dist/test/reports/src.python.web.pages_test.py.tests.xml", d["ci"]["dist/test/reports/src.python.web.pages_test.py.tests.xml"])
+	stackstest.WriteFile(t, root, "dist/test/reports/src.python.web.pages_test.py.tests.xml", d["ci"]["dist/test/reports/src.python.web.pages_test.py.tests.xml"])
 
 	status, data, events := runJob(t, root, "src/python/pricing", stacks.TaskTest)
 	if status != "OK" {
@@ -502,14 +491,14 @@ func TestThePantsReportsBecomeTheTestAndCoverageSummary(t *testing.T) {
 	// The override a repository without the Python backend states reads no
 	// coverage report, and the file patterns the sync writes beside it are
 	// no member of the profile.
-	writeFile(t, root, "src/python/pricing/putnami.json", `{"options": {"@putnami/pants": {"filePatterns": ["../../../python-default.lock"], "tasks": {"test": {"steps": [["pants", "--test-report", "test", "{component}:"]], "reports": {"junit": ["{root}/dist/test/reports/*.xml"], "coverage": []}}}}}}`)
+	stackstest.WriteFile(t, root, "src/python/pricing/putnami.json", `{"options": {"@putnami/pants": {"filePatterns": ["../../../python-default.lock"], "tasks": {"test": {"steps": [["pants", "--test-report", "test", "{component}:"]], "reports": {"junit": ["{root}/dist/test/reports/*.xml"], "coverage": []}}}}}}`)
 	status, data, events = runJob(t, root, "src/python/pricing", stacks.TaskTest)
 	if _, covered := data["coverageSummary"]; status != "OK" || covered {
 		t.Errorf("the documented override: %s %v %s", status, data, events)
 	}
 
 	// A test run that writes no report fails.
-	writeFile(t, root, "src/python/pricing/putnami.json", `{"options": {"@putnami/pants": {"tasks": {"test": {"steps": [["pants", "lint", "{component}:"]]}}}}}`)
+	stackstest.WriteFile(t, root, "src/python/pricing/putnami.json", `{"options": {"@putnami/pants": {"tasks": {"test": {"steps": [["pants", "lint", "{component}:"]]}}}}}`)
 	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskTest); status != "FAILED" || !strings.Contains(events, "wrote no JUnit report") {
 		t.Errorf("a test that writes no report fails: %s %s", status, events)
 	}
@@ -531,8 +520,8 @@ func TestTheSyncRetractsAFormerPackage(t *testing.T) {
 	root := repository(t, d, true)
 	// A former package keeps a putnami.json that names the extension; api
 	// still depends on it and on a package whose directory is gone.
-	writeFile(t, root, "src/python/legacy/putnami.json", `{"name": "legacy", "extensions": ["@putnami/pants", "@acme/lint"], "dependencies": ["/src/python/pricing", "@acme/design"]}`+"\n")
-	writeFile(t, root, "src/python/api/putnami.json", `{"extensions": ["@putnami/pants"], "dependencies": ["/src/python/legacy", "/src/python/gone", "@acme/design"]}`+"\n")
+	stackstest.WriteFile(t, root, "src/python/legacy/putnami.json", `{"name": "legacy", "extensions": ["@putnami/pants", "@acme/lint"], "dependencies": ["/src/python/pricing", "@acme/design"]}`+"\n")
+	stackstest.WriteFile(t, root, "src/python/api/putnami.json", `{"extensions": ["@putnami/pants"], "dependencies": ["/src/python/legacy", "/src/python/gone", "@acme/design"]}`+"\n")
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
 		t.Fatal(err)
@@ -556,7 +545,7 @@ func TestTheSyncLeavesAFileWhoseOwnedMembersAreCurrent(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	root := repository(t, d, true)
 	handWritten := "{\n    \"name\": \"web\",\n    \"extensions\": [\"@putnami/pants\"],\n    \"dependencies\": [\"/3rdparty/python\"],\n    \"options\": {\"ratio\": 1.0, \"big\": 12345678901234567890, \"@putnami/pants\": {\"filePatterns\": [\"../../../3rdparty/python/default.lock\", \"../../../3rdparty/python/requirements.txt\"]}}\n}\n"
-	writeFile(t, root, "src/python/web/putnami.json", handWritten)
+	stackstest.WriteFile(t, root, "src/python/web/putnami.json", handWritten)
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
@@ -564,7 +553,7 @@ func TestTheSyncLeavesAFileWhoseOwnedMembersAreCurrent(t *testing.T) {
 		t.Errorf("a file whose owned members are current is kept byte for byte:\n%s", data)
 	}
 	// A change to an owned member rewrites it, numbers kept.
-	writeFile(t, root, "src/python/web/putnami.json", strings.Replace(handWritten, `["@putnami/pants"]`, `[]`, 1))
+	stackstest.WriteFile(t, root, "src/python/web/putnami.json", strings.Replace(handWritten, `["@putnami/pants"]`, `[]`, 1))
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}

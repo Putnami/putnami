@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -78,28 +79,17 @@ func readDemo(t *testing.T) demo {
 	return out
 }
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // repository writes the demo's base files and a workspace config in the
 // mode, with command-line.json when commands.
 func repository(t *testing.T, d demo, mode string, commands bool) string {
 	t.Helper()
 	root := t.TempDir()
 	for rel, content := range d["base"] {
-		writeFile(t, root, rel, content)
+		stackstest.WriteFile(t, root, rel, content)
 	}
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "extensions": ["@putnami/rush"], "options": {"@putnami/rush": {"mode": "`+mode+`"}}}`)
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "extensions": ["@putnami/rush"], "options": {"@putnami/rush": {"mode": "`+mode+`"}}}`)
 	if commands {
-		writeFile(t, root, CommandLineFile, commandLine)
+		stackstest.WriteFile(t, root, CommandLineFile, commandLine)
 	}
 	return root
 }
@@ -129,7 +119,7 @@ func stack(t *testing.T) stacks.Stack {
 func probe(t *testing.T, root string) wsproto.ProbeResult {
 	t.Helper()
 	s := stack(t)
-	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension,
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, DependencySources: true,
 		Paths: []string{".", "apps/api", "apps/web", "libs/pricing", "common/autoinstallers/lint"}})
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +131,7 @@ func TestTheRushProjectsBecomeProjectsWithTheirEdges(t *testing.T) {
 	spectest.Proves(t, feature, "projects-become-projects", "the-rush-projects-become-projects-with-their-edges")
 	d := readDemo(t)
 	root := repository(t, d, ModeDelegate, false)
-	writeFile(t, root, "common/autoinstallers/lint/package.json", `{"name": "lint"}`)
+	stackstest.WriteFile(t, root, "common/autoinstallers/lint/package.json", `{"name": "lint"}`)
 
 	result := probe(t, root)
 	got := map[string]wsproto.ProbeProject{}
@@ -170,6 +160,13 @@ func TestTheRushProjectsBecomeProjectsWithTheirEdges(t *testing.T) {
 		if !reflect.DeepEqual(deps, want.deps) {
 			t.Errorf("%s dependencies = %v, want %v", dir, p.Dependencies, want.deps)
 		}
+		// Each edge is one Rush's own project graph states (ADR 0007 of
+		// protocols/workspace).
+		for _, dep := range p.Dependencies {
+			if p.DependencySources[dep] != wsproto.DependencySourceBuildGraph {
+				t.Errorf("%s edge %s source = %q", dir, dep, p.DependencySources[dep])
+			}
+		}
 		if !strings.Contains(string(p.Metadata), `"`+want.name+`"`) {
 			t.Errorf("%s metadata names no package %s: %s", dir, want.name, p.Metadata)
 		}
@@ -193,7 +190,7 @@ func TestTheSyncWritesEachProjectPutnamiJSONFromRushJSON(t *testing.T) {
 	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-from-rush-json")
 	d := readDemo(t)
 	root := repository(t, d, ModeDelegate, true)
-	writeFile(t, root, "apps/web/putnami.json", `{"name": "web", "dependencies": ["@acme/design"], "disable": {"jobs": ["serve"]}}`+"\n")
+	stackstest.WriteFile(t, root, "apps/web/putnami.json", `{"name": "web", "dependencies": ["@acme/design"], "disable": {"jobs": ["serve"]}}`+"\n")
 
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
@@ -231,7 +228,7 @@ func TestTheSyncWritesEachProjectPutnamiJSONFromRushJSON(t *testing.T) {
 
 	// A project removed from rush.json is retracted.
 	root = repository(t, d, ModeDelegate, true)
-	writeFile(t, root, "legacy/putnami.json", `{"extensions": ["@putnami/rush", "@acme/lint"], "dependencies": ["/libs/pricing"]}`+"\n")
+	stackstest.WriteFile(t, root, "legacy/putnami.json", `{"extensions": ["@putnami/rush", "@acme/lint"], "dependencies": ["/libs/pricing"]}`+"\n")
 	result, err = Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil || !reflect.DeepEqual(result.Retracted, []string{"legacy/putnami.json"}) {
 		t.Errorf("retracted = %v, %v", result.Retracted, err)
@@ -242,7 +239,7 @@ func TestTheSyncWritesEachProjectPutnamiJSONFromRushJSON(t *testing.T) {
 
 	// A rush.json that is no JSON fails the sync and writes nothing.
 	root = repository(t, d, ModeDelegate, true)
-	writeFile(t, root, "rush.json", "not json")
+	stackstest.WriteFile(t, root, "rush.json", "not json")
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "rush.json cannot be parsed") {
 		t.Errorf("an unreadable rush.json fails the sync: %v", err)
 	}
@@ -259,7 +256,7 @@ func TestAnImportWritesTypeScriptProjectsAndRetractsNone(t *testing.T) {
 	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-from-rush-json")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, true)
-	writeFile(t, root, "tools/design/putnami.json", `{"extensions": ["@putnami/typescript"]}`+"\n")
+	stackstest.WriteFile(t, root, "tools/design/putnami.json", `{"extensions": ["@putnami/typescript"]}`+"\n")
 
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
@@ -284,8 +281,8 @@ func TestTheSyncListsTheCommandsItDoesNotMap(t *testing.T) {
 	spectest.Proves(t, feature, "unmapped-commands-are-listed", "the-sync-lists-the-commands-it-does-not-map")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, true)
-	writeFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "scripts": {"build": "tsc", "start": "node lib", "storybook": "sb"}}`)
-	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"start": "node lib", "test": "jest"}}`)
+	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "scripts": {"build": "tsc", "start": "node lib", "storybook": "sb"}}`)
+	stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"start": "node lib", "test": "jest"}}`)
 
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
@@ -327,11 +324,11 @@ func TestDelegateModeWarnsWithoutTheRushBuildCache(t *testing.T) {
 	if got := cacheWarnings(result.Warnings); err != nil || len(got) != 1 || !strings.Contains(got[0], "reruns the projects upstream") {
 		t.Fatalf("warnings = %v, %v", result.Warnings, err)
 	}
-	writeFile(t, root, BuildCacheFile, "// cache\n{ \"buildCacheEnabled\": false }\n")
+	stackstest.WriteFile(t, root, BuildCacheFile, "// cache\n{ \"buildCacheEnabled\": false }\n")
 	if result, _ := Sync(context.Background(), root, &bytes.Buffer{}); len(cacheWarnings(result.Warnings)) != 1 {
 		t.Errorf("a disabled cache warns: %v", result.Warnings)
 	}
-	writeFile(t, root, BuildCacheFile, "// cache\n{ \"buildCacheEnabled\": true, \"cacheProvider\": \"local-only\" }\n")
+	stackstest.WriteFile(t, root, BuildCacheFile, "// cache\n{ \"buildCacheEnabled\": true, \"cacheProvider\": \"local-only\" }\n")
 	if result, _ := Sync(context.Background(), root, &bytes.Buffer{}); len(cacheWarnings(result.Warnings)) != 0 {
 		t.Errorf("an enabled cache warns: %v", result.Warnings)
 	}
@@ -349,7 +346,7 @@ func TestAStaleRushGraphFailsValidate(t *testing.T) {
 		t.Errorf("check after the sync: %s %v", status, err)
 	}
 	// @demo/web now depends on @demo/pricing: the edge is stale.
-	writeFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "dependencies": {"@demo/pricing": "workspace:*"}}`)
+	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "dependencies": {"@demo/pricing": "workspace:*"}}`)
 	before, _ := os.ReadFile(filepath.Join(root, "apps/web/putnami.json"))
 	if status, _, err := RunCheck(ctx, jsonl.New(), nil); status != "FAILED" || err == nil || err.Error() != CodeSyncStale {
 		t.Errorf("check on a stale graph: %s %v", status, err)
@@ -371,7 +368,7 @@ func TestAStaleRushGraphFailsValidate(t *testing.T) {
 func stubRush(t *testing.T) {
 	t.Helper()
 	bin := t.TempDir()
-	writeFile(t, bin, "rush", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "rush", `#!/bin/sh
 if [ "$1" = "--help" ]; then
   echo "Rush Multi-Project Build Tool ${STUB_VERSION:-`+rushVersion+`} - https://rushjs.io"
   exit 0
@@ -489,7 +486,7 @@ func TestTheTestTaskReadsTheReportsItsProjectNames(t *testing.T) {
 	layer := project["options"].(map[string]any)[ExtensionName].(map[string]any)
 	layer["tasks"] = map[string]any{"test": map[string]any{"reports": map[string]any{"junit": []string{"temp/junit.xml"}}}}
 	data, _ := json.MarshalIndent(project, "", "  ")
-	writeFile(t, root, "libs/pricing/putnami.json", string(data)+"\n")
+	stackstest.WriteFile(t, root, "libs/pricing/putnami.json", string(data)+"\n")
 	status, out, events := runJob(t, root, "libs/pricing", stacks.TaskTest)
 	if status != "OK" {
 		t.Fatalf("status %s: %s", status, events)
@@ -542,12 +539,26 @@ func TestTheModeParamOutranksTheRecordedMode(t *testing.T) {
 
 func TestModeReadsTheWorkspaceOptions(t *testing.T) {
 	root := t.TempDir()
-	if got := Mode(root); got != ModeImport {
-		t.Errorf("no workspace config = %s, want import", got)
+	if got, err := Mode(root); err != nil || got != ModeImport {
+		t.Errorf("no workspace config = %s %v, want import", got, err)
 	}
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "x", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
-	if got := Mode(root); got != ModeDelegate {
-		t.Errorf("mode = %s, want delegate", got)
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "x", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
+	if got, err := Mode(root); err != nil || got != ModeDelegate {
+		t.Errorf("mode = %s %v, want delegate", got, err)
+	}
+	// A mode that names none is an error, not an import.
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "x", "options": {"@putnami/rush": {"mode": "delgate"}}}`)
+	if _, err := Mode(root); err == nil {
+		t.Error("an unknown mode imports")
+	}
+	stackstest.WriteFile(t, root, "rush.json", `{"rushVersion": "5.140.0", "projects": [{"packageName": "@demo/api", "projectFolder": "apps/api"}]}`)
+	stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0"}`)
+	_, diags := Detect(root, wsproto.ProbeRequest{Paths: []string{"apps/api"}})
+	if len(diags) != 1 || diags[0].Code != stacks.CodeAdoptionModeInvalid {
+		t.Errorf("the probe of an unknown mode: %v", diags)
+	}
+	if _, err := Sync(context.Background(), root, io.Discard); err == nil || !strings.Contains(err.Error(), "delgate") {
+		t.Errorf("the sync of an unknown mode: %v", err)
 	}
 }
 
@@ -567,8 +578,8 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, false)
 	// web keeps its own tsconfig and declares exports; api names no main.
-	writeFile(t, root, "apps/web/tsconfig.json", `{"compilerOptions": {"strict": true}}`)
-	writeFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "main": "lib/index.js", "exports": "./lib/index.js"}`)
+	stackstest.WriteFile(t, root, "apps/web/tsconfig.json", `{"compilerOptions": {"strict": true}}`)
+	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "main": "lib/index.js", "exports": "./lib/index.js"}`)
 
 	dry, err := Stale(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
@@ -643,7 +654,7 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 func TestSourceExportsKeepAManifestTheyCannotEdit(t *testing.T) {
 	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
 	dir := t.TempDir()
-	writeFile(t, dir, "src/index.ts", "export {}\n")
+	stackstest.WriteFile(t, dir, "src/index.ts", "export {}\n")
 	for name, manifest := range map[string]string{
 		"a main under src": `{"name": "a", "main": "src/index.ts"}`,
 		"no main":          `{"name": "a"}`,
@@ -682,7 +693,7 @@ func TestAnImportKeepsTheEntryOfAProjectRushPublishes(t *testing.T) {
 	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, false)
-	writeFile(t, root, "rush.json", strings.Replace(d["base"]["rush.json"], `"shouldPublish": false`, `"shouldPublish": true`, 1))
+	stackstest.WriteFile(t, root, "rush.json", strings.Replace(d["base"]["rush.json"], `"shouldPublish": false`, `"shouldPublish": true`, 1))
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
 		t.Fatal(err)
@@ -702,7 +713,7 @@ func TestASwitchOfModeDropsTheOtherModesExtension(t *testing.T) {
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "import"}}}`)
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "import"}}}`)
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
@@ -710,7 +721,7 @@ func TestASwitchOfModeDropsTheOtherModesExtension(t *testing.T) {
 	if !reflect.DeepEqual(api["extensions"], []any{TypeScriptExtension}) || api["disable"] != nil || api["options"] != nil {
 		t.Errorf("after an import apps/api = %v, want the TypeScript extension alone", api)
 	}
-	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}

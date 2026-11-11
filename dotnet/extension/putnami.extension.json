@@ -63,7 +63,8 @@
         "go.mod",
         "go.sum",
         "*.go",
-        "profile.json"
+        "profile.json",
+        "sdkreleases.json"
       ],
       "toolchains": [
         "runtimeCompiler"
@@ -93,7 +94,10 @@
       "obj",
       "TestResults"
     ],
-    "language": "dotnet"
+    "language": "dotnet",
+    "installInputs": [
+      "packages.lock.json"
+    ]
   },
   "commands": {
     "lint": {
@@ -131,7 +135,14 @@
             "^test"
           ]
         }
-      ]
+      ],
+      "flags": {
+        "test": {
+          "type": "string",
+          "short": "-t",
+          "description": "Test filter to run, passed to dotnet test as --filter"
+        }
+      }
     },
     "build": {
       "description": "Build the projects with dotnet build.",
@@ -195,6 +206,10 @@
           "type": "number",
           "default": 3000,
           "description": "Port for the server"
+        },
+        "args": {
+          "type": "string",
+          "description": "Arguments passed to the server program"
         }
       },
       "run": [
@@ -260,6 +275,11 @@
         "framework": {
           "type": "string",
           "description": "Target framework the image runs, for a project that targets several"
+        },
+        "port": {
+          "type": "number",
+          "default": 8080,
+          "description": "Port the image exposes and sets as PORT"
         }
       },
       "run": [
@@ -348,7 +368,7 @@
       },
       "outputs": {
         "data": {
-          "description": "The task result: the test and coverage totals of a test task."
+          "description": "The task result: the lint findings of the component."
         }
       },
       "cache": {
@@ -382,6 +402,9 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 1800000,
       "inputs": {
+        "test": {
+          "from": "params"
+        },
         "sources": {
           "from": "project",
           "files": [
@@ -478,7 +501,7 @@
       },
       "outputs": {
         "data": {
-          "description": "The task result: the test and coverage totals of a test task."
+          "description": "The task result: the outcome of the component's build."
         }
       },
       "cache": {

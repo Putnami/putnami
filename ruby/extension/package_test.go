@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"slices"
@@ -13,11 +12,8 @@ import (
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/protocol/job"
@@ -26,6 +22,8 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
+	"go.putnami.dev/tooling/stacks/stackstest/imagetest"
 )
 
 // linuxHost makes the packaging host a Linux machine for the test.
@@ -41,59 +39,26 @@ func linuxHost(t *testing.T) {
 func imageApplication(t *testing.T, root string) []string {
 	t.Helper()
 	rackApp(t, root, "shop")
-	writeFile(t, root, "shop/bin/rails", "#!/usr/bin/env ruby\n")
+	stackstest.WriteFile(t, root, "shop/bin/rails", "#!/usr/bin/env ruby\n")
 	if err := os.Chmod(filepath.Join(root, "shop/bin/rails"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "shop/app/controllers/home_controller.rb", "class HomeController; end\n")
-	writeFile(t, root, "shop/config/credentials.yml.enc", "sealed\n")
-	writeFile(t, root, "shop/config/master.key", "secret\n")
-	writeFile(t, root, "shop/config/credentials/production.key", "secret\n")
-	writeFile(t, root, "shop/.env", "SECRET=1\n")
-	writeFile(t, root, "shop/.env.production", "SECRET=1\n")
-	writeFile(t, root, "shop/config/.env.example", "SECRET=\n")
-	writeFile(t, root, "shop/spec/home_spec.rb", "RSpec.describe HomeController\n")
-	writeFile(t, root, "shop/test/home_test.rb", "class HomeTest; end\n")
-	writeFile(t, root, "shop/tmp/cache/bootsnap", "x\n")
-	writeFile(t, root, "shop/log/development.log", "x\n")
-	writeFile(t, root, "shop/storage/development.sqlite3", "x\n")
-	writeFile(t, root, "shop/vendor/bundle/ruby/3.3.0/gems/rack-3.0.0/lib/rack.rb", "x\n")
-	writeFile(t, root, "shop/vendor/javascript/chart.js", "x\n")
-	writeFile(t, root, "shop/.bundle/config", "BUNDLE_PATH: vendor/bundle\n")
+	stackstest.WriteFile(t, root, "shop/app/controllers/home_controller.rb", "class HomeController; end\n")
+	stackstest.WriteFile(t, root, "shop/config/credentials.yml.enc", "sealed\n")
+	stackstest.WriteFile(t, root, "shop/config/master.key", "secret\n")
+	stackstest.WriteFile(t, root, "shop/config/credentials/production.key", "secret\n")
+	stackstest.WriteFile(t, root, "shop/.env", "SECRET=1\n")
+	stackstest.WriteFile(t, root, "shop/.env.production", "SECRET=1\n")
+	stackstest.WriteFile(t, root, "shop/config/.env.example", "SECRET=\n")
+	stackstest.WriteFile(t, root, "shop/spec/home_spec.rb", "RSpec.describe HomeController\n")
+	stackstest.WriteFile(t, root, "shop/test/home_test.rb", "class HomeTest; end\n")
+	stackstest.WriteFile(t, root, "shop/tmp/cache/bootsnap", "x\n")
+	stackstest.WriteFile(t, root, "shop/log/development.log", "x\n")
+	stackstest.WriteFile(t, root, "shop/storage/development.sqlite3", "x\n")
+	stackstest.WriteFile(t, root, "shop/vendor/bundle/ruby/3.3.0/gems/rack-3.0.0/lib/rack.rb", "x\n")
+	stackstest.WriteFile(t, root, "shop/vendor/javascript/chart.js", "x\n")
+	stackstest.WriteFile(t, root, "shop/.bundle/config", "BUNDLE_PATH: vendor/bundle\n")
 	return []string{"config.ru", "Gemfile", "Gemfile.lock", "bin/rails", "app/controllers/home_controller.rb", "config/credentials.yml.enc", "vendor/javascript/chart.js"}
-}
-
-// imageRegistry starts a registry double holding a two-platform base image, and
-// answers its host and the digest reference of the base.
-func imageRegistry(t *testing.T) (string, string) {
-	t.Helper()
-	server := httptest.NewServer(registry.New())
-	t.Cleanup(server.Close)
-	host := strings.TrimPrefix(server.URL, "http://")
-	amd64, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	arm64, err := random.Image(256, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	index := mutate.AppendManifests(empty.Index,
-		mutate.IndexAddendum{Add: amd64, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "amd64"}}},
-		mutate.IndexAddendum{Add: arm64, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: "arm64"}}},
-	)
-	reference, err := name.ParseReference(host + "/base:latest")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := remote.WriteIndex(reference, index); err != nil {
-		t.Fatal(err)
-	}
-	digest, err := index.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return host, host + "/base@" + digest.String()
 }
 
 // imageAt answers the image at reference and the tar headers of its files.
@@ -133,7 +98,7 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionBundle(t *testing
 	log := rubyTools(t)
 	machineCache(t)
 	root := workspaceRoot(t)
-	host, base := imageRegistry(t)
+	host, base := imagetest.Registry(t)
 	shipped := imageApplication(t, root)
 
 	status, _, err := runProjectJob(t, root, "shop", PackageDockerJob(stack(t)), nil, "--docker-base-image", base)
@@ -233,7 +198,7 @@ func TestAStaticRubyBuildsExtensionsTheImagesRubyFinds(t *testing.T) {
 	rubyTools(t)
 	machineCache(t)
 	root := workspaceRoot(t)
-	host, base := imageRegistry(t)
+	host, base := imagetest.Registry(t)
 	rackApp(t, root, "shop")
 	t.Setenv("STUB_RUBY_HOST", `3.3.6\naarch64\nlinux\n\n3.3.0-static\n`)
 	t.Setenv("STUB_EXTENSION_API", "3.3.0-static")
@@ -269,7 +234,7 @@ func TestPackagingTheSameTreeTwiceGivesTheSameImage(t *testing.T) {
 	rubyTools(t)
 	machineCache(t)
 	root := workspaceRoot(t)
-	_, base := imageRegistry(t)
+	_, base := imagetest.Registry(t)
 	imageApplication(t, root)
 	digests := []string{}
 	for range 2 {
@@ -295,7 +260,7 @@ func TestPackageKeepsTheConfigureArgumentsOfTheEnvironment(t *testing.T) {
 	log := rubyTools(t)
 	machineCache(t)
 	root := workspaceRoot(t)
-	_, base := imageRegistry(t)
+	_, base := imagetest.Registry(t)
 	rackApp(t, root, "shop")
 	t.Setenv("CONFIGURE_ARGS", "--with-opt-dir=/opt")
 	status, _, err := runProjectJob(t, root, "shop", PackageDockerJob(stack(t)), nil, "--docker-base-image", base)
@@ -454,14 +419,14 @@ func TestPackageRefusesWhatItCannotImage(t *testing.T) {
 		}, "shop", CodeImageFailed},
 		"a path gem outside the application": {func(t *testing.T, root string) {
 			rackApp(t, root, "shop")
-			writeFile(t, root, "shop/Gemfile.lock", "PATH\n  remote: ../gems/audit\n  specs:\n    audit (0.1.0)\n\nGEM\n  remote: https://rubygems.org/\n  specs:\n\nBUNDLED WITH\n   2.5.22\n")
+			stackstest.WriteFile(t, root, "shop/Gemfile.lock", "PATH\n  remote: ../gems/audit\n  specs:\n    audit (0.1.0)\n\nGEM\n  remote: https://rubygems.org/\n  specs:\n\nBUNDLED WITH\n   2.5.22\n")
 		}, "shop", CodeImageFailed},
 		"an application below another stack root": {func(t *testing.T, root string) {
-			writeFile(t, root, "Gemfile", "source \"https://rubygems.org\"\n")
-			writeFile(t, root, "Gemfile.lock", "GEM\n  specs:\n\nBUNDLED WITH\n   2.5.22\n")
-			writeFile(t, root, ".ruby-version", "3.3.6\n")
-			writeFile(t, root, "packs/admin/package.yml", "enforce_dependencies: true\n")
-			writeFile(t, root, "packs/admin/config.ru", "run ->(env) { [200, {}, []] }\n")
+			stackstest.WriteFile(t, root, "Gemfile", "source \"https://rubygems.org\"\n")
+			stackstest.WriteFile(t, root, "Gemfile.lock", "GEM\n  specs:\n\nBUNDLED WITH\n   2.5.22\n")
+			stackstest.WriteFile(t, root, ".ruby-version", "3.3.6\n")
+			stackstest.WriteFile(t, root, "packs/admin/package.yml", "enforce_dependencies: true\n")
+			stackstest.WriteFile(t, root, "packs/admin/config.ru", "run ->(env) { [200, {}, []] }\n")
 		}, "packs/admin", CodeImageFailed},
 	}
 	for label, c := range cases {
@@ -543,11 +508,11 @@ func TestPublishDryRunPushesNothing(t *testing.T) {
 func TestAnApplicationThatPublishesAnImageIsAReleaseSetMember(t *testing.T) {
 	root := t.TempDir()
 	rackApp(t, root, "shop")
-	writeFile(t, root, "shop/putnami.json", `{"options": {"publish": {"docker": true}}}`)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
-	writeFile(t, root, "gems/audit/audit.gemspec", "Gem::Specification.new do |s|\n  s.name = \"audit\"\nend\n")
-	writeFile(t, root, "gems/audit/Gemfile", "source \"https://rubygems.org\"\ngemspec\n")
-	writeFile(t, root, "gems/audit/putnami.json", `{"publish": ["docker"]}`)
+	stackstest.WriteFile(t, root, "shop/putnami.json", `{"options": {"publish": {"docker": true}}}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
+	stackstest.WriteFile(t, root, "gems/audit/audit.gemspec", "Gem::Specification.new do |s|\n  s.name = \"audit\"\nend\n")
+	stackstest.WriteFile(t, root, "gems/audit/Gemfile", "source \"https://rubygems.org\"\ngemspec\n")
+	stackstest.WriteFile(t, root, "gems/audit/putnami.json", `{"publish": ["docker"]}`)
 	s := stack(t)
 	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"gems/audit", "shop"}})
 	if err != nil || len(result.Projects) != 2 {
@@ -579,8 +544,8 @@ func TestAProjectNamedWithUppercaseLettersPackagesALowercaseImage(t *testing.T) 
 	rubyTools(t)
 	root := workspaceRoot(t)
 	rackApp(t, root, "Shop")
-	writeFile(t, root, "Shop/putnami.json", `{"publish": ["docker"]}`)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
+	stackstest.WriteFile(t, root, "Shop/putnami.json", `{"publish": ["docker"]}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "registry.test/acme"}}}`)
 	if status, _, err := runProjectJob(t, root, "Shop", PackageDockerJob(stack(t)), job.Params{"dry-run": json.RawMessage(`true`)}); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
 	}
@@ -606,7 +571,7 @@ func TestAProjectNamedWithUppercaseLettersPackagesALowercaseImage(t *testing.T) 
 
 func TestAStagedSymbolicLinkFailsPackaging(t *testing.T) {
 	source := t.TempDir()
-	writeFile(t, source, "public/app.js", "a")
+	stackstest.WriteFile(t, source, "public/app.js", "a")
 	if err := os.Symlink("app.js", filepath.Join(source, "public/linked.js")); err != nil {
 		t.Skipf("no symbolic links: %v", err)
 	}

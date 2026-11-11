@@ -183,6 +183,15 @@
           }
         },
         {
+          "id": "package-dry-run-builds-nothing",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-dry-run-package-writes-the-channel-record-and-builds-nothing"]
+          }
+        },
+        {
           "id": "publish-sends-the-staged-crate",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

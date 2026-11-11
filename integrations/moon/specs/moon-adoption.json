@@ -19,11 +19,11 @@
     },
     {
       "id": "sync-writes-each-project",
-      "text": "The workspace sync task writes in each moon project's putnami.json the tag moon, the extension the mode maps it to, the project IDs of the projects moon says it depends on, and build, test or lint in disable.jobs when the project has no moon task named or tagged that way. It keeps every member it does not own, retracts a former project, and lists each moon task it maps to no Putnami command with the reason."
+      "text": "The sync task writes in each moon project's putnami.json the tag moon, the extension the mode maps it to, the project IDs of the projects moon says it depends on, build, test or lint in disable.jobs when the project has no moon task named or tagged that way, and for a project moon runs the root files its tasks read (.moon configuration, .prototools, lockfile) as filePatterns. It keeps the members it does not own, retracts a former project, and lists each moon task it maps to no Putnami command."
     },
     {
       "id": "import-maps-to-language-extensions",
-      "text": "With mode import in the workspace options of @putnami/moon, a project whose moon language is typescript, go, python, php, ruby or rust runs that language's Putnami extension, which the sync declares in the workspace's extensions; any other project runs the delegated @putnami/moon tasks, so no Putnami cache sits over moon's. With mode delegate, or no mode, every project runs @putnami/moon."
+      "text": "With mode import in the workspace options of @putnami/moon, or no mode, a project whose moon language is typescript, go, python, php, ruby or rust runs that language's Putnami extension, which the sync declares in the workspace's extensions; any other project runs the delegated @putnami/moon tasks, so no Putnami cache sits over moon's. With mode delegate every project runs @putnami/moon; another value fails the sync and the probe with stacks.adoption_mode_invalid."
     },
     {
       "id": "tasks-delegate-to-moon",

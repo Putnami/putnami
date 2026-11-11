@@ -17,6 +17,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // credentialFD is the descriptor the tests hand workspace-fetch its
@@ -158,11 +159,11 @@ func TestWorkspaceInstallAndDepsUpgradeRunPubAtEachStackRoot(t *testing.T) {
 	if status, err := runWorkspaceJob(t, root, WorkspaceInstallJob(stack(t)), job.Params{"force": json.RawMessage(`true`)}, paths...); status != "OK" || err != nil || !strings.Contains(ran(t, log), root+": flutter pub get") {
 		t.Errorf("--force resolves a current root: %s %v", status, err)
 	}
-	writeFile(t, root, ".dart_tool/package_config.json", `{"by": "an editor"}`)
+	stackstest.WriteFile(t, root, ".dart_tool/package_config.json", `{"by": "an editor"}`)
 	if status, err := runWorkspaceJob(t, root, WorkspaceInstallJob(stack(t)), nil, paths...); status != "OK" || err != nil || ran(t, log) != root+": flutter pub get --enforce-lockfile --offline\n" {
 		t.Errorf("a resolution another tool wrote is not current: %s %v", status, err)
 	}
-	writeFile(t, root, "packages/ui/pubspec.yaml", "name: ui\nresolution: workspace\n")
+	stackstest.WriteFile(t, root, "packages/ui/pubspec.yaml", "name: ui\nresolution: workspace\n")
 	if status, err := runWorkspaceJob(t, root, WorkspaceInstallJob(stack(t)), nil, paths...); status != "OK" || err != nil || ran(t, log) != root+": flutter pub get --enforce-lockfile --offline\n" {
 		t.Errorf("a member's pubspec change makes the root stale: %s %v", status, err)
 	}
@@ -206,11 +207,11 @@ func TestRunForwardsTheExitCodeAndServeReportsReady(t *testing.T) {
 		t.Errorf("a Flutter app does not run with dart run: %s %v", status, err)
 	}
 
-	writeFile(t, root, "tools/gen/bin/server.dart", "void main() {}\n")
-	if status, _, err := runProjectJob(t, root, "tools/gen", ServeJob(stack(t)), job.Params{"port": json.RawMessage(`8081`)}); status != "OK" || err != nil {
+	stackstest.WriteFile(t, root, "tools/gen/bin/server.dart", "void main() {}\n")
+	if status, _, err := runProjectJob(t, root, "tools/gen", ServeJob(stack(t)), job.Params{"port": json.RawMessage(`8081`), "args": json.RawMessage(`"--verbose"`)}); status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
-	if got := ran(t, log); got != gen+": dart run bin/server.dart\n" {
+	if got := ran(t, log); got != gen+": dart run bin/server.dart --verbose\n" {
 		t.Errorf("serve ran %q", got)
 	}
 	if env, _ := os.ReadFile(log + ".env"); !strings.Contains(string(env), "PORT=8081") {
@@ -219,7 +220,7 @@ func TestRunForwardsTheExitCodeAndServeReportsReady(t *testing.T) {
 	if status, _, err := runProjectJob(t, root, "apps/mobile", ServeJob(stack(t)), nil); status != "FAILED" || err == nil || err.Error() != CodeNotRunnable {
 		t.Errorf("a Flutter app with no web/ is not served: %s %v", status, err)
 	}
-	writeFile(t, root, "apps/mobile/web/index.html", "<html></html>\n")
+	stackstest.WriteFile(t, root, "apps/mobile/web/index.html", "<html></html>\n")
 	if status, _, err := runProjectJob(t, root, "apps/mobile", ServeJob(stack(t)), nil); status != "OK" || err != nil {
 		t.Fatalf("serve mobile: %s %v", status, err)
 	}
@@ -310,9 +311,9 @@ func TestASwitchBehindOneShimMakesTheRootStale(t *testing.T) {
 	bin := t.TempDir()
 	log := filepath.Join(bin, "tools.log")
 	version := filepath.Join(bin, "version")
-	writeFile(t, bin, "version", "3.7.2")
+	stackstest.WriteFile(t, bin, "version", "3.7.2")
 	// A shim, as asdf or mise install: one file whose SDK follows a setting.
-	writeFile(t, bin, "dart", "#!/bin/sh\nread v < "+version+"\nif [ \"$1\" = --version ]; then echo \"Dart SDK version: $v (stable)\"; exit 0; fi\necho \"$PWD: dart $v $*\" >> "+log+"\nif [ \"$1 $2\" = \"pub get\" ]; then mkdir -p .dart_tool && echo '{}' > .dart_tool/package_config.json; fi\n")
+	stackstest.WriteFile(t, bin, "dart", "#!/bin/sh\nread v < "+version+"\nif [ \"$1\" = --version ]; then echo \"Dart SDK version: $v (stable)\"; exit 0; fi\necho \"$PWD: dart $v $*\" >> "+log+"\nif [ \"$1 $2\" = \"pub get\" ]; then mkdir -p .dart_tool && echo '{}' > .dart_tool/package_config.json; fi\n")
 	if err := os.Chmod(filepath.Join(bin, "dart"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -330,7 +331,7 @@ func TestASwitchBehindOneShimMakesTheRootStale(t *testing.T) {
 	if got := install(); got != "" {
 		t.Errorf("the same SDK finds the root current: %q", got)
 	}
-	writeFile(t, bin, "version", "3.8.1")
+	stackstest.WriteFile(t, bin, "version", "3.8.1")
 	if got := install(); !strings.Contains(got, "dart 3.8.1 pub get") {
 		t.Errorf("another SDK behind the same shim resolves again: %q", got)
 	}

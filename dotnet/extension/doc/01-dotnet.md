@@ -71,8 +71,16 @@ it into the test and coverage summary, even when `dotnet test` exits
 non-zero. The `coverlet.collector` package that `dotnet new` adds to a test
 project writes it. A failed case fails the task with `stacks.test_failed`,
 which names it; a step that exits non-zero with no failed case, or a missing
-TRX or Cobertura report, fails it too. The output directory is emptied before
-the step.
+TRX report, fails it too. A test project with no Coverlet collector writes no
+Cobertura report: the task passes with the warning
+`stacks.coverage_unavailable` and no coverage. The output directory is emptied before the step.
+
+`putnami test --test <filter>`, short `-t`, passes the filter to `dotnet test`
+as `--filter <filter>`: a bare value selects the tests whose fully qualified
+name contains it, and the test platform's expression syntax works as it does
+on the command line. The filter also reaches the test projects the selected
+ones depend on; one in which it selects no test writes no TRX report, and its
+run passes with zero tests. The filter is part of the task's cache key.
 
 `lint` also checks every relative link and anchor of the project's
 `README.md` files and `doc/` trees with the documentation link check every
@@ -85,6 +93,10 @@ build writes the `obj/` of each project it references: the .NET tasks of a
 workspace run one at a time.
 
 ## Restore and upgrade the packages
+
+A change to `packages.lock.json` at the workspace root makes the next
+`putnami` command reinstall the workspace, as a change to `putnami.lock.json`
+does.
 
 `dotnet build`, `dotnet test` and `dotnet format` restore their project
 themselves. The workspace commands restore every project ahead of them:
@@ -146,20 +158,29 @@ satisfies `global.json`, the task runs its steps with one under
 
 1. an SDK an earlier task installed there for the same platform, the one the
    rules below pick among them; this needs no network;
-2. else it reads Microsoft's release metadata,
-   `builds.dotnet.microsoft.com/dotnet/release-metadata`, for the channels the
-   roll-forward policy reaches, and picks the SDK the .NET host would: the
-   stated one for `disable`, `patch` or no policy (for `patch` or none, the
-   latest of its feature band when the stated one is not published), the latest patch of
-   the stated feature band, else of the next one, for `feature`, `minor` and
-   `major`, the highest for the `latest*` policies, and with no `global.json`
-   the latest SDK of the 10.0 channel. A prerelease is picked only when
-   `global.json` states one;
+2. else it picks, in the release metadata the extension pins, the SDK the
+   .NET host would: the stated one for `disable`, `patch` or no policy (for
+   `patch` or none, the latest of its feature band when the stated one is not
+   pinned), the latest patch of the stated feature band, else of the next one,
+   for `feature`, `minor` and `major`, the highest for the `latest*` policies,
+   and with no `global.json` the latest SDK of the 10.0 channel;
 3. it installs, beside the SDK, the latest ASP.NET Core runtime, which holds
    the .NET runtime, of every channel from 8.0 up to the SDK's, whatever its
    support phase, since an SDK carries only its own runtime and a project may
-   target an older one. Each archive is checked
-   against the SHA-512 the metadata states.
+   target an older one. Each archive comes from `builds.dotnet.microsoft.com`
+   and is checked against the SHA-512 the extension pins.
+
+The pinned metadata is `sdkreleases.json`, which `scripts/sdk-releases.sh`
+writes from Microsoft's: the newest stable SDK of each feature band and the
+newest ASP.NET Core runtime of every channel from 8.0. The same extension
+release installs the same SDK on every machine, and a pin moves with the next
+extension release
+([ADR 0002](https://github.com/Putnami/putnami/blob/main/dotnet/extension/doc/adr/0002-the-extension-pins-the-sdk-and-runtime-releases-it-installs.md)).
+A `global.json` that admits only an SDK the extension does not pin finds none
+to install, and the task says to put that SDK on `PATH`: `rollForward:
+disable` on an SDK that is not the newest of its feature band, a prerelease,
+or a version newer than the newest pinned patch of its band, such as 8.0.429
+when the extension pins 8.0.428, until the next extension release.
 
 An offline run (`PUTNAMI_OFFLINE_DEPENDENCIES=1`) installs nothing, and
 reuses none either: it checks the SDK on `PATH` alone. Linux, including a
@@ -177,7 +198,7 @@ other project is a library, which has no `serve`, `run`, `package` or
 
 | Command | Runs |
 |---|---|
-| `putnami serve` | `dotnet build <project file>` under the stack-root lock, then `dotnet run --no-build --project <project file> --no-launch-profile`, with `ASPNETCORE_URLS=http://0.0.0.0:<port>` and `PORT=<port>`; `--port` defaults to 3000, and 0 picks a free port. The application is ready once its port accepts connections. |
+| `putnami serve` | `dotnet build <project file>` under the stack-root lock, then `dotnet run --no-build --project <project file> --no-launch-profile`, with `-- <args>` from `--args`, with `ASPNETCORE_URLS=http://0.0.0.0:<port>` and `PORT=<port>`; `--port` defaults to 3000, and 0 picks a free port. The application is ready once its port accepts connections. |
 | `putnami run` | `dotnet build`, then `dotnet run --no-build --project <project file> --no-launch-profile -- <args>`, with the words of `--args`, and exits with the application's exit code. |
 
 `putnami qualify <project> --target local` serves an application and
@@ -205,8 +226,8 @@ The publish runs under the stack-root lock, since it restores and builds the
 referenced projects in place. The image leaves out the `putnami.json`,
 `global.json` and `schema/http-routes.json` the SDK copies into its output.
 It runs `dotnet /app/<AssemblyName>.dll` as the non-root `app` user in
-`/app`; an ASP.NET Core application listens on 8080 (`ASPNETCORE_HTTP_PORTS` and
-`PORT`). A project that targets several frameworks names one with
+`/app`; an ASP.NET Core application listens on `--port`, 8080 by default
+(`ASPNETCORE_HTTP_PORTS` and `PORT`). A project that targets several frameworks names one with
 `--framework`. `--docker-load` also loads the image into the local Docker
 daemon, and `--docker-tag` adds a tag. The image name is the project name in
 lowercase.
@@ -276,7 +297,8 @@ uses most:
   can report JUnit instead of TRX: replace the test step's
   `--logger trx` with `--logger "junit;LogFilePath={output}/junit.xml"`, and
   `tasks.test.reports` with `{"junit": ["{output}/junit.xml"], "coverage": [{"format": "cobertura", "paths": ["{output}/*/coverage.cobertura.xml"]}]}`.
-- **No coverage.** A test project without `coverlet.collector` drops
+- **No coverage.** A test project without `coverlet.collector` runs and warns
+  with `stacks.coverage_unavailable`. To silence the warning, it drops
   `--collect "XPlat Code Coverage"` from its step and sets
   `tasks.test.reports` to `{"trx": ["{output}/*.trx"]}`.
 - **Microsoft.Testing.Platform.** A test project that runs on it replaces the

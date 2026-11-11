@@ -17,6 +17,7 @@
     "rust/stack-extension#overrides-are-honored",
     "rust/stack-extension#package-assembles-an-image",
     "rust/stack-extension#package-builds-each-platform",
+    "rust/stack-extension#package-dry-run-builds-nothing",
     "rust/stack-extension#package-provides-its-cross-tools",
     "rust/stack-extension#package-writes-archives",
     "rust/stack-extension#provides-its-test-tools",

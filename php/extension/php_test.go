@@ -19,17 +19,6 @@ import (
 
 const feature = "php/stack-extension"
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 // fixture writes the layout of the observe Composer detector's Symfony demo:
 // an application at the root that requires demo/pricing, a package its path
 // repository provides, and a tool, tools/gen, with a Composer build of its
@@ -37,7 +26,7 @@ func writeFile(t *testing.T, root, rel, content string) {
 func fixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	writeFile(t, root, "composer.json", `{
+	stackstest.WriteFile(t, root, "composer.json", `{
 	  "type": "project",
 	  "require": {"php": ">=8.4", "demo/pricing": "^1.0", "symfony/framework-bundle": "8.1.*"},
 	  "require-dev": {"phpstan/phpstan": "^2.1", "phpunit/phpunit": "^12"},
@@ -46,25 +35,25 @@ func fixture(t *testing.T) string {
 	  "autoload-dev": {"psr-4": {"App\\Tests\\": "tests/"}},
 	  "repositories": [{"type": "path", "url": "packages/*", "options": {"symlink": true}}]
 	}`)
-	writeFile(t, root, "composer.lock", `{"packages": []}`)
-	writeFile(t, root, "phpunit.dist.xml", `<phpunit bootstrap="tests/bootstrap.php"><testsuites><testsuite name="app"><directory>tests</directory></testsuite></testsuites></phpunit>`)
-	writeFile(t, root, "phpstan.dist.neon", "parameters:\n  level: 6\n")
-	writeFile(t, root, ".env", "APP_ENV=dev\n")
-	writeFile(t, root, "config/bundles.php", "<?php\n")
-	writeFile(t, root, "src/Controller/QuoteController.php", "<?php\n")
-	writeFile(t, root, "src/Kernel.php", "<?php\n")
-	writeFile(t, root, "tests/Controller/QuoteControllerTest.php", "<?php\n")
-	writeFile(t, root, "tests/bootstrap.php", "<?php\n")
-	writeFile(t, root, "packages/pricing/composer.json", `{
+	stackstest.WriteFile(t, root, "composer.lock", `{"packages": []}`)
+	stackstest.WriteFile(t, root, "phpunit.dist.xml", `<phpunit bootstrap="tests/bootstrap.php"><testsuites><testsuite name="app"><directory>tests</directory></testsuite></testsuites></phpunit>`)
+	stackstest.WriteFile(t, root, "phpstan.dist.neon", "parameters:\n  level: 6\n")
+	stackstest.WriteFile(t, root, ".env", "APP_ENV=dev\n")
+	stackstest.WriteFile(t, root, "config/bundles.php", "<?php\n")
+	stackstest.WriteFile(t, root, "src/Controller/QuoteController.php", "<?php\n")
+	stackstest.WriteFile(t, root, "src/Kernel.php", "<?php\n")
+	stackstest.WriteFile(t, root, "tests/Controller/QuoteControllerTest.php", "<?php\n")
+	stackstest.WriteFile(t, root, "tests/bootstrap.php", "<?php\n")
+	stackstest.WriteFile(t, root, "packages/pricing/composer.json", `{
 	  "name": "demo/pricing", "type": "library",
 	  "require": {"php": ">=8.4"},
 	  "autoload": {"psr-4": {"Demo\\Pricing\\": "src/"}}
 	}`)
-	writeFile(t, root, "packages/pricing/src/Calculator.php", "<?php\n")
-	writeFile(t, root, "packages/pricing/tests/CalculatorTest.php", "<?php\n")
-	writeFile(t, root, "tools/gen/composer.json", `{"name": "demo/gen", "require": {"php": "^8.3"}}`)
-	writeFile(t, root, "tools/gen/.php-version", "8.3\n")
-	writeFile(t, root, "tools/gen/src/Gen.php", "<?php\n")
+	stackstest.WriteFile(t, root, "packages/pricing/src/Calculator.php", "<?php\n")
+	stackstest.WriteFile(t, root, "packages/pricing/tests/CalculatorTest.php", "<?php\n")
+	stackstest.WriteFile(t, root, "tools/gen/composer.json", `{"name": "demo/gen", "require": {"php": "^8.3"}}`)
+	stackstest.WriteFile(t, root, "tools/gen/.php-version", "8.3\n")
+	stackstest.WriteFile(t, root, "tools/gen/src/Gen.php", "<?php\n")
 	return root
 }
 
@@ -129,7 +118,7 @@ func TestTheComponentsOfAComposerRepositoryBecomeProjects(t *testing.T) {
 
 func TestARootPHPVersionWinsOverAPackageRange(t *testing.T) {
 	root := fixture(t)
-	writeFile(t, root, ".php-version", "8.4.10\n")
+	stackstest.WriteFile(t, root, ".php-version", "8.4.10\n")
 	for _, p := range probe(t, root).Projects {
 		if p.Path != "packages/pricing" {
 			continue
@@ -146,7 +135,7 @@ func TestARootPHPVersionWinsOverAPackageRange(t *testing.T) {
 
 func TestAMalformedRootManifestLeavesEachPackageItsOwnRoot(t *testing.T) {
 	root := fixture(t)
-	writeFile(t, root, "composer.json", `{`)
+	stackstest.WriteFile(t, root, "composer.json", `{`)
 	result := probe(t, root)
 	var diagnosed bool
 	for _, d := range result.Diagnostics {
@@ -173,20 +162,20 @@ func stubTools(t *testing.T, root, version string, failures int) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "tools.log")
-	writeFile(t, bin, "php", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "php", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "PHP `+version+` (cli) (built: Oct  1 2026 10:00:00) (NTS)"; exit 0; fi
 if [ "$1" = "-r" ]; then exit ${STUB_NO_COVERAGE_DRIVER:-0}; fi
 while [ "$#" -gt 0 ] && [ "$1" = "-d" ]; do shift 2; done
 exec "$@"
 `)
-	writeFile(t, root, "vendor/bin/phpstan", `#!/bin/sh
+	stackstest.WriteFile(t, root, "vendor/bin/phpstan", `#!/bin/sh
 echo "$PWD: phpstan $*" >> "`+log+`"
 `)
 	failure := ""
 	if failures > 0 {
 		failure = `<failure type="AssertionFailedError">expected 700</failure>`
 	}
-	writeFile(t, root, "vendor/bin/phpunit", `#!/bin/sh
+	stackstest.WriteFile(t, root, "vendor/bin/phpunit", `#!/bin/sh
 case " $* " in *" --help "*) [ -n "$STUB_PHPUNIT_WITHOUT_EMPTY_SUITE_OPTION" ] || echo "  --do-not-fail-on-empty-test-suite  Do not fail"; exit 0;; esac
 echo "$PWD: phpunit $*" >> "`+log+`"
 prev=""
@@ -279,14 +268,14 @@ func TestATaskRunsTheProfileStepsAfterTheToolchainCheck(t *testing.T) {
 		t.Errorf("a PHP outside the stated range fails the task: %s %v", status, err)
 	}
 	// tools/gen pins 8.3 in .php-version, which outranks its composer.json.
-	writeFile(t, root, "tools/gen/vendor/bin/phpstan", "#!/bin/sh\n")
+	stackstest.WriteFile(t, root, "tools/gen/vendor/bin/phpstan", "#!/bin/sh\n")
 	if err := os.Chmod(filepath.Join(root, "tools/gen/vendor/bin/phpstan"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if status, _, _, err := runJob(t, root, "tools/gen", stacks.TaskLint); status != "OK" || err != nil {
 		t.Errorf("a PHP .php-version names runs the task: %s %v", status, err)
 	}
-	writeFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/php": {"toolchain": {"check": "warn"}}}}`)
+	stackstest.WriteFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/php": {"toolchain": {"check": "warn"}}}}`)
 	if status, _, _, err := runJob(t, root, "packages/pricing", stacks.TaskLint); status != "OK" || err != nil {
 		t.Errorf("warn runs the task on a mismatch: %s %v", status, err)
 	}
@@ -346,7 +335,7 @@ func TestATaskUsesTheProvisionedPHPOnlyWhenTheMachinePHPIsUnusable(t *testing.T)
 	root := fixture(t)
 	pinnedDir := t.TempDir()
 	used := filepath.Join(pinnedDir, "used")
-	writeFile(t, pinnedDir, "php", `#!/bin/sh
+	stackstest.WriteFile(t, pinnedDir, "php", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo "PHP 8.4.23 (cli)"; exit 0; fi
 echo "$1" >> "`+used+`"
 if [ "$1" = "-r" ]; then exit 1; fi
@@ -424,7 +413,7 @@ func TestATestOnlyChangeLeavesTheLintInputsUnchanged(t *testing.T) {
 		t.Errorf("gen lint inputs = %v", got)
 	}
 
-	writeFile(t, root, "tests/Controller/ProfileTest.php", "<?php\n")
+	stackstest.WriteFile(t, root, "tests/Controller/ProfileTest.php", "<?php\n")
 	if got := resolve(t, root, ".", "php:lint"); !reflect.DeepEqual(got, lint) {
 		t.Errorf("a test change moved the lint inputs: %v", got)
 	}
@@ -436,8 +425,8 @@ func TestATestOnlyChangeLeavesTheLintInputsUnchanged(t *testing.T) {
 func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	spectest.Proves(t, feature, "overrides-are-honored", "a-putnami-json-override-changes-the-steps-and-the-inputs")
 	root := fixture(t)
-	writeFile(t, root, "packages/pricing/lib/Legacy.php", "<?php\n")
-	writeFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/php": {
+	stackstest.WriteFile(t, root, "packages/pricing/lib/Legacy.php", "<?php\n")
+	stackstest.WriteFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/php": {
 	  "inputs": {"sources": ["src/**", "lib/**"]},
 	  "tasks": {"lint": {"steps": [["{root}/vendor/bin/php-cs-fixer", "fix", "--dry-run", "--diff"]]}}
 	}}}`)
@@ -445,7 +434,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		t.Errorf("an input override is honored: %v", got)
 	}
 	log := stubTools(t, root, "8.4.10", 0)
-	writeFile(t, root, "vendor/bin/php-cs-fixer", "#!/bin/sh\necho \"$PWD: php-cs-fixer $*\" >> \""+log+"\"\n")
+	stackstest.WriteFile(t, root, "vendor/bin/php-cs-fixer", "#!/bin/sh\necho \"$PWD: php-cs-fixer $*\" >> \""+log+"\"\n")
 	if err := os.Chmod(filepath.Join(root, "vendor/bin/php-cs-fixer"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -458,7 +447,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 	}
 
 	// A machine with no coverage driver keeps the JUnit report only.
-	writeFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/php": {"tasks": {"test": {
+	stackstest.WriteFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/php": {"tasks": {"test": {
 	  "steps": [["{root}/vendor/bin/phpunit", "--log-junit", "{output}/junit.xml", "tests"]],
 	  "reports": {"coverage": []}
 	}}}}}`)
@@ -466,7 +455,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 		t.Errorf("a test without coverage: %s %v %v", status, err, data)
 	}
 
-	writeFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/php": {"inputs": {"manifests": ["composer.json", "{root}/symfony.lock"]}}}}`)
+	stackstest.WriteFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/php": {"inputs": {"manifests": ["composer.json", "{root}/symfony.lock"]}}}}`)
 	if status, _, _, err := runJob(t, root, "packages/pricing", stacks.TaskLint); status != "FAILED" || err == nil || err.Error() != stacks.CodeProjectConfigInvalid {
 		t.Errorf("a stack-root input the manifest does not declare fails the task: %s %v", status, err)
 	}
@@ -475,6 +464,7 @@ func TestAPutnamiJSONOverrideChangesTheStepsAndTheInputs(t *testing.T) {
 func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	spectest.Proves(t, feature, "manifest-follows-the-profile", "the-manifest-conforms-to-the-stack-core")
 	stackstest.CheckManifest(t, "putnami.extension.json", stack(t))
+	stackstest.CheckSurface(t, "putnami.extension.json", stackstest.Exemption{Convention: stackstest.ConventionServeArgs, Reason: "the PHP built-in server takes no program arguments"})
 	if got := stack(t).Selectors(); !slices.Equal(got, []string{"php:lint", "php:test"}) {
 		t.Errorf("selectors = %v", got)
 	}

@@ -87,3 +87,21 @@ func TestReadReportsMergesASourceFileAcrossCoverageReports(t *testing.T) {
 		t.Errorf("coverage = %+v, want api.go's 4 lines with 3 covered once each and routes.go's largest stated 5/4", s.Coverage)
 	}
 }
+
+func TestReadReportsWarnsWhenAnOptionalCoverageReportIsMissing(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "out/junit.xml", junitPass)
+	r := &Reports{JUnit: []string{"out/*.xml"}, Coverage: []Coverage{{Format: "cobertura", Paths: []string{"out/*/coverage.cobertura.xml"}, Optional: true, WarnWhenMissing: true}}}
+	s, d := ReadReports(r, globUnder(dir), dir, Attribution{})
+	if codes(d) != CodeCoverageUnavailable || d[0].Severity != diag.Warning {
+		t.Fatalf("diagnostics: %v", d)
+	}
+	if s.Coverage != nil || s.Tests.Passed != 2 {
+		t.Errorf("summary: %+v", s)
+	}
+	// An optional report that does not warn stays silent.
+	r.Coverage[0].WarnWhenMissing = false
+	if _, d := ReadReports(r, globUnder(dir), dir, Attribution{}); len(d) != 0 {
+		t.Errorf("a silent optional report: %v", d)
+	}
+}

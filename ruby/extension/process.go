@@ -67,7 +67,8 @@ func ServeJob(stack stacks.Stack) cli.JobFunc {
 		serving, done := context.WithCancel(context.Background())
 		defer done()
 		go stacks.AnnounceReady(serving, emit, port)
-		code, stopped, err := stacks.RunForeground(root, root.Program("bundle"), env, emit, serverArgs(root.Project, strconv.Itoa(port))...)
+		argv := append(serverArgs(root.Project, strconv.Itoa(port)), strings.Fields(ctx.Params.String("args"))...)
+		code, stopped, err := stacks.RunForeground(root, root.Program("bundle"), env, emit, argv...)
 		if err != nil {
 			emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeRunFailed)
 			return "FAILED", nil, fmt.Errorf("%s: %w", CodeRunFailed, err)

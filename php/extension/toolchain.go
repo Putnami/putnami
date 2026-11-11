@@ -3,8 +3,6 @@ package php
 import (
 	"fmt"
 	"io"
-	"os"
-	"slices"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/observe/detect/composer"
@@ -59,35 +57,14 @@ var releases = []release{
 // HandleToolchainResolve serves the toolchain-resolve control call. The bool
 // reports whether args name that call.
 func HandleToolchainResolve(args []string, stdin io.Reader, stdout io.Writer, profile stacks.Profile) (bool, error) {
-	return wsproto.ServeToolchainResolve(args, stdin, stdout, func(request wsproto.ToolchainResolveRequest) (wsproto.ToolchainResolveResult, error) {
-		root, err := os.Getwd()
-		if err != nil {
-			return wsproto.ToolchainResolveResult{}, fmt.Errorf("resolve the workspace root: %w", err)
-		}
-		return answerToolchainResolve(root, request, profile), nil
-	})
+	return stacks.ServeToolchainResolve(args, stdin, stdout, ExtensionName, LockIdentity, pinResolver(profile))
 }
 
-// answerToolchainResolve answers one request against the workspace at root. An
-// identity it pins nothing for is omitted, which leaves the lock without it.
-func answerToolchainResolve(root string, request wsproto.ToolchainResolveRequest, profile stacks.Profile) wsproto.ToolchainResolveResult {
-	result := wsproto.ToolchainResolveResult{
-		Version:    wsproto.ToolchainResolveProtocolVersion,
-		Extension:  ExtensionName,
-		Toolchains: map[string]wsproto.ToolchainResolution{},
+// pinResolver answers the release the workspace pins, as resolvePin does.
+func pinResolver(profile stacks.Profile) stacks.PinResolver {
+	return func(root string, request wsproto.ToolchainResolveRequest) (wsproto.LockToolchainEntry, bool) {
+		return resolvePin(root, request, profile)
 	}
-	for _, identity := range request.Identities {
-		if identity != LockIdentity {
-			result.Toolchains[identity] = wsproto.ToolchainResolution{Problem: &wsproto.ToolchainProblem{
-				Message: fmt.Sprintf("%s pins the %s toolchain only, not %q", ExtensionName, LockIdentity, identity),
-			}}
-			continue
-		}
-		if pin, ok := resolvePin(root, request, profile); ok {
-			result.Toolchains[identity] = wsproto.ToolchainResolution{Pin: &pin}
-		}
-	}
-	return result
 }
 
 // resolvePin returns the PHP release the workspace at root pins, among the
@@ -135,22 +112,18 @@ func resolvePin(root string, request wsproto.ToolchainResolveRequest, profile st
 
 // acceptedBy returns the releases expected accepts, oldest first.
 func acceptedBy(toolchain stacks.Toolchain, candidates []release, expected stacks.Expected) []release {
-	return slices.DeleteFunc(slices.Clone(candidates), func(r release) bool {
-		return toolchain.Compare(expected, r.version).Fail
+	return stacks.Accepted(candidates, release.name, func(version string) bool {
+		return !toolchain.Compare(expected, version).Fail
 	})
 }
 
-// choose picks among accepted releases, oldest first.
+// name is the version of the release.
+func (r release) name() string { return r.version }
+
+// choose picks among accepted releases, oldest first: the committed one, else
+// the default one, else the newest.
 func choose(accepted []release, committed string) (release, bool) {
-	if len(accepted) == 0 {
-		return release{}, false
-	}
-	for _, version := range []string{committed, defaultVersion} {
-		if i := slices.IndexFunc(accepted, func(r release) bool { return r.version == version }); i >= 0 {
-			return accepted[i], true
-		}
-	}
-	return accepted[len(accepted)-1], true
+	return stacks.Choose(accepted, release.name, committed, defaultVersion)
 }
 
 // lockEntry returns the release as a lock version 5 pin.

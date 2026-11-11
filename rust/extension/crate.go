@@ -451,12 +451,12 @@ func publishCrate(c context.Context, ctx *pctx.Context, root stacks.RootStep, em
 	}
 	// The staged copy differs from any checkout by design.
 	args := []string{"publish", "--locked", "--allow-dirty"}
-	if registry := ctx.Params.String("crates-registry"); registry != "" {
+	if registry := ctx.Params.String("crates-registry", "cratesRegistry"); registry != "" {
 		args = append(args, "--registry", registry)
 	}
 	cargo := root.Program("cargo")
 	env := root.Env
-	dryRun := ctx.Params.Bool("dry-run", false)
+	dryRun := ctx.Params.Bool("dry-run", false, "dryRun")
 	packages := []string{root.Component}
 	if dryRun {
 		var outside []string
@@ -474,7 +474,7 @@ func publishCrate(c context.Context, ctx *pctx.Context, root stacks.RootStep, em
 				return fmt.Errorf("install the Rust of the dry run: %w", err)
 			}
 			bin := filepath.Dir(provided.Executable)
-			cargo = filepath.Join(bin, "cargo"+executableSuffix())
+			cargo = filepath.Join(bin, "cargo"+stacks.ExecutableSuffix(hostPlatform))
 			env = prependPath(append(withoutRustupEnv(env), provided.Env...), bin)
 		}
 	}

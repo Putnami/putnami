@@ -123,18 +123,23 @@ same task of the packages it depends on.
 
 When the `dart` or `flutter` on `PATH` is missing, or it or the Dart a Flutter
 SDK bundles is outside the constraints its package states, a task installs the
-newest stable release the constraints admit, under `tools/dart` of the Putnami
-home, and runs it
-([ADR 0001](https://github.com/Putnami/putnami/blob/main/dart/extension/doc/adr/0001-the-sdk-installs-from-the-publishers-archives.md)):
+newest release the extension pins that the constraints admit, under
+`tools/dart` of the Putnami home, and runs it
+([ADR 0001](https://github.com/Putnami/putnami/blob/main/dart/extension/doc/adr/0001-the-sdk-installs-from-the-publishers-archives.md),
+[ADR 0003](https://github.com/Putnami/putnami/blob/main/dart/extension/doc/adr/0003-the-extension-pins-the-sdk-releases-it-installs.md)):
 
-| SDK | Release list | Checksum |
+| SDK | Pinned releases | Archive |
 |---|---|---|
-| Dart | The stable releases of the dart-archive on `storage.googleapis.com` | The `.sha256sum` beside each archive |
-| Flutter | The release manifest of the host system on `storage.googleapis.com`; the release must also bundle a Dart in `environment.sdk` | The SHA-256 the manifest names |
+| Dart | The newest patch of each stable minor from 2.19, with the SHA-256 of each platform's archive | The dart-archive on `storage.googleapis.com` |
+| Flutter | The newest stable release of each minor from 3.10 on each system; the release must also bundle a Dart in `environment.sdk` | The Flutter release bucket on `storage.googleapis.com` |
 
-The archive is checked before it is unpacked, and later tasks reuse the
-install. The checksum comes over HTTPS from the host that serves the archive:
-it detects a truncated or altered download, not a compromised publisher. An SDK on `PATH` that satisfies the constraint runs, and nothing is
+The pins live in `sdkreleases.json`, which `scripts/sdk-releases.sh` writes
+from the publishers' release lists, so the same extension release installs
+the same SDK on every machine; a pin moves with the next extension release.
+The archive is checked against the pinned SHA-256 before it is unpacked, and
+later tasks reuse the install. A constraint that admits only a patch the
+extension does not pin, such as `sdk: 3.4.0`, fails: put that SDK on `PATH`.
+An SDK on `PATH` that satisfies the constraint runs, and nothing is
 installed. An offline run installs nothing. A Flutter archive weighs 1.5 to
 2.5 GB and unpacks with the host's `tar`, which needs `xz` on Linux, without
 keeping the archive's owner; Flutter itself needs `git`. Flutter publishes no
@@ -246,10 +251,10 @@ the host system. The design of the stack core is in
 | Command | What it runs |
 |---|---|
 | `putnami workspace-fetch` | `pub get --enforce-lockfile` at each stack root, which downloads the locked packages into the pub cache and runs none of their code. A hosted run calls it with the network, before any repository process. A root with no `pubspec.lock` fails it. |
-| `putnami workspace-install` | `pub get --enforce-lockfile` at each stack root, with `flutter` when the root holds a Flutter package, `--offline` in an offline run. A root the selected SDK resolved last, with the same pubspecs, `pubspec.lock` and `package_config.json`, is current and skipped; `--force` resolves it anyway. A root with no `pubspec.lock` yet resolves one. A root whose SDK the machine lacks in an offline run is left out with a warning. |
+| `putnami workspace-install` | `pub get --enforce-lockfile` at each stack root, with `flutter` when the root holds a Flutter package, `--offline` in an offline run. A root the selected SDK resolved last, with the same pubspecs, `pubspec.lock` and `package_config.json`, is current and skipped; `--force` resolves it anyway. A root with no `pubspec.lock` yet resolves one. A root whose SDK the machine lacks in an offline run is left out with a warning. A change to `pubspec.lock` at the workspace root makes the next `putnami` command run it again. |
 | `putnami deps-upgrade` | `pub upgrade` at each stack root. It needs the network. |
 | `putnami run` | `dart run` in a Dart command-line package, with `--entrypoint` and `--args`, and forwards its exit code. A Flutter app runs on a device with `flutter run`, outside Putnami. |
-| `putnami serve` | A Dart server: `dart run` on `bin/server.dart`, or `--entrypoint`, or the package's executable, with `PORT` set. A Flutter app with `web/`: `flutter run -d web-server --web-port <port> --web-hostname 0.0.0.0`. It reports ready once the port accepts connections; `--port 0` picks a free one. |
+| `putnami serve` | A Dart server: `dart run` on `bin/server.dart`, or `--entrypoint`, followed by the words of `--args`, or the package's executable, with `PORT` set. A Flutter app with `web/`: `flutter run -d web-server --web-port <port> --web-hostname 0.0.0.0`. It reports ready once the port accepts connections; `--port 0` picks a free one. |
 | `putnami lint --docs-links` | Checks every relative link and anchor of the package's `README.md` and `doc/`, on by default. |
 
 On a hosted run, the engine hands `workspace-fetch` a read credential on an
@@ -313,8 +318,8 @@ machine ([ADR 0002](https://github.com/Putnami/putnami/blob/main/dart/extension/
 The executable links the C library dynamically, so the base is
 `gcr.io/distroless/cc-debian12:nonroot` pinned by digest, which holds glibc,
 CA certificates and time zones and no shell. The image runs as the user
-`65532`, the `nonroot` user of distroless, in `/app`, with `PORT=8080` set and
-exposed: the server reads `PORT` to listen, as it does under `serve`. A
+`65532`, the `nonroot` user of distroless, in `/app`, with `PORT` set and
+exposed from `--port`, 8080 by default: the server reads `PORT` to listen, as it does under `serve`. A
 project names another base with `--docker-base-image image@sha256:<digest>`; a
 base with no digest fails with `dart.base_not_pinned`. The cache key of
 `package` covers the package's build inputs, the `lib/` and `pubspec.yaml` of

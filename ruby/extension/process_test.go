@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // defaultHost is what the stub ruby answers the host probe with: Ruby 3.3.6,
@@ -31,11 +32,11 @@ func rubyTools(t *testing.T) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "bundle.log")
-	writeFile(t, bin, "ruby", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "ruby", `#!/bin/sh
 if [ "$1" = "-e" ]; then printf "${STUB_RUBY_HOST:-`+defaultHost+`}"; exit 0; fi
 echo 'ruby 3.3.6 (2024-11-05 revision 75015d4c1f) [x86_64-linux]'
 `)
-	writeFile(t, bin, "bundle", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "bundle", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo 'Bundler version 2.5.22'; exit 0; fi
 if [ "$1" = "check" ]; then exit "${STUB_BUNDLE_CHECK:-0}"; fi
 echo "$PWD: bundle $*" >> "`+log+`"
@@ -76,10 +77,10 @@ exit "${STUB_EXIT:-0}"
 // rackApp writes a Rack application with its own Gemfile at rel under root.
 func rackApp(t *testing.T, root, rel string) {
 	t.Helper()
-	writeFile(t, root, rel+"/Gemfile", "source \"https://rubygems.org\"\n\ngem \"rack\"\ngem \"puma\"\n")
-	writeFile(t, root, rel+"/Gemfile.lock", "GEM\n  remote: https://rubygems.org/\n  specs:\n    rack (3.1.0)\n\nPLATFORMS\n  ruby\n\nBUNDLED WITH\n   2.5.22\n")
-	writeFile(t, root, rel+"/.ruby-version", "3.3.6\n")
-	writeFile(t, root, rel+"/config.ru", "run ->(env) { [200, {}, [\"ok\"]] }\n")
+	stackstest.WriteFile(t, root, rel+"/Gemfile", "source \"https://rubygems.org\"\n\ngem \"rack\"\ngem \"puma\"\n")
+	stackstest.WriteFile(t, root, rel+"/Gemfile.lock", "GEM\n  remote: https://rubygems.org/\n  specs:\n    rack (3.1.0)\n\nPLATFORMS\n  ruby\n\nBUNDLED WITH\n   2.5.22\n")
+	stackstest.WriteFile(t, root, rel+"/.ruby-version", "3.3.6\n")
+	stackstest.WriteFile(t, root, rel+"/config.ru", "run ->(env) { [200, {}, [\"ok\"]] }\n")
 }
 
 // workspaceRoot answers a new workspace directory by its real path: on macOS
@@ -146,14 +147,14 @@ func TestServeRunsRailsServerOrRackupOnAnApplication(t *testing.T) {
 	if status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
-	writeFile(t, root, "shop/bin/rails", "#!/usr/bin/env ruby\n")
-	status, _, err = runProjectJob(t, root, "shop", ServeJob(stack(t)), job.Params{"port": json.RawMessage(`8081`)})
+	stackstest.WriteFile(t, root, "shop/bin/rails", "#!/usr/bin/env ruby\n")
+	status, _, err = runProjectJob(t, root, "shop", ServeJob(stack(t)), job.Params{"port": json.RawMessage(`8081`), "args": json.RawMessage(`"--verbose"`)})
 	if status != "OK" || err != nil {
 		t.Fatalf("serve: %s %v", status, err)
 	}
 	shop := filepath.Join(root, "shop")
 	lines := readLines(t, log)
-	if len(lines) != 2 || lines[0] != shop+": bundle exec rackup -o 0.0.0.0 -p 3000" || lines[1] != shop+": bundle exec rails server -b 0.0.0.0 -p 8081" {
+	if len(lines) != 2 || lines[0] != shop+": bundle exec rackup -o 0.0.0.0 -p 3000" || lines[1] != shop+": bundle exec rails server -b 0.0.0.0 -p 8081 --verbose" {
 		t.Errorf("bundle ran with %q", lines)
 	}
 	if env := readLines(t, log+".env"); len(env) != 2 || !strings.Contains(env[0], "PORT=3000") || !strings.Contains(env[1], "PORT=8081") {

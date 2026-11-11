@@ -76,7 +76,7 @@
     },
     {
       "id": "run-forwards-the-exit-code",
-      "text": "putnami run runs cargo run --package <crate> --locked once after the toolchain check, with no cache and no stack-root lock. The words of --args reach the program, --port sets PORT, and the task returns the program's exit code as its exit-code result; a non-zero exit fails the task."
+      "text": "putnami run runs cargo run --package <crate> --locked, with --bin <name> when --entrypoint names one of its binaries, once after the toolchain check, with no cache and no stack-root lock. The words of --args reach the program, --port sets PORT, and the task returns the program's exit code as its exit-code result; a non-zero exit fails the task."
     },
     {
       "id": "serve-sets-the-port",
@@ -96,7 +96,11 @@
     },
     {
       "id": "package-assembles-an-image",
-      "text": "package --docker assembles a reproducible OCI layout for one Linux platform with no docker daemon: the binary on a digest-pinned cc-debian12 base, PORT set from --port, and the manifest the shared Docker publisher reads."
+      "text": "package --docker assembles a reproducible OCI layout for one Linux platform with no docker daemon: the binary --entrypoint names, else the crate's default-run or only binary, on a digest-pinned cc-debian12 base, PORT set from --port, 8080 by default, and the manifest the shared Docker publisher reads."
+    },
+    {
+      "id": "package-dry-run-builds-nothing",
+      "text": "package --dry-run checks the platforms its flags name, compiles nothing, writes no archive and no image layout, and writes the channel record; package --crates still stages the crate, which cargo publish --dry-run checks."
     },
     {
       "id": "publish-sends-the-staged-crate",

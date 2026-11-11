@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/sha512"
 	"debug/elf"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -17,9 +18,7 @@ import (
 	"strings"
 	"time"
 
-	"go.putnami.dev/sdk/extension/filelock"
 	"go.putnami.dev/sdk/extension/pinnedarchive"
-	"go.putnami.dev/sdk/extension/putnamihome"
 	"go.putnami.dev/sdk/extension/robustio"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -37,13 +36,9 @@ const (
 	installedMarker = ".putnami-installed"
 	// sdkPrefix starts the folder of an installed SDK, then its version.
 	sdkPrefix = "sdk-"
-	// stagingPrefix starts a folder an installation works in.
-	stagingPrefix = "download-"
 	// minRuntimeChannel is the oldest channel whose runtime an installation
 	// adds: the oldest one the extension pins an image for.
 	minRuntimeChannel = "8.0"
-	// maxMetadataBytes bounds a release metadata document.
-	maxMetadataBytes = 32 << 20
 	// maxArchiveBytes bounds an archive.
 	maxArchiveBytes = 2 << 30
 )
@@ -106,9 +101,32 @@ func hostRuntimeIdentifier() (string, bool) {
 	return rid, ok
 }
 
-// metadataBase is where Microsoft publishes the release metadata of every
-// channel. Tests point it at a local server.
-var metadataBase = "https://builds.dotnet.microsoft.com/dotnet/release-metadata"
+// sdkReleasesJSON is the release metadata the extension pins, which
+// scripts/sdk-releases.sh writes from Microsoft's: the newest SDK of each
+// feature band and the newest ASP.NET Core runtime of every channel from 8.0,
+// with the SHA-512 of each platform's archive. A pin moves only when a release
+// of the extension ships a regenerated file (ADR 0002).
+//
+//go:embed sdkreleases.json
+var sdkReleasesJSON []byte
+
+// shippedReleases is the release metadata the extension pins: the channels of
+// the release index, and the releases of each channel by its version.
+type shippedReleases struct {
+	releasesIndex
+	Channels map[string]channelReleases `json:"channels"`
+}
+
+// shipped is the metadata this build of the extension pins. Tests replace it.
+var shipped = mustDecodeReleases(sdkReleasesJSON)
+
+func mustDecodeReleases(data []byte) shippedReleases {
+	var r shippedReleases
+	if err := json.Unmarshal(data, &r); err != nil {
+		panic(fmt.Sprintf("the shipped .NET release metadata does not decode: %v", err))
+	}
+	return r
+}
 
 // httpClient fetches the metadata and the archives, and follows no redirect
 // away from HTTPS.
@@ -166,16 +184,15 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 	if !ok {
 		return stacks.Provided{}, fmt.Errorf("the extension installs no .NET SDK on %s", hostPlatform)
 	}
-	base, release, err := lockedHome()
+	base, release, err := stacks.LockedToolsHome("dotnet")
 	if err != nil {
 		return stacks.Provided{}, err
 	}
 	defer release()
-	removeStaging(base)
 	if version, ok := installedSDK(base, expected, rid); ok {
 		return provided(filepath.Join(base, sdkFolder(version, rid))), nil
 	}
-	plan, err := planInstall(ctx, expected, rid)
+	plan, err := planInstall(expected, rid)
 	if err != nil {
 		return stacks.Provided{}, err
 	}
@@ -190,7 +207,7 @@ func Provide(ctx context.Context, expected stacks.Expected, info func(string)) (
 // provided is the dotnet of the SDK installed at dir.
 func provided(dir string) stacks.Provided {
 	return stacks.Provided{
-		Executable: filepath.Join(dir, "dotnet"+executableSuffix()),
+		Executable: filepath.Join(dir, "dotnet"+stacks.ExecutableSuffix(hostPlatform)),
 		Env: []string{
 			"DOTNET_ROOT=" + dir,
 			"DOTNET_MULTILEVEL_LOOKUP=0",
@@ -312,24 +329,16 @@ func (p installPlan) runtimeVersions() []string {
 	return out
 }
 
-// planInstall reads the release metadata and plans the SDK chooseSDK picks
-// and the latest ASP.NET Core runtime, which holds the .NET runtime, of every
-// channel from 8.0 up to the SDK's.
-func planInstall(ctx context.Context, expected stacks.Expected, rid string) (installPlan, error) {
-	var index releasesIndex
-	if err := fetchJSON(ctx, metadataBase+"/releases-index.json", &index); err != nil {
-		return installPlan{}, err
-	}
-	channels := map[string]channelReleases{}
-	load := func(version, url string) (channelReleases, error) {
-		if c, ok := channels[version]; ok {
-			return c, nil
+// planInstall reads the release metadata the extension pins and plans the
+// SDK chooseSDK picks and the latest ASP.NET Core runtime, which holds the
+// .NET runtime, of every channel from 8.0 up to the SDK's.
+func planInstall(expected stacks.Expected, rid string) (installPlan, error) {
+	index := shipped.releasesIndex
+	load := func(version, _ string) (channelReleases, error) {
+		c, ok := shipped.Channels[version]
+		if !ok {
+			return channelReleases{}, fmt.Errorf("the extension pins no release of the .NET %s channel", version)
 		}
-		var c channelReleases
-		if err := fetchJSON(ctx, url, &c); err != nil {
-			return channelReleases{}, err
-		}
-		channels[version] = c
 		return c, nil
 	}
 	chosen, err := chooseSDK(index, load, expected)
@@ -406,9 +415,9 @@ func chooseSDK(index releasesIndex, load func(version, url string) (channelRelea
 	}
 	if len(versions) == 0 {
 		if !stated {
-			return published{}, fmt.Errorf("the release metadata lists no SDK of the %s channel", defaultChannel)
+			return published{}, fmt.Errorf("the extension pins no SDK of the %s channel: put an SDK on PATH", defaultChannel)
 		}
-		return published{}, fmt.Errorf("the release metadata lists no SDK that %s accepts for version %s", expected.Source, expected.Version)
+		return published{}, fmt.Errorf("no SDK the extension pins is one %s accepts for version %s (it pins the newest SDK of each feature band): put that SDK on PATH", expected.Source, expected.Version)
 	}
 	return byVersion[pickSDK(versions, expected)], nil
 }
@@ -460,7 +469,7 @@ func archiveFormat(name string) pinnedarchive.Format {
 // the shared frameworks of each runtime beside it, and moves the result to
 // dir, through a staging folder under base.
 func install(ctx context.Context, base string, plan installPlan, dir string) error {
-	staging, err := os.MkdirTemp(base, stagingPrefix+"*")
+	staging, err := os.MkdirTemp(base, stacks.StagingPattern)
 	if err != nil {
 		return err
 	}
@@ -525,20 +534,6 @@ func mergeShared(runtimeRoot, root string) error {
 	return nil
 }
 
-// removeStaging deletes the staging folders an interrupted installation left;
-// the caller holds the lock every installation takes.
-func removeStaging(base string) {
-	entries, err := os.ReadDir(base)
-	if err != nil {
-		return
-	}
-	for _, e := range entries {
-		if e.IsDir() && strings.HasPrefix(e.Name(), stagingPrefix) {
-			_ = os.RemoveAll(filepath.Join(base, e.Name()))
-		}
-	}
-}
-
 // download writes the body at url to path and checks its SHA-512.
 func download(ctx context.Context, url, path, want string) error {
 	if len(want) != sha512.Size*2 {
@@ -570,27 +565,6 @@ func download(ctx context.Context, url, path, want string) error {
 	return nil
 }
 
-func fetchJSON(ctx context.Context, url string, v any) error {
-	ctx, cancel := context.WithTimeout(ctx, time.Minute)
-	defer cancel()
-	body, err := get(ctx, url)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = body.Close() }()
-	data, err := io.ReadAll(io.LimitReader(body, maxMetadataBytes+1))
-	if err != nil {
-		return fmt.Errorf("read %s: %w", url, err)
-	}
-	if len(data) > maxMetadataBytes {
-		return fmt.Errorf("read %s: the document exceeds %d bytes", url, maxMetadataBytes)
-	}
-	if err := json.Unmarshal(data, v); err != nil {
-		return fmt.Errorf("read %s: %w", url, err)
-	}
-	return nil
-}
-
 func get(ctx context.Context, url string) (io.ReadCloser, error) {
 	if !strings.HasPrefix(url, "https://") {
 		return nil, fmt.Errorf("%s is no HTTPS URL", url)
@@ -608,30 +582,4 @@ func get(ctx context.Context, url string) (io.ReadCloser, error) {
 		return nil, fmt.Errorf("get %s: %s", url, resp.Status)
 	}
 	return resp.Body, nil
-}
-
-// lockedHome returns the extension's folder under the Putnami home, holding the
-// lock every install of the machine takes, and the function that releases it.
-func lockedHome() (string, func(), error) {
-	home := putnamihome.Resolve(os.Getenv)
-	if home == "" {
-		return "", nil, fmt.Errorf("no Putnami home: set %s", putnamihome.Env)
-	}
-	base := filepath.Join(home, "tools", "dotnet")
-	if err := os.MkdirAll(base, 0o755); err != nil {
-		return "", nil, err
-	}
-	lock, err := filelock.Acquire(filepath.Join(base, ".lock"), true, false)
-	if err != nil {
-		return "", nil, fmt.Errorf("lock %s: %w", base, err)
-	}
-	return base, func() { _ = lock.Release() }, nil
-}
-
-// executableSuffix is the suffix of an executable on the host.
-func executableSuffix() string {
-	if strings.HasPrefix(hostPlatform, "windows/") {
-		return ".exe"
-	}
-	return ""
 }

@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -25,6 +24,7 @@ import (
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/imageload"
 )
 
 const (
@@ -45,14 +45,13 @@ const (
 )
 
 const (
-	dockerChannel    = "docker"
-	imageAppDir      = "/app"
-	imageBundlePath  = "/usr/local/bundle"
-	imageUser        = "65534:65534"
-	imageUID         = 65534
-	defaultImagePort = "8080"
-	defaultPlatform  = "linux/amd64"
-	bundleWithout    = "development:test"
+	dockerChannel   = "docker"
+	imageAppDir     = "/app"
+	imageBundlePath = "/usr/local/bundle"
+	imageUser       = "65534:65534"
+	imageUID        = 65534
+	defaultPlatform = "linux/amd64"
+	bundleWithout   = "development:test"
 )
 
 // slimBases are the official Ruby slim images on Debian trixie, pinned by the
@@ -203,7 +202,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 	if err := writeWritableDirs(writable); err != nil {
 		return fail(CodeImageFailed, err)
 	}
-	spec, err := imageSpec(staged, bundle, writable, base, platform, defaultImagePort)
+	spec, err := imageSpec(staged, bundle, writable, base, platform, stacks.ImagePort(ctx, flags))
 	if err != nil {
 		return fail(CodeImageFailed, err)
 	}
@@ -224,7 +223,7 @@ func assembleImage(run context.Context, ctx *pctx.Context, root stacks.RootStep,
 		tags = append(tags, name+":"+tag)
 	}
 	if cli.FlagBool(flags, "docker-load", ctx.Params.Bool("docker-load", false, "dockerLoad")) {
-		if err := loadImage(filepath.Join(output, "oci"), tags); err != nil {
+		if err := imageload.Load(filepath.Join(output, "oci"), tags, emit); err != nil {
 			return fail(CodeImageFailed, err)
 		}
 	}
@@ -620,31 +619,4 @@ func imageFiles(dir, prefix string, keep func(rel string) bool) ([]oci.File, err
 		return nil
 	})
 	return files, err
-}
-
-// loadImage loads the assembled image into the local Docker daemon under its
-// tags.
-func loadImage(layout string, tags []string) error {
-	archive, err := os.CreateTemp("", "putnami-ruby-image-*.tar")
-	if err != nil {
-		return err
-	}
-	_ = archive.Close()
-	defer func() { _ = os.Remove(archive.Name()) }()
-	if err := oci.WriteDockerTarball(layout, tags[0], archive.Name()); err != nil {
-		return err
-	}
-	load := exec.Command("docker", "load", "-i", archive.Name()) //nolint:gosec // fixed program, a path from CreateTemp
-	load.Stderr = os.Stderr
-	if err := load.Run(); err != nil {
-		return errors.New("docker load failed for " + tags[0])
-	}
-	for _, alias := range tags[1:] {
-		tag := exec.Command("docker", "tag", tags[0], alias) //nolint:gosec // fixed program
-		tag.Stderr = os.Stderr
-		if err := tag.Run(); err != nil {
-			return errors.New("docker tag failed for " + alias)
-		}
-	}
-	return nil
 }

@@ -7,7 +7,6 @@ require (
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
-	go.putnami.dev/protocol/runtime v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
 	go.putnami.dev/tooling/observe v0.0.0
@@ -23,6 +22,7 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	go.putnami.dev/protocol/oci v0.0.0 // indirect
 	go.putnami.dev/protocol/registry v0.0.0 // indirect
+	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 )
 

@@ -39,6 +39,22 @@ would write and changes nothing; `--apply` writes it.
 
 A project never runs both: no Putnami cache sits over moon's. Switching mode
 is a change to `options["@putnami/moon"].mode` and a `putnami projects sync`.
+A workspace that records no mode imports, as `init` does without a terminal;
+a value other than `import` or `delegate` fails the sync and the probe with
+`stacks.adoption_mode_invalid`.
+
+For each project moon runs, the sync also writes, as `filePatterns`, the root
+files every moon task reads: `.moon/workspace.yml`, `.moon/tasks.yml`,
+`.moon/tasks/**`, `.moon/toolchain.yml`, `.prototools`, and the root lockfile
+of each language moon runs (npm, pnpm, Yarn, Bun, Cargo, Go workspaces, uv,
+Poetry, Composer, Bundler) with `.npmrc` and `pnpm-workspace.yaml`, those the
+root holds. A change to one of them
+selects every such project, as moon's own hashes do. Each edge of a project
+moon runs is attributed to moon's project graph (`build-graph`), so
+`workspace.declared_edge` does not warn about it. A project imported into a
+language extension takes its edges' provenance from that extension: an edge
+moon states that its manifests do not, such as a TypeScript project's edge to
+a Rust one, is still reported as a declaration.
 
 ## Projects and tasks
 

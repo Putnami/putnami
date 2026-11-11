@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,11 +13,7 @@ import (
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/name"
-	"github.com/google/go-containerregistry/pkg/registry"
 	v1 "github.com/google/go-containerregistry/pkg/v1"
-	"github.com/google/go-containerregistry/pkg/v1/empty"
-	"github.com/google/go-containerregistry/pkg/v1/mutate"
-	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
@@ -29,6 +24,8 @@ import (
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/sdk/extension/pkgmeta"
+	"go.putnami.dev/tooling/stacks/stackstest"
+	"go.putnami.dev/tooling/stacks/stackstest/imagetest"
 )
 
 // stubDartCompile puts first on PATH a dart that logs its arguments, prints
@@ -39,7 +36,7 @@ func stubDartCompile(t *testing.T) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(bin, "dart.log")
-	writeFile(t, bin, "dart", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "dart", `#!/bin/sh
 echo "$PWD: dart $*" >> "`+log+`"
 if [ "$1" = --version ]; then echo "Dart SDK version: ${DART_STUB_VERSION:-3.8.0} (stable) (Wed May 14 09:07:14 2025 -0700) on \"linux_x64\""; exit 0; fi
 if [ "$1 $2" = "compile exe" ]; then
@@ -65,18 +62,18 @@ exit ${STUB_EXIT:-0}
 // beside it, and a Flutter app.
 func serverPackage(t *testing.T, root string) {
 	t.Helper()
-	writeFile(t, root, "server/pubspec.yaml", "name: server\nenvironment:\n  sdk: ^3.8.0\n")
-	writeFile(t, root, "server/pubspec.lock", "packages: {}\n")
-	writeFile(t, root, "server/lib/server.dart", "String greet() => 'hi';\n")
-	writeFile(t, root, "server/bin/server.dart", "void main() {}\n")
-	writeFile(t, root, "server/bin/migrate.dart", "void main() {}\n")
-	writeFile(t, root, "model/pubspec.yaml", "name: model\nenvironment:\n  sdk: ^3.8.0\n")
-	writeFile(t, root, "model/pubspec.lock", "packages: {}\n")
-	writeFile(t, root, "model/lib/model.dart", "class Model {}\n")
-	writeFile(t, root, "app/pubspec.yaml", "name: app\nenvironment:\n  sdk: ^3.8.0\n  flutter: \">=3.32.0\"\ndependencies:\n  flutter:\n    sdk: flutter\n")
-	writeFile(t, root, "app/pubspec.lock", "packages: {}\n")
-	writeFile(t, root, "app/lib/main.dart", "void main() {}\n")
-	writeFile(t, root, "app/bin/tool.dart", "void main() {}\n")
+	stackstest.WriteFile(t, root, "server/pubspec.yaml", "name: server\nenvironment:\n  sdk: ^3.8.0\n")
+	stackstest.WriteFile(t, root, "server/pubspec.lock", "packages: {}\n")
+	stackstest.WriteFile(t, root, "server/lib/server.dart", "String greet() => 'hi';\n")
+	stackstest.WriteFile(t, root, "server/bin/server.dart", "void main() {}\n")
+	stackstest.WriteFile(t, root, "server/bin/migrate.dart", "void main() {}\n")
+	stackstest.WriteFile(t, root, "model/pubspec.yaml", "name: model\nenvironment:\n  sdk: ^3.8.0\n")
+	stackstest.WriteFile(t, root, "model/pubspec.lock", "packages: {}\n")
+	stackstest.WriteFile(t, root, "model/lib/model.dart", "class Model {}\n")
+	stackstest.WriteFile(t, root, "app/pubspec.yaml", "name: app\nenvironment:\n  sdk: ^3.8.0\n  flutter: \">=3.32.0\"\ndependencies:\n  flutter:\n    sdk: flutter\n")
+	stackstest.WriteFile(t, root, "app/pubspec.lock", "packages: {}\n")
+	stackstest.WriteFile(t, root, "app/lib/main.dart", "void main() {}\n")
+	stackstest.WriteFile(t, root, "app/bin/tool.dart", "void main() {}\n")
 }
 
 // probeServer probes the packages serverPackage writes.
@@ -118,7 +115,7 @@ func TestPackageAssemblesTheImageOfAnAOTExecutable(t *testing.T) {
 	log := stubDartCompile(t)
 	root := tempDir(t)
 	serverPackage(t, root)
-	host, base := imageRegistry(t)
+	host, base := imagetest.Registry(t)
 
 	if status, err := runPackageJob(t, root, "server", PackageDockerJob(stack(t)), nil, "--docker-base-image", base); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
@@ -158,7 +155,7 @@ func TestPackageCompilesForTheArm64Platform(t *testing.T) {
 	log := stubDartCompile(t)
 	root := tempDir(t)
 	serverPackage(t, root)
-	host, base := imageRegistry(t)
+	host, base := imagetest.Registry(t)
 	if status, err := runPackageJob(t, root, "server", PackageDockerJob(stack(t)), job.Params{"platform": json.RawMessage(`"linux/arm64"`)}, "--docker-base-image", base); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
 	}
@@ -197,10 +194,10 @@ func assertImageLayout(t *testing.T, image v1.Image, executable, arch string) {
 		t.Errorf("platform = %s/%s, want linux/%s", config.OS, config.Architecture, arch)
 	}
 	c := config.Config
-	if c.User != imageUser || c.WorkingDir != imageAppDir || !slices.Equal(c.Entrypoint, []string{"/app/" + executable}) || !slices.Contains(c.Env, "PORT="+defaultImagePort) {
+	if c.User != imageUser || c.WorkingDir != imageAppDir || !slices.Equal(c.Entrypoint, []string{"/app/" + executable}) || !slices.Contains(c.Env, "PORT="+"8080") {
 		t.Errorf("config = %+v", c)
 	}
-	if _, ok := c.ExposedPorts[defaultImagePort+"/tcp"]; !ok {
+	if _, ok := c.ExposedPorts["8080"+"/tcp"]; !ok {
 		t.Errorf("the image exposes %v", c.ExposedPorts)
 	}
 }
@@ -233,7 +230,7 @@ func TestPackageCompilesTheEntrypointServeStarts(t *testing.T) {
 	spectest.Proves(t, feature, "chooses-the-entrypoint", "package-compiles-the-entrypoint-serve-starts")
 	dir := tempDir(t)
 	for _, f := range []string{"bin/server.dart", "bin/shop.dart", "bin/migrate.dart", "tool/serve.dart"} {
-		writeFile(t, dir, f, "void main() {}\n")
+		stackstest.WriteFile(t, dir, f, "void main() {}\n")
 	}
 	remove := func(rel string) {
 		if err := os.Remove(filepath.Join(dir, rel)); err != nil {
@@ -275,7 +272,7 @@ func TestPackageCompilesTheEntrypointServeStarts(t *testing.T) {
 	log := stubDartCompile(t)
 	root := tempDir(t)
 	serverPackage(t, root)
-	_, base := imageRegistry(t)
+	_, base := imagetest.Registry(t)
 	if status, err := runPackageJob(t, root, "server", PackageDockerJob(stack(t)), job.Params{"entrypoint": json.RawMessage(`"bin/migrate.dart"`)}, "--docker-base-image", base); status != "OK" || err != nil {
 		t.Fatalf("package: %s %v", status, err)
 	}
@@ -285,7 +282,7 @@ func TestPackageCompilesTheEntrypointServeStarts(t *testing.T) {
 	if err := os.Remove(filepath.Join(root, "server/bin/server.dart")); err != nil {
 		t.Fatal(err)
 	}
-	writeFile(t, root, "server/bin/seed.dart", "void main() {}\n")
+	stackstest.WriteFile(t, root, "server/bin/seed.dart", "void main() {}\n")
 	status, err := runPackageJob(t, root, "server", PackageDockerJob(stack(t)), nil, "--dry-run")
 	if status != "FAILED" || err == nil || !strings.Contains(err.Error(), CodeNoEntrypoint) {
 		t.Errorf("several executables and no bin/server.dart: %s %v", status, err)
@@ -297,7 +294,7 @@ func TestPackageRefusesAnOldSDKAPlatformAndAnUnpinnedBase(t *testing.T) {
 	log := stubDartCompile(t)
 	root := tempDir(t)
 	serverPackage(t, root)
-	_, base := imageRegistry(t)
+	_, base := imagetest.Registry(t)
 	for name, c := range map[string]struct {
 		version string
 		args    []string
@@ -310,8 +307,10 @@ func TestPackageRefusesAnOldSDKAPlatformAndAnUnpinnedBase(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if c.version != "" {
 				t.Setenv("DART_STUB_VERSION", c.version)
-				writeFile(t, root, "server/pubspec.yaml", "name: server\nenvironment:\n  sdk: ^3.7.0\n")
-				t.Cleanup(func() { writeFile(t, root, "server/pubspec.yaml", "name: server\nenvironment:\n  sdk: ^3.8.0\n") })
+				stackstest.WriteFile(t, root, "server/pubspec.yaml", "name: server\nenvironment:\n  sdk: ^3.7.0\n")
+				t.Cleanup(func() {
+					stackstest.WriteFile(t, root, "server/pubspec.yaml", "name: server\nenvironment:\n  sdk: ^3.8.0\n")
+				})
 			}
 			status, err := runPackageJob(t, root, "server", PackageDockerJob(stack(t)), nil, c.args...)
 			if status != "FAILED" || err == nil || !strings.Contains(err.Error(), c.code) {
@@ -371,7 +370,7 @@ func TestALibraryOrAFlutterPackageNeitherPackagesNorPublishes(t *testing.T) {
 func TestAnApplicationThatPublishesAnImageIsAReleaseSetMember(t *testing.T) {
 	root := tempDir(t)
 	serverPackage(t, root)
-	writeFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme/apps"}}}`)
+	stackstest.WriteFile(t, root, "putnami.workspace.json", `{"registries": {"oci": {"publish": "ghcr.io/acme/apps"}}}`)
 	members := func() map[string]string {
 		out := map[string]string{}
 		for path, p := range probeServer(t, root) {
@@ -397,51 +396,11 @@ func TestAnApplicationThatPublishesAnImageIsAReleaseSetMember(t *testing.T) {
 		t.Errorf("an application that publishes no image is a member: %v", got)
 	}
 	for _, rel := range []string{"server", "model", "app"} {
-		writeFile(t, root, rel+"/putnami.json", `{"options": {"publish": {"docker": true}}}`)
+		stackstest.WriteFile(t, root, rel+"/putnami.json", `{"options": {"publish": {"docker": true}}}`)
 	}
 	if got := members(); len(got) != 1 || got["server"] != "oci:acme/apps/server" {
 		t.Errorf("members = %v", got)
 	}
-}
-
-// imageRegistry starts a registry double holding a two-platform base image, and
-// answers its host and the digest reference of the base.
-func imageRegistry(t *testing.T) (string, string) {
-	t.Helper()
-	server := httptest.NewServer(registry.New())
-	t.Cleanup(server.Close)
-	host := strings.TrimPrefix(server.URL, "http://")
-	var addenda []mutate.IndexAddendum
-	for _, arch := range []string{"amd64", "arm64"} {
-		image, err := random.Image(256, 1)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// Each image of the base names its platform, as a distroless one does.
-		config, err := image.ConfigFile()
-		if err != nil {
-			t.Fatal(err)
-		}
-		config = config.DeepCopy()
-		config.OS, config.Architecture = "linux", arch
-		if image, err = mutate.ConfigFile(image, config); err != nil {
-			t.Fatal(err)
-		}
-		addenda = append(addenda, mutate.IndexAddendum{Add: image, Descriptor: v1.Descriptor{Platform: &v1.Platform{OS: "linux", Architecture: arch}}})
-	}
-	index := mutate.AppendManifests(empty.Index, addenda...)
-	reference, err := name.ParseReference(host + "/base:latest")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := remote.WriteIndex(reference, index); err != nil {
-		t.Fatal(err)
-	}
-	digest, err := index.Digest()
-	if err != nil {
-		t.Fatal(err)
-	}
-	return host, host + "/base@" + digest.String()
 }
 
 func remoteImage(t *testing.T, reference string) v1.Image {

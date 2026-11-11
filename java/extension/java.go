@@ -50,7 +50,7 @@ func Stack() (stacks.Stack, error) {
 	if err != nil {
 		return stacks.Stack{}, fmt.Errorf("profile.json: %w", err)
 	}
-	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Provide: Provide, Step: Step, MatchVersion: MatchVersion}, nil
+	return stacks.Stack{Extension: ExtensionName, Profile: profile, Detect: Detect, Provide: Provide, Env: Env, Step: Step, MatchVersion: MatchVersion}, nil
 }
 
 // Step adapts a step of a component's task to its build: a Gradle step runs

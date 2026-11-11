@@ -226,6 +226,10 @@
           "type": "number",
           "default": 3000,
           "description": "Port for the server"
+        },
+        "args": {
+          "type": "string",
+          "description": "Arguments passed to the server program"
         }
       },
       "run": [
@@ -305,6 +309,11 @@
           "type": "boolean",
           "default": false,
           "description": "Plan the image without assembling it"
+        },
+        "port": {
+          "type": "number",
+          "default": 8080,
+          "description": "Port the image exposes and sets as PORT"
         }
       },
       "run": [

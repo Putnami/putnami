@@ -100,7 +100,9 @@ end
 
 The test task reads the JUnit report and `coverage/coverage.xml` at the stack
 root into the test and coverage summary. A failed case, a step that exits
-non-zero, or a missing report fails the task. The coverage summary counts
+non-zero, or a missing JUnit report fails the task. A bundle that does not set
+up SimpleCov writes no coverage report: the task passes with the warning
+`stacks.coverage_unavailable` and no coverage. The coverage summary counts
 only the component's own files: those under its directory, outside a nested
 pack or gem. A covered file in no component is left out with the warning
 `stacks.coverage_unmapped`. The tasks of the components of one stack root
@@ -170,7 +172,7 @@ that makes it a Rack application. Any other component is a library. `serve`,
 
 | Command | What it runs |
 |---|---|
-| `putnami serve <project>` | `bundle exec rails server -b 0.0.0.0 -p <port>` in the project directory when it holds `bin/rails`, else `bundle exec rackup -o 0.0.0.0 -p <port>`. `--port` defaults to 3000, and 0 selects a free port; the port is also in `PORT`. It reports the server ready once the port accepts connections, so `putnami qualify` and compose can wait on it. It runs in the development environment. |
+| `putnami serve <project>` | `bundle exec rails server -b 0.0.0.0 -p <port>`, followed by the words of `--args`, in the project directory when it holds `bin/rails`, else `bundle exec rackup -o 0.0.0.0 -p <port>`. `--port` defaults to 3000, and 0 selects a free port; the port is also in `PORT`. It reports the server ready once the port accepts connections, so `putnami qualify` and compose can wait on it. It runs in the development environment. |
 | `putnami run <project> --args "<arguments>"` | `bundle exec ruby <entrypoint> <arguments>` in the project directory, and exits with its exit code. `--entrypoint` defaults to `bin/rails`, so `--args "db:migrate"` runs a Rails command. |
 
 Both run the install step first, with the Ruby the toolchain check selects.
@@ -198,7 +200,7 @@ through the shared publisher of the Go and TypeScript extensions.
 | Writable directories | `tmp/`, `tmp/cache`, `tmp/pids`, `tmp/sockets` and `log/`, owned by the image's user |
 
 The image runs as the user `65534:65534`, for whom `/app` is read-only but
-`tmp/` and `log/`. It listens on `PORT`, 8080 by default, with `RAILS_ENV` and
+`tmp/` and `log/`. It listens on `PORT`, `--port`, 8080 by default, with `RAILS_ENV` and
 `RACK_ENV` set to `production`, `RAILS_LOG_TO_STDOUT=1` and
 `RAILS_SERVE_STATIC_FILES=1`. Its command is `bundle exec rails server` on
 `$PORT` when the application holds `bin/rails`, else `bundle exec rackup`. A

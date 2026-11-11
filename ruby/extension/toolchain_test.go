@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 func resolved(t *testing.T, root, platform, committed string) *wsproto.LockToolchainEntry {
@@ -20,7 +21,7 @@ func resolved(t *testing.T, root, platform, committed string) *wsproto.LockToolc
 	if committed != "" {
 		request.Locked = map[string]wsproto.LockToolchainEntry{LockIdentity: {Version: committed}}
 	}
-	result := answerToolchainResolve(root, request, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(root, request, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if resolution, ok := result.Toolchains[LockIdentity]; ok {
 		return resolution.Pin
 	}
@@ -57,12 +58,12 @@ func TestTheExtensionPinsARubyReleaseTheRepositoryAccepts(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			root := t.TempDir()
-			writeFile(t, root, "Gemfile", "source \"https://rubygems.org\"\n")
+			stackstest.WriteFile(t, root, "Gemfile", "source \"https://rubygems.org\"\n")
 			if c.rubyVersion != "" {
-				writeFile(t, root, ".ruby-version", c.rubyVersion)
+				stackstest.WriteFile(t, root, ".ruby-version", c.rubyVersion)
 			}
 			if c.toolVersions != "" {
-				writeFile(t, root, ".tool-versions", c.toolVersions)
+				stackstest.WriteFile(t, root, ".tool-versions", c.toolVersions)
 			}
 			if got := version(resolved(t, root, "linux/amd64", c.committed)); got != c.want {
 				t.Errorf("pin = %s, want %s", got, c.want)
@@ -71,27 +72,27 @@ func TestTheExtensionPinsARubyReleaseTheRepositoryAccepts(t *testing.T) {
 	}
 
 	nested := t.TempDir()
-	writeFile(t, nested, "Gemfile", "source \"https://rubygems.org\"\n")
-	writeFile(t, nested, "gems/billing/billing.gemspec", "Gem::Specification.new { |s| s.name = \"billing\" }\n")
-	writeFile(t, nested, "gems/billing/.ruby-version", "3.3\n")
+	stackstest.WriteFile(t, nested, "Gemfile", "source \"https://rubygems.org\"\n")
+	stackstest.WriteFile(t, nested, "gems/billing/billing.gemspec", "Gem::Specification.new { |s| s.name = \"billing\" }\n")
+	stackstest.WriteFile(t, nested, "gems/billing/.ruby-version", "3.3\n")
 	if got := version(resolved(t, nested, "linux/amd64", "")); got != "3.3.13" {
 		t.Errorf("a component's statement narrows the pin: %s", got)
 	}
-	writeFile(t, nested, "gems/ledger/ledger.gemspec", "Gem::Specification.new { |s| s.name = \"ledger\" }\n")
-	writeFile(t, nested, "gems/ledger/.ruby-version", "3.4\n")
+	stackstest.WriteFile(t, nested, "gems/ledger/ledger.gemspec", "Gem::Specification.new { |s| s.name = \"ledger\" }\n")
+	stackstest.WriteFile(t, nested, "gems/ledger/.ruby-version", "3.4\n")
 	if got := version(resolved(t, nested, "linux/amd64", "")); got != "4.0.9" {
 		t.Errorf("components with no common release leave the root's choice: %s", got)
 	}
 
 	none := t.TempDir()
-	writeFile(t, none, "vendor/bundle/ruby/3.4.0/gems/rake/Gemfile", "source \"https://rubygems.org\"\n")
-	writeFile(t, none, "README.md", "# No Ruby\n")
+	stackstest.WriteFile(t, none, "vendor/bundle/ruby/3.4.0/gems/rake/Gemfile", "source \"https://rubygems.org\"\n")
+	stackstest.WriteFile(t, none, "README.md", "# No Ruby\n")
 	if pin := resolved(t, none, "linux/amd64", ""); pin != nil {
 		t.Errorf("a workspace with no Ruby component pins nothing: %v", pin.Version)
 	}
 
 	root := t.TempDir()
-	writeFile(t, root, "Gemfile", "source \"https://rubygems.org\"\n")
+	stackstest.WriteFile(t, root, "Gemfile", "source \"https://rubygems.org\"\n")
 	for _, platform := range []string{"windows/amd64", "windows/arm64", "linux/riscv64"} {
 		if pin := resolved(t, root, platform, ""); pin != nil {
 			t.Errorf("%s has no archive and pins nothing: %v", platform, pin.Version)
@@ -176,7 +177,7 @@ func olderThan(a, b string) bool {
 }
 
 func TestToolchainResolveRefusesAnIdentityItDoesNotPin(t *testing.T) {
-	result := answerToolchainResolve(t.TempDir(), wsproto.ToolchainResolveRequest{Identities: []string{"go"}, Platform: "linux/amd64"}, stack(t).Profile)
+	result := stacks.AnswerToolchainResolve(t.TempDir(), wsproto.ToolchainResolveRequest{Identities: []string{"go"}, Platform: "linux/amd64"}, ExtensionName, LockIdentity, pinResolver(stack(t).Profile))
 	if result.Toolchains["go"].Problem == nil {
 		t.Errorf("another identity is a problem: %+v", result)
 	}
@@ -187,8 +188,8 @@ func TestATaskUsesTheProvisionedRubyOnlyWhenTheMachineRubyIsUnusable(t *testing.
 	root := fixture(t)
 	pinnedDir := t.TempDir()
 	used := filepath.Join(pinnedDir, "used")
-	writeFile(t, pinnedDir, "ruby", "#!/bin/sh\necho 'ruby 3.3.6 (2024-11-05 revision 75015d4c1f) [x86_64-linux]'\n")
-	writeFile(t, pinnedDir, "bundle", `#!/bin/sh
+	stackstest.WriteFile(t, pinnedDir, "ruby", "#!/bin/sh\necho 'ruby 3.3.6 (2024-11-05 revision 75015d4c1f) [x86_64-linux]'\n")
+	stackstest.WriteFile(t, pinnedDir, "bundle", `#!/bin/sh
 if [ "$1" = "--version" ]; then echo 'Bundler version 2.5.22'; exit 0; fi
 echo "$PWD: bundle $*" >> "`+used+`"
 `)

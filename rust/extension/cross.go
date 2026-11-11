@@ -89,7 +89,7 @@ var provideCompiler = func(ctx context.Context, expected stacks.Expected, target
 			return compiler{}, err
 		}
 	}
-	base, release, err := lockedHome()
+	base, release, err := stacks.LockedToolsHome("rust")
 	if err != nil {
 		return compiler{}, err
 	}
@@ -137,8 +137,8 @@ var provideCompiler = func(ctx context.Context, expected stacks.Expected, target
 	bin := filepath.Join(toolchain, "bin")
 	// The first directory wins: this cargo and rustc, whatever the machine has.
 	return compiler{
-		cargo:    filepath.Join(bin, "cargo"+executableSuffix()),
-		zigbuild: filepath.Join(dirs["cargo-zigbuild"], "cargo-zigbuild"+executableSuffix()),
+		cargo:    filepath.Join(bin, "cargo"+stacks.ExecutableSuffix(hostPlatform)),
+		zigbuild: filepath.Join(dirs["cargo-zigbuild"], "cargo-zigbuild"+stacks.ExecutableSuffix(hostPlatform)),
 		env:      prependPath(append(withoutRustupEnv(env), provided.Env...), bin, dirs["cargo-zigbuild"], dirs["zig"]),
 	}, nil
 }
@@ -148,7 +148,7 @@ var provideCompiler = func(ctx context.Context, expected stacks.Expected, target
 func provideCrossTool(ctx context.Context, base string, t crossTool, offline bool, info func(string)) (string, error) {
 	dest := filepath.Join(base, t.name+"-"+t.version)
 	subdir := filepath.FromSlash(t.subdir)
-	binary := filepath.Join(subdir, t.binary+executableSuffix())
+	binary := filepath.Join(subdir, t.binary+stacks.ExecutableSuffix(hostPlatform))
 	if _, err := os.Stat(filepath.Join(dest, binary)); err == nil {
 		return filepath.Join(dest, subdir), nil
 	}

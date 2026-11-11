@@ -39,7 +39,7 @@
       "inputs": ["project", "projects", "packages", "buildOutputs"],
       "reports": {
         "trx": ["{output}/*.trx"],
-        "coverage": [{ "format": "cobertura", "paths": ["{output}/*/coverage.cobertura.xml"] }]
+        "coverage": [{ "format": "cobertura", "paths": ["{output}/*/coverage.cobertura.xml"], "optional": true, "warnWhenMissing": true }]
       }
     },
     "build": {

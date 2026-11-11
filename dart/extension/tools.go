@@ -58,7 +58,7 @@ func Tools(ctx context.Context, task string, meta stacks.Metadata, env []string,
 	if err != nil {
 		return nil, err
 	}
-	base, release, err := lockedHome()
+	base, release, err := stacks.LockedToolsHome("dart")
 	if err != nil {
 		return nil, err
 	}

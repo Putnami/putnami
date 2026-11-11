@@ -21,17 +21,6 @@ import (
 
 const feature = "dotnet/stack-extension"
 
-func writeFile(t *testing.T, root, rel, content string) {
-	t.Helper()
-	p := filepath.Join(root, filepath.FromSlash(rel))
-	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(p, []byte(content), 0o644); err != nil {
-		t.Fatal(err)
-	}
-}
-
 const library = `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup>
 </Project>
@@ -43,20 +32,20 @@ const library = `<Project Sdk="Microsoft.NET.Sdk">
 func fixture(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
-	writeFile(t, root, "Demo.sln", "\xef\xbb\xbf\r\nMicrosoft Visual Studio Solution File, Format Version 12.00\r\n"+
+	stackstest.WriteFile(t, root, "Demo.sln", "\xef\xbb\xbf\r\nMicrosoft Visual Studio Solution File, Format Version 12.00\r\n"+
 		`Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pricing", "src\Pricing\Pricing.csproj", "{B2F797C7-2016-4B69-917D-114309AF047B}"`+"\r\nEndProject\r\n"+
 		`Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Api", "src\Api\Api.csproj", "{07D2D3BD-60A9-4733-899B-9054A2707FC4}"`+"\r\nEndProject\r\n"+
 		`Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Pricing.Tests", "tests\Pricing.Tests\Pricing.Tests.csproj", "{33A27E1E-B1F2-4215-9EEB-EBA57D2B14F6}"`+"\r\nEndProject\r\nGlobal\r\nEndGlobal\r\n")
-	writeFile(t, root, "global.json", `{"sdk": {"version": "8.0.100", "rollForward": "latestFeature"}}`)
-	writeFile(t, root, "Directory.Build.props", `<Project><PropertyGroup><Nullable>enable</Nullable></PropertyGroup></Project>`)
-	writeFile(t, root, "src/Pricing/Pricing.csproj", library)
-	writeFile(t, root, "src/Pricing/Calculator.cs", "namespace Pricing;\npublic static class Calculator { public static int Add(int a, int b) => a + b; }\n")
-	writeFile(t, root, "src/Api/Api.csproj", `<Project Sdk="Microsoft.NET.Sdk">
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "8.0.100", "rollForward": "latestFeature"}}`)
+	stackstest.WriteFile(t, root, "Directory.Build.props", `<Project><PropertyGroup><Nullable>enable</Nullable></PropertyGroup></Project>`)
+	stackstest.WriteFile(t, root, "src/Pricing/Pricing.csproj", library)
+	stackstest.WriteFile(t, root, "src/Pricing/Calculator.cs", "namespace Pricing;\npublic static class Calculator { public static int Add(int a, int b) => a + b; }\n")
+	stackstest.WriteFile(t, root, "src/Api/Api.csproj", `<Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup><ProjectReference Include="..\Pricing\Pricing.csproj" /></ItemGroup>
 </Project>
 `)
-	writeFile(t, root, "src/Api/Quote.cs", "namespace Api;\npublic static class Quote { public static int Of(int a) => Pricing.Calculator.Add(a, 1); }\n")
-	writeFile(t, root, "tests/Pricing.Tests/Pricing.Tests.csproj", `<Project Sdk="Microsoft.NET.Sdk">
+	stackstest.WriteFile(t, root, "src/Api/Quote.cs", "namespace Api;\npublic static class Quote { public static int Of(int a) => Pricing.Calculator.Add(a, 1); }\n")
+	stackstest.WriteFile(t, root, "tests/Pricing.Tests/Pricing.Tests.csproj", `<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup><TargetFramework>net8.0</TargetFramework><IsTestProject>true</IsTestProject></PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.6.0" />
@@ -65,7 +54,7 @@ func fixture(t *testing.T) string {
   <ItemGroup><ProjectReference Include="..\..\src\Pricing\Pricing.csproj" /></ItemGroup>
 </Project>
 `)
-	writeFile(t, root, "tests/Pricing.Tests/CalculatorTest.cs", "namespace Pricing.Tests;\npublic class CalculatorTest {}\n")
+	stackstest.WriteFile(t, root, "tests/Pricing.Tests/CalculatorTest.cs", "namespace Pricing.Tests;\npublic class CalculatorTest {}\n")
 	return root
 }
 
@@ -160,8 +149,8 @@ func stubDotnet(t *testing.T, versions, trx string) string {
 	isolateSDKs(t)
 	bin := t.TempDir()
 	log := filepath.Join(bin, "dotnet.log")
-	writeFile(t, bin, "trx.xml", trx)
-	writeFile(t, bin, "dotnet", `#!/bin/sh
+	stackstest.WriteFile(t, bin, "trx.xml", trx)
+	stackstest.WriteFile(t, bin, "dotnet", `#!/bin/sh
 tool=dotnet
 `+startedRecord(log)+`set -- "$@"
 selected="$(echo "`+versions+`" | cut -d' ' -f1)"
@@ -176,10 +165,13 @@ if [ "$1" = "test" ]; then
   for a in "$@"; do
     if [ "$prev" = "--results-directory" ]; then
       mkdir -p "$a/3f6c0e9a-run" "$a/_vm_2026-11-08/In/vm"
+      [ -n "$STUB_NO_TRX" ] && exit 0
       cp "`+filepath.Join(bin, "trx.xml")+`" "$a/_vm_2026-11-08.trx"
       covered="$(cd "$PWD/../../src/Pricing" && pwd)/Calculator.cs"
-      printf '<coverage line-rate="0.5"><sources><source>/</source></sources><packages><package name="Pricing"><classes><class name="Pricing.Calculator" filename="%s"><lines><line number="1" hits="1"/><line number="2" hits="0"/></lines></class></classes></package></packages></coverage>' "${covered#/}" > "$a/3f6c0e9a-run/coverage.cobertura.xml"
-      cp "$a/3f6c0e9a-run/coverage.cobertura.xml" "$a/_vm_2026-11-08/In/vm/coverage.cobertura.xml"
+      if [ -z "$STUB_NO_COVERAGE" ]; then
+        printf '<coverage line-rate="0.5"><sources><source>/</source></sources><packages><package name="Pricing"><classes><class name="Pricing.Calculator" filename="%s"><lines><line number="1" hits="1"/><line number="2" hits="0"/></lines></class></classes></package></packages></coverage>' "${covered#/}" > "$a/3f6c0e9a-run/coverage.cobertura.xml"
+        cp "$a/3f6c0e9a-run/coverage.cobertura.xml" "$a/_vm_2026-11-08/In/vm/coverage.cobertura.xml"
+      fi
     fi
     prev="$a"
   done
@@ -242,7 +234,7 @@ func TestATaskRunsTheDotnetStepsOnTheProjectFileAfterTheSDKCheck(t *testing.T) {
 	spectest.Proves(t, feature, "tasks-run-the-profile", "a-task-runs-the-dotnet-steps-on-the-project-file-after-the-sdk-check")
 	root := fixture(t)
 	// A folder that holds a solution beside its project needs the file named.
-	writeFile(t, root, "src/Api/Api.sln", "")
+	stackstest.WriteFile(t, root, "src/Api/Api.sln", "")
 	log := stubDotnet(t, "8.0.404", trxPass)
 	for _, task := range []string{stacks.TaskLint, stacks.TaskBuild} {
 		if status, _, _, err := runJob(t, root, "src/Api", task); status != "OK" || err != nil {
@@ -276,7 +268,7 @@ func TestATaskRunsTheDotnetStepsOnTheProjectFileAfterTheSDKCheck(t *testing.T) {
 	if status, _, _, err := runJob(t, root, "src/Api", stacks.TaskBuild); status != "FAILED" || err == nil || err.Error() != stacks.CodeToolchainMismatch {
 		t.Errorf("no SDK satisfies global.json: %s %v", status, err)
 	}
-	writeFile(t, root, "src/Api/putnami.json", `{"options": {"@putnami/dotnet": {"toolchain": {"check": "warn"}}}}`)
+	stackstest.WriteFile(t, root, "src/Api/putnami.json", `{"options": {"@putnami/dotnet": {"toolchain": {"check": "warn"}}}}`)
 	if status, _, _, err := runJob(t, root, "src/Api", stacks.TaskBuild); status != "OK" || err != nil {
 		t.Errorf("warn relaxes it: %s %v", status, err)
 	}
@@ -299,9 +291,9 @@ func TestAProjectThatIsNoTestProjectRunsNoTest(t *testing.T) {
 	}
 
 	// A project file denies what the nearest Directory.Build.props states.
-	writeFile(t, root, "tests/Directory.Build.props", `<Project><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /></ItemGroup></Project>`)
-	writeFile(t, root, "tests/Helpers/Helpers.csproj", `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><IsTestProject>false</IsTestProject></PropertyGroup></Project>`)
-	writeFile(t, root, "tests/Api.Tests/Api.Tests.csproj", library)
+	stackstest.WriteFile(t, root, "tests/Directory.Build.props", `<Project><ItemGroup><PackageReference Include="Microsoft.NET.Test.Sdk" /></ItemGroup></Project>`)
+	stackstest.WriteFile(t, root, "tests/Helpers/Helpers.csproj", `<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><IsTestProject>false</IsTestProject></PropertyGroup></Project>`)
+	stackstest.WriteFile(t, root, "tests/Api.Tests/Api.Tests.csproj", library)
 	s := stack(t)
 	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"tests/Api.Tests", "tests/Helpers"}})
 	if err != nil {
@@ -340,13 +332,22 @@ func TestTRXAndCoberturaBecomeTheTestAndCoverageSummary(t *testing.T) {
 		t.Errorf("test ran\n%s\nwant %q", ran, want)
 	}
 
+	// A test project with no Coverlet collector writes no Cobertura report: it
+	// passes, with no coverage.
+	t.Setenv("STUB_NO_COVERAGE", "1")
+	stubDotnet(t, "8.0.404", trxPass)
+	if status, data, _, err := runJob(t, root, "tests/Pricing.Tests", stacks.TaskTest); status != "OK" || err != nil || data["coverageSummary"] != nil || data["testSummary"].(map[string]any)["passed"] != 2 {
+		t.Errorf("no Cobertura report: %s %v %v", status, err, data)
+	}
+	t.Setenv("STUB_NO_COVERAGE", "")
+
 	stubDotnet(t, "8.0.404", trxFail)
 	if status, data, _, err := runJob(t, root, "tests/Pricing.Tests", stacks.TaskTest); status != "FAILED" || err == nil || data["testSummary"].(map[string]any)["failed"] != 1 {
 		t.Errorf("a failed case fails the task: %s %v %v", status, err, data)
 	}
 
 	// A test step that writes no report fails: it ran nothing.
-	writeFile(t, root, "tests/Pricing.Tests/putnami.json", `{"options": {"@putnami/dotnet": {"tasks": {"test": {"steps": [["dotnet", "build", "{manifest}"]]}}}}}`)
+	stackstest.WriteFile(t, root, "tests/Pricing.Tests/putnami.json", `{"options": {"@putnami/dotnet": {"tasks": {"test": {"steps": [["dotnet", "build", "{manifest}"]]}}}}}`)
 	if status, _, _, err := runJob(t, root, "tests/Pricing.Tests", stacks.TaskTest); status != "FAILED" || err == nil {
 		t.Errorf("a test that writes no report fails: %s %v", status, err)
 	}
@@ -374,7 +375,7 @@ func TestTheSDKCheckAppliesTheGlobalJSONRollForwardPolicy(t *testing.T) {
 		if policy != "" {
 			doc = `{"sdk": {"version": "8.0.400", "rollForward": "` + policy + `"}}`
 		}
-		writeFile(t, root, "global.json", doc)
+		stackstest.WriteFile(t, root, "global.json", doc)
 		for machine, want := range machines {
 			if got := MatchSDK(root, expected, machine); got != want {
 				t.Errorf("rollForward %q: MatchSDK(8.0.400, %s) = %v, want %v", policy, machine, got, want)
@@ -389,12 +390,12 @@ func TestTheSDKCheckAppliesTheGlobalJSONRollForwardPolicy(t *testing.T) {
 		t.Errorf("a version that is no SDK version matches only itself")
 	}
 	// A prerelease orders below its release, and its identifiers in order.
-	writeFile(t, root, "global.json", `{"sdk": {"version": "9.0.100-rc.1.24452.12", "rollForward": "disable"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "9.0.100-rc.1.24452.12", "rollForward": "disable"}}`)
 	rc := stacks.Expected{Version: "9.0.100-rc.1.24452.12", Source: "global.json"}
 	if MatchSDK(root, rc, "9.0.100-rc.2.24474.11") || !MatchSDK(root, rc, "9.0.100-rc.1.24452.12") {
 		t.Errorf("disable needs the same prerelease")
 	}
-	writeFile(t, root, "global.json", `{"sdk": {"version": "9.0.100-rc.1.24452.12"}}`)
+	stackstest.WriteFile(t, root, "global.json", `{"sdk": {"version": "9.0.100-rc.1.24452.12"}}`)
 	for machine, want := range map[string]bool{"9.0.100-rc.2.24474.11": true, "9.0.100": true, "9.0.100-preview.7.24407.12": false, "9.0.100-rc.1.24452.9": false, "9.0.100-rc.1": false} {
 		if got := MatchSDK(root, rc, machine); got != want {
 			t.Errorf("MatchSDK(%s, %s) = %v, want %v", rc.Version, machine, got, want)
@@ -423,7 +424,7 @@ func TestBuildOutputsAndTestSettingsStayOutOfTheLintInputs(t *testing.T) {
 		"TestResults/run/coverage.cobertura.xml", "Nested/obj/Gen.g.cs", "node_modules/pkg/index.cs",
 		".gen/version.json", ".vs/Pricing/v17/.suo", ".idea/workspace.xml", ".vscode/settings.json", ".DS_Store", "Pricing.Tests.sln.DotSettings.user",
 	} {
-		writeFile(t, root, "tests/Pricing.Tests/"+f, "generated")
+		stackstest.WriteFile(t, root, "tests/Pricing.Tests/"+f, "generated")
 	}
 	for f, content := range map[string]string{
 		"coverlet.runsettings": "<RunSettings/>", "xunit.runner.json": "{}", "packages.lock.json": "{}",
@@ -431,7 +432,7 @@ func TestBuildOutputsAndTestSettingsStayOutOfTheLintInputs(t *testing.T) {
 		"TestData/prices.json": "[]", "Snapshots/Quote.verified.txt": "", "Migrations/.editorconfig": "root = false",
 		"BannedSymbols.txt": "", "Pricing.globalconfig": "is_global = true",
 	} {
-		writeFile(t, root, "tests/Pricing.Tests/"+f, content)
+		stackstest.WriteFile(t, root, "tests/Pricing.Tests/"+f, content)
 	}
 	s := stack(t)
 
@@ -469,6 +470,7 @@ func TestBuildOutputsAndTestSettingsStayOutOfTheLintInputs(t *testing.T) {
 func TestTheManifestConformsToTheStackCore(t *testing.T) {
 	spectest.Proves(t, feature, "manifest-follows-the-profile", "the-manifest-conforms-to-the-stack-core")
 	stackstest.CheckManifest(t, "putnami.extension.json", stack(t))
+	stackstest.CheckSurface(t, "putnami.extension.json")
 	if got := stack(t).Selectors(); !slices.Equal(got, []string{"dotnet:build", "dotnet:lint", "dotnet:test"}) {
 		t.Errorf("selectors = %v", got)
 	}

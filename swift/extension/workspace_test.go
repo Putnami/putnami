@@ -13,6 +13,7 @@ import (
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/tooling/stacks"
+	"go.putnami.dev/tooling/stacks/stackstest"
 )
 
 // runWorkspaceJob runs a workspace job over the demo's three components.
@@ -57,7 +58,7 @@ func TestInstallAndUpgradeRunAtEachComponent(t *testing.T) {
 	if status, err := runWorkspaceJob(t, root, install, nil); status != "OK" || err != nil || strings.Contains(s.ran(t), "package resolve") {
 		t.Errorf("a current package is not resolved again: %s %v %s", status, err, s.ran(t))
 	}
-	writeFile(t, root, "Packages/Networking/Package.resolved", `{"pins": [], "version": 3}`)
+	stackstest.WriteFile(t, root, "Packages/Networking/Package.resolved", `{"pins": [], "version": 3}`)
 	if status, err := runWorkspaceJob(t, root, install, nil); status != "OK" || err != nil || strings.Count(s.ran(t), "package resolve") != 1 {
 		t.Errorf("a changed Package.resolved resolves its package: %s %v %s", status, err, s.ran(t))
 	}
@@ -92,7 +93,7 @@ func TestAFailedResolveNamesItsComponent(t *testing.T) {
 	stubTools(t)
 	// A swift that exits non-zero on any package command.
 	bin := t.TempDir()
-	writeFile(t, bin, "swift", "#!/bin/sh\ncase \"$1\" in --version) echo 'Apple Swift version 6.0.2';; *) exit 3;; esac\n")
+	stackstest.WriteFile(t, bin, "swift", "#!/bin/sh\ncase \"$1\" in --version) echo 'Apple Swift version 6.0.2';; *) exit 3;; esac\n")
 	if err := os.Chmod(filepath.Join(bin, "swift"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -126,19 +127,19 @@ func TestTheTestFilterReachesSwiftTestAndXcodebuild(t *testing.T) {
 	if status != "OK" || err != nil || summary(t, data, "testSummary")["total"] != 0 {
 		t.Errorf("a filter that selects nothing passes: %s %v %v", status, err, data)
 	}
-	writeFile(t, root, "App/.xcode-version", "16.1\n")
+	stackstest.WriteFile(t, root, "App/.xcode-version", "16.1\n")
 	status, _, _, err = runJobWith(t, root, "App", stacks.TaskTest, test, job.Params{"test": json.RawMessage(`"ShopTests/CheckoutTests"`)})
 	if status != "OK" || err != nil || !strings.Contains(s.ran(t), "-only-testing:ShopTests/CheckoutTests CODE_SIGNING_ALLOWED=NO") {
 		t.Errorf("the filter reaches xcodebuild: %s %v %s", status, err, s.ran(t))
 	}
 	// An override whose last step is another program gets no filter, and a
 	// filter after "--" in a swiftpm-test step still passes an empty run.
-	writeFile(t, root, "Packages/Networking/putnami.json", `{"options": {"@putnami/swift": {"tasks": {"test": {"steps": [["swift", "build", "--force-resolved-versions"]], "reports": null}}}}}`)
+	stackstest.WriteFile(t, root, "Packages/Networking/putnami.json", `{"options": {"@putnami/swift": {"tasks": {"test": {"steps": [["swift", "build", "--force-resolved-versions"]], "reports": null}}}}}`)
 	_ = os.Remove(s.log)
 	if status, _, _, err := runJobWith(t, root, "Packages/Networking", stacks.TaskTest, test, filter); status != "OK" || err != nil || strings.Contains(s.ran(t), "--filter") {
 		t.Errorf("a build-only test step gets no filter: %s %v %s", status, err, s.ran(t))
 	}
-	writeFile(t, root, "Packages/Networking/putnami.json", `{"options": {"@putnami/swift": {"tasks": {"test": {"steps": [["{runtime}", "swiftpm-test", "--output", "{output}", "--", "--filter", "Nothing"]]}}}}}`)
+	stackstest.WriteFile(t, root, "Packages/Networking/putnami.json", `{"options": {"@putnami/swift": {"tasks": {"test": {"steps": [["{runtime}", "swiftpm-test", "--output", "{output}", "--", "--filter", "Nothing"]]}}}}}`)
 	if status, data, _, err := runJobWith(t, root, "Packages/Networking", stacks.TaskTest, test, nil); status != "OK" || err != nil || summary(t, data, "testSummary")["total"] != 0 {
 		t.Errorf("a filter after -- that selects nothing passes: %s %v %v", status, err, data)
 	}

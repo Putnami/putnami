@@ -7,7 +7,7 @@
       "id": "java/stack-extension",
       "type": "feature",
       "name": "Run the Gradle projects and Maven modules of a Java or Kotlin build as Putnami tasks",
-      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build with Putnami's runner and cache, without rewriting its build, on a machine with no JDK, Gradle or Maven once putnami install prepared it: each component is a project, each task runs its build's steps, test reads JUnit and JaCoCo reports and filters tests, lint checks doc links, an application serves, runs and ships an image",
+      "outcome": "A team with a Gradle build, Android included, or a Maven build adds @putnami/java and runs putnami lint, test and build with Putnami's runner and cache, without rewriting its build, on a machine with no JDK, Gradle or Maven, or Android SDK the workspace accepts the licenses of, once putnami install prepared it: each component is a project, each task runs its build's steps, test reads JUnit and JaCoCo reports and filters tests, lint checks doc links, an application serves, runs and ships an image",
       "owner": "java",
       "target": "coded",
       "requirements": [
@@ -77,6 +77,23 @@
             "checks": [
               "the-toolchain-versions-of-the-build-are-read",
               "each-gradle-step-gets-the-jdks-the-toolchains-ask-for"
+            ]
+          }
+        },
+        {
+          "id": "android-sdk-is-provided",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-android-task-keeps-the-machine-sdk",
+              "an-android-task-installs-the-sdk-the-workspace-accepts",
+              "an-android-task-without-the-option-names-it",
+              "an-offline-android-task-installs-nothing",
+              "workspace-install-gives-an-android-build-the-sdk"
             ]
           }
         },

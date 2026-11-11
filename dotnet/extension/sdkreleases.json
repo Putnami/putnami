@@ -1,0 +1,918 @@
+{
+  "releases-index": [
+    {
+      "channel-version": "11.0",
+      "support-phase": "active",
+      "releases.json": "11.0"
+    },
+    {
+      "channel-version": "10.0",
+      "support-phase": "active",
+      "releases.json": "10.0"
+    },
+    {
+      "channel-version": "9.0",
+      "support-phase": "eol",
+      "releases.json": "9.0"
+    },
+    {
+      "channel-version": "8.0",
+      "support-phase": "eol",
+      "releases.json": "8.0"
+    }
+  ],
+  "channels": {
+    "11.0": {
+      "releases": [
+        {
+          "aspnetcore-runtime": {
+            "version": "11.0.0",
+            "files": [
+              {
+                "name": "aspnetcore-runtime-linux-arm64.tar.gz",
+                "rid": "linux-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/11.0.0/aspnetcore-runtime-11.0.0-linux-arm64.tar.gz",
+                "hash": "11a625c5a16627cfb301795670f3ee21deb40b0d1f16aca401251b3b5ab10205cb5ef84cdaa2725a4e6a9a627ecb9ee582318b76081503975fedab884ef7ea48"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-musl-arm64.tar.gz",
+                "rid": "linux-musl-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/11.0.0/aspnetcore-runtime-11.0.0-linux-musl-arm64.tar.gz",
+                "hash": "1163ef70fc52191de898d64c3183a185d2ed0ed44fd61b512a27b8f3674f2c7b733da58e97e949135b4c72bd737799e79b019011ad49a806d970be79389e6301"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-musl-x64.tar.gz",
+                "rid": "linux-musl-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/11.0.0/aspnetcore-runtime-11.0.0-linux-musl-x64.tar.gz",
+                "hash": "63df27c6da3c6e0d95e575b9b17c655e4b92b06bec1ecc9992203501d29f6f9c7258af4b31be0aaa9659b1c7d0ecff3b393fa9c80b5bfffbdf9d0b95a6280feb"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-x64.tar.gz",
+                "rid": "linux-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/11.0.0/aspnetcore-runtime-11.0.0-linux-x64.tar.gz",
+                "hash": "4f94d65a7c534b82d25153e1c740d1a87d9bcbc9187935d69fb14f9dde5fb284e69302bde3fe2818ff96e9ac0c62d4385aaa68d8f6f3cb6002aa39c859a252f3"
+              },
+              {
+                "name": "aspnetcore-runtime-osx-arm64.tar.gz",
+                "rid": "osx-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/11.0.0/aspnetcore-runtime-11.0.0-osx-arm64.tar.gz",
+                "hash": "602d014d1bbc6277d4afc92a6aee11c2ea9177396698be91bb01ccbb040caa0abe8c0690b92ababeb09d67a0eb6201c27e206ae24251a77b22caeec2730c956f"
+              },
+              {
+                "name": "aspnetcore-runtime-osx-x64.tar.gz",
+                "rid": "osx-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/11.0.0/aspnetcore-runtime-11.0.0-osx-x64.tar.gz",
+                "hash": "cd634e01eaa727523eec91337066831121aab4aa25cbead311a6fc0ba03ea34d2138b1d80038183b6c5846d36393626bffa5ea6b885269b72b4c110a53af94d7"
+              },
+              {
+                "name": "aspnetcore-runtime-win-arm64.zip",
+                "rid": "win-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/11.0.0/aspnetcore-runtime-11.0.0-win-arm64.zip",
+                "hash": "29584539184969d9c07b4c2de53df0371282f9b64fa3ded5670c7b2b8027a40193d76e2e739c6bef744bb76a5c48b2091e1d265e0f57f74b256864ea7a2d482a"
+              },
+              {
+                "name": "aspnetcore-runtime-win-x64.zip",
+                "rid": "win-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/11.0.0/aspnetcore-runtime-11.0.0-win-x64.zip",
+                "hash": "de96763d681ca72f0bec6747d896bfbe7ff9b7203cc5adb55b07847d1f88135ad2fa7e3353a5c6b67240545a991be23781d5280f4ea5545bd261c969e9d011b0"
+              }
+            ]
+          },
+          "sdks": []
+        },
+        {
+          "sdks": [
+            {
+              "version": "11.0.100",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100/dotnet-sdk-11.0.100-linux-arm64.tar.gz",
+                  "hash": "cfa248bb1377606e868602fb5b4d66fa16b7546156593937d1982f7f2142e6ded76d71c4a26efdab99f87c46ab40c3c672ab1b57ef7fa25449efe5b140a55af4"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100/dotnet-sdk-11.0.100-linux-musl-arm64.tar.gz",
+                  "hash": "ffe8df27a87ad1abe39333ae9625d53bfd41b1933df64d96e79572dc9e74176379ac2419f989e32b54117bf84db1ec13a88f757bad8787dc112501b3a6314db3"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100/dotnet-sdk-11.0.100-linux-musl-x64.tar.gz",
+                  "hash": "b6d042d4bd7a9a35f63648e33e1d0b39378d59bd488d306b9286f6a3e48ff605b4bd08902e3e4dd23ae489c7122d2b5d181077558124a63e98c3b03a56b24d21"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100/dotnet-sdk-11.0.100-linux-x64.tar.gz",
+                  "hash": "1bec9cca2ec689b1e80245b84f2b53c9441d1aa6daccf2ceb27490768bffa95954fa585bd275def31069d874d543d9ba9e6591fe9ade2dbd9f34ec5c0fd0050c"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100/dotnet-sdk-11.0.100-osx-arm64.tar.gz",
+                  "hash": "6c8978e0a8f24a04b69a539fe29edf0c68e3247e46e24afb4920ee479e2ce1256b17fdf0626f8835b9c743784c08b40ecb25abdd8dd49fc99d040daf1ddb4de2"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100/dotnet-sdk-11.0.100-osx-x64.tar.gz",
+                  "hash": "8e9c8835c4d1ed8e3045f1a00e5831b028fb090161d1acbeb6e8b26882cb783ff18ab04f478134bf51b538f2becbbf999737c18f17c568ef37fb94a91a03d6a5"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100/dotnet-sdk-11.0.100-win-arm64.zip",
+                  "hash": "8046f940a70c57428c09a732c9e618939af1695b06cba80fc536e2d2d23039cdc9eed314193aaa23ab20096480aa9e226d9f5fd166ea4357185f30ba31e37f7a"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/11.0.100/dotnet-sdk-11.0.100-win-x64.zip",
+                  "hash": "5cdd9122c84873f090038548ebe8a4786e5c50a6b1b9792ca2c6dab82fd74a0d7f1d6cdf59e7dcd25e4903dd44f37af5d7ed73ecd3bca4d0cce948b5572452c3"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "10.0": {
+      "releases": [
+        {
+          "aspnetcore-runtime": {
+            "version": "10.0.15",
+            "files": [
+              {
+                "name": "aspnetcore-runtime-linux-arm64.tar.gz",
+                "rid": "linux-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.15/aspnetcore-runtime-10.0.15-linux-arm64.tar.gz",
+                "hash": "1d82a6822871c0e750d2d3d3b9b27657d24a2083eb999c2f78b39b0cd10862178cb2c6d21f941579cd521baf5738a78d3378e5754c5895a93d7546135eb40ec6"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-musl-arm64.tar.gz",
+                "rid": "linux-musl-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.15/aspnetcore-runtime-10.0.15-linux-musl-arm64.tar.gz",
+                "hash": "fc11fb386be841f4b1d84b1a95e68bb95177fad228e56e215a5cd196ef2460f3fb354c8f2f48d132aa71f676829aaf403e2f546fe5e20c2d38f097be0c64e7b9"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-musl-x64.tar.gz",
+                "rid": "linux-musl-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.15/aspnetcore-runtime-10.0.15-linux-musl-x64.tar.gz",
+                "hash": "0c4608259c99236bcb860c145b8794c72c6817d01d4ed0ad2132b78cd90e13c6527341edb787b38d9e0382d806b61bfbb170b9951cec68d1043840ff176fa90b"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-x64.tar.gz",
+                "rid": "linux-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.15/aspnetcore-runtime-10.0.15-linux-x64.tar.gz",
+                "hash": "704751c6d671b720935a18849e8f10cdb6938549e9cf25493050ebc838a95eb5cb1caa9936d2edae3b85c5975778ed926e9b736e3a2582d861411babba3229c3"
+              },
+              {
+                "name": "aspnetcore-runtime-osx-arm64.tar.gz",
+                "rid": "osx-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.15/aspnetcore-runtime-10.0.15-osx-arm64.tar.gz",
+                "hash": "68b8d201be12e3d8f8bd9e3b0f59b50097fb3a0d35b2f599a269bb26ed75d5b7c3c00aecd0fc5979bc224559550b694abe047d4f962ccb58b50e985f07edfd72"
+              },
+              {
+                "name": "aspnetcore-runtime-osx-x64.tar.gz",
+                "rid": "osx-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.15/aspnetcore-runtime-10.0.15-osx-x64.tar.gz",
+                "hash": "5981a3fe43285b0277458dbb33ec6c3cdb561f6de37ef7cc2d15a3b5c2d608625887124cc7f31bae412a37b3cc443fe876716d809f38983f9124d2b5e334c7c3"
+              },
+              {
+                "name": "aspnetcore-runtime-win-arm64.zip",
+                "rid": "win-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.15/aspnetcore-runtime-10.0.15-win-arm64.zip",
+                "hash": "69a298248e08e5902560b982c0476837e135a455078395b60a70bec7ef5f46a7fd3cada0d981463e9c08668ba93b802da8306eb6ca1e7fdaff53a8fc4d9ea988"
+              },
+              {
+                "name": "aspnetcore-runtime-win-x64.zip",
+                "rid": "win-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/10.0.15/aspnetcore-runtime-10.0.15-win-x64.zip",
+                "hash": "8f246ab1e2b29eb2fbd6fa58585cc91f2c20c6dacb92aa2759cd49b90cc8901cf040669e8b47f41db22d9bc63efac5a133efed24787342a3bfcade21b87a51c3"
+              }
+            ]
+          },
+          "sdks": []
+        },
+        {
+          "sdks": [
+            {
+              "version": "10.0.404",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-linux-arm64.tar.gz",
+                  "hash": "3533a3869da219cac45c567aadac3d8e96cdf1c6a04fe1c1d5fdeefea5d45af8424488f0144730d11b4a751f7ad546fb11e4c2b2725cd8401efee726711f8f11"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-linux-musl-arm64.tar.gz",
+                  "hash": "b39da19b6134190ed0b9107c05c98c58586f4f77782c4b0e3e36c6274a2d59528f67412c2b0cbb927a914378177f763cb662b435c5bef62ad5c2cd86a422c877"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-linux-musl-x64.tar.gz",
+                  "hash": "68ada5fd8fa2b65f55c3db1c2e773dfc9468c9828cbb56fc600151415cc2b116a32804f9aeeb82ca1a3229e3821af7b5b074d5e34487b2807630b5c00f51d801"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-linux-x64.tar.gz",
+                  "hash": "577d0eb17fec33d029104c5c63a1ab0accc3e28776274abef2218dbac5af18d2109b5406d26b31d76f5c245215e3ba0926a94c20246c672c41847c9e1eb1dc50"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-osx-arm64.tar.gz",
+                  "hash": "1c9a13f625d0c08f08ef5a53597bababe3d2473527e98db2199210940c69dd5fc599a39a4d7c30ebf297ca2334a81b2f64b9bf05ff99585de9af4a5d85215e96"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-osx-x64.tar.gz",
+                  "hash": "88ca5dac50562b619f852b1b9845f85243f00434be52d2149db18ab4dc05f527f3fca8e1dac82e87b9eeb46a98de1ba4a6d612714caf2222f37b95aeebb611b6"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-win-arm64.zip",
+                  "hash": "55c041098c709c898d416eaea9a56ab1d17ee884167b2093a5b3d68935a283d15ea796a880b9cf281baccdab56eae1537fae91627f480a68dec081734f535cf5"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.404/dotnet-sdk-10.0.404-win-x64.zip",
+                  "hash": "330ddd2665b43cd2e428216a0d8ea1ac7bb19b5434fdc530e62010dc3b52823a620bf95489d628e1ed6f5122401793ee4887cca4a019122361a1231497f632ee"
+                }
+              ]
+            },
+            {
+              "version": "10.0.303",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.303/dotnet-sdk-10.0.303-linux-arm64.tar.gz",
+                  "hash": "622e059198058ee5f92d7817bdd83885480a979628348f878201cb8dba52d168c1a324f9943a0e7a03ad547d85332aa82f16aced29da599ef02422b5378452de"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.303/dotnet-sdk-10.0.303-linux-musl-arm64.tar.gz",
+                  "hash": "f82f9c10fc12cb2619ad1d7536ce212a5e9a5b96f94878737d16a65a477151d093b393890724536562dadc3dd890b837fcaebeddbe2cc3b61dc5076f9c4980da"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.303/dotnet-sdk-10.0.303-linux-musl-x64.tar.gz",
+                  "hash": "f11dd9d9b4cdc52155d3ed6e0ee15cd3270267ce4010b56e8ad330907601ea032d50ff490a1230742022db485b7d37cf615cc7de6a7a438b1b67ef11c60cf435"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.303/dotnet-sdk-10.0.303-linux-x64.tar.gz",
+                  "hash": "538df11ceb9d86bdda061bab6ede3d1f6d46bb9ba087ae905643f3d456afe982949d1b952bceb305a5d22d2d6e69cc0e5100216ffcc709aaa86e867f2d9cdf9a"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.303/dotnet-sdk-10.0.303-osx-arm64.tar.gz",
+                  "hash": "9b1f05664654f339090bde1b64e0edc12e814012dc3898a1d01876c65754ef18d59ec7dd98405d9c6ba6ce735696dfa96add89cd7f4c51636e2200e8cd691d10"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.303/dotnet-sdk-10.0.303-osx-x64.tar.gz",
+                  "hash": "fdfa4d213cea117e82519c036fa4ddaf5617a4004ebaf6a3ab080bfa3eb286e13b944c36e649222516ecad8b643730e82dd96b964919c2854df21e24d5438f4d"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.303/dotnet-sdk-10.0.303-win-arm64.zip",
+                  "hash": "1ae2572dc1cfb753cf8c4424ee3f3be0b185f04e0e9d9619bb3c0dae9b197200f739a8c9842efc083a767a70170b675a14459ab7791370f7f4721b629394fe1d"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.303/dotnet-sdk-10.0.303-win-x64.zip",
+                  "hash": "ad4ef6202e55babde1c65e1be7b468c3ecb738ccc2fb8bd3c2bb408a4f45d247c8c5a5f57fedc54ebee7cb5fc4f487772997f2d053010d2e1903b974cc64216d"
+                }
+              ]
+            },
+            {
+              "version": "10.0.204",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.204/dotnet-sdk-10.0.204-linux-arm64.tar.gz",
+                  "hash": "4023284e9fe5a4a06538dd244bbaf96ccfc3c30a4b2f0c108129f520eebc21cb2ed5f91e7c1c04aaa27d5f445cce288032199d2ecdb7de7ae1570248de037621"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.204/dotnet-sdk-10.0.204-linux-musl-arm64.tar.gz",
+                  "hash": "b5fc8b42d22f904094b77b3743eec410dd7815acc9210e23ea80720e16cf860476926633ff5f050cd1a02756316a2dfe745322173768978f7fa2d818968c76ea"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.204/dotnet-sdk-10.0.204-linux-musl-x64.tar.gz",
+                  "hash": "f67f18811119a5d0fee3b020e53b5a168571d914830f1919fa0f66421f0eacc233c0f3f6cd6477866efbe28f765e80560ffd92719b83d462d3238aa4a5806e94"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.204/dotnet-sdk-10.0.204-linux-x64.tar.gz",
+                  "hash": "54822b15db93c3ea654aa485397126b19753414db38dbaac902d446673077c567a4d7ee3488b5eb6eef0747e9b557f88dcfdc9cce55784c43930e8e0810f58c4"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.204/dotnet-sdk-10.0.204-osx-arm64.tar.gz",
+                  "hash": "f4ab9ade88d28f05f3f89f064bc2e0b7d9ea0c579f974cee514059710cfcab391e1cc19134320aa8781a5a1a512d4b9018c5b0ce23e06adf92d4c80d67fa535c"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.204/dotnet-sdk-10.0.204-osx-x64.tar.gz",
+                  "hash": "86d834f3a36d5b6ee168c5cc83130deaa0fe6161b8cf6d631c16823b4caf2e894406de85ae56fc2a12efda25d755bdacef990ba27bcaec402365b76af7c46f0e"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.204/dotnet-sdk-10.0.204-win-arm64.zip",
+                  "hash": "7fbdcc85f41319274633c0edaf607371d9e60a777c5b76fc31f9deb872ccd08561c5e4e00d0c696ed55acf371a90454a460ced00608834902397bc9f95322269"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.204/dotnet-sdk-10.0.204-win-x64.zip",
+                  "hash": "675d61d9fe0856ad024f39f78764c5061916e11407d34c60d979bd3797726891febe25caa851fcc9bb90bee3bdb34afaabdbfda03a959ea6d23e2bcf3940e86d"
+                }
+              ]
+            },
+            {
+              "version": "10.0.115",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.115/dotnet-sdk-10.0.115-linux-arm64.tar.gz",
+                  "hash": "3d2fc61a3913e3ba65f1c6188f0a193c58eb219c31fdd19a0d07ab2f4ec663fc3c5338ed3382941bac45f666c6c9b58d9082a7464223244e3ca4b18295d164a0"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.115/dotnet-sdk-10.0.115-linux-musl-arm64.tar.gz",
+                  "hash": "73309ca1a28dae721098b4b37b81e03e5ba468c742ecaf2e3b619a60257ece44d6c02eadc70e2716e0b541e5aa53d3a73fe10f6a52addc48e2a0a32dc2ebbc10"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.115/dotnet-sdk-10.0.115-linux-musl-x64.tar.gz",
+                  "hash": "5b63792faea80bf8fef74069bbaaed432be1cdcddbdbac4f4833370ad7a40e6b592ff8fbca38c2bd78cc7e7bad510e877a006021226da3cb7d10c00e83f96696"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.115/dotnet-sdk-10.0.115-linux-x64.tar.gz",
+                  "hash": "01bf048cf0495a7ce76be07b9623d385c9d9f172237d0267ded25c31f4b19604d74f1d328d0ee5fe6bcfb23cb20c41fb072c9b84fce6582c20edb1e3d93ea012"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.115/dotnet-sdk-10.0.115-osx-arm64.tar.gz",
+                  "hash": "a26e049329ca2e0912882bb5d2d2342b78de89b40303df46a249774745a265a9eff05e4f34e6869a2b61b7c8fc6282e93d006d104f69433e208dc8c7c9791e1d"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.115/dotnet-sdk-10.0.115-osx-x64.tar.gz",
+                  "hash": "1935aa02a52b1604596c0a36381dc87733086fc8a5935748d10bc7fe583c93aea3a16eb806e6d54453eae202c82b26ceec2c5b39c4c71a674ddda0d1234398c4"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.115/dotnet-sdk-10.0.115-win-arm64.zip",
+                  "hash": "379129c6d09b0b0c29d3c8246b93cd3c50d2b671989d50f7da80b7d7f469a46b456750058257577e0b32ab8e3392f14038400ccaa7d5f95c3ecb273810093f5e"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/10.0.115/dotnet-sdk-10.0.115-win-x64.zip",
+                  "hash": "f9547ed219c7bb08603adc1eea8bd92f21a02b684dd4088131f89cede677326bcfa84960a027d01e0c51091eaf27d4f41aa38a51ff15abc271c1025bc5df198e"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "9.0": {
+      "releases": [
+        {
+          "aspnetcore-runtime": {
+            "version": "9.0.23",
+            "files": [
+              {
+                "name": "aspnetcore-runtime-linux-arm64.tar.gz",
+                "rid": "linux-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.23/aspnetcore-runtime-9.0.23-linux-arm64.tar.gz",
+                "hash": "eda0d6a5c58019f83284f428b2c0d15c7689fb141c452f58f30adcb04366ebe499a5996000c6cd1f7b4979989e8e2671eddcac0a90d86323a62848dd6c681b0b"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-musl-x64.tar.gz",
+                "rid": "linux-musl-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.23/aspnetcore-runtime-9.0.23-linux-musl-x64.tar.gz",
+                "hash": "651d5d9f18a8989daa9d99f68b61d589ebd9475beaf869745497e402427ef14fc693d6486fc5951c5b64bd218b7257a001b9c46eae6c00d72bfa6c6b1b73f040"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-musl-arm64.tar.gz",
+                "rid": "linux-musl-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.23/aspnetcore-runtime-9.0.23-linux-musl-arm64.tar.gz",
+                "hash": "befed8b127fa140a4012b61224b3aa774c051bc9b7d60770d9a15e2ea5accf19ae2ff1eab62adeaa3a0d4e82943e6fcf02abd1cea2fc442acb87d3c5a6f02992"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-x64.tar.gz",
+                "rid": "linux-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.23/aspnetcore-runtime-9.0.23-linux-x64.tar.gz",
+                "hash": "d4f5d2e3c7296c3736817dbd39b4942a8a8ab2137032856389f533e93c94275b11e206b580f3d2e27dfa2dabf96a5ec7eb9dba9120f97a1285e6df543874b21b"
+              },
+              {
+                "name": "aspnetcore-runtime-osx-x64.tar.gz",
+                "rid": "osx-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.23/aspnetcore-runtime-9.0.23-osx-x64.tar.gz",
+                "hash": "2f9f9600e5beeac71d6101a9a0c208f5d964316de32e4d15366bc613c985d558f0b4e1121c3c4b3bbc36e3637cff3546dc97c81bf00dc40cb9e02ca3f3b983ca"
+              },
+              {
+                "name": "aspnetcore-runtime-osx-arm64.tar.gz",
+                "rid": "osx-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.23/aspnetcore-runtime-9.0.23-osx-arm64.tar.gz",
+                "hash": "665eb4f9aee59298f0f22852d878cc3afe28b9bdf5c03fd3fafde7cde654a55d0c3e0262fd12b58e1d04d6ea514e8b2321909570407e465f47de077e84f09afd"
+              },
+              {
+                "name": "aspnetcore-runtime-win-arm64.zip",
+                "rid": "win-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.23/aspnetcore-runtime-9.0.23-win-arm64.zip",
+                "hash": "178008ba59b50bdc39e1aafc9b7b02a5b708e6f79effba76317d64462d8cf94632a605337c96fd32f2e36e178a898ea2f9eaf34caad7f51743d7d7a15f525c10"
+              },
+              {
+                "name": "aspnetcore-runtime-win-x64.zip",
+                "rid": "win-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/9.0.23/aspnetcore-runtime-9.0.23-win-x64.zip",
+                "hash": "386e0205321a7b2d42f9c627094eda8c9968bf3d870252e1f78e4439b95ebb565b436dafc0b2091689eef845c775b9211500ff4b2107e7f96c3a9a27a1363084"
+              }
+            ]
+          },
+          "sdks": []
+        },
+        {
+          "sdks": [
+            {
+              "version": "9.0.321",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.321/dotnet-sdk-9.0.321-linux-arm64.tar.gz",
+                  "hash": "5b47e5f85c5841d1d189a264e133860d74307f48537232a03ac3bd39d2ba41413a87bf27d7a74579e175d7456932c0841718103d69e1ebcf6539cf463c0f14ef"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.321/dotnet-sdk-9.0.321-linux-musl-x64.tar.gz",
+                  "hash": "8f4826c7e1648c4a16b657660b6ae999fa29ccf3a6c2d58cf274838c6c07321ef5b2ddf9b38a55b2dcbe19ebd41b7c04c52d8ac8f6ca1ef0ce0f0d397476e161"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.321/dotnet-sdk-9.0.321-linux-musl-arm64.tar.gz",
+                  "hash": "d497746ead9bb474f9c11ad5528a35c8c44d81ed9bd2bc0263c3d7097e59e0b0a828e9a4fa94819b9620e5bf055a185a9425d52908083d3d7911c4911573c2f5"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.321/dotnet-sdk-9.0.321-linux-x64.tar.gz",
+                  "hash": "612bae8e90be6e69b65b904647b88a28d0d8c4d79ed4b208d9fdfa61ab34be57e6fd018ab46c3897dc08aad203380130e6af3e748f742a09aa11f8f189cab7e8"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.321/dotnet-sdk-9.0.321-osx-x64.tar.gz",
+                  "hash": "74246a2243ba975a98ae19a95de86b9a31e654d7d6dfc2be7464ecf1151d3bdd2fc925add4e1e35bdc829acaff952912c2ca813275e3c52c9f013bb575b85e5a"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.321/dotnet-sdk-9.0.321-osx-arm64.tar.gz",
+                  "hash": "2b4fff5a872ce214ffbe1c001b889ab91a37c8c54959adb37d7f20f6cb2c4c30316e3926bcfbb95e56cdc541ab0393ecc55b9f0700b24f243056cc186f380812"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.321/dotnet-sdk-9.0.321-win-arm64.zip",
+                  "hash": "6208f37bb2287db96852f56ad5897ce948bd3429a226222bc1968234f2a7b9817871a231c6b0fb5ce271dd64abe4f26a060eb9574f6f77525da55e1e8b22b28f"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.321/dotnet-sdk-9.0.321-win-x64.zip",
+                  "hash": "bad4818927b80cf836c3b5865e5e9cbc77c2bbee68cfcf51307a2dde644546719e88a77ebf9664bbcb1848a0d606d8626982af117b157344b6c5da93369f1cf3"
+                }
+              ]
+            },
+            {
+              "version": "9.0.205",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.205/dotnet-sdk-9.0.205-linux-arm64.tar.gz",
+                  "hash": "ca4c89c4fa9b3c2d0966b1289e4a0a1a926b3778d974f4e32124a2191c2bb9952b80c3d36235eee7310310023fc9f479e05b84fb4a8676b97e1b4f739b7e1a10"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.205/dotnet-sdk-9.0.205-linux-musl-arm64.tar.gz",
+                  "hash": "9782e0a33726cce01bf68a8431c7fecfaeebaade21796ef00417c2f90721ff4d39e7859e91e8cd66eaf4c066e9019f7c0bcaca9844b37014c2e9ce41624b9646"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.205/dotnet-sdk-9.0.205-linux-musl-x64.tar.gz",
+                  "hash": "ce6b03fbd955be22a0551c8614f56c04ec80de214375e6a5dec2cc9b6c64f8d6d30f185ad8d8cef42d055cf899aa588217fd74c6fb0d51b138b6a327f803e490"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.205/dotnet-sdk-9.0.205-linux-x64.tar.gz",
+                  "hash": "df8e2d95a617051c44a524471137300868d52b523cc41e8f8d31aade968407ae406d5b6e47f484f603be52c0a6e567586f0f9c16ffc25944f3a8f42f88c3c781"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.205/dotnet-sdk-9.0.205-osx-arm64.tar.gz",
+                  "hash": "9c753021c26a0178cfbb4f7a2cf4be65e2ef1c6ce68912c5936c7cc992b0260f14a4490077314c363744f52be96f432f169838a2df4b5dd00bd3d3ff9855b4a1"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.205/dotnet-sdk-9.0.205-osx-x64.tar.gz",
+                  "hash": "ee4b8d1b61b08fdcfe98cdf6d1cb46354ae8203b12560c73e7986489dfcd85c5c186eb085ee44d6af90a0a702cbd0c5ce1d9eb4f1e0d4933eb043eb3b6f63b28"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.205/dotnet-sdk-9.0.205-win-arm64.zip",
+                  "hash": "6f9989e5428ead881b0d906cd422e559af8664838550ae6bc3b735b09268b8091495513d6d6898bc4c812cd929624c97600d3de2b99b400c6a7c5749c08703f7"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.205/dotnet-sdk-9.0.205-win-x64.zip",
+                  "hash": "2764269644241a01e392e0b53aa0689948a5d238f0a87ba4ad5452c5e7b6991c9b8406813d25ac8abc72839ab04ed399c3ff3166a310715306f4d5d977b4fdd7"
+                }
+              ]
+            },
+            {
+              "version": "9.0.124",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.124/dotnet-sdk-9.0.124-linux-arm64.tar.gz",
+                  "hash": "150c5a70135056a04cc5106a35826b7d58614dadc52082cc303fb52cd4563540c8dbc0ee30fed14688201d8648fec5edfaa09972f540282d54237cfbf8edb879"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.124/dotnet-sdk-9.0.124-linux-musl-x64.tar.gz",
+                  "hash": "33279364f6056afe0c24c26b748ec739f668442fb2410bdd73804db657399b0da25adad10d8d4c410d9b49e215f7ccb4827f2f0306474d2160db5e37e1887a94"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.124/dotnet-sdk-9.0.124-linux-musl-arm64.tar.gz",
+                  "hash": "d811792cb26e46d31ade89aa71756b9e506f846493445decf44ed3e9309ad4385fa5103e7b237c6e56c48912283d5fb15590a691c1788a013247ff41cd46666c"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.124/dotnet-sdk-9.0.124-linux-x64.tar.gz",
+                  "hash": "7339a44080e3b99afd461f854860bd36c26ccec5559983c38526e47ea4087a2d3b104546c7c0f1915c71ce8abbfb6d91dad1330be2f5427df2de41af2dd78915"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.124/dotnet-sdk-9.0.124-osx-x64.tar.gz",
+                  "hash": "7799381f9f4f4807d9211bce672188465b66d95b583ba5a9237610dc30fd9a3bc7c211ba1cc399cb907cb7df2cdbb3f91ce258f04d8d5a45179146bfe232be3d"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.124/dotnet-sdk-9.0.124-osx-arm64.tar.gz",
+                  "hash": "6114a637633106877ced3ebcf6db063a320b13ecc3cca642fca2ee0a64084f305fdd6cad6b3c53ea7611d1a95316206b21e87e83fbc0c2722964405f0a157d4f"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.124/dotnet-sdk-9.0.124-win-arm64.zip",
+                  "hash": "e3322f87d09b2542ddd774833c17a8d848b89c732b13fea8d9ee40aee608a8c3cb29bd742cb70d8728d845abb09a1e83bcad63eab81a2ad4e9147952cec3244b"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/9.0.124/dotnet-sdk-9.0.124-win-x64.zip",
+                  "hash": "d06fa9a08c7bd61f32e1623fcad240614d8c398191790163c061fdf32c39b048475a30040287399c9c7cc585ad0dabe0269edffb092bc188ba4823675f2b04f7"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "8.0": {
+      "releases": [
+        {
+          "aspnetcore-runtime": {
+            "version": "8.0.34",
+            "files": [
+              {
+                "name": "aspnetcore-runtime-linux-arm64.tar.gz",
+                "rid": "linux-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.34/aspnetcore-runtime-8.0.34-linux-arm64.tar.gz",
+                "hash": "347c0bf1e5c1e500c15a7e45bddd2f7a54aea1965b0aae187a5f0f21483e365d8dcadd1c6166916bcc88561ef59a808b09e0c0e8ca894e6f946df0ba668fb92e"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-musl-x64.tar.gz",
+                "rid": "linux-musl-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.34/aspnetcore-runtime-8.0.34-linux-musl-x64.tar.gz",
+                "hash": "d8b83f18d8bbd1d7bd62f2dba2d43f06cfccba351b875a7654643c1e57aa3b4bba297c824e52451604578ac322301d74a706528f2d2e19586cf7d1675e33c0a2"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-musl-arm64.tar.gz",
+                "rid": "linux-musl-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.34/aspnetcore-runtime-8.0.34-linux-musl-arm64.tar.gz",
+                "hash": "a652b4c56f2223a6ea90c8716cdc446eb1d966964e75dc1690fb3cc2240381495975de107b22ae8a9b28b10e11d587c7f734e1093d9a5238684175d40bffe619"
+              },
+              {
+                "name": "aspnetcore-runtime-linux-x64.tar.gz",
+                "rid": "linux-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.34/aspnetcore-runtime-8.0.34-linux-x64.tar.gz",
+                "hash": "ecf5b14d8a7ec32a3662f131e74c40f9003534e98b24c682c07c0d68f653d08fb1d67c9b3497efdd3d2790179cbeda9fc80b1f88736964411719d94feada9533"
+              },
+              {
+                "name": "aspnetcore-runtime-osx-x64.tar.gz",
+                "rid": "osx-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.34/aspnetcore-runtime-8.0.34-osx-x64.tar.gz",
+                "hash": "2f7d6e0fa6fbb1d2db7808a9d98434daf089fec6546ce6ddea8c7cb9dacec15916469cf335213f24ec9062a61c5d43361d49e020631fd5e1e3212d8def80faa6"
+              },
+              {
+                "name": "aspnetcore-runtime-osx-arm64.tar.gz",
+                "rid": "osx-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.34/aspnetcore-runtime-8.0.34-osx-arm64.tar.gz",
+                "hash": "1000c26c9be655e124678569e53982c84175949caf73da3514b23ed5fd39fe8fd0667d40124c650b6b97698c264bd34c8450055f734fba280f0fb943b4173a09"
+              },
+              {
+                "name": "aspnetcore-runtime-win-arm64.zip",
+                "rid": "win-arm64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.34/aspnetcore-runtime-8.0.34-win-arm64.zip",
+                "hash": "cf3ca050c89accc87857fc1a951efbe909a20a9199e31032234fed382d0bf23187a1bf6f2b10aeb91f8dbb18437036c4a4d97c3d65328914fb669e2a8b5b04c9"
+              },
+              {
+                "name": "aspnetcore-runtime-win-x64.zip",
+                "rid": "win-x64",
+                "url": "https://builds.dotnet.microsoft.com/dotnet/aspnetcore/Runtime/8.0.34/aspnetcore-runtime-8.0.34-win-x64.zip",
+                "hash": "c19f5562ffff4dcbf4781e85d0d4601d7d5b557bdbdc3ebdeeeef0c87f5a1f6075cb8b47d230d385918309440bc12387b70b595305b492dc4d71bd40c7b17b01"
+              }
+            ]
+          },
+          "sdks": []
+        },
+        {
+          "sdks": [
+            {
+              "version": "8.0.428",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-linux-arm64.tar.gz",
+                  "hash": "bcc10091e404baaec01d538be8bd7125a33a8338594a6a795b1036128ace747a450d3f1482f16210b6a7ee937b911488676109156ec2c905ce31030badb1b0f2"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-linux-musl-x64.tar.gz",
+                  "hash": "b342314bcec0ae1903f0848fec83264a289fea6089b96646c4780be3f698fa6343b9c38e77a4969bc2bde6c7a4e5d5080cc6353c44d6fd7586b6f64c17485956"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-linux-musl-arm64.tar.gz",
+                  "hash": "ecccd790c5b85f90c664184bd4068851dfc5b2b6ec0266d039aa61feb36e8369fb1b66ee5c113efa2c35be54af05661b9754595b249203eab5ee3b4622398edd"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-linux-x64.tar.gz",
+                  "hash": "33212bb99a2bf003973d41106c7e8fe94208a12958ff601d4a476be379403c85a7dc9183a6ec64dfb44ded7102965be09f35add1758e68e9251bae7891d7b7bf"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-osx-x64.tar.gz",
+                  "hash": "273bfca1f5b5019d4dbec47dce3543ebe825510934e2fb86f5433ca32e0690a824261d1e561a9d3140b8f806048dc1a280c979058de0a966c1acc672abf7c0bb"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-osx-arm64.tar.gz",
+                  "hash": "c2930ce6363417165142e5610992df1430b1cf93f4b5ac31027da611a6bc089a73e7062eed0200be3e4a32db893a92c86fc27816a53521e5b041aafba0aa1215"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-win-arm64.zip",
+                  "hash": "909437e6001bdd3b5f9a5a0914f990c165f5687570430442631dea8775ddbf5e6fb3eb7840cbbbaaf00d4830a205d1be68f4e048d4bb534ec5a03ced0f4b83f9"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.428/dotnet-sdk-8.0.428-win-x64.zip",
+                  "hash": "cce1dc5cfb2c5b73ddd9d3658f6009deb85be3a58dbec44a6dfe3910bb32b044ad2fc6bb28c77aded70c73270a204d207fe790dcb82ffca6c7b42c1335b51c21"
+                }
+              ]
+            },
+            {
+              "version": "8.0.319",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.319/dotnet-sdk-8.0.319-linux-arm64.tar.gz",
+                  "hash": "4213c90db442e5611aba443528fd50387deb31f47ce4cb15d1029e0c0cc0407afc154eb1760dafeb5d2e93b234487a39bf75d337ab5b152f95d6d847712f4ae0"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.319/dotnet-sdk-8.0.319-linux-musl-x64.tar.gz",
+                  "hash": "2e8aa61612c40e5df7caad52f9bc0c7195ba2585011512ab9fcf2762b4a590ffc6fb46c2c839929e8594c1db4154b7a1f77823414f3052b5afe3fa9acd67946d"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.319/dotnet-sdk-8.0.319-linux-musl-arm64.tar.gz",
+                  "hash": "51581c1ebf8473c110ad988236310f263c12b815c3fd35df2d5774bf826c9cb758c03dad89044fd4b05d3db8f48feb7809e9a860fc7744ef86b6e4c4f2683bb5"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.319/dotnet-sdk-8.0.319-linux-x64.tar.gz",
+                  "hash": "38c212b527f36802c896f47bc4f2dfda498511c2d5cc0800d9bddedfad35a10a88c0b5072bb0ab50d05d83be0a571349827a86cc7a7c3dace67d4d96b6f46df0"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.319/dotnet-sdk-8.0.319-osx-x64.tar.gz",
+                  "hash": "cd4e458575ab59790d44eb618c70f404e4c12064fff367a1803ea64425462b48409ac0737b7a07ec4ec3aea75813adf225ff1e9f472c5a8cd237286da80424e5"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.319/dotnet-sdk-8.0.319-osx-arm64.tar.gz",
+                  "hash": "827611848b4e2846479daf20296d156377c25b9373efb38b74a0bf917a5f3058069b3bedc6fcfd475ea96c6526bb8de2e3387ca614e512fa236a970b639d46a6"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.319/dotnet-sdk-8.0.319-win-arm64.zip",
+                  "hash": "6894cfc7ece70cc0284218d1670438be3b51920ccffcad191c3d378d80b6786582a09324e5ba9b6a4d70a7112cecc1c40008f1f6c719e62377ada198e1bce7c3"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.319/dotnet-sdk-8.0.319-win-x64.zip",
+                  "hash": "129c6c24bbe5b3a771fec4f18ed0394442cd1bafaa95a5232967d7fe8444b9f25a7727621ba93aeb83180d2b77b2c5850637da6857111185ad4e886a1a33ccea"
+                }
+              ]
+            },
+            {
+              "version": "8.0.206",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.206/dotnet-sdk-8.0.206-linux-arm64.tar.gz",
+                  "hash": "eb0489785dc5bf824bc3fc1014815ebd371fbc73eb02b63e5a1650bcadb158cab7e909904889f6e198a180a1742976351208a57796ef38a4205c52fb945b7d09"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.206/dotnet-sdk-8.0.206-linux-musl-arm64.tar.gz",
+                  "hash": "1de4f0ee791fe433b1e230c6621c8773921328fdc8fcdbe154e804fcc938374a950ed2c6f60e5cf4ffb26e03b346810d6b661bc544ac33ae2e249a98dacd421f"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.206/dotnet-sdk-8.0.206-linux-musl-x64.tar.gz",
+                  "hash": "9213697221d4ce977a80099f1df68a0e785729910ed3f2a2e44fda0e69ca9c9e08e70642b9975732695fbc5745f3dc862f4ba7cd79088858982e8ec0301189b8"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.206/dotnet-sdk-8.0.206-linux-x64.tar.gz",
+                  "hash": "d03cbb5ea44a6f4957d7c1fa0f7c19e3df2efcbf569b071082e37ac86776af0729540c3bbddc44668ae2eedcfcb4b098883bb560d26418f1583a558d60c99ef5"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.206/dotnet-sdk-8.0.206-osx-arm64.tar.gz",
+                  "hash": "c4a17c17b02d9559e0029328179d22617321e439e9360175f25385d60789f91582a4024ce41690439d85852e4c85f0d0ae20fe818c0f4acf0d7d48ffac2d2b5c"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.206/dotnet-sdk-8.0.206-osx-x64.tar.gz",
+                  "hash": "d7742a0b00c4df835639eeb18f2ae4888ac33d7d7c25d097a8868c5172c878d7df8c5bbd54de9b34f877f07a2dc6c748ea510f783e1842058e8cfd0ad2cda83f"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.206/dotnet-sdk-8.0.206-win-arm64.zip",
+                  "hash": "570b597c4d232b6c605f7cd89729d3b0a75071a867b8bb31406830b37dccb95f8e15284c4acbecf3a288484136af5844f16c7aaccd7a158b27502695e3231cc1"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.206/dotnet-sdk-8.0.206-win-x64.zip",
+                  "hash": "6d194e3e897074198557fd3f917b60953c82d192497eb0ceb7fd1fad37357c30aee84d1a798f896355c33871c8fbcc621b5a95192dcf701139a9f5f58b0f1b0b"
+                }
+              ]
+            },
+            {
+              "version": "8.0.134",
+              "files": [
+                {
+                  "name": "dotnet-sdk-linux-arm64.tar.gz",
+                  "rid": "linux-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.134/dotnet-sdk-8.0.134-linux-arm64.tar.gz",
+                  "hash": "a2598dbd6b207eaaed8bb1f4a546f3f405285606ba2301c6ee75b9dda08e0789bee51a20a3bb94d87f7a6e191e7e0b4932589df4d6c91709485932a75bf9fa66"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-x64.tar.gz",
+                  "rid": "linux-musl-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.134/dotnet-sdk-8.0.134-linux-musl-x64.tar.gz",
+                  "hash": "8fe34beb7449de5a5f95c626e876dfd2609829858297666aa0bf8d20d13180a1db0e35db63a169a2d2bd401fdecc874d95536604121944b9d45f34100e4b2f5a"
+                },
+                {
+                  "name": "dotnet-sdk-linux-musl-arm64.tar.gz",
+                  "rid": "linux-musl-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.134/dotnet-sdk-8.0.134-linux-musl-arm64.tar.gz",
+                  "hash": "9d0a6979398678c206eace0e3d890649e1578334ec26885f8f2bfdbf1f17b22974003d26bd552684db03e4e996dbd5bb3581a8be9340c1c58aeb6b6b7d77ffde"
+                },
+                {
+                  "name": "dotnet-sdk-linux-x64.tar.gz",
+                  "rid": "linux-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.134/dotnet-sdk-8.0.134-linux-x64.tar.gz",
+                  "hash": "a7e10581123a8fc79bfa807f20cddec4ab1d190b1f7ee64dc690d0358cd3515d33462e54e109b5b9f55f6fbb75d16a54d01d7d35d25465f97765b86c48d79796"
+                },
+                {
+                  "name": "dotnet-sdk-osx-x64.tar.gz",
+                  "rid": "osx-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.134/dotnet-sdk-8.0.134-osx-x64.tar.gz",
+                  "hash": "379528394da206d7832b7bef1f226037df0c34ce612f3705ca603f72ef9f6e0bb2be3f59ad426bfe7b4ed598c12273c86e2ce8af10fefbd97029da7b834bf778"
+                },
+                {
+                  "name": "dotnet-sdk-osx-arm64.tar.gz",
+                  "rid": "osx-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.134/dotnet-sdk-8.0.134-osx-arm64.tar.gz",
+                  "hash": "cda1f7fd86ea0deb76bc7c36f9a95a5d76fade3d76138e4fec57dd912d31ae236580ce32afd7a899b8d281005b2ab150ff2f842979420372a8a9c9a34ba194a8"
+                },
+                {
+                  "name": "dotnet-sdk-win-arm64.zip",
+                  "rid": "win-arm64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.134/dotnet-sdk-8.0.134-win-arm64.zip",
+                  "hash": "6ab89157b134a910c72dbbe738607afb3343dd03f4b524281ee38d397fa4c3705aa0cb93c5082e9485b50f011fccd564ecc530926a2ab3afad1b8213b675b55b"
+                },
+                {
+                  "name": "dotnet-sdk-win-x64.zip",
+                  "rid": "win-x64",
+                  "url": "https://builds.dotnet.microsoft.com/dotnet/Sdk/8.0.134/dotnet-sdk-8.0.134-win-x64.zip",
+                  "hash": "82ea5e23677606af6ef8828599f90ab6a81a8d3354c89719db310fc515ce34f353fc9d988d9414e42c2af31fb1a8c25b80f1505401786623d812600c82e38360"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

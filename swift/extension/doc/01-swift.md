@@ -119,7 +119,9 @@ no target the filter names fails, since `xcodebuild` refuses the selection.
 ## Install and upgrade dependencies
 
 `putnami install` runs the `workspace-install` job of this extension over the
-workspace's components, except the projects `disable.tags` excludes:
+workspace's components, except the projects `disable.tags` excludes. A change
+to `Package.resolved` at the workspace root makes the next `putnami` command
+run it again:
 
 | Component | What it runs |
 |---|---|
@@ -150,7 +152,7 @@ product (`.executable(name:)`) or an executable target
 
 | Command | What it runs |
 |---|---|
-| `putnami serve <project>` | `swift run --force-resolved-versions <executable>` in the package, with `PORT` set: `--port` defaults to 3000, and 0 selects a free port. The executable reads `PORT` to listen. The command reports the server ready once the port accepts a connection, so `putnami qualify` and compose can wait on it. There is no watcher. |
+| `putnami serve <project>` | `swift run --force-resolved-versions <executable>`, with `-- <arguments>` from `--args`, in the package, with `PORT` set: `--port` defaults to 3000, and 0 selects a free port. The executable reads `PORT` to listen. The command reports the server ready once the port accepts a connection, so `putnami qualify` and compose can wait on it. There is no watcher. |
 | `putnami run <project> --args "<arguments>"` | `swift run --force-resolved-versions <executable> -- <arguments>`, and exits with its exit code. |
 
 Both resolve with the versions `Package.resolved` pins. The executable is the
@@ -205,7 +207,7 @@ of the selected Swift, so the same command packages from macOS and from Linux
 | Executable | `/app/<executable>`, the image's entrypoint |
 
 The image runs as the user `65532`, the `nonroot` user of distroless, in
-`/app`, with `PORT=8080` set and exposed: the executable reads `PORT` to
+`/app`, with `PORT` set and exposed from `--port`, 8080 by default: the executable reads `PORT` to
 listen, as it does under `serve`. The base is `gcr.io/distroless/static:nonroot`
 pinned by digest, which holds CA certificates and time zones and no shell. A
 project names another base with `--docker-base-image image@sha256:<digest>`; a
