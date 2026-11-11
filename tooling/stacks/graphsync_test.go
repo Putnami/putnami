@@ -344,3 +344,35 @@ func TestTheSyncJobReportsTheWarningsOfTheToolsSync(t *testing.T) {
 		t.Errorf("the sync job reports no warning:\n%s", events.String())
 	}
 }
+
+func TestAGraphPackageRunsTwoExtensionsWithQualifiedJobs(t *testing.T) {
+	root := t.TempDir()
+	g := testGraphSync()
+	g.Extensions = []string{"@acme/lang"}
+	g.Jobs = []string{"test", "lint", "build"}
+	writeTestFile(t, filepath.Join(root, "api", "putnami.json"), `{"extensions": ["@acme/lang"], "disable": {"jobs": ["serve", "@acme/lang:test", "build"]}}`)
+	both := GraphPackage{Dir: "api", Extension: testExtension, Also: []string{"@acme/lang"},
+		Disabled: []string{"@acme/lang:build", testExtension + ":test", "lint", "@acme/other:test"}}
+	if _, err := g.Apply(root, []GraphPackage{both}, false); err != nil {
+		t.Fatal(err)
+	}
+	api := readTestProject(t, root, "api")
+	// The extension it already ran keeps its place; the jobs it owns follow
+	// the foreign ones: bare, then by extension, the sync's own first. A job
+	// qualified by an extension it does not own is not its to write.
+	if got := api["extensions"]; !reflect.DeepEqual(got, []any{"@acme/lang", testExtension}) {
+		t.Errorf("api extensions %v", got)
+	}
+	if got := api["disable"]; !reflect.DeepEqual(got, map[string]any{"jobs": []any{"serve", "lint", testExtension + ":test", "@acme/lang:build"}}) {
+		t.Errorf("api disable %v", got)
+	}
+
+	// Back to one extension: the other leaves, with its qualified jobs.
+	if _, err := g.Apply(root, []GraphPackage{{Dir: "api", Extension: "@acme/lang", Disabled: []string{"lint"}}}, false); err != nil {
+		t.Fatal(err)
+	}
+	api = readTestProject(t, root, "api")
+	if !reflect.DeepEqual(api["extensions"], []any{"@acme/lang"}) || !reflect.DeepEqual(api["disable"], map[string]any{"jobs": []any{"serve", "lint"}}) {
+		t.Errorf("api with one extension %v", api)
+	}
+}

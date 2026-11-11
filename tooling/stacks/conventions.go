@@ -1,4 +1,4 @@
-package rush
+package stacks
 
 import (
 	"bytes"
@@ -12,97 +12,99 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-
-	detect "go.putnami.dev/tooling/observe/detect/rush"
-	"go.putnami.dev/tooling/stacks"
 )
 
-// sourceEntry is the entry an import gives a project whose package.json
-// names a build output: the TypeScript extension builds and resolves a
-// project from its sources (D-066).
-const sourceEntry = "./src/index.ts"
+// SourceEntry is the entry an import gives a project whose package.json
+// names a build output that its build no longer writes: the TypeScript
+// extension's Bun build resolves a project from its sources (D-066).
+const SourceEntry = "./src/index.ts"
 
 // rootTSConfig is the TypeScript configuration of the workspace root, which
 // the TypeScript extension's install writes.
 const rootTSConfig = "tsconfig.json"
 
-// conventionWrite is one file an import writes to adopt Putnami's TypeScript
-// conventions.
-type conventionWrite struct {
-	// file is the workspace-relative file.
-	file string
-	// before and after are its bytes; before is nil for a new file.
-	before, after []byte
-	// what says what the write does, for the warning that lists it.
-	what string
+// ConventionProject is a project an import hands to the TypeScript
+// extension, with what D-066 reads of it.
+type ConventionProject struct {
+	// Dir is the workspace-relative project directory.
+	Dir string
+	// Name is the project's name, for the warnings.
+	Name string
+	// BunBuild reports a build the import moves to the TypeScript
+	// extension's Bun build, which writes nothing in the project: a build
+	// that runs tsc writes the output its main names, and so does one that
+	// stays on the tool.
+	BunBuild bool
+	// PublishedBy, when set, names what publishes the project, such as
+	// rush.json: its main stays the entry its consumers read.
+	PublishedBy string
 }
 
-// importConventions answers the files an import writes for the projects, and
-// a warning for each manifest it cannot edit: the exports of a package.json
-// whose main or types names a file outside src/, unless rush.json publishes
-// the project, and a tsconfig.json that extends the root's where a project
-// has none.
-func importConventions(root string, projects []detect.Project) ([]conventionWrite, []string, error) {
-	published, err := publishedProjects(root)
-	if err != nil {
-		return nil, nil, err
-	}
-	var writes []conventionWrite
+// ConventionWrite is one file an import writes to adopt Putnami's
+// TypeScript conventions.
+type ConventionWrite struct {
+	// File is the workspace-relative file.
+	File string
+	// Before and After are its bytes; Before is nil for a new file.
+	Before, After []byte
+	// What says what the write does, for the note that lists it.
+	What string
+}
+
+// ImportConventions answers the files an import writes for the projects
+// (D-066), and a warning for each manifest it does not edit: the exports of
+// a package.json whose main or types names a file outside src/, when the
+// project's build moves to the Bun build and nothing publishes it, and a
+// tsconfig.json that extends the root's where a project holds no
+// tsconfig*.json. A project that holds another tsconfig*.json keeps its
+// configuration, which its test runner or its linter may read (ADR 0017).
+func ImportConventions(root string, projects []ConventionProject) ([]ConventionWrite, []string, error) {
+	var writes []ConventionWrite
 	var warnings []string
 	for _, p := range projects {
-		dir := filepath.Join(root, filepath.FromSlash(p.Folder))
-		manifest := path.Join(p.Folder, "package.json")
+		dir := filepath.Join(root, filepath.FromSlash(p.Dir))
+		manifest := path.Join(p.Dir, "package.json")
 		data, err := os.ReadFile(filepath.Join(dir, "package.json")) //nolint:gosec // a project manifest under the workspace root
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
 			return nil, nil, err
 		}
-		if data != nil {
+		if data != nil && p.BunBuild {
 			after, reason, err := withSourceExports(dir, data)
 			switch {
 			case err != nil:
 				return nil, nil, fmt.Errorf("%s: %w", manifest, err)
-			case after != nil && published[p.Folder]:
-				warnings = append(warnings, fmt.Sprintf("%s keeps its entry: rush.json publishes %s, so its main stays the build output its consumers read, which Putnami's TypeScript build does not write, and the projects that depend on it cannot resolve it; add \"exports\": {\".\": %q} by hand when no consumer outside the repository needs that entry, or adopt the repository in delegate mode", manifest, p.Name, sourceEntry))
+			case after != nil && p.PublishedBy != "":
+				warnings = append(warnings, fmt.Sprintf("%s keeps its entry: %s publishes %s, so its main stays the build output its consumers read, which Putnami's Bun build does not write, and the projects that depend on it cannot resolve it; add \"exports\": {\".\": %q} by hand when no consumer outside the repository needs that entry, or keep its build on the tool", manifest, p.PublishedBy, p.Name, SourceEntry))
 			case after != nil:
-				writes = append(writes, conventionWrite{file: manifest, before: data, after: after, what: "exports " + sourceEntry + " added, so its dependents build against its sources"})
+				writes = append(writes, ConventionWrite{File: manifest, Before: data, After: after, What: "exports " + SourceEntry + " added, so its dependents build against its sources"})
 			case reason != "":
-				warnings = append(warnings, fmt.Sprintf("%s keeps its entry: %s; add \"exports\": {\".\": %q} by hand so its dependents build against its sources", manifest, reason, sourceEntry))
+				warnings = append(warnings, fmt.Sprintf("%s keeps its entry: %s; add \"exports\": {\".\": %q} by hand so its dependents build against its sources", manifest, reason, SourceEntry))
 			}
 		}
-		config := filepath.Join(dir, rootTSConfig)
-		if _, err := os.Stat(config); errors.Is(err, fs.ErrNotExist) {
-			up := strings.Repeat("../", strings.Count(p.Folder, "/")+1)
+		if configs, _ := filepath.Glob(filepath.Join(dir, "tsconfig*.json")); len(configs) == 0 {
+			up := strings.Repeat("../", strings.Count(p.Dir, "/")+1)
 			body := fmt.Sprintf("{\n  \"extends\": %q\n}\n", up+rootTSConfig)
-			writes = append(writes, conventionWrite{file: path.Join(p.Folder, rootTSConfig), after: []byte(body), what: "written, extending the root's"})
+			writes = append(writes, ConventionWrite{File: path.Join(p.Dir, rootTSConfig), After: []byte(body), What: "written, extending the root's"})
 		}
 	}
 	return writes, warnings, nil
 }
 
-// publishedProjects answers the folders of the projects rush.json publishes:
-// shouldPublish, or a version policy.
-func publishedProjects(root string) (map[string]bool, error) {
-	data, err := os.ReadFile(filepath.Join(root, detect.Config)) //nolint:gosec // rush.json at the workspace root
+// PackagePublished answers what publishes the package in dir: its
+// package.json when it is not private, which npm then publishes; empty for a
+// private package or a directory without a readable package.json.
+func PackagePublished(root, dir string) string {
+	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(dir), "package.json")) //nolint:gosec // a project manifest under the workspace root
 	if err != nil {
-		return nil, err
+		return ""
 	}
-	var cfg struct {
-		Projects []struct {
-			Folder        string `json:"projectFolder"`
-			ShouldPublish bool   `json:"shouldPublish"`
-			VersionPolicy string `json:"versionPolicyName"`
-		} `json:"projects"`
+	var manifest struct {
+		Private bool `json:"private"`
 	}
-	if err := json.Unmarshal(detect.StripComments(data), &cfg); err != nil {
-		return nil, fmt.Errorf("rush.json cannot be parsed: %w", err)
+	if json.Unmarshal(data, &manifest) != nil || manifest.Private {
+		return ""
 	}
-	out := map[string]bool{}
-	for _, p := range cfg.Projects {
-		if p.ShouldPublish || p.VersionPolicy != "" {
-			out[path.Clean(strings.TrimPrefix(p.Folder, "./"))] = true
-		}
-	}
-	return out, nil
+	return "its package.json, which is not private,"
 }
 
 // entryKeys are the top-level members of a package.json that name its entry.
@@ -112,7 +114,7 @@ var entryKeys = []string{"main", "types", "typings"}
 // its indentation, and an optional trailing comma.
 var memberLine = regexp.MustCompile(`^([ \t]+)"[^"]+"\s*:\s*"[^"]*"(,?)[ \t]*$`)
 
-// withSourceExports answers the package.json data with exports sourceEntry
+// withSourceExports answers the package.json data with exports SourceEntry
 // added after its top-level main, types or typings member, or nil when it
 // keeps its own entry: it declares exports, names no entry outside src/, or
 // the project holds no src/index.ts. A manifest it would edit but cannot,
@@ -136,7 +138,7 @@ func withSourceExports(dir string, data []byte) ([]byte, string, error) {
 	if !outside {
 		return nil, "", nil
 	}
-	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(sourceEntry))); err != nil {
+	if _, err := os.Stat(filepath.Join(dir, filepath.FromSlash(SourceEntry))); err != nil {
 		return nil, "", nil
 	}
 	end, err := topLevelEntryEnd(data)
@@ -158,7 +160,7 @@ func withSourceExports(dir string, data []byte) ([]byte, string, error) {
 		return nil, "its entry shares its line with another member", nil
 	}
 	indent := string(m[1])
-	member := fmt.Sprintf("%s\"exports\": {\n%s%s\".\": %q\n%s}", indent, indent, indent, sourceEntry, indent)
+	member := fmt.Sprintf("%s\"exports\": {\n%s%s\".\": %q\n%s}", indent, indent, indent, SourceEntry, indent)
 	var out bytes.Buffer
 	out.Write(data[:start])
 	if len(m[2]) > 0 {
@@ -224,20 +226,23 @@ func topLevelEntryEnd(data []byte) (int, error) {
 	return found, nil
 }
 
-// applyConventions writes the files, each replaced through a temporary file
-// beside it, and lists each in a warning, or with dry set adds their diffs.
-func applyConventions(root string, writes []conventionWrite, result *stacks.GraphResult, dry bool) error {
+// ApplyConventions writes the files, each replaced through a temporary file
+// beside it, and answers a note that lists each; with dry set it writes
+// nothing and answers each as a change.
+func ApplyConventions(root string, writes []ConventionWrite, dry bool) ([]FileChange, []string, error) {
+	var changes []FileChange
+	var notes []string
 	for _, w := range writes {
 		if dry {
-			result.Changes = append(result.Changes, stacks.FileChange{File: w.file, Before: w.before, After: w.after})
+			changes = append(changes, FileChange{File: w.File, Before: w.Before, After: w.After})
 			continue
 		}
-		if err := writeAtomic(filepath.Join(root, filepath.FromSlash(w.file)), w.after); err != nil {
-			return err
+		if err := writeAtomic(filepath.Join(root, filepath.FromSlash(w.File)), w.After); err != nil {
+			return nil, nil, err
 		}
-		result.Warnings = append(result.Warnings, fmt.Sprintf("%s: %s", w.file, w.what))
+		notes = append(notes, fmt.Sprintf("%s: %s", w.File, w.What))
 	}
-	return nil
+	return changes, notes, nil
 }
 
 // writeAtomic replaces file with data through a temporary file beside it.
