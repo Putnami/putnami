@@ -24,7 +24,16 @@ allowed to move:
 ```text
 generate ──→ transpile ──→ types
          └──→ compile
+tsc / tsc-auto              (a library whose build script runs tsc alone)
 ```
+
+`build-tsc` compiles such a library with its own `tsc` into the `outDir` its
+`tsconfig` names, a `pathFrom` output its dependents read
+([ADR 0010](doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md)).
+It empties that output itself, since the engine empties no `pathFrom` output,
+and runs `tsc -b` on a config with references as `tsc -p`. The rule of what
+"runs tsc alone" is lives in the SDK's `tscscript` package, which the Nx and
+Turborepo imports read too: change it there, never in a copy.
 
 Each phase caches independently and can be batched across projects. Batching is
 an execution strategy only: every batched phase writes each project's artifacts

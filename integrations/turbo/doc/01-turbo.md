@@ -38,21 +38,25 @@ to write them.
 
 | | Import | Delegate |
 |---|---|---|
-| A TypeScript package's task whose script runs only `bun build`, `bun test`, `vitest`, `jest` or `biome`, or a bare `eslint` or `eslint .` lint | Runs the `@putnami/typescript` task: Putnami's runner and cache | Runs `turbo run` on it |
-| Any other task, such as a `tsc` or `prettier` script, an ESLint with arguments, or a lint chained with `prettier` | Runs `turbo run` on it | Runs `turbo run` on it |
+| A TypeScript package's task whose script runs only `bun build`, `bun test`, `vitest`, `jest` or `biome`, a bare `eslint` or `eslint .` lint, or a `build` script that runs `tsc` alone | Runs the `@putnami/typescript` task: Putnami's runner and cache | Runs `turbo run` on it |
+| Any other task, such as a bundler build, another `tsc` script, a `prettier` script, an ESLint with arguments, or a lint chained with `prettier` | Runs `turbo run` on it | Runs `turbo run` on it |
 | Cache | Putnami's for the tasks `@putnami/typescript` runs, Turborepo's for the others | Turborepo's, local and remote |
 
 Import mode moves a task to `@putnami/typescript` only when its script
-runs what that extension's task runs and nothing else: moving a `tsc` or
-`prettier` task would change the tool that checks the code. A test script that
-runs `vitest` or `jest` moves, because the test task runs the project's own
-runner with its own configuration, as
+runs what that extension's task runs and nothing else: moving a `prettier`
+task would change the tool that checks the code. A test script that runs
+`vitest` or `jest` moves, because the test task runs the project's own runner
+with its own configuration, as
 [the test command](https://github.com/Putnami/putnami/blob/main/typescript/extension/doc/03-test.md#test-runner)
 describes. A bare `eslint` lint script moves: `@putnami/typescript` lints the
 package with ESLint because its lint script runs it, from the package's own
 configuration. An ESLint script with arguments, such as `--max-warnings 0`,
 stays: the TypeScript lint passes ESLint no argument, so move them to the
-ESLint configuration first. Each task that stays on Turborepo is listed with the reason. One
+ESLint configuration first. A `build` script that runs `tsc` alone (`tsc`,
+`tsc -b` or `tsc -p` with one config) moves with that `tsc`, which Putnami
+runs into the package's `outDir`, as
+[A library built with tsc](https://github.com/Putnami/putnami/blob/main/typescript/extension/doc/02-build.md#a-library-built-with-tsc)
+describes. Each task that stays on Turborepo is listed with the reason. One
 extension runs each task, so no Putnami cache sits over Turborepo's.
 
 A package is TypeScript when it holds a `tsconfig.json`, or a TypeScript
