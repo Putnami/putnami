@@ -66,11 +66,7 @@
     },
     {
       "id": "import-maps-a-tsc-build-target",
-      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone, or when its executor is @nx/js:tsc with no assets, outputPath or rootDir, a tsConfig of tsconfig.lib.json, else tsconfig.json, and no build script other than one that runs tsc alone. Any other tsc target keeps running through Nx and is listed with its reason."
-    },
-    {
-      "id": "import-writes-the-tsc-compiler",
-      "text": "For an imported @nx/js:tsc target, the sync writes compiler tsc in options[\"@putnami/typescript\"] of the project's putnami.json when that key is absent, and records in options[\"@putnami/nx\"] that it wrote it. When the target no longer maps, it removes only a compiler it recorded, and a value the project wrote stays."
+      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone. An @nx/js:tsc target, which compiles with rootDir at the project root into its outputPath and writes a package.json there, and any other tsc target keep running through Nx and are listed with their reason."
     }
   ],
   "decisions": [

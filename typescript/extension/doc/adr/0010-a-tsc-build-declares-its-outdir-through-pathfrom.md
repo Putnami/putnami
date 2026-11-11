@@ -123,8 +123,11 @@ Two facts constrain the answer:
 - The `@putnami/typescript` manifest: the `compiler` flag, the `build-tsc`
   task and its `tsc` and `tsc-auto` steps in `build` and `test`, and `^tsc`
   edges. No CLI or protocol contract changes.
-- `@putnami/nx` and `@putnami/turbo` map a `tsc` build to
-  `@putnami/typescript:build`, and Nx writes the `compiler` it needs.
+- `@putnami/nx` and `@putnami/turbo` map a build whose `package.json`
+  script runs `tsc` alone to `@putnami/typescript:build`. Nx's `@nx/js:tsc`
+  executor stays on Nx: it compiles with `rootDir` at the project root into
+  its `outputPath` and writes a `package.json` there, an emit this task does
+  not reproduce.
 
 ## Migration and reversal
 
