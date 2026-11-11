@@ -171,6 +171,36 @@
               "a-node-start-script-or-the-node-executor-marks-the-node-runtime"
             ]
           }
+        },
+        {
+          "id": "import-maps-a-tsc-build-target",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-tsc-alone-build-script-target-is-imported",
+              "an-nx-js-tsc-target-is-imported",
+              "an-nx-js-tsc-target-writing-outside-the-project-stays-on-nx",
+              "an-nx-js-tsc-target-with-assets-stays-on-nx"
+            ]
+          }
+        },
+        {
+          "id": "import-writes-the-tsc-compiler",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-imported-nx-js-tsc-target-gets-the-tsc-compiler",
+              "the-sync-removes-only-the-compiler-it-wrote"
+            ]
+          }
         }
       ]
     }
