@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/typescript/extension/internal/build"
 	"go.putnami.dev/typescript/extension/internal/catalog"
 	"go.putnami.dev/typescript/extension/internal/git"
+	"go.putnami.dev/typescript/extension/internal/pnpmworkspace"
 	"go.putnami.dev/typescript/extension/internal/project"
 )
 
@@ -144,14 +145,27 @@ func packageNpm(workspaceRoot string, projectPath string, stable bool, versionIn
 		return nil, fmt.Errorf("staged npm package %q does not match release-set coordinate %q", pkg.Name, releaseSet.Coordinate)
 	}
 
-	// Inherit shared fields from workspace root package.json, and read any Bun
-	// catalog declared there so catalog: dependency specifiers resolve to
-	// concrete versions at publish time.
+	// Inherit shared fields from workspace root package.json, and read the
+	// catalog declared there for Bun, else in pnpm-workspace.yaml for pnpm, so
+	// catalog: dependency specifiers resolve to concrete versions at publish
+	// time.
 	wsPkg := project.ReadPackageJSONSafe(filepath.Join(workspaceRoot, "package.json"))
 	var catalogs *catalog.Catalogs
 	if wsPkg != nil {
 		inheritWorkspaceFields(pkg, wsPkg)
 		catalogs = catalog.Parse(wsPkg.Raw)
+	}
+	if catalogs == nil || !catalogs.Present() {
+		if data, err := os.ReadFile(filepath.Join(workspaceRoot, pnpmworkspace.File)); err == nil {
+			pnpmCatalogs, err := catalog.FromPNPMWorkspace(string(data))
+			if err != nil {
+				_ = os.RemoveAll(packageDir)
+				return nil, fmt.Errorf("read the workspace catalogs: %w", err)
+			}
+			if pnpmCatalogs.Present() {
+				catalogs = pnpmCatalogs
+			}
+		}
 	}
 
 	wsProjects := loadWorkspaceProjectNames(workspaceRoot)

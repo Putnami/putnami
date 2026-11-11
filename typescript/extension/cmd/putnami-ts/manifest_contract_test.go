@@ -1072,21 +1072,69 @@ func TestWorkspaceAdapterDeclaresEdgeAttribution(t *testing.T) {
 	}
 }
 
-// The workspace adapter names the bun lockfiles, text and binary, as the root
-// files whose change makes the installed tree stale. biome.json and the
-// tsconfig files change what a project resolves to and install nothing, so
-// they stay out. The adapter claims TypeScript projects, under the language id
-// "typescript".
+// The workspace adapter names the lockfile of every package manager the
+// workspace install runs, and pnpm-workspace.yaml, as the root files whose
+// change makes the installed tree stale. biome.json and the tsconfig files
+// change what a project resolves to and install nothing, so they stay out.
+// The adapter claims TypeScript projects, under the language id "typescript".
 func TestWorkspaceAdapterDeclaresInstallInputsAndLanguage(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "the-lockfile-in-use-keys-the-cache", "every-lockfile-is-an-install-input")
 	manifest := loadExtensionManifest(t)
 	if manifest.Workspace == nil {
 		t.Fatal("manifest declares no workspace adapter")
 	}
-	if got, want := manifest.Workspace.InstallInputs, []string{"bun.lock", "bun.lockb"}; !slices.Equal(got, want) {
+	want := []string{"bun.lock", "bun.lockb", "npm-shrinkwrap.json", "package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock"}
+	if got := manifest.Workspace.InstallInputs; !slices.Equal(got, want) {
 		t.Errorf("workspace.installInputs = %v, want %v", got, want)
+	}
+	for _, manager := range []packageManager{{Name: managerBun}, {Name: managerNPM}, {Name: managerPNPM}, {Name: managerYarn}} {
+		for _, lock := range manager.lockfiles() {
+			if !slices.Contains(want, lock) {
+				t.Errorf("the %s lockfile %s is no install input", manager.Name, lock)
+			}
+		}
 	}
 	if got := manifest.Workspace.Language; got != "typescript" {
 		t.Errorf("workspace.language = %q, want %q", got, "typescript")
+	}
+}
+
+// Every input that keys a task on the bun lockfile keys it on the lockfile of
+// every other manager and on pnpm-workspace.yaml too, and so do the workspace
+// adapter's inputs and each batch's configuration candidates: the key follows
+// the lockfile in use, whichever manager installs.
+func TestEveryLockfileKeysTheTasksThatReadTheBunLock(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "the-lockfile-in-use-keys-the-cache", "every-lockfile-is-a-workspace-input")
+	manifest := loadExtensionManifest(t)
+	lockfiles := []string{"npm-shrinkwrap.json", "package-lock.json", "pnpm-lock.yaml", "pnpm-workspace.yaml", "yarn.lock"}
+	for _, file := range lockfiles {
+		if !slices.Contains(manifest.Workspace.Inputs, file) {
+			t.Errorf("workspace.inputs misses %s", file)
+		}
+	}
+	keyed := 0
+	for name, task := range manifest.Tasks {
+		for port, input := range task.Inputs {
+			if input.From != "workspace" || !slices.Contains(input.Files, "bun.lock") {
+				continue
+			}
+			keyed++
+			for _, file := range lockfiles {
+				if !slices.Contains(input.Files, file) {
+					t.Errorf("task %s input %s reads bun.lock and not %s", name, port, file)
+				}
+			}
+		}
+		if task.Batchable != nil && slices.Contains(task.Batchable.ConfigFiles, "{workspaceRoot}/bun.lock") {
+			for _, file := range []string{"pnpm-lock.yaml", "yarn.lock", "package-lock.json", "npm-shrinkwrap.json"} {
+				if !slices.Contains(task.Batchable.ConfigFiles, "{workspaceRoot}/"+file) {
+					t.Errorf("task %s batch configFiles name bun.lock and not %s", name, file)
+				}
+			}
+		}
+	}
+	if keyed == 0 {
+		t.Fatal("no task input reads bun.lock from the workspace")
 	}
 }
 

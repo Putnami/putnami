@@ -534,8 +534,8 @@
     },
     {
       "id": "D-065",
-      "statement": "an adoption in import mode lets Putnami install the dependencies: the language extension writes the root manifest of its package manager and installs, and the tool's own lockfile and installer are no longer used",
-      "settled": "2026-11-09",
+      "statement": "an adoption in import mode lets Putnami install the dependencies: the language extension writes the members where the repository's package manager reads them and installs with that manager and its lockfile (D-068)",
+      "settled": "2026-11-10",
       "settledBy": "fdumay",
       "reviewOnly": true
     },
@@ -552,6 +552,14 @@
       "settled": "2026-11-10",
       "settledBy": "fdumay",
       "adr": "tooling/cli/doc/adr/0086-init-declares-the-languages-a-repository-holds.md",
+      "reviewOnly": true
+    },
+    {
+      "id": "D-068",
+      "statement": "a TypeScript workspace installs with the package manager its repository declares, in packageManager, else by its root lockfile or pnpm-workspace.yaml, and Bun is the default only when it declares none; Bun still runs the TypeScript tasks",
+      "settled": "2026-11-10",
+      "settledBy": "fdumay",
+      "adr": "typescript/extension/doc/adr/0007-the-repository-chooses-its-package-manager.md",
       "reviewOnly": true
     }
   ]

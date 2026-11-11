@@ -113,7 +113,7 @@ func TestEnsureWorkspaceCatalog_SeedsTheExactVersionOfTheChannel(t *testing.T) {
 	})
 
 	ctx := channelSeedContext(t, dir, candidateChannel, registry.URL)
-	if err := ensureWorkspaceCatalog(ctx, jsonl.New()); err != nil {
+	if err := ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager); err != nil {
 		t.Fatalf("ensureWorkspaceCatalog: %v", err)
 	}
 
@@ -150,7 +150,7 @@ func TestEnsureWorkspaceCatalog_AChannelThatNamesNoVersionFailsAndWritesNothing(
 	})
 
 	ctx := channelSeedContext(t, dir, candidateChannel, registry.URL)
-	err = ensureWorkspaceCatalog(ctx, jsonl.New())
+	err = ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager)
 	if err == nil {
 		t.Fatal("ensureWorkspaceCatalog succeeded for a package the channel does not name")
 	}
@@ -178,7 +178,7 @@ func TestEnsureWorkspaceCatalog_LatestSeedsTheDistTagWithoutARequest(t *testing.
 			refuseNPMMetadataRequests(t)
 
 			ctx := channelSeedContext(t, dir, channel, "http://127.0.0.1:1")
-			if err := ensureWorkspaceCatalog(ctx, jsonl.New()); err != nil {
+			if err := ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager); err != nil {
 				t.Fatalf("ensureWorkspaceCatalog: %v", err)
 			}
 			catalog := readCatalog(t, dir)
@@ -202,7 +202,7 @@ func TestEnsureWorkspaceCatalog_AChannelKeepsExistingEntries(t *testing.T) {
 	refuseNPMMetadataRequests(t)
 
 	ctx := channelSeedContext(t, dir, candidateChannel, "http://127.0.0.1:1")
-	if err := ensureWorkspaceCatalog(ctx, jsonl.New()); err != nil {
+	if err := ensureWorkspaceCatalog(ctx, jsonl.New(), bunManager); err != nil {
 		t.Fatalf("ensureWorkspaceCatalog: %v", err)
 	}
 	catalog := readCatalog(t, dir)

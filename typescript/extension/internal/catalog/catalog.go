@@ -1,5 +1,5 @@
-// Package catalog reads the Bun workspace catalogs declared in a root
-// package.json. Bun lets a member depend on a shared version through the
+// Package catalog reads the workspace catalogs declared in a root package.json,
+// for Bun, or in pnpm-workspace.yaml, for pnpm. Bun lets a member depend on a shared version through the
 // "catalog:" protocol; the concrete version lives in a catalog on the root
 // manifest. This package is the single source of truth for discovering those
 // catalogs — both the install/upgrade tooling and the npm publisher resolve
@@ -9,6 +9,8 @@ package catalog
 import (
 	"encoding/json"
 	"strings"
+
+	"go.putnami.dev/typescript/extension/internal/pnpmworkspace"
 )
 
 // Protocol is the Bun dependency protocol that resolves a version from the
@@ -143,4 +145,16 @@ func unmarshalNamedCatalogs(raw json.RawMessage) map[string]map[string]string {
 		return nil
 	}
 	return m
+}
+
+// FromPNPMWorkspace returns the catalogs a pnpm-workspace.yaml declares, where
+// pnpm reads them: `catalog` backs the bare "catalog:" protocol and
+// `catalogs.<name>` backs "catalog:<name>". It is the reader for a pnpm
+// workspace, whose root package.json declares no catalog.
+func FromPNPMWorkspace(text string) (*Catalogs, error) {
+	c, err := pnpmworkspace.ReadCatalogs(text)
+	if err != nil {
+		return nil, err
+	}
+	return &Catalogs{Default: c.Default, Named: c.Named, DefaultAtTop: c.Default != nil, NamedAtTop: c.Named != nil}, nil
 }

@@ -253,7 +253,7 @@ func TestFetchWorkspaceDependencies_StoppedParentRemovesItsPrivateFiles(t *testi
 		cancel()
 		return &exec.Result{ExitCode: -1}, nil
 	})
-	err := fetchWorkspaceDependencies(parent, ctx.WorkspaceRoot, "/mock/bun", unitCredential(), jsonl.New())
+	err := fetchWorkspaceDependencies(parent, ctx.WorkspaceRoot, bunManager, "/mock/bun", committedLockFile, unitCredential(), jsonl.New())
 	if err == nil || !strings.Contains(err.Error(), "stopped") {
 		t.Fatalf("err = %v, want the stop reported", err)
 	}
@@ -434,7 +434,7 @@ func TestFetchInputs_CopiesWhatAFrozenInstallReads(t *testing.T) {
 	writeProbeFile(t, filepath.Join(root, "vendor", "tb.tgz"), "tarball")
 	writeProbeFile(t, filepath.Join(root, "patches", "marker.patch"), "diff")
 
-	got, err := fetchInputs(root)
+	got, err := fetchInputs(root, bunManager, committedLockFile)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -469,7 +469,7 @@ func TestFetchInputs_RefusesWhatAHostedRunCannotHold(t *testing.T) {
 			writeProbeFile(t, filepath.Join(root, "package.json"), manifest)
 			writeProbeFile(t, filepath.Join(root, committedLockFile), `{"lockfileVersion":1}`)
 			writeProbeFile(t, filepath.Join(root, "pkgs", "a", "package.json"), `{"name":"a","devDependencies":{"l":"link:l"}}`)
-			_, err := fetchInputs(root)
+			_, err := fetchInputs(root, bunManager, committedLockFile)
 			if err == nil || !strings.Contains(err.Error(), "hosted run") {
 				t.Fatalf("fetchInputs err = %v, want a refusal naming the hosted run", err)
 			}
@@ -478,7 +478,7 @@ func TestFetchInputs_RefusesWhatAHostedRunCannotHold(t *testing.T) {
 }
 
 func TestFetchInputs_RequiresARootManifest(t *testing.T) {
-	if _, err := fetchInputs(t.TempDir()); err == nil {
+	if _, err := fetchInputs(t.TempDir(), bunManager, committedLockFile); err == nil {
 		t.Fatal("fetchInputs accepted a workspace without package.json")
 	}
 }
@@ -590,7 +590,7 @@ func TestShapeWorkspaceManifests_IsIdempotent(t *testing.T) {
 		return &exec.Result{Success: true, Stdout: "1.4.0"}, nil
 	})
 
-	if err := shapeWorkspaceManifests(ctx, jsonl.New(), "/mock/bun"); err != nil {
+	if err := shapeWorkspaceManifests(ctx, jsonl.New(), bunManager, "/mock/bun"); err != nil {
 		t.Fatal(err)
 	}
 	shaped := []string{"package.json", ".npmrc", "tsconfig.json", "biome.json"}
@@ -609,7 +609,7 @@ func TestShapeWorkspaceManifests_IsIdempotent(t *testing.T) {
 		}
 	}
 
-	if err := shapeWorkspaceManifests(ctx, jsonl.New(), "/mock/bun"); err != nil {
+	if err := shapeWorkspaceManifests(ctx, jsonl.New(), bunManager, "/mock/bun"); err != nil {
 		t.Fatal(err)
 	}
 	for _, rel := range shaped {
