@@ -26,7 +26,7 @@
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, and its build, test and lint targets whose script runs only what that extension runs (bun build; bun test, vitest or jest; biome; eslint per import-keeps-eslint) run as its task, with @putnami/nx:<task> off. Every other target, such as tsc, prettier or another executor, keeps running through Nx, is listed, and @putnami/typescript:<task> is off."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, and its build, test and lint targets that run only what that extension runs (bun build or tsc, see import-maps-a-tsc-build-target; bun test, vitest or jest; biome; eslint, see import-keeps-eslint) run as its task, with @putnami/nx:<task> off. Every other target, such as prettier, stays on Nx, is listed, and @putnami/typescript:<task> is off."
     },
     {
       "id": "import-maps-vitest-and-jest-tests",
@@ -63,11 +63,21 @@
     {
       "id": "import-marks-the-node-runtime",
       "text": "In import mode, an imported TypeScript project whose package.json start script runs node, or whose Nx serve target runs the @nx/js:node executor, gets options[\"@putnami/typescript\"].runtime node in its putnami.json. The sync never changes a runtime the project already declares."
+    },
+    {
+      "id": "import-maps-a-tsc-build-target",
+      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone, or when it is an @nx/js:tsc target that import-maps-an-nx-js-tsc-build-target maps. Any other tsc target keeps running through Nx and is listed with its reason."
+    },
+    {
+      "id": "import-maps-an-nx-js-tsc-build-target",
+      "text": "An @nx/js:tsc build maps when, with nx.json targetDefaults and its default configuration applied, it sets no assets, external or other emit option and generatePackageJson false, its tsConfig is the config the tsc build compiles, its outputPath that config's outDir, inside the project, its rootDir (else the project root) the config's rootDir, and no .tsbuildinfo goes unnamed. The sync then owns options[\"@putnami/typescript\"].compiler tsc unless the project sets another. Others stay on Nx with their reason."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
     "integrations/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md",
-    "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md"
+    "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
+    "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
+    "integrations/nx/doc/adr/0004-an-nx-js-tsc-build-moves-when-the-tsc-build-reproduces-its-emit.md"
   ]
 }

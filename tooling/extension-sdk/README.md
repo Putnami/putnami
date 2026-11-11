@@ -53,6 +53,13 @@ the author's-eye version, with the CLI-side behavior, is
 | Workspace adapter | `workspace.markers`, `.inputs`, `.excludes`, `.syncTask`, `.installInputs`, `.language` | `ServeProbe` in `go.putnami.dev/protocol/workspace` serves `__putnami workspace-probe`; project-level `watchedFiles` may include provider-owned workspace-root invalidation inputs without changing the v1 wire shape |
 | Invocation-scoped sensitive outputs | `declares.outputs` (`scope: "invocation"`, `sensitive`), `runOn: "finally"` + `finalizes` | `dbtestenv` is the reference implementation — provisioning, the non-secret lease, orphan reaping after `SIGKILL`, and the `sensitive` binding artifact a consumer reads with `BindingFrom` |
 
+The `tscscript` package states when a `package.json` build script runs the
+TypeScript compiler alone (`tsc`, `tsc -b` or `tsc -p` with at most one
+config, plus `--pretty` or `--verbose`), and the config `tsc -p` compiles for
+a project with no build script.
+`@putnami/typescript` compiles such a project with that `tsc`, and the Nx and
+Turborepo imports move such a build to it, so the three read one rule.
+
 The `goembed` package supplies the shared Go directive parser and target
 resolver used by Go module packaging and by the Go extension's answer for its
 `go-embed:build` / `go-embed:test` input selectors. It scans potentially buildable source

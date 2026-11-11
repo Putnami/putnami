@@ -1,4 +1,4 @@
-package project
+package tscscript
 
 import (
 	"encoding/json"
@@ -42,7 +42,7 @@ func TestStripJSONC_RemovesCommentsAndTrailingCommasOnly(t *testing.T) {
 	}
 }
 
-func TestReadTsConfigChain_AppliesExtendsPrecedenceAndRecordsDeclaringDir(t *testing.T) {
+func TestReadChain_AppliesExtendsPrecedenceAndRecordsDeclaringDir(t *testing.T) {
 	// A package config resolves through its real path.
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
@@ -61,9 +61,9 @@ func TestReadTsConfigChain_AppliesExtendsPrecedenceAndRecordsDeclaringDir(t *tes
 	writeTsConfigFile(t, filepath.Join(project, "tsconfig.json"),
 		`{"extends": "../../tsconfig.base.json", "compilerOptions": {"paths": {"@/*": ["${configDir}/src/*"]}}}`)
 
-	chain := ReadTsConfigChain(filepath.Join(project, "tsconfig.json"))
+	chain := ReadChain(filepath.Join(project, "tsconfig.json"))
 
-	cases := map[string]TsConfigValue{
+	cases := map[string]Value{
 		"strict":    {Value: true, Dir: filepath.Join(root, "base")},
 		"jsx":       {Value: "react-jsx", Dir: root},
 		"typeRoots": {Value: []any{"./types"}, Dir: filepath.Join(root, "node_modules", "@scope", "cfg")},
@@ -80,29 +80,29 @@ func TestReadTsConfigChain_AppliesExtendsPrecedenceAndRecordsDeclaringDir(t *tes
 	}
 }
 
-func TestReadTsConfigChain_ToleratesCyclesAndMissingConfigs(t *testing.T) {
+func TestReadChain_ToleratesCyclesAndMissingConfigs(t *testing.T) {
 	root := t.TempDir()
 	writeTsConfigFile(t, filepath.Join(root, "a.json"), `{"extends": ["./b.json", "missing-package"], "compilerOptions": {"strict": true}}`)
 	writeTsConfigFile(t, filepath.Join(root, "b.json"), `{"extends": "./a.json", "compilerOptions": {"noEmit": true}}`)
 
-	chain := ReadTsConfigChain(filepath.Join(root, "a.json"))
+	chain := ReadChain(filepath.Join(root, "a.json"))
 	if chain.CompilerOptions["strict"].Value != true || chain.CompilerOptions["noEmit"].Value != true {
 		t.Errorf("compilerOptions = %+v, want strict and noEmit", chain.CompilerOptions)
 	}
-	if got := ReadTsConfigChain(filepath.Join(root, "absent.json")); len(got.CompilerOptions) != 0 || got.Files != nil {
+	if got := ReadChain(filepath.Join(root, "absent.json")); len(got.CompilerOptions) != 0 || got.Files != nil {
 		t.Errorf("an unreadable config resolves %+v, want nothing", got)
 	}
 }
 
-func TestReadTsConfigChain_IgnoresAByteOrderMark(t *testing.T) {
+func TestReadChain_IgnoresAByteOrderMark(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tsconfig.json")
 	writeTsConfigFile(t, path, "\xEF\xBB\xBF{\"compilerOptions\": {\"baseUrl\": \"${configDir}\"}}")
-	if got := ReadTsConfigChain(path).CompilerOptions["baseUrl"].Value; got != "${configDir}" {
+	if got := ReadChain(path).CompilerOptions["baseUrl"].Value; got != "${configDir}" {
 		t.Errorf("baseUrl = %v, want the value behind the byte-order mark", got)
 	}
 }
 
-func TestReadTsConfigChain_ResolvesPackageExports(t *testing.T) {
+func TestReadChain_ResolvesPackageExports(t *testing.T) {
 	root := t.TempDir()
 	pkg := filepath.Join(root, "store", "cfg")
 	writeTsConfigFile(t, filepath.Join(pkg, "package.json"), `{"exports": {
@@ -125,12 +125,12 @@ func TestReadTsConfigChain_ResolvesPackageExports(t *testing.T) {
 	writeTsConfigFile(t, filepath.Join(project, "tsconfig.json"),
 		`{"extends": ["@scope/cfg", "@scope/cfg/strict", "@scope/cfg/presets/bun", "@scope/cfg/hidden.json"]}`)
 
-	chain := ReadTsConfigChain(filepath.Join(project, "tsconfig.json"))
+	chain := ReadChain(filepath.Join(project, "tsconfig.json"))
 	realPkg, err := filepath.EvalSymlinks(pkg)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got, want := chain.CompilerOptions["typeRoots"], (TsConfigValue{Value: []any{"./types"}, Dir: realPkg}); !reflect.DeepEqual(got, want) {
+	if got, want := chain.CompilerOptions["typeRoots"], (Value{Value: []any{"./types"}, Dir: realPkg}); !reflect.DeepEqual(got, want) {
 		t.Errorf("typeRoots = %+v, want the require target anchored on the real package path %+v", got, want)
 	}
 	if chain.CompilerOptions["strict"].Value != true || chain.CompilerOptions["jsx"].Value != "react-jsx" {
@@ -145,14 +145,14 @@ func TestExportsTarget_PrefersTheLongerPatternKeyOnATie(t *testing.T) {
 	}
 }
 
-func TestReadTsConfigChain_ReadsExportsBehindAByteOrderMark(t *testing.T) {
+func TestReadChain_ReadsExportsBehindAByteOrderMark(t *testing.T) {
 	root := t.TempDir()
 	pkg := filepath.Join(root, "node_modules", "cfg")
 	writeTsConfigFile(t, filepath.Join(pkg, "package.json"), "\xEF\xBB\xBF{\"exports\": {\".\": \"./base.json\"}}")
 	writeTsConfigFile(t, filepath.Join(pkg, "base.json"), `{"compilerOptions": {"strict": true}}`)
 	writeTsConfigFile(t, filepath.Join(pkg, "tsconfig.json"), `{"compilerOptions": {"strict": false}}`)
 	writeTsConfigFile(t, filepath.Join(root, "tsconfig.json"), `{"extends": "cfg"}`)
-	if got := ReadTsConfigChain(filepath.Join(root, "tsconfig.json")).CompilerOptions["strict"].Value; got != true {
+	if got := ReadChain(filepath.Join(root, "tsconfig.json")).CompilerOptions["strict"].Value; got != true {
 		t.Errorf("strict = %v, want the exported base.json", got)
 	}
 }

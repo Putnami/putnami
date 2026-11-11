@@ -23,7 +23,8 @@
               "each-project-writes-only-into-its-own-output-directory",
               "incremental-build-info-state-is-per-project",
               "the-types-phase-emits-per-project-declarations",
-              "the-generate-phase-emits-per-project-data"
+              "the-generate-phase-emits-per-project-data",
+              "a-tsc-build-writes-nothing-in-a-referenced-project"
             ]
           }
         },
@@ -846,7 +847,8 @@
             "checks": [
               "the-runtime-defaults-to-bun",
               "an-unknown-runtime-fails-naming-bun-and-node",
-              "a-node-project-transpiles-for-node-unless-the-command-names-a-target"
+              "a-node-project-transpiles-for-node-unless-the-command-names-a-target",
+              "a-tsc-build-on-node-runs-the-node-target-check"
             ]
           }
         },
@@ -917,6 +919,86 @@
               "the-base-follows-the-declared-node-major",
               "no-declared-major-fails-naming-the-fields",
               "an-unpinned-major-fails-naming-the-pinned-majors"
+            ]
+          }
+        },
+        {
+          "id": "tsc-compiler-choice",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "auto-compiles-a-tsc-alone-build-script-with-tsc",
+              "auto-keeps-bun-for-any-other-build-script",
+              "an-explicit-compiler-overrides-the-script",
+              "an-explicit-tsc-with-another-build-script-fails",
+              "a-tsc-project-plans-no-bun-transpile-or-types"
+            ]
+          }
+        },
+        {
+          "id": "tsc-build-runs-the-installed-tsc",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-build-script-arguments-reach-tsc",
+              "tsc-b-with-references-runs-as-tsc-p",
+              "no-build-script-runs-tsc-p-on-the-default-config",
+              "a-missing-tsc-fails-naming-typescript",
+              "tsc-runs-with-bun-and-no-node"
+            ]
+          }
+        },
+        {
+          "id": "tsc-output-restores-at-outdir",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-cache-hit-restores-a-deleted-outdir",
+              "a-dependent-builds-after-its-tsc-library",
+              "a-file-tsc-stops-emitting-is-gone-after-a-rebuild",
+              "the-tsbuildinfo-outside-the-outdir-is-declared",
+              "an-unusable-outdir-fails-before-tsc-runs",
+              "serve-run-and-package-run-after-the-tsc-steps"
+            ]
+          }
+        },
+        {
+          "id": "tsc-key-follows-what-tsc-reads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-ignored-output-does-not-move-the-key",
+              "a-dependency-tsconfig-change-moves-the-dependent-key",
+              "a-dependent-test-runs-after-its-library-tsc"
+            ]
+          }
+        },
+        {
+          "id": "tsc-project-does-not-package",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "package-refuses-a-tsc-project"
             ]
           }
         }

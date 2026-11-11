@@ -156,6 +156,20 @@
               "a-node-start-script-marks-the-node-runtime"
             ]
           }
+        },
+        {
+          "id": "import-maps-a-tsc-build-script",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-tsc-alone-build-script-is-imported",
+              "a-tsc-script-with-another-argument-stays-on-turborepo"
+            ]
+          }
         }
       ]
     }

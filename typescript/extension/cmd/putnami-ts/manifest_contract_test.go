@@ -261,6 +261,11 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-infra", id: "requirements", kind: "file", root: "project", path: ".gen/requirements.json"},
 		{task: "build-infra", id: "runtimeDefaults", kind: "file", root: "project", path: ".gen/infra/runtime.json", optionalEmpty: true},
 		{task: "build-transpile", id: "lib", kind: "directory", root: "command-output", path: "lib", optionalEmpty: true},
+		// The tsc build's outputs, at the paths its tsconfig names, which the
+		// task reports on its data ports (ADR 0010).
+		{task: "build-tsc", id: "buildInfo", kind: "file", root: "project", path: "buildInfo", optionalEmpty: true},
+		{task: "build-tsc", id: "declarationDir", kind: "directory", root: "project", path: "declarationDir", optionalEmpty: true},
+		{task: "build-tsc", id: "outDir", kind: "directory", root: "project", path: "outDir", optionalEmpty: true},
 		{task: "build-types", id: "types", kind: "directory", root: "command-output", path: "types", optionalEmpty: true},
 		{task: "config-extract-exec", id: "jsonSchema", kind: "file", root: "project", path: "schema/config.jsonschema.json", optionalEmpty: true},
 		{task: "config-extract-exec", id: "schema", kind: "file", root: "project", path: "schema/config.json", optionalEmpty: true},

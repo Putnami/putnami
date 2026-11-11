@@ -16,8 +16,9 @@ Putnami adopts a tool in one of two modes:
   What an import maps depends on the tool: every Rush project, each moon
   project whose language has a Putnami extension, and in Nx and Turborepo
   only a TypeScript project's targets whose script already runs `bun build`,
-  Biome, a bare ESLint, or a test runner Putnami runs: `bun test`, Vitest or
-  Jest. Each tool's section below gives the exact scope.
+  Biome, a bare ESLint, a test runner Putnami runs: `bun test`, Vitest or
+  Jest, or a `build` that runs `tsc` alone. Each tool's section below gives
+  the exact scope.
 
 | Tool | Mode | Command |
 |---|---|---|
@@ -226,11 +227,15 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
   under Putnami's runner and cache. A Vitest or Jest test keeps its runner and
   its configuration, and an ESLint lint target writes
   `options["@putnami/typescript"].lint.linter: "eslint"`, so the project keeps
-  its ESLint configuration. Every other target, an `@nx/webpack:webpack` build,
-  an ESLint with `--max-warnings` or a lint chained with `prettier` for
-  example, keeps running through Nx, so no target changes the tool that checks
-  it. Move such ESLint arguments to the ESLint configuration, then rerun
-  `putnami projects sync`.
+  its ESLint configuration. So does a `build` whose script runs `tsc` alone:
+  Putnami compiles it with that `tsc`, into its `outDir`, and an `@nx/js:tsc`
+  build whose options repeat its `tsconfig` (`outputPath` its `outDir`,
+  `rootDir` its `rootDir`, no `assets`, `generatePackageJson` `false`). Every
+  other target, another `@nx/js:tsc` or an `@nx/webpack:webpack` build, an
+  ESLint with `--max-warnings` or a lint chained with `prettier` for example,
+  keeps running through Nx, listed with its reason, so no target changes the
+  tool that checks it. Move such ESLint arguments to the ESLint configuration,
+  then rerun `putnami projects sync`.
 - **Delegate**: you keep Nx and its cache, local or Nx Cloud. Each task runs
   `nx run <project>:<target>` on one affected project, and Putnami caches
   nothing for it.
@@ -479,11 +484,12 @@ Turborepo adopts in either mode:
 - **Import**: a TypeScript package's task whose script runs only
   `bun build`, `bun test`, `vitest`, `jest` or `biome`, or a bare `eslint` or
   `eslint .` lint, runs the `@putnami/typescript` task, with Putnami's cache; a
-  Vitest or Jest test keeps its runner and its configuration, and an `eslint`
-  lint script keeps ESLint and the package's configuration. Every other task,
-  such as a `tsc` script, an ESLint with arguments, or a lint chained with
-  `prettier`, keeps running through Turborepo: moving it would change the tool
-  that checks the code. Import mode also declares `@putnami/typescript`,
+  Vitest or Jest test keeps its runner and its configuration, an `eslint`
+  lint script keeps ESLint and the package's configuration, and a `build`
+  script that runs `tsc` alone compiles with that `tsc` into its `outDir`.
+  Every other task, such as a bundler build, another `tsc` script, an ESLint
+  with arguments, or a lint chained with `prettier`, keeps running through
+  Turborepo: moving it would change the tool that checks the code. Import mode also declares `@putnami/typescript`,
   whose setup adds its devDependencies to the root `package.json`, lists the
   packages where the repository's package manager reads its members, writes a
   root `tsconfig.json` and `biome.json` when they are missing, and installs

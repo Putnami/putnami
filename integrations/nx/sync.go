@@ -357,6 +357,9 @@ type projectPlan struct {
 	// vitest or jest, or "" when it records none.
 	runner   string
 	unmapped []Unmapped
+	// compiler reports an @nx/js:tsc build the TypeScript extension compiles
+	// with tsc, for which the sync writes the tsc compiler (ADR 0004).
+	compiler bool
 	// eslint reports a lint target the TypeScript extension takes over that
 	// runs ESLint: the project's putnami.json then names eslint as its linter.
 	eslint bool
@@ -384,10 +387,23 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 	plan.nodeRuntime = isTS && (targets["serve"].Executor == nodeExecutor || startScriptRunsNode(filepath.Join(root, filepath.FromSlash(p.Path))))
 	for _, task := range lifecycleTasks {
 		target, ok := targets[task]
+		covered := ok && isTS && coveredByTypeScript(root, p.Path, task, target)
+		reason := ""
+		if ok && task == "build" && !covered {
+			// A tsc build moves when the TypeScript extension compiles it
+			// with that tsc (ADR 0010 of @putnami/typescript).
+			var tscCovered, compiler bool
+			tscCovered, compiler, reason = tscBuild(root, p.Path, target)
+			covered = isTS && tscCovered
+			plan.compiler = covered && compiler
+		}
+		if reason == "" && ok {
+			reason = importReason(typeScript, isTS, task, target)
+		}
 		switch {
 		case !ok:
 			plan.disabled = append(plan.disabled, task)
-		case isTS && coveredByTypeScript(root, p.Path, task, target):
+		case covered:
 			plan.disabled = append(plan.disabled, ExtensionName+":"+task)
 			if task == "test" {
 				plan.runner = testRunner(target)
@@ -400,10 +416,10 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 			// runs through Nx alone.
 			plan.disabled = append(plan.disabled, TypeScriptExtension+":"+task)
 			if mode == ModeImport {
-				plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: importReason(typeScript, isTS, task, target)})
+				plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: reason})
 			}
 		case mode == ModeImport:
-			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: importReason(typeScript, isTS, task, target)})
+			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: reason})
 		}
 	}
 	if test, ok := targets["test"]; ok && !slices.Contains(plan.disabled, ExtensionName+":test") {
@@ -507,9 +523,9 @@ func hasManifest(root, dir string) bool {
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs: a target whose script runs one keeps its runner when the
 // extension takes it over: a test target that runs Vitest or Jest keeps its
-// runner, and a lint target that runs ESLint moves only as bare as
-// eslintCommands says. A tsc target, or one another Nx executor runs, stays on
-// Nx.
+// runner, a lint target that runs ESLint moves only as bare as eslintCommands
+// says, and a build that runs tsc alone moves too (tscBuild). Another tsc
+// target, or one another Nx executor runs, stays on Nx.
 var typeScriptCommands = map[string][]string{
 	"build": {"bun build"},
 	"test":  {"bun test", "vitest", "jest", "npx vitest", "npx jest"},
@@ -867,9 +883,11 @@ func ownedJobs() []string {
 // the extension, @putnami/typescript for an imported TypeScript project, the
 // dependencies on Nx projects, the entries of disable.jobs it owns,
 // options["@putnami/nx"].tasks.test.reports,
-// options["@putnami/typescript:test"].runner and an eslint
-// options["@putnami/typescript"].lint.linter. Every other member is kept as
-// it is. It returns the change, or nil when the file is current.
+// options["@putnami/typescript:test"].runner, an eslint
+// options["@putnami/typescript"].lint.linter, and
+// options["@putnami/typescript"].compiler as setCompiler owns it. Every other
+// member is kept as it is. It returns the change, or nil when the file is
+// current.
 func writeProject(root, file string, plan projectPlan, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)
@@ -900,6 +918,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	setDisabled(doc, plan.disabled)
 	setReports(doc, plan.reports)
 	setRunner(doc, plan.runner)
+	setCompiler(doc, plan.typeScript && plan.compiler)
 	setLinter(doc, plan.eslint)
 	if plan.nodeRuntime {
 		markNodeRuntime(doc)
@@ -926,6 +945,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	setDisabled(doc, nil)
 	setReports(doc, nil)
 	setRunner(doc, "")
+	setCompiler(doc, false)
 	setLinter(doc, false)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil

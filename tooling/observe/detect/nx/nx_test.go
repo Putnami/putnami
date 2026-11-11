@@ -757,7 +757,7 @@ func TestDetectListsTheTargetsOfEachProject(t *testing.T) {
 	}
 	wantB := []Target{
 		{Name: "lint", Executor: "@nx/eslint:lint"},
-		{Name: "serve", Executor: "nx:run-commands", Command: "node main.js"},
+		{Name: "serve", Executor: "nx:run-commands", Command: "node main.js", Options: map[string]any{"command": "node main.js"}},
 	}
 	if !reflect.DeepEqual(b.Targets, wantB) {
 		t.Errorf("b targets = %+v, want %+v", b.Targets, wantB)
@@ -774,8 +774,85 @@ func TestDetectReadsTheScriptOfARunScriptTargetInAGraphExport(t *testing.T) {
 	if len(detection.Projects) != 1 || !detection.Projects[0].FromGraph {
 		t.Fatalf("projects = %+v", detection.Projects)
 	}
-	want := []Target{{Name: "build", Executor: "nx:run-script", Command: "tsc"}}
+	want := []Target{{Name: "build", Executor: "nx:run-script", Command: "tsc", Options: map[string]any{"script": "build"}}}
 	if got := detection.Projects[0].Targets; !reflect.DeepEqual(got, want) {
 		t.Errorf("targets = %+v, want %+v", got, want)
+	}
+}
+
+func TestDetectMergesTheOptionsNxRunPassesTheExecutor(t *testing.T) {
+	root := tree(t, map[string]string{
+		"nx.json": `{"targetDefaults": {
+			"@nx/js:tsc": {"options": {"outputPath": "{projectRoot}/dist", "generatePackageJson": false, "assets": ["{projectRoot}/*.md"]}},
+			"build": {"options": {"clean": false}},
+			"lint": {"options": {"maxWarnings": 0}}
+		}}`,
+		"package.json":        `{"name": "ws", "workspaces": ["libs/*"]}`,
+		"libs/a/package.json": `{"name": "a"}`,
+		"libs/a/project.json": `{"name": "a", "targets": {"build": {"executor": "@nx/js:tsc", "defaultConfiguration": "production", "options": {"tsConfig": "{projectRoot}/tsconfig.lib.json", "rootDir": "{workspaceRoot}/libs/{projectName}"}, "configurations": {"production": {"assets": []}, "development": {"watch": true}}}, "lint": {"executor": "@nx/eslint:lint"}}}`,
+	})
+	detection := Detect(root, Options{})
+	if len(detection.Projects) != 1 {
+		t.Fatalf("projects = %+v", detection.Projects)
+	}
+	want := []Target{
+		// The executor's entry wins over the name's, the target over the
+		// entry, and the default configuration over the target.
+		{Name: "build", Executor: "@nx/js:tsc", Options: map[string]any{
+			"outputPath": "libs/a/dist", "generatePackageJson": false, "assets": []any{},
+			"tsConfig": "libs/a/tsconfig.lib.json", "rootDir": "libs/a",
+		}},
+		// With no entry for its executor, the entry of its name applies.
+		{Name: "lint", Executor: "@nx/eslint:lint", Options: map[string]any{"maxWarnings": float64(0)}},
+	}
+	if got := detection.Projects[0].Targets; !reflect.DeepEqual(got, want) {
+		t.Errorf("targets = %+v, want %+v", got, want)
+	}
+}
+
+func TestDetectLaysATargetOverItsTargetDefaultsAsNxDoes(t *testing.T) {
+	root := tree(t, map[string]string{
+		"nx.json": `{"targetDefaults": {
+			"@nx/js:tsc": {"defaultConfiguration": "production", "options": {"outputPath": "{workspaceRoot}/dist/{projectName}"}, "configurations": {"production": {"assets": ["{projectRoot}/README.md"]}}},
+			"compile": {"executor": "@nx/js:tsc", "options": {"main": "{projectRoot}/src/index.ts"}},
+			"lint": {"executor": "@nx/eslint:lint", "options": {"maxWarnings": 0}},
+			"e2e-*": {"options": {"headless": true}}
+		}}`,
+		"package.json":        `{"name": "ws", "workspaces": ["libs/*"]}`,
+		"libs/a/package.json": `{"name": "a"}`,
+		"libs/a/project.json": `{"name": "a", "targets": {
+			"build": {"executor": "@nx/js:tsc", "options": {"tsConfig": "{projectRoot}/tsconfig.lib.json"}, "configurations": {"production": {"watch": false}}},
+			"compile": {"options": {"tsConfig": "{projectRoot}/tsconfig.json"}},
+			"lint": {"executor": "nx:run-commands", "options": {"command": "eslint ."}},
+			"e2e-ci": {"executor": "nx:run-commands", "options": {"command": "playwright test"}}
+		}}`,
+	})
+	detection := Detect(root, Options{})
+	if len(detection.Projects) != 1 {
+		t.Fatalf("projects = %+v", detection.Projects)
+	}
+	targets := map[string]Target{}
+	for _, target := range detection.Projects[0].Targets {
+		targets[target.Name] = target
+	}
+	// The entry's defaultConfiguration and its configuration's assets apply
+	// under the target's own configuration, and a leading {workspaceRoot}/
+	// is removed.
+	if got, want := targets["build"].Options, map[string]any{
+		"outputPath": "dist/a", "tsConfig": "libs/a/tsconfig.lib.json", "assets": []any{"libs/a/README.md"}, "watch": false,
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("build options = %v, want %v", got, want)
+	}
+	// A target that names no executor takes its entry's.
+	if got := targets["compile"]; got.Executor != "@nx/js:tsc" || !reflect.DeepEqual(got.Options, map[string]any{"main": "libs/a/src/index.ts", "tsConfig": "libs/a/tsconfig.json"}) {
+		t.Errorf("compile = %+v", got)
+	}
+	// An entry whose executor differs from the target's applies to none.
+	if got := targets["lint"].Options; !reflect.DeepEqual(got, map[string]any{"command": "eslint ."}) {
+		t.Errorf("lint options = %v", got)
+	}
+	// A glob key applies to a target its pattern matches.
+	if got := targets["e2e-ci"].Options; got["headless"] != true {
+		t.Errorf("e2e-ci options = %v, want the glob entry's", got)
 	}
 }

@@ -220,6 +220,16 @@
           "type": "boolean",
           "default": false,
           "description": "Build for stable release"
+        },
+        "compiler": {
+          "type": "string",
+          "default": "auto",
+          "choices": [
+            "auto",
+            "bun",
+            "tsc"
+          ],
+          "description": "Compiler of the project, set in options[\"@putnami/typescript\"].compiler: tsc compiles with the tsc its package.json build script runs, into the outDir of its tsconfig; bun transpiles with Bun; auto picks tsc when the build script runs tsc alone"
         }
       },
       "run": [
@@ -231,12 +241,39 @@
           ]
         },
         {
+          "id": "tsc-auto",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'auto'",
+          "activation": {
+            "contains": {
+              "package.json": "tsc"
+            }
+          }
+        },
+        {
+          "id": "tsc",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'tsc'"
+        },
+        {
           "id": "transpile",
           "task": "build-transpile",
           "dependsOn": [
-            "generate"
+            "generate",
+            "^tsc",
+            "^tsc-auto"
           ],
-          "if": "params.transpile || !params.transpile && !params.types && !params.compile",
+          "if": "(params.transpile || !params.transpile && !params.types && !params.compile) && params.compiler != 'tsc'",
           "with": {
             "generateResult": {
               "fromStep": "generate",
@@ -250,9 +287,11 @@
           "task": "build-types",
           "dependsOn": [
             "generate",
-            "transpile"
+            "transpile",
+            "^tsc",
+            "^tsc-auto"
           ],
-          "if": "params.types || !params.transpile && !params.types && !params.compile",
+          "if": "(params.types || !params.transpile && !params.types && !params.compile) && params.compiler != 'tsc'",
           "with": {
             "generateResult": {
               "fromStep": "generate",
@@ -264,7 +303,11 @@
           "id": "compile",
           "task": "build-compile",
           "dependsOn": [
-            "generate"
+            "generate",
+            "tsc",
+            "tsc-auto",
+            "^tsc",
+            "^tsc-auto"
           ],
           "if": "params.compile",
           "with": {
@@ -279,6 +322,8 @@
           "task": "build-infra",
           "dependsOn": [
             "generate",
+            "tsc",
+            "tsc-auto",
             "transpile",
             "types",
             "compile"
@@ -373,6 +418,16 @@
           "type": "boolean",
           "default": false,
           "description": "Show the complete test transcript at info level; changes visibility only, never the Bun invocation or verdict"
+        },
+        "compiler": {
+          "type": "string",
+          "default": "auto",
+          "choices": [
+            "auto",
+            "bun",
+            "tsc"
+          ],
+          "description": "Compiler of the project, set in options[\"@putnami/typescript\"].compiler: tsc compiles with the tsc its package.json build script runs, into the outDir of its tsconfig; bun transpiles with Bun; auto picks tsc when the build script runs tsc alone"
         }
       },
       "run": [
@@ -387,6 +442,31 @@
               "value": "test"
             }
           }
+        },
+        {
+          "id": "tsc-auto",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'auto'",
+          "activation": {
+            "contains": {
+              "package.json": "tsc"
+            }
+          }
+        },
+        {
+          "id": "tsc",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'tsc'"
         },
         {
           "id": "test-env",
@@ -406,7 +486,9 @@
           "task": "test-run",
           "dependsOn": [
             "generate",
-            "test-env"
+            "test-env",
+            "^tsc",
+            "^tsc-auto"
           ]
         },
         {
@@ -414,7 +496,9 @@
           "heavy": true,
           "task": "test-types",
           "dependsOn": [
-            "generate"
+            "generate",
+            "^tsc",
+            "^tsc-auto"
           ]
         },
         {
@@ -473,6 +557,16 @@
         "inspect-brk": {
           "type": "boolean",
           "description": "Debugger breaks on first line"
+        },
+        "compiler": {
+          "type": "string",
+          "default": "auto",
+          "choices": [
+            "auto",
+            "bun",
+            "tsc"
+          ],
+          "description": "Compiler of the project, set in options[\"@putnami/typescript\"].compiler: tsc compiles with the tsc its package.json build script runs, into the outDir of its tsconfig; bun transpiles with Bun; auto picks tsc when the build script runs tsc alone"
         }
       },
       "run": [
@@ -489,10 +583,39 @@
           }
         },
         {
+          "id": "tsc-auto",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'auto'",
+          "activation": {
+            "contains": {
+              "package.json": "tsc"
+            }
+          }
+        },
+        {
+          "id": "tsc",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'tsc'"
+        },
+        {
           "id": "serve",
           "task": "serve-app",
           "dependsOn": [
-            "generate"
+            "generate",
+            "tsc",
+            "tsc-auto",
+            "^tsc",
+            "^tsc-auto"
           ]
         }
       ]
@@ -520,6 +643,16 @@
         "args": {
           "type": "string",
           "description": "Additional arguments to pass to the program"
+        },
+        "compiler": {
+          "type": "string",
+          "default": "auto",
+          "choices": [
+            "auto",
+            "bun",
+            "tsc"
+          ],
+          "description": "Compiler of the project, set in options[\"@putnami/typescript\"].compiler: tsc compiles with the tsc its package.json build script runs, into the outDir of its tsconfig; bun transpiles with Bun; auto picks tsc when the build script runs tsc alone"
         }
       },
       "run": [
@@ -536,10 +669,39 @@
           }
         },
         {
+          "id": "tsc-auto",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'auto'",
+          "activation": {
+            "contains": {
+              "package.json": "tsc"
+            }
+          }
+        },
+        {
+          "id": "tsc",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'tsc'"
+        },
+        {
           "id": "run",
           "task": "run-app",
           "dependsOn": [
-            "generate"
+            "generate",
+            "tsc",
+            "tsc-auto",
+            "^tsc",
+            "^tsc-auto"
           ]
         }
       ]
@@ -695,6 +857,16 @@
           "type": "boolean",
           "default": false,
           "description": "Show what would be packaged without creating artifacts"
+        },
+        "compiler": {
+          "type": "string",
+          "default": "auto",
+          "choices": [
+            "auto",
+            "bun",
+            "tsc"
+          ],
+          "description": "Compiler of the project, set in options[\"@putnami/typescript\"].compiler: tsc compiles with the tsc its package.json build script runs, into the outDir of its tsconfig; bun transpiles with Bun; auto picks tsc when the build script runs tsc alone"
         }
       },
       "run": [
@@ -705,6 +877,31 @@
             "^generate"
           ],
           "if": "!params.image"
+        },
+        {
+          "id": "tsc-auto",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'auto' && !params.image",
+          "activation": {
+            "contains": {
+              "package.json": "tsc"
+            }
+          }
+        },
+        {
+          "id": "tsc",
+          "task": "build-tsc",
+          "dependsOn": [
+            "generate",
+            "^tsc",
+            "^tsc-auto"
+          ],
+          "if": "params.compiler == 'tsc' && !params.image"
         },
         {
           "id": "transpile",
@@ -728,7 +925,11 @@
           "id": "compile",
           "task": "build-compile",
           "dependsOn": [
-            "generate"
+            "generate",
+            "tsc",
+            "tsc-auto",
+            "^tsc",
+            "^tsc-auto"
           ],
           "if": "params.docker && !params.image"
         },
@@ -1178,6 +1379,9 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
+        "compiler": {
+          "from": "params"
+        },
         "sources": {
           "from": "project",
           "files": [
@@ -1277,6 +1481,9 @@
       "cwd": "{projectRoot}",
       "timeoutMs": 300000,
       "inputs": {
+        "compiler": {
+          "from": "params"
+        },
         "sources": {
           "from": "project",
           "files": [
@@ -1347,6 +1554,111 @@
         "effects": [
           "toolchain-cache"
         ]
+      }
+    },
+    "build-tsc": {
+      "description": "Compile a project with the tsc its package.json build script runs, into the outDir its tsconfig names, where the packages that depend on it resolve its main and exports (ADR 0010). The task resolves the compiler itself: a project that compiles with Bun compiles nothing here and reports no output. It refuses an outDir that is unset, outside the project, not ignored by Git or holding a tracked file, empties its outputs, since the engine empties no pathFrom output, and runs node_modules/typescript/bin/tsc with Bun. tsc -b on a config with references runs as tsc -p: Putnami builds or restores each reference first, through ^tsc and readByDependents, and tsc -b would rebuild a restored reference in place, because a restored file keeps the time its blob was stored. The key reads the project's files Git does not ignore, so the ignored output never keys its own build, and the top-level JSON and tsconfig files of the dependency closure, a shared configuration package or a reference's config included. On the node runtime, the task then refuses a Bun API in the source, as the transpile does.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "build-tsc"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 600000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "git:**/*",
+            "!../**",
+            "!node_modules/**",
+            "!**/node_modules/**"
+          ]
+        },
+        "closureConfig": {
+          "from": "closure",
+          "files": [
+            "*.json",
+            "**/tsconfig*.json",
+            "!node_modules/**",
+            "!**/node_modules/**"
+          ]
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "npm-shrinkwrap.json",
+            "package-lock.json",
+            "pnpm-lock.yaml",
+            "pnpm-workspace.yaml",
+            "yarn.lock",
+            "tsconfig*.json"
+          ]
+        },
+        "compiler": {
+          "from": "params"
+        },
+        "target": {
+          "from": "params"
+        },
+        "runtime": {
+          "from": "params"
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "outputs": {
+        "data": {
+          "description": "The tsc compile result"
+        },
+        "outDir": {
+          "description": "Project-relative outDir tsc compiled into, reported when the project compiles with tsc. The consumer reads it under this exact name."
+        },
+        "declarationDir": {
+          "description": "Project-relative declarationDir, reported when it lies outside the outDir"
+        },
+        "buildInfo": {
+          "description": "Project-relative .tsbuildinfo, reported when it lies outside the outDir"
+        }
+      },
+      "writes": [
+        "tsc-output"
+      ],
+      "reads": [
+        "gen",
+        "sources"
+      ],
+      "cache": {
+        "enabled": true,
+        "deterministic": true
+      },
+      "declares": {
+        "outputs": {
+          "outDir": {
+            "kind": "directory",
+            "pathFrom": "outDir",
+            "optionalEmpty": true,
+            "readByDependents": true,
+            "description": "The outDir of the compiled config, where the dependents resolve the library. Empty when the project compiles with Bun."
+          },
+          "declarationDir": {
+            "kind": "directory",
+            "pathFrom": "declarationDir",
+            "optionalEmpty": true,
+            "readByDependents": true,
+            "description": "The declarationDir of the compiled config when it lies outside the outDir."
+          },
+          "buildInfo": {
+            "kind": "file",
+            "pathFrom": "buildInfo",
+            "optionalEmpty": true,
+            "description": "The .tsbuildinfo of the compiled config when it lies outside the outDir, such as beside a config whose rootDir is src."
+          }
+        }
       }
     },
     "build-compile": {

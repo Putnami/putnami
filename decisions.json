@@ -561,6 +561,14 @@
       "settledBy": "fdumay",
       "adr": "typescript/extension/doc/adr/0007-the-repository-chooses-its-package-manager.md",
       "reviewOnly": true
+    },
+    {
+      "id": "D-069",
+      "statement": "a TypeScript library whose build script runs tsc alone builds with that tsc, run by Bun, and declares the outDir its tsconfig names as an output its dependents read; a config that declares references runs as tsc -p, since Putnami builds the references",
+      "settled": "2026-11-11",
+      "settledBy": "fdumay",
+      "adr": "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
+      "reviewOnly": true
     }
   ]
 }
