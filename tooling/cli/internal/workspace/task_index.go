@@ -103,16 +103,19 @@ type taskIndex struct {
 	// nothing (WithManifestBaseline).
 	baseline ManifestBaseline
 
-	// planned memoizes MayPlanJob; an index WithManifestBaseline binds
-	// shares it.
+	// planned memoizes MayPlanJob. A copy of the index shares it
+	// (WithManifestBaseline).
 	planned *plannedMemo
 }
 
-// plannedMemo memoizes MayPlanJob per command and project ID. projectRoots
-// holds the absolute directories of the workspace's projects. mu guards both.
+// plannedMemo memoizes MayPlanJob per command and project ID, and
+// HasActivationFiles per project directory and pattern set. projectRoots
+// holds the absolute directories of the workspace's projects. mu guards all
+// three.
 type plannedMemo struct {
 	mu           sync.Mutex
 	answers      map[plannedKey]bool
+	hasFiles     map[string]bool
 	projectRoots map[string]bool
 }
 
@@ -184,7 +187,7 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 		extensionProjects: make(map[string][]string),
 		runtimeInputs:     make(map[string][]string),
 		ownManifests:      make(map[string]bool),
-		planned:           &plannedMemo{answers: make(map[plannedKey]bool)},
+		planned:           &plannedMemo{answers: make(map[plannedKey]bool), hasFiles: make(map[string]bool)},
 	}
 	// successors is the intra-project task graph: a task scope mapped to the
 	// task scopes of the same project that depend on it.
@@ -618,7 +621,16 @@ func (idx *taskIndex) mayPlan(job *extension.JobDefinition, project *Project) bo
 			memo.projectRoots[filepath.Clean(filepath.Join(idx.ws.Root, filepath.FromSlash(p.Path)))] = true
 		}
 	}
-	planned := MayPlanJob(project, job, filepath.Join(idx.ws.Root, filepath.FromSlash(project.Path)), memo.projectRoots)
+	dir := filepath.Join(idx.ws.Root, filepath.FromSlash(project.Path))
+	planned := MayPlanJob(project, job, func(patterns []string) bool {
+		key := dir + "\x00" + strings.Join(patterns, "\x01")
+		found, ok := memo.hasFiles[key]
+		if !ok {
+			found = HasActivationFiles(dir, patterns, memo.projectRoots)
+			memo.hasFiles[key] = found
+		}
+		return found
+	})
 	memo.answers[key] = planned
 	return planned
 }

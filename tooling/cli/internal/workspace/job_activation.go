@@ -18,23 +18,22 @@ var ProjectWalkExcludedDirs = map[string]bool{
 }
 
 // MayPlanJob reports whether the planner may run job, one command of an
-// extension, in proj, whose absolute directory is projRoot: the command's
-// activation files, when it names any, match a file of the project, and
-// UsesJobExtension holds. projectRoots holds the absolute directories of the
-// workspace's projects, which a "**" walk does not enter; nil enters every
+// extension, in proj: a workspace-once command always may; any other one when
+// UsesJobExtension holds and its activation files, when it names any, match a
+// file of the project. hasFiles answers HasActivationFiles for the project's
 // directory.
 //
-// The planner checks these conditions before it picks one of the jobs that
-// pass them, and it leaves out a disabled job and a job of another channel,
-// so a job this reports false for is never planned in the project.
-func MayPlanJob(proj *Project, job *extension.JobDefinition, projRoot string, projectRoots map[string]bool) bool {
+// The planner plans no job that fails these conditions in the project. It
+// also leaves out a disabled job, a job of another channel and a step whose
+// condition is false, so a job this reports true for may still not run.
+func MayPlanJob(proj *Project, job *extension.JobDefinition, hasFiles func(patterns []string) bool) bool {
+	if job.Activation == workspaceOnceActivation {
+		return true
+	}
 	if !UsesJobExtension(proj, job, len(job.ActivationFiles) > 0) {
 		return false
 	}
-	if len(job.ActivationFiles) == 0 {
-		return true
-	}
-	return HasActivationFiles(projRoot, job.ActivationFiles, projectRoots)
+	return len(job.ActivationFiles) == 0 || hasFiles(job.ActivationFiles)
 }
 
 // UsesJobExtension reports whether proj may use the jobs of job's extension.

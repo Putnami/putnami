@@ -78,10 +78,7 @@ func matchJobs(
 			matchedActivationFiles = true
 		}
 
-		// Check extension dependency: the project must list the extension in its
-		// dependencies or extensions, unless activation files matched or the
-		// project IS the extension (self-publish)
-		// or the command has workspace activation.
+		// The project must use the job's extension (workspace.UsesJobExtension).
 		if !workspace.UsesJobExtension(proj, job, matchedActivationFiles) {
 			continue
 		}
