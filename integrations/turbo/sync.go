@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/tscscript"
 	"go.putnami.dev/tooling/observe/detect/nodeworkspace"
 	"go.putnami.dev/tooling/stacks"
 )
@@ -383,8 +384,9 @@ func ownedJob(job string) bool {
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs. A script that runs one keeps its tool when the extension
 // takes the task over: the test task runs the vitest or jest a test script
-// runs, and a bare eslint lint script moves to the TypeScript lint, which
-// lints with ESLint because the script runs it. A tsc or prettier script
+// runs, a build script that runs tsc alone compiles with that tsc, and a bare
+// eslint lint script moves to the TypeScript lint, which lints with ESLint
+// because the script runs it. Any other tsc script, or a prettier script,
 // stays on Turborepo, because moving it would change the tool that checks the
 // code.
 var typeScriptCommands = map[string][]string{
@@ -414,7 +416,17 @@ func unmappedReason(task, script string) string {
 	case task == stacks.TaskLint && strings.Contains(script, "eslint"):
 		return fmt.Sprintf("its ESLint takes arguments (%q) that %s would drop: move them to the ESLint configuration; %s", script, TypeScriptExtension, keeps)
 	}
-	return fmt.Sprintf("%s runs %s, not %q: %s", TypeScriptExtension, strings.Join(typeScriptCommands[task], " or "), script, keeps)
+	return fmt.Sprintf("%s runs %s, not %q: %s", TypeScriptExtension, typeScriptRuns(task), script, keeps)
+}
+
+// typeScriptRuns names what the TypeScript extension's task runs, for the
+// reason a task stays on Turborepo.
+func typeScriptRuns(task string) string {
+	runs := typeScriptCommands[task]
+	if task == stacks.TaskBuild {
+		runs = append(slices.Clone(runs), "tsc alone")
+	}
+	return strings.Join(runs, " or ")
 }
 
 // runsTypeScriptTask reports whether a package script runs what the
@@ -422,6 +434,9 @@ func unmappedReason(task, script string) string {
 // pipes another command, such as eslint . && prettier --check ., runs a tool
 // the TypeScript extension does not.
 func runsTypeScriptTask(task, script string) bool {
+	if task == stacks.TaskBuild && tscscript.Runs(script) {
+		return true
+	}
 	script = strings.TrimSpace(script)
 	if strings.ContainsAny(script, "&|;") {
 		return false
