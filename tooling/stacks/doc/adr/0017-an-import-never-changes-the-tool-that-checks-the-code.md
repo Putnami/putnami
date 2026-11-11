@@ -67,7 +67,10 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    rule above, and its project records the test runner, `bun` included, and
    the ESLint linter, since `@putnami/typescript` would otherwise read them
    from `package.json`. A task of another language moves when it runs the
-   program its extension runs, and nothing more: `go build` or `go test`;
+   program its extension runs, which runs it under the extension's own flags
+   (race detection on the changed Go packages, nextest's `ci` profile, which
+   the repository defines, the `src` and `tests` paths of phpstan and
+   phpunit): `go build` or `go test`;
    `cargo build`, `cargo nextest` or `cargo llvm-cov nextest`; `pytest` or
    `ruff`; `rspec` or `rubocop`; `phpunit` or `phpstan`. A Go or Rust lint
    stays on moon, since the extension's lint checks more than the task did
