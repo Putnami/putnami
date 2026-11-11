@@ -103,10 +103,10 @@ func TestDetectOutsideAMoonWorkspace(t *testing.T) {
 
 func TestInheritanceIncludeEmptyKeepsNone(t *testing.T) {
 	in := readInheritance(map[string]any{"include": []any{}})
-	if got := in.apply(map[string]Task{"build": {}}); len(got) != 0 {
+	if got := inherit(in, map[string]Task{"build": {}}); len(got) != 0 {
 		t.Fatalf("kept %v", got)
 	}
-	if got := (inheritance{}).apply(map[string]Task{"build": {}}); len(got) != 1 {
+	if got := inherit(inheritance{}, map[string]Task{"build": {}}); len(got) != 1 {
 		t.Fatalf("no setting keeps every task, kept %v", got)
 	}
 }

@@ -304,11 +304,6 @@ func readInheritance(settings map[string]any) inheritance {
 	return in
 }
 
-// apply keeps the included tasks less the excluded ones, then renames them.
-func (in inheritance) apply(tasks map[string]Task) map[string]Task {
-	return inherit(in, tasks)
-}
-
 // inherit keeps the included tasks less the excluded ones, then renames
 // them, whatever a task holds.
 func inherit[T any](in inheritance, tasks map[string]T) map[string]T {

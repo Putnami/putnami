@@ -127,7 +127,8 @@ code of `rush test` alone.
 Each project becomes a `@putnami/typescript` project, and an import never
 changes the tool that checks the code (D-070). A `build`, `test` or `lint`
 script moves to Putnami's TypeScript task only when that task runs the same
-tool: `bun build` or `tsc` alone, `bun test`, Vitest or Jest, Biome or a bare
+tool: `bun build` or `tsc` alone, `bun test`, Vitest or Jest with no argument
+that picks a configuration or a subset of the suite, Biome or a bare
 `eslint`, with no other command chained. The task then runs that tool, under
 Putnami's cache: a Jest suite keeps Jest and its configuration. A script that
 runs another tool, such as `mocha`, `webpack` or an ESLint with arguments,

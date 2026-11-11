@@ -123,7 +123,8 @@ task is listed by the sync and keeps running through moon.
   moved and `@putnami/go:lint` for a lint that stays;
 - for a task moon runs that is tagged rather than named, the step under
   `options["@putnami/moon"].tasks.<command>.steps`;
-- for a TypeScript project, the Vitest or Jest runner of a test that moved
+- for a TypeScript project, the runner of a test that moved, `bun`, `vitest`
+  or `jest`,
   under `options["@putnami/typescript:test"].runner`, and `eslint` under
   `options["@putnami/typescript"].lint.linter` for an ESLint lint that moved;
 - for a TypeScript project, the conventions of D-066: a `tsconfig.json` that

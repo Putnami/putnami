@@ -39,7 +39,7 @@ to write them.
 | | Import | Delegate |
 |---|---|---|
 | A TypeScript package's task whose script runs only `bun build`, `bun test`, `vitest`, `jest` or `biome`, a bare `eslint` or `eslint .` lint, or a `build` script that runs `tsc` alone | Runs the `@putnami/typescript` task: Putnami's runner and cache | Runs `turbo run` on it |
-| Any other task, such as a bundler build, another `tsc` script, a `prettier` script, an ESLint with arguments, or a lint chained with `prettier` | Runs `turbo run` on it | Runs `turbo run` on it |
+| Any other task, such as a bundler build, another `tsc` script, a `prettier` script, an ESLint with arguments, a test whose arguments pick a configuration or a subset, or a lint chained with `prettier` | Runs `turbo run` on it | Runs `turbo run` on it |
 | Cache | Putnami's for the tasks `@putnami/typescript` runs, Turborepo's for the others | Turborepo's, local and remote |
 
 Import mode moves a task to `@putnami/typescript` only when its script

@@ -136,14 +136,14 @@ func initSourceNames() string {
 	return strings.Join(names, ", ")
 }
 
-// installExtension is swapped in tests so init tests never perform a real
-// registry install (slow and environment-dependent). Its progress lines go to
-// stdout.
 // removeInitExtension removes from the lock and the disk an extension init
 // removed from the workspace config; cfg is the config as it now stands.
 // Swapped in tests.
 var removeInitExtension = extensions.ExtensionsRemoveUndeclared
 
+// installExtension is swapped in tests so init tests never perform a real
+// registry install (slow and environment-dependent). Its progress lines go to
+// stdout.
 var installExtension = func(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, outputFormat string) error {
 	return extensions.ExtensionsInstallWithOptions(ctx, wsRoot, cfg, args, extensions.InstallOptions{OutputFormat: outputFormat, Out: os.Stdout})
 }

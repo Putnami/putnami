@@ -24,6 +24,7 @@ func TestTypeScriptRunsTheToolOfTheScript(t *testing.T) {
 		{TaskTest, "vitest run --project unit", false},
 		{TaskTest, "bun test test/unit", false},
 		{TaskTest, "npx vitest run --coverage", true},
+		{TaskTest, "bun test run", false},
 		{TaskTest, "", false},
 		{TaskLint, "eslint .", true},
 		{TaskLint, "eslint --max-warnings 0 src", false},

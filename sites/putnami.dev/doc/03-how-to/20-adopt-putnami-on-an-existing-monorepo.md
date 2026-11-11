@@ -484,7 +484,7 @@ nextest, which runs no doctest. A project that keeps a task, such as a
 extension that does not run each command: `@putnami/moon:test` for a test
 that moved, `@putnami/go:lint` for a lint that stays. The kept task runs
 `moon run <project>:<task>`, and the sync lists it with its reason. A
-TypeScript project records the Vitest or Jest runner and the ESLint linter
+TypeScript project records the test runner, `bun`, `vitest` or `jest`, and the ESLint linter
 of the tasks that moved. `@putnami/typescript`'s workspace install then lists
 the projects where the repository's package manager reads its members and
 installs with that manager, which keeps its lockfile; it writes no

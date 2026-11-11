@@ -63,7 +63,7 @@ func TypeScriptRuns(task, script string) bool {
 // changes what the runner checks, and the extension passes none of the
 // script's arguments (ADR 0008 of typescript/extension).
 var testFlags = map[string]bool{
-	"run": true, "--run": true, "--coverage": true, "--passWithNoTests": true, "--silent": true,
+	"--run": true, "--coverage": true, "--passWithNoTests": true, "--silent": true,
 	"--ci": true, "--runInBand": true, "-i": true, "--detectOpenHandles": true, "--forceExit": true,
 }
 
@@ -79,6 +79,11 @@ func TestArgumentsDropped(script string) string {
 	case len(fields) > 1 && fields[0] == "bun" && fields[1] == "test":
 		fields = fields[2:]
 	case len(fields) > 0 && (fields[0] == "vitest" || fields[0] == "jest"):
+		if len(fields) > 1 && fields[0] == "vitest" && fields[1] == "run" {
+			// vitest run is Vitest's single run, which the test task runs; for
+			// bun test, run is a file filter.
+			fields = fields[1:]
+		}
 		fields = fields[1:]
 	default:
 		return ""

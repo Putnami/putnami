@@ -159,7 +159,8 @@ type importPlan struct {
 	// unmapped list each kept task with its reason.
 	unmapped []Unmapped
 	// runner and eslint are what a TypeScript project records for the tasks
-	// that moved: the Vitest or Jest runner of its test, an ESLint lint.
+	// that moved: the runner of its test, bun, vitest or jest, and an
+	// ESLint lint.
 	runner string
 	eslint bool
 	// bunBuild reports a build that moved to the TypeScript extension's Bun
