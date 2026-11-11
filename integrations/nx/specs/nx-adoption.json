@@ -26,11 +26,15 @@
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, its build, test and lint targets whose script already runs what that extension runs (bun build; bun test, vitest or jest; biome) run as its task, and @putnami/nx:<task> is disabled. Every other build, test or lint target, such as eslint, tsc or an Nx executor, keeps running through Nx, is listed with its reason, and @putnami/typescript:<task> is off."
+      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, and its build, test and lint targets whose script runs only what that extension runs (bun build; bun test, vitest or jest; biome; eslint per import-keeps-eslint) run as its task, with @putnami/nx:<task> off. Every other target, such as tsc, prettier or another executor, keeps running through Nx, is listed, and @putnami/typescript:<task> is off."
     },
     {
       "id": "import-maps-vitest-and-jest-tests",
       "text": "In import mode, the test target of a TypeScript project whose script runs vitest or jest, or whose Nx executor is @nx/vite:test or @nx/jest:jest, runs as @putnami/typescript:test, and the sync writes that runner in options[\"@putnami/typescript:test\"].runner of its putnami.json. The sync owns that member: it removes it from a project whose test target no longer maps to Vitest or Jest, and from a former project."
+    },
+    {
+      "id": "import-keeps-eslint",
+      "text": "A lint target that runs eslint or eslint . alone, plainly or through npx, bunx, pnpm exec or yarn, or @nx/eslint:lint with no option but lintFilePatterns naming the project root, runs as @putnami/typescript:lint and sets options[\"@putnami/typescript\"].lint.linter to eslint unless the project chose a linter. Other ESLint arguments keep the target on Nx, listed. The sync removes the eslint it wrote when the target stops mapping and on retract."
     },
     {
       "id": "delegate-imports-listed-projects",

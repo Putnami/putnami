@@ -10,8 +10,9 @@ import (
 	"go.putnami.dev/typescript/extension/internal/parse"
 )
 
-// runLint executes the no-fix (read-only) lint path as a single `biome check`
-// pass that combines the formatter and linter in one file scan. The fix
+// runLint executes the no-fix (read-only) lint path. A project that lints
+// with ESLint runs ESLint without fixes (runESLint); any other runs a single
+// `biome check` pass that combines the formatter and linter in one file scan. The fix
 // (writer) path is handled by the distinct runLintFormat + runLintCheck phases
 // so auto-fix write behavior is preserved exactly.
 func runLint(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
@@ -19,6 +20,13 @@ func runLint(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map
 		return runLintBatch(ctx, lintBatchCombined)
 	}
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
+	linter, err := projectLinter(ctx.Params, projectPath)
+	if err != nil {
+		return "FAILED", nil, err
+	}
+	if linter == lint.LinterESLint {
+		return runESLint(ctx, emit, false)
+	}
 	maxDiagnostics := ctx.Params.Int("max-diagnostics", 10, "maxDiagnostics")
 	diagnosticLevel := ctx.Params.String("diagnostic-level", "diagnosticLevel")
 
@@ -74,6 +82,13 @@ func runLintFormat(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (strin
 		return runLintBatch(ctx, lintBatchFormat)
 	}
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
+	linter, err := projectLinter(ctx.Params, projectPath)
+	if err != nil {
+		return "FAILED", nil, err
+	}
+	if linter == lint.LinterESLint {
+		return skipBiomeFormatter(ctx, emit)
+	}
 	fix := ctx.Params.Bool("fix", true)
 
 	biomeBin, err := resolveBiomeBinFn(projectPath, ctx.WorkspaceRoot)
@@ -109,6 +124,13 @@ func runLintCheck(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string
 	}
 	projectPath := filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path)
 	fix := ctx.Params.Bool("fix", true)
+	linter, err := projectLinter(ctx.Params, projectPath)
+	if err != nil {
+		return "FAILED", nil, err
+	}
+	if linter == lint.LinterESLint {
+		return runESLint(ctx, emit, fix)
+	}
 	maxDiagnostics := ctx.Params.Int("max-diagnostics", 10, "maxDiagnostics")
 	diagnosticLevel := ctx.Params.String("diagnostic-level", "diagnosticLevel")
 

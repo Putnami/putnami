@@ -65,6 +65,23 @@
           }
         },
         {
+          "id": "import-keeps-eslint",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-eslint-lint-target-maps-to-the-typescript-lint",
+              "a-chained-lint-script-stays-on-nx",
+              "the-sync-removes-the-eslint-linter-it-wrote",
+              "eslint-with-other-arguments-stays-on-nx",
+              "a-linter-the-project-chose-is-kept"
+            ]
+          }
+        },
+        {
           "id": "delegate-imports-listed-projects",
           "stage": "coded",
           "evidenceKinds": [

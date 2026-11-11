@@ -369,6 +369,71 @@ func TestTheSyncListsTheTasksItCannotMap(t *testing.T) {
 	}
 }
 
+func TestAnESLintLintScriptMapsToTheTypeScriptLint(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-eslint", "an-eslint-lint-script-maps-to-the-typescript-lint")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, "turbo.json", `{"tasks": {"build": {}, "test": {}, "lint": {}}}`)
+	for _, script := range []string{"eslint .", "npx eslint", "pnpm exec eslint ."} {
+		writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "`+script+`"}}`)
+		result, err := Sync(root, Options{Mode: ModeImport})
+		if err != nil {
+			t.Fatal(err)
+		}
+		jobs, _ := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"].([]any)
+		if !slices.Contains(jobs, any(ExtensionName+":lint")) || slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
+			t.Errorf("lint script %q: jobs = %v, want the TypeScript lint kept and the Turborepo lint disabled", script, jobs)
+		}
+		for _, u := range result.Unmapped {
+			if u.Task == "@demo/pricing#lint" {
+				t.Errorf("lint script %q is listed as unmapped: %s", script, u.Reason)
+			}
+		}
+	}
+}
+
+func TestAChainedLintScriptStaysOnTurborepo(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-eslint", "a-chained-lint-script-stays-on-turborepo")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, "turbo.json", `{"tasks": {"build": {}, "test": {}, "lint": {}}}`)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "eslint . && prettier --check ."}}`)
+	result, err := Sync(root, Options{Mode: ModeImport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs, _ := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"].([]any)
+	if !slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
+		t.Errorf("jobs = %v, want the TypeScript lint disabled", jobs)
+	}
+	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool {
+		return u.Task == "@demo/pricing#lint" && strings.Contains(u.Reason, "prettier")
+	}) {
+		t.Errorf("unmapped = %+v, want the chained lint listed", result.Unmapped)
+	}
+}
+
+func TestESLintWithOtherArgumentsStaysOnTurborepo(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-eslint", "eslint-with-other-arguments-stays-on-turborepo")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, "turbo.json", `{"tasks": {"build": {}, "test": {}, "lint": {}}}`)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "eslint --ext .ts src"}}`)
+	result, err := Sync(root, Options{Mode: ModeImport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs, _ := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"].([]any)
+	if !slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
+		t.Errorf("jobs = %v, want the TypeScript lint disabled", jobs)
+	}
+	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool {
+		return u.Task == "@demo/pricing#lint" && strings.Contains(u.Reason, "would drop")
+	}) {
+		t.Errorf("unmapped = %+v, want the lint listed with the arguments it would lose", result.Unmapped)
+	}
+}
+
 func TestAStalePackageGraphFailsValidate(t *testing.T) {
 	spectest.Proves(t, feature, "validate-fails-on-a-stale-graph", "a-stale-package-graph-fails-validate")
 	d := readDemo(t)

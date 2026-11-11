@@ -284,9 +284,9 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	root := repository(t, d, ModeImport, TypeScriptExtension)
 	// pricing's scripts already run what @putnami/typescript runs: they move
 	// to it, and so does the api's jest test. The api keeps a webpack build and
-	// an eslint lint, which stay on Nx.
+	// a lint chained with prettier, which stay on Nx.
 	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "bun build src/index.ts --outdir dist", "test": "bun test", "lint": "biome check ."}}`)
-	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"build": {"executor": "@nx/webpack:webpack"}, "lint": {"executor": "@nx/eslint:lint"}}}`)
+	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"build": {"executor": "@nx/webpack:webpack"}, "lint": {"executor": "nx:run-commands", "options": {"command": "eslint . && prettier --check ."}}}}`)
 	result := sync(t, root, SyncOptions{})
 	if result.Mode != ModeImport {
 		t.Fatalf("mode = %s", result.Mode)
@@ -391,6 +391,160 @@ func TestTheSyncOwnsTheTestRunnerOption(t *testing.T) {
 	}
 	if got := readProjectFile(t, root, "old-api")["options"]; !reflect.DeepEqual(got, map[string]any{TypeScriptExtension + ":test": map[string]any{"timeout": float64(9000)}}) {
 		t.Fatalf("former project options = %v, want the runner retracted", got)
+	}
+}
+
+func TestAnESLintLintTargetMapsToTheTypeScriptLint(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-eslint", "an-eslint-lint-target-maps-to-the-typescript-lint")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	// pricing lints with an eslint script, the api with the ESLint executor:
+	// both move to @putnami/typescript:lint, which lints them with ESLint.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "eslint ."}}`)
+	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"lint": {"executor": "@nx/eslint:lint"}}}`)
+	sync(t, root, SyncOptions{})
+	for _, dir := range []string{"packages/pricing", "apps/api"} {
+		doc := readProjectFile(t, root, dir)
+		jobs, _ := doc["disable"].(map[string]any)["jobs"].([]any)
+		if !slices.Contains(jobs, any(ExtensionName+":lint")) || slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
+			t.Errorf("%s jobs = %v, want @putnami/nx:lint disabled and the TypeScript lint kept", dir, jobs)
+		}
+		options, _ := doc["options"].(map[string]any)
+		layer, _ := options[TypeScriptExtension].(map[string]any)
+		if got := layer["lint"]; !reflect.DeepEqual(got, map[string]any{"linter": "eslint"}) {
+			t.Errorf("%s options[%q].lint = %v, want {linter: eslint}", dir, TypeScriptExtension, got)
+		}
+	}
+}
+
+func TestAChainedLintScriptStaysOnNx(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-eslint", "a-chained-lint-script-stays-on-nx")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "eslint . && prettier --check ."}}`)
+	result := sync(t, root, SyncOptions{})
+	doc := readProjectFile(t, root, "packages/pricing")
+	jobs, _ := doc["disable"].(map[string]any)["jobs"].([]any)
+	if !slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
+		t.Errorf("jobs = %v, want @putnami/typescript:lint disabled", jobs)
+	}
+	options, _ := doc["options"].(map[string]any)
+	if _, ok := options[TypeScriptExtension]; ok {
+		t.Errorf("options = %v, want no linter for a lint that stays on Nx", options)
+	}
+	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool { return u.Target == "lint" && strings.Contains(u.Reason, "prettier") }) {
+		t.Errorf("unmapped = %+v, want the chained lint listed", result.Unmapped)
+	}
+}
+
+func TestESLintWithOtherArgumentsStaysOnNx(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-eslint", "eslint-with-other-arguments-stays-on-nx")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	// pricing passes --max-warnings, which the TypeScript lint would drop;
+	// the api's executor sets maxWarnings. Both stay on Nx, and say why.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "eslint . --max-warnings 0"}}`)
+	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"lint": {"executor": "@nx/eslint:lint", "options": {"maxWarnings": 0}}}}`)
+	result := sync(t, root, SyncOptions{})
+	for _, dir := range []string{"packages/pricing", "apps/api"} {
+		doc := readProjectFile(t, root, dir)
+		jobs, _ := doc["disable"].(map[string]any)["jobs"].([]any)
+		if !slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
+			t.Errorf("%s jobs = %v, want the TypeScript lint disabled", dir, jobs)
+		}
+		options, _ := doc["options"].(map[string]any)
+		if _, ok := options[TypeScriptExtension]; ok {
+			t.Errorf("%s options = %v, want no linter", dir, options)
+		}
+	}
+	listed := 0
+	for _, u := range result.Unmapped {
+		if u.Target == "lint" && strings.Contains(u.Reason, "would drop") {
+			listed++
+		}
+	}
+	if listed != 2 {
+		t.Errorf("unmapped = %+v, want both lint targets listed with the arguments they would lose", result.Unmapped)
+	}
+
+	// lintFilePatterns that name the project root carry over.
+	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"lint": {"executor": "@nx/eslint:lint", "options": {"lintFilePatterns": ["{projectRoot}"]}}}}`)
+	sync(t, root, SyncOptions{})
+	apiJobs := func() []any {
+		jobs, _ := readProjectFile(t, root, "apps/api")["disable"].(map[string]any)["jobs"].([]any)
+		return jobs
+	}
+	if jobs := apiJobs(); !slices.Contains(jobs, any(ExtensionName+":lint")) {
+		t.Errorf("api jobs = %v, want the lint moved to the TypeScript lint", jobs)
+	}
+
+	// Options nx.json's targetDefaults set, by executor or by name, and a
+	// target with configurations, keep the target on Nx.
+	nxJSON, err := os.ReadFile(filepath.Join(root, "nx.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var nx map[string]any
+	if err := json.Unmarshal(nxJSON, &nx); err != nil {
+		t.Fatal(err)
+	}
+	for _, defaults := range []map[string]any{
+		{"@nx/eslint:lint": map[string]any{"options": map[string]any{"maxWarnings": 0}}},
+		{"lint": map[string]any{"options": map[string]any{"quiet": true}}},
+	} {
+		nx["targetDefaults"] = defaults
+		data, _ := json.Marshal(nx)
+		writeFile(t, root, "nx.json", string(data))
+		sync(t, root, SyncOptions{})
+		if jobs := apiJobs(); !slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
+			t.Errorf("targetDefaults %v: api jobs = %v, want the lint kept on Nx", defaults, jobs)
+		}
+	}
+	writeFile(t, root, "nx.json", string(nxJSON))
+	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"lint": {"executor": "@nx/eslint:lint", "configurations": {"ci": {"maxWarnings": 0}}}}}`)
+	sync(t, root, SyncOptions{})
+	if jobs := apiJobs(); !slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
+		t.Errorf("a target with configurations: api jobs = %v, want the lint kept on Nx", jobs)
+	}
+}
+
+func TestALinterTheProjectChoseIsKept(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-eslint", "a-linter-the-project-chose-is-kept")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "eslint ."}}`)
+	writeFile(t, root, "packages/pricing/putnami.json", `{"options": {"@putnami/typescript": {"lint": {"linter": "biome"}}}}`)
+	sync(t, root, SyncOptions{})
+	layer, _ := readProjectFile(t, root, "packages/pricing")["options"].(map[string]any)[TypeScriptExtension].(map[string]any)
+	if got := layer["lint"]; !reflect.DeepEqual(got, map[string]any{"linter": "biome"}) {
+		t.Errorf("lint option = %v, want the project's biome kept", got)
+	}
+}
+
+func TestTheSyncRemovesTheESLintLinterItWrote(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-eslint", "the-sync-removes-the-eslint-linter-it-wrote")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "eslint ."}}`)
+	sync(t, root, SyncOptions{})
+	// The project moves to Biome: the eslint linter the sync wrote goes, and
+	// an option of the project's own stays.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "biome check ."}}`)
+	sync(t, root, SyncOptions{})
+	if options, ok := readProjectFile(t, root, "packages/pricing")["options"].(map[string]any); ok {
+		if _, ok := options[TypeScriptExtension]; ok {
+			t.Errorf("options = %v, want the eslint linter removed", options)
+		}
+	}
+
+	doc := readProjectFile(t, root, "packages/pricing")
+	doc["options"] = map[string]any{TypeScriptExtension: map[string]any{"lint": map[string]any{"linter": "biome"}}}
+	data, _ := json.Marshal(doc)
+	writeFile(t, root, "packages/pricing/putnami.json", string(data))
+	sync(t, root, SyncOptions{})
+	layer, _ := readProjectFile(t, root, "packages/pricing")["options"].(map[string]any)[TypeScriptExtension].(map[string]any)
+	if got := layer["lint"]; !reflect.DeepEqual(got, map[string]any{"linter": "biome"}) {
+		t.Errorf("lint option = %v, want the project's own biome kept", got)
 	}
 }
 

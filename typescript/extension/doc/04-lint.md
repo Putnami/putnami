@@ -1,6 +1,6 @@
 # Lint
 
-The lint command formats and lints TypeScript code using [Biome](https://biomejs.dev/). The no-fix (read-only) path runs a single `biome check` pass that combines formatting and linting in one file scan; the fix (writer) path runs the format and lint phases separately so auto-fix behavior is preserved exactly.
+The lint command formats and lints TypeScript code using [Biome](https://biomejs.dev/), or lints it with the project's own [ESLint](https://eslint.org/) configuration when the project chooses ESLint (see [Choosing the linter](#choosing-the-linter)). The no-fix (read-only) path runs a single `biome check` pass that combines formatting and linting in one file scan; the fix (writer) path runs the format and lint phases separately so auto-fix behavior is preserved exactly.
 
 ## Overview
 
@@ -31,6 +31,35 @@ putnami lint . --max-diagnostics 100
 # Show all severity levels (including info)
 putnami lint . --diagnostic-level info
 ```
+
+## Choosing the linter
+
+Each project lints with one linter, Biome or ESLint, chosen in this order:
+
+1. **The option** `options["@putnami/typescript"].lint.linter` in the project's `putnami.json`, `biome` or `eslint`:
+
+   ```json
+   { "options": { "@putnami/typescript": { "lint": { "linter": "eslint" } } } }
+   ```
+
+   Another value fails lint with `typescript.lint_linter_unknown`.
+2. **The `lint` script** of the project's `package.json`: ESLint when its first command runs `eslint`, plainly, by a `node_modules/.bin` path, or through `npx`, `bunx`, `pnpm exec`, `yarn` or `npm exec`.
+3. **Biome** otherwise.
+
+A configuration file never chooses: `putnami deps install` writes a root `biome.json` whatever the projects lint with, and an `eslint.config.js` alone leaves a project on Biome. The `lint` script only names the linter: its arguments do not run, so a flag such as `--max-warnings 0` belongs in the ESLint configuration. An ESLint lint whose script carries arguments other than `.`, or chains another command, reports a `typescript.lint_script_arguments_ignored` warning that names them. [ADR 0009](./adr/0009-a-project-lints-with-biome-or-eslint.md) records the choice.
+
+## ESLint
+
+A project that lints with ESLint keeps its ESLint release, configuration and plugins, under Putnami's runner and cache:
+
+- **Runner**: the nearest `node_modules/.bin/eslint`, from the project up to the workspace root; an `eslint` on `PATH` is never used. ESLint runs on the `node` on `PATH`, and lint fails with a message that names Node when there is none, or names ESLint when no `node_modules/.bin/eslint` exists.
+- **Files**: ESLint runs from the project directory over `.`, so it resolves the flat (`eslint.config.*`) or legacy (`.eslintrc*`) configuration that applies there and its own ignores. A nested project and Putnami's `.gen` and `.putnami` directories are passed as `--ignore-pattern` and never linted.
+- **Diagnostics**: the `--format json` result becomes diagnostics with the workspace-relative file, the line, the column and the rule. A message ESLint reports without a rule, such as a parsing error, has the category `eslint`. `--diagnostic-level error` passes `--quiet`, and `--max-diagnostics` caps what is shown.
+- **Fixes**: `--fix` (the default) passes ESLint's `--fix` and reports what remains; `--fix false` only reports. The format phase runs no formatter: Prettier, or any other formatter, stays the project's own.
+- **Cache**: the lint tasks key `eslint.config.{js,mjs,cjs,ts,mts,cts}`, `.eslintrc`, `.eslintrc.{js,cjs,json,yaml,yml}` and `.eslintignore`, in the project and at the workspace root, besides the project's sources, which include the `.vue`, `.svelte`, `.astro`, `.md`, `.mdx`, `.yml` and `.yaml` files ESLint plugins lint. A configuration in a directory between the project and the workspace root, or a file a configuration imports from outside the project, is not keyed: keep the configuration in the project or at the root.
+- **Batching**: in a batch, the Biome projects share one Biome invocation and the ESLint projects run their own ESLint in parallel, up to the task's CPU budget; each result belongs to its project, and an ESLint that cannot start fails its project alone.
+
+The skip guard and the documentation link check run the same way for both linters.
 
 ## Pipeline
 
@@ -227,7 +256,7 @@ The first `biome.json` found wins. To customize, place a `biome.json` in your pr
 
 ## Biome Resolution
 
-Lint needs Bun and no Node.js on the host. It looks in the nearest `node_modules`, from the project up to the workspace root, and starts the first of:
+A Biome lint needs Bun and no Node.js on the host; only an [ESLint](#eslint) lint runs on Node. It looks in the nearest `node_modules`, from the project up to the workspace root, and starts the first of:
 
 1. **The native executable** of the platform package installed for the host: `@biomejs/cli-<os>-<arch>/biome`, and the `-musl` package on a musl host. A hoisted install and an isolated install are both read.
 2. **The launcher** in `node_modules/.bin`, when no platform package is installed for the host. The launcher is a JavaScript file: lint runs it with the Bun the task uses, never with a `node` from `PATH`.
@@ -300,5 +329,5 @@ The pass emits structured diagnostics with:
 
 - **Scope**: Formatting and linting TypeScript, JavaScript, JSON, CSS, HTML, and GraphQL files within a project
 - **Out of scope**: Type checking (see [Build](./02-build.md) types phase), custom Biome plugins. Test rules other than the [skip guard](#skip-guard) come from Biome overrides
-- **Dependencies**: Bun, and Biome resolved from `node_modules` (walks up the directory tree) or `PATH`; see [Biome Resolution](#biome-resolution). Node.js is not needed
+- **Dependencies**: Bun, and Biome resolved from `node_modules` (walks up the directory tree) or `PATH`; see [Biome Resolution](#biome-resolution). Node.js is needed only by a project that lints with [ESLint](#eslint), which also needs `eslint` in `node_modules/.bin`
 - **Extension points**: Override Biome configuration by placing `biome.json` in project root or workspace root. Use `extends` to inherit the default config.
