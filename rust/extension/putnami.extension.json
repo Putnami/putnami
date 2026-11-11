@@ -198,8 +198,7 @@
         },
         "port": {
           "type": "number",
-          "default": 8080,
-          "description": "Port the image exposes and sets as PORT"
+          "description": "Port the image exposes and sets as PORT, 8080 by default"
         },
         "entrypoint": {
           "type": "string",

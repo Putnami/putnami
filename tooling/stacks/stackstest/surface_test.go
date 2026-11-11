@@ -14,7 +14,7 @@ const surfaceManifestJSON = `{
     "test": {"flags": {"test": {"type": "string", "short": "-t"}}},
     "serve": {"flags": {"port": {"type": "number", "default": 3000}, "args": {"type": "string"}}},
     "run": {"flags": {"args": {"type": "string"}}},
-    "package": {"flags": {"docker": {}, "docker-base-image": {}, "docker-tag": {}, "docker-load": {}, "dry-run": {}, "platform": {}, "port": {"type": "number", "default": 8080}}},
+    "package": {"flags": {"docker": {}, "docker-base-image": {}, "docker-tag": {}, "docker-load": {}, "dry-run": {}, "platform": {}, "port": {"type": "number"}}},
     "publish": {"flags": {"docker": {}, "docker-registry": {}, "dry-run": {}}},
     "workspace-install": {}
   }
@@ -49,13 +49,13 @@ func TestCheckSurfaceReportsEachDrift(t *testing.T) {
 		`"args": {"type": "string"}}},
     "run"`, `"other": {}}},
     "run"`,
-		`"default": 8080`, `"default": 3000`,
+		`"platform": {}, "port": {"type": "number"}`, `"platform": {}, "port": {"type": "number", "default": 8080}`,
 		`"short": "-t"`, `"short": "-f"`,
 		`, {"id": "docs", "task": "lint-docs"}`, ``,
 		`"installInputs": ["Cargo.lock"]`, `"installInputs": []`,
 	).Replace(surfaceManifestJSON)
 	r := surface(t, drifted)
-	for _, want := range []string{"serve declares no args flag", "package flag port defaults to 3000", "short form is \"-f\"", "lint runs no lint-docs task", "declares no workspace.installInputs"} {
+	for _, want := range []string{"serve declares no args flag", "package flag port defaults to 8080", "short form is \"-f\"", "lint runs no lint-docs task", "declares no workspace.installInputs"} {
 		if !strings.Contains(strings.Join(r.errors, "\n"), want) {
 			t.Errorf("no error %q in %v", want, r.errors)
 		}
