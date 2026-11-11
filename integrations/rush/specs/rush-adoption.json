@@ -20,7 +20,7 @@
     },
     {
       "id": "sync-writes-the-project-graph",
-      "text": "The sync task writes in each project's putnami.json the extension of the mode, the mode param or else the recorded mode, import by default, an unknown one failing, and the project IDs it depends on, and removes the other mode's extension. In delegate mode it adds rush.json, command-line.json and the Rush lockfile as filePatterns, disables test and lint without a bulk or phased command of that name, and retracts a former project. In import mode it disables build, test and lint without a script of that name. It rewrites a file only when a member it owns changes."
+      "text": "The sync task writes in each project's putnami.json the extension of the mode, the mode param or else the recorded mode, import by default, an unknown one failing, and the project IDs it depends on, and removes the other mode's extension. In delegate mode it adds rush.json, command-line.json and the Rush lockfile as filePatterns, disables test and lint without a Rush command of that name, and retracts a former project; in import mode it disables a task with no script. It rewrites a file only on a change."
     },
     {
       "id": "validate-fails-on-a-stale-graph",
