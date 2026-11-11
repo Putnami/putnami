@@ -357,6 +357,9 @@ type projectPlan struct {
 	// vitest or jest, or "" when it records none.
 	runner   string
 	unmapped []Unmapped
+	// eslint reports a lint target the TypeScript extension takes over that
+	// runs ESLint: the project's putnami.json then names eslint as its linter.
+	eslint bool
 }
 
 // planProject maps the targets of one project in the mode.
@@ -380,10 +383,13 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 		switch {
 		case !ok:
 			plan.disabled = append(plan.disabled, task)
-		case isTS && coveredByTypeScript(task, target):
+		case isTS && coveredByTypeScript(root, p.Path, task, target):
 			plan.disabled = append(plan.disabled, ExtensionName+":"+task)
 			if task == "test" {
 				plan.runner = testRunner(target)
+			}
+			if task == "lint" && lintsWithESLint(root, p.Path, target) {
+				plan.eslint = true
 			}
 		case typeScript && hasManifest(root, p.Path):
 			// The TypeScript extension claims the project too: the target
@@ -418,6 +424,12 @@ func importReason(declared, isTS bool, task string, target detect.Target) string
 	if !isTS {
 		return fmt.Sprintf("the project is no TypeScript project (package.json, and a tsconfig*.json or a .ts source): %s keeps running through nx run", task)
 	}
+	if strings.ContainsAny(runs, "&|;") {
+		return fmt.Sprintf("its script chains another command (%q), which @putnami/typescript does not run: %s keeps running through nx run", runs, task)
+	}
+	if task == "lint" && (target.Executor == eslintExecutor || strings.Contains(runs, "eslint")) {
+		return fmt.Sprintf("its ESLint takes arguments or options (%q) that @putnami/typescript would drop: move them to the ESLint configuration; %s keeps running through nx run", runs, task)
+	}
 	return fmt.Sprintf("@putnami/typescript runs %s, not %q: %s keeps running through nx run", strings.Join(typeScriptCommands[task], " or "), runs, task)
 }
 
@@ -442,12 +454,14 @@ func hasManifest(root, dir string) bool {
 
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs: a target whose script runs one keeps its runner when the
-// extension takes it over. An eslint or tsc target, or one another Nx
-// executor runs, stays on Nx.
+// extension takes it over: a test target that runs Vitest or Jest keeps its
+// runner, and a lint target that runs ESLint moves only as bare as
+// eslintCommands says. A tsc target, or one another Nx executor runs, stays on
+// Nx.
 var typeScriptCommands = map[string][]string{
 	"build": {"bun build"},
 	"test":  {"bun test", "vitest", "jest", "npx vitest", "npx jest"},
-	"lint":  {"biome", "bunx biome", "bunx @biomejs/biome"},
+	"lint":  {"biome", "bunx biome", "bunx @biomejs/biome", "eslint"},
 }
 
 // testExecutors are the Nx executors of a test target the TypeScript
@@ -460,17 +474,171 @@ var testExecutors = map[string]string{
 	"@nrwl/jest:jest": "jest",
 }
 
+// eslintCommands are the lint commands that run ESLint the way the TypeScript
+// lint does: over the project, with no argument the TypeScript lint would
+// drop, plainly or through a package runner.
+var eslintCommands = []string{
+	"eslint", "eslint .",
+	"npx eslint", "npx eslint .",
+	"bunx eslint", "bunx eslint .",
+	"pnpm exec eslint", "pnpm exec eslint .",
+	"yarn eslint", "yarn eslint .",
+}
+
+// eslintExecutor is the Nx executor that lints with ESLint, which the
+// TypeScript extension's lint task runs from the project's own configuration.
+const eslintExecutor = "@nx/eslint:lint"
+
 // coveredByTypeScript reports whether the TypeScript extension's task runs
-// what a target runs: a script or a command whose program is the one that
-// task runs, or a test executor of testExecutors.
-func coveredByTypeScript(task string, target detect.Target) bool {
+// what a target of the project at dir runs: a script or a command whose
+// program is the one that task runs, with no other command chained to it, a
+// test executor of testExecutors, or for lint a bare ESLint (lintsWithESLint).
+func coveredByTypeScript(root, dir, task string, target detect.Target) bool {
+	if task == "lint" && lintsWithESLint(root, dir, target) {
+		return true
+	}
 	switch target.Executor {
 	case "", "nx:run-script", "nx:run-commands":
 	default:
 		return task == "test" && testExecutors[target.Executor] != ""
 	}
 	command := strings.TrimSpace(target.Command)
-	for _, program := range typeScriptCommands[task] {
+	if task == "lint" && strings.Contains(command, "eslint") {
+		return false
+	}
+	return runsOnly(command, typeScriptCommands[task])
+}
+
+// lintsWithESLint reports whether a lint target runs ESLint the way the
+// TypeScript lint does: a command in eslintCommands, or the ESLint executor
+// with no option but lintFilePatterns naming the project root.
+func lintsWithESLint(root, dir string, target detect.Target) bool {
+	switch target.Executor {
+	case eslintExecutor:
+		return eslintExecutorOptionsCarried(root, dir)
+	case "", "nx:run-script", "nx:run-commands":
+		return slices.Contains(eslintCommands, strings.Join(strings.Fields(target.Command), " "))
+	}
+	return false
+}
+
+// eslintExecutorOptionsCarried reports whether the lint target of the project
+// at dir sets no option the TypeScript lint would drop: none, or only
+// lintFilePatterns that name the project root. It reads the target in the
+// project's project.json, else the nx member of its package.json, under the
+// targetDefaults of nx.json for lint and for the ESLint executor. It fails
+// closed: a target it cannot find or read, or one with configurations, whose
+// options a default configuration may set, is not carried.
+func eslintExecutorOptionsCarried(root, dir string) bool {
+	target, ok := lintTarget(root, dir)
+	if !ok || len(target.Configurations) > 0 {
+		return false
+	}
+	options := map[string]any{}
+	defaults, ok := lintTargetDefaults(root)
+	if !ok {
+		return false
+	}
+	for _, layer := range append(defaults, target) {
+		if len(layer.Configurations) > 0 {
+			return false
+		}
+		for name, value := range layer.Options {
+			options[name] = value
+		}
+	}
+	for name, value := range options {
+		if name != "lintFilePatterns" {
+			return false
+		}
+		patterns, _ := value.([]any)
+		for _, pattern := range patterns {
+			switch pattern {
+			case "{projectRoot}", ".", "./", dir, "./" + dir:
+			default:
+				return false
+			}
+		}
+	}
+	return true
+}
+
+// nxTargetConfig is the part of an Nx target configuration the ESLint
+// mapping reads.
+type nxTargetConfig struct {
+	Options        map[string]any `json:"options"`
+	Configurations map[string]any `json:"configurations"`
+}
+
+// lintTarget reads the lint target of the project at dir, in its
+// project.json, else the nx member of its package.json. It answers false when
+// neither holds one or a file cannot be read.
+func lintTarget(root, dir string) (nxTargetConfig, bool) {
+	type targets struct {
+		Targets map[string]nxTargetConfig `json:"targets"`
+	}
+	abs := filepath.Join(root, filepath.FromSlash(dir))
+	if data, err := os.ReadFile(filepath.Join(abs, "project.json")); err == nil { //nolint:gosec // a project file
+		var project targets
+		if json.Unmarshal(data, &project) != nil {
+			return nxTargetConfig{}, false
+		}
+		if t, ok := project.Targets["lint"]; ok {
+			return t, true
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nxTargetConfig{}, false
+	}
+	data, err := os.ReadFile(filepath.Join(abs, "package.json")) //nolint:gosec // a project file
+	if err != nil {
+		return nxTargetConfig{}, false
+	}
+	var pkg struct {
+		Nx *targets `json:"nx"`
+	}
+	if json.Unmarshal(data, &pkg) != nil || pkg.Nx == nil {
+		return nxTargetConfig{}, false
+	}
+	t, ok := pkg.Nx.Targets["lint"]
+	return t, ok
+}
+
+// lintTargetDefaults reads the targetDefaults of nx.json that apply to an
+// ESLint lint target: by executor, then by target name, which Nx applies
+// over it. A workspace without nx.json has none; one that cannot be read
+// answers false.
+func lintTargetDefaults(root string) ([]nxTargetConfig, bool) {
+	data, err := os.ReadFile(filepath.Join(root, "nx.json")) //nolint:gosec // the workspace's nx.json
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, true
+	}
+	if err != nil {
+		return nil, false
+	}
+	var nx struct {
+		TargetDefaults map[string]nxTargetConfig `json:"targetDefaults"`
+	}
+	if json.Unmarshal(data, &nx) != nil {
+		return nil, false
+	}
+	var layers []nxTargetConfig
+	for _, key := range []string{eslintExecutor, "lint"} {
+		if layer, ok := nx.TargetDefaults[key]; ok {
+			layers = append(layers, layer)
+		}
+	}
+	return layers, true
+}
+
+// runsOnly reports whether command runs one of programs and nothing else: a
+// command that chains or pipes another, such as eslint . && prettier --check .,
+// runs a tool the TypeScript extension does not.
+func runsOnly(command string, programs []string) bool {
+	command = strings.TrimSpace(command)
+	if strings.ContainsAny(command, "&|;") {
+		return false
+	}
+	for _, program := range programs {
 		if command == program || strings.HasPrefix(command, program+" ") {
 			return true
 		}
@@ -646,8 +814,9 @@ func ownedJobs() []string {
 // workspace-relative file and writes it when a member the sync owns changes:
 // the extension, @putnami/typescript for an imported TypeScript project, the
 // dependencies on Nx projects, the entries of disable.jobs it owns,
-// options["@putnami/nx"].tasks.test.reports and
-// options["@putnami/typescript:test"].runner. Every other member is kept as
+// options["@putnami/nx"].tasks.test.reports,
+// options["@putnami/typescript:test"].runner and an eslint
+// options["@putnami/typescript"].lint.linter. Every other member is kept as
 // it is. It returns the change, or nil when the file is current.
 func writeProject(root, file string, plan projectPlan, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
@@ -679,6 +848,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	setDisabled(doc, plan.disabled)
 	setReports(doc, plan.reports)
 	setRunner(doc, plan.runner)
+	setLinter(doc, plan.eslint)
 
 	if existing != nil && reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
@@ -688,7 +858,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 
 // retractProject removes from the putnami.json of a former project the
 // extension, @putnami/typescript, its Nx edges, the disable.jobs entries, the
-// reports and the test runner the sync owns.
+// reports, the test runner and the eslint linter the sync owns.
 func retractProject(root, file string, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)
@@ -701,6 +871,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	setDisabled(doc, nil)
 	setReports(doc, nil)
 	setRunner(doc, "")
+	setLinter(doc, false)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
 	}
@@ -783,6 +954,53 @@ func setReports(doc map[string]any, reports map[string]any) {
 		delete(doc, "options")
 	}
 }
+
+// setLinter writes options["@putnami/typescript"].lint.linter: eslint when
+// eslint is set and the project chose no other linter. The sync owns that
+// value only while it is eslint: without eslint, it removes it and each layer
+// left empty, and it keeps any other value the project chose.
+func setLinter(doc map[string]any, eslint bool) {
+	options, _ := doc["options"].(map[string]any)
+	layer, _ := options[TypeScriptExtension].(map[string]any)
+	lint, _ := layer["lint"].(map[string]any)
+	if eslint {
+		if current, set := lint["linter"].(string); set && current != "" && current != eslintLinter {
+			// The project chose its linter: the sync keeps it.
+			return
+		}
+		if options == nil {
+			options = map[string]any{}
+			doc["options"] = options
+		}
+		if layer == nil {
+			layer = map[string]any{}
+			options[TypeScriptExtension] = layer
+		}
+		if lint == nil {
+			lint = map[string]any{}
+			layer["lint"] = lint
+		}
+		lint["linter"] = eslintLinter
+		return
+	}
+	if lint == nil || lint["linter"] != eslintLinter {
+		return
+	}
+	delete(lint, "linter")
+	if len(lint) == 0 {
+		delete(layer, "lint")
+	}
+	if len(layer) == 0 {
+		delete(options, TypeScriptExtension)
+	}
+	if len(options) == 0 {
+		delete(doc, "options")
+	}
+}
+
+// eslintLinter is the value of
+// options["@putnami/typescript"].lint.linter that lints a project with ESLint.
+const eslintLinter = "eslint"
 
 // keepDependency reports whether the sync keeps a dependency it does not
 // write: one on a project that is no Nx project, current or former.

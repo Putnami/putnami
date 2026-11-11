@@ -568,7 +568,10 @@
         "**/*.gql",
         "**/*.html",
         "**/*.htm",
-        "**/*.grit"
+        "**/*.grit",
+        "**/*.vue",
+        "**/*.svelte",
+        "**/*.astro"
       ],
       "flags": {
         "fix": {
@@ -1574,6 +1577,13 @@
             "**/*.html",
             "**/*.htm",
             "**/*.grit",
+            "**/*.vue",
+            "**/*.svelte",
+            "**/*.astro",
+            "**/*.md",
+            "**/*.mdx",
+            "**/*.yml",
+            "**/*.yaml",
             "!.gen/**"
           ]
         },
@@ -1581,7 +1591,20 @@
           "from": "project",
           "files": [
             "biome.json",
-            "package.json"
+            "package.json",
+            "eslint.config.js",
+            "eslint.config.mjs",
+            "eslint.config.cjs",
+            "eslint.config.ts",
+            "eslint.config.mts",
+            "eslint.config.cts",
+            ".eslintrc",
+            ".eslintrc.js",
+            ".eslintrc.cjs",
+            ".eslintrc.json",
+            ".eslintrc.yaml",
+            ".eslintrc.yml",
+            ".eslintignore"
           ]
         },
         "max-diagnostics": {
@@ -1607,7 +1630,20 @@
             "bunfig.toml",
             "tsconfig.json",
             "tsconfig.base.json",
-            "biome.json"
+            "biome.json",
+            "eslint.config.js",
+            "eslint.config.mjs",
+            "eslint.config.cjs",
+            "eslint.config.ts",
+            "eslint.config.mts",
+            "eslint.config.cts",
+            ".eslintrc",
+            ".eslintrc.js",
+            ".eslintrc.cjs",
+            ".eslintrc.json",
+            ".eslintrc.yaml",
+            ".eslintrc.yml",
+            ".eslintignore"
           ]
         },
         "extensionVersion": {
@@ -1665,14 +1701,34 @@
             "**/*.gql",
             "**/*.html",
             "**/*.htm",
-            "**/*.grit"
+            "**/*.grit",
+            "**/*.vue",
+            "**/*.svelte",
+            "**/*.astro",
+            "**/*.md",
+            "**/*.mdx",
+            "**/*.yml",
+            "**/*.yaml"
           ]
         },
         "config": {
           "from": "project",
           "files": [
             "biome.json",
-            "package.json"
+            "package.json",
+            "eslint.config.js",
+            "eslint.config.mjs",
+            "eslint.config.cjs",
+            "eslint.config.ts",
+            "eslint.config.mts",
+            "eslint.config.cts",
+            ".eslintrc",
+            ".eslintrc.js",
+            ".eslintrc.cjs",
+            ".eslintrc.json",
+            ".eslintrc.yaml",
+            ".eslintrc.yml",
+            ".eslintignore"
           ]
         },
         "fix": {
@@ -1692,7 +1748,20 @@
             "bunfig.toml",
             "tsconfig.json",
             "tsconfig.base.json",
-            "biome.json"
+            "biome.json",
+            "eslint.config.js",
+            "eslint.config.mjs",
+            "eslint.config.cjs",
+            "eslint.config.ts",
+            "eslint.config.mts",
+            "eslint.config.cts",
+            ".eslintrc",
+            ".eslintrc.js",
+            ".eslintrc.cjs",
+            ".eslintrc.json",
+            ".eslintrc.yaml",
+            ".eslintrc.yml",
+            ".eslintignore"
           ]
         },
         "extensionVersion": {
@@ -1815,14 +1884,34 @@
             "**/*.gql",
             "**/*.html",
             "**/*.htm",
-            "**/*.grit"
+            "**/*.grit",
+            "**/*.vue",
+            "**/*.svelte",
+            "**/*.astro",
+            "**/*.md",
+            "**/*.mdx",
+            "**/*.yml",
+            "**/*.yaml"
           ]
         },
         "config": {
           "from": "project",
           "files": [
             "biome.json",
-            "package.json"
+            "package.json",
+            "eslint.config.js",
+            "eslint.config.mjs",
+            "eslint.config.cjs",
+            "eslint.config.ts",
+            "eslint.config.mts",
+            "eslint.config.cts",
+            ".eslintrc",
+            ".eslintrc.js",
+            ".eslintrc.cjs",
+            ".eslintrc.json",
+            ".eslintrc.yaml",
+            ".eslintrc.yml",
+            ".eslintignore"
           ]
         },
         "fix": {
@@ -1851,7 +1940,20 @@
             "bunfig.toml",
             "tsconfig.json",
             "tsconfig.base.json",
-            "biome.json"
+            "biome.json",
+            "eslint.config.js",
+            "eslint.config.mjs",
+            "eslint.config.cjs",
+            "eslint.config.ts",
+            "eslint.config.mts",
+            "eslint.config.cts",
+            ".eslintrc",
+            ".eslintrc.js",
+            ".eslintrc.cjs",
+            ".eslintrc.json",
+            ".eslintrc.yaml",
+            ".eslintrc.yml",
+            ".eslintignore"
           ]
         },
         "extensionVersion": {

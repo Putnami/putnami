@@ -173,8 +173,7 @@ func Sync(root string, opts Options) (Result, error) {
 				m.disabled = append(m.disabled, ExtensionName+":"+task)
 			default:
 				m.disabled = append(m.disabled, TypeScriptExtension+":"+task)
-				unmapped[p.SourceName+"#"+task] = fmt.Sprintf("%s runs %s, not %q: it keeps running through Turborepo, with turbo run %s",
-					TypeScriptExtension, strings.Join(typeScriptCommands[task], " or "), script, task)
+				unmapped[p.SourceName+"#"+task] = unmappedReason(task, script)
 			}
 		}
 		members = append(members, m)
@@ -376,18 +375,52 @@ func ownedJob(job string) bool {
 // typeScriptCommands are the programs the TypeScript extension's task of the
 // same name runs. A script that runs one keeps its tool when the extension
 // takes the task over: the test task runs the vitest or jest a test script
-// runs. A tsc or eslint script stays on Turborepo, because moving it would
-// change the tool that checks the code.
+// runs, and a bare eslint lint script moves to the TypeScript lint, which
+// lints with ESLint because the script runs it. A tsc or prettier script
+// stays on Turborepo, because moving it would change the tool that checks the
+// code.
 var typeScriptCommands = map[string][]string{
 	stacks.TaskBuild: {"bun build"},
 	stacks.TaskTest:  {"bun test", "vitest", "jest", "npx vitest", "npx jest"},
-	stacks.TaskLint:  {"biome", "bunx biome", "bunx @biomejs/biome"},
+	stacks.TaskLint:  {"biome", "bunx biome", "bunx @biomejs/biome", "eslint"},
+}
+
+// eslintScripts are the lint scripts that run ESLint the way the TypeScript
+// lint does: over the package, with no argument the TypeScript lint would
+// drop, plainly or through a package runner.
+var eslintScripts = []string{
+	"eslint", "eslint .",
+	"npx eslint", "npx eslint .",
+	"bunx eslint", "bunx eslint .",
+	"pnpm exec eslint", "pnpm exec eslint .",
+	"yarn eslint", "yarn eslint .",
+}
+
+// unmappedReason says why a script of a TypeScript package keeps running
+// through Turborepo in import mode.
+func unmappedReason(task, script string) string {
+	keeps := fmt.Sprintf("it keeps running through Turborepo, with turbo run %s", task)
+	switch {
+	case strings.ContainsAny(script, "&|;"):
+		return fmt.Sprintf("its script chains another command (%q), which %s does not run: %s", script, TypeScriptExtension, keeps)
+	case task == stacks.TaskLint && strings.Contains(script, "eslint"):
+		return fmt.Sprintf("its ESLint takes arguments (%q) that %s would drop: move them to the ESLint configuration; %s", script, TypeScriptExtension, keeps)
+	}
+	return fmt.Sprintf("%s runs %s, not %q: %s", TypeScriptExtension, strings.Join(typeScriptCommands[task], " or "), script, keeps)
 }
 
 // runsTypeScriptTask reports whether a package script runs what the
-// TypeScript extension's task runs.
+// TypeScript extension's task runs, and nothing else: a script that chains or
+// pipes another command, such as eslint . && prettier --check ., runs a tool
+// the TypeScript extension does not.
 func runsTypeScriptTask(task, script string) bool {
 	script = strings.TrimSpace(script)
+	if strings.ContainsAny(script, "&|;") {
+		return false
+	}
+	if task == stacks.TaskLint && strings.Contains(script, "eslint") {
+		return slices.Contains(eslintScripts, strings.Join(strings.Fields(script), " "))
+	}
 	for _, program := range typeScriptCommands[task] {
 		if script == program || strings.HasPrefix(script, program+" ") {
 			return true

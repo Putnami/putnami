@@ -29,6 +29,74 @@ func runLintBatch(ctx *pctx.Context, mode string) (string, map[string]any, error
 	if len(projects) == 0 {
 		return "FAILED", nil, fmt.Errorf("lint batch requires at least one selected project")
 	}
+	switch mode {
+	case lintBatchCombined, lintBatchFormat, lintBatchCheck:
+	default:
+		return "FAILED", nil, fmt.Errorf("unsupported lint batch mode %q", mode)
+	}
+	maxDiagnostics := ctx.Params.Int("max-diagnostics", 10, "maxDiagnostics")
+	diagnosticLevel := ctx.Params.String("diagnostic-level", "diagnosticLevel")
+
+	// Biome's singleton default is 20 when the flag is omitted. The format
+	// phase never consumes the command's max-diagnostics parameter, while the
+	// check phases override that default only with a positive value.
+	displayMaxDiagnostics := 20
+	if mode != lintBatchFormat && maxDiagnostics > 0 {
+		displayMaxDiagnostics = maxDiagnostics
+	}
+
+	// Each member lints with its own linter. The Biome members share one
+	// Biome invocation; each ESLint member runs ESLint from its own directory,
+	// where ESLint resolves that project's configuration.
+	results := make([]lintBatchProjectResult, len(projects))
+	var biomeProjects []pctx.ProjectRef
+	var biomeIndexes, eslintIndexes []int
+	for i, project := range projects {
+		linter, err := projectLinter(ctx.Params, filepath.Join(ctx.WorkspaceRoot, project.Path))
+		if err != nil {
+			return "FAILED", nil, err
+		}
+		switch {
+		case linter != lint.LinterESLint:
+			biomeProjects = append(biomeProjects, project)
+			biomeIndexes = append(biomeIndexes, i)
+		case mode == lintBatchFormat:
+			results[i] = lintBatchProjectResult{ProjectID: project.ID, Status: "OK"}
+		default:
+			eslintIndexes = append(eslintIndexes, i)
+		}
+	}
+	fix := mode == lintBatchCheck && ctx.Params.Bool("fix", true)
+	runESLintMembers(eslintIndexes, func(i int) {
+		results[i] = eslintBatchResult(ctx.WorkspaceRoot, projects[i], fix, diagnosticLevel, displayMaxDiagnostics)
+	})
+	if len(biomeProjects) > 0 {
+		biomeResults, err := runBiomeBatch(ctx, mode, biomeProjects, diagnosticLevel, displayMaxDiagnostics)
+		if err != nil {
+			return "FAILED", nil, err
+		}
+		for j, i := range biomeIndexes {
+			results[i] = biomeResults[j]
+		}
+	}
+	if mode != lintBatchFormat && skipGuardEnabled(ctx.Params) {
+		addSkipGuardDiagnostics(ctx.WorkspaceRoot, projects, results, displayMaxDiagnostics)
+	}
+	// The subprocess itself succeeded in producing the split protocol. Per-job
+	// failures stay in batchResults so the scheduler can preserve independent
+	// DAG and cache outcomes without turning every peer into a process failure.
+	return "OK", map[string]any{"batchResults": results}, nil
+}
+
+// runBiomeBatch runs one Biome invocation over the projects that lint with
+// Biome and splits its report into one result per project, in their order.
+func runBiomeBatch(
+	ctx *pctx.Context,
+	mode string,
+	projects []pctx.ProjectRef,
+	diagnosticLevel string,
+	displayMaxDiagnostics int,
+) ([]lintBatchProjectResult, error) {
 	projectPaths := make([]string, 0, len(projects))
 	for _, project := range projects {
 		projectPaths = append(projectPaths, filepath.Join(ctx.WorkspaceRoot, project.Path))
@@ -36,11 +104,9 @@ func runLintBatch(ctx *pctx.Context, mode string) (string, map[string]any, error
 
 	biomeBin, err := resolveBiomeBinFn(projectPaths[0], ctx.WorkspaceRoot)
 	if err != nil {
-		return "FAILED", nil, err
+		return nil, err
 	}
 	configPath := resolveBiomeConfigFn(projectPaths[0], ctx.WorkspaceRoot, ctx.Extension.Root)
-	maxDiagnostics := ctx.Params.Int("max-diagnostics", 10, "maxDiagnostics")
-	diagnosticLevel := ctx.Params.String("diagnostic-level", "diagnosticLevel")
 
 	var report parse.BiomeReport
 	var ok bool
@@ -62,7 +128,7 @@ func runLintBatch(ctx *pctx.Context, mode string) (string, map[string]any, error
 			configPath,
 			ctx.Params.Bool("fix", true),
 		)
-	case lintBatchCheck:
+	default:
 		report, ok, err = lint.CheckProjects(
 			biomeBin,
 			projectPaths,
@@ -72,28 +138,11 @@ func runLintBatch(ctx *pctx.Context, mode string) (string, map[string]any, error
 			-1,
 			diagnosticLevel,
 		)
-	default:
-		return "FAILED", nil, fmt.Errorf("unsupported lint batch mode %q", mode)
 	}
 	if err != nil {
-		return "FAILED", nil, err
+		return nil, err
 	}
-
-	// Biome's singleton default is 20 when the flag is omitted. The format
-	// phase never consumes the command's max-diagnostics parameter, while the
-	// check phases override that default only with a positive value.
-	displayMaxDiagnostics := 20
-	if mode != lintBatchFormat && maxDiagnostics > 0 {
-		displayMaxDiagnostics = maxDiagnostics
-	}
-	results := splitBiomeBatchReport(ctx.WorkspaceRoot, projects, report, ok, displayMaxDiagnostics)
-	if mode != lintBatchFormat && skipGuardEnabled(ctx.Params) {
-		addSkipGuardDiagnostics(ctx.WorkspaceRoot, projects, results, displayMaxDiagnostics)
-	}
-	// The subprocess itself succeeded in producing the split protocol. Per-job
-	// failures stay in batchResults so the scheduler can preserve independent
-	// DAG and cache outcomes without turning every peer into a process failure.
-	return "OK", map[string]any{"batchResults": results}, nil
+	return splitBiomeBatchReport(ctx.WorkspaceRoot, projects, report, ok, displayMaxDiagnostics), nil
 }
 
 func splitBiomeBatchReport(
