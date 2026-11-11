@@ -173,3 +173,73 @@ func impactProjectIDs(projects []*Project) []string {
 	slices.Sort(ids)
 	return ids
 }
+
+// A step a dependent's step names through `^` is read, project and workspace
+// ports alike, where a project that depends on this one may run its command:
+// the dependent's toolchain may read the sources and build files of a project
+// that runs no such step. Where no dependent may run it, it reads nothing.
+func TestTaskIndex_AnUpstreamStepIsReadWhereADependentMayRunIt(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure",
+		"a-file-claims-only-the-tasks-its-project-may-plan")
+	javaExt := &extension.ExtensionDescription{
+		Name: "@fixture/java", RelPath: "java/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"java-build": {Inputs: map[string]extproto.TaskInputPort{
+				"sources": {From: extproto.TaskInputFromProject, Files: []string{"**/*.java"}},
+				"poms":    {From: extproto.TaskInputFromWorkspace, Files: []string{"*/*/pom.xml"}},
+			}},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"build": {
+				CommandName: "build", Name: "build", ExtensionName: "@fixture/java", ExtensionPath: "java/extension",
+				PipelineSteps: []extproto.PipelineStep{{ID: "build", Task: "java-build", DependsOn: []string{"^build"}}},
+			},
+		},
+	}
+	projects := []*Project{
+		{ID: "/java/extension", Name: "@fixture/java", Path: "java/extension"},
+		{ID: "/libs/shared", Name: "shared", Path: "libs/shared"},
+		{ID: "/libs/alone", Name: "alone", Path: "libs/alone"},
+		{ID: "/apps/svc", Name: "svc", Path: "apps/svc", Extensions: []string{"/java/extension"}, Dependencies: []string{"/libs/shared"}},
+	}
+	ws := NewWorkspace(t.TempDir(), nil, projects)
+	ws.Graph = BuildGraph(projects)
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{javaExt}, nil)
+	for _, tc := range []struct {
+		project, path string
+		want          []string
+	}{
+		{project: "/libs/shared", path: "libs/shared/Shared.java", want: []string{"build~build"}},
+		{project: "/libs/shared", path: "libs/shared/pom.xml", want: []string{"build~build"}},
+		{project: "/libs/alone", path: "libs/alone/Alone.java"},
+		{project: "/libs/alone", path: "libs/alone/pom.xml"},
+	} {
+		if got := idx.TasksReadingPath(tc.project, tc.path); !slices.Equal(got, tc.want) {
+			t.Errorf("%s is read by %v, want %v", tc.path, got, tc.want)
+		}
+	}
+}
+
+// A workspace-once command reads for no project, so manifests whose only file
+// declarations are workspace-once attribute nothing: the index is nil and the
+// selection keeps the project-level mapping instead of selecting nothing.
+func TestNewTaskIndex_OnlyWorkspaceOnceDeclarationsIsANilInterface(t *testing.T) {
+	ext := &extension.ExtensionDescription{
+		Name: "@fixture/sdd", RelPath: "sdd/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"decisions-validate": {Inputs: map[string]extproto.TaskInputPort{
+				"repository": {From: extproto.TaskInputFromProject, Files: []string{"git:**"}},
+			}},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"validate-workspace": {
+				CommandName: "validate-workspace", Name: "validate-workspace", ExtensionName: "@fixture/sdd",
+				ExtensionPath: "sdd/extension", Activation: workspaceOnceActivation,
+				PipelineSteps: []extproto.PipelineStep{{ID: "decisions", Task: "decisions-validate"}},
+			},
+		},
+	}
+	if idx := NewTaskIndex(activationIndexWorkspace(t), []*extension.ExtensionDescription{ext}, nil); idx != nil {
+		t.Fatalf("NewTaskIndex = %T, want a nil interface", idx)
+	}
+}

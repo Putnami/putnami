@@ -238,11 +238,16 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 //
 // A single declaration is enough, and a task that declares none inside an
 // otherwise-declaring workspace reads nothing of its own: it runs when a task it
-// depends on runs, through the intra-project closure.
+// depends on runs, through the intra-project closure. A declaration of a
+// command the workspace-once activation plans does not count: it reads for no
+// project (answersForProjects), so an index built from such declarations alone
+// would select nothing as well.
 func (idx *taskIndex) attributes() bool {
 	for _, task := range idx.tasks {
-		if len(task.files) > 0 || len(task.workspaceFiles) > 0 {
-			return true
+		for _, declared := range task.declarations {
+			if answersForProjects(declared.job) && (len(declared.files) > 0 || len(declared.workspaceFiles) > 0) {
+				return true
+			}
 		}
 	}
 	return false
@@ -612,8 +617,7 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 				continue
 			}
 			if inProject && wsproto.SelectsPath(rel, declared.files) {
-				if idx.mayPlan(declared.job, project) ||
-					(len(idx.reachedBy[scope]) > 0 && idx.mayPlanInClosureOf(declared.job, project)) {
+				if idx.readsWhere(scope, declared.job, project) {
 					reading[scope] = true
 				}
 				if wsproto.SelectsPath(rel, declared.closureFiles) && idx.mayPlanInClosureOf(declared.job, project) {
@@ -621,7 +625,7 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 				}
 				continue
 			}
-			if wsproto.SelectsPath(lookup, declared.workspaceFiles) && idx.mayPlan(declared.job, project) {
+			if wsproto.SelectsPath(lookup, declared.workspaceFiles) && idx.readsWhere(scope, declared.job, project) {
 				reading[scope] = true
 			}
 		}
@@ -704,6 +708,16 @@ func (idx *taskIndex) mayPlan(job *extension.JobDefinition, project *Project) bo
 	})
 	memo.answers[key] = planned
 	return planned
+}
+
+// readsWhere reports whether a port of scope, which job declares, is read in
+// project: where the planner may run job there, or, for a step a dependent's
+// step names through `^`, where it may run in a project that depends on it.
+func (idx *taskIndex) readsWhere(scope string, job *extension.JobDefinition, project *Project) bool {
+	if idx.mayPlan(job, project) {
+		return true
+	}
+	return len(idx.reachedBy[scope]) > 0 && idx.mayPlanInClosureOf(job, project)
 }
 
 // mayPlanInClosureOf reports whether job may be planned in project or in a
