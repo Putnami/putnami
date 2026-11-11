@@ -49,10 +49,10 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    that choose no configuration and no subset of the suite (`vitest run`,
    `--coverage`, `--ci`, `--passWithNoTests` and the like), as an ESLint
    script moves only bare. A `bun build` script moves whatever its
-   arguments: the Bun build reads no script argument, takes its entry from
-   `package.json` (`exports`, `bin`, then `main`, which D-066 points at the
-   sources) and writes under Putnami's output, so a script whose entry
-   differs from `main` builds another entry once moved. Turborepo, Rush and moon
+   arguments: the Bun build reads no script argument; it transpiles the
+   entries the `exports` of `package.json` name (the `.` export D-066 adds
+   names `src/index.ts`), else `src/index.ts`, into Putnami's output, so a
+   script that bundles another file builds another entry once moved. Turborepo, Rush and moon
    read it; Nx reads it beside its executors.
 3. **A project runs both extensions.** A project that keeps one target on
    the tool names the tool's extension and the language extension in its
