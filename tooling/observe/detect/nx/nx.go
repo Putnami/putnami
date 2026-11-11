@@ -136,6 +136,12 @@ type Target struct {
 	Outputs []string `json:"outputs,omitempty"`
 	// Test reports whether the target runs tests.
 	Test bool `json:"test,omitempty"`
+	// Options are the options nx run passes the executor: the targetDefaults
+	// of nx.json for its executor, else its name, overlaid by the target's
+	// options, then by those of its defaultConfiguration, with
+	// {projectRoot}, {workspaceRoot} and {projectName} replaced in each
+	// string.
+	Options map[string]any `json:"options,omitempty"`
 }
 
 // Project is one Nx project with its targets.
@@ -345,10 +351,12 @@ func projectType(t string) string {
 // --- configuration ----------------------------------------------------------
 
 type nxTarget struct {
-	Executor string         `json:"executor"`
-	Command  string         `json:"command"`
-	Outputs  []string       `json:"outputs"`
-	Options  map[string]any `json:"options"`
+	Executor             string                    `json:"executor"`
+	Command              string                    `json:"command"`
+	Outputs              []string                  `json:"outputs"`
+	Options              map[string]any            `json:"options"`
+	Configurations       map[string]map[string]any `json:"configurations"`
+	DefaultConfiguration string                    `json:"defaultConfiguration"`
 }
 
 type projectJSON struct {
@@ -544,6 +552,12 @@ func mergeTargets(into, from map[string]nxTarget) {
 		}
 		if target.Options == nil {
 			target.Options = earlier.Options
+		}
+		if target.Configurations == nil {
+			target.Configurations = earlier.Configurations
+		}
+		if target.DefaultConfiguration == "" {
+			target.DefaultConfiguration = earlier.DefaultConfiguration
 		}
 		into[name] = target
 	}
@@ -812,7 +826,8 @@ func (d *detector) metadata(name, source, root string, targets map[string]nxTarg
 			}
 		}
 		test := isTestTarget(targetName, target)
-		described := Target{Name: targetName, Executor: target.Executor, Command: targetCommand(target), Test: test}
+		described := Target{Name: targetName, Executor: target.Executor, Command: targetCommand(target), Test: test,
+			Options: effectiveOptions(targetName, target, defaults, root, name)}
 		if script, ok := target.Options["script"].(string); ok && described.Command == "" && target.Executor == "nx:run-script" {
 			described.Command = d.script(root, script)
 		}
@@ -834,6 +849,60 @@ func (d *detector) metadata(name, source, root string, targets map[string]nxTarg
 	sort.Strings(m.TestOutputs)
 	data, _ := json.Marshal(m)
 	return data
+}
+
+// effectiveOptions merges the options nx run passes a target's executor: the
+// targetDefaults entry of its executor, else of its name, then the target's
+// own options, then those of its defaultConfiguration, each key replacing the
+// one before it. The tokens {projectRoot}, {workspaceRoot} and {projectName}
+// are replaced in each string, and each string of a list. It returns nil when
+// no layer sets an option.
+func effectiveOptions(targetName string, target nxTarget, defaults map[string]nxTarget, root, name string) map[string]any {
+	var layers []map[string]any
+	if byExecutor, ok := defaults[target.Executor]; ok && target.Executor != "" {
+		layers = append(layers, byExecutor.Options)
+	} else if byName, ok := defaults[targetName]; ok {
+		layers = append(layers, byName.Options)
+	}
+	layers = append(layers, target.Options)
+	if target.DefaultConfiguration != "" {
+		layers = append(layers, target.Configurations[target.DefaultConfiguration])
+	}
+	projectRoot := root
+	if projectRoot == workspace.ProbeRootPath {
+		projectRoot = "."
+	}
+	replacer := strings.NewReplacer("{projectRoot}", projectRoot, "{workspaceRoot}", ".", "{projectName}", name)
+	var merged map[string]any
+	for _, layer := range layers {
+		for key, value := range layer {
+			if merged == nil {
+				merged = map[string]any{}
+			}
+			merged[key] = replaceTokens(value, replacer)
+		}
+	}
+	return merged
+}
+
+// replaceTokens replaces the tokens of a string option, and of each string of
+// a list option; any other value is kept as it is.
+func replaceTokens(value any, replacer *strings.Replacer) any {
+	switch v := value.(type) {
+	case string:
+		return replacer.Replace(v)
+	case []any:
+		out := make([]any, len(v))
+		for i, item := range v {
+			if text, ok := item.(string); ok {
+				out[i] = replacer.Replace(text)
+			} else {
+				out[i] = item
+			}
+		}
+		return out
+	}
+	return value
 }
 
 // script reads the command of a package.json script of a project root; an

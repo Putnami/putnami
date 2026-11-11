@@ -197,13 +197,13 @@ func declaresReferences(config string) bool {
 func (p *TscPlan) resolveOutputs(projectPath string, chain project.TsConfigChain, buildMode bool) error {
 	configDir := filepath.Dir(p.Config)
 	rel := slashRel(projectPath, p.Config)
-	if truthy(chain, "noEmit") {
+	if chain.True("noEmit") {
 		return tscErrorf(CodeTscOutDir, rel, "%s sets noEmit, so tsc builds nothing: set compiler to bun, or remove noEmit", rel)
 	}
-	if _, ok := chainPath(chain, "outFile", configDir); ok {
+	if _, ok := chain.Path("outFile", configDir); ok {
 		return tscErrorf(CodeTscOutDir, rel, "%s sets outFile; Putnami compiles with tsc into an outDir only", rel)
 	}
-	outDir, ok := chainPath(chain, "outDir", configDir)
+	outDir, ok := chain.Path("outDir", configDir)
 	if !ok {
 		return tscErrorf(CodeTscOutDir, rel, "%s sets no outDir, so tsc would write next to the sources: set compilerOptions.outDir", rel)
 	}
@@ -212,7 +212,7 @@ func (p *TscPlan) resolveOutputs(projectPath string, chain project.TsConfigChain
 	}
 	p.OutDir = outDir
 
-	if dir, ok := chainPath(chain, "declarationDir", configDir); ok && !within(outDir, dir) {
+	if dir, ok := chain.Path("declarationDir", configDir); ok && !within(outDir, dir) {
 		if err := insideProject(projectPath, dir, "declarationDir", rel); err != nil {
 			return err
 		}
@@ -234,15 +234,15 @@ func (p *TscPlan) resolveOutputs(projectPath string, chain project.TsConfigChain
 // .tsbuildinfo extension, under outDir and as deep relative to rootDir as the
 // config lies, so a config beside a rootDir of src writes it next to itself.
 func buildInfoPath(chain project.TsConfigChain, config, outDir string, buildMode bool) (string, bool) {
-	if !buildMode && !truthy(chain, "incremental") && !truthy(chain, "composite") {
+	if !buildMode && !chain.True("incremental") && !chain.True("composite") {
 		return "", false
 	}
 	configDir := filepath.Dir(config)
-	if path, ok := chainPath(chain, "tsBuildInfoFile", configDir); ok {
+	if path, ok := chain.Path("tsBuildInfoFile", configDir); ok {
 		return path, true
 	}
 	extensionLess := strings.TrimSuffix(config, filepath.Ext(config))
-	if rootDir, ok := chainPath(chain, "rootDir", configDir); ok {
+	if rootDir, ok := chain.Path("rootDir", configDir); ok {
 		rel, err := filepath.Rel(rootDir, extensionLess)
 		if err != nil {
 			return "", false
@@ -250,36 +250,6 @@ func buildInfoPath(chain project.TsConfigChain, config, outDir string, buildMode
 		return filepath.Join(outDir, rel) + ".tsbuildinfo", true
 	}
 	return filepath.Join(outDir, filepath.Base(extensionLess)) + ".tsbuildinfo", true
-}
-
-// chainPath resolves a path setting of the chain against the directory of
-// the config that declares it, with ${configDir} standing for the directory
-// of the config tsc compiles.
-func chainPath(chain project.TsConfigChain, name, configDir string) (string, bool) {
-	value, ok := chain.CompilerOptions[name]
-	if !ok {
-		return "", false
-	}
-	text, ok := value.Value.(string)
-	if !ok || text == "" {
-		return "", false
-	}
-	if strings.Contains(text, "${configDir}") {
-		return filepath.Clean(filepath.FromSlash(strings.ReplaceAll(text, "${configDir}", filepath.ToSlash(configDir)))), true
-	}
-	if filepath.IsAbs(text) {
-		return filepath.Clean(text), true
-	}
-	return filepath.Join(value.Dir, filepath.FromSlash(text)), true
-}
-
-func truthy(chain project.TsConfigChain, name string) bool {
-	value, ok := chain.CompilerOptions[name]
-	if !ok {
-		return false
-	}
-	b, ok := value.Value.(bool)
-	return ok && b
 }
 
 // insideProject refuses an output that is the project itself or lies outside

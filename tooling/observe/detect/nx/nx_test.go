@@ -757,7 +757,7 @@ func TestDetectListsTheTargetsOfEachProject(t *testing.T) {
 	}
 	wantB := []Target{
 		{Name: "lint", Executor: "@nx/eslint:lint"},
-		{Name: "serve", Executor: "nx:run-commands", Command: "node main.js"},
+		{Name: "serve", Executor: "nx:run-commands", Command: "node main.js", Options: map[string]any{"command": "node main.js"}},
 	}
 	if !reflect.DeepEqual(b.Targets, wantB) {
 		t.Errorf("b targets = %+v, want %+v", b.Targets, wantB)
@@ -774,7 +774,37 @@ func TestDetectReadsTheScriptOfARunScriptTargetInAGraphExport(t *testing.T) {
 	if len(detection.Projects) != 1 || !detection.Projects[0].FromGraph {
 		t.Fatalf("projects = %+v", detection.Projects)
 	}
-	want := []Target{{Name: "build", Executor: "nx:run-script", Command: "tsc"}}
+	want := []Target{{Name: "build", Executor: "nx:run-script", Command: "tsc", Options: map[string]any{"script": "build"}}}
+	if got := detection.Projects[0].Targets; !reflect.DeepEqual(got, want) {
+		t.Errorf("targets = %+v, want %+v", got, want)
+	}
+}
+
+func TestDetectMergesTheOptionsNxRunPassesTheExecutor(t *testing.T) {
+	root := tree(t, map[string]string{
+		"nx.json": `{"targetDefaults": {
+			"@nx/js:tsc": {"options": {"outputPath": "{projectRoot}/dist", "generatePackageJson": false, "assets": ["{projectRoot}/*.md"]}},
+			"build": {"options": {"clean": false}},
+			"lint": {"options": {"maxWarnings": 0}}
+		}}`,
+		"package.json":        `{"name": "ws", "workspaces": ["libs/*"]}`,
+		"libs/a/package.json": `{"name": "a"}`,
+		"libs/a/project.json": `{"name": "a", "targets": {"build": {"executor": "@nx/js:tsc", "defaultConfiguration": "production", "options": {"tsConfig": "{projectRoot}/tsconfig.lib.json", "rootDir": "{workspaceRoot}/libs/{projectName}"}, "configurations": {"production": {"assets": []}, "development": {"watch": true}}}, "lint": {"executor": "@nx/eslint:lint"}}}`,
+	})
+	detection := Detect(root, Options{})
+	if len(detection.Projects) != 1 {
+		t.Fatalf("projects = %+v", detection.Projects)
+	}
+	want := []Target{
+		// The executor's entry wins over the name's, the target over the
+		// entry, and the default configuration over the target.
+		{Name: "build", Executor: "@nx/js:tsc", Options: map[string]any{
+			"outputPath": "libs/a/dist", "generatePackageJson": false, "assets": []any{},
+			"tsConfig": "libs/a/tsconfig.lib.json", "rootDir": "./libs/a",
+		}},
+		// With no entry for its executor, the entry of its name applies.
+		{Name: "lint", Executor: "@nx/eslint:lint", Options: map[string]any{"maxWarnings": float64(0)}},
+	}
 	if got := detection.Projects[0].Targets; !reflect.DeepEqual(got, want) {
 		t.Errorf("targets = %+v, want %+v", got, want)
 	}
