@@ -399,8 +399,9 @@ those bytes.
      record either. The diagnostic names the module, each package with the
      module and version tidy picked, and each raised requirement, and the task
      ends as an uncacheable skip. A package a directory `replace` resolves is
-     no lookup, even though tidy prints `go: found` for it. Tidy's rewrite of `go.mod` and `go.sum` is
-     kept: commit it, and the next tidy looks nothing up and caches as usual.
+     no lookup, even though tidy prints `go: found` for it. Tidy's rewrite of
+     `go.mod` and `go.sum` is kept: commit it, and the next tidy looks
+     nothing up and caches as usual.
    - Syncs `go.mod` dependencies back to `putnami.json`
 2. **Generate**:
    - Parses non-test Go sources
