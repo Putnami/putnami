@@ -58,13 +58,18 @@
     },
     {
       "id": "import-maps-a-tsc-build-target",
-      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone. An @nx/js:tsc target, which compiles with rootDir at the project root into its outputPath and writes a package.json there, and any other tsc target keep running through Nx and are listed with their reason."
+      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone, or when it is an @nx/js:tsc target import-maps-an-nx-js-tsc-build-target maps. Any other tsc target keeps running through Nx and is listed with its reason."
+    },
+    {
+      "id": "import-maps-an-nx-js-tsc-build-target",
+      "text": "An @nx/js:tsc build target maps when, with nx.json targetDefaults and its default configuration applied, it copies no assets, sets generatePackageJson false and no other emit option, its tsConfig is the config the tsc build compiles, its outputPath that config's outDir, its rootDir (else the project root) the config's rootDir, and the build writes no .tsbuildinfo the config does not name. The sync then owns options[\"@putnami/typescript\"].compiler tsc. Another stays on Nx with its reason."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
     "integrations/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md",
     "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
-    "typescript/extension/doc/adr/0009-a-tsc-build-declares-its-outdir-through-pathfrom.md"
+    "typescript/extension/doc/adr/0009-a-tsc-build-declares-its-outdir-through-pathfrom.md",
+    "integrations/nx/doc/adr/0003-an-nx-js-tsc-build-moves-when-the-tsc-build-reproduces-its-emit.md"
   ]
 }

@@ -152,8 +152,22 @@
             "kind": "acceptance",
             "checks": [
               "a-tsc-alone-build-script-target-is-imported",
-              "another-tsc-target-stays-on-nx",
-              "an-nx-js-tsc-target-stays-on-nx"
+              "another-tsc-target-stays-on-nx"
+            ]
+          }
+        },
+        {
+          "id": "import-maps-an-nx-js-tsc-build-target",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-nx-js-tsc-target-whose-emit-matches-is-imported",
+              "an-nx-js-tsc-target-whose-emit-differs-stays-on-nx",
+              "the-sync-owns-the-tsc-compiler-option"
             ]
           }
         }
