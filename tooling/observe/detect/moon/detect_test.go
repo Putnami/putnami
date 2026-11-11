@@ -54,13 +54,13 @@ func TestDetectReadsLanguagesAndInheritedTasks(t *testing.T) {
 	}
 	want := []Project{
 		{ID: "api", Dir: "apps/api", Language: "typescript", Layer: "application", Tags: []string{"ci"}, SourceFile: "apps/api/moon.yml", DependsOn: []string{"packages/pricing"},
-			Tasks: []Task{{Name: "eslint"}, {Name: "format"}, {Name: "smoke", Tags: []string{"test"}}, {Name: "test"}, {Name: "unit", Tags: []string{"fast", "test"}}}},
+			Tasks: []Task{{Name: "eslint", Command: "eslint ."}, {Name: "format", Command: "prettier"}, {Name: "smoke", Tags: []string{"test"}, Command: "echo"}, {Name: "test", Command: "vitest run"}, {Name: "unit", Tags: []string{"fast", "test"}, Command: "vitest"}}},
 		{ID: "web", Dir: "apps/web", Language: "typescript",
-			Tasks: []Task{{Name: "format"}, {Name: "lint"}, {Name: "typecheck"}}},
+			Tasks: []Task{{Name: "format", Command: "prettier"}, {Name: "lint", Command: "eslint ."}, {Name: "typecheck", Command: "tsc"}}},
 		{ID: "pricing", Dir: "packages/pricing", Language: "rust", Stack: "backend", SourceFile: "packages/pricing/moon.yml",
-			Tasks: []Task{{Name: "clippy"}, {Name: "format"}}},
+			Tasks: []Task{{Name: "clippy", Command: "cargo clippy"}, {Name: "format", Command: "prettier"}}},
 		{ID: "ui", Dir: "packages/ui", Language: "typescript", Layer: "library", SourceFile: "packages/ui/moon.yml",
-			Tasks: []Task{{Name: "build"}}},
+			Tasks: []Task{{Name: "build", Command: "tsc -b"}}},
 	}
 	if !reflect.DeepEqual(got.Projects, want) {
 		t.Fatalf("projects:\n got %+v\nwant %+v", got.Projects, want)
@@ -70,7 +70,7 @@ func TestDetectReadsLanguagesAndInheritedTasks(t *testing.T) {
 func TestDetectPrefersTheTasksOfTheExport(t *testing.T) {
 	files := map[string]string{
 		"moon-graph.json": `{"graph": {"nodes": [
-  {"id": "api", "source": "apps/api", "language": "typescript", "layer": "application", "config": {"tags": ["ci"]}, "tasks": {"build": {}, "check": {"tags": ["lint"]}}},
+  {"id": "api", "source": "apps/api", "language": "typescript", "layer": "application", "config": {"tags": ["ci"]}, "tasks": {"build": {"command": "tsc", "args": ["-b"], "script": null}, "check": {"tags": ["lint"], "script": "eslint . && prettier --check ."}, "test": {"command": {"unknown": true}}}},
   {"id": "pricing", "source": "packages/pricing", "language": {"other": "zig"}}
 ], "edges": [[0, 1, "production"]]}}`,
 		"apps/api/moon.yml":         "language: 'javascript'\ntasks:\n  test:\n    command: 'vitest'\n",
@@ -82,9 +82,9 @@ func TestDetectPrefersTheTasksOfTheExport(t *testing.T) {
 	}
 	want := []Project{
 		{ID: "api", Dir: "apps/api", Language: "typescript", Layer: "application", Tags: []string{"ci"}, SourceFile: "apps/api/moon.yml", DependsOn: []string{"packages/pricing"},
-			Tasks: []Task{{Name: "build"}, {Name: "check", Tags: []string{"lint"}}}},
+			Tasks: []Task{{Name: "build", Command: "tsc -b"}, {Name: "check", Tags: []string{"lint"}, Command: "eslint . && prettier --check ."}, {Name: "test"}}},
 		{ID: "pricing", Dir: "packages/pricing", Language: "unknown", SourceFile: "packages/pricing/moon.yml",
-			Tasks: []Task{{Name: "test"}}},
+			Tasks: []Task{{Name: "test", Command: "zig test"}}},
 	}
 	if !reflect.DeepEqual(got.Projects, want) {
 		t.Fatalf("projects:\n got %+v\nwant %+v", got.Projects, want)
@@ -103,10 +103,10 @@ func TestDetectOutsideAMoonWorkspace(t *testing.T) {
 
 func TestInheritanceIncludeEmptyKeepsNone(t *testing.T) {
 	in := readInheritance(map[string]any{"include": []any{}})
-	if got := in.apply(map[string][]string{"build": nil}); len(got) != 0 {
+	if got := in.apply(map[string]Task{"build": {}}); len(got) != 0 {
 		t.Fatalf("kept %v", got)
 	}
-	if got := (inheritance{}).apply(map[string][]string{"build": nil}); len(got) != 1 {
+	if got := (inheritance{}).apply(map[string]Task{"build": {}}); len(got) != 1 {
 		t.Fatalf("no setting keeps every task, kept %v", got)
 	}
 }
@@ -120,5 +120,29 @@ func TestStringsOf(t *testing.T) {
 	}
 	if stringsOf(map[string]any{}) != nil {
 		t.Fatal("a mapping reads as none")
+	}
+}
+
+func TestATaskCommandLineReadsItsScriptOrItsCommandAndArgs(t *testing.T) {
+	for want, settings := range map[string]map[string]any{
+		"vitest run --coverage": {"command": "vitest", "args": []any{"run", "--coverage"}},
+		"go vet ./...":          {"command": []any{"go", "vet"}, "args": "./..."},
+		"eslint . && tsc":       {"command": "ignored", "script": "eslint . && tsc"},
+		"":                      {"args": []any{"run"}},
+	} {
+		if got := commandLine(settings); got != want {
+			t.Errorf("commandLine(%v) = %q, want %q", settings, got, want)
+		}
+	}
+	// A project task that states only args runs the command it inherits.
+	root := tree(t, map[string]string{
+		".moon/workspace.yml":   "projects:\n  - 'apps/*'\n",
+		".moon/tasks.yml":       "tasks:\n  lint:\n    command: 'eslint'\n",
+		"apps/api/moon.yml":     "tasks:\n  lint:\n    args: ['src']\n",
+		"apps/api/package.json": `{"name": "@demo/api"}`,
+	})
+	got := Detect(root, Options{})
+	if len(got.Projects) != 1 || !reflect.DeepEqual(got.Projects[0].Tasks, []Task{{Name: "lint", Command: "eslint src"}}) {
+		t.Fatalf("projects %+v", got.Projects)
 	}
 }

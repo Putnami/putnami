@@ -252,35 +252,43 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 	if !reflect.DeepEqual(result.Extensions, []string{"@putnami/rust", "@putnami/typescript"}) || !slices.Contains(result.Written, wsproto.WorkspaceConfigFilename) {
 		t.Errorf("extensions %v, written %v", result.Extensions, result.Written)
 	}
-	for dir, ext := range map[string]string{"apps/api": "@putnami/typescript", "packages/pricing": "@putnami/rust", "apps/web": ExtensionName} {
+	inputs := []any{"../../.moon/workspace.yml", "../../.prototools", "../../.moon/tasks/**"}
+	for dir, ext := range map[string]string{"packages/pricing": "@putnami/rust", "apps/web": ExtensionName} {
 		doc := readProjectFile(t, root, dir)
 		if !reflect.DeepEqual(doc["extensions"], []any{ext}) || !reflect.DeepEqual(doc["tags"], []any{"moon"}) {
 			t.Errorf("%s = %v, want %s", dir, doc, ext)
 		}
 		want := map[string]any{"graphSync": true}
 		if ext == ExtensionName {
-			want["filePatterns"] = []any{"../../.moon/workspace.yml", "../../.prototools", "../../.moon/tasks/**"}
+			want["filePatterns"] = inputs
 		}
 		if !reflect.DeepEqual(doc["options"], map[string]any{ExtensionName: want}) {
 			t.Errorf("%s holds a moon step: %v", dir, doc["options"])
 		}
 	}
-	if result.Unreported != nil {
-		t.Errorf("an imported project reads its extension's reports: %v", result.Unreported)
+	// api's Vitest test and bare ESLint lint move to @putnami/typescript,
+	// which records the runner and the linter; its tsc -b is no package.json
+	// build script, so its build keeps running through moon (ADR 0017 of
+	// tooling/stacks).
+	api := readProjectFile(t, root, "apps/api")
+	if !reflect.DeepEqual(api["extensions"], []any{ExtensionName, "@putnami/typescript"}) ||
+		!reflect.DeepEqual(api["disable"], map[string]any{"jobs": []any{"@putnami/moon:lint", "@putnami/moon:test", "@putnami/typescript:build"}}) ||
+		!reflect.DeepEqual(api["options"], map[string]any{
+			ExtensionName:              map[string]any{"graphSync": true, "filePatterns": inputs},
+			"@putnami/typescript":      map[string]any{"lint": map[string]any{"linter": "eslint"}},
+			"@putnami/typescript:test": map[string]any{"runner": "vitest"},
+		}) {
+		t.Errorf("apps/api = %v", api)
 	}
-	var cfg struct {
-		Extensions []string `json:"extensions"`
+	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool {
+		return u.Project == "api" && u.Task == "build" && strings.Contains(u.Reason, "compiles the tsc of the package.json build script") && strings.HasSuffix(u.Reason, "moon run api:build")
+	}) {
+		t.Errorf("unmapped = %v, want api:build with its reason", result.Unmapped)
 	}
-	data, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
-	if err := json.Unmarshal(data, &cfg); err != nil || !reflect.DeepEqual(cfg.Extensions, []string{ExtensionName, "@putnami/rust", "@putnami/typescript"}) {
-		t.Errorf("workspace extensions %v (%v)", cfg.Extensions, err)
+	// D-066: api has no tsconfig*.json, so the import writes one.
+	if config, _ := os.ReadFile(filepath.Join(root, "apps/api/tsconfig.json")); string(config) != "{\n  \"extends\": \"../../tsconfig.json\"\n}\n" {
+		t.Errorf("apps/api tsconfig = %q", config)
 	}
-	// The probe answers only the project that stays delegated.
-	got := probe(t, root)
-	if len(got) != 1 || got["apps/web"].SourceName != "web" {
-		t.Errorf("probe %+v", got)
-	}
-
 	// Back to delegate mode, every project runs moon again; the language
 	// extensions stay declared in the workspace.
 	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": ["@putnami/moon", "@putnami/rust", "@putnami/typescript"], "options": {"@putnami/moon": {"mode": "delegate"}}}`)
@@ -291,6 +299,9 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 		if doc := readProjectFile(t, root, dir); !reflect.DeepEqual(doc["extensions"], []any{ExtensionName}) {
 			t.Errorf("%s = %v", dir, doc)
 		}
+	}
+	if options := readProjectFile(t, root, "apps/api")["options"].(map[string]any); options["@putnami/typescript"] != nil || options["@putnami/typescript:test"] != nil {
+		t.Errorf("a delegated api keeps the TypeScript options: %v", options)
 	}
 	// A workspace that records no mode imports, as putnami init does without
 	// a terminal (D-064).
@@ -632,5 +643,151 @@ func TestTheDryRunOfASwitchToImportPreviewsWhatTheApplyWrites(t *testing.T) {
 		if got, _ := os.ReadFile(filepath.Join(root, filepath.FromSlash(file))); string(got) != string(want) {
 			t.Errorf("%s: the apply wrote\n%s\nthe preview showed\n%s", file, got, want)
 		}
+	}
+}
+
+func TestAnImportKeepsOnMoonATaskThatRunsAnotherTool(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-the-tool-that-checks-the-code", "a-task-that-runs-another-tool-keeps-running-through-moon")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, false)
+	// api tests with Mocha and lints with the ESLint it inherits; pricing lints with rustfmt and tests with
+	// cargo nextest; a Go project tests with go test and lints with go vet.
+	stackstest.WriteFile(t, root, "apps/api/moon.yml", "language: 'typescript'\ndependsOn: ['pricing']\ntasks:\n  build:\n    command: 'bun build src/index.ts --outdir dist'\n  test:\n    command: 'mocha'\n")
+	stackstest.WriteFile(t, root, "packages/pricing/moon.yml", "language: 'rust'\ntasks:\n  unit:\n    command: 'cargo nextest run'\n    tags: ['test']\n  lint:\n    command: 'cargo fmt --check'\n")
+	stackstest.WriteFile(t, root, "apps/svc/moon.yml", "language: 'go'\ntasks:\n  test:\n    script: 'go test ./...'\n  lint:\n    command: 'go'\n    args: ['vet', './...']\n")
+	stackstest.WriteFile(t, root, "apps/svc/go.mod", "module svc\n")
+	result, err := Sync(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reasons := map[string]string{}
+	for _, u := range result.Unmapped {
+		reasons[u.Project+":"+u.Task] = u.Reason
+	}
+	for task, want := range map[string]string{
+		"api:test":     `@putnami/typescript runs bun test or vitest or jest or npx vitest or npx jest, not "mocha": it keeps running through moon run api:test`,
+		"pricing:lint": `@putnami/rust runs cargo clippy, not "cargo fmt --check": it keeps running through moon run pricing:lint`,
+		"svc:lint":     `@putnami/go runs golangci-lint, not "go vet ./...": it keeps running through moon run svc:lint`,
+	} {
+		if reasons[task] != want {
+			t.Errorf("%s reason = %q, want %q", task, reasons[task], want)
+		}
+	}
+	for dir, jobs := range map[string][]any{
+		"apps/api":         {"@putnami/moon:build", "@putnami/moon:lint", "@putnami/typescript:test"},
+		"packages/pricing": {"build", "@putnami/moon:test", "@putnami/rust:lint"},
+		"apps/svc":         {"build", "@putnami/moon:test", "@putnami/go:lint"},
+	} {
+		doc := readProjectFile(t, root, dir)
+		if !reflect.DeepEqual(doc["disable"], map[string]any{"jobs": jobs}) || !slices.Contains(stringsOf(doc["extensions"]), ExtensionName) {
+			t.Errorf("%s = %v, want the jobs %v", dir, doc, jobs)
+		}
+	}
+	// A kept task moon tags, not names, runs its own task.
+	pricing := readProjectFile(t, root, "packages/pricing")
+	if tasks := pricing["options"].(map[string]any)[ExtensionName].(map[string]any)["tasks"]; tasks != nil {
+		t.Errorf("pricing writes steps for a moved task: %v", tasks)
+	}
+	stackstest.WriteFile(t, root, "packages/pricing/moon.yml", "language: 'rust'\ntasks:\n  unit:\n    command: 'cargo test-all'\n    tags: ['test']\n")
+	if _, err := Sync(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	pricing = readProjectFile(t, root, "packages/pricing")
+	if steps := pricing["options"].(map[string]any)[ExtensionName].(map[string]any)["tasks"]; !reflect.DeepEqual(steps, map[string]any{"test": map[string]any{"steps": []any{[]any{"moon", "run", "{component}:unit"}}}}) {
+		t.Errorf("pricing's kept unit task steps = %v", steps)
+	}
+	// The check sees a task that changed its tool.
+	if status, _, err := RunCheck(&pctx.Context{WorkspaceRoot: root}, jsonl.New(), nil); status != "OK" || err != nil {
+		t.Errorf("check after the sync: %s %v", status, err)
+	}
+	stackstest.WriteFile(t, root, "packages/pricing/moon.yml", "language: 'rust'\ntasks:\n  unit:\n    command: 'cargo test'\n    tags: ['test']\n")
+	if status, _, err := RunCheck(&pctx.Context{WorkspaceRoot: root}, jsonl.New(), nil); status != "FAILED" || err == nil || err.Error() != CodeSyncStale {
+		t.Errorf("check on a changed tool: %s %v", status, err)
+	}
+}
+
+func TestATypeScriptTaskMovesOnlyWhereItsScriptsLeadTheExtension(t *testing.T) {
+	spectest.Proves(t, feature, "import-keeps-the-tool-that-checks-the-code", "a-task-that-runs-another-tool-keeps-running-through-moon")
+	root := t.TempDir()
+	stackstest.WriteFile(t, root, "p/package.json", `{"name": "p", "scripts": {"build": "tsc -p tsconfig.lib.json", "test": "jest", "lint": "eslint ."}}`)
+	p := detect.Project{ID: "p", Dir: "p", Language: "typescript", Tasks: []detect.Task{{Name: "build"}, {Name: "test"}, {Name: "lint"}}}
+	for _, c := range []struct {
+		command, line string
+		moves         bool
+	}{
+		{"build", "tsc -p tsconfig.lib.json", true},
+		{"build", "tsc -b", false},
+		{"build", "bun build src/index.ts", false},
+		{"test", "vitest run", true},
+		{"test", "bun test", false},
+		{"lint", "biome check .", false},
+		{"lint", "eslint", true},
+		{"test", "", false},
+	} {
+		if got, reason := moves(root, p, c.command, c.line); got != c.moves || (!got && reason == "") {
+			t.Errorf("%s %q moves = %v (%q), want %v", c.command, c.line, got, reason, c.moves)
+		}
+	}
+	for line, want := range map[string]string{"bundle exec rspec": "rspec", "vendor/bin/phpunit --testdox": "phpunit --testdox", "uv run pytest -q": "pytest -q"} {
+		if got := program(line); got != want {
+			t.Errorf("program(%q) = %q, want %q", line, got, want)
+		}
+	}
+	if ok, _ := moves(root, detect.Project{ID: "r", Language: "ruby"}, "test", "bundle exec rspec spec && echo done"); ok {
+		t.Error("a chained command moves")
+	}
+	if ok, reason := moves(root, detect.Project{ID: "py", Language: "python"}, "build", "uv build"); ok || !strings.Contains(reason, "runs no build") {
+		t.Errorf("a Python build moves: %v %q", ok, reason)
+	}
+}
+
+func stringsOf(v any) []string {
+	var out []string
+	list, _ := v.([]any)
+	for _, item := range list {
+		if s, ok := item.(string); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
+	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, true)
+	// api builds with Bun, so its main names an output nothing writes in the
+	// project.
+	stackstest.WriteFile(t, root, "apps/api/moon.yml", "language: 'typescript'\ndependsOn: ['pricing']\ntasks:\n  build:\n    command: 'bun build src/index.ts --outdir lib'\n")
+	manifest := "{\n  \"name\": \"@demo/api\",\n  \"private\": true,\n  \"main\": \"lib/index.js\"\n}\n"
+	stackstest.WriteFile(t, root, "apps/api/package.json", manifest)
+	dry, err := Stale(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var files []string
+	for _, c := range dry.Changes {
+		files = append(files, c.File)
+	}
+	if !slices.Contains(files, "apps/api/package.json") || !slices.Contains(files, "apps/api/tsconfig.json") {
+		t.Errorf("a dry import shows %v, want the exports and the tsconfig", files)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "apps/api/package.json")); string(data) != manifest {
+		t.Errorf("a dry import wrote package.json")
+	}
+	result, err := Sync(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "apps/api/package.json")); !strings.Contains(string(data), `"exports": {`) {
+		t.Errorf("api package.json = %s", data)
+	}
+	if !slices.ContainsFunc(result.Warnings, func(w string) bool {
+		return strings.HasPrefix(w, "apps/api/package.json: exports ./src/index.ts added")
+	}) {
+		t.Errorf("warnings = %v", result.Warnings)
+	}
+	if again, err := Stale(context.Background(), root); err != nil || len(again.Written) != 0 || len(again.Changes) != 0 {
+		t.Errorf("a second import changes %v %v, %v", again.Written, again.Changes, err)
 	}
 }

@@ -189,9 +189,30 @@ type exportProject struct {
 	} `json:"config"`
 	// Tasks are the project's resolved tasks, inherited ones included; nil
 	// when the export omits them.
-	Tasks map[string]struct {
-		Tags []string `json:"tags"`
-	} `json:"tasks"`
+	Tasks map[string]exportTask `json:"tasks"`
+}
+
+// exportTask is one resolved task of the export: its tags and what it runs.
+// Command, Args and Script are read leniently, so a shape this reader does
+// not know states no command rather than failing the export.
+type exportTask struct {
+	Tags    []string        `json:"tags"`
+	Command json.RawMessage `json:"command"`
+	Args    json.RawMessage `json:"args"`
+	Script  json.RawMessage `json:"script"`
+}
+
+// commandLine is the command line the task runs: its script, else its
+// command followed by its args.
+func (t exportTask) commandLine() string {
+	settings := map[string]any{}
+	for key, raw := range map[string]json.RawMessage{"command": t.Command, "args": t.Args, "script": t.Script} {
+		var value any
+		if len(raw) > 0 && json.Unmarshal(raw, &value) == nil {
+			settings[key] = value
+		}
+	}
+	return commandLine(settings)
 }
 
 // fromGraph reads the graph export. It reports ok=false when there is no

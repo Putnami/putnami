@@ -30,6 +30,9 @@ type Task struct {
 	Name string
 	// Tags are the task's own tags.
 	Tags []string
+	// Command is the command line the task runs: its script, else its
+	// command followed by its args; empty when neither states one.
+	Command string
 }
 
 // Project is one moon project, with what an integration needs to run it.
@@ -184,10 +187,10 @@ func (d *detector) describe(p *project, inherited []taskFile) Project {
 	slices.Sort(out.Tags)
 	out.Tags = slices.Compact(out.Tags)
 
-	tasks := map[string][]string{}
+	tasks := map[string]Task{}
 	if p.export != nil && p.export.Tasks != nil {
 		for name, t := range p.export.Tasks {
-			tasks[name] = t.Tags
+			tasks[name] = Task{Tags: t.Tags, Command: t.commandLine()}
 		}
 	} else {
 		for _, f := range inherited {
@@ -195,18 +198,24 @@ func (d *detector) describe(p *project, inherited []taskFile) Project {
 				continue
 			}
 			for name, settings := range f.tasks {
-				tasks[name] = stringsOf(settings["tags"])
+				tasks[name] = Task{Tags: stringsOf(settings["tags"]), Command: commandLine(settings)}
 			}
 		}
 		tasks = cfg.inheritance.apply(tasks)
 		for name, settings := range cfg.tasks {
-			tasks[name] = stringsOf(settings["tags"])
+			task := Task{Tags: stringsOf(settings["tags"]), Command: commandLine(settings)}
+			if inheritedTask, ok := tasks[name]; ok && task.Command == "" {
+				// A project's task that states only args runs the command it
+				// inherits with them, as moon merges args by default.
+				task.Command = strings.TrimSpace(inheritedTask.Command + " " + strings.Join(stringsOf(settings["args"]), " "))
+			}
+			tasks[name] = task
 		}
 	}
-	for name, tags := range tasks {
-		tags = slices.Clone(tags)
+	for name, task := range tasks {
+		tags := slices.Clone(task.Tags)
 		slices.Sort(tags)
-		out.Tasks = append(out.Tasks, Task{Name: name, Tags: slices.Compact(tags)})
+		out.Tasks = append(out.Tasks, Task{Name: name, Tags: slices.Compact(tags), Command: task.Command})
 	}
 	sort.Slice(out.Tasks, func(i, j int) bool { return out.Tasks[i].Name < out.Tasks[j].Name })
 	return out
@@ -295,18 +304,32 @@ func readInheritance(settings map[string]any) inheritance {
 }
 
 // apply keeps the included tasks less the excluded ones, then renames them.
-func (in inheritance) apply(tasks map[string][]string) map[string][]string {
-	out := map[string][]string{}
-	for name, tags := range tasks {
+func (in inheritance) apply(tasks map[string]Task) map[string]Task {
+	out := map[string]Task{}
+	for name, task := range tasks {
 		if in.include != nil && !slices.Contains(in.include, name) || slices.Contains(in.exclude, name) {
 			continue
 		}
 		if to, ok := in.rename[name]; ok {
 			name = to
 		}
-		out[name] = tags
+		out[name] = task
 	}
 	return out
+}
+
+// commandLine is the command line a task's settings state: its script, else
+// its command, a string or a list, followed by its args; empty when they
+// state neither.
+func commandLine(settings map[string]any) string {
+	if script, ok := settings["script"].(string); ok && strings.TrimSpace(script) != "" {
+		return strings.TrimSpace(script)
+	}
+	command := strings.Join(stringsOf(settings["command"]), " ")
+	if command == "" {
+		return ""
+	}
+	return strings.TrimSpace(command + " " + strings.Join(stringsOf(settings["args"]), " "))
 }
 
 // inheritedBy reports whether the project inherits the file's tasks. A file
