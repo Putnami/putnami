@@ -137,6 +137,9 @@ type SyncResult struct {
 	Imported []string
 	// Unmatched are the entries of the import list that select no project.
 	Unmatched []string
+	// Conventions list each file an import rewrote to adopt Putnami's
+	// TypeScript conventions, and each manifest it did not (D-066).
+	Conventions []string
 }
 
 // Sync writes the project graph of the Nx workspace at root into each
@@ -189,6 +192,7 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 		return SyncResult{}, err
 	}
 	typeScript := slices.Contains(opts.Declared, TypeScriptExtension) || declaresExtension(root, TypeScriptExtension)
+	var conventions []stacks.ConventionProject
 	for _, p := range detection.Projects {
 		projectMode := mode
 		if imports.Selects(p.Path) {
@@ -197,6 +201,9 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 		plan := planProject(root, p, projectMode, typeScript)
 		if mode == ModeDelegate && plan.typeScript {
 			result.Imported = append(result.Imported, p.Path)
+		}
+		if plan.typeScript {
+			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.Name, BunBuild: plan.bunBuild, PublishedBy: stacks.PackagePublished(root, p.Path)})
 		}
 		result.Unmapped = append(result.Unmapped, plan.unmapped...)
 		file := path.Join(p.Path, wsproto.ConfigFilename)
@@ -227,6 +234,20 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	}
 	slices.Sort(result.Imported)
 	result.Unmatched = imports.Unmatched()
+	writes, warnings, err := stacks.ImportConventions(root, conventions)
+	if err != nil {
+		return SyncResult{}, err
+	}
+	_, notes, err := stacks.ApplyConventions(root, writes, opts.DryRun)
+	if err != nil {
+		return SyncResult{}, err
+	}
+	// A convention write is a change of the sync, written or not, as each
+	// putnami.json is.
+	for _, w := range writes {
+		result.Changes = append(result.Changes, Change{File: w.File, Before: w.Before, After: w.After})
+	}
+	result.Conventions = append(append(result.Conventions, notes...), warnings...)
 	return result, nil
 }
 
@@ -366,6 +387,9 @@ type projectPlan struct {
 	// nodeRuntime reports an imported TypeScript project that runs on Node:
 	// its putnami.json declares the node runtime.
 	nodeRuntime bool
+	// bunBuild reports a build the TypeScript extension takes over with its
+	// Bun build, which writes nothing in the project (D-066).
+	bunBuild bool
 }
 
 // planProject maps the targets of one project in the mode.
@@ -388,6 +412,7 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 	for _, task := range lifecycleTasks {
 		target, ok := targets[task]
 		covered := ok && isTS && coveredByTypeScript(root, p.Path, task, target)
+		plan.bunBuild = plan.bunBuild || (task == "build" && covered)
 		reason := ""
 		if ok && task == "build" && !covered {
 			// A tsc build moves when the TypeScript extension compiles it
@@ -521,16 +546,12 @@ func hasManifest(root, dir string) bool {
 }
 
 // typeScriptCommands are the programs the TypeScript extension's task of the
-// same name runs: a target whose script runs one keeps its runner when the
-// extension takes it over: a test target that runs Vitest or Jest keeps its
-// runner, a lint target that runs ESLint moves only as bare as eslintCommands
-// says, and a build that runs tsc alone moves too (tscBuild). Another tsc
-// target, or one another Nx executor runs, stays on Nx.
-var typeScriptCommands = map[string][]string{
-	"build": {"bun build"},
-	"test":  {"bun test", "vitest", "jest", "npx vitest", "npx jest"},
-	"lint":  {"biome", "bunx biome", "bunx @biomejs/biome", "eslint"},
-}
+// same name runs (ADR 0017 of tooling/stacks): a test target that runs
+// Vitest or Jest keeps its runner, a lint target that runs ESLint moves only
+// as bare as stacks.ESLintScripts says, and a build that runs tsc alone moves
+// too (tscBuild). Another tsc target, or one another Nx executor runs, stays
+// on Nx.
+var typeScriptCommands = stacks.TypeScriptPrograms
 
 // testExecutors are the Nx executors of a test target the TypeScript
 // extension runs, with the runner each one starts.
@@ -540,17 +561,6 @@ var testExecutors = map[string]string{
 	"@nrwl/vite:test": "vitest",
 	"@nx/jest:jest":   "jest",
 	"@nrwl/jest:jest": "jest",
-}
-
-// eslintCommands are the lint commands that run ESLint the way the TypeScript
-// lint does: over the project, with no argument the TypeScript lint would
-// drop, plainly or through a package runner.
-var eslintCommands = []string{
-	"eslint", "eslint .",
-	"npx eslint", "npx eslint .",
-	"bunx eslint", "bunx eslint .",
-	"pnpm exec eslint", "pnpm exec eslint .",
-	"yarn eslint", "yarn eslint .",
 }
 
 // eslintExecutor is the Nx executor that lints with ESLint, which the
@@ -578,14 +588,14 @@ func coveredByTypeScript(root, dir, task string, target detect.Target) bool {
 }
 
 // lintsWithESLint reports whether a lint target runs ESLint the way the
-// TypeScript lint does: a command in eslintCommands, or the ESLint executor
+// TypeScript lint does: a command in stacks.ESLintScripts, or the ESLint executor
 // with no option but lintFilePatterns naming the project root.
 func lintsWithESLint(root, dir string, target detect.Target) bool {
 	switch target.Executor {
 	case eslintExecutor:
 		return eslintExecutorOptionsCarried(root, dir)
 	case "", "nx:run-script", "nx:run-commands":
-		return slices.Contains(eslintCommands, strings.Join(strings.Fields(target.Command), " "))
+		return slices.Contains(stacks.ESLintScripts, strings.Join(strings.Fields(target.Command), " "))
 	}
 	return false
 }
@@ -720,13 +730,7 @@ func testRunner(target detect.Target) string {
 	if runner := testExecutors[target.Executor]; runner != "" {
 		return runner
 	}
-	command := strings.TrimPrefix(strings.TrimSpace(target.Command), "npx ")
-	for _, runner := range []string{"vitest", "jest"} {
-		if command == runner || strings.HasPrefix(command, runner+" ") {
-			return runner
-		}
-	}
-	return ""
+	return stacks.TestRunner(target.Command)
 }
 
 // testConfigs are the test runner configuration files a project's reports
@@ -917,9 +921,9 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 
 	setDisabled(doc, plan.disabled)
 	setReports(doc, plan.reports)
-	setRunner(doc, plan.runner)
+	stacks.SetTypeScriptRunner(doc, plan.runner)
 	setCompiler(doc, plan.typeScript && plan.compiler)
-	setLinter(doc, plan.eslint)
+	stacks.SetTypeScriptLinter(doc, plan.eslint)
 	if plan.nodeRuntime {
 		markNodeRuntime(doc)
 	}
@@ -944,9 +948,9 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, components) }))
 	setDisabled(doc, nil)
 	setReports(doc, nil)
-	setRunner(doc, "")
+	stacks.SetTypeScriptRunner(doc, "")
 	setCompiler(doc, false)
-	setLinter(doc, false)
+	stacks.SetTypeScriptLinter(doc, false)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
 	}
@@ -1029,53 +1033,6 @@ func setReports(doc map[string]any, reports map[string]any) {
 		delete(doc, "options")
 	}
 }
-
-// setLinter writes options["@putnami/typescript"].lint.linter: eslint when
-// eslint is set and the project chose no other linter. The sync owns that
-// value only while it is eslint: without eslint, it removes it and each layer
-// left empty, and it keeps any other value the project chose.
-func setLinter(doc map[string]any, eslint bool) {
-	options, _ := doc["options"].(map[string]any)
-	layer, _ := options[TypeScriptExtension].(map[string]any)
-	lint, _ := layer["lint"].(map[string]any)
-	if eslint {
-		if current, set := lint["linter"].(string); set && current != "" && current != eslintLinter {
-			// The project chose its linter: the sync keeps it.
-			return
-		}
-		if options == nil {
-			options = map[string]any{}
-			doc["options"] = options
-		}
-		if layer == nil {
-			layer = map[string]any{}
-			options[TypeScriptExtension] = layer
-		}
-		if lint == nil {
-			lint = map[string]any{}
-			layer["lint"] = lint
-		}
-		lint["linter"] = eslintLinter
-		return
-	}
-	if lint == nil || lint["linter"] != eslintLinter {
-		return
-	}
-	delete(lint, "linter")
-	if len(lint) == 0 {
-		delete(layer, "lint")
-	}
-	if len(layer) == 0 {
-		delete(options, TypeScriptExtension)
-	}
-	if len(options) == 0 {
-		delete(doc, "options")
-	}
-}
-
-// eslintLinter is the value of
-// options["@putnami/typescript"].lint.linter that lints a project with ESLint.
-const eslintLinter = "eslint"
 
 // keepDependency reports whether the sync keeps a dependency it does not
 // write: one on a project that is no Nx project, current or former.
@@ -1252,6 +1209,9 @@ func report(emit *jsonl.Emitter, result SyncResult, dry bool) {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("%s:%s %s", u.Project, u.Target, u.Reason), "", 0, 0, CodeUnmapped)
 	}
 	reportUnmatched(emit, result)
+	for _, note := range result.Conventions {
+		emit.Diagnostic("warning", note, "", 0)
+	}
 	if !dry {
 		return
 	}
@@ -1303,37 +1263,4 @@ func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		emit.DiagnosticWithCode("error", fmt.Sprintf("%s no longer matches the Nx project graph of %s: run putnami projects sync and commit the result", file, result.Source), file, 0, 0, CodeSyncStale)
 	}
 	return "FAILED", nil, errors.New(CodeSyncStale)
-}
-
-// runnerLayer is the option layer of the TypeScript extension's test command,
-// whose runner member the sync writes.
-const runnerLayer = TypeScriptExtension + ":test"
-
-// setRunner sets options["@putnami/typescript:test"].runner to runner, or
-// removes it, and every object it empties, when runner is "".
-func setRunner(doc map[string]any, runner string) {
-	options, _ := doc["options"].(map[string]any)
-	layer, _ := options[runnerLayer].(map[string]any)
-	if runner != "" {
-		if options == nil {
-			options = map[string]any{}
-			doc["options"] = options
-		}
-		if layer == nil {
-			layer = map[string]any{}
-			options[runnerLayer] = layer
-		}
-		layer["runner"] = runner
-		return
-	}
-	if layer == nil {
-		return
-	}
-	delete(layer, "runner")
-	if len(layer) == 0 {
-		delete(options, runnerLayer)
-	}
-	if len(options) == 0 {
-		delete(doc, "options")
-	}
 }

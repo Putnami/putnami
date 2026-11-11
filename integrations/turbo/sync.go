@@ -75,6 +75,9 @@ type Result struct {
 	Imported []string
 	// Unmatched are the entries of the import list that select no package.
 	Unmatched []string
+	// Conventions list each file an import rewrote to adopt Putnami's
+	// TypeScript conventions, and each manifest it did not (D-066).
+	Conventions []string
 }
 
 // Stale reports the files a sync would change.
@@ -132,6 +135,7 @@ func Sync(root string, opts Options) (Result, error) {
 	noteUnmapped(rootTasks, unmapped)
 
 	var members []member
+	var conventions []stacks.ConventionProject
 	current := map[string]bool{}
 	for _, p := range detection.Projects {
 		if p.Path == wsproto.ProbeRootPath {
@@ -165,6 +169,7 @@ func Sync(root string, opts Options) (Result, error) {
 				m.deps = append(m.deps, wsproto.ProjectIDFromPath(dep))
 			}
 		}
+		bunBuild := false
 		for _, task := range MappedTasks {
 			declared := rootTasks[task] || rootTasks[p.SourceName+"#"+task] || own[task]
 			script, scripted := run[task]
@@ -176,10 +181,14 @@ func Sync(root string, opts Options) (Result, error) {
 				// One extension runs each task: the TypeScript extension's
 				// task already runs what the script runs.
 				m.disabled = append(m.disabled, ExtensionName+":"+task)
+				bunBuild = bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
 			default:
 				m.disabled = append(m.disabled, TypeScriptExtension+":"+task)
 				unmapped[p.SourceName+"#"+task] = unmappedReason(task, script)
 			}
+		}
+		if imported {
+			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.SourceName, BunBuild: bunBuild, PublishedBy: stacks.PackagePublished(root, p.Path)})
 		}
 		members = append(members, m)
 		current[p.Path] = true
@@ -251,6 +260,20 @@ func Sync(root string, opts Options) (Result, error) {
 			result.Retracted = append(result.Retracted, rel)
 		}
 	}
+	// The convention writes come after the putnami.json files, whose diffs
+	// Diffs holds first, in the order of Stale.
+	writes, warnings, err := stacks.ImportConventions(root, conventions)
+	if err != nil {
+		return Result{}, err
+	}
+	_, notes, err := stacks.ApplyConventions(root, writes, opts.DryRun)
+	if err != nil {
+		return Result{}, err
+	}
+	for _, w := range writes {
+		result.Diffs = append(result.Diffs, UnifiedDiff(w.File, w.Before, w.After))
+	}
+	result.Conventions = append(append(result.Conventions, notes...), warnings...)
 	return result, nil
 }
 

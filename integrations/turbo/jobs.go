@@ -107,6 +107,12 @@ func Report(r Result, dryRun bool) []string {
 	if len(r.Unreported) > 0 {
 		lines = append(lines, fmt.Sprintf("Test result from the exit code alone, no JUnit report named: %s", strings.Join(r.Unreported, ", ")))
 	}
+	if len(r.Conventions) > 0 {
+		lines = append(lines, "TypeScript conventions (D-066):")
+		for _, note := range r.Conventions {
+			lines = append(lines, "  "+note)
+		}
+	}
 	return lines
 }
 
