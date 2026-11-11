@@ -77,7 +77,7 @@
     },
     {
       "id": "proxy-dependent-tidy-is-reported-and-uncached",
-      "text": "A tidy that looks up a package (`go: finding module for package`) or raises a requirement go.mod names picks a version from the module proxy, not from the tree. It reports a warning naming the module, each looked-up package with the module and version picked, and each raised requirement, and says to commit go.mod. It is an uncacheable skip. Once go.mod requires a version providing every imported package, tidy looks nothing up and cached and uncached runs leave the same files."
+      "text": "A tidy that queries the proxy for a package (`go: finding module for package`) or raises a requirement go.mod names picks a version the committed go.mod does not pin. It warns, naming the module, each queried package with the module and version picked, and each raise, and says to commit go.mod. It is an uncacheable skip. A package resolved through a replace is no query. Once go.mod pins a version providing every imported package, cached and uncached runs leave the same files."
     },
     {
       "id": "a-check-run-writes-no-source",

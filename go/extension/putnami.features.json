@@ -357,6 +357,7 @@
             "checks": [
               "a-package-lookup-is-reported-and-stays-a-skip",
               "a-raised-requirement-is-reported",
+              "a-package-resolved-through-a-replace-is-no-lookup",
               "a-go-mod-that-provides-every-package-tidies-without-a-lookup"
             ]
           }
