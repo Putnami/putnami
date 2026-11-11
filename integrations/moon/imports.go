@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.putnami.dev/sdk/extension/tscscript"
@@ -13,35 +14,61 @@ import (
 )
 
 // languagePrograms are, by moon language, the programs the language
-// extension's build, lint and test tasks run. A moon task of an imported
-// project moves to the extension only when it runs one of them, alone
-// (ADR 0017 of tooling/stacks); TypeScript reads the shared rule instead.
-var languagePrograms = map[string]map[string][]string{
+// extension's build, lint and test tasks run, each with the arguments it
+// runs the same without: they choose the whole project or only change the
+// output. A moon task of an imported project moves to the extension only
+// when it runs one of them with no other argument, since the extension runs
+// the program under its own arguments and drops the task's (ADR 0017 of
+// tooling/stacks); TypeScript reads the shared rule instead.
+var languagePrograms = map[string]map[string][]program{
 	// The Go lint runs golangci-lint with staticcheck and the docs-links
 	// check beside it, and the Rust lint cargo fmt --check before clippy -D
 	// warnings: a lint task of either moves to no extension, since the
 	// extension's lint checks more than the task did. The Rust test runs
 	// nextest, which runs no doctest, so a cargo test stays on moon too.
 	"go": {
-		stacks.TaskBuild: {"go build"},
-		stacks.TaskTest:  {"go test"},
+		stacks.TaskBuild: {{"go build", []string{"./...", "."}}},
+		stacks.TaskTest:  {{"go test", []string{"./...", ".", "-v"}}},
 	},
 	"rust": {
-		stacks.TaskBuild: {"cargo build"},
-		stacks.TaskTest:  {"cargo nextest", "cargo llvm-cov nextest"},
+		stacks.TaskBuild: {{"cargo build", []string{"--locked"}}},
+		stacks.TaskTest:  {{"cargo nextest", []string{"run"}}, {"cargo llvm-cov nextest", nil}},
 	},
 	"python": {
-		stacks.TaskTest: {"pytest"},
-		stacks.TaskLint: {"ruff"},
+		stacks.TaskTest: {{"pytest", []string{"-q", "-v"}}},
+		stacks.TaskLint: {{"ruff", []string{"check", "."}}},
 	},
 	"ruby": {
-		stacks.TaskTest: {"rspec"},
-		stacks.TaskLint: {"rubocop"},
+		stacks.TaskTest: {{"rspec", nil}},
+		stacks.TaskLint: {{"rubocop", []string{"."}}},
 	},
 	"php": {
-		stacks.TaskTest: {"phpunit"},
-		stacks.TaskLint: {"phpstan"},
+		stacks.TaskTest: {{"phpunit", nil}},
+		stacks.TaskLint: {{"phpstan", []string{"analyze", "analyze"}}},
 	},
+}
+
+// program is a program a language extension's task runs, with the
+// arguments it runs the same without.
+type program struct {
+	name string
+	args []string
+}
+
+// dropped answers the arguments of run, a command line without its runner,
+// that the extension would drop, and whether run runs the program at all.
+func (p program) dropped(run string) (string, bool) {
+	rest, ok := strings.CutPrefix(run, p.name)
+	if !ok || (rest != "" && !strings.HasPrefix(rest, " ")) {
+		return "", false
+	}
+	var out []string
+	for _, arg := range strings.Fields(rest) {
+		if !slices.Contains(p.args, arg) {
+			out = append(out, arg)
+		}
+	}
+	return strings.Join(out, " "), true
 }
 
 // runners are the prefixes that run a program through a package manager or
@@ -49,9 +76,9 @@ var languagePrograms = map[string]map[string][]string{
 // the program through its own.
 var runners = []string{"bundle exec ", "uv run ", "poetry run ", "python -m ", "python3 -m ", "npx ", "bunx ", "pnpm exec ", "yarn "}
 
-// program is the command line without the runner prefixes and without a
-// path before its program, such as vendor/bin/.
-func program(command string) string {
+// bareCommand is the command line without the runner prefixes and without
+// a path before its program, such as vendor/bin/.
+func bareCommand(command string) string {
 	command = strings.TrimSpace(command)
 	for trimmed := true; trimmed; {
 		trimmed = false
@@ -81,19 +108,26 @@ func moves(root string, p detect.Project, command, line string) (bool, string) {
 	programs := languagePrograms[p.Language][command]
 	switch {
 	case len(programs) == 0:
-		return false, fmt.Sprintf("%s runs no %s of a moon task: %s", extension, command, keeps)
+		return false, fmt.Sprintf("%s has no %s that runs only what a moon task runs: %s", extension, command, keeps)
 	case strings.TrimSpace(line) == "":
 		return false, fmt.Sprintf("it states no command %s reads: %s", extension, keeps)
 	case strings.ContainsAny(line, "&|;"):
 		return false, fmt.Sprintf("it chains another command (%q), which %s does not run: %s", line, extension, keeps)
 	}
-	run := program(line)
+	run := bareCommand(line)
+	names := make([]string, 0, len(programs))
 	for _, want := range programs {
-		if run == want || strings.HasPrefix(run, want+" ") {
-			return true, ""
+		names = append(names, want.name)
+		dropped, runs := want.dropped(run)
+		switch {
+		case !runs:
+			continue
+		case dropped != "":
+			return false, fmt.Sprintf("%s runs %s under its own arguments and would drop %q: %s", extension, want.name, dropped, keeps)
 		}
+		return true, ""
 	}
-	return false, fmt.Sprintf("%s runs %s, not %q: %s", extension, strings.Join(programs, " or "), line, keeps)
+	return false, fmt.Sprintf("%s runs %s, not %q: %s", extension, strings.Join(names, " or "), line, keeps)
 }
 
 // typeScriptMoves applies the TypeScript rule to a moon task. The

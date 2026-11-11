@@ -692,8 +692,8 @@ func TestAnImportKeepsOnMoonATaskThatRunsAnotherTool(t *testing.T) {
 	}
 	for task, want := range map[string]string{
 		"api:test":     `@putnami/typescript runs bun test or vitest or jest or npx vitest or npx jest, not "mocha": it keeps running through moon run api:test`,
-		"pricing:lint": `@putnami/rust runs no lint of a moon task: it keeps running through moon run pricing:lint`,
-		"svc:lint":     `@putnami/go runs no lint of a moon task: it keeps running through moon run svc:lint`,
+		"pricing:lint": `@putnami/rust has no lint that runs only what a moon task runs: it keeps running through moon run pricing:lint`,
+		"svc:lint":     `@putnami/go has no lint that runs only what a moon task runs: it keeps running through moon run svc:lint`,
 	} {
 		if reasons[task] != want {
 			t.Errorf("%s reason = %q, want %q", task, reasons[task], want)
@@ -763,14 +763,43 @@ func TestATypeScriptTaskMovesOnlyWhereItsScriptsLeadTheExtension(t *testing.T) {
 		t.Errorf("a bun test plans %+v, want it moved with the bun runner", plan)
 	}
 	for line, want := range map[string]string{"bundle exec rspec": "rspec", "vendor/bin/phpunit --testdox": "phpunit --testdox", "uv run pytest -q": "pytest -q"} {
-		if got := program(line); got != want {
-			t.Errorf("program(%q) = %q, want %q", line, got, want)
+		if got := bareCommand(line); got != want {
+			t.Errorf("bareCommand(%q) = %q, want %q", line, got, want)
+		}
+	}
+	// A task moves only with the arguments its extension runs the same
+	// without: the extension drops the others, such as build tags, a release
+	// profile or a subset of the suite.
+	for _, c := range []struct {
+		language, command, line string
+		moves                   bool
+		dropped                 string
+	}{
+		{"go", "test", "go test ./...", true, ""},
+		{"go", "test", "go test -tags integration ./...", false, "-tags integration"},
+		{"go", "build", "go build ./...", true, ""},
+		{"rust", "build", "cargo build --release", false, "--release"},
+		{"rust", "build", "cargo build", true, ""},
+		{"rust", "test", "cargo nextest run", true, ""},
+		{"rust", "test", "cargo nextest run -p pricing", false, "-p pricing"},
+		{"python", "test", "uv run pytest tests/unit", false, "tests/unit"},
+		{"python", "test", "pytest -q", true, ""},
+		{"python", "lint", "ruff check .", true, ""},
+		{"php", "test", "vendor/bin/phpunit --testsuite unit", false, "--testsuite unit"},
+		{"php", "lint", "vendor/bin/phpstan analyze", true, ""},
+		{"ruby", "test", "bundle exec rspec", true, ""},
+		{"ruby", "test", "bundle exec rspec spec/models", false, "spec/models"},
+		{"go", "test", "gotestsum", false, ""},
+	} {
+		ok, reason := moves(root, detect.Project{ID: "x", Language: c.language}, c.command, c.line)
+		if ok != c.moves || (c.dropped != "" && !strings.Contains(reason, "would drop \""+c.dropped+"\"")) {
+			t.Errorf("%s %q moves = %v (%q), want %v dropping %q", c.language, c.line, ok, reason, c.moves, c.dropped)
 		}
 	}
 	if ok, _ := moves(root, detect.Project{ID: "r", Language: "ruby"}, "test", "bundle exec rspec spec && echo done"); ok {
 		t.Error("a chained command moves")
 	}
-	if ok, reason := moves(root, detect.Project{ID: "py", Language: "python"}, "build", "uv build"); ok || !strings.Contains(reason, "runs no build") {
+	if ok, reason := moves(root, detect.Project{ID: "py", Language: "python"}, "build", "uv build"); ok || !strings.Contains(reason, "has no build") {
 		t.Errorf("a Python build moves: %v %q", ok, reason)
 	}
 }
