@@ -155,7 +155,7 @@ func TestInputSelectorReadsNothingInAProjectItsExtensionCannotPlan(t *testing.T)
 				t.Errorf("%s: %s is read by %v, want %v", name, path, got, want)
 			}
 		}
-		if got := idx.TasksReadingPath("/libs/pub", "libs/pub/src/main.go"); !slices.Equal(got, []string{"build~compile"}) {
+		if got := idx.TasksReadingPath("/libs/http", "libs/http/src/main.go"); !slices.Equal(got, []string{"build~compile"}) {
 			t.Errorf("%s: a source the task's own pattern selects is read by %v, want the task", name, got)
 		}
 	}
