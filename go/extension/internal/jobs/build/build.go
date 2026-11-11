@@ -192,17 +192,18 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 						// step that made the change, not at publish time.
 						emit.Diagnostic("warning", tidyDriftMessage(ctx.Project.FullPath, added), "go.mod", 0)
 					}
-					// A tidy that looked up a package or raised a requirement
-					// picked a version from what the module proxy publishes, not
-					// from the tree: the same tree tidies differently once a new
-					// release appears. Such an outcome must not answer a later
-					// run from the cache, so it ends as the uncacheable SKIP a
-					// failed tidy ends as. Its output is kept: it is what the
-					// diagnostic tells the developer to commit.
+					// A tidy that looked up a package picked a version from what
+					// the module proxy publishes, not from the tree: the same tree
+					// tidies differently once a new release appears. A tidy that
+					// raised a requirement selected a version the committed go.mod
+					// does not pin, from go.mod files build-tidy does not key on.
+					// Neither outcome may answer a later run from the cache, so
+					// each ends as the uncacheable SKIP a failed tidy ends as. Its
+					// output is kept: it is what the diagnostic says to commit.
 					lookups := tidyPackageLookups(tidyOut.String())
 					raised := tidyRaisedRequirements(snap, ctx.Project.FullPath)
 					if len(lookups) > 0 || len(raised) > 0 {
-						emit.Diagnostic("warning", tidyProxyResolutionMessage(ctx.Project.FullPath, lookups, raised), "go.mod", 0)
+						emit.Diagnostic("warning", tidyUnpinnedResolutionMessage(ctx.Project.FullPath, lookups, raised), "go.mod", 0)
 						tidyResult = "SKIP"
 						tidyPhaseStatus = "skipped"
 					}
@@ -922,8 +923,9 @@ type tidyRaise struct {
 // output: each `go: finding module for package <pkg>` line, with the module and
 // version of the matching `go: found <pkg> in <module> <version>` line. Such a
 // lookup is a version query against the module proxy, so its answer changes
-// when a new release is published. Ordered as tidy printed them, each package
-// once.
+// when a new release is published. A `found` line alone is no lookup: Go also
+// prints it for an import a directory replace resolves, which queries nothing.
+// Ordered as tidy printed them, each package once.
 func tidyPackageLookups(output string) []tidyLookup {
 	var lookups []tidyLookup
 	index := map[string]int{}
@@ -945,15 +947,10 @@ func tidyPackageLookups(output string) []tidyLookup {
 		if len(fields) != 4 || fields[1] != "in" {
 			continue
 		}
-		pkg := fields[0]
-		i, seen := index[pkg]
-		if !seen {
-			i = len(lookups)
-			index[pkg] = i
-			lookups = append(lookups, tidyLookup{Package: pkg})
+		if i, seen := index[fields[0]]; seen {
+			lookups[i].Module = fields[2]
+			lookups[i].Version = fields[3]
 		}
-		lookups[i].Module = fields[2]
-		lookups[i].Version = fields[3]
 	}
 	return lookups
 }
@@ -998,10 +995,13 @@ func tidyRaisedRequirements(snap modSnapshot, dir string) []tidyRaise {
 	return raised
 }
 
-// tidyProxyResolutionMessage names what a tidy resolved through the module
-// proxy and the remedy: commit go.mod and go.sum, so the requirement is pinned
-// by the tree and the next tidy looks nothing up.
-func tidyProxyResolutionMessage(projectDir string, lookups []tidyLookup, raised []tidyRaise) string {
+// tidyUnpinnedResolutionMessage names what a tidy resolved past the committed
+// go.mod and the remedy: commit go.mod and go.sum, so the tree pins those
+// versions and the next tidy changes nothing. A lookup is a query against the
+// module proxy, whose answer moves with each release; a raise alone is the
+// version selection of the dependencies' own go.mod files, which the committed
+// go.mod does not record.
+func tidyUnpinnedResolutionMessage(projectDir string, lookups []tidyLookup, raised []tidyRaise) string {
 	module := toolchain.GoModModulePath(filepath.Join(projectDir, "go.mod"))
 	if module == "" {
 		module = filepath.Base(projectDir)
@@ -1017,8 +1017,12 @@ func tidyProxyResolutionMessage(projectDir string, lookups []tidyLookup, raised 
 	for _, raise := range raised {
 		parts = append(parts, fmt.Sprintf("raised %s from %s to %s", raise.Module, raise.From, raise.To))
 	}
-	return fmt.Sprintf("go mod tidy for %s %s: the committed go.mod does not pin these versions, so the result depends on what the module proxy publishes and is not cached: commit go.mod and go.sum",
-		module, strings.Join(parts, "; "))
+	reason := "the committed go.mod does not pin the versions tidy selects, so the result is not cached"
+	if len(lookups) > 0 {
+		reason = "the committed go.mod does not require a version that provides every imported package, so the result depends on what the module proxy publishes and is not cached"
+	}
+	return fmt.Sprintf("go mod tidy for %s %s: %s: commit go.mod and go.sum",
+		module, strings.Join(parts, "; "), reason)
 }
 
 // modFileNames are the module files `go mod tidy` may rewrite. They are also

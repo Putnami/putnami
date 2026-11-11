@@ -152,7 +152,7 @@ func TestRunTidy_APackageLookupIsReportedAndStaysASkip(t *testing.T) {
 		if len(messages) != 1 {
 			t.Fatalf("run %d: diagnostics = %q, want one", run, messages)
 		}
-		for _, want := range []string{"example.com/app", proxyLib + "/sub", proxyLib + " v0.2.0", "commit go.mod"} {
+		for _, want := range []string{"example.com/app", proxyLib + "/sub", proxyLib + " v0.2.0", "module proxy", "commit go.mod"} {
 			if !strings.Contains(messages[0], want) {
 				t.Errorf("run %d: diagnostic %q does not mention %q", run, messages[0], want)
 			}
@@ -211,14 +211,18 @@ func TestTidyRaisedRequirements_ReportsAnExistingRequirementMovedUp(t *testing.T
 	if !slices.Equal(raised, want) {
 		t.Fatalf("raised = %+v, want %+v", raised, want)
 	}
-	message := tidyProxyResolutionMessage(dir, nil, raised)
-	for _, want := range []string{"example.com/app", "raised example.com/lib from v0.1.0 to v0.2.0", "commit go.mod"} {
+	message := tidyUnpinnedResolutionMessage(dir, nil, raised)
+	for _, want := range []string{"example.com/app", "raised example.com/lib from v0.1.0 to v0.2.0", "does not pin", "commit go.mod"} {
 		if !strings.Contains(message, want) {
 			t.Errorf("diagnostic %q does not mention %q", message, want)
 		}
 	}
 
-	// A go.mod tidy left alone, or did not lower, raises nothing.
+	if strings.Contains(message, "module proxy") {
+		t.Errorf("diagnostic %q blames the module proxy for a raise no lookup made", message)
+	}
+
+	// A go.mod tidy left alone raises nothing.
 	writeTidyFile(t, dir, "go.mod",
 		"module example.com/app\n\ngo 1.25\n\nrequire (\n\texample.com/lib v0.1.0\n\texample.com/other v1.0.0\n)\n")
 	if raised := tidyRaisedRequirements(snap, dir); raised != nil {
@@ -230,7 +234,8 @@ func TestTidyPackageLookups_ReadsTheModuleAndVersionTidyPicked(t *testing.T) {
 	output := "go: finding module for package example.com/lib/sub\n" +
 		"go: finding module for package example.com/other/pkg\n" +
 		"go: downloading example.com/lib v0.2.0\n" +
-		"go: found example.com/lib/sub in example.com/lib v0.2.0\n"
+		"go: found example.com/lib/sub in example.com/lib v0.2.0\n" +
+		"go: found example.com/sibling in example.com/sibling v0.0.0-00010101000000-000000000000\n"
 	got := tidyPackageLookups(output)
 	want := []tidyLookup{
 		{Package: "example.com/lib/sub", Module: "example.com/lib", Version: "v0.2.0"},
@@ -241,5 +246,34 @@ func TestTidyPackageLookups_ReadsTheModuleAndVersionTidyPicked(t *testing.T) {
 	}
 	if got := tidyPackageLookups("go: downloading example.com/lib v0.2.0\n"); got != nil {
 		t.Errorf("lookups = %+v for a tidy that looked nothing up, want nil", got)
+	}
+}
+
+// Go prints `go: found` for an import a directory replace resolves, too, though
+// it queries no proxy. Such a tidy is the ordinary workspace case: it reports
+// no proxy lookup and stays a cacheable OK.
+func TestRunTidy_APackageResolvedThroughAReplaceIsNoLookup(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "proxy-dependent-tidy-is-reported-and-uncached",
+		"a-package-resolved-through-a-replace-is-no-lookup")
+	root, appDir := proxyTidyFixture(t, "v0.2.0")
+	libDir := filepath.Join(root, "lib")
+	if err := os.MkdirAll(filepath.Join(libDir, "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeTidyFile(t, libDir, "go.mod", "module "+proxyLib+"\n\ngo 1.24\n")
+	writeTidyFile(t, filepath.Join(libDir, "sub"), "sub.go", "package sub\n")
+	// No requirement, only the replace: tidy adds the requirement and prints
+	// `go: found` for the package, without a `finding` query.
+	writeTidyFile(t, appDir, "go.mod", "module example.com/app\n\ngo 1.24\n\nreplace "+proxyLib+" => ../lib\n")
+
+	status, events := runTidyPhase(t, root, appDir)
+	if status != "OK" {
+		t.Fatalf("status = %q, want OK; diagnostics %q", status, diagnostics(events))
+	}
+	if messages := diagnostics(events); len(messages) != 0 {
+		t.Fatalf("diagnostics = %q, want none for a package a replace resolves", messages)
+	}
+	if got := readTidyFile(t, appDir, "go.mod"); !strings.Contains(got, "require "+proxyLib+" v0.0.0-") {
+		t.Errorf("go.mod = %q, want tidy to have added the replaced requirement", got)
 	}
 }

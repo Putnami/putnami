@@ -394,9 +394,12 @@ those bytes.
      imported package, even though `go.work` selects a version that has it:
      tidy runs in module mode and asks the module proxy for the latest
      version that provides the package. The answer changes when a release is
-     published, so the diagnostic names the module, each package with the
+     published. A raise with no lookup comes from the selection over the
+     dependencies' own `go.mod` files, which the committed `go.mod` does not
+     record either. The diagnostic names the module, each package with the
      module and version tidy picked, and each raised requirement, and the task
-     ends as an uncacheable skip. Tidy's rewrite of `go.mod` and `go.sum` is
+     ends as an uncacheable skip. A package a directory `replace` resolves is
+     no lookup, even though tidy prints `go: found` for it. Tidy's rewrite of `go.mod` and `go.sum` is
      kept: commit it, and the next tidy looks nothing up and caches as usual.
    - Syncs `go.mod` dependencies back to `putnami.json`
 2. **Generate**:
