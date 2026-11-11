@@ -5,26 +5,26 @@
   "outcomes": [
     "Each Rush project is a Putnami project with an edge to each Rush project its package.json depends on, in the mode the workspace adopted",
     "In delegate mode, putnami build, test and lint run rush on each affected project, and Rush's build cache decides what reruns",
-    "In import mode, each Rush project is a TypeScript project that Putnami's runner, installer and cache serve"
+    "In import mode, each Rush project is a TypeScript project that Putnami's runner, installer and cache serve, and a target whose tool @putnami/typescript does not run keeps running with rushx"
   ],
   "nonGoals": [
     "Installing or switching a Rush version: the toolchain check compares and never installs",
-    "Rewriting rush.json or command-line.json, or a project's package.json beyond the exports an import adds (D-066)",
+    "Rewriting rush.json or command-line.json, or a project's package.json beyond the exports an import adds (D-066); an import never rewrites a script",
     "Rush subspaces, version policies and publishing: rush publish and rush version keep running through Rush",
     "A Rush repository whose rush.json is not at the Putnami workspace root"
   ],
   "requirements": [
     {
       "id": "projects-become-projects",
-      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and as the name rush receives, the projects the putnami observe Rush detector says it depends on, each edge attributed to build-graph, the extension @putnami/rush, the tag rush and the workspace root as stack root. In import mode, options.@putnami/rush.mode of putnami.workspace.json or its default, it answers no project, so the TypeScript extension runs them."
+      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and as the name rush receives, the projects the putnami observe Rush detector says it depends on, each edge attributed to build-graph, the extension @putnami/rush, the tag rush and the workspace root as stack root. In import mode, options.@putnami/rush.mode of putnami.workspace.json or its default, it answers only the projects whose putnami.json names @putnami/rush, which keep a target on Rush."
     },
     {
       "id": "sync-writes-the-project-graph",
-      "text": "The sync task writes in each project's putnami.json the extension of the mode, the mode param or else the recorded mode, import by default, an unknown one failing, and the project IDs it depends on, and removes the other mode's extension. In delegate mode it adds rush.json, command-line.json and the Rush lockfile as filePatterns, disables test and lint without a bulk or phased command of that name, and retracts a former project. It rewrites a file only when a member it owns changes."
+      "text": "The sync task writes in each project's putnami.json the extension of the mode, the mode param or else the recorded mode, import by default, an unknown one failing, and the project IDs it depends on, and removes the other mode's extension. In delegate mode it adds rush.json, command-line.json and the Rush lockfile as filePatterns, disables test and lint without a bulk or phased command of that name, and retracts a former project. In import mode it disables build, test and lint without a script of that name. It rewrites a file only when a member it owns changes."
     },
     {
       "id": "validate-fails-on-a-stale-graph",
-      "text": "In delegate mode, putnami validate compares each project's putnami.json with rush.json and the project manifests, writes nothing, and fails with rush.sync_stale when a sync would change one. In import mode Putnami owns the graph, and the check passes."
+      "text": "In import mode as in delegate mode, putnami validate compares each project's putnami.json with rush.json and the project manifests, writes nothing, and fails with rush.sync_stale when a sync would change one."
     },
     {
       "id": "tasks-delegate-to-rush",
@@ -47,12 +47,17 @@
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the rush:build, rush:test and rush:lint selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task, the graph task included, sets cache.enabled to false."
     },
     {
+      "id": "import-keeps-the-tool-that-checks-the-code",
+      "text": "In import mode, a build, test or lint script moves to @putnami/typescript only when that extension runs its tool: bun build or tsc alone, bun test, Vitest or Jest, Biome or a bare ESLint, with no command chained. Any other script keeps running with rushx <task> in the project's directory: its putnami.json names @putnami/rush beside @putnami/typescript, disables each task for the extension that does not run it, and the sync lists the script with its reason (D-070)."
+    },
+    {
       "id": "import-adopts-typescript-conventions",
-      "text": "In import mode, the sync adds exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json that declares no exports, names a file outside src/ there, holds src/index.ts and that rush.json does not publish, and writes a tsconfig.json extending the root's where a project has none. It keeps every other byte, warns about each file it writes and each manifest it cannot edit, and a dry sync shows each diff."
+      "text": "In import mode, the sync adds exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json whose build script runs bun build, that declares no exports, names a file outside src/ there, holds src/index.ts and that rush.json does not publish, and writes a tsconfig.json extending the root's where a project holds no tsconfig*.json. It keeps every other byte, warns about each file it writes and each manifest it cannot edit, and a dry sync shows each diff."
     }
   ],
   "decisions": [
     "tooling/stacks/doc/adr/0001-one-extension-per-stack-on-a-shared-core.md",
-    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md"
+    "tooling/stacks/doc/adr/0008-a-delegated-stack-keeps-its-tool-cache.md",
+    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
   ]
 }

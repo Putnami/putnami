@@ -7,7 +7,7 @@
       "id": "monorepo/rush-adoption",
       "type": "feature",
       "name": "Adopt a Rush repository, imported or delegated to Rush",
-      "outcome": "A team with a Rush repository reaches Putnami's runner and verdict in the mode it picks: its projects become TypeScript projects that Putnami builds, tests and caches, or each task runs rush on its project and Rush keeps its build cache",
+      "outcome": "A team with a Rush repository reaches Putnami's runner and verdict in the mode it picks: its projects become TypeScript projects that Putnami builds, tests and caches, keeping on Rush each target whose tool Putnami does not run, or each task runs rush on its project and Rush keeps its build cache",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -112,6 +112,19 @@
             "kind": "acceptance",
             "checks": [
               "the-manifest-conforms-to-the-stack-core"
+            ]
+          }
+        },
+        {
+          "id": "import-keeps-the-tool-that-checks-the-code",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-target-that-runs-another-tool-keeps-running-with-rushx"
             ]
           }
         },
