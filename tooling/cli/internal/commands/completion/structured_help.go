@@ -18,31 +18,6 @@ type StructuredFlagInfo struct {
 	ValueName   string
 }
 
-// structuredCommandHelp is derived from the command catalog: the catalog owns
-// every description, usage line, flag, and example, and this map is only the
-// lookup shape the help renderers want. Paths that share another path's help
-// (`scopes` ≡ `scopes list`, `init` ≡ `workspace init`) resolve through
-// commandmeta.Detail, so both spellings answer with identical bytes.
-var structuredCommandHelp = buildStructuredCommandHelp()
-
-func buildStructuredCommandHelp() map[string]StructuredCommandInfo {
-	commands := commandmeta.StructuredCommands()
-	out := make(map[string]StructuredCommandInfo, len(commands))
-	for _, command := range commands {
-		detail, ok := commandmeta.Detail(command.Path)
-		if !ok {
-			continue
-		}
-		out[command.Path] = StructuredCommandInfo{
-			Description: detail.Description,
-			Usage:       detail.Usage,
-			Flags:       structuredFlagInfos(detail.Flags),
-			Examples:    detail.Examples,
-		}
-	}
-	return out
-}
-
 func structuredFlagInfos(flags []commandmeta.Flag) []StructuredFlagInfo {
 	if len(flags) == 0 {
 		return nil
@@ -60,19 +35,30 @@ func structuredFlagInfos(flags []commandmeta.Flag) []StructuredFlagInfo {
 }
 
 // StructuredCommandHelp returns help metadata for a structured command or
-// subcommand.
+// subcommand, derived from the command catalog: the catalog owns every
+// description, usage line, flag, and example. Paths that share another path's
+// help (`scopes` ≡ `scopes list`, `init` ≡ `workspace init`) resolve through
+// commandmeta.Detail, so both spellings answer with identical bytes.
 //
-// The returned Flags slice is shared with the table, so callers must not sort or
-// otherwise mutate it. Until slice A1b, shell completion seeded itself through
-// this accessor and then sorted the result in place, reordering the flags
-// `putnami help projects create` prints for any process that had already
-// generated a completion script. Completion projects the catalog directly now,
-// and its own copy is the one it sorts.
+// Every call builds its own Flags and Examples slices, so a caller may sort or
+// otherwise change them without changing what the next caller reads.
 func StructuredCommandHelp(command, subcommand string) (StructuredCommandInfo, bool) {
-	key := command
+	path := command
 	if subcommand != "" {
-		key = command + " " + subcommand
+		path = command + " " + subcommand
 	}
-	info, ok := structuredCommandHelp[key]
-	return info, ok
+	entry, ok := commandmeta.Lookup(path)
+	if !ok || entry.Kind != commandmeta.KindStructured {
+		return StructuredCommandInfo{}, false
+	}
+	detail, ok := commandmeta.Detail(path)
+	if !ok {
+		return StructuredCommandInfo{}, false
+	}
+	return StructuredCommandInfo{
+		Description: detail.Description,
+		Usage:       detail.Usage,
+		Flags:       structuredFlagInfos(detail.Flags),
+		Examples:    append([]string(nil), detail.Examples...),
+	}, true
 }

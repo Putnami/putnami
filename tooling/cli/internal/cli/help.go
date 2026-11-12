@@ -33,14 +33,11 @@ type FlagInfo struct {
 	JobOnly bool
 }
 
-// allFlagCategories is the categorized global-flag listing the text, man, and
-// markdown help renderers all draw from, in display order. It is DERIVED from
-// the command catalog's global-flag table (internal/commandmeta): a flag appears
-// here because it declares a Category there. The same table drives shell
-// completion, which before slice A1b carried two more wordings of these same
-// descriptions (one in the zsh generator, one in the fish generator).
-var allFlagCategories = flagCategoriesFromCatalog()
-
+// flagCategoriesFromCatalog returns the categorized global-flag listing the
+// text, man, and markdown help renderers all draw from, in display order. It
+// is DERIVED from the command catalog's global-flag table
+// (internal/commandmeta): a flag appears here because it declares a Category
+// there. The same table drives shell completion.
 func flagCategoriesFromCatalog() []FlagCategory {
 	categories := commandmeta.GlobalFlagCategories()
 	out := make([]FlagCategory, 0, len(categories))
@@ -102,12 +99,11 @@ func oneLine(text string) string {
 // the loaded extensions.
 const commandGroupsTitle = "Commands (from extensions):"
 
-// structuredCommandCategories is the categorized command listing the text, man,
-// and markdown help renderers all draw from. It is DERIVED from the command
-// catalog (internal/commandmeta): a command appears here because it declares a
-// Category there, under its Label when it collapses several paths into one row.
-var structuredCommandCategories = structuredCommandCategoriesFromCatalog()
-
+// structuredCommandCategoriesFromCatalog returns the categorized command
+// listing the text, man, and markdown help renderers all draw from. It is
+// DERIVED from the command catalog (internal/commandmeta): a command appears
+// here because it declares a Category there, under its Label when it collapses
+// several paths into one row.
 func structuredCommandCategoriesFromCatalog() []CommandCategory {
 	categories := commandmeta.Categories()
 	out := make([]CommandCategory, 0, len(categories))
@@ -135,21 +131,15 @@ func jobCommandNames(scope *helpScope) string {
 	return strings.Join(names, ", ")
 }
 
-// relatedCommands maps each command to related commands. It is DERIVED from the
-// command catalog: the keys are catalog paths, which is what the help renderers
-// look up (printSubcommandHelp joins command and subcommand the same way).
-var relatedCommands = relatedCommandsFromCatalog()
-
-func relatedCommandsFromCatalog() map[string][]string {
-	catalog := commandmeta.Commands()
-	out := make(map[string][]string, len(catalog))
-	for _, command := range catalog {
-		if len(command.Related) == 0 {
-			continue
-		}
-		out[command.Path] = append([]string(nil), command.Related...)
+// catalogRelated returns the related commands the catalog declares for the
+// path command, or nil when it declares none. The help renderers join command
+// and subcommand into that path (printSubcommandHelp).
+func catalogRelated(command string) []string {
+	entry, ok := commandmeta.Lookup(command)
+	if !ok || len(entry.Related) == 0 {
+		return nil
 	}
-	return out
+	return append([]string(nil), entry.Related...)
 }
 
 // printHelp prints the top-level help of scope to the process's standard
@@ -183,7 +173,7 @@ Usage:
 
 	printCommandGroups(w, scope)
 
-	for _, cat := range structuredCommandCategories {
+	for _, cat := range structuredCommandCategoriesFromCatalog() {
 		iox.Fprintf(w, "%s:\n", cat.Name)
 		for _, c := range cat.Commands {
 			iox.Fprintf(w, "  %-28s %s\n", c.Name, c.Description)

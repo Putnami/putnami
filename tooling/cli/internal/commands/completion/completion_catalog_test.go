@@ -12,12 +12,13 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// Shell completion is a projection of the command
-// catalog. These tests pin the properties that makes true, none of which the
-// goldens can state: the projection is TOTAL (no catalog path is silently
-// dropped), it is the ONLY wording (descriptions are catalog Summaries, not a
-// third phrasing), it does not MUTATE the surface it reads from, and the prose
-// it embeds survives shell quoting.
+// Shell completion is a projection of the command catalog. These tests pin
+// the properties that makes true on the CLI's own catalog: the projection is
+// TOTAL (no catalog path is silently dropped), it is the ONLY wording
+// (descriptions are catalog Summaries, not a third phrasing), it does not
+// MUTATE the surface it reads from, and the prose it embeds survives shell
+// quoting. completion_render_test.go proves the script each shell gets on a
+// small catalog.
 
 // completionGenerators are the three scripts, rendered with no workspace so only
 // the catalog-derived half is exercised.
@@ -98,12 +99,9 @@ func TestCompletionOffersEveryGlobalFlag(t *testing.T) {
 	}
 }
 
-// TestCompletionDoesNotMutateStructuredHelp pins the aliasing bug A1b removed:
-// completion used to seed itself with the very slices structuredCommandHelp
-// stores and then sort them in place, so generating a completion script
-// reordered the flags `putnami help projects create` prints for the rest of the
-// process. The two surfaces are independent projections now, and the help table
-// must keep the catalog's declaration order no matter what ran before it.
+// TestCompletionDoesNotMutateStructuredHelp pins that generating a completion
+// script leaves the flags `putnami help <path>` prints in the catalog's
+// declaration order: completion sorts its own copy of them.
 func TestCompletionDoesNotMutateStructuredHelp(t *testing.T) {
 	for shell := range completionGenerators {
 		renderCompletion(t, shell)
@@ -122,14 +120,14 @@ func TestCompletionDoesNotMutateStructuredHelp(t *testing.T) {
 			continue
 		}
 		if len(info.Flags) != len(detail.Flags) {
-			t.Errorf("structuredCommandHelp[%q] has %d flags, the catalog declares %d",
+			t.Errorf("StructuredCommandHelp(%q) has %d flags, the catalog declares %d",
 				command.Path, len(info.Flags), len(detail.Flags))
 			continue
 		}
 		for i := range detail.Flags {
 			if info.Flags[i].Long != detail.Flags[i].Long {
-				t.Errorf("structuredCommandHelp[%q] flag %d is %q, the catalog declares %q — "+
-					"something reordered the shared slice",
+				t.Errorf("StructuredCommandHelp(%q) flag %d is %q, the catalog declares %q — "+
+					"something reordered the catalog's flags",
 					command.Path, i, info.Flags[i].Long, detail.Flags[i].Long)
 			}
 		}
