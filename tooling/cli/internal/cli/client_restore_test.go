@@ -39,8 +39,9 @@ func clientGenerateTrust(t *testing.T, trust string) *wsproto.Config {
 	return cfg
 }
 
-// The first-run pass runs client-generate as `putnami client-generate --all`
-// would: every project, the action cache on, the cache trust that command
+// The first-run pass runs client-generate as `putnami client-generate
+// --projects '*'` would: every project, disabled ones included, the action
+// cache on, the cache trust that command
 // resolves, and no lifecycle policy. A cache hit restores a client and a miss
 // renders it.
 func TestRestoreGeneratedClients_RunsAnOrdinaryCachedEngineRun(t *testing.T) {
@@ -73,8 +74,8 @@ func TestRestoreGeneratedClients_RunsAnOrdinaryCachedEngineRun(t *testing.T) {
 		t.Errorf("the run turns the cache off: %+v", req.Global)
 	case req.WorkspaceLifecycle:
 		t.Error("the run is a lifecycle run")
-	case !req.Global.All || req.Global.Projects != "*":
-		t.Errorf("selection = all %v, projects %q; want every project", req.Global.All, req.Global.Projects)
+	case req.Global.All || req.Global.Projects != "*":
+		t.Errorf("selection = all %v, projects %q; want every project by name, so disable.tags cannot narrow it", req.Global.All, req.Global.Projects)
 	case req.Global.CacheTrust == "" || req.Global.CacheTrust != want.CacheTrust:
 		t.Errorf("cache trust = %q, want %q, the trust client-generate resolves", req.Global.CacheTrust, want.CacheTrust)
 	case !req.Global.Verbose:

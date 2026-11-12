@@ -70,7 +70,7 @@ func rootFileExists(root, rel string) bool {
 
 // restoreCommand is the restore hook's command for a launcher.
 func restoreCommand(launcher string) string {
-	return jsonEscape(launcher) + ` client-generate --all >&2 || true`
+	return jsonEscape(launcher) + ` client-generate --projects '*' >&2 || true`
 }
 
 // wantRestoreHooks is a hook file that holds the restore hook alone.
@@ -249,7 +249,8 @@ func TestClientRestoreHookStaysWhenTheWorkspaceDoesNotLoad(t *testing.T) {
 func TestClientRestoreHookOwnershipByCommand(t *testing.T) {
 	paths := [][]string{clientRestorePath}
 	owned := []string{
-		`putnami client-generate --all >&2 || true`,
+		`putnami client-generate --projects '*' >&2 || true`,
+		`"$CLAUDE_PROJECT_DIR"/putnamiw client-generate --projects '*' >&2 || true`,
 		`"$CLAUDE_PROJECT_DIR"/putnamiw client-generate --all >&2 || true`,
 		`"$(git rev-parse --show-toplevel)"/putnamiw client-generate >&2 || true`,
 		`./putnamiw client-generate`,

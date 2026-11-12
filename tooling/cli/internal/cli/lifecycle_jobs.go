@@ -188,9 +188,12 @@ func RunWorkspaceJob(ctx context.Context, req lifecycle.WorkspaceJobRequest) (li
 
 // RestoreGeneratedClients is the first-run pass's client restore (ADR 0087),
 // bound to lifecycle.BootstrapOptions.RestoreClients. It runs client-generate
-// over every project as an ordinary cached engine run, the run `putnami
-// client-generate --all` starts: the action cache is on, so a hit restores a
-// client and a miss renders it.
+// over every project as an ordinary cached engine run: the action cache is on,
+// so a hit restores a client and a miss renders it.
+//
+// It selects projects with "*", not All, so the workspace's disable.tags does
+// not narrow it. go.work names the modules of disabled projects too, and the go
+// command builds them, so their clients must exist like any other.
 //
 // It is not a lifecycle run. Generation is cacheable work, planned once per
 // project. Like the lifecycle adapter, it supplies no telemetry observer: the
@@ -209,7 +212,7 @@ func restoreGeneratedClients(ctx context.Context, req lifecycle.ClientRestoreReq
 		out = os.Stdout
 	}
 	commands := []string{shared.ClientGenerateCommand}
-	global := GlobalFlags{All: true, Projects: "*", Verbose: req.Display.Verbose, Debug: req.Display.Debug, Quiet: req.Display.Quiet}
+	global := GlobalFlags{Projects: "*", Verbose: req.Display.Verbose, Debug: req.Display.Debug, Quiet: req.Display.Quiet}
 	if err := resolveCacheTrust(&global, req.Config, nil, commands); err != nil {
 		return err
 	}

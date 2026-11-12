@@ -29,9 +29,12 @@ const clientRestoreEvent = "SessionStart"
 // runs it through a known launcher is Putnami's.
 var clientRestorePath = []string{shared.ClientGenerateCommand}
 
-// clientRestoreArgs select every project: the hook runs from the root the host
-// provides, and the run must not depend on the directory it starts in.
-var clientRestoreArgs = []string{"--all"}
+// clientRestoreArgs select every project by name: the hook runs from the root
+// the host provides, and the run must not depend on the directory it starts
+// in. "*" rather than --all keeps the workspace's disable.tags from narrowing
+// it, as for the first-run pass: go.work builds the modules of disabled
+// projects too.
+var clientRestoreArgs = []string{"--projects", "'*'"}
 
 // clientRestoreRedirect sends the command's output to standard error. A host
 // adds the standard output of a SessionStart hook to the agent's context, and
