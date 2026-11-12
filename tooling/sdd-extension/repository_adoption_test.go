@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"testing"
 
@@ -439,40 +438,18 @@ func TestAdoptionMatrixPublishesEveryExclusion(t *testing.T) {
 	}
 }
 
-// architectureReadmePath is the protocol README that summarizes this
-// repository's adoption.
-const architectureReadmePath = "protocols/architecture/README.md"
+var matrixProjectRow = regexp.MustCompile("(?m)^\\| `(/[^`]+)` \\|")
 
-var (
-	matrixProjectRow = regexp.MustCompile("(?m)^\\| `(/[^`]+)` \\|")
-	matrixHeading    = regexp.MustCompile("(?m)^### `([a-z0-9-]+)` — (\\d+) projects?$")
-	matrixDomainRow  = regexp.MustCompile("(?m)^\\| `([a-z0-9-]+)` \\| `[a-z0-9-]+` \\| (\\d+) \\|")
-	readmeDomainRow  = regexp.MustCompile("(?m)^\\| `([a-z0-9-]+)` \\| [a-z0-9-]+ \\| (\\d+) \\|")
-	adoptionTotals   = regexp.MustCompile(`maps \*\*(\d+) of its (\d+) projects`)
-	excludedTotal    = regexp.MustCompile(`(?:other \*\*|excludes the other )(\d+)`)
-)
-
-// TestAdoptionMatrixPublishesEveryMembershipAndItsCounts holds the published
-// numbers to the manifests. Every workspace project is one row of the matrix,
-// and every count the matrix and the protocol README print — the totals, the
-// excluded share and each domain's size — is the one the committed manifests
-// give, so a project mapped or excluded without its row, or a stale count,
-// fails here.
-func TestAdoptionMatrixPublishesEveryMembershipAndItsCounts(t *testing.T) {
+// TestAdoptionMatrixPublishesEveryMembership holds the matrix to the workspace.
+// Every workspace project is exactly one row of the matrix, mapped or excluded,
+// and no row names something that is not a project. The documents state no
+// count: adding a project edits its manifest and one matrix row, nothing else.
+func TestAdoptionMatrixPublishesEveryMembership(t *testing.T) {
 	root := workspaceRoot(t)
 	discovered := discoverProjects(t, root)
-	mapped := mappedProjects(t, root)
-	perDomain := map[string]int{}
-	for _, domain := range mapped {
-		perDomain[domain]++
-	}
 	matrix, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(adoptionMatrixPath))) //nolint:gosec // a committed document inside this repository
 	if err != nil {
 		t.Fatalf("read the adoption matrix: %v", err)
-	}
-	readme, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(architectureReadmePath))) //nolint:gosec // a committed document inside this repository
-	if err != nil {
-		t.Fatalf("read the architecture README: %v", err)
 	}
 
 	rows := map[string]int{}
@@ -492,46 +469,9 @@ func TestAdoptionMatrixPublishesEveryMembershipAndItsCounts(t *testing.T) {
 		}
 	}
 
-	for path, document := range map[string]string{adoptionMatrixPath: string(matrix), architectureReadmePath: string(readme)} {
-		totals := adoptionTotals.FindStringSubmatch(document)
-		if totals == nil {
-			t.Errorf("%s states no adoption totals", path)
-			continue
-		}
-		if totals[1] != strconv.Itoa(len(mapped)) || totals[2] != strconv.Itoa(len(discovered)) {
-			t.Errorf("%s says %s of %s projects are mapped; the manifests map %d of %d", path, totals[1], totals[2], len(mapped), len(discovered))
-		}
-		if excluded := excludedTotal.FindStringSubmatch(document); excluded == nil || excluded[1] != strconv.Itoa(len(excludedProjects)) {
-			t.Errorf("%s states excluded total %v, want %d", path, excluded, len(excludedProjects))
-		}
-	}
-
-	for _, count := range []struct {
-		path    string
-		pattern *regexp.Regexp
-		text    string
-	}{
-		{adoptionMatrixPath + " heading", matrixHeading, string(matrix)},
-		{adoptionMatrixPath + " domain table", matrixDomainRow, string(matrix)},
-		{architectureReadmePath + " domain table", readmeDomainRow, string(readme)},
-	} {
-		seen := map[string]bool{}
-		for _, match := range count.pattern.FindAllStringSubmatch(count.text, -1) {
-			seen[match[1]] = true
-			if want := strconv.Itoa(perDomain[match[1]]); match[2] != want {
-				t.Errorf("%s gives domain %q %s projects; its manifest maps %s", count.path, match[1], match[2], want)
-			}
-		}
-		for _, domain := range declaredDomains {
-			if !seen[domain] {
-				t.Errorf("%s gives no project count for domain %q", count.path, domain)
-			}
-		}
-	}
-
 	// Everything this comparison reads is a declared test input, so a new
-	// project, a moved membership or an edited count re-runs it.
-	read := []string{adoptionMatrixPath, architectureReadmePath}
+	// project or a moved membership re-runs it.
+	read := []string{adoptionMatrixPath}
 	for _, source := range repositoryManifests(t, root) {
 		read = append(read, source.Path)
 	}

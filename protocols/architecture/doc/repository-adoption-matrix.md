@@ -1,12 +1,12 @@
 # Repository adoption matrix
 
-This repository maps **105 of its 196 projects** to **11 architecture domains**.
-The other **91 are excluded on purpose**: 46 samples, 7 templates, 2 template
-proofs, 2 protocol proofs, the standalone area detector, the 2 Cloud runtime
-destinations, the Cloud CLI extension with its 14 generated clients, the new
-development verb vocabulary, the new evidence report readers, and the new
-stack core with its first thirteen stack extensions. Every one of the 196 appears
-in a table below, mapped or excluded, with a reason.
+This repository maps part of its projects to **11 architecture domains**.
+The others are **excluded on purpose**: samples, templates, template proofs,
+protocol proofs, the standalone area detector, the Cloud runtime destinations,
+the Cloud CLI extension with its generated clients, the new development verb
+vocabulary, the new evidence report readers, and the new stack core with its
+stack extensions. Every workspace project appears in a table below, mapped or
+excluded, with a reason. This file states no count: the tables are the count.
 
 The matrix exists so the adoption frontier is measurable instead of implied.
 `putnami architecture validate` proves that every mapped project's cross-domain
@@ -28,19 +28,19 @@ an unmapped project is simply invisible to it. This file is that second half.
 
 ## The 11 domains
 
-| Domain | Owner | Projects | Manifest |
-|---|---|---|---|
-| `protocols` | `protocols` | 44 | `protocols/putnami.architecture.json` |
-| `go-framework` | `framework` | 24 | `go/framework/putnami.architecture.json` |
-| `typescript-framework` | `framework` | 15 | `typescript/framework/putnami.architecture.json` |
-| `extension-providers` | `extension-providers` | 12 | `go/extension/putnami.architecture.json` |
-| `cli` | `cli` | 5 | `tooling/cli/putnami.architecture.json` |
-| `sdd` | `sdd` | 1 | `tooling/sdd-extension/putnami.architecture.json` |
-| `extension-sdk` | `tooling` | 1 | `tooling/extension-sdk/putnami.architecture.json` |
-| `agent-workflows` | `tooling` | 1 | `tooling/contributor/putnami.architecture.json` |
-| `observability` | `observability` | 1 | `sites/telemetry.putnami.dev/putnami.architecture.json` |
-| `public-docs` | `public-docs` | 1 | `sites/putnami.dev/putnami.architecture.json` |
-| `stacks` | `tooling` | 0 | `tooling/stacks/putnami.architecture.json` |
+| Domain | Owner | Manifest |
+|---|---|---|
+| `protocols` | `protocols` | `protocols/putnami.architecture.json` |
+| `go-framework` | `framework` | `go/framework/putnami.architecture.json` |
+| `typescript-framework` | `framework` | `typescript/framework/putnami.architecture.json` |
+| `extension-providers` | `extension-providers` | `go/extension/putnami.architecture.json` |
+| `cli` | `cli` | `tooling/cli/putnami.architecture.json` |
+| `sdd` | `sdd` | `tooling/sdd-extension/putnami.architecture.json` |
+| `extension-sdk` | `tooling` | `tooling/extension-sdk/putnami.architecture.json` |
+| `agent-workflows` | `tooling` | `tooling/contributor/putnami.architecture.json` |
+| `observability` | `observability` | `sites/telemetry.putnami.dev/putnami.architecture.json` |
+| `public-docs` | `public-docs` | `sites/putnami.dev/putnami.architecture.json` |
+| `stacks` | `tooling` | `tooling/stacks/putnami.architecture.json` |
 
 A manifest does not have to live inside a mapped project. `protocols`,
 `go-framework`, and `typescript-framework` each declare a manifest at the root of
@@ -53,7 +53,7 @@ from the directory.
 Each section states the domain's **membership test** first. A project belongs
 because it passes that test, not because of where its directory sits.
 
-### `protocols` — 44 projects
+### `protocols`
 
 **Membership test:** the project decides what one wire document *means*. It owns
 that document's strict parser, its validator, and its canonical writer, and no
@@ -106,7 +106,7 @@ other project in the repository may reinterpret it.
 | `/protocols/transaction` | `go.putnami.dev/protocol/transaction` | The unit-of-work contract. |
 | `/protocols/workspace` | `go.putnami.dev/protocol/workspace` | Workspace and project configuration, and the project graph model. |
 
-### `go-framework` — 24 projects
+### `go-framework`
 
 **Membership test:** the project publishes part of the `go.putnami.dev/*` runtime
 that a tenant Go application links. It decides what an application can express;
@@ -139,7 +139,7 @@ the application composes it and owns none of its shape.
 | `/go/framework/storage` | `go.putnami.dev/storage` | Object and blob storage access. |
 | `/go/framework/telemetry` | `go.putnami.dev/telemetry` | Traces, metrics, and log export from an application. |
 
-### `typescript-framework` — 15 projects
+### `typescript-framework`
 
 **Membership test:** the project publishes part of the `@putnami/*` runtime a
 tenant TypeScript application links, with the same authority relationship as
@@ -163,7 +163,7 @@ tenant TypeScript application links, with the same authority relationship as
 | `/typescript/framework/utils` | `@putnami/utils` | The shared primitives the other packages build on. |
 | `/typescript/framework/web` | `@putnami/web` | Routing, rendering, islands, and the web pipeline. |
 
-### `extension-providers` — 12 projects
+### `extension-providers`
 
 **Membership test:** the project is an extension binary that *answers the
 orchestrator* — it owns the probe answers, the lifecycle jobs, the verification
@@ -185,7 +185,7 @@ authority is what it reports, not what it builds.
 | `/tooling/memory-store` | `@putnami/memory-store` | The memory provider results for the file and Git stores: context selection and compare-and-set checkpoints. |
 | `/tooling/observe` | `@putnami/observe` | What a CI job reports about its change: the repository key, the diff base, the changed files, the reports it found, and the change evidence document. |
 
-### `cli` — 5 projects
+### `cli`
 
 **Membership test:** the project decides how a workspace resolves, how work is
 planned, scheduled, and cached, or what the model of those things is. Internal
@@ -200,7 +200,7 @@ contracts only.
 | `/tooling/install-scripts` | `@putnami/install-scripts` | The tests of the CLI's install and smoke scripts. A separate project so that its key holds the scripts and the install pages, not the CLI's sources. |
 | `/tooling/windows-vet` | `@putnami/windows-vet` | The Windows compile gate: `go vet` of every `go.work` module for windows/amd64. A separate project so that its key holds only the Go sources, module files and `go.work`. |
 
-### `sdd` — 1 project
+### `sdd`
 
 **Membership test:** the project decides what a valid feature, spec,
 architecture declaration, or contract *is*.
@@ -209,7 +209,7 @@ architecture declaration, or contract *is*.
 |---|---|---|
 | `/tooling/sdd-extension` | `@putnami/sdd` | Feature, spec, architecture, and contract validation, and the method documentation under `/tooling/sdd-extension/doc`. |
 
-### `extension-sdk` — 1 project
+### `extension-sdk`
 
 **Membership test:** the project decides what an extension is *able to say* to
 the orchestrator and in what shape.
@@ -218,7 +218,7 @@ the orchestrator and in what shape.
 |---|---|---|
 | `/tooling/extension-sdk` | `putnami-extension-sdk` | The JSONL emitter, the job-context parser, the lifecycle runner, result envelopes, and the ARC authoring builder. |
 
-### `agent-workflows` — 1 project
+### `agent-workflows`
 
 **Membership test:** the project decides which agent workflows Putnami publishes
 and what a published workflow archive contains.
@@ -227,7 +227,7 @@ and what a published workflow archive contains.
 |---|---|---|
 | `/tooling/contributor` | `@putnami/contributor` | The contributor skills and workers, their host adapters, the content policy their extension ships under, and the extension's runtime. The repository-root `.agents`, `.claude`, and `.codex` trees are generated from this source; the audit skill and host policy files stay outside this authority. |
 
-### `observability` — 1 project
+### `observability`
 
 **Membership test:** the project decides what anonymous CLI usage means once it
 is received — what is accepted, what is dropped, how it is bucketed, and how
@@ -237,7 +237,7 @@ long it is kept.
 |---|---|---|
 | `/sites/telemetry.putnami.dev` | `telemetry.putnami.dev` | The usage ingest, its sanitizer, and the daily aggregates. |
 
-### `public-docs` — 1 project
+### `public-docs`
 
 **Membership test:** the project decides the *published information
 architecture* — which trees appear, at which section, in what order — while
@@ -247,14 +247,14 @@ owning none of their content.
 |---|---|---|
 | `/sites/putnami.dev` | `putnami.dev` | Placement, navigation, and the site's own authored pages. Nineteen documentation sources are copied in from six other domains, under eight imports, and none of them is edited here. |
 
-### `stacks` — 0 projects
+### `stacks`
 
 **Membership test:** none yet. The domain owns one kind of fact: the reference
 page each stack extension and each monorepo tool integration writes in its own
 `doc/` folder, which `public-docs` publishes and never edits. It maps no
 project, because no review has named the domain that owns *running* a stack;
 the stack core and its extensions stay excluded until one does (see
-[Stack core and stack extensions](#stack-core-and-stack-extensions--14-projects)).
+[Stack core and stack extensions](#stack-core-and-stack-extensions)).
 A manifest with no project is how the protocol states a domain that holds a
 fact before it holds code.
 
@@ -268,7 +268,7 @@ repository imports it. None of the existing domains owns that reading.
 Mapping it to one of them would imply authority that domain does not hold.
 Each exclusion has an owner and a condition for joining a domain.
 
-### Standalone Intelligence library — 1 project
+### Standalone Intelligence library
 
 **Why excluded:** the area detector splits a repository into areas from the
 manifests that repository declares. It does not decide workspace planning,
@@ -283,7 +283,7 @@ adding it to the frontier.
 |---|---|---|
 | `/intelligence/areas` | Standalone area detector | `intelligence` |
 
-### Cloud runtime destinations — 2 projects
+### Cloud runtime destinations
 
 **Why excluded:** `go.putnami.dev/cloud/runtime` and `@putnami/cloud` are
 client code of the hosted platform. They add config, secrets and, for
@@ -302,7 +302,7 @@ to the frontier.
 | `/cloud/runtime/go` | Hosted-platform client library | `cloud` |
 | `/cloud/runtime/typescript` | Hosted-platform client library | `cloud` |
 
-### Cloud CLI extension — 15 projects
+### Cloud CLI extension
 
 **Why excluded:** `@putnami/cloud-extension` builds the `@putnami/cloud`
 extension binary, a client of the hosted platform. Its 14 generated clients
@@ -332,7 +332,7 @@ to the frontier.
 | `/cloud/clients/runtime-api` | Generated client | `cloud` |
 | `/cloud/clients/source-api` | Generated client | `cloud` |
 
-### Development verb vocabulary — 1 project
+### Development verb vocabulary
 
 **Why excluded:** `@putnami/dev` is a new project. Its manifest declares the
 development verbs that the language extensions run, and its executable answers
@@ -347,7 +347,7 @@ protocols and the extension SDK need.
 |---|---|---|
 | `/tooling/dev` | Development verb vocabulary | `tooling` |
 
-### Evidence report readers — 1 project
+### Evidence report readers
 
 **Why excluded:** `@putnami/evidence-readers` is a new project. It reads the
 JUnit, LCOV, Cobertura, Clover and Go cover reports a CI already wrote into
@@ -366,7 +366,7 @@ permissions its import of the protocols and its consumer in
 |---|---|---|
 | `/tooling/evidence-readers` | Evidence report readers | `tooling` |
 
-### Stack core and stack extensions — 14 projects
+### Stack core and stack extensions
 
 **Why excluded:** `@putnami/stacks` is a new library, the stack core, and
 `@putnami/rust`, `@putnami/php`, `@putnami/dotnet`, `@putnami/dart`, `@putnami/java`,
@@ -400,7 +400,7 @@ detectors need; the next stack extensions join the same section until then.
 | `/swift/extension` | Stack extension | `tooling` |
 | `/tooling/stacks` | Stack core | `tooling` |
 
-### Samples — 46 projects
+### Samples
 
 **Why excluded:** a sample is a *proof*. It exists to demonstrate that the public
 API works and to fail loudly in the end-to-end suite when it stops working. It
@@ -466,7 +466,7 @@ parents. They exist to prove that a Go service and a TypeScript service can call
 each other through generated clients. Their only consumer is the sample above
 them.
 
-### Templates — 7 projects
+### Templates
 
 **Why excluded:** a template is a *scaffold input*. Its files are the starting
 state of somebody else's project, not code this repository runs. The authority
@@ -489,7 +489,7 @@ enforces on generated projects — has acquired an authority and needs a domain.
 | `/typescript/templates/typescript-server` | TypeScript template | `extension-providers` |
 | `/typescript/templates/typescript-web` | TypeScript template | `extension-providers` |
 
-### Template proofs — 2 projects
+### Template proofs
 
 **Why excluded:** a template proof is a *test*. It renders each template of its
 language into a throwaway workspace wired to this repository's framework
@@ -509,7 +509,7 @@ authority and needs a domain.
 | `/go/templates/proof` | Go template proof | `extension-providers` |
 | `/typescript/templates/proof` | TypeScript template proof | `extension-providers` |
 
-### Protocol proofs — 2 projects
+### Protocol proofs
 
 **Why excluded:** a protocol proof is a *test*. It holds the conformance tests
 of the protocol it sits in, bound with `spectest` to the requirements that

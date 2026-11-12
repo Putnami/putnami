@@ -198,8 +198,8 @@ Published schemas:
 
 ## Current repository adoption
 
-The Putnami repository maps **105 of its 196 projects to 11 domains** and
-excludes the other 91 with a reason and an owner each. There is no workspace-root
+The Putnami repository maps part of its projects to **11 domains** and
+excludes the others with a reason and an owner each. There is no workspace-root
 baseline and no waiver file: adoption started clean and every wave landed with
 its declarations complete, so there has never been debt to record.
 
@@ -216,25 +216,24 @@ its declarations complete, so there has never been debt to record.
 | `coverage.projectDependencies` | `enforced-for-mapped-projects` |
 | `coverage.domainAccess` | `framework-evidence` |
 
-| Domain | Owner | Projects | What it decides |
-|---|---|---|---|
-| `protocols` | protocols | 44 | The strict wire contracts every other domain speaks |
-| `go-framework` | framework | 24 | The Go application runtime API and its documentation |
-| `typescript-framework` | framework | 15 | The TypeScript application runtime API and its documentation |
-| `extension-providers` | extension-providers | 12 | Probe answers, verification observations, provider results, the Python surface |
-| `cli` | cli | 5 | The workspace engine and the tooling documentation |
-| `sdd` | sdd | 1 | The spec-driven method and its documentation |
-| `extension-sdk` | tooling | 1 | The extension runtime an extension binary is built on |
-| `agent-workflows` | tooling | 1 | The agent content of the `@putnami/contributor` extension |
-| `observability` | observability | 1 | Anonymous CLI-usage aggregates |
-| `public-docs` | public-docs | 1 | What the public documentation site publishes |
-| `stacks` | tooling | 0 | The reference pages of the stack extensions and the monorepo tool integrations |
+| Domain | Owner | What it decides |
+|---|---|---|
+| `protocols` | protocols | The strict wire contracts every other domain speaks |
+| `go-framework` | framework | The Go application runtime API and its documentation |
+| `typescript-framework` | framework | The TypeScript application runtime API and its documentation |
+| `extension-providers` | extension-providers | Probe answers, verification observations, provider results, the Python surface |
+| `cli` | cli | The workspace engine and the tooling documentation |
+| `sdd` | sdd | The spec-driven method and its documentation |
+| `extension-sdk` | tooling | The extension runtime an extension binary is built on |
+| `agent-workflows` | tooling | The agent content of the `@putnami/contributor` extension |
+| `observability` | observability | Anonymous CLI-usage aggregates |
+| `public-docs` | public-docs | What the public documentation site publishes |
+| `stacks` | tooling | The reference pages of the stack extensions and the monorepo tool integrations |
 
-The excluded 67 are the 32 samples, 7 templates, 2 template proofs, 2 protocol
-proofs, the standalone area detector, the 2 Cloud runtime
-destinations, the Cloud CLI extension with its 14 generated clients, the
-development verb vocabulary, the evidence report readers, and the stack core
-with its three stack extensions. Samples,
+The excluded projects are the samples, templates, template proofs, protocol
+proofs, the standalone area detector, the Cloud runtime destinations, the Cloud
+CLI extension with its generated clients, the development verb vocabulary, the
+evidence report readers, and the stack core with its stack extensions. Samples,
 templates and proofs prove or seed the public API without owning a fact another repository project consumes.
 The area detector reads the manifests of repositories that are not Putnami
 workspaces; no repository project imports it, and no existing domain owns that
@@ -244,8 +243,9 @@ client code that no repository project links from the workspace.
 The development verb vocabulary and the evidence report readers are new
 projects, excluded until a review names the domain that owns their authority;
 the TypeScript extension already reads its reports through the readers.
-The full inventory, the reason for every exclusion, and the completion rule live
-in [`doc/repository-adoption-matrix.md`](doc/repository-adoption-matrix.md), and
+The full inventory with each domain's members, the reason for every exclusion,
+and the completion rule live in
+[`doc/repository-adoption-matrix.md`](doc/repository-adoption-matrix.md), and
 `TestEveryWorkspaceProjectIsClassified` in
 [`tooling/sdd-extension/repository_adoption_test.go`](../../tooling/sdd-extension/repository_adoption_test.go)
 fails on a project that is neither mapped nor excluded.

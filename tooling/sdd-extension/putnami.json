@@ -30,7 +30,6 @@
     },
     "test": {
       "filePatterns": [
-        "../../protocols/architecture/README.md",
         "../../protocols/architecture/doc/repository-adoption-matrix.md",
         "git:**/putnami.architecture.json",
         "git:**/putnami.json",
