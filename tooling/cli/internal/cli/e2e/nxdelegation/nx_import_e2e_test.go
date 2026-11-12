@@ -41,11 +41,15 @@ func TestADelegatedNxWorkspaceImportsPricingAndPassesLintTestBuild(t *testing.T)
 
 	// A delegated workspace that loads @putnami/typescript and @putnami/dev
 	// from this tree. pricing's scripts run what @putnami/typescript runs.
+	// pricing is private, so the import names its sources as its entry and
+	// its Bun build moves: a published package keeps the dist/index.js its
+	// main names, which that build does not write, and its build on Nx.
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"),
 		`{"name": "shop", "extensions": ["/nx-extension", "/.ext/typescript", "/.ext/dev"], "includes": [], "options": {"@putnami/nx": {"mode": "delegate"}}}`)
 	clitest.WriteFile(t, filepath.Join(root, "packages/pricing/package.json"), `{
   "name": "@demo/pricing",
   "version": "1.0.0",
+  "private": true,
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
