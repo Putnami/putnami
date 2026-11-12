@@ -30,10 +30,18 @@ func TestOrdinaryValidateSiteContentPlanHasOnlySourceChecks(t *testing.T) {
 	if got, want := string(traits), `{"injectPublishChannels":true,"kind":"criteria"}`; got != want {
 		t.Fatalf("validate traits = %s, want %s", got, want)
 	}
-	for _, field := range []string{"dependsOn", "sessionPrerequisites", "alsoRuns"} {
+	for _, field := range []string{"dependsOn", "alsoRuns"} {
 		if value, found := command[field]; found {
 			t.Fatalf("validate must not schedule prerequisites: %s=%v", field, value)
 		}
+	}
+	// A site project alone plans build first: its declared generated
+	// sections exist only once build's cloud-site-content-generate step ran.
+	// Any other project plans no prerequisite.
+	if prerequisites := command["sessionPrerequisites"]; !reflect.DeepEqual(prerequisites, []any{
+		map[string]any{"command": "build", "if": "params.site-content"},
+	}) {
+		t.Fatalf("validate sessionPrerequisites = %v, want build for site projects alone", prerequisites)
 	}
 	run := command["run"].([]any)
 	if len(run) != 2 {

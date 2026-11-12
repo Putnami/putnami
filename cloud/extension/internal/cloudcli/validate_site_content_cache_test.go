@@ -17,9 +17,12 @@ import (
 
 // These tests pin the cache key of cloud-validate-site-content. The task keys
 // on the project's putnami.json and on the project's Git candidate files, and
-// the check reads the sections through the same candidate cut. A cache hit
-// replays the verdict of an earlier run, so two project states the key cannot
-// tell apart must get one verdict.
+// the check reads the committed sections through the same candidate cut. It
+// reads a declared generated section from .gen/site-content, which its key
+// does not read: validate plans build first, so its key folds the key of the
+// generate step, which fixes those bytes.
+// A cache hit replays the verdict of an earlier run, so two project states the
+// key cannot tell apart must get one verdict.
 
 const validateSiteContentTaskName = "cloud-validate-site-content"
 
@@ -40,7 +43,7 @@ func TestValidateSiteContentCacheContract(t *testing.T) {
 		keys = append(keys, key)
 	}
 	slices.Sort(keys)
-	if want := []string{"args", "cache", "command", "cwd", "declares", "description", "inputs", "kind", "timeoutMs"}; !slices.Equal(keys, want) {
+	if want := []string{"args", "cache", "command", "cwd", "declares", "description", "inputs", "kind", "reads", "timeoutMs"}; !slices.Equal(keys, want) {
 		t.Fatalf("%s fields = %v, want %v", validateSiteContentTaskName, keys, want)
 	}
 
@@ -58,6 +61,11 @@ func TestValidateSiteContentCacheContract(t *testing.T) {
 	if task.CWD != "{projectRoot}" || !slices.Equal(task.Args, []string{"validate-site-content"}) {
 		t.Fatalf("cwd = %q args = %v", task.CWD, task.Args)
 	}
+	// The check reads .gen/site-content, which the build step writes: the
+	// read serializes it after that write.
+	if !slices.Equal(task.Reads, []string{"gen"}) {
+		t.Fatalf("reads = %v, want [gen]", task.Reads)
+	}
 	want := map[string]manifestInputPort{
 		// A glob keeps every byte of putnami.json, and keys a manifest Git
 		// ignores, which the candidate files do not hold.
@@ -65,6 +73,9 @@ func TestValidateSiteContentCacheContract(t *testing.T) {
 		// "git:**" alone selects the whole repository. The exclusion keeps the
 		// candidate files of the project and nothing above it.
 		"sections": {From: "project", Files: []string{"git:**", "!../**"}},
+		// No port reads .gen/site-content. The generate step can rewrite it
+		// between the run's key pass and this task's start, so reading it
+		// would move the key; the folded generate key fixes those bytes.
 		// `putnami validate --app X` reaches each project's step, and the check
 		// refuses a project other than its own.
 		"app": {From: "params"}, "appName": {From: "params"},
@@ -227,11 +238,26 @@ func TestValidateSiteContentVerdictMovesOnlyWithItsKey(t *testing.T) {
 	}
 }
 
+// declareGeneratedSiteContent rewrites the fixture's putnami.json so it
+// declares each named section as generated.
+func declareGeneratedSiteContent(t *testing.T, project string, sections ...string) {
+	t.Helper()
+	generated := map[string]any{}
+	for _, section := range sections {
+		generated[section] = map[string]any{"command": []string{"generate", "--out", "{output}"}}
+	}
+	writeFixtureJSON(t, filepath.Join(project, "putnami.json"), map[string]any{
+		"name": "docs/example.test", "publish": []string{"site-content"},
+		"options": map[string]any{"@putnami/cloud": map[string]any{"site-content": map[string]any{"generated": generated}}},
+	})
+}
+
 // TestSiteContentPackagingReadsTheTreeValidationChecks changes the project in
 // each way where the candidate files and the disk differ. Inside a Git work
-// tree validation and packaging both read the candidate files: they agree on
-// the verdict, and packaging ships the sections and files validation counted,
-// which the workspace probe declares.
+// tree validation and packaging both read the candidate files and the
+// declared generated sections: they agree on the verdict, and packaging ships
+// the sections and files validation counted, which the workspace probe
+// declares.
 func TestSiteContentPackagingReadsTheTreeValidationChecks(t *testing.T) {
 	nestedRepository := func(rel string) func(*testing.T, string) {
 		return func(t *testing.T, project string) {
@@ -242,10 +268,34 @@ func TestSiteContentPackagingReadsTheTreeValidationChecks(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
 		change func(*testing.T, string)
+		// sections and files are what both accept, or the fixture's guide
+		// and reference with 3 files when nil.
+		sections []string
+		files    int
 		// refusal is part of both errors, or empty when both accept the
-		// project as the fixture holds it.
+		// project.
 		refusal string
+		// probe is what the workspace probe declares for a refused project,
+		// and probeRefuses states that the probe refuses it with refusal
+		// too. A refused case that sets neither leaves the probe unchecked.
+		probe        []string
+		probeRefuses bool
 	}{
+		{name: "a declared generated section", change: func(t *testing.T, project string) {
+			declareGeneratedSiteContent(t, project, "api")
+			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "api", "index.md"), "# API\n")
+			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "api", "types", "user.md"), "# User\n")
+		}, sections: []string{"api", "guide", "reference"}, files: 5},
+		{name: "an undeclared generated directory", change: func(t *testing.T, project string) {
+			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "x", "index.md"), "# X\n")
+		}},
+		{name: "a declared generated section build has not written", change: func(t *testing.T, project string) {
+			declareGeneratedSiteContent(t, project, "api")
+		}, refusal: "run `putnami build` for the project", probe: []string{"api", "guide", "reference"}},
+		{name: "a declared generated section that is also a section directory", change: func(t *testing.T, project string) {
+			declareGeneratedSiteContent(t, project, "guide")
+			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "guide", "index.md"), "# Guide\n")
+		}, refusal: "is declared generated and is also a section directory", probeRefuses: true},
 		{name: "a section of ignored files", change: func(t *testing.T, project string) {
 			writeFixtureFile(t, filepath.Join(project, "scratch", "notes.draft"), "notes\n")
 		}},
@@ -282,33 +332,46 @@ func TestSiteContentPackagingReadsTheTreeValidationChecks(t *testing.T) {
 			t.Chdir(project)
 			validateErr := distributioncli.ValidateSiteContentSources(params, nil, root, IO{JSON: func(data any) { validated = resultMap(t, data) }})
 			packageErr := distributioncli.PackageSiteContent(params, nil, root, IO{JSON: func(data any) { packaged = resultMap(t, data) }})
+			sections, probeErr := distributioncli.SiteContentSections(project)
 			if tc.refusal != "" {
 				for _, err := range []error{validateErr, packageErr} {
 					if err == nil || !strings.Contains(err.Error(), tc.refusal) {
 						t.Fatalf("validate = %v, package = %v, want both to refuse with %q", validateErr, packageErr, tc.refusal)
 					}
 				}
+				switch {
+				case tc.probe != nil && (probeErr != nil || !reflect.DeepEqual(sections, tc.probe)):
+					t.Fatalf("declared sections = (%v, %v), want %v", sections, probeErr, tc.probe)
+				case tc.probeRefuses && (probeErr == nil || !strings.Contains(probeErr.Error(), tc.refusal)):
+					t.Fatalf("declared sections = (%v, %v), want the probe to refuse with %q", sections, probeErr, tc.refusal)
+				}
 				return
 			}
 			if validateErr != nil || packageErr != nil {
 				t.Fatalf("validate = %v, package = %v, want both to accept the project", validateErr, packageErr)
 			}
-			if validated["sections"] != float64(2) || validated["files"] != float64(3) {
-				t.Fatalf("validated = %v, want the fixture's 2 sections and 3 files", validated)
+			wantSections, wantFiles := tc.sections, tc.files
+			if wantSections == nil {
+				wantSections, wantFiles = []string{"guide", "reference"}, 3
 			}
-			var coordinates []string
+			if validated["sections"] != float64(len(wantSections)) || validated["files"] != float64(wantFiles) {
+				t.Fatalf("validated = %v, want %d sections and %d files", validated, len(wantSections), wantFiles)
+			}
+			var coordinates, wantCoordinates []string
+			for _, section := range wantSections {
+				wantCoordinates = append(wantCoordinates, distributioncli.SiteContentCoordinate(section))
+			}
 			files := 0.0
 			for _, bundle := range packaged["bundles"].([]any) {
 				bundle := bundle.(map[string]any)
 				coordinates = append(coordinates, bundle["coordinate"].(string))
 				files += bundle["files"].(float64)
 			}
-			if want := []string{"cloud/doc-contents-guide", "cloud/doc-contents-reference"}; !reflect.DeepEqual(coordinates, want) || files != 3 {
-				t.Fatalf("packaged %v with %v files, want %v with 3", coordinates, files, want)
+			if !reflect.DeepEqual(coordinates, wantCoordinates) || files != float64(wantFiles) {
+				t.Fatalf("packaged %v with %v files, want %v with %d", coordinates, files, wantCoordinates, wantFiles)
 			}
-			sections, err := distributioncli.SiteContentSections(project)
-			if err != nil || !reflect.DeepEqual(sections, []string{"guide", "reference"}) {
-				t.Fatalf("declared sections = (%v, %v), want [guide reference]", sections, err)
+			if probeErr != nil || !reflect.DeepEqual(sections, wantSections) {
+				t.Fatalf("declared sections = (%v, %v), want %v", sections, probeErr, wantSections)
 			}
 		})
 	}

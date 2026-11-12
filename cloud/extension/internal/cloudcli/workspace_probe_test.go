@@ -523,6 +523,47 @@ func TestCloudWorkspaceProbeDeclaresOneSiteContentMemberPerSection(t *testing.T)
 	}
 }
 
+// The probe runs before build, so it lists a declared generated section from
+// putnami.json alone: the member exists whether or not .gen/site-content
+// holds it, and an undeclared directory there is no member.
+func TestCloudWorkspaceProbeDeclaresAMemberForAGeneratedSection(t *testing.T) {
+	root := t.TempDir()
+	projectPath := "docs/example.test"
+	projectRoot := filepath.Join(root, filepath.FromSlash(projectPath))
+	for _, rel := range []string{"guides/index.md", ".gen/site-content/undeclared/index.md"} {
+		path := filepath.Join(projectRoot, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("# page\n"), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	document := `{"name":"docs/example.test","publish":["site-content"],` +
+		`"options":{"@putnami/cloud":{"site-content":{"generated":{"api":{"command":["generate","{output}"]}}}}}}`
+	if err := os.WriteFile(filepath.Join(projectRoot, cloudProjectMarker), []byte(document), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result, err := probeCloudWorkspace(root, workspaceproto.ProbeRequest{Paths: []string{projectPath}})
+	if err != nil || len(result.Projects) != 1 {
+		t.Fatalf("result = %+v, %v; want one project", result, err)
+	}
+	metadata, found, err := releaseset.ProjectReleaseMetadata(map[string]json.RawMessage{cloudRuntimeIdentity: result.Projects[0].Metadata})
+	if err != nil || !found {
+		t.Fatalf("metadata = %+v, %v, %v", metadata, found, err)
+	}
+	var coordinates []string
+	for _, member := range metadata.Ecosystems {
+		coordinates = append(coordinates, member.Coordinate)
+	}
+	if want := []string{"cloud/doc-contents-api", "cloud/doc-contents-guides"}; !slices.Equal(coordinates, want) {
+		t.Fatalf("members = %v, want %v", coordinates, want)
+	}
+	if step, ok := metadata.PackageStepFor(cloudSiteContentEcosystem, "cloud/doc-contents-api"); !ok || step != cloudSiteContentPackageStep {
+		t.Fatalf("generated member package step = %q/%v", step, ok)
+	}
+}
+
 func TestCloudWorkspaceProbeDoesNotDeclareSiteContentWithoutThePublishEntry(t *testing.T) {
 	root := t.TempDir()
 	projectRoot := filepath.Join(root, "docs", "example.test")

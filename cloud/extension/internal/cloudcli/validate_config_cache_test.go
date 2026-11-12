@@ -32,12 +32,13 @@ const validateConfigTaskName = "cloud-validate-config-project"
 const versionStampRel = "apps/my-app/.gen/version.json"
 
 // taskCacheSetting decodes a task "cache" value. The task contract accepts a
-// bool or an {"enabled", "noOutput"} object.
+// bool or an {"enabled", "noOutput", "deterministic"} object.
 type taskCacheSetting struct {
-	Declared bool
-	Object   bool
-	Enabled  bool
-	NoOutput bool
+	Declared      bool
+	Object        bool
+	Enabled       bool
+	NoOutput      bool
+	Deterministic bool
 }
 
 func (s *taskCacheSetting) UnmarshalJSON(data []byte) error {
@@ -47,15 +48,16 @@ func (s *taskCacheSetting) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	var object struct {
-		Enabled  bool `json:"enabled"`
-		NoOutput bool `json:"noOutput"`
+		Enabled       bool `json:"enabled"`
+		NoOutput      bool `json:"noOutput"`
+		Deterministic bool `json:"deterministic"`
 	}
 	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&object); err != nil {
-		return fmt.Errorf("cache must be a bool or {enabled, noOutput}: %w", err)
+		return fmt.Errorf("cache must be a bool or {enabled, noOutput, deterministic}: %w", err)
 	}
-	*s = taskCacheSetting{Declared: true, Object: true, Enabled: object.Enabled, NoOutput: object.NoOutput}
+	*s = taskCacheSetting{Declared: true, Object: true, Enabled: object.Enabled, NoOutput: object.NoOutput, Deterministic: object.Deterministic}
 	return nil
 }
 
@@ -413,11 +415,13 @@ func copyFixtureFile(t *testing.T, from, to string) {
 }
 
 // TestOnlyThePureReadChecksAreCached keeps every task but the three checks
-// uncached and requires each uncached pipeline task to state why in its
-// description. Each cached check has a test file that pins its key.
+// and the site-content generate step uncached and requires each uncached
+// pipeline task to state why in its description. Each cached task has a test
+// file that pins its key; site_content_generate_contract_test.go pins the
+// generate step's.
 func TestOnlyThePureReadChecksAreCached(t *testing.T) {
 	tasks := readCloudManifestTasks(t)
-	cached := []string{validateConfigTaskName, validateSiteContentTaskName, imageLayersCheckTaskName}
+	cached := []string{validateConfigTaskName, validateSiteContentTaskName, imageLayersCheckTaskName, siteContentGenerateTaskName}
 	for name, raw := range tasks {
 		if slices.Contains(cached, name) {
 			continue

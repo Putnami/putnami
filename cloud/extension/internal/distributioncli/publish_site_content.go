@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -98,6 +99,9 @@ type SiteContentSection struct {
 	// source is the tree the section's files are read from; nil reads the
 	// tree of the directory above Dir.
 	source *siteContentSource
+	// generated is set for a section the project declares generated: Dir is
+	// then <site directory>/.gen/site-content/<section>.
+	generated bool
 }
 
 // walk visits the section's files through its source tree.
@@ -205,7 +209,9 @@ func PublishSiteContentBundles(params map[string]any, workspaceRoot string, env 
 
 // DeriveSiteContentSections derives the sections of one site directory from
 // its source tree (siteContentSource): each section directory is a section,
-// and files directly under the site directory are meta. When only is
+// each generated section the project declares is a section read from
+// .gen/site-content/<section>, and files directly under the site directory
+// are meta. When only is
 // non-empty, sections are filtered to that slug. byPackage carries the
 // cross-site duplicate guard: it maps each claimed section slug to its owning
 // "site/section". The result is sorted by section.
@@ -233,14 +239,19 @@ func DeriveSiteContentSections(siteDir, site, only string, byPackage map[string]
 				section, site, section, owner, siteContentNamespace, siteContentPackagePrefix, section), clicore.ExitUsage)
 		}
 		byPackage[section] = site + "/" + section
+		dir, generated := filepath.Join(siteDir, section), slices.Contains(source.generated, section)
+		if generated {
+			dir = siteContentGeneratedSectionDir(siteDir, section)
+		}
 		sections = append(sections, SiteContentSection{
-			Site:    site,
-			Section: section,
-			Dir:     filepath.Join(siteDir, section),
-			Name:    section,
-			Package: siteContentPackagePrefix + section,
-			Mount:   mount,
-			source:  source,
+			Site:      site,
+			Section:   section,
+			Dir:       dir,
+			Name:      section,
+			Package:   siteContentPackagePrefix + section,
+			Mount:     mount,
+			source:    source,
+			generated: generated,
 		})
 	}
 	return sections, nil

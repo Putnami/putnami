@@ -25,6 +25,13 @@ import (
 // a clone, and a symbolic link is a candidate the key holds as a link, so the
 // check refuses it. Outside a work tree no `git:` key exists to serve a
 // verdict from, and the check walks the disk.
+//
+// A generated section the project declares is read from
+// .gen/site-content/<section>, which the build step cloud-site-content-generate
+// writes. The task's key folds that step's key, which fixes those bytes, so it
+// does not read them. The check refuses a
+// declared generated section whose directory is absent, and one whose name is
+// also a section directory.
 func ValidateSiteContentSources(params map[string]any, args []string, workspaceRoot string, ioctx clicore.IO) error {
 	clicore.AdoptPositionalApp(params, args)
 	app, err := clicore.ResolveApp(params, workspaceRoot)

@@ -210,6 +210,8 @@ func probeCloudWorkspace(root string, request workspaceproto.ProbeRequest) (work
 			}
 		}
 		if slices.Contains(project.Publish, distributioncli.SiteContentPublishEntry) {
+			// The sections hold each generated section putnami.json declares,
+			// whether or not build has written it: the probe reads no .gen.
 			sections, err := distributioncli.SiteContentSections(filepath.Join(root, filepath.FromSlash(projectPath)))
 			if err != nil {
 				return workspaceproto.ProbeResult{}, fmt.Errorf("read %s site-content sections: %w", projectFile, err)

@@ -234,8 +234,11 @@ func TestFirstPartyJobsKeepTheirTraitsUnderADevelopmentVocabulary(t *testing.T) 
 // selfDeclaredKinds are the kinds, workloads and effects first-party commands
 // declare themselves, so a workspace without @putnami/dev keeps them: serve and
 // run declare their workload in every language extension, and Cloud and sdd
-// declare the kind of the commands they own the meaning of.
+// declare the kind of the commands they own the meaning of. Cloud's build
+// declares its traits to inject the publish channels, so it restates its
+// verb's kind.
 var selfDeclaredKinds = map[string]CommandTraits{
+	"@putnami/cloud build":            {Kind: proto.CommandKindFiles},
 	"@putnami/cloud test":             {Kind: proto.CommandKindVerification},
 	"@putnami/cloud validate":         {Kind: proto.CommandKindCriteria},
 	"@putnami/sdd validate":           {Kind: proto.CommandKindCriteria},
