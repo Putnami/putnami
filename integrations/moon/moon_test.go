@@ -279,7 +279,8 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 		}
 	}
 	// api's Vitest test and bare ESLint lint move to @putnami/typescript,
-	// which records the runner and the linter; its tsc -b is no package.json
+	// which records the runner and the linter, with no type check the test
+	// did not run and no fix the lint did not write; its tsc -b is no package.json
 	// build script, so its build keeps running through moon (ADR 0017 of
 	// tooling/stacks).
 	api := readProjectFile(t, root, "apps/api")
@@ -288,9 +289,13 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 		!reflect.DeepEqual(api["options"], map[string]any{
 			ExtensionName:              map[string]any{"graphSync": true, "filePatterns": inputs},
 			"@putnami/typescript":      map[string]any{"lint": map[string]any{"linter": "eslint"}},
-			"@putnami/typescript:test": map[string]any{"runner": "vitest"},
+			"@putnami/typescript:test": map[string]any{"runner": "vitest", "types": false},
+			"@putnami/typescript:lint": map[string]any{"fix": false},
 		}) {
 		t.Errorf("apps/api = %v", api)
+	}
+	if !slices.Contains(result.Warnings, stacks.LintDependentsNote) {
+		t.Errorf("warnings = %v, want the lint selection note", result.Warnings)
 	}
 	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool {
 		return u.Project == "api" && u.Task == "build" && strings.Contains(u.Reason, "compiles the tsc of the package.json build script") && strings.HasSuffix(u.Reason, "moon run api:build")
@@ -816,6 +821,26 @@ func TestATypeScriptTaskMovesOnlyWhereItsScriptsLeadTheExtension(t *testing.T) {
 	}
 	if ok, reason := moves(root, detect.Project{ID: "py", Language: "python"}, "build", "uv build"); ok || !strings.Contains(reason, "has no build") {
 		t.Errorf("a Python build moves: %v %q", ok, reason)
+	}
+}
+
+func TestAMovedTypeScriptTaskDoesWhatItsTaskDid(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-task-does-what-its-script-did", "an-imported-task-does-what-its-task-did")
+	root := t.TempDir()
+	// lib is published and names a build output: the Bun build would not
+	// write it. app names its sources.
+	stackstest.WriteFile(t, root, "lib/package.json", `{"name": "lib", "main": "dist/index.js"}`)
+	stackstest.WriteFile(t, root, "app/package.json", `{"name": "app", "private": true, "main": "src/index.ts"}`)
+	lib := detect.Project{ID: "lib", Dir: "lib", Language: "typescript", Tasks: []detect.Task{{Name: "build", Command: "bun build src/index.ts"}}}
+	if ok, reason := moves(root, lib, "build", "bun build src/index.ts"); ok || !strings.Contains(reason, `names "dist/index.js", which the Bun build`) || !strings.HasSuffix(reason, "moon run lib:build") {
+		t.Errorf("lib build moves = %v (%q), want it kept on moon", ok, reason)
+	}
+	app := detect.Project{ID: "app", Dir: "app", Language: "typescript", Tasks: []detect.Task{
+		{Name: "build", Command: "bun build src/index.ts"}, {Name: "lint", Command: "biome check --write ."}, {Name: "test", Command: "bun test"},
+	}}
+	plan := planImport(root, app, map[string]string{"build": "build", "lint": "lint", "test": "test"})
+	if len(plan.kept) != 0 || !plan.bunBuild || !plan.lintMoved || plan.lintChecksOnly || !plan.testMoved {
+		t.Errorf("app plans %+v, want every task moved, a lint that writes and a test", plan)
 	}
 }
 

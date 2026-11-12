@@ -112,8 +112,15 @@ depend on it build against its sources:
   and whose project holds `src/index.ts`, gains
   `"exports": { ".": "./src/index.ts" }`: the Bun build writes nothing in the
   project. A `tsc` build, or one that stays on Turborepo, writes the output
-  its `main` names, so its entry stays. A package that is not private keeps
-  its entry, and the sync warns.
+  its `main` names, so its entry stays. A `bun build` whose entry the sync
+  does not rewrite stays on Turborepo, and the sync lists it with its reason:
+  a package that is not private, one whose `exports` name a build output,
+  and one with no `src/index.ts`.
+- A lint that writes no fix, such as `biome check .`, moves with `fix: false`
+  in `options["@putnami/typescript:lint"]`, and a test moves with
+  `types: false` in `options["@putnami/typescript:test"]`, since its script
+  type-checked nothing. `putnami lint --impacted` then lints the projects a
+  change touches, not their dependents, and the sync says so.
 - A project with no `tsconfig*.json` gets a `tsconfig.json` that extends the
   root's. A project that holds another one, such as `tsconfig.lib.json`,
   keeps its configuration, which Jest or ESLint may read.

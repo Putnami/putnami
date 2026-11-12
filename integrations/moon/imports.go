@@ -158,6 +158,12 @@ func typeScriptMoves(root, dir, command, line, keeps string) (bool, string) {
 		return false, fmt.Sprintf("the package.json build script runs tsc, which %s would compile instead of %q: %s", stacks.TypeScriptExtension, line, keeps)
 	case command == stacks.TaskLint && !strings.Contains(line, "eslint") && strings.Contains(firstCommand(script), "eslint"):
 		return false, fmt.Sprintf("the package.json lint script runs ESLint, which %s would run instead of %q: %s", stacks.TypeScriptExtension, line, keeps)
+	case command == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(line):
+		// The Bun build writes nothing in the project: it moves only when
+		// it writes the entries the package.json names.
+		if reason := stacks.BunBuildKeptReason(root, dir, stacks.PackagePublished(root, dir), keeps); reason != "" {
+			return false, reason
+		}
 	}
 	return true, ""
 }
@@ -208,6 +214,10 @@ type importPlan struct {
 	// bunBuild reports a build that moved to the TypeScript extension's Bun
 	// build.
 	bunBuild bool
+	// lintMoved reports a TypeScript lint that moved, and lintChecksOnly
+	// one that writes no fix; testMoved a TypeScript test that moved, which
+	// type-checked nothing.
+	lintMoved, lintChecksOnly, testMoved bool
 }
 
 // planImport maps the moon tasks of a project whose language has an
@@ -245,8 +255,11 @@ func planImport(root string, p detect.Project, mapped map[string]string) importP
 			if plan.runner == "" {
 				plan.runner = "bun"
 			}
+			plan.testMoved = true
 		case stacks.TaskLint:
 			plan.eslint = stacks.LintsWithESLint(line)
+			plan.lintMoved = true
+			plan.lintChecksOnly = !stacks.LintWrites(line)
 		case stacks.TaskBuild:
 			plan.bunBuild = stacks.TypeScriptBuildsWithBun(line)
 		}

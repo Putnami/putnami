@@ -179,8 +179,9 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 		"dependencies": []any{"/packages/pricing"},
 		"tags":         []any{"turbo"},
 		"disable":      map[string]any{"jobs": []any{"lint", "@putnami/turbo:test", "@putnami/turbo:build"}},
-		// The api starts with node: it declares the node runtime.
-		"options": map[string]any{TypeScriptExtension: map[string]any{"runtime": "node"}},
+		// The api starts with node: it declares the node runtime. Its test
+		// script type-checked nothing, so the moved test runs no type check.
+		"options": map[string]any{TypeScriptExtension: map[string]any{"runtime": "node"}, stacks.TypeScriptRunnerLayer: map[string]any{"types": false}},
 	}
 	if !reflect.DeepEqual(api, want) {
 		t.Errorf("api putnami.json = %v, want %v", api, want)
@@ -842,4 +843,50 @@ func TestTheProbeAttributesEachEdgeToTurborepo(t *testing.T) {
 	check("delegate")
 	writeFile(t, root, "apps/api/putnami.json", `{"extensions": ["@putnami/turbo", "@putnami/typescript"]}`)
 	check("import")
+}
+
+func TestAnImportedTaskDoesWhatItsScriptDid(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-task-does-what-its-script-did", "an-imported-task-does-what-its-script-did")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, "turbo.json", `{"tasks": {"build": {}, "test": {}, "lint": {}}}`)
+	// pricing is published and its main names a build output: Putnami's Bun
+	// build would not write it, so the build stays on Turborepo.
+	writeFile(t, root, "packages/pricing/package.json", "{\n  \"name\": \"@demo/pricing\",\n  \"main\": \"dist/index.js\",\n  \"scripts\": {\"build\": \"bun build src/index.ts --outdir dist\", \"test\": \"bun test\", \"lint\": \"biome check .\"}\n}\n")
+	writeFile(t, root, "packages/pricing/src/index.ts", "export {}\n")
+	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "private": true, "scripts": {"lint": "biome check --write ."}, "dependencies": {"@demo/pricing": "workspace:*"}}`)
+	result, err := Sync(root, Options{Mode: ModeImport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pricing := readProjectFile(t, root, "packages/pricing")
+	if jobs := pricing["disable"].(map[string]any)["jobs"]; !reflect.DeepEqual(jobs, []any{"@putnami/turbo:lint", "@putnami/turbo:test", "@putnami/typescript:build"}) {
+		t.Errorf("pricing jobs = %v, want the build on Turborepo", jobs)
+	}
+	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool {
+		return u.Task == "@demo/pricing#build" && strings.Contains(u.Reason, `names "dist/index.js", which the Bun build`)
+	}) {
+		t.Errorf("unmapped = %+v, want the build kept for its entry", result.Unmapped)
+	}
+	want := map[string]any{
+		"@putnami/typescript:lint": map[string]any{"fix": false},
+		"@putnami/typescript:test": map[string]any{"types": false},
+	}
+	if !reflect.DeepEqual(pricing["options"], want) {
+		t.Errorf("pricing options = %v, want a lint that checks only and a test with no type check", pricing["options"])
+	}
+	// A lint script that writes its fixes keeps the TypeScript lint's.
+	if options := readProjectFile(t, root, "apps/api")["options"]; options != nil {
+		t.Errorf("api options = %v, want none", options)
+	}
+	if lines := strings.Join(Report(result, false), "\n"); !strings.Contains(lines, stacks.LintDependentsNote) {
+		t.Errorf("report:\n%s", lines)
+	}
+	// Delegate mode retracts the options.
+	if _, err := Sync(root, Options{Mode: ModeDelegate}); err != nil {
+		t.Fatal(err)
+	}
+	if options := readProjectFile(t, root, "packages/pricing")["options"]; options != nil {
+		t.Errorf("delegated pricing options = %v", options)
+	}
 }

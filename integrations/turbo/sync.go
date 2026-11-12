@@ -78,6 +78,9 @@ type Result struct {
 	// Conventions list each file an import rewrote to adopt Putnami's
 	// TypeScript conventions, and each manifest it did not (D-066).
 	Conventions []string
+	// Notes say how Putnami runs a task that moved differently from
+	// Turborepo, such as the projects --impacted lints.
+	Notes []string
 }
 
 // Stale reports the files a sync would change.
@@ -94,6 +97,10 @@ type member struct {
 	// nodeRuntime reports an imported TypeScript package whose start script
 	// runs node: its putnami.json declares the node runtime.
 	nodeRuntime bool
+	// lintChecksOnly reports a lint script that moved and writes no fix;
+	// testMoved a test script that moved, which type-checked nothing.
+	lintChecksOnly bool
+	testMoved      bool
 }
 
 // Sync writes the package graph of the Turborepo repository at root into each
@@ -136,6 +143,7 @@ func Sync(root string, opts Options) (Result, error) {
 
 	var members []member
 	var conventions []stacks.ConventionProject
+	lintMoved := false
 	current := map[string]bool{}
 	for _, p := range detection.Projects {
 		if p.Path == wsproto.ProbeRootPath {
@@ -170,25 +178,36 @@ func Sync(root string, opts Options) (Result, error) {
 			}
 		}
 		bunBuild := false
+		published := stacks.PackagePublished(root, p.Path)
 		for _, task := range MappedTasks {
 			declared := rootTasks[task] || rootTasks[p.SourceName+"#"+task] || own[task]
 			script, scripted := run[task]
+			kept := ""
+			if imported && task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script) {
+				kept = stacks.BunBuildKeptReason(root, p.Path, published, keeps(task))
+			}
 			switch {
 			case !scripted || !declared:
 				m.disabled = append(m.disabled, task)
 			case !imported:
+			case kept != "":
+				m.disabled = append(m.disabled, TypeScriptExtension+":"+task)
+				unmapped[p.SourceName+"#"+task] = kept
 			case stacks.TypeScriptRuns(task, script):
 				// One extension runs each task: the TypeScript extension's
 				// task already runs what the script runs.
 				m.disabled = append(m.disabled, ExtensionName+":"+task)
 				bunBuild = bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
+				m.lintChecksOnly = m.lintChecksOnly || (task == stacks.TaskLint && !stacks.LintWrites(script))
+				m.testMoved = m.testMoved || task == stacks.TaskTest
+				lintMoved = lintMoved || task == stacks.TaskLint
 			default:
 				m.disabled = append(m.disabled, TypeScriptExtension+":"+task)
 				unmapped[p.SourceName+"#"+task] = unmappedReason(task, script)
 			}
 		}
 		if imported {
-			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.SourceName, BunBuild: bunBuild, PublishedBy: stacks.PackagePublished(root, p.Path)})
+			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.SourceName, BunBuild: bunBuild, PublishedBy: published})
 		}
 		members = append(members, m)
 		current[p.Path] = true
@@ -197,6 +216,9 @@ func Sync(root string, opts Options) (Result, error) {
 		result.Unmapped = append(result.Unmapped, Unmapped{Task: task, Reason: reason})
 	}
 	sort.Slice(result.Unmapped, func(i, j int) bool { return result.Unmapped[i].Task < result.Unmapped[j].Task })
+	if lintMoved {
+		result.Notes = append(result.Notes, stacks.LintDependentsNote)
+	}
 	slices.Sort(result.Imported)
 	result.Unmatched = imports.Unmatched()
 
@@ -340,6 +362,8 @@ func applyMember(root string, doc map[string]any, m member, owned map[string]boo
 	if m.nodeRuntime {
 		markNodeRuntime(doc)
 	}
+	stacks.SetTypeScriptLintChecksOnly(doc, m.lintChecksOnly)
+	stacks.SetTypeScriptTestTypesOff(doc, m.testMoved)
 }
 
 // retract removes from the putnami.json of a former package what the sync
@@ -349,6 +373,8 @@ func retract(root string, doc map[string]any, owned map[string]bool) {
 	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return slices.Contains(ownedExtensions, e) }))
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, owned) }))
 	setList(doc, "tags", slices.DeleteFunc(stringList(doc["tags"]), func(t string) bool { return t == Tag }))
+	stacks.SetTypeScriptLintChecksOnly(doc, false)
+	stacks.SetTypeScriptTestTypesOff(doc, false)
 	if disable, ok := doc["disable"].(map[string]any); ok {
 		setList(disable, "jobs", slices.DeleteFunc(stringList(disable["jobs"]), ownedJob))
 		if len(disable) == 0 {
@@ -406,7 +432,12 @@ func ownedJob(job string) bool {
 // unmappedReason says why a script of a TypeScript package keeps running
 // through Turborepo in import mode.
 func unmappedReason(task, script string) string {
-	return stacks.TypeScriptUnmappedReason(task, script, fmt.Sprintf("it keeps running through Turborepo, with turbo run %s", task))
+	return stacks.TypeScriptUnmappedReason(task, script, keeps(task))
+}
+
+// keeps says how a task that stays on Turborepo runs.
+func keeps(task string) string {
+	return fmt.Sprintf("it keeps running through Turborepo, with turbo run %s", task)
 }
 
 // nodeRuntimeOption is the member of options["@putnami/typescript"] that

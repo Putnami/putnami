@@ -104,6 +104,7 @@ func Report(r Result, dryRun bool) []string {
 			lines = append(lines, fmt.Sprintf("  %s: %s", u.Task, u.Reason))
 		}
 	}
+	lines = append(lines, r.Notes...)
 	if len(r.Unreported) > 0 {
 		lines = append(lines, fmt.Sprintf("Test result from the exit code alone, no JUnit report named: %s", strings.Join(r.Unreported, ", ")))
 	}

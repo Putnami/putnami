@@ -30,6 +30,17 @@ tool:
 - Every other target, such as a webpack build, a Mocha test or an ESLint with
   arguments, keeps running as the repository defines it, through the tool.
   The sync lists it as not mapped, with its reason, and rewrites no script.
+- A target that moves does what it did. A lint that writes no fix, such as
+  `biome check .`, moves with `fix: false` in
+  `options["@putnami/typescript:lint"]`. A test moves with `types: false` in
+  `options["@putnami/typescript:test"]`, since its script type-checked
+  nothing. A `bun build` moves only when Putnami's Bun build writes the
+  entries `package.json` names: entries under `src/`, or a `main` the import
+  rewrites as described below. A published package, or one whose `exports`
+  name a build output, keeps its build on the tool.
+- `putnami lint --impacted` lints the projects a change touches, not their
+  dependents: the TypeScript lint reads only the project's own files. The
+  sync says so when a lint moves.
 - Putnami installs the dependencies with the repository's package manager and
   its lockfile.
 - An imported TypeScript project whose build moves to the Bun build, and that
@@ -766,12 +777,11 @@ reason. A project with no script of a task has that task disabled.
 
 A project whose build moves to the Bun build and whose `main` names Rush's
 build output, such as `lib/index.js`, gains
-`"exports": { ".": "./src/index.ts" }` unless `rush.json` publishes it, and a
-project with no `tsconfig*.json` gets a `tsconfig.json` that extends the
-root's, so Putnami builds the project from its sources. A project `rush.json`
-publishes keeps its build-output entry, so the projects that depend on it
-cannot resolve it in import mode: the sync warns, and delegate mode suits such
-a repository better.
+`"exports": { ".": "./src/index.ts" }`, and a project with no
+`tsconfig*.json` gets a `tsconfig.json` that extends the root's, so Putnami
+builds the project from its sources. A project `rush.json` publishes keeps its
+build-output entry for its consumers, so its `bun build` stays on Rush, run
+with `rushx build`, and the sync lists it with its reason.
 
 The sync writes nothing it cannot map. It warns, with the reason, about each
 `command-line.json` command other than `build`, `test` and `lint`, which keeps

@@ -417,6 +417,11 @@
           "default": true,
           "description": "Pass if no tests found"
         },
+        "types": {
+          "type": "boolean",
+          "default": true,
+          "description": "Type-check every TypeScript file of the project, tests included. An import sets it false for a test script it moves, which type-checked nothing."
+        },
         "test-verbose": {
           "type": "boolean",
           "default": false,
@@ -502,7 +507,8 @@
             "generate",
             "^tsc",
             "^tsc-auto"
-          ]
+          ],
+          "if": "params.types"
         },
         {
           "id": "test-env-teardown",

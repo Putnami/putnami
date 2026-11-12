@@ -121,6 +121,7 @@ Bun strips types when it runs a test, and `build~types` reads only `src/`, `bin/
 - It leaves out `node_modules`, `dist`, `.putnami`, `out`, `vendor`, `bower_components`, `jspm_packages`, and every nested project: a subdirectory with its own `putnami.json` is checked by its own `test`. A change to a nested project's files still re-runs the parent's check, since the task's cache inputs cover the whole project tree.
 - It keeps `tsc`'s incremental build info in the extension's cache scratch, so a warm run re-checks only what changed. `putnami cache clean` removes it.
 - It caches like the test run: an unchanged project replays its verdict.
+- `--types false` skips it. An import from Nx, Turborepo, Rush or moon writes `types: false` in `options["@putnami/typescript:test"]` of each project whose test script it moves: that script type-checked nothing, so the moved test does not either.
 
 ## Test File Conventions
 
@@ -287,6 +288,7 @@ Unhandled errors between tests (module-level crashes) are extracted and reported
 | `--test` / `-t` | `string` | — | Run tests matching this filter string |
 | `--concurrent` | `string` | — | Treat all tests as concurrent |
 | `--pass-with-no-tests` | `boolean` | `true` | Pass if no test files are found |
+| `--types` | `boolean` | `true` | Type-check every TypeScript file of the project, tests included, in the `types` step |
 | `--test-verbose` | `boolean` | `false` | Show the complete Bun transcript at info level; changes visibility only, never the invocation or verdict |
 
 ### Activation

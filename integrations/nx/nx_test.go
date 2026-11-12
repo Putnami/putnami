@@ -329,12 +329,19 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 		}
 	}
 	// A test the TypeScript extension runs carries no Nx reports, and a bun
-	// test no runner.
-	if _, ok := readProjectFile(t, root, "packages/pricing")["options"]; ok {
-		t.Errorf("an imported bun test carries no options")
+	// test no runner. The moved test runs no type check its script did not
+	// run, and the moved biome check . writes no fix.
+	if got, want := readProjectFile(t, root, "packages/pricing")["options"], map[string]any{
+		TypeScriptExtension + ":test": map[string]any{"types": false},
+		TypeScriptExtension + ":lint": map[string]any{"fix": false},
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing options = %v, want %v", got, want)
+	}
+	if !slices.Contains(result.Notes, stacks.LintDependentsNote) {
+		t.Errorf("notes = %v, want the lint selection note", result.Notes)
 	}
 	// The api's start script runs node: it also declares the node runtime.
-	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": "jest"}, TypeScriptExtension: map[string]any{"runtime": "node"}}; !reflect.DeepEqual(got, want) {
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": "jest", "types": false}, TypeScriptExtension: map[string]any{"runtime": "node"}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("api options = %v, want %v", got, want)
 	}
 
@@ -379,7 +386,7 @@ func TestImportMapsVitestAndJestTestTargetsToTheTypeScriptTest(t *testing.T) {
 			if !slices.Contains(jobs, any("@putnami/nx:test")) || slices.Contains(jobs, any("@putnami/typescript:test")) {
 				t.Errorf("jobs = %v, want the test on @putnami/typescript", jobs)
 			}
-			want := map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": tc.runner}}
+			want := map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": tc.runner, "types": false}}
 			if tc.script == "" {
 				// The demo's package.json starts the api with node.
 				want[TypeScriptExtension] = map[string]any{"runtime": "node"}
@@ -400,7 +407,7 @@ func TestTheSyncOwnsTheTestRunnerOption(t *testing.T) {
 	root := repository(t, d, ModeImport, TypeScriptExtension)
 	writeFile(t, root, "apps/api/putnami.json", `{"options": {"@putnami/typescript:test": {"timeout": 9000}}}`)
 	sync(t, root, SyncOptions{})
-	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": "jest", "timeout": float64(9000)}, TypeScriptExtension: map[string]any{"runtime": "node"}}; !reflect.DeepEqual(got, want) {
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"runner": "jest", "timeout": float64(9000), "types": false}, TypeScriptExtension: map[string]any{"runtime": "node"}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("options = %v, want the runner beside the kept member", got)
 	}
 	// The test no longer runs jest: the runner goes, the other member stays.
@@ -408,7 +415,7 @@ func TestTheSyncOwnsTheTestRunnerOption(t *testing.T) {
 	sync(t, root, SyncOptions{})
 	// The node runtime the sync wrote stays: the sync never changes a
 	// declared runtime.
-	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"timeout": float64(9000)}, TypeScriptExtension: map[string]any{"runtime": "node"}}; !reflect.DeepEqual(got, want) {
+	if got, want := readProjectFile(t, root, "apps/api")["options"], map[string]any{TypeScriptExtension + ":test": map[string]any{"timeout": float64(9000), "types": false}, TypeScriptExtension: map[string]any{"runtime": "node"}}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("options = %v, want the runner removed", got)
 	}
 	// A former project loses the runner it was given.
@@ -1352,5 +1359,27 @@ func TestTheProbeAttributesEachEdgeToNx(t *testing.T) {
 	}
 	if edges == 0 {
 		t.Fatalf("projects = %+v, want the api's edge to pricing", result.Projects)
+	}
+}
+
+func TestAnImportedTargetDoesWhatItsTargetDid(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-task-does-what-its-script-did", "an-imported-target-does-what-its-target-did")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	// pricing is published and its main names a build output, which
+	// Putnami's Bun build would not write; its lint writes its fixes.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "main": "dist/index.js", "scripts": {"build": "bun build src/index.ts --outdir dist", "lint": "biome check --write ."}}`)
+	result := sync(t, root, SyncOptions{})
+	pricing := readProjectFile(t, root, "packages/pricing")
+	if got, want := pricing["disable"].(map[string]any)["jobs"], []any{"@putnami/nx:lint", "@putnami/typescript:build", "test"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing jobs = %v, want %v", got, want)
+	}
+	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool {
+		return u.Project == "@demo/pricing" && u.Target == "build" && strings.Contains(u.Reason, `names "dist/index.js", which the Bun build`) && strings.HasSuffix(u.Reason, "build keeps running through nx run")
+	}) {
+		t.Errorf("unmapped = %+v, want the build kept for its entry", result.Unmapped)
+	}
+	if got := pricing["options"]; got != nil {
+		t.Errorf("pricing options = %v, want none for a lint that writes", got)
 	}
 }

@@ -1196,3 +1196,19 @@ func TestLifecycleCommandsWaitForClientGenerate(t *testing.T) {
 		}
 	}
 }
+
+// TestTheTestTypeCheckRunsUnlessTypesIsOff checks that the test command's
+// types step is planned only while the types flag is on: an import turns it
+// off for a test script that type-checked nothing.
+func TestTheTestTypeCheckRunsUnlessTypesIsOff(t *testing.T) {
+	m := loadExtensionManifest(t)
+	flag, ok := m.Commands["test"].Flags["types"]
+	if !ok || flag.Type != "boolean" || flag.Default != true {
+		t.Fatalf("test types flag = %+v (present %v), want a boolean on by default", flag, ok)
+	}
+	for _, step := range m.Commands["test"].Run {
+		if step.ID == "types" && step.If != "params.types" {
+			t.Errorf("test types step if = %q, want params.types", step.If)
+		}
+	}
+}
