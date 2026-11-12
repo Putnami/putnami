@@ -203,6 +203,15 @@ func checkMachineOutputSanitized(v *validator, path string, value any) {
 	}
 }
 
+// IsMachineOutputLifecycle reports whether a record is a task's lifecycle: its
+// task:start or its task:end. Lifecycle records are always live and spend no
+// partition, so a consumer meets one task:start and one task:end per task
+// whatever the run size; the fixed budget bounds the detail between them. Their
+// count follows the plan the caller chose, not the output a tool wrote.
+func IsMachineOutputLifecycle(record SessionStreamRecord) bool {
+	return record.Record == RecordTaskStart || record.Record == RecordTaskEnd
+}
+
 // IsMachineOutputFailurePriority reports whether a record consumes the
 // dedicated protected reserve. It principally retains failure evidence; the
 // successful managed-publication handoff also uses it because that terminal
@@ -211,12 +220,10 @@ func checkMachineOutputSanitized(v *validator, path string, value any) {
 // supervisor acts on them however much ordinary output preceded them. Every
 // such record shares the one bounded reserve: once it is spent, a later one is
 // a failure elision.
-// Within each partition records keep arrival order. A test:case record is
-// never failure priority: the failed task's task:end already is.
+// Within each partition records keep arrival order. Only a task:event is ever
+// failure priority: a failed task's task:end is a lifecycle record, always
+// live, and a test:case record is debug detail.
 func IsMachineOutputFailurePriority(record SessionStreamRecord) bool {
-	if record.Record == RecordTaskEnd && record.Task != nil {
-		return record.Task.Status == TaskStatusFailed || record.Task.Status == TaskStatusCanceled
-	}
 	return record.Record == RecordTaskEvent && failurePriorityEvent(record.Event)
 }
 
@@ -232,12 +239,14 @@ func IsMachineOutputDebugDetail(record SessionStreamRecord) bool {
 	return record.Record == RecordTaskEvent && debugDetailEvent(record.Event)
 }
 
+// lifecycleRecord is IsMachineOutputLifecycle over a decoded record.
+func lifecycleRecord(root map[string]any) bool {
+	record, _ := childString(root, "record")
+	return record == RecordTaskStart || record == RecordTaskEnd
+}
+
 func failurePriorityRecord(root map[string]any) bool {
 	record, _ := childString(root, "record")
-	if record == RecordTaskEnd {
-		status, _ := childString(childObject(root, "task"), "status")
-		return status == TaskStatusFailed || status == TaskStatusCanceled
-	}
 	return record == RecordTaskEvent && failurePriorityEvent(childObject(root, "event"))
 }
 
@@ -335,7 +344,7 @@ type machineOutputLine struct {
 // ValidateSessionStream validates a complete bounded live JSONL sequence
 // against the complete sanitized events.jsonl session artifact. This is the
 // whole-sequence check a per-line JSON schema cannot express: total bytes and
-// records, mandatory final record, deterministic partition selection and exact
+// records outside the always-live task lifecycle, mandatory final record, deterministic partition selection and exact
 // split elision accounting.
 func ValidateSessionStream(live, artifact []byte) []Violation {
 	v := &validator{}
@@ -356,10 +365,19 @@ func ValidateSessionStream(live, artifact []byte) []Violation {
 	if !hasMode || !known {
 		return v.sorted()
 	}
-	if int64(len(live)) > budget.MaxBytes {
+	// The budget bounds every live record but a task's lifecycle, which is
+	// always live.
+	budgetedBytes, budgetedRecords := int64(len(live)), len(liveLines)
+	for _, line := range liveLines {
+		if lifecycleRecord(line.root) {
+			budgetedBytes -= int64(len(line.raw) + 1)
+			budgetedRecords--
+		}
+	}
+	if budgetedBytes > budget.MaxBytes {
 		v.add(ViolationBudgetExceeded, "stream.bytes")
 	}
-	if len(liveLines) > budget.MaxRecords {
+	if budgetedRecords > budget.MaxRecords {
 		v.add(ViolationBudgetExceeded, "stream.records")
 	}
 	if len(liveFinal.raw)+1 > int(budget.FinalReserveBytes) {
@@ -530,6 +548,10 @@ func selectMachineOutput(candidates []machineOutputLine, mode string, budget Mac
 	var ordinaryElided, failureElided MachineOutputElision
 	for _, candidate := range candidates {
 		size := int64(len(candidate.raw) + 1)
+		if lifecycleRecord(candidate.root) {
+			selected = append(selected, candidate)
+			continue
+		}
 		if failurePriorityRecord(candidate.root) {
 			if failureRecords > 0 && size <= failureBytes {
 				selected = append(selected, candidate)

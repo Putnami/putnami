@@ -3447,17 +3447,25 @@ function checkMachineOutputSanitized(v: Validator, path: string, value: unknown)
 }
 
 /**
+ * Reports whether a record is a task's lifecycle: its `task:start` or its
+ * `task:end`. Lifecycle records are always live and spend no partition, so a
+ * consumer meets one `task:start` and one `task:end` per task whatever the run
+ * size; the fixed budget bounds the detail between them.
+ */
+export function isMachineOutputLifecycle(record: SessionStreamRecord): boolean {
+  return record.record === STREAM_RECORD.taskStart || record.record === STREAM_RECORD.taskEnd;
+}
+
+/**
  * Reports whether a record consumes the protected failure/control-evidence
  * reserve. A workload's `ready` claim and a serve step's `process` event do,
  * because a supervisor acts on them however much ordinary output preceded
  * them. Every such record shares the one bounded reserve: once it is spent, a
- * later one is a failure elision. A `test:case` record never does: the failed
- * task's `task:end` already is.
+ * later one is a failure elision. Only a `task:event` is ever failure priority:
+ * a failed task's `task:end` is a lifecycle record, always live, and a
+ * `test:case` record is debug detail.
  */
 export function isMachineOutputFailurePriority(record: SessionStreamRecord): boolean {
-  if (record.record === STREAM_RECORD.taskEnd) {
-    return record.task?.status === TASK_STATUS.failed || record.task?.status === TASK_STATUS.canceled;
-  }
   return record.record === STREAM_RECORD.taskEvent && failurePriorityEvent(record.event);
 }
 
@@ -3472,13 +3480,14 @@ export function isMachineOutputDebugDetail(record: SessionStreamRecord): boolean
   return record.record === STREAM_RECORD.taskEvent && childString(record.event, 'level') === 'debug';
 }
 
-function failurePriorityRecord(root: JsonObject): boolean {
+/** {@link isMachineOutputLifecycle} over a decoded record. */
+function lifecycleRecord(root: JsonObject): boolean {
   const record = childString(root, 'record');
-  if (record === STREAM_RECORD.taskEnd) {
-    const status = childString(childObject(root, 'task'), 'status');
-    return status === TASK_STATUS.failed || status === TASK_STATUS.canceled;
-  }
-  return record === STREAM_RECORD.taskEvent && failurePriorityEvent(childObject(root, 'event'));
+  return record === STREAM_RECORD.taskStart || record === STREAM_RECORD.taskEnd;
+}
+
+function failurePriorityRecord(root: JsonObject): boolean {
+  return childString(root, 'record') === STREAM_RECORD.taskEvent && failurePriorityEvent(childObject(root, 'event'));
 }
 
 /**
@@ -3535,7 +3544,8 @@ interface MachineOutputLine {
 
 /**
  * Validates a bounded live JSONL sequence against the complete sanitized
- * `events.jsonl` session artifact, including total caps and exact elision.
+ * `events.jsonl` session artifact, including total caps outside the always-live
+ * task lifecycle and exact elision.
  */
 export function validateSessionStream(live: string, artifact: string): Violation[] {
   const v = new Validator();
@@ -3555,10 +3565,14 @@ export function validateSessionStream(live: string, artifact: string): Violation
     return v.sorted();
   }
   const budget = machineOutputBudgetFor(mode);
-  if (UTF8.encode(live).length > budget.maxBytes) {
+  // The budget bounds every live record but a task's lifecycle, which is
+  // always live.
+  const lifecycle = liveLines.filter((line) => lifecycleRecord(line.root));
+  const lifecycleBytes = lifecycle.reduce((total, line) => total + line.bytes, 0);
+  if (UTF8.encode(live).length - lifecycleBytes > budget.maxBytes) {
     v.add(VIOLATION_CODE.budgetExceeded, 'stream.bytes');
   }
-  if (liveLines.length > budget.maxRecords) {
+  if (liveLines.length - lifecycle.length > budget.maxRecords) {
     v.add(VIOLATION_CODE.budgetExceeded, 'stream.records');
   }
   if (liveFinal.bytes > budget.finalReserveBytes) {
@@ -3722,7 +3736,9 @@ function selectMachineOutput(
   const ordinaryElided = { records: 0, bytes: 0 };
   const failureElided = { records: 0, bytes: 0 };
   for (const candidate of candidates) {
-    if (failurePriorityRecord(candidate.root)) {
+    if (lifecycleRecord(candidate.root)) {
+      lines.push(candidate);
+    } else if (failurePriorityRecord(candidate.root)) {
       if (failureRecords > 0 && candidate.bytes <= failureBytes) {
         lines.push(candidate);
         failureRecords--;

@@ -47,9 +47,15 @@ func newMachineOutputState(mode string) machineOutputState {
 	}
 }
 
-// admit applies the contract's whole-record decision. size includes the one LF
-// written after the compact JSON object.
-func (s *machineOutputState) admit(failure, debugDetail bool, size int64) bool {
+// admit applies the contract's whole-record decision to record, whose
+// sanitized compact line is size bytes with its LF. A task's lifecycle is
+// always live and spends no partition.
+func (s *machineOutputState) admit(record protocolcli.SessionStreamRecord, size int64) bool {
+	if protocolcli.IsMachineOutputLifecycle(record) {
+		return true
+	}
+	failure := protocolcli.IsMachineOutputFailurePriority(record)
+	debugDetail := protocolcli.IsMachineOutputDebugDetail(record)
 	if failure {
 		if s.failureRecords > 0 && size <= s.failureBytes {
 			s.failureRecords--
@@ -416,11 +422,7 @@ func (r *sessionRecordingRenderer) record(records ...protocolcli.SessionStreamRe
 			}
 			continue
 		}
-		r.state.admit(
-			protocolcli.IsMachineOutputFailurePriority(sanitized),
-			protocolcli.IsMachineOutputDebugDetail(sanitized),
-			int64(len(line)+1),
-		)
+		r.state.admit(sanitized, int64(len(line)+1))
 		r.append(line)
 	}
 }

@@ -466,7 +466,10 @@ unverifiable reference.
 The live stream has fixed hard partitions: normal mode allows 1 MiB / 1024
 records with 256 KiB / 256 records reserved for failure evidence; `--verbose`
 allows 8 MiB / 8192 records with a 2 MiB / 2048-record failure reserve. Both
-reserve one 16 KiB terminal record. Normal mode suppresses debug-level task
+reserve one 16 KiB terminal record. Every task's `task:start` and `task:end`
+are always live, outside every partition: a run of any size streams one of each
+per task, and the budget bounds what the tasks emit between them. Normal mode
+suppresses debug-level task
 detail, including per-test success transcripts, while `--verbose` admits it
 under the larger budget. Records are sanitized, compacted, and then selected
 whole in arrival order; ordinary traffic cannot consume the failure reserve.

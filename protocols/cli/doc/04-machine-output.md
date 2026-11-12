@@ -15,7 +15,8 @@ sequence validation. Other producers conform only when they do the same.
 ## Fixed live budgets
 
 Every byte count is the UTF-8 length of compact JSON plus one LF per record. The
-total includes the mandatory final `session:end` record.
+total includes the mandatory final `session:end` record, and excludes the task
+lifecycle records described below.
 
 | Mode | Total | Failure reserve | Final reserve | Derived ordinary partition |
 |------|-------|-----------------|---------------|----------------------------|
@@ -26,6 +27,13 @@ These values are contract constants, not producer settings. `normal` excludes
 debug task detail from the live copy; `verbose` admits that detail under its
 larger fixed budget. Neither mode can change task selection,
 execution, cache behavior, task or run verdicts, or the process exit code.
+
+A task's lifecycle is always live: its `task:start` and its `task:end` are
+admitted before any partition, spend none, and are never elided, whatever their
+size or the task's status. A consumer meets one `task:start` and one `task:end`
+per task, however many tasks the run holds. Their count follows the plan the
+caller selected, not the output a tool wrote, so the fixed budget still bounds
+everything a task emits between the two.
 
 The three partitions are hard. Ordinary records cannot borrow unused failure
 capacity, and neither ordinary nor failure records can borrow the final reserve.
@@ -38,7 +46,6 @@ and admitted records retain arrival order.
 
 Failure priority is deliberately narrow and stable:
 
-- `task:end` whose status is `failed` or `canceled`;
 - `task:event` whose `level` is `error`;
 - a `diagnostic` event whose `severity` is `error`;
 - a `phase` event whose `status` is `failed`;
@@ -62,7 +69,7 @@ one is elided whole and counted in `machineOutput.elided.failure`, and the
 complete artifact still retains it.
 
 A `test:case` record is never failure priority, whatever its status. The failed
-task's `task:end` already takes the reserve.
+task's `task:end` is always live as a lifecycle record.
 
 Everything else consumes the ordinary partition.
 

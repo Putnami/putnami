@@ -5,6 +5,7 @@ import {
   derivedKey,
   isMachineOutputDebugDetail,
   isMachineOutputFailurePriority,
+  isMachineOutputLifecycle,
   MACHINE_OUTPUT_BUDGETS,
   MACHINE_OUTPUT_MODE,
   PREPARATION_PHASE,
@@ -192,12 +193,19 @@ describe('bounded machine-output helpers', () => {
           durationMs: 1,
         },
       });
-      expect(isMachineOutputFailurePriority(taskRecord(TASK_STATUS.failed))).toBe(true);
-      expect(isMachineOutputFailurePriority(taskRecord(TASK_STATUS.canceled))).toBe(true);
+      // A task's task:end is a lifecycle record, always live, whatever its
+      // status: it never spends the failure reserve.
+      expect(isMachineOutputFailurePriority(taskRecord(TASK_STATUS.failed))).toBe(false);
+      expect(isMachineOutputFailurePriority(taskRecord(TASK_STATUS.canceled))).toBe(false);
       expect(isMachineOutputFailurePriority(taskRecord(TASK_STATUS.success))).toBe(false);
+      expect(isMachineOutputLifecycle(taskRecord(TASK_STATUS.failed))).toBe(true);
+      expect(isMachineOutputLifecycle(taskRecord(TASK_STATUS.success))).toBe(true);
+      expect(
+        isMachineOutputLifecycle({ protocolVersion: 2, record: STREAM_RECORD.taskStart, time: 't', identity }),
+      ).toBe(true);
+      expect(isMachineOutputLifecycle(eventRecord({ level: 'error' }))).toBe(false);
 
-      // Every test case is debug detail, and none uses the failure reserve: the
-      // failed task's task:end already does.
+      // Every test case is debug detail, and none uses the failure reserve.
       const testCaseRecord = (status: TestCase['status']): SessionStreamRecord => ({
         protocolVersion: 2,
         record: STREAM_RECORD.testCase,
