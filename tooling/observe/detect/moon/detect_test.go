@@ -1,6 +1,8 @@
 package moon
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 )
@@ -157,5 +159,29 @@ func TestATaskCommandLineReadsItsScriptOrItsCommandAndArgs(t *testing.T) {
 		if !reflect.DeepEqual(p.Tasks, want[p.ID]) {
 			t.Errorf("%s tasks %+v, want %+v", p.ID, p.Tasks, want[p.ID])
 		}
+	}
+}
+
+func TestInfersTasksNamesTheSettingThatInfersTasksFromScripts(t *testing.T) {
+	for _, c := range []struct{ file, text, want string }{
+		{".moon/toolchains.yml", "javascript:\n  packageManager: 'pnpm'\n  inferTasksFromScripts: true\n", ".moon/toolchains.yml: javascript.inferTasksFromScripts"},
+		{".moon/toolchain.yml", "node:\n  inferTasksFromScripts: true\n", ".moon/toolchain.yml: node.inferTasksFromScripts"},
+		{".moon/toolchains.yml", "javascript:\n  inferTasksFromScripts: false\n", ""},
+		{".moon/toolchains.yml", "typescript:\n  inferTasksFromScripts: true\n", ""},
+		{".moon/toolchains.yml", "javascript: &anchor\n  inferTasksFromScripts: true\n", ""},
+	} {
+		root := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(root, ".moon"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, filepath.FromSlash(c.file)), []byte(c.text), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if got := InfersTasks(root); got != c.want {
+			t.Errorf("%s %q: InfersTasks = %q, want %q", c.file, c.text, got, c.want)
+		}
+	}
+	if got := InfersTasks(t.TempDir()); got != "" {
+		t.Errorf("no toolchain file: %q", got)
 	}
 }

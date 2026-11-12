@@ -22,10 +22,24 @@
       ]
     },
     {
+      "id": "inferred-tasks-are-read",
+      "text": [
+        "When the workspace infers tasks from package.json scripts (inferTasksFromScripts under javascript or node in .moon/toolchains.yml or .moon/toolchain.yml) and the root holds no moon-graph.json, the sync reads what moon project-graph --json prints, run with node_modules/.bin/moon, else the moon on PATH.",
+        "A moon that fails fails the sync and validate.",
+        "Without moon, the sync and validate warn with moon.tasks_inferred, naming the setting and the export command."
+      ]
+    },
+    {
       "id": "sync-writes-each-project",
       "text": [
         "The sync task writes in each moon project's putnami.json the tag moon, the extension the mode maps it to, the project IDs of the projects moon says it depends on, build, test or lint in disable.jobs when the project has no moon task named or tagged that way, and for a project moon runs the root files its tasks read (.moon configuration, .prototools, lockfile) as filePatterns.",
         "It keeps the members it does not own, retracts a former project, and lists each moon task it maps to no Putnami command."
+      ]
+    },
+    {
+      "id": "the-root-project-is-named",
+      "text": [
+        "The sync writes no putnami.json for a moon project at the workspace root, and warns with its id and the tasks that keep running through moon."
       ]
     },
     {

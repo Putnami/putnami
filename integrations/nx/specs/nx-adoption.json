@@ -32,6 +32,14 @@
       ]
     },
     {
+      "id": "sync-reads-the-graph-nx-resolves",
+      "text": [
+        "The sync reads graph.json at the workspace root when present, else the graph the repository's Nx resolves: it runs node_modules/.bin/nx graph --file=<temporary file> at the root, so it reads the edges Nx infers from imports and the targets its plugins infer.",
+        "An nx graph that fails or writes no graph export fails the sync and validate, and writes nothing.",
+        "Without either, it reads nx.json and the project files, and the sync and validate warn with nx.graph_static that this read misses what Nx infers."
+      ]
+    },
+    {
       "id": "import-maps-typescript-targets",
       "text": [
         "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, and its build, test and lint targets that run only what that extension runs (bun build or tsc, see import-maps-a-tsc-build-target;",
@@ -68,7 +76,8 @@
       "id": "unmapped-targets-are-listed",
       "text": [
         "The sync writes nothing it cannot map.",
-        "It lists each target it maps to no Putnami task, such as serve or e2e, and in import mode each build, test or lint target that keeps running through Nx, with the project, the target and the reason, and each such target keeps running through nx run."
+        "It lists each target it maps to no Putnami task, such as serve or e2e, and in import mode each build, test or lint target that keeps running through Nx, with the project, the target and the reason, and each such target keeps running through nx run.",
+        "The sync job prints one line per target name that no Putnami task runs on several projects, with their count and first three names, and its data still lists each project and target."
       ]
     },
     {

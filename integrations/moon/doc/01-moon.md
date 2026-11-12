@@ -93,7 +93,15 @@ a Rust one, is still reported as a declaration.
 
 The extension reads `moon-graph.json` at the root when the CI wrote it
 (`moon project-graph --json > moon-graph.json`), else `.moon/workspace.yml`
-and each project's `moon.yml`. A project's tasks are the export's, or its
+and each project's `moon.yml`.
+
+A workspace that infers tasks from `package.json` scripts
+(`inferTasksFromScripts` under `javascript` in `.moon/toolchains.yml`, or under
+`node` in `.moon/toolchain.yml`) states those tasks nowhere but in moon. With
+no `moon-graph.json`, the sync then runs `moon project-graph --json` at the
+root, with `node_modules/.bin/moon`, else the `moon` on `PATH`, and reads the
+tasks moon lists. A moon that fails fails the sync and `validate`. Without
+moon, the sync and `validate` warn with `moon.tasks_inferred`. A project's tasks are the export's, or its
 `moon.yml` tasks over the ones it inherits from `.moon/tasks.yml` and
 `.moon/tasks/*.yml`: by file name (`node`, `<language>`, `<stack>`,
 `<language>-<layer>`, `tag-<tag>`) or by `inheritedBy`, after its
@@ -111,6 +119,11 @@ joins once the sync has written its `putnami.json`.
 `lint`, `test` or `build`, else the first one, by name, tagged that way. A
 project with no such task has that command in `disable.jobs`. Every other
 task is listed by the sync and keeps running through moon.
+
+A moon project at the workspace root, such as moon's `root`, becomes no
+Putnami project: a project there would own every file no deeper project
+claims. The sync names it and the tasks that keep running through
+`moon run root:<task>`.
 
 ## What the sync writes
 

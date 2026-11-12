@@ -111,9 +111,14 @@ type Change struct {
 type SyncResult struct {
 	// Mode is the mode the sync applied.
 	Mode string
-	// Source names where the graph came from: the graph export, or nx.json.
-	// Empty when the root is no Nx workspace.
+	// Source names where the graph came from: the graph export, the graph
+	// the repository's Nx resolved (nx graph), or nx.json. Empty when the
+	// root is no Nx workspace.
 	Source string
+	// Warnings say what the sync could not read, each an nx.graph_static
+	// warning: a read of nx.json and the project files misses what Nx
+	// infers.
+	Warnings []string
 	// Written are the workspace-relative putnami.json files the sync created
 	// or changed, or would in a dry run, sorted.
 	Written []string
@@ -148,7 +153,6 @@ type SyncResult struct {
 // does not run through the extension that owns it. A root with neither
 // nx.json nor the graph export is no Nx workspace and gets an empty result.
 func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error) {
-	_ = ctx
 	var result SyncResult
 	if !exists(root, "nx.json") && !exists(root, detect.DefaultGraphFile) {
 		return result, nil
@@ -158,15 +162,20 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 		return result, err
 	}
 	result.Mode = mode
-	detection := detect.Detect(root, detect.Options{})
-	result.Source = "nx.json"
+	graph, err := resolveGraph(ctx, root)
+	if err != nil {
+		return SyncResult{}, err
+	}
+	defer graph.cleanup()
+	detection := detect.Detect(root, graph.options)
+	result.Source = graph.source
 	for _, d := range detection.Diagnostics {
 		if d.Code == detect.CodeGraphUnreadable || d.Code == detect.CodeManifestUnreadable {
-			return SyncResult{}, fmt.Errorf("the Nx configuration cannot be read, so no edge is written: %s", d.Message)
+			return SyncResult{}, fmt.Errorf("the Nx project graph of %s cannot be read, so no edge is written: %s", graph.source, d.Message)
 		}
 	}
-	if len(detection.Projects) > 0 && detection.Projects[0].FromGraph {
-		result.Source = detect.DefaultGraphFile
+	if graph.static {
+		result.Warnings = append(result.Warnings, staticWarning)
 	}
 	current := map[string]bool{}
 	for _, p := range detection.Projects {
@@ -402,8 +411,7 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 	for _, t := range p.Targets {
 		targets[t.Name] = t
 		if !slices.Contains(lifecycleTasks, t.Name) {
-			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: t.Name,
-				Reason: fmt.Sprintf("no Putnami task runs it: run nx run %s:%s", p.Name, t.Name)})
+			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: t.Name, Reason: unrunReason(p.Name, t.Name)})
 		}
 	}
 	isTS := mode == ModeImport && typeScript && isTypeScriptProject(root, p.Path)
@@ -1236,8 +1244,9 @@ func stringsParam(params pctx.Params, key string) ([]string, error) {
 // shows them.
 func report(emit *jsonl.Emitter, result SyncResult, dry bool) {
 	emit.Info(syncSummary(result, dry))
-	for _, u := range result.Unmapped {
-		emit.DiagnosticWithCode("warning", fmt.Sprintf("%s:%s %s", u.Project, u.Target, u.Reason), "", 0, 0, CodeUnmapped)
+	reportWarnings(emit, result)
+	for _, line := range unmappedLines(result.Unmapped) {
+		emit.DiagnosticWithCode("warning", line, "", 0, 0, CodeUnmapped)
 	}
 	reportUnmatched(emit, result)
 	for _, note := range result.Conventions {
@@ -1249,6 +1258,54 @@ func report(emit *jsonl.Emitter, result SyncResult, dry bool) {
 	for _, c := range result.Changes {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("%s would change (%s mode):\n%s", c.File, result.Mode, strings.TrimSuffix(Diff(c.File, c.Before, c.After), "\n")), c.File, 0, 0, CodeSyncPreview)
 	}
+}
+
+// reportWarnings warns of what the sync could not read.
+func reportWarnings(emit *jsonl.Emitter, result SyncResult) {
+	for _, warning := range result.Warnings {
+		emit.DiagnosticWithCode("warning", warning, "", 0, 0, CodeGraphStatic)
+	}
+}
+
+// unmappedLines words the unmapped targets: a target name no Putnami task
+// runs is one line for every project that has it, and every other target a
+// line of its own, with its project and reason.
+func unmappedLines(unmapped []Unmapped) []string {
+	projects := map[string][]string{}
+	var names []string
+	for _, u := range unmapped {
+		if u.Reason != unrunReason(u.Project, u.Target) {
+			continue
+		}
+		if projects[u.Target] == nil {
+			names = append(names, u.Target)
+		}
+		projects[u.Target] = append(projects[u.Target], u.Project)
+	}
+	var lines []string
+	for _, u := range unmapped {
+		if list := projects[u.Target]; u.Reason != unrunReason(u.Project, u.Target) || len(list) == 1 {
+			lines = append(lines, fmt.Sprintf("%s:%s %s", u.Project, u.Target, u.Reason))
+		}
+	}
+	for _, name := range names {
+		list := projects[name]
+		if len(list) == 1 {
+			continue
+		}
+		slices.Sort(list)
+		shown := strings.Join(list, ", ")
+		if len(list) > 3 {
+			shown = fmt.Sprintf("%s and %d more", strings.Join(list[:3], ", "), len(list)-3)
+		}
+		lines = append(lines, fmt.Sprintf("target %s of %d projects (%s): %s", name, len(list), shown, unrunReason("<project>", name)))
+	}
+	return lines
+}
+
+// unrunReason is the reason of a target no Putnami task runs.
+func unrunReason(project, target string) string {
+	return fmt.Sprintf("no Putnami task runs it: run nx run %s:%s", project, target)
 }
 
 // reportUnmatched warns of each entry of the import list that selects no
@@ -1285,6 +1342,7 @@ func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, CodeSyncFailed)
 		return "FAILED", nil, errors.New(CodeSyncFailed)
 	}
+	reportWarnings(emit, result)
 	reportUnmatched(emit, result)
 	stale := append(slices.Clone(result.Written), result.Retracted...)
 	if len(stale) == 0 {
