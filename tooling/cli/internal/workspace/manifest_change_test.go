@@ -107,9 +107,9 @@ func selectManifestWorkspace(t *testing.T, root string) ImpactedSelection {
 		{ID: "/apps/web", Name: "web", Path: "apps/web", Extensions: []string{"/go/extension"}},
 	})
 	index := NewTaskIndex(ws, []*extension.ExtensionDescription{description}, nil)
-	selection, err := ImpactedSelectionForBaselineWithTasks(ws, "main", index)
+	selection, err := ImpactedSelectionWithOptions(ws, "main", ImpactedSelectionOptions{Tasks: index})
 	if err != nil {
-		t.Fatalf("ImpactedSelectionForBaselineWithTasks: %v", err)
+		t.Fatalf("ImpactedSelectionWithOptions: %v", err)
 	}
 	return selection
 }

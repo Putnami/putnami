@@ -402,6 +402,7 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 		}
 		iox.Fprintf(os.Stdout, "  ✓ %s updated\n", wsproto.WorkspaceConfigFilename)
 	}
+	writeInitGitignore(wsRoot)
 	cfg = wsproto.Load(wsRoot)
 	for _, e := range missing {
 		if err := installExtension(ctx, wsRoot, cfg, []string{shared.ChannelArtifact(e, env.channel)}, ""); err != nil {

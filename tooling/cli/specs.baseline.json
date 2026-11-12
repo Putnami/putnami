@@ -305,6 +305,7 @@
     "cli/workspace-discovery-selection#declared-edge-check",
     "cli/workspace-discovery-selection#explicit-baseline",
     "cli/workspace-discovery-selection#impacted-closure",
+    "cli/workspace-discovery-selection#impacted-ignores-own-writes",
     "cli/workspace-discovery-selection#import-visibility-check",
     "cli/workspace-discovery-selection#project-inventory",
     "cli/workspace-discovery-selection#registries-keyed-by-ecosystem",

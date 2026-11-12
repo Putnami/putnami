@@ -83,8 +83,10 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 		// (ADR 0044). A run that loaded none keeps the project-level mapping.
 		// The run's resolver answers the input selectors of the changed
 		// projects; a nil resolver's matcher selects every path.
-		selection, err := workspace.ImpactedSelectionForBaselineWithTasks(
-			ws, req.Global.Baseline, workspace.NewTaskIndex(ws, extensions, req.inputResolver.Matcher()))
+		selection, err := workspace.ImpactedSelectionWithOptions(ws, req.Global.Baseline, workspace.ImpactedSelectionOptions{
+			Tasks:    workspace.NewTaskIndex(ws, extensions, req.inputResolver.Matcher()),
+			RunStart: req.runStart,
+		})
 		switch {
 		case err != nil && impactedFailureEndsRun(req, ws.Root, err):
 			return nil, ExitError
@@ -119,7 +121,13 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 			// which keeps a task-scoped project's jobs of the changed
 			// extensions and drops the rest.
 			req.selectionEvidence.taskScopes = selection.TaskScopes()
-			for _, note := range []string{selection.BaselineExplanation(), selection.UnownedRootFilesExplanation()} {
+			// The base line itself is a statement, not a diagnostic: only a
+			// fallback tier's warning joins the diagnostics.
+			notes := []string{selection.UnownedRootFilesExplanation(), selection.RunWrittenFilesExplanation()}
+			if selection.BaselineIsFallback() {
+				notes = append([]string{selection.BaselineExplanation()}, notes...)
+			}
+			for _, note := range notes {
 				if note != "" {
 					req.selectionEvidence.diagnostics = append(req.selectionEvidence.diagnostics, note)
 				}
@@ -134,6 +142,9 @@ func selectProjects(req *Request, ws *workspace.Workspace, extensions ...*extens
 					iox.Fprintln(req.stdout(), note)
 				}
 				if note := selection.UnownedRootFilesExplanation(); note != "" {
+					iox.Fprintln(req.stdout(), note)
+				}
+				if note := selection.RunWrittenFilesExplanation(); note != "" {
 					iox.Fprintln(req.stdout(), note)
 				}
 				// The other direction — a selection that is too LARGE — is

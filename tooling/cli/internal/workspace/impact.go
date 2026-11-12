@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -60,6 +61,12 @@ type ImpactedSelection struct {
 	// per-project watchedFiles answer — sorted, deduplicated. They contributed
 	// nothing to Projects.
 	UnownedRootFiles []string
+	// RunWrittenFiles are the uncommitted paths this process wrote before the
+	// selection — clean or absent when the run started, and changed by no
+	// commit since the base: a lockfile the first-use install wrote, for
+	// example. They are not in ChangedFiles and select nothing. Nil when the
+	// run recorded no tree state at its start (ImpactedSelectionOptions).
+	RunWrittenFiles []string
 	// Trace explains every entry of Projects: which changed file claimed each
 	// directly affected project and how, which edge reached each propagated
 	// one, and which of them run a subset of their tasks (Trace.Scopes). It is
@@ -122,20 +129,88 @@ func (s ImpactedSelection) UnownedRootFilesExplanation() string {
 	return line + " changed at the workspace root and belong to no project — they select nothing on their own."
 }
 
-// BaselineExplanation renders the resolution tier as one line for a human
-// notice stream, or "" when the resolved baseline needs no account. Only the
-// fallback tiers speak: a local trunk can be stale relative to the remote, and
-// an upstream tracking ref is the earlier default that made --impacted
-// select nothing on pushed branches — a caller that lands there should see it.
+// RunWrittenFilesExplanation renders RunWrittenFiles as one line for a human
+// notice stream, or "" when the run wrote nothing the diff would have counted.
+func (s ImpactedSelection) RunWrittenFilesExplanation() string {
+	if len(s.RunWrittenFiles) == 0 {
+		return ""
+	}
+	shown, extra := s.RunWrittenFiles, 0
+	if len(shown) > unownedRootFilesShown {
+		shown, extra = shown[:unownedRootFilesShown], len(shown)-unownedRootFilesShown
+	}
+	line := "  --impacted: " + strings.Join(shown, ", ")
+	if extra > 0 {
+		line += fmt.Sprintf(" (+%d more)", extra)
+	}
+	return line + " changed during this run, before the selection — not counted as a change."
+}
+
+// BaselineExplanation renders the ref the diff measured against, and the tier
+// that chose it, as one line for a human notice stream, or "" when no baseline
+// resolved. Every --impacted run prints it, a dry run included: the same
+// change selects a handful of projects against HEAD~1 and the whole workspace
+// against a trunk the branch has not been compared with yet, and the count
+// alone does not say which one happened. The fallback tiers say more: a local
+// trunk can be stale relative to the remote, and an upstream tracking ref is
+// the earlier default that made --impacted select nothing on pushed branches.
 func (s ImpactedSelection) BaselineExplanation() string {
+	if s.Baseline == "" {
+		return ""
+	}
 	switch s.BaselineSource {
 	case git.BaselineSourceLocalTrunk:
 		return "  --impacted: baseline resolved to local '" + s.Baseline + "' — no origin/HEAD or origin/main ref exists; a stale local trunk under-selects."
 	case git.BaselineSourceUpstream:
 		return "  --impacted: baseline resolved to the upstream tracking ref '" + s.Baseline + "' — no trunk ref exists. Set the workspace config baseline (or epicBranches) if this ref is not the merge target."
-	default:
-		return ""
 	}
+	at := ""
+	if len(s.DiffBase) >= 7 && s.DiffBase != s.Baseline {
+		at = " at " + s.DiffBase[:7]
+	}
+	return "  --impacted: diffs against " + s.Baseline + at + " (" + baselineOrigin(s.BaselineSource) + ")."
+}
+
+// BaselineIsFallback reports whether the baseline came from a fallback tier,
+// whose explanation is a warning rather than a statement of the base.
+func (s ImpactedSelection) BaselineIsFallback() bool {
+	return s.BaselineSource == git.BaselineSourceLocalTrunk || s.BaselineSource == git.BaselineSourceUpstream
+}
+
+// baselineOrigin names where a non-fallback baseline came from.
+func baselineOrigin(source git.BaselineSource) string {
+	switch source {
+	case git.BaselineSourceExplicit:
+		return "from --baseline"
+	case git.BaselineSourceConfig:
+		return "from the workspace config baseline"
+	case git.BaselineSourceEpic:
+		return "the nearest configured epic branch"
+	case git.BaselineSourceTrunk:
+		return "the remote trunk, by default; --baseline sets another ref"
+	default:
+		return string(source)
+	}
+}
+
+// putnamiWrittenDirs are the directory names, at any depth, whose contents a
+// Putnami run writes: `.gen` (generated output and the build stamp
+// .gen/version.json) and `.putnami` (sessions, caches and command output).
+// The init .gitignore lists both, but an adopted repository keeps its own
+// .gitignore, and nothing under them is ever a change an operator made.
+var putnamiWrittenDirs = map[string]bool{".gen": true, ".putnami": true}
+
+// PutnamiWrittenPath reports whether the workspace-relative path sits under a
+// directory a Putnami run writes. --impacted leaves such paths out of the diff
+// whether or not .gitignore lists them.
+func PutnamiWrittenPath(rel string) bool {
+	segments := strings.Split(filepath.ToSlash(rel), "/")
+	for _, segment := range segments[:len(segments)-1] {
+		if putnamiWrittenDirs[segment] {
+			return true
+		}
+	}
+	return false
 }
 
 // TraceExplanation renders Trace as lines for a human notice stream, or nothing
@@ -236,6 +311,7 @@ type ImpactTraceRecord struct {
 	ChangedFiles     []string           `json:"changedFiles"`
 	UncommittedFiles []string           `json:"uncommittedFiles,omitempty"`
 	UnownedRootFiles []string           `json:"unownedRootFiles,omitempty"`
+	RunWrittenFiles  []string           `json:"runWrittenFiles,omitempty"`
 	Seeds            []ImpactTraceSeed  `json:"seeds"`
 	Edges            []ImpactTraceEdge  `json:"edges"`
 	Scopes           []ImpactTraceScope `json:"scopes"`
@@ -262,6 +338,7 @@ func (s ImpactedSelection) TraceRecord() ImpactTraceRecord {
 		ChangedFiles:     append([]string{}, s.ChangedFiles...),
 		UncommittedFiles: s.UncommittedFiles,
 		UnownedRootFiles: s.UnownedRootFiles,
+		RunWrittenFiles:  s.RunWrittenFiles,
 		Seeds:            make([]ImpactTraceSeed, 0, len(s.Trace.Seeds)),
 		Edges:            make([]ImpactTraceEdge, 0, len(s.Trace.Edges)),
 		Scopes:           make([]ImpactTraceScope, 0, len(s.Trace.Scopes)),
@@ -439,19 +516,34 @@ func (s ImpactedSelection) orderedSeeds() []orderedSeed {
 // it. It is what ImpactedProjectsWithBaseline is built from, and the surface a
 // caller reaches for when "nothing was selected" needs a reason.
 func ImpactedSelectionForBaseline(ws *Workspace, baseline string) (ImpactedSelection, error) {
-	return ImpactedSelectionForBaselineWithTasks(ws, baseline, nil)
+	return ImpactedSelectionWithOptions(ws, baseline, ImpactedSelectionOptions{})
 }
 
-// ImpactedSelectionForBaselineWithTasks is ImpactedSelectionForBaseline
-// resolved onto tasks: each changed file selects the tasks that read it, and
-// propagation carries tasks instead of whole projects (ADR 0044). A nil index
-// keeps the project-level mapping, which is what a caller that could not load
-// the workspace's extensions gets.
-func ImpactedSelectionForBaselineWithTasks(
+// ImpactedSelectionOptions refine one --impacted computation.
+type ImpactedSelectionOptions struct {
+	// Tasks resolves the selection onto tasks: each changed file selects the
+	// tasks that read it, and propagation carries tasks instead of whole
+	// projects (ADR 0044). Nil keeps the project-level mapping, which is what a
+	// caller that could not load the workspace's extensions gets.
+	Tasks TaskImpactIndex
+	// RunStart is the tree state the process recorded before it wrote anything
+	// (git.UncommittedPaths). An uncommitted path that was not uncommitted
+	// then, and that no commit since the base changed, was written by this run
+	// and is left out of the diff (ImpactedSelection.RunWrittenFiles). Nil when
+	// nothing was recorded: every uncommitted path then counts.
+	RunStart []string
+}
+
+// ImpactedSelectionWithOptions is ImpactedSelectionForBaseline refined by
+// opts. The diff leaves out the paths Putnami writes (PutnamiWrittenPath) and
+// the paths this run wrote (ImpactedSelectionOptions.RunStart) before any of
+// it reaches the mapping.
+func ImpactedSelectionWithOptions(
 	ws *Workspace,
 	baseline string,
-	tasks TaskImpactIndex,
+	opts ImpactedSelectionOptions,
 ) (ImpactedSelection, error) {
+	tasks := opts.Tasks
 	resolved, err := ResolveImpactedBaselineDetailed(ws, baseline)
 	if err != nil {
 		return ImpactedSelection{}, err
@@ -461,11 +553,13 @@ func ImpactedSelectionForBaselineWithTasks(
 	if err != nil {
 		return ImpactedSelection{Baseline: resolved.Ref, BaselineSource: resolved.Source}, err
 	}
+	runWritten := excludeRunWrittenPaths(ws.Root, &diff, opts.RunStart)
 
 	if len(diff.Files) == 0 {
-		return ImpactedSelection{Baseline: resolved.Ref, BaselineSource: resolved.Source, DiffBase: diff.Base}, nil
+		return ImpactedSelection{
+			Baseline: resolved.Ref, BaselineSource: resolved.Source, DiffBase: diff.Base, RunWrittenFiles: runWritten,
+		}, nil
 	}
-
 	// A change to an extension's manifest is measured against the manifest the
 	// diff's base records (TaskImpactIndex.TasksOfManifestChange).
 	tasks = WithManifestBaseline(tasks, func(path string) ([]byte, bool) {
@@ -491,8 +585,58 @@ func ImpactedSelectionForBaselineWithTasks(
 		ChangedFiles:     diff.Files,
 		UncommittedFiles: diff.Uncommitted,
 		UnownedRootFiles: impact.UnownedRootFiles,
+		RunWrittenFiles:  runWritten,
 		Trace:            impact.Trace,
 	}, nil
+}
+
+// excludeRunWrittenPaths removes from diff the paths Putnami writes and the
+// uncommitted paths this run wrote since runStart, and returns the second set,
+// sorted. A path the run rewrote that a commit since the base also changed
+// stays: the commit is a change on its own.
+func excludeRunWrittenPaths(root string, diff *git.WorkingTreeDiff, runStart []string) []string {
+	var candidates map[string]bool
+	if runStart != nil {
+		before := make(map[string]bool, len(runStart))
+		for _, path := range runStart {
+			before[path] = true
+		}
+		for _, path := range diff.Uncommitted {
+			if !before[path] && !PutnamiWrittenPath(path) {
+				if candidates == nil {
+					candidates = make(map[string]bool)
+				}
+				candidates[path] = true
+			}
+		}
+	}
+	if len(candidates) > 0 {
+		// The committed side of the diff keeps a candidate: only a path no
+		// commit since the base changed is the run's alone. When git cannot
+		// say, every candidate stays.
+		committed, err := git.DiffCommitFiles(root, diff.Base, "HEAD")
+		if err != nil {
+			candidates = nil
+		}
+		for _, path := range committed {
+			delete(candidates, path)
+		}
+	}
+	keep := func(path string) bool { return !PutnamiWrittenPath(path) && !candidates[path] }
+	diff.Files = slices.DeleteFunc(diff.Files, func(path string) bool { return !keep(path) })
+	diff.Uncommitted = slices.DeleteFunc(diff.Uncommitted, func(path string) bool { return !keep(path) })
+	if len(diff.Uncommitted) == 0 {
+		diff.Uncommitted = nil
+	}
+	if len(candidates) == 0 {
+		return nil
+	}
+	written := make([]string, 0, len(candidates))
+	for path := range candidates {
+		written = append(written, path)
+	}
+	sort.Strings(written)
+	return written
 }
 
 // ResolveImpactedBaselineDetailed applies Putnami's --impacted baseline
@@ -505,12 +649,18 @@ func ResolveImpactedBaselineDetailed(ws *Workspace, explicit string) (git.Resolv
 		return git.ResolvedBaseline{}, fmt.Errorf("workspace is nil")
 	}
 	baseline := strings.TrimSpace(explicit)
+	fromConfig := false
 	var epicBranches []string
 	if ws.Config != nil {
 		if baseline == "" {
-			baseline = ws.Config.Baseline
+			baseline = strings.TrimSpace(ws.Config.Baseline)
+			fromConfig = baseline != ""
 		}
 		epicBranches = ws.Config.EpicBranches
 	}
-	return git.ResolveBaselineDetailed(ws.Root, baseline, epicBranches)
+	resolved, err := git.ResolveBaselineDetailed(ws.Root, baseline, epicBranches)
+	if err == nil && fromConfig {
+		resolved.Source = git.BaselineSourceConfig
+	}
+	return resolved, err
 }
