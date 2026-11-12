@@ -52,7 +52,7 @@ func (f workspaceFiles) List(prefix string) ([]string, error) {
 		if mode, found := f.tree.Lstat(clean); found && !mode.IsDir() {
 			paths = append(paths, clean)
 		}
-		return append(paths, f.candidatesBelow(clean, nil)...), nil
+		return append(paths, f.candidatesBelow(clean)...), nil
 	}
 	base := filepath.Join(f.root, filepath.FromSlash(clean))
 	var paths []string
@@ -89,10 +89,9 @@ func (f workspaceFiles) isRegularFile(rel string) bool {
 }
 
 // candidatesBelow lists, in sorted order, the candidates strictly below the
-// slash directory dir ("." is the root) that no directory skip names holds.
-// skip is asked about the directories between dir and the file, never about
-// dir itself. It reads the cut and must not be called without one.
-func (f workspaceFiles) candidatesBelow(dir string, skip func(name string) bool) []string {
+// slash directory dir ("." is the root). It reads the cut and must not be
+// called without one.
+func (f workspaceFiles) candidatesBelow(dir string) []string {
 	paths := f.tree.Paths()
 	start, prefix := 0, ""
 	if dir != "." {
@@ -103,9 +102,6 @@ func (f workspaceFiles) candidatesBelow(dir string, skip func(name string) bool)
 	for _, rel := range paths[start:] {
 		if !strings.HasPrefix(rel, prefix) {
 			break
-		}
-		if skip != nil && skipsADirectory(rel[len(prefix):], skip) {
-			continue
 		}
 		below = append(below, rel)
 	}
@@ -136,14 +132,6 @@ type workspaceView struct {
 // members returns the member project paths, or why no membership is known.
 func (v workspaceView) members() ([]string, error) {
 	return v.projects, v.membershipErr
-}
-
-// indexedView reads the disk and finds the members in the project index a
-// Putnami run records under .putnami. It is the view of sync and adopt, which
-// read what the session's builds wrote.
-func indexedView(workspaceRoot string) workspaceView {
-	projects, err := indexedProjectPaths(workspaceRoot)
-	return workspaceView{workspaceFiles: workspaceFiles{root: workspaceRoot}, projects: projects, membershipErr: err}
 }
 
 // committedView is the check's view: the candidate cut of the workspace when

@@ -26,12 +26,14 @@ Start a delivery plan from the recipe whose intention matches the request, and n
 - Since: `0.0.0-20260917065345-3cc91b658`
 - Primitives:
   - `@putnami/application: openapi()`
-  - `@putnami/client/generator: clientGenerator({ packageName, targets })`
-  - `putnami clientgen`
+  - `@putnami/client/generator: clientGenerator(), with the contract committed at schema/openapi.json`
+  - `client project putnami.json: generatedFrom { service, language: "ts" }; the package name comes from the client's package.json`
+  - `putnami client-generate, or any build, test or lint of the client project`
   - `@putnami/client: BaseClient (the generated classes extend it)`
 - Replaces:
   - A fetch wrapper with request and response types copied by hand
   - An edit inside a generated clients/ tree instead of a regeneration
+  - A generated client file committed to Git instead of ignored and built
   - A base URL, header or retry interceptor written in the consumer
 
 ### Run tests against a real database
@@ -110,12 +112,14 @@ Start a delivery plan from the recipe whose intention matches the request, and n
 - Since: `0.0.0-20260917065345-3cc91b658`
 - Primitives:
   - `go.putnami.dev/openapi: NewPlugin(...).From(apiPlugin)`
-  - `go.putnami.dev/api: Clients(api.ClientsOptions{Targets})`
-  - `putnami clientgen`
+  - `go.putnami.dev/api: Clients(api.ClientsOptions{}).From(apiPlugin), with the contract committed at schema/openapi.json`
+  - `client project putnami.json: generatedFrom { service, language: "go", packageName, clientName, omitOperations }`
+  - `putnami client-generate, or any build, test or lint of the client project`
   - `generated client: RegisterItemsClient(module) with go.putnami.dev/client: Services()`
 - Replaces:
   - A net/http wrapper with request and response structs copied by hand
   - An edit inside a generated clients/ tree instead of a regeneration
+  - A generated client file committed to Git instead of ignored and built
   - A base URL, header or retry loop written in the consumer
 
 ### Run tests against a real database

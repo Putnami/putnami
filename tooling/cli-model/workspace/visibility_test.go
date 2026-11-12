@@ -179,10 +179,10 @@ func TestVisibilityViolationsKeepsAGeneratedClientThatDeclaresScope(t *testing.T
 	}
 }
 
-func TestVisibilityViolationsOpensNothingForAClientManifestNoProviderBacks(t *testing.T) {
+func TestVisibilityViolationsOpensNothingForAClientNoProviderBacks(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-model", "import-visibility", "a-cross-scope-import-of-a-scope-private-project-is-reported")
 	if got := VisibilityViolations(clientWorkspace("", false)); len(got) != 1 {
-		t.Fatalf("violations = %v, want the import refused: no provider backs the manifest", got)
+		t.Fatalf("violations = %v, want the import refused: no provider backs the client", got)
 	}
 }
 

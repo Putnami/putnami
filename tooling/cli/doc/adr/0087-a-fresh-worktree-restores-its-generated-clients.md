@@ -44,13 +44,22 @@ conventional type decides the bump.
 **5. The first-run pass restores clients.** After the implicit install, the
 first-run pass runs `client-generate` for every project that declares it, as an
 ordinary cached engine run: a hit restores, a miss renders. It runs once per
-fresh worktree, like the install it follows.
+fresh worktree, like the install it follows. A project declares
+`client-generate` when its `putnami.json` names a provider in `generatedFrom`,
+or when it holds a `clientgen.json`: the projects where the command plans a
+step. The pass skips `client-generate` itself, which does the same work, and a
+hosted run, whose gate plans the clients its builds need and reads a remote
+cache this second run would miss.
 
 **6. `install` writes a core SessionStart hook.** When the workspace declares a
 generated client, `install`, `init` and `upgrade` write a SessionStart handler
 that runs `putnamiw client-generate`. The core owns it: no extension declares
 it and no collaboration binding gates it. It keeps auto-install on, so the
-first-run pass runs too. It is removed when the workspace declares no client.
+first-run pass runs too. It runs `client-generate --all`, so the selection
+does not depend on the directory the host starts it in, and sends its output
+to stderr, because a host adds a SessionStart hook's stdout to the agent's
+context. It is removed when the workspace declares no client. A workspace that
+does not load keeps the hook as it is.
 Other rules of ADR 0081 hold: only those three commands write the hook files,
 and they keep every entry they did not write.
 

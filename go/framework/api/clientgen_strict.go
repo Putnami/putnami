@@ -1081,9 +1081,9 @@ func lowerFirst(value string) string {
 }
 
 // strictMethodSymbols is the single source of the Go symbol every first-party
-// operation gets, keyed by operationId. The emitter and the generated ownership
-// manifest both call it on the same post-omission contract, so the two can
-// never disagree (ADR 0003).
+// operation gets, keyed by operationId. The emitter calls it once on the
+// post-omission contract, so every generated method takes its symbol from one
+// derivation (ADR 0003).
 //
 // Each operation starts from strictMethodSymbol. That derivation drops path
 // parameters, so routes that differ only by one — GET /x/{a}/deploy and

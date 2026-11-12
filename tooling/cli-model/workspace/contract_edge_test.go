@@ -37,8 +37,8 @@ func contractWorkspace(contractDigest string) *Workspace {
 const contractEdgeDigest = "1111111111111111111111111111111111111111111111111111111111111111"
 
 // TestBuildGraph_ContractEdgeResolvesServiceToProvider pins the derivation
-// rule: a project's committed client manifest names a service, and the provider
-// is the project whose committed contract declares that same service.
+// rule: a project's `generatedFrom` names a service, and the provider is the
+// project whose committed contract declares that same service.
 func TestBuildGraph_ContractEdgeResolvesServiceToProvider(t *testing.T) {
 	g := contractWorkspace(contractEdgeDigest).Graph
 
@@ -273,16 +273,16 @@ func TestMetadataDigest_ContractIsTheClientsProviderSideIdentity(t *testing.T) {
 	}
 }
 
-// TestMetadataDigest_NoClientManifestFoldsNothing pins that a project with no
-// committed client manifest keeps the identity it had. The fold is guarded on
+// TestMetadataDigest_NoGeneratedFromFoldsNothing pins that a project with no
+// `generatedFrom` keeps the identity it had. The fold is guarded on
 // presence, so adding the contract binding moved no key in any workspace that
 // generates no client.
-func TestMetadataDigest_NoClientManifestFoldsNothing(t *testing.T) {
+func TestMetadataDigest_NoGeneratedFromFoldsNothing(t *testing.T) {
 	ws := contractWorkspace(contractEdgeDigest)
 	project := ws.ProjectByID("/apps/storefront")
 
 	const golden = "wsid1:20e1003d325718a4d67ac92e9e3ca4e7e021fbe27f146bdedd7fae862f78d498"
 	if got := ws.MetadataDigestFor(project); got != golden {
-		t.Errorf("digest of a project with no client manifest = %s, want %s", got, golden)
+		t.Errorf("digest of a project with no generatedFrom = %s, want %s", got, golden)
 	}
 }

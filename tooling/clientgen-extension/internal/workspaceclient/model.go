@@ -10,7 +10,7 @@ import (
 // Mode names what produced a report. The guard is the only producer left.
 type Mode string
 
-// ModeCheck inspects committed client bytes without trusting build rewrites.
+// ModeCheck inspects the committed inputs without trusting build rewrites.
 const ModeCheck Mode = "check"
 
 // Classification distinguishes strict Putnami contracts from external inputs.
@@ -67,8 +67,8 @@ type Adaptation struct {
 	Reason      string              `json:"reason"`
 }
 
-// AdaptationBinding is an actual generated registration candidate. Every
-// symbol comes from a validated emitter manifest rather than a naming guess.
+// AdaptationBinding is a generated registration a consumer can call instead of
+// a handwritten transport. Every symbol derives from a ClientReport.
 type AdaptationBinding struct {
 	ProviderProject string `json:"providerProject"`
 	ImportPath      string `json:"importPath"`
@@ -77,43 +77,29 @@ type AdaptationBinding struct {
 	BindingSymbol   string `json:"bindingSymbol"`
 }
 
-// Coverage reports operation-target coverage from generated descriptors.
-type Coverage struct {
-	Required int `json:"required"`
-	Covered  int `json:"covered"`
-	Percent  int `json:"percent"`
+// ClientReport is one generated client of a provider: a client project that
+// names the provider's service in generatedFrom, or the in-module Go client
+// the provider's committed clientgen.json declares. Its symbols derive from
+// the committed contract and the generation options, never from generated
+// bytes, which Git does not hold.
+type ClientReport struct {
+	// Project is the project that generates the client: the client project,
+	// or the provider for an in-module client.
+	Project    string                           `json:"project"`
+	Language   clientcontract.GeneratedLanguage `json:"language"`
+	ImportPath string                           `json:"importPath"`
+	// Bindings lists the generated service registrations in canonical order.
+	Bindings []ClientBinding `json:"bindings"`
 }
 
-// TargetReport reports one configured generated target.
-type TargetReport struct {
-	Language            clientcontract.GeneratedLanguage    `json:"language"`
-	Output              string                              `json:"output"`
-	Manifest            string                              `json:"manifest"`
-	Binding             *clientcontract.GeneratedBinding    `json:"binding,omitempty"`
-	GeneratedOperations []clientcontract.GeneratedOperation `json:"generatedOperations,omitempty"`
-	Operations          int                                 `json:"operations"`
-	Covered             int                                 `json:"covered"`
-	// Omitted names the provider operations the target's configuration leaves
-	// out, as its manifest records them. They count in Operations and never in
-	// Covered.
-	Omitted []string `json:"omitted,omitempty"`
-}
-
-// ConsumerEdge joins a provider operation to an imported typed binding.
-type ConsumerEdge struct {
-	ProviderProject   string                           `json:"providerProject"`
-	ServiceID         string                           `json:"serviceId"`
-	OperationID       string                           `json:"operationId"`
-	Stream            clientcontract.StreamMode        `json:"stream"`
-	Language          clientcontract.GeneratedLanguage `json:"language"`
-	GeneratedArtifact string                           `json:"generatedArtifact"`
-	ConsumerProject   string                           `json:"consumerProject"`
-	BindingImport     string                           `json:"bindingImport"`
-	ClientSymbol      string                           `json:"clientSymbol"`
-	BindingSymbol     string                           `json:"bindingSymbol"`
-	MethodSymbol      string                           `json:"methodSymbol"`
-	AuthProfiles      []string                         `json:"authProfiles"`
-	Transports        []clientcontract.Transport       `json:"transports"`
+// ClientBinding is one generated service registration of a client.
+type ClientBinding struct {
+	// Service is the generated service the registration binds.
+	Service string `json:"service"`
+	// ClientSymbol is the generated public client type name.
+	ClientSymbol string `json:"clientSymbol"`
+	// BindingSymbol is the generated typed registration function.
+	BindingSymbol string `json:"bindingSymbol"`
 }
 
 // ExternalContract records explicit authority for an unmarked third-party input.
@@ -164,24 +150,23 @@ const (
 	StatusPendingProviderContract = "pending-provider-contract"
 )
 
-// ProviderReport reports provider classification and generated target coverage.
+// ProviderReport reports a provider's classification and its generated clients.
 type ProviderReport struct {
 	Project        string         `json:"project"`
 	Classification Classification `json:"classification"`
 	ServiceID      string         `json:"serviceId,omitempty"`
 	Audience       string         `json:"audience,omitempty"`
 	ContractSHA256 string         `json:"contractSha256,omitempty"`
-	Targets        []TargetReport `json:"targets,omitempty"`
+	Clients        []ClientReport `json:"clients,omitempty"`
 	// EmptyContract marks a first-party provider whose contract declares a
 	// service identity and no first-party operation: every route is owned by an
 	// external authority, or none is served. It is the report's half of the
 	// declaration the committed contract sidecar carries, and the reason such a
-	// provider names no target — Targets is empty for one, because a target
-	// with nothing to generate produced nothing to report (ADR 0004).
+	// provider needs no client (ADR 0004).
 	//
 	// A consumer that reaches such a service has no generated binding to switch
 	// to and never will, so bindingAdvice says to classify the callsite instead
-	// of telling the developer to regenerate a client that cannot exist.
+	// of naming a client that cannot exist.
 	EmptyContract bool `json:"emptyContract,omitempty"`
 }
 
@@ -189,9 +174,7 @@ type ProviderReport struct {
 type Report struct {
 	ProtocolVersion     int                  `json:"protocolVersion"`
 	Mode                Mode                 `json:"mode"`
-	Coverage            Coverage             `json:"coverage"`
 	Providers           []ProviderReport     `json:"providers"`
-	ConsumerEdges       []ConsumerEdge       `json:"consumerEdges"`
 	ExternalContracts   []ExternalContract   `json:"externalContracts"`
 	FrameworkTransports []FrameworkTransport `json:"frameworkTransports"`
 	AdaptationQueue     []Adaptation         `json:"adaptationQueue"`
@@ -213,7 +196,8 @@ type Report struct {
 // constant is the metric name, prefixed by PhaseMetricPrefix, so a reader of
 // the session's event log and a reader of the report see one vocabulary.
 const (
-	// PhaseInspect compares manifests, generated files and inventories.
+	// PhaseInspect discovers providers and their clients and validates the
+	// inventories.
 	PhaseInspect = "inspect"
 	// PhaseScan parses every consumer source for bindings and transports.
 	PhaseScan = "scan"
@@ -230,7 +214,6 @@ func (r *Report) recordTiming(phase string, elapsed time.Duration) {
 	r.Timings[phase] = elapsed.Milliseconds()
 }
 
-// Clean reports whether every first-party generated target is current.
-// Censused pending transports are deliberately excluded: they are reported
+// Clean reports whether the run found no finding. Censused pending transports are deliberately excluded: they are reported
 // debt, not a failure of the change under test.
 func (r Report) Clean() bool { return len(r.Findings) == 0 }

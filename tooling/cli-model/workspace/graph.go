@@ -42,7 +42,8 @@ type DependencyGraph struct {
 	contractClients map[string][]string
 	// contractProvider is the inverse of contractClients: a generated client's
 	// project ID → the provider whose contract it was generated from. One
-	// client has at most one provider: its manifest names exactly one service.
+	// client has at most one provider: its `generatedFrom` names exactly one
+	// service.
 	contractProvider map[string]string
 	// edgeSources records each edge's PROVENANCE: dependent ID → dependency ID
 	// → the manifest family the edge was derived from. Every edge of deps and
@@ -157,12 +158,13 @@ func BuildGraph(projects []*Project) *DependencyGraph {
 	return g
 }
 
-// deriveContractEdges resolves each generated client target onto the provider
-// whose committed contract declares the service its manifest names.
+// deriveContractEdges resolves each generated client onto the provider whose
+// committed contract declares the service its `generatedFrom` names.
 //
-// The rule is the manifest's own words and nothing else: `service.id` in a
-// project's committed client.putnami.json names the provider, and the provider
-// is the project whose committed contract declares that same identity. Nearness
+// The rule is the client's own declaration and nothing else: `service` in the
+// `generatedFrom` member of a project's putnami.json names the provider, and
+// the provider is the project whose committed contract declares that same
+// identity. Nearness
 // in the tree is deliberately not a rule — a client that lives beside its
 // provider and one that lives in another scope are the same relation, and the
 // cloud workspaces this serves keep clients where their consumers are.

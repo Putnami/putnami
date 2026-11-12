@@ -34,8 +34,8 @@ func TestDiscoveryUsesTheWorkspaceIndex(t *testing.T) {
 }
 
 // A provider with no app commits its generation contract as clientgen.json at
-// its root. Discovery reads it, and a first-party provider with no contract is
-// told to commit one.
+// its root, and discovery reads it. A first-party provider needs none: its
+// committed contract alone makes it a provider.
 func TestDiscoveryReadsTheCommittedGenerationContract(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "strict-provider-discovery", "the-check-reads-the-committed-contract-and-the-committed-generation-contract")
 	root := t.TempDir()
@@ -46,23 +46,18 @@ func TestDiscoveryReadsTheCommittedGenerationContract(t *testing.T) {
 	writeWorkspaceFile(t, root, "providers/slice/putnami.json", `{"name":"slice"}`)
 	writeWorkspaceFile(t, root, "providers/slice/schema/openapi.json", string(catalogContractForFixture(t)))
 
-	_, findings := discoverCommitted(indexedView(root))
-	assertFindingCodeList(t, findings, "clientgen.missing-config")
-	for _, finding := range findings {
-		if finding.Code == "clientgen.missing-config" &&
-			!strings.Contains(finding.Message, "clientgen.json") {
-			t.Errorf("missing-config message = %q, want it to name clientgen.json", finding.Message)
-		}
+	providers, findings := discoverCommitted(indexedView(root))
+	if len(findings) != 0 || len(providers) != 1 || providers[0].config != nil || providers[0].classification != ClassificationFirstParty {
+		t.Fatalf("a first-party provider without clientgen.json: providers=%+v findings=%+v", providers, findings)
 	}
 
 	writeWorkspaceFile(t, root, "providers/slice/clientgen.json", `{"targets":["go"],"go":{"output":"go"}}`)
-	providers, findings := discoverCommitted(indexedView(root))
-	for _, finding := range findings {
-		if finding.Code == "clientgen.missing-config" || finding.Code == "clientgen.invalid-config" {
-			t.Errorf("discovery with a committed contract reported %+v", finding)
-		}
+	providers, findings = discoverCommitted(indexedView(root))
+	if len(findings) != 0 {
+		t.Errorf("discovery with a committed contract reported %+v", findings)
 	}
-	if len(providers) != 1 || providers[0].config == nil || !reflect.DeepEqual(providers[0].config.Targets, []string{"go"}) {
+	if len(providers) != 1 || providers[0].config == nil || !reflect.DeepEqual(providers[0].config.Targets, []string{"go"}) ||
+		providers[0].config.Go.Output != "go" {
 		t.Fatalf("the committed clientgen.json was not read: %+v", providers)
 	}
 }
@@ -128,17 +123,6 @@ func TestDiscoveryIgnoresUnindexedFixturesAndRequiresExplicitThirdParty(t *testi
 	}
 }
 
-// committedManifest is a generated client manifest's identity half, as the
-// generator emits it: the marker, the provider service, and the contract
-// digest. Discovery reads a target through the shared protocol decoder, which
-// refuses bytes that name only one end of the relation, so a fixture that
-// leaves any of them out is a file no first-party target is described by.
-func committedManifest(language string) string {
-	return `{"protocolVersion":1,"generatedBy":"@putnami/clientgen","language":"` + language + `",` +
-		`"service":{"id":"catalog","audience":"catalog"},` +
-		`"contractSha256":"1111111111111111111111111111111111111111111111111111111111111111"}`
-}
-
 func markedOpenAPI(serviceID string) string {
 	return `{
   "openapi": "3.1.0",
@@ -151,20 +135,17 @@ func markedOpenAPI(serviceID string) string {
 }`
 }
 
-// TestTheCheckReadsTheCommittedContractAndNamesTargetsFromCommittedManifests
-// is the cold-tree half of discovery: with nothing under .gen, a provider is
-// still found through its committed sidecar, and its targets through the
-// manifests committed under it — the trap that once justified a nested build
-// of every provider on every validate.
-func TestTheCheckReadsTheCommittedContractAndNamesTargetsFromCommittedManifests(t *testing.T) {
+// TestTheCheckReadsTheCommittedContractOnAColdTree is the cold-tree half of
+// discovery: with nothing under .gen, a provider is still found through its
+// committed sidecar, a client manifest an older generator left is no input,
+// and a stale build's contract does not outrank the sidecar.
+func TestTheCheckReadsTheCommittedContractOnAColdTree(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "strict-provider-discovery", "the-check-reads-the-committed-contract-and-the-committed-generation-contract")
 	root := t.TempDir()
 	writeWorkspaceFile(t, root, ".putnami/workspace-index.json", `{"version":4,"projects":[{"path":"services/catalog"}]}`)
 	writeWorkspaceFile(t, root, "services/catalog/putnami.json", `{"name":"catalog","extensions":["@putnami/clientgen"]}`)
 	writeWorkspaceFile(t, root, "services/catalog/schema/openapi.json", markedOpenAPI("committed"))
-	writeWorkspaceFile(t, root, "services/catalog/clients/go/client.putnami.json", committedManifest("go"))
-	writeWorkspaceFile(t, root, "services/catalog/clients/ts/client.putnami.json", committedManifest("ts"))
-	writeWorkspaceFile(t, root, "services/catalog/node_modules/dep/client.putnami.json", committedManifest("ts"))
+	writeWorkspaceFile(t, root, "services/catalog/clients/go/client.putnami.json", `{"protocolVersion":1,"language":"go"}`)
 
 	providers, findings := discoverCommitted(indexedView(root))
 	if len(findings) != 0 {
@@ -173,12 +154,10 @@ func TestTheCheckReadsTheCommittedContractAndNamesTargetsFromCommittedManifests(
 	if len(providers) != 1 || providers[0].specPath != "services/catalog/schema/openapi.json" || providers[0].document.Service.ID != "committed" {
 		t.Fatalf("the committed sidecar was not the provider's contract: %+v", providers)
 	}
-	config := providers[0].config
-	if config == nil || !reflect.DeepEqual(config.Targets, []string{"go", "ts"}) || config.Go.Output != "clients/go" || config.TS.Output != "clients/ts" {
-		t.Fatalf("targets synthesized from committed manifests = %+v", config)
+	if providers[0].config != nil {
+		t.Fatalf("a leftover client manifest configured the provider: %+v", providers[0].config)
 	}
 
-	// A stale build's contract does not outrank the committed sidecar.
 	writeWorkspaceFile(t, root, "services/catalog/.gen/schema/openapi.json", markedOpenAPI("built"))
 	providers, _ = discoverCommitted(indexedView(root))
 	if providers[0].document.Service.ID != "committed" {
@@ -186,54 +165,25 @@ func TestTheCheckReadsTheCommittedContractAndNamesTargetsFromCommittedManifests(
 	}
 }
 
-// TestACommittedManifestThatNamesNoFirstPartyTargetIsAFinding pins the one
-// decoder both readers share. A file at a target's path that does not name a
-// first-party target — no generator marker, no provider service, no contract
-// digest — names no target here and derives no contract edge in the workspace
-// graph, and saying so is a finding rather than a silently missing target.
-func TestACommittedManifestThatNamesNoFirstPartyTargetIsAFinding(t *testing.T) {
+// TestAGenerationContractWithoutAContractIsAFinding: a provider that commits
+// clientgen.json but no contract sidecar names clients nothing can generate. It
+// is reported, never skipped as a project that generates nothing. A project
+// with neither is no provider and no finding.
+func TestAGenerationContractWithoutAContractIsAFinding(t *testing.T) {
 	root := t.TempDir()
-	writeWorkspaceFile(t, root, ".putnami/workspace-index.json", `{"version":4,"projects":[{"path":"services/catalog"}]}`)
+	writeWorkspaceFile(t, root, ".putnami/workspace-index.json",
+		`{"version":4,"projects":[{"path":"services/catalog"},{"path":"services/orders"}]}`)
 	writeWorkspaceFile(t, root, "services/catalog/putnami.json", `{"name":"catalog","extensions":["@putnami/clientgen"]}`)
-	writeWorkspaceFile(t, root, "services/catalog/schema/openapi.json", markedOpenAPI("catalog"))
-	writeWorkspaceFile(t, root, "services/catalog/clients/go/client.putnami.json",
-		`{"protocolVersion":1,"generatedBy":"somebody-else","language":"go"}`)
-
-	providers, findings := discoverCommitted(indexedView(root))
-	assertFindingCodeList(t, findings, "clientgen.invalid-manifest")
-	if len(providers) != 1 {
-		t.Fatalf("providers = %+v, want the provider itself", providers)
-	}
-	if config := providers[0].config; config != nil && len(config.Targets) != 0 {
-		t.Errorf("targets = %+v, want none named by a manifest no generator wrote", config.Targets)
-	}
-}
-
-// TestCommittedManifestsWithoutAContractAreAFinding: a provider that commits
-// generated clients but no contract sidecar has clients nothing can judge. It
-// is reported, never skipped as a project that generates nothing.
-func TestCommittedManifestsWithoutAContractAreAFinding(t *testing.T) {
-	root := t.TempDir()
-	writeWorkspaceFile(t, root, ".putnami/workspace-index.json", `{"version":4,"projects":[{"path":"services/catalog"}]}`)
-	writeWorkspaceFile(t, root, "services/catalog/putnami.json", `{"name":"catalog","extensions":["@putnami/clientgen"]}`)
-	writeWorkspaceFile(t, root, "services/catalog/clients/go/client.putnami.json", committedManifest("go"))
+	writeWorkspaceFile(t, root, "services/catalog/clientgen.json", `{"targets":["go"],"go":{"output":"client"}}`)
+	writeWorkspaceFile(t, root, "services/orders/putnami.json", `{"name":"orders"}`)
 
 	providers, findings := discoverCommitted(indexedView(root))
 	if len(providers) != 0 {
 		t.Fatalf("a provider without a contract was admitted: %+v", providers)
 	}
 	assertFindingCodeList(t, findings, "clientgen.missing-contract")
-
-	// An indexed client package INSIDE a provider's output directory holds a
-	// manifest at its own root: it is a client the project is, not one it
-	// generates, and it is neither a provider nor a finding.
-	writeWorkspaceFile(t, root, ".putnami/workspace-index.json",
-		`{"version":4,"projects":[{"path":"services/catalog"},{"path":"services/catalog/clients/go"}]}`)
-	writeWorkspaceFile(t, root, "services/catalog/schema/openapi.json", markedOpenAPI("catalog"))
-	writeWorkspaceFile(t, root, "services/catalog/clients/go/putnami.json", `{"name":"catalog-go-client"}`)
-	providers, findings = discoverCommitted(indexedView(root))
-	if len(findings) != 0 || len(providers) != 1 || providers[0].rel != "services/catalog" {
-		t.Fatalf("nested client package handling: providers=%+v findings=%+v", providers, findings)
+	if !strings.Contains(findings[0].Message, "schema/openapi.json") || findings[0].Path != "services/catalog" {
+		t.Fatalf("missing-contract finding = %+v, want it to name the project and schema/openapi.json", findings[0])
 	}
 }
 

@@ -31,9 +31,9 @@ import (
 //     is reported with the edit to make, never half-applied: remove it from
 //     the manifest the workspace provider read the importer from, then run
 //     `putnami deps install`;
-//   - an orphan client manifest is a deletion, not an edit: the repair is to
-//     remove the generated target or restore its provider's contract, and
-//     guessing which one the user means is not this command's call.
+//   - an orphan generatedFrom is a deletion, not an edit: the repair is to
+//     remove the client's generatedFrom or restore its provider's contract,
+//     and guessing which one the user means is not this command's call.
 //
 // The extension that edits a manifest finding is the one `deps remove` would
 // run for the importer (projectJobProviders): the core names no language.

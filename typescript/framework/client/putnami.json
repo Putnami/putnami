@@ -7,7 +7,7 @@
   "extensions": ["/typescript/extension", "/tooling/sdd-extension"],
   "options": {
     "test": {
-      "filePatterns": ["../../../protocols/clientcontract/fixtures/**"]
+      "filePatterns": ["../../../protocols/clientcontract/fixtures/**", "../../../protocols/clientcontract/*.go"]
     },
     "package": {
       "npm": true

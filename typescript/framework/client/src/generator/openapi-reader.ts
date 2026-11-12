@@ -57,7 +57,6 @@ export type ClientContractDiagnosticCode =
   | 'client_contract.invalid_resilience'
   | 'client_contract.invalid_schema'
   | 'client_contract.invalid_protobuf'
-  | 'client_contract.invalid_generated_manifest'
   | 'client_contract.unsupported_runtime_capability';
 
 /** Every contract diagnostic this reader can emit, in the Go package's order. */
@@ -77,7 +76,6 @@ export const CLIENT_CONTRACT_DIAGNOSTIC_CODES: readonly ClientContractDiagnostic
   'client_contract.invalid_resilience',
   'client_contract.invalid_schema',
   'client_contract.invalid_protobuf',
-  'client_contract.invalid_generated_manifest',
   'client_contract.unsupported_runtime_capability',
 ];
 

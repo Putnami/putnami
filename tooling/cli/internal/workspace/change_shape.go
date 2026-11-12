@@ -376,11 +376,6 @@ func dependencyClosure(ws *Workspace, p *Project) map[string]bool {
 // names no package manager.
 var lockfileSuffixes = []string{".lock", ".lockb", ".lock.json", ".lock.yaml", "-lock.json", "-lock.yaml", ".sum"}
 
-// generatedManifestNames are manifests a Putnami generator writes.
-var generatedManifestNames = map[string]bool{
-	"client.putnami.json": true,
-}
-
 // testDirectoryNames and docDirectoryNames are the path segments that put a
 // file in the tests or docs category whatever its name.
 var (
@@ -411,9 +406,6 @@ func isGeneratedPath(slash string) bool {
 		}
 	}
 	base := strings.ToLower(path.Base(slash))
-	if generatedManifestNames[base] {
-		return true
-	}
 	for _, suffix := range lockfileSuffixes {
 		if strings.HasSuffix(base, suffix) {
 			return true

@@ -78,8 +78,8 @@ const (
 	// tool builds with it, so it backs the edge as an import does.
 	DependencySourceBuildGraph DependencySource = "build-graph"
 	// DependencySourceContract is the edge from a generated client to the
-	// provider whose contract it was generated from. It is derived by core from
-	// the committed client manifest and is never reported by a provider.
+	// provider whose contract it was generated from. Core derives it from the
+	// client's `generatedFrom` and no provider reports it.
 	DependencySourceContract DependencySource = "contract"
 )
 

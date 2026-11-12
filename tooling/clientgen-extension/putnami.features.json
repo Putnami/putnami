@@ -176,7 +176,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "generation-fails-a-cache-policy-its-runtime-does-not-implement"
+              "a-generated-client-fails-to-load-on-a-runtime-without-its-capability"
             ]
           }
         },
@@ -205,8 +205,8 @@
             "checks": [
               "a-consumer-of-an-empty-contract-is-told-to-classify-the-callsite",
               "a-contract-discovery-could-not-read-is-never-empty",
-              "a-contract-that-declares-no-first-party-operation-needs-no-generated-target",
-              "a-contract-with-first-party-operations-still-needs-its-generated-target"
+              "a-contract-that-declares-no-first-party-operation-needs-no-client",
+              "a-contract-with-first-party-operations-is-not-empty"
             ]
           }
         },

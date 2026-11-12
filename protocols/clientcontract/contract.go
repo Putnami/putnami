@@ -114,12 +114,11 @@ const (
 // declares in its document-level x-putnami-client block, without parsing the
 // paths, the schemas or the credential profiles.
 //
-// It is the counterpart of DecodeGeneratedClientReference: the two read the
-// same service identity from the two ends of a generated client's relation to
-// its provider, so a caller can pair a committed manifest with the contract it
-// names. ok is false for a document with no first-party marker, for one whose
-// marker does not parse, and for one that declares a blank service identity —
-// none of the three identifies a provider.
+// A client project names its provider by this service identity in the
+// generatedFrom block of its putnami.json, so a caller pairs the client with
+// the contract it generates from. ok is false for a document with no
+// first-party marker, for one whose marker does not parse, and for one that
+// declares a blank service identity: none of the three identifies a provider.
 func DecodeContractService(document []byte) (Service, bool) {
 	var envelope struct {
 		Client *struct {

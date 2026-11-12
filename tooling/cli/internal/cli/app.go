@@ -329,6 +329,9 @@ func (a *App) Run(ctx context.Context, args []string) int {
 			Plan:                 bootstrapGlobal.Plan,
 			DryRun:               bootstrapGlobal.DryRun,
 			BeforeRepositoryCode: startHostedHoldersOfJobCommand(hostedCache, hostedReporters, parsed, extensionGroups, wsRoot, cfg),
+			// After a fresh worktree's install, the first-run pass restores its
+			// generated clients through an ordinary cached engine run.
+			RestoreClients: RestoreGeneratedClients,
 		}); err != nil {
 			return bootstrapFailureExit(ctx)
 		}

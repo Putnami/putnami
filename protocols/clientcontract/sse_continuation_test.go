@@ -276,60 +276,38 @@ func TestAMalformedMisplacedOrMismatchedContinuationIsRefused(t *testing.T) {
 	})
 }
 
-func continuedManifest(capabilities []RuntimeCapability, metadata *SSETransport, cache *CachePolicy) *GeneratedClientManifestV1 {
-	manifest := cachedManifest(capabilities, cache)
-	manifest.Operations = append(manifest.Operations, GeneratedOperation{
-		OperationID: "tailLogs", Service: "identity", MethodSymbol: "tailLogs", Stream: StreamServer,
-		Transports: []Transport{sseTransport(metadata)},
-	})
-	return manifest
+func continuedOperations(metadata *SSETransport, cache *CachePolicy) []GeneratedOperation {
+	return []GeneratedOperation{
+		{
+			OperationID: "effectiveAccess", Stream: StreamUnary,
+			Transports: []Transport{{Protocol: TransportRESTJSON, Path: "/internal/authorization/effective-access", Encoding: EncodingJSON}},
+			Cache:      cache,
+		},
+		{OperationID: "tailLogs", Stream: StreamServer, Transports: []Transport{sseTransport(metadata)}},
+	}
 }
 
-func TestAManifestThatDeclaresAContinuationRequiresTheSSEContinuationRuntimeCapability(t *testing.T) {
-	spectest.Proves(t, sseFeature, sseRequirement, "a-manifest-that-declares-a-continuation-requires-the-sse-continuation-runtime-capability")
-	policy := &CachePolicy{FreshMs: 5000}
-	both := continuedManifest(nil, cursorContinuation(), policy)
+func TestAContinuationRequiresTheSSEContinuationRuntimeCapability(t *testing.T) {
+	spectest.Proves(t, sseFeature, sseRequirement, "a-continuation-requires-the-sse-continuation-runtime-capability")
 	want := []RuntimeCapability{RuntimeCapabilityResponseCache, RuntimeCapabilitySSEContinuation}
-	if got := RequiredRuntimeCapabilities(both.Operations); !reflect.DeepEqual(got, want) {
+	if got := RequiredRuntimeCapabilities(continuedOperations(cursorContinuation(), &CachePolicy{FreshMs: 5000})); !reflect.DeepEqual(got, want) {
 		t.Fatalf("required capabilities = %v, want %v", got, want)
 	}
-	if got := RequiredRuntimeCapabilities(continuedManifest(nil, nil, nil).Operations); got != nil {
+	if got := RequiredRuntimeCapabilities(continuedOperations(bestEffortContinuation(), nil)); !reflect.DeepEqual(got, []RuntimeCapability{RuntimeCapabilitySSEContinuation}) {
+		t.Fatalf("a best-effort continuation required %v", got)
+	}
+	if got := RequiredRuntimeCapabilities(continuedOperations(nil, nil)); got != nil {
 		t.Fatalf("an sse transport without a continuation required %v", got)
 	}
-
-	// A TypeScript target that needs the capability must name it: one that
-	// omits it is refused, so it never runs a declared continuation without
-	// the runtime behavior.
-	unnamed := ValidateGeneratedManifest(continuedManifest(nil, bestEffortContinuation(), nil))
-	named := false
-	for _, diagnostic := range unnamed {
-		named = named || (diagnostic.Code == ErrorCodeUnsupportedRuntimeCapability &&
-			strings.Contains(diagnostic.Message, `declare an sse continuation but the target does not require the "sse-continuation"`))
+	// Each runtime implements the capability, so a generated client of either
+	// language that requires it loads.
+	for _, language := range []GeneratedLanguage{GeneratedLanguageGo, GeneratedLanguageTypeScript} {
+		if !slices.Contains(RuntimeCapabilitiesImplementedBy(language), RuntimeCapabilitySSEContinuation) {
+			t.Fatalf("the %s runtime does not implement sse continuation", language)
+		}
 	}
-	if !named {
-		t.Fatalf("a continuation without its capability produced %v", unnamed)
-	}
-	listed := ValidateGeneratedManifest(continuedManifest([]RuntimeCapability{RuntimeCapabilitySSEContinuation}, cursorContinuation(), nil))
-	if listed != nil {
-		t.Fatalf("a TypeScript target that requires the capability its runtime implements was refused: %v", listed)
-	}
-
-	// The Go runtime implements it too: a Go target that names it is valid,
-	// and one that omits it is still refused.
-	goTarget := func(capabilities []RuntimeCapability) *GeneratedClientManifestV1 {
-		manifest := continuedManifest(capabilities, cursorContinuation(), nil)
-		manifest.Language = GeneratedLanguageGo
-		manifest.Binding.ImportPath = "example.com/identityclient"
-		return manifest
-	}
-	if diags := ValidateGeneratedManifest(goTarget([]RuntimeCapability{RuntimeCapabilitySSEContinuation})); diags != nil {
-		t.Fatalf("a Go target that requires the capability its runtime implements was refused: %v", diags)
-	}
-	if diags := ValidateGeneratedManifest(goTarget(nil)); !hasCode(diags, ErrorCodeUnsupportedRuntimeCapability) {
-		t.Fatalf("a Go target that omits a required capability was accepted: %v", diags)
-	}
-	// The shared set, which the manifest schema publishes, is what every
-	// runtime implements: a capability one runtime leads with is not in it.
+	// The shared set is what every runtime implements: a capability one
+	// runtime leads with is not in it.
 	var common []RuntimeCapability
 	for _, capability := range RuntimeCapabilitiesImplementedBy(GeneratedLanguageGo) {
 		if slices.Contains(RuntimeCapabilitiesImplementedBy(GeneratedLanguageTypeScript), capability) {
@@ -340,18 +318,8 @@ func TestAManifestThatDeclaresAContinuationRequiresTheSSEContinuationRuntimeCapa
 		t.Fatalf("shared capabilities = %v, want the intersection %v", ImplementedRuntimeCapabilities, common)
 	}
 	// Both runtimes implement ADR 0013, so the shared set is the full set.
-	if want := []RuntimeCapability{RuntimeCapabilityResponseCache, RuntimeCapabilitySSEContinuation}; !reflect.DeepEqual(ImplementedRuntimeCapabilities, want) {
+	if !reflect.DeepEqual(ImplementedRuntimeCapabilities, want) {
 		t.Fatalf("shared capabilities = %v, want %v", ImplementedRuntimeCapabilities, want)
-	}
-	if got := RuntimeCapabilitiesImplementedBy("rust"); got != nil {
-		t.Fatalf("an unknown language implements %v", got)
-	}
-	if diags := ValidateGeneratedManifest(continuedManifest(nil, nil, nil)); diags != nil {
-		t.Fatalf("a manifest without a continuation was refused: %v", diags)
-	}
-	malformed := continuedManifest(nil, &SSETransport{Continuation: &SSEContinuation{Mode: "replay"}}, nil)
-	if diags := ValidateGeneratedManifest(malformed); !hasCode(diags, ErrorCodeInvalidEnum) {
-		t.Fatalf("a manifest carrying an unknown continuation mode was accepted: %v", diags)
 	}
 }
 

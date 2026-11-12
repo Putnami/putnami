@@ -20,7 +20,6 @@ import (
 	"sync"
 
 	clientcontract "go.putnami.dev/protocol/clientcontract"
-	diag "go.putnami.dev/protocol/diagnostic"
 )
 
 type sourceRecord struct {
@@ -28,33 +27,11 @@ type sourceRecord struct {
 	project  string
 	language string
 	content  string
-	// code is the TypeScript comment/string/JSX mask of content, computed once
-	// by the scan. Masking is not cheap and every consumer of a TypeScript
-	// record needs the same mask, so the record carries it instead of each
-	// consumer recomputing it. It is empty for Go records.
-	code string
-	// imports is the file's own import set: decoded Go import paths, or
-	// TypeScript module specifiers of the named and namespace import forms this
-	// package understands. It is the exact evidence that decides whether a file
-	// can reference a module at all, so a caller can skip a file no import
-	// makes relevant without weakening what the scanner would have concluded.
+	// imports is the decoded import paths of a Go file. It decides whether
+	// the file can call a transport at all, so the scan parses only a file
+	// that imports a transport package. It is empty for TypeScript records.
 	imports []string
 	calls   []detectedTransport
-}
-
-// importsModule reports whether this file imports the exact module path.
-//
-// Both scanners answer "does this file use symbol S from module M" by parsing
-// or masking the whole file. Neither can answer yes for a file that does not
-// import M, so this exact, already-collected fact is a sound gate in front of
-// that work rather than a heuristic that could hide a usage.
-func (r sourceRecord) importsModule(path string) bool {
-	for _, value := range r.imports {
-		if value == path {
-			return true
-		}
-	}
-	return false
 }
 
 type detectedTransport struct {
@@ -64,9 +41,8 @@ type detectedTransport struct {
 }
 
 // scanManualClients classifies every transport callsite the workspace scan
-// found. It receives the records rather than scanning for them: the
-// consumer-edge scan needs the identical set and the scan is the check's
-// dominant cost (see inspect).
+// found. It receives the records rather than scanning for them, because the
+// scan is the check's dominant cost (see inspect).
 func scanManualClients(files workspaceFiles, providers []provider, records []sourceRecord, report Report) ([]Adaptation, []Finding) {
 	externalCallsites := map[string]bool{}
 	for _, contract := range report.ExternalContracts {
@@ -243,9 +219,13 @@ func projectFirstPartyCandidates(files workspaceFiles, project string, providers
 			candidates[item.document.Service.ID] = true
 		}
 	}
-	for _, edge := range report.ConsumerEdges {
-		if edge.ConsumerProject == project {
-			candidates[edge.ServiceID] = true
+	// A consumer that depends on a generated client project reaches its
+	// provider through it.
+	for _, providerReport := range report.Providers {
+		for _, client := range providerReport.Clients {
+			if client.Project != providerReport.Project && (dependencies["/"+client.Project] || dependencies[client.Project]) {
+				candidates[providerReport.ServiceID] = true
+			}
 		}
 	}
 	result := make([]string, 0, len(candidates))
@@ -288,14 +268,14 @@ func adaptationBindings(report Report, language, serviceID string) []AdaptationB
 		if provider.Classification != ClassificationFirstParty || provider.ServiceID != serviceID {
 			continue
 		}
-		for _, target := range provider.Targets {
-			if string(target.Language) != language || target.Binding == nil {
+		for _, client := range provider.Clients {
+			if string(client.Language) != language {
 				continue
 			}
-			for _, binding := range target.Binding.Clients {
+			for _, binding := range client.Bindings {
 				bindings = append(bindings, AdaptationBinding{
 					ProviderProject: provider.Project,
-					ImportPath:      target.Binding.ImportPath,
+					ImportPath:      client.ImportPath,
 					Service:         binding.Service,
 					ClientSymbol:    binding.ClientSymbol,
 					BindingSymbol:   binding.BindingSymbol,
@@ -327,28 +307,18 @@ func bindingAdvice(report Report, consumerProject, language, serviceID string, b
 		return strings.Join(advice, ", or ")
 	}
 	for _, provider := range report.Providers {
-		if provider.Classification != ClassificationFirstParty || provider.ServiceID != serviceID {
-			continue
-		}
-		if provider.EmptyContract {
-			// No target of this provider can ever carry this call: its contract
-			// declares no first-party operation, so there is no binding to
-			// regenerate and none to declare. The only honest instruction is
-			// the one the inventory exists for (ADR 0004 decision 5).
+		if provider.Classification == ClassificationFirstParty && provider.ServiceID == serviceID && provider.EmptyContract {
+			// No client of this provider can ever carry this call: its contract
+			// declares no first-party operation, so no binding exists. The only
+			// honest instruction is the one the inventory exists for (ADR 0004
+			// decision 5).
 			return fmt.Sprintf("%s declares no first-party operation, so no %s client is generated for it; "+
 				"classify this callsite in %s under the authority that owns the wire",
 				serviceID, languageName(language), projectInventoryPath(consumerProject, externalInventoryFile))
 		}
-		for _, target := range provider.Targets {
-			if string(target.Language) == language {
-				return fmt.Sprintf("the %s target of %s has no committed client manifest at %s; regenerate the client",
-					languageName(language), serviceID, target.Manifest)
-			}
-		}
-		return fmt.Sprintf("%s generates no %s client yet; declare the target on the provider %s",
-			serviceID, languageName(language), provider.Project)
 	}
-	return fmt.Sprintf("%s generates no %s client yet; declare the target on the provider", serviceID, languageName(language))
+	return fmt.Sprintf("%s has no %s client project yet; create one whose putnami.json names the service %s in generatedFrom "+
+		"with language %q, depend on it, and call its binding", serviceID, languageName(language), serviceID, language)
 }
 
 // languageName spells a generated-language code the way the diagnostic reads.
@@ -362,62 +332,29 @@ func languageName(language string) string {
 	return language
 }
 
-func generatedSourceInventory(files workspaceFiles, report Report) map[string]bool {
-	generated := map[string]bool{}
-	for _, providerReport := range report.Providers {
-		for _, target := range providerReport.Targets {
-			data, err := files.Read(target.Manifest)
-			if err != nil {
-				continue
-			}
-			manifest, valid := parseManifestWithoutDiagnostics(data)
-			base := filepath.ToSlash(filepath.Dir(target.Manifest))
-			if !valid || !manifestFilesMatch(files, base, manifest.Files) {
-				continue
-			}
-			for _, file := range manifest.Files {
-				generated[joinRel(base, file.Path)] = true
-			}
-		}
-	}
-	return generated
-}
-
-func manifestFilesMatch(workspace workspaceFiles, base string, files []clientcontract.GeneratedFile) bool {
-	for _, file := range files {
-		content, err := workspace.Read(joinRel(base, file.Path))
-		if err != nil {
-			return false
-		}
-		sum := sha256.Sum256(content)
-		if hex.EncodeToString(sum[:]) != file.SHA256 {
-			return false
-		}
-	}
-	return true
-}
-
-// workspaceSourceRecords is the one production-source scan a check performs. It
-// derives the generated-file exclusion set from the report's providers, which is
-// the only report field discoverSourceRecords depends on.
-func workspaceSourceRecords(view workspaceView, report Report) ([]sourceRecord, error) {
-	return discoverSourceRecords(view, generatedSourceInventory(view.workspaceFiles, report))
+// workspaceSourceRecords is the one production-source scan a check performs.
+// It returns the consumer sources and, apart, the paths of the sources that
+// carry the generated-client marker.
+func workspaceSourceRecords(view workspaceView) ([]sourceRecord, []string, error) {
+	return discoverSourceRecords(view)
 }
 
 // discoverSourceRecords reads every production source of the member projects:
 // each file a member owns (the deepest member whose directory holds it), outside
 // the build, install and dot-directories between that member's directory and
-// the file, and outside the generated files the report's verified manifests
-// list. In the candidate cut an ignored file is not a source, as it is not one
-// on a clone.
-func discoverSourceRecords(view workspaceView, generated map[string]bool) ([]sourceRecord, error) {
+// the file. A file that opens with the generated-client marker is no consumer
+// source: its path is returned apart. In the candidate cut an ignored file is
+// not a source, as it is not one on a clone, so a generated client that Git
+// ignores is neither scanned nor reported.
+func discoverSourceRecords(view workspaceView) ([]sourceRecord, []string, error) {
 	projects, err := view.members()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	var records []sourceRecord
+	var generated []string
 	add := func(rel, project string, read func() ([]byte, error)) error {
-		if generated[rel] || excludedManualScanPath(rel) {
+		if excludedManualScanPath(rel) {
 			return nil
 		}
 		language, supported := sourceLanguage(rel)
@@ -427,6 +364,10 @@ func discoverSourceRecords(view workspaceView, generated map[string]bool) ([]sou
 		content, readErr := read()
 		if readErr != nil {
 			return readErr
+		}
+		if carriesGeneratedMarker(content) {
+			generated = append(generated, rel)
+			return nil
 		}
 		records = append(records, newSourceRecord(rel, filepath.Join(view.root, filepath.FromSlash(rel)), project, language, content))
 		return nil
@@ -438,10 +379,10 @@ func discoverSourceRecords(view workspaceView, generated map[string]bool) ([]sou
 				continue
 			}
 			if err := add(rel, project, func() ([]byte, error) { return view.Read(rel) }); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 		}
-		return records, nil
+		return records, generated, nil
 	}
 	seen := map[string]bool{}
 	for _, project := range projects {
@@ -468,11 +409,12 @@ func discoverSourceRecords(view workspaceView, generated map[string]bool) ([]sou
 			return add(rel, project, func() ([]byte, error) { return os.ReadFile(path) })
 		})
 		if walkErr != nil {
-			return nil, walkErr
+			return nil, nil, walkErr
 		}
 	}
 	sort.Slice(records, func(i, j int) bool { return records[i].path < records[j].path })
-	return records, nil
+	sort.Strings(generated)
+	return records, generated, nil
 }
 
 // excludedBetween reports whether a directory the production scan skips lies
@@ -491,8 +433,7 @@ func newSourceRecord(rel, path, project, language string, content []byte) source
 	text := string(content)
 	record := sourceRecord{path: rel, project: project, language: language, content: text}
 	if language == "ts" {
-		record.code = tsCodeMask(text)
-		record.calls, record.imports = tsScanSource(rel, text, record.code)
+		record.calls = tsScanSource(rel, text, tsCodeMask(text))
 		return record
 	}
 	record.imports = goImportPaths(path, content)
@@ -804,25 +745,14 @@ type tsImportedTransport struct {
 }
 
 func tsTransportCallsites(relative, content string) []detectedTransport {
-	calls, _ := tsScanSource(relative, content, tsCodeMask(content))
-	return calls
+	return tsScanSource(relative, content, tsCodeMask(content))
 }
 
-// tsScanSource answers both TypeScript questions the workspace scan asks of a
-// file, in one pass over one masked source: which transport callsites the file
-// contains, and which modules it imports. Both answers read the same mask and
-// the same import matches, so deriving them separately scanned every source in
-// the workspace twice for nothing.
-func tsScanSource(relative, content, code string) ([]detectedTransport, []string) {
+// tsScanSource returns the transport callsites of a TypeScript file, read
+// from its masked source code.
+func tsScanSource(relative, content, code string) []detectedTransport {
 	named := tsImportMatches(tsNamedImport, content, code)
 	namespace := tsImportMatches(tsNamespaceImport, content, code)
-	modules := make([]string, 0, len(named)+len(namespace))
-	for _, match := range named {
-		modules = append(modules, match[2])
-	}
-	for _, match := range namespace {
-		modules = append(modules, match[2])
-	}
 	locals := map[string]tsImportedTransport{}
 	for _, match := range named {
 		kind := tsTransportModuleKind(match[2])
@@ -871,7 +801,7 @@ func tsScanSource(relative, content, code string) ([]detectedTransport, []string
 		}
 	}
 	sortDetectedTransports(calls)
-	return uniqueDetectedTransports(calls), modules
+	return uniqueDetectedTransports(calls)
 }
 
 func tsGlobalTransportCallsites(relative, content, code string) []detectedTransport {
@@ -1223,11 +1153,6 @@ func uniqueDetectedTransports(calls []detectedTransport) []detectedTransport {
 		result = append(result, call)
 	}
 	return result
-}
-
-func parseManifestWithoutDiagnostics(data []byte) (*clientcontract.GeneratedClientManifestV1, bool) {
-	manifest, diags := clientcontract.ParseAndValidateGeneratedManifest(data)
-	return manifest, manifest != nil && !diag.HasErrors(diags)
 }
 
 func excludedManualScanPath(path string) bool {

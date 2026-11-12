@@ -13,6 +13,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/commands/doctor"
 	"go.putnami.dev/tooling/cli/internal/commands/lifecycle"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/engine"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
@@ -183,6 +184,63 @@ func RunWorkspaceJob(ctx context.Context, req lifecycle.WorkspaceJobRequest) (li
 		return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobFailed}, nil
 	}
 	return lifecycle.WorkspaceJobResult{Outcome: lifecycle.WorkspaceJobOK}, nil
+}
+
+// RestoreGeneratedClients is the first-run pass's client restore (ADR 0087),
+// bound to lifecycle.BootstrapOptions.RestoreClients. It runs client-generate
+// over every project as an ordinary cached engine run, the run `putnami
+// client-generate --all` starts: the action cache is on, so a hit restores a
+// client and a miss renders it.
+//
+// It is not a lifecycle run. Generation is cacheable work, planned once per
+// project. Like the lifecycle adapter, it supplies no telemetry observer: the
+// pass is not a session the user started.
+func RestoreGeneratedClients(ctx context.Context, req lifecycle.ClientRestoreRequest) error {
+	return restoreGeneratedClients(ctx, req, func(ctx context.Context, req engine.Request, sink engine.EventSink) (engine.SessionResult, error) {
+		return engine.New().Run(ctx, req, sink)
+	})
+}
+
+// restoreGeneratedClients is RestoreGeneratedClients with the engine as a
+// parameter, so a test reads the exact request.
+func restoreGeneratedClients(ctx context.Context, req lifecycle.ClientRestoreRequest, run engineRun) error {
+	out := req.Out
+	if out == nil {
+		out = os.Stdout
+	}
+	commands := []string{shared.ClientGenerateCommand}
+	global := GlobalFlags{All: true, Projects: "*", Verbose: req.Display.Verbose, Debug: req.Display.Debug, Quiet: req.Display.Quiet}
+	if err := resolveCacheTrust(&global, req.Config, nil, commands); err != nil {
+		return err
+	}
+	var hooks *wsproto.HooksConfig
+	if req.Config != nil {
+		hooks = req.Config.Hooks
+	}
+	result, err := run(ctx, engine.Request{
+		WorkspaceRoot: req.WorkspaceRoot,
+		Config:        req.Config,
+		Commands:      commands,
+		Global:        global,
+		Hooks:         hooks,
+		Preflight:     doctor.DoctorPreflight,
+		Stdout:        out,
+		ErrorOut:      out,
+	}, output.NewLifecycleRenderer(output.Config{
+		Verbose: req.Display.Verbose,
+		Debug:   req.Display.Debug,
+		Quiet:   req.Display.Quiet,
+		NoColor: req.Display.NoColor,
+		Out:     out,
+		Err:     out,
+	}, req.Display.Interactive))
+	if err != nil {
+		return err
+	}
+	if result.ExitCode != engine.ExitSuccess {
+		return fmt.Errorf("%s exited with code %d", shared.ClientGenerateCommand, result.ExitCode)
+	}
+	return nil
 }
 
 type lifecycleIndexIdentity struct {

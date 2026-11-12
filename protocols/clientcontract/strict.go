@@ -13,22 +13,21 @@ import (
 
 // Stable diagnostic codes returned by strict client contract parsing and validation.
 const (
-	ErrorCodeParseError               = "client_contract.parse_error"
-	ErrorCodeUnknownField             = "client_contract.unknown_field"
-	ErrorCodeInvalidVersion           = "client_contract.invalid_protocol_version"
-	ErrorCodeRequired                 = "client_contract.required"
-	ErrorCodeInvalidEnum              = "client_contract.invalid_enum"
-	ErrorCodeInvalidCredential        = "client_contract.invalid_credential"
-	ErrorCodeUnknownProfile           = "client_contract.unknown_profile"
-	ErrorCodeDuplicate                = "client_contract.duplicate"
-	ErrorCodeInvalidTransport         = "client_contract.invalid_transport"
-	ErrorCodeInvalidSecurity          = "client_contract.invalid_security"
-	ErrorCodeInvalidError             = "client_contract.invalid_error"
-	ErrorCodeInvalidIdempotency       = "client_contract.invalid_idempotency"
-	ErrorCodeInvalidResilience        = "client_contract.invalid_resilience"
-	ErrorCodeInvalidSchema            = "client_contract.invalid_schema"
-	ErrorCodeInvalidProtobuf          = "client_contract.invalid_protobuf"
-	ErrorCodeInvalidGeneratedManifest = "client_contract.invalid_generated_manifest"
+	ErrorCodeParseError         = "client_contract.parse_error"
+	ErrorCodeUnknownField       = "client_contract.unknown_field"
+	ErrorCodeInvalidVersion     = "client_contract.invalid_protocol_version"
+	ErrorCodeRequired           = "client_contract.required"
+	ErrorCodeInvalidEnum        = "client_contract.invalid_enum"
+	ErrorCodeInvalidCredential  = "client_contract.invalid_credential"
+	ErrorCodeUnknownProfile     = "client_contract.unknown_profile"
+	ErrorCodeDuplicate          = "client_contract.duplicate"
+	ErrorCodeInvalidTransport   = "client_contract.invalid_transport"
+	ErrorCodeInvalidSecurity    = "client_contract.invalid_security"
+	ErrorCodeInvalidError       = "client_contract.invalid_error"
+	ErrorCodeInvalidIdempotency = "client_contract.invalid_idempotency"
+	ErrorCodeInvalidResilience  = "client_contract.invalid_resilience"
+	ErrorCodeInvalidSchema      = "client_contract.invalid_schema"
+	ErrorCodeInvalidProtobuf    = "client_contract.invalid_protobuf"
 	// ErrorCodeUnsupportedRuntimeCapability names a generated target that
 	// declares a behavior its runtime requirement does not cover, or requires a
 	// runtime capability the runtimes of this protocol version do not implement.
@@ -45,7 +44,6 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeInvalidError: true, ErrorCodeInvalidIdempotency: true,
 	ErrorCodeInvalidResilience: true, ErrorCodeInvalidSchema: true,
 	ErrorCodeInvalidProtobuf:              true,
-	ErrorCodeInvalidGeneratedManifest:     true,
 	ErrorCodeUnsupportedRuntimeCapability: true,
 }
 

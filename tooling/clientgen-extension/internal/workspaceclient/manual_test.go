@@ -168,31 +168,36 @@ function local(fetch: (url: string) => void, WebSocket: new (url: string) => obj
 	}
 }
 
-func TestStaleGeneratedManifestCannotExemptHandwrittenSource(t *testing.T) {
-	item, expected := analyzerFixture(t)
+// TestAHandwrittenFileInAClientDirectoryIsStillScanned: only the emitter's
+// marker sets a source apart. A file at a generated client's path that does not
+// open with it is a handwritten source, scanned like any other, even when the
+// provider has a generated client to switch to.
+func TestAHandwrittenFileInAClientDirectoryIsStillScanned(t *testing.T) {
 	root := t.TempDir()
 	writeSourceIndex(t, root, "services/catalog")
-	for path, content := range expected {
-		writeWorkspaceFile(t, root, path, string(content))
-	}
 	writeWorkspaceFile(t, root, "services/catalog/putnami.json", `{"name":"catalog"}`)
-	manifestPath := "services/catalog/clients/go/client.putnami.json"
-	var manifest clientcontract.GeneratedClientManifestV1
-	if err := json.Unmarshal(expected[manifestPath], &manifest); err != nil {
-		t.Fatal(err)
-	}
 	writeWorkspaceFile(t, root, "services/catalog/clients/go/client.gen.go", `package catalog
 import client "go.putnami.dev/client"
 const service = "catalog"
 func handwritten() { _, _ = client.NewBuilder().BaseURL(service).Build() }
 `)
+	item := provider{
+		rel: "services/catalog", classification: ClassificationFirstParty,
+		document: &clientcontract.DocumentV1{
+			ProtocolVersion: clientcontract.ProtocolVersion,
+			Service:         clientcontract.Service{ID: "catalog", Audience: "catalog"},
+			Credentials:     map[string]clientcontract.CredentialProfile{},
+		},
+	}
 	report := Report{Providers: []ProviderReport{{
 		Project: "services/catalog", Classification: ClassificationFirstParty, ServiceID: "catalog",
-		Targets: []TargetReport{{Language: clientcontract.GeneratedLanguageGo, Manifest: manifestPath, Binding: &manifest.Binding}},
+		Clients: []ClientReport{{Project: "services/catalog", Language: clientcontract.GeneratedLanguageGo,
+			ImportPath: "example.dev/catalog/clients/go",
+			Bindings:   []ClientBinding{{Service: "catalog", ClientSymbol: "Client", BindingSymbol: "RegisterClient"}}}},
 	}}}
 	adaptations, findings := scanManualClientsFromWorkspace(t, root, []provider{item}, report)
 	if len(adaptations) != 1 || len(findings) != 1 {
-		t.Fatalf("stale generated inventory exempted handwritten source: adaptations=%+v findings=%+v", adaptations, findings)
+		t.Fatalf("a file without the marker was exempted: adaptations=%+v findings=%+v", adaptations, findings)
 	}
 }
 
@@ -250,14 +255,11 @@ func catalog() { _, _ = client.NewBuilder().BaseURL(catalogURL).Build() }
 func TestAdaptationQueueUsesEveryActualGeneratedBindingSymbol(t *testing.T) {
 	report := Report{Providers: []ProviderReport{{
 		Project: "providers/catalog", Classification: ClassificationFirstParty, ServiceID: "catalog-service",
-		Targets: []TargetReport{{
-			Language: clientcontract.GeneratedLanguageTypeScript,
-			Binding: &clientcontract.GeneratedBinding{
-				ImportPath: "@acme/catalog-client",
-				Clients: []clientcontract.GeneratedBindingClient{
-					{Service: "CatalogAdmin", ClientSymbol: "CatalogAdminClient", BindingSymbol: "registerCatalogAdminClient"},
-					{Service: "CatalogPublic", ClientSymbol: "CatalogPublicClient", BindingSymbol: "registerCatalogPublicClient"},
-				},
+		Clients: []ClientReport{{
+			Project: "clients/catalog", Language: clientcontract.GeneratedLanguageTypeScript, ImportPath: "@acme/catalog-client",
+			Bindings: []ClientBinding{
+				{Service: "CatalogAdminService", ClientSymbol: "CatalogAdminClient", BindingSymbol: "registerCatalogAdminClient"},
+				{Service: "CatalogPublicService", ClientSymbol: "CatalogPublicClient", BindingSymbol: "registerCatalogPublicClient"},
 			},
 		}},
 	}}}
@@ -346,7 +348,7 @@ func TestSourceInventoryIgnoresContextOutputsAndUnindexedTrees(t *testing.T) {
 	writeTestFile(t, root, "scratch/call.ts", `export const scratch = () => fetch(url);`)
 	writeTestFile(t, root, "consumer/out/call.ts", `export const output = () => fetch(url);`)
 
-	records, err := discoverSourceRecords(indexedView(root), nil)
+	records, _, err := discoverSourceRecords(indexedView(root))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -528,15 +530,9 @@ func call() { _, _ = http.Get("catalog-service") }
 	}
 	providerReport := ProviderReport{
 		Project: "providers/catalog", Classification: ClassificationFirstParty, ServiceID: "catalog-service",
-		Targets: []TargetReport{{
-			Language: clientcontract.GeneratedLanguageTypeScript,
-			Manifest: "providers/catalog/clients/ts/client.putnami.json",
-			Binding: &clientcontract.GeneratedBinding{
-				ImportPath: "@acme/catalog-client",
-				Clients: []clientcontract.GeneratedBindingClient{
-					{Service: "Catalog", ClientSymbol: "CatalogClient", BindingSymbol: "registerCatalogClient"},
-				},
-			},
+		Clients: []ClientReport{{
+			Project: "clients/catalog-ts", Language: clientcontract.GeneratedLanguageTypeScript, ImportPath: "@acme/catalog-client",
+			Bindings: []ClientBinding{{Service: "CatalogService", ClientSymbol: "CatalogClient", BindingSymbol: "registerCatalogClient"}},
 		}},
 	}
 	messages := func(report Report) map[string]string {
@@ -561,25 +557,24 @@ func call() { _, _ = http.Get("catalog-service") }
 		t.Fatalf("TypeScript diagnostic names neither service nor binding:\n got  %s\n want %s...", got["consumer/call.ts"], wantTS)
 	}
 	wantGo := "handwritten first-party transport to catalog-service must be replaced by the generated binding: " +
-		"catalog-service generates no Go client yet; declare the target on the provider providers/catalog (transport=http"
+		"catalog-service has no Go client project yet; create one whose putnami.json names the service catalog-service " +
+		"in generatedFrom with language \"go\", depend on it, and call its binding (transport=http"
 	if !strings.HasPrefix(got["consumer/call.go"], wantGo) {
-		t.Fatalf("Go diagnostic does not say the target is missing:\n got  %s\n want %s...", got["consumer/call.go"], wantGo)
-	}
-
-	// A configured target whose manifest is not committed yet is a different
-	// instruction: regenerate, do not declare.
-	providerReport.Targets[0].Binding = nil
-	got = messages(Report{Providers: []ProviderReport{providerReport}})
-	wantPending := "the TypeScript target of catalog-service has no committed client manifest at providers/catalog/clients/ts/client.putnami.json; regenerate the client"
-	if !strings.Contains(got["consumer/call.ts"], wantPending) {
-		t.Fatalf("TypeScript diagnostic does not point at the uncommitted manifest:\n got  %s\n want %s", got["consumer/call.ts"], wantPending)
+		t.Fatalf("Go diagnostic does not name the client project to create:\n got  %s\n want %s...", got["consumer/call.go"], wantGo)
 	}
 
 	// Without a provider report (the provider never reached the inventory),
 	// the service is still named.
 	got = messages(Report{})
 	if !strings.Contains(got["consumer/call.ts"], "to catalog-service must be replaced") ||
-		!strings.Contains(got["consumer/call.ts"], "catalog-service generates no TypeScript client yet") {
+		!strings.Contains(got["consumer/call.ts"], "catalog-service has no TypeScript client project yet") {
 		t.Fatalf("diagnostic without provider report lost the service: %s", got["consumer/call.ts"])
+	}
+	for path, message := range got {
+		for _, retired := range []string{"regenerate the client", "declare the target on the provider"} {
+			if strings.Contains(message, retired) {
+				t.Fatalf("the %s diagnostic still says %q: %s", path, retired, message)
+			}
+		}
 	}
 }

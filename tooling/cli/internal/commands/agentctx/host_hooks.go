@@ -19,22 +19,25 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // Host hooks: the hooks an extension declares (the manifest's `hostHooks`
-// member), written into the agent hosts' own hook files (ADR 0081).
+// member), and the core's client restore hook, written into the agent hosts'
+// own hook files (ADR 0081, ADR 0087).
 //
 // Only an explicit `putnami install`, `init` or `upgrade` writes them. An
 // extension's hooks are written when the workspace opts into its agent
 // content, binds the collaboration contract the hooks require, and has the
 // extension installed. When one of the three goes away, the next explicit run
-// removes them.
+// removes them. The restore hook is written when the workspace declares a
+// generated client, and removed when it declares none (client_restore.go).
 //
 // The files are shared with the person who edits them, and no record says
 // which entries Putnami wrote. A hook handler is Putnami's when its command
 // runs a known launcher followed by the command path an installed extension
-// declares. Every other entry, key and group is the person's and keeps its
-// text and its place.
+// declares, or the restore hook's path. Every other entry, key and group is
+// the person's and keeps its text and its place.
 
 // hostHookFile is the hook file of one agent host.
 type hostHookFile struct {
@@ -63,9 +66,11 @@ const (
 	hostHookWakeGuard = `; s=$?; [ "$s" -eq 75 ] && exit 2; exit 0`
 )
 
-// hostHookEnvironment starts every hook command: a hook never runs the
-// first-use install. That install can outlast the host's timeout, and it
-// prints on standard output, which the host reads as the hook's answer.
+// hostHookEnvironment starts every extension hook command: such a hook never
+// runs the first-use install. That install can outlast the host's timeout,
+// and it prints on standard output, which the host reads as the hook's
+// answer. The client restore hook is the one hook that installs
+// (renderClientRestoreGroup).
 const hostHookEnvironment = shared.NoAutoInstallEnv + "=1"
 
 // hostHookLaunchers are the launchers a hook command may start with. Each one
@@ -121,7 +126,8 @@ func (c HostHookChange) Description() string {
 	return text
 }
 
-// RegisterHostHooks writes the host hooks the workspace's extensions declare
+// RegisterHostHooks writes the host hooks the workspace's extensions declare,
+// and the client restore hook when the workspace declares a generated client,
 // into .claude/settings.json and .codex/hooks.json, and removes the ones that
 // no longer apply. It plans every file before it writes, writes each changed
 // file once, and returns what it changed.
@@ -153,8 +159,9 @@ func applyHostHooks(wsRoot string, cfg *wsproto.Config, warn io.Writer, write bo
 		return nil
 	}
 	if len(set.paths) == 0 {
-		// No installed extension declares hooks, so no entry can be ours:
-		// the files are not even read.
+		// No command path is known, so no entry can be ours: the files are
+		// not even read. The restore hook's path is known whenever the
+		// workspace loads, so a stale restore hook is still removed.
 		return nil
 	}
 	var changes []HostHookChange
@@ -182,20 +189,33 @@ func applyHostHooks(wsRoot string, cfg *wsproto.Config, warn io.Writer, write bo
 	return changes
 }
 
-// hostHookSet is what the workspace's extensions ask of the hook files.
+// hostHookSet is what the workspace asks of the hook files.
 type hostHookSet struct {
 	// paths are the command paths of every installed extension that declares
-	// hooks, active or not. A handler that runs one of them is Putnami's.
+	// hooks, active or not, and the restore hook's path when the workspace
+	// loads. A handler that runs one of them is Putnami's.
 	paths [][]string
-	// desired maps a host and an event to the groups the active extensions
-	// declare there, in extension name order, then declared order.
+	// desired maps a host and an event to the groups the workspace asks for
+	// there: the active extensions' groups, in extension name order, then
+	// declared order, and the restore hook last.
 	desired map[string]map[string][]hostHookGroupJSON
 }
 
+// addDesired appends a group to the hooks of host at event.
+func (s *hostHookSet) addDesired(host, event string, group hostHookGroupJSON) {
+	events := s.desired[host]
+	if events == nil {
+		events = map[string][]hostHookGroupJSON{}
+		s.desired[host] = events
+	}
+	events[event] = append(events[event], group)
+}
+
 // collectHostHooks reads the declarations of the workspace's extensions and
-// decides which are active. It fails only when the workspace document cannot
-// be read: without it, no binding can be confirmed or ruled out, and removing
-// hooks on a guess would be wrong.
+// decides which are active, then adds the client restore hook when the
+// workspace declares a generated client. It fails only when the workspace
+// document cannot be read: without it, no binding can be confirmed or ruled
+// out, and removing hooks on a guess would be wrong.
 func collectHostHooks(wsRoot string, cfg *wsproto.Config, warnf func(string, ...any)) (hostHookSet, error) {
 	set := hostHookSet{desired: map[string]map[string][]hostHookGroupJSON{}}
 	if cfg == nil {
@@ -228,17 +248,24 @@ func collectHostHooks(wsRoot string, cfg *wsproto.Config, warnf func(string, ...
 			warnf("the host hooks of %s are not written: %v", name, err)
 		}
 	}
-	if len(sources) == 0 {
+	clients, clientsKnown := workspaceDeclaresGeneratedClient(wsRoot, warnf)
+	if len(sources) == 0 && !clientsKnown {
 		return set, nil
 	}
 
-	bound, err := boundCollaborationContracts(wsRoot)
-	if err != nil {
-		return hostHookSet{}, err
+	var bound map[string]bool
+	if len(sources) > 0 {
+		var err error
+		if bound, err = boundCollaborationContracts(wsRoot); err != nil {
+			return hostHookSet{}, err
+		}
 	}
-	base, err := workspaceLauncher(wsRoot)
-	if err != nil {
-		return hostHookSet{}, err
+	var base string
+	if len(sources) > 0 || clients {
+		var err error
+		if base, err = workspaceLauncher(wsRoot); err != nil {
+			return hostHookSet{}, err
+		}
 	}
 	for _, source := range sources {
 		declaration := source.Declaration
@@ -248,16 +275,34 @@ func collectHostHooks(wsRoot string, cfg *wsproto.Config, warnf func(string, ...
 		}
 		for _, file := range hostHookFiles {
 			for _, entry := range declaration.Hosts[file.host] {
-				events := set.desired[file.host]
-				if events == nil {
-					events = map[string][]hostHookGroupJSON{}
-					set.desired[file.host] = events
-				}
-				events[entry.Event] = append(events[entry.Event], renderHostHookGroup(file.host, base, declaration.Command, entry))
+				set.addDesired(file.host, entry.Event, renderHostHookGroup(file.host, base, declaration.Command, entry))
 			}
 		}
 	}
+	// The restore hook's path is known only when the workspace loads. A
+	// workspace that does not load can neither confirm nor rule out a client,
+	// so its restore hook stays as it is.
+	if clientsKnown {
+		set.paths = append(set.paths, clientRestorePath)
+	}
+	if clients {
+		for _, file := range hostHookFiles {
+			set.addDesired(file.host, clientRestoreEvent, renderClientRestoreGroup(file.host, base))
+		}
+	}
 	return set, nil
+}
+
+// workspaceDeclaresGeneratedClient loads the workspace and reports whether
+// it declares a generated client (shared.DeclaresGeneratedClient). known is
+// false when the workspace does not load; the reason goes to warnf.
+func workspaceDeclaresGeneratedClient(wsRoot string, warnf func(string, ...any)) (clients, known bool) {
+	ws, err := workspace.Load(wsRoot)
+	if err != nil {
+		warnf("the client restore hook is not written: %v", err)
+		return false, false
+	}
+	return shared.DeclaresGeneratedClient(ws), true
 }
 
 // boundCollaborationContracts returns the contracts the workspace document

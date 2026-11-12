@@ -654,8 +654,8 @@ func TestHostHooksKeepEntriesTheyCannotReadAgain(t *testing.T) {
 	}
 }
 
-// A workspace in which no extension declares hooks never reads the files, so
-// an unparseable one draws no warning.
+// A workspace in which no extension declares hooks and no project declares a
+// client asks nothing of the files, so an unparseable one draws no warning.
 func TestHostHooksNeedADeclaringExtension(t *testing.T) {
 	root := t.TempDir()
 	writePathFile(t, root, claudeHooksFile, "{")

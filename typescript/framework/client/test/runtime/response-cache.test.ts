@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect } from 'bun:test';
 import { once } from 'node:events';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { createServer } from 'node:http';
 import type { Socket } from 'node:net';
 import { join } from 'node:path';
@@ -335,6 +335,32 @@ async function bindPrincipals(url: string): Promise<PrincipalsClient> {
 }
 
 /** A vector's JSON text read into the value a consumer holds. */
+// typeScriptRuntimeCapabilities reads the TypeScript row of
+// runtimeCapabilitiesByLanguage, the Go source of truth in
+// protocols/clientcontract, and resolves each constant to its wire value.
+function typeScriptRuntimeCapabilities(): string[] {
+  const source = readdirSync(CONTRACT_ROOT)
+    .filter((name) => name.endsWith('.go') && !name.endsWith('_test.go'))
+    .map((name) => readFileSync(join(CONTRACT_ROOT, name), 'utf8'))
+    .join('\n');
+  const values = new Map(
+    [...source.matchAll(/^\s*(RuntimeCapability\w+)\s+RuntimeCapability\s*=\s*"([^"]+)"/gm)].map(
+      (match) => [match[1], match[2]] as const,
+    ),
+  );
+  const row = /^\s*GeneratedLanguageTypeScript:\s*\{([^}]*)\}/m.exec(source);
+  if (!row) throw new Error('protocols/clientcontract declares no TypeScript runtime capability row');
+  return row[1]
+    .split(',')
+    .map((name) => name.trim())
+    .filter((name) => name !== '')
+    .map((name) => {
+      const value = values.get(name);
+      if (value === undefined) throw new Error(`protocols/clientcontract declares no value for ${name}`);
+      return value;
+    });
+}
+
 function nativeVectorValue(text: string): ResponseFieldValue {
   if (/^-?\d+$/.test(text)) {
     const number = Number(text);
@@ -921,10 +947,9 @@ describe('generated client response cache', () => {
     'implements exactly the capabilities the contract publishes',
     { feature: FEATURE, requirement: REQUIREMENT, check: 'the-runtime-implements-exactly-the-published-capabilities' },
     () => {
-      const schema = JSON.parse(
-        readFileSync(join(CONTRACT_ROOT, 'schemas/generated-client-manifest-v1.json'), 'utf8'),
-      ) as { properties: { runtimeCapabilities: { items: { enum: string[] } } } };
-      expect([...CLIENT_RUNTIME_CAPABILITIES]).toEqual(schema.properties.runtimeCapabilities.items.enum);
+      const published = typeScriptRuntimeCapabilities();
+      expect(published.length).toBeGreaterThan(0);
+      expect([...CLIENT_RUNTIME_CAPABILITIES]).toEqual(published);
       expect(() => requireClientRuntimeCapabilities(['response-cache'])).not.toThrow();
       expect(() => requireClientRuntimeCapabilities(['response-cache-v2'])).toThrow(/response-cache-v2/);
     },

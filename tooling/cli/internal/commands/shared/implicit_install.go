@@ -27,5 +27,5 @@ func IsImplicitInstall(ctx context.Context) bool {
 
 // NoAutoInstallEnv turns the first-use install off for a process when it holds
 // any value. A CI pipeline sets it to install in a step of its own, and every
-// host hook command the CLI writes starts with it set.
+// extension host hook command the CLI writes starts with it set.
 const NoAutoInstallEnv = "PUTNAMI_NO_AUTO_INSTALL"

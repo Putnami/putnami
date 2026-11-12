@@ -187,7 +187,6 @@ describe('generateClient (TypeScript)', () => {
         'src/widgets-client.ts',
         'tsconfig.json',
       ]);
-      expect(existsSync(join(fixture.client, 'client.putnami.json'))).toBe(false);
       for (const [rel, content] of Object.entries(AUTHORED)) {
         expect(readFileSync(join(fixture.workspace, rel), 'utf8')).toBe(content);
       }

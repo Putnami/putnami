@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
@@ -25,26 +24,16 @@ import (
 type clientGenConfig struct {
 	ThirdParty bool     `json:"thirdParty,omitempty"`
 	Targets    []string `json:"targets"`
-	TS         struct {
-		Output string `json:"output"`
-	} `json:"ts"`
-	Go struct {
+	Go         struct {
 		Output string `json:"output"`
 		// ModulePath, PackageName, ClientName and OmitOperations are the
 		// in-module Go target's options (ReadModuleTarget). The guard reads
-		// none of them.
+		// the output and the client name to name the client's binding.
 		ModulePath     string   `json:"modulePath,omitempty"`
 		PackageName    string   `json:"packageName,omitempty"`
 		ClientName     string   `json:"clientName,omitempty"`
 		OmitOperations []string `json:"omitOperations,omitempty"`
 	} `json:"go"`
-}
-
-type workspaceProjectIndex struct {
-	Version  int `json:"version"`
-	Projects []struct {
-		Path string `json:"path"`
-	} `json:"projects"`
 }
 
 type openAPIDocument struct {
@@ -69,8 +58,12 @@ type provider struct {
 	classification Classification
 	document       *clientcontract.DocumentV1
 	operations     []clientcontract.GeneratedOperation
-	security       map[string]clientcontract.Security
-	contractHash   string
+	// routes holds the path of every first-party operation, sorted and
+	// unique. The TypeScript emitter names a generated service after a
+	// route's first literal segment.
+	routes       []string
+	security     map[string]clientcontract.Security
+	contractHash string
 	// unreadOperations counts the contract operations discovery could not turn
 	// into a generated one AND could not read as deliberately absent — an
 	// unmarked operation, an invalid x-putnami-client marker, a missing
@@ -91,12 +84,11 @@ type provider struct {
 // serves none. The declaration is the provider's COMMITTED contract sidecar —
 // the document-level x-putnami-client marker with an empty first-party
 // operation set — so a cold clone reads exactly the same bytes as a tree the
-// session has just built, and the guard needs no configuration, no target and
-// no manifest to be satisfied by it.
+// session has just built, and the guard needs no configuration and no client
+// to be satisfied by it.
 //
 // It is deliberately NOT a blanket suppression. A contract whose operations
-// discovery could not read is not empty, and a contract that declares even one
-// first-party operation still owes its declared targets a generated client.
+// discovery could not read is not empty.
 func (p provider) emptyFirstPartyContract() bool {
 	return p.classification == ClassificationFirstParty && p.document != nil &&
 		len(p.operations) == 0 && p.unreadOperations == 0
@@ -122,10 +114,8 @@ var httpMethods = map[string]bool{
 // discoverCommitted reads the COMMITTED tree, which is the only tree the guard
 // may trust: on a cold clone nothing under .gen exists, and on a warm one the
 // bytes there describe whatever build last ran — possibly another commit's.
-// The committed contract sidecar wins over a built one, and a provider whose
-// build never ran here still names its targets through the committed
-// client.putnami.json manifests under its tree. A provider the session did
-// build converged the sidecar it commits, so the two views agree for it. In
+// The committed contract sidecar wins over a built one. A provider the session
+// did build converged the sidecar it commits, so the two views agree for it. In
 // the candidate cut a .gen file exists only when the project commits it, and
 // each such file under .gen/clientgen or .gen/schema is a finding.
 func discoverCommitted(view workspaceView) ([]provider, []Finding) {
@@ -211,7 +201,7 @@ func committedGeneratedContracts(view workspaceView) []Finding {
 		case ignoreErr != nil:
 			message = fmt.Sprintf("%s sits in %s, which a build owns whole, and cannot be told apart from a build's output: %v", item.rel, item.dir, ignoreErr)
 		case ignored[item.rel]:
-			message = fmt.Sprintf("%s sits in %s, which a build owns whole, and Git tracks it; committing a file there is no longer supported: run %s",
+			message = fmt.Sprintf("%s sits in %s, which a build owns whole, and Git tracks it; a build output is never committed: run %s",
 				item.rel, item.dir, remedy)
 		default:
 			message = fmt.Sprintf("%s sits in %s, which a build owns whole, and no ignore rule excludes it, so each build's output there is a Git candidate: ignore .gen in .gitignore and drop any rule that re-includes the file, and if Git tracks it, first run %s",
@@ -294,24 +284,10 @@ func discoverWith(view workspaceView) ([]provider, []Finding) {
 			findings = append(findings, Finding{Code: "clientgen.invalid-config", Path: configRel, Message: configErr.Error()})
 		}
 		item.specPath = committedSpecPath(view.workspaceFiles, projectRel, configErr == nil)
-		if item.config == nil {
-			// The project commits no generation contract, but the tree may commit
-			// generated targets: each committed manifest names its own language and
-			// directory, which is exactly what the contract would have said. A
-			// project that commits none is not a provider, exactly as a project
-			// with no generation contract never was. One that commits targets
-			// but no contract has clients nothing can judge, and says so below
-			// rather than being skipped as a non-provider.
-			config, manifestFindings := configFromCommittedManifests(view.workspaceFiles, projectRel)
-			findings = append(findings, manifestFindings...)
-			if config != nil {
-				item.config = config
-			}
-		}
 		if item.specPath == "" {
 			if item.config != nil {
 				findings = append(findings, Finding{Code: "clientgen.missing-contract", Path: item.rel,
-					Message: "the project generates clients (a clientgen config or committed client manifests) but no OpenAPI contract was found, built or committed"})
+					Message: "the project commits " + committedConfigFile + " but no OpenAPI contract: commit the contract at schema/openapi.json"})
 			}
 			continue
 		}
@@ -370,7 +346,7 @@ func discoverWith(view workspaceView) ([]provider, []Finding) {
 			for _, method := range methods {
 				op := document.Paths[route][method]
 				// An operation an external authority owns is not a contract
-				// operation: no target generates it, so no manifest lists it.
+				// operation: no client carries it.
 				authority, externalDiags := clientcontract.ExternalContractAuthority(op.Client, op.External)
 				if len(externalDiags) > 0 {
 					for _, finding := range diagnostics(item.specPath, "clientgen.invalid-operation-contract", externalDiags) {
@@ -407,17 +383,12 @@ func discoverWith(view workspaceView) ([]provider, []Finding) {
 					operation.Cache = opMetadata.Resilience.Cache
 				}
 				item.operations = append(item.operations, operation)
+				item.routes = append(item.routes, route)
 				item.security[op.OperationID] = opMetadata.Security
 			}
 		}
 		sort.Slice(item.operations, func(i, j int) bool { return item.operations[i].OperationID < item.operations[j].OperationID })
-		// A contract with no first-party operation declares that it generates
-		// nothing, so it owes no generation configuration either — on a cold
-		// clone that absence is the only thing there is to read.
-		if item.config == nil && !item.emptyFirstPartyContract() {
-			findings = append(findings, Finding{Code: "clientgen.missing-config", Path: item.rel,
-				ServiceID: metadata.Service.ID, Message: "first-party provider has no " + committedConfigFile})
-		}
+		item.routes = slices.Compact(item.routes)
 		providers = append(providers, *item)
 	}
 	return providers, findings
@@ -439,33 +410,6 @@ func readGenerationConfig(view workspaceView, projectRel string) ([]byte, string
 	committed := joinRel(projectRel, committedConfigFile)
 	data, err := view.Read(committed)
 	return data, committed, err
-}
-
-func indexedProjectPaths(workspaceRoot string) ([]string, error) {
-	path := filepath.Join(workspaceRoot, ".putnami", "workspace-index.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("read Putnami workspace project index: %w", err)
-	}
-	var index workspaceProjectIndex
-	if err := json.Unmarshal(data, &index); err != nil {
-		return nil, fmt.Errorf("parse Putnami workspace project index: %w", err)
-	}
-	if index.Version <= 0 || index.Projects == nil {
-		return nil, fmt.Errorf("putnami workspace project index is incomplete; run `putnami projects sync`")
-	}
-	seen := map[string]bool{}
-	paths := make([]string, 0, len(index.Projects))
-	for _, project := range index.Projects {
-		clean, pathErr := safeInventoryProject(project.Path)
-		if pathErr != nil || clean != project.Path || seen[project.Path] {
-			return nil, fmt.Errorf("putnami workspace project index contains invalid or duplicate path %q", project.Path)
-		}
-		seen[project.Path] = true
-		paths = append(paths, project.Path)
-	}
-	sort.Strings(paths)
-	return paths, nil
 }
 
 // committedSpecPath prefers the committed sidecar: it is what the checkout
@@ -493,122 +437,6 @@ func firstSpecPath(files workspaceFiles, projectRel string, candidates ...string
 		}
 	}
 	return ""
-}
-
-// configFromCommittedManifests synthesizes the generation contract a cold tree
-// lacks from the client.putnami.json manifests committed under the provider:
-// one target per manifest language, at the directory that holds it. A tree
-// that commits none yields nil — the project is not a provider; a manifest
-// that cannot be read as a first-party target is a finding, because a closure
-// nobody can read is not an empty one. Directories the project walk skips
-// (dot-directories, installs, vendored trees, testdata) are skipped here for
-// the same reason.
-//
-// The manifest is read through clientcontract.DecodeGeneratedClientReference,
-// the same decoder the workspace graph resolves a contract edge with. One
-// decoder is what keeps the two answers about a target — which language it is
-// generated for, and which provider it belongs to — from disagreeing about
-// which files are targets at all.
-func configFromCommittedManifests(files workspaceFiles, projectRel string) (*clientGenConfig, []Finding) {
-	config := &clientGenConfig{}
-	var findings []Finding
-	manifests := committedManifestPaths(files, projectRel)
-	if len(manifests) == 0 {
-		return nil, findings
-	}
-	for _, manifestRel := range manifests {
-		data, readErr := files.Read(manifestRel)
-		if readErr != nil {
-			findings = append(findings, Finding{Code: "clientgen.invalid-manifest", Path: manifestRel,
-				Message: fmt.Sprintf("committed generated client manifest could not be read: %v", readErr)})
-			continue
-		}
-		reference, ok := clientcontract.DecodeGeneratedClientReference(data)
-		if !ok {
-			findings = append(findings, Finding{Code: "clientgen.invalid-manifest", Path: manifestRel,
-				Message: "committed generated client manifest does not name a first-party target " +
-					"(generatedBy, protocolVersion, service.id, contractSha256), so the target it names cannot be judged"})
-			continue
-		}
-		output := path.Dir(manifestRel)
-		if projectRel != "." {
-			output = strings.TrimPrefix(output, projectRel+"/")
-		}
-		switch reference.Language {
-		case clientcontract.GeneratedLanguageGo:
-			if !hasConfiguredTarget(config.Targets, "go") {
-				config.Targets = append(config.Targets, "go")
-				config.Go.Output = output
-			}
-		case clientcontract.GeneratedLanguageTypeScript:
-			if !hasConfiguredTarget(config.Targets, "ts") {
-				config.Targets = append(config.Targets, "ts")
-				config.TS.Output = output
-			}
-		default:
-			findings = append(findings, Finding{Code: "clientgen.invalid-manifest", Path: manifestRel,
-				Message: fmt.Sprintf("committed generated client manifest names no supported language (%q)", reference.Language)})
-		}
-	}
-	sort.Strings(config.Targets)
-	return config, findings
-}
-
-// committedManifestPaths lists, in directory-walk order, the workspace-relative
-// client.putnami.json manifests below the provider projectRel ("." is the
-// root), outside the directories the project walk skips and never at the
-// project's own root. A manifest at the project's OWN root is a generated
-// client the project IS — an indexed client package inside its provider's
-// output directory — not a target the project generates; its provider names
-// it from above. In the candidate cut an ignored manifest is absent.
-func committedManifestPaths(files workspaceFiles, projectRel string) []string {
-	var manifests []string
-	if files.tree != nil {
-		for _, rel := range files.candidatesBelow(projectRel, excludedWalkDir) {
-			if path.Base(rel) != clientcontract.GeneratedManifestFile || path.Dir(rel) == projectRel {
-				continue
-			}
-			manifests = append(manifests, rel)
-		}
-		sort.SliceStable(manifests, func(i, j int) bool { return walkOrderLess(manifests[i], manifests[j]) })
-		return manifests
-	}
-	projectRoot := filepath.Join(files.root, filepath.FromSlash(projectRel))
-	_ = filepath.WalkDir(projectRoot, func(walked string, entry fs.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			if entry != nil && entry.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.IsDir() {
-			if walked != projectRoot && excludedWalkDir(entry.Name()) {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-		if entry.Name() != clientcontract.GeneratedManifestFile || filepath.Dir(walked) == projectRoot {
-			return nil
-		}
-		if rel, relErr := filepath.Rel(files.root, walked); relErr == nil {
-			manifests = append(manifests, filepath.ToSlash(rel))
-		}
-		return nil
-	})
-	return manifests
-}
-
-// walkOrderLess orders two slash paths as a lexical directory walk visits
-// them: segment by segment, so "a/b" precedes "a-c/d" although '-' sorts
-// before '/'.
-func walkOrderLess(a, b string) bool {
-	left, right := strings.Split(a, "/"), strings.Split(b, "/")
-	for index := 0; index < len(left) && index < len(right); index++ {
-		if left[index] != right[index] {
-			return left[index] < right[index]
-		}
-	}
-	return len(left) < len(right)
 }
 
 func readSpec(files workspaceFiles, rel string) ([]byte, error) {
@@ -646,13 +474,3 @@ func diagnostics(path, code string, values []diag.Diagnostic) []Finding {
 }
 
 func blank(value string) bool { return strings.TrimSpace(value) == "" }
-
-// excludedWalkDir reports whether a project walk skips a directory: a
-// dot-directory, an install, a vendored tree or test data holds no target.
-func excludedWalkDir(name string) bool {
-	return strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "testdata"
-}
-
-func hasConfiguredTarget(values []string, want string) bool {
-	return slices.Contains(values, want)
-}

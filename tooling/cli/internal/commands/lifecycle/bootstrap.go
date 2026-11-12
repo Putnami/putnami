@@ -13,6 +13,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/iox"
 	"go.putnami.dev/tooling/cli/internal/runcredential"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 const (
@@ -25,7 +26,7 @@ const (
 	// noAutoInstallEnv opts out of first-use auto-install entirely — for CI
 	// pipelines that prefer to run `putnami install` as an explicit, isolated
 	// step rather than have it triggered by the first command, and for every
-	// host hook command.
+	// extension host hook command.
 	noAutoInstallEnv = shared.NoAutoInstallEnv
 )
 
@@ -64,7 +65,28 @@ type BootstrapOptions struct {
 	// LifecycleEnv.BeforeRepositoryCode: on a hosted run it runs after the
 	// workspace-fetch and before the install's first repository code.
 	BeforeRepositoryCode func(context.Context) error
+	// RestoreClients runs client-generate after a successful implicit install
+	// (restoreGeneratedClients). It travels on the options for the reason
+	// RunJob does: the caller in internal/cli owns the engine binding. Nil
+	// skips the pass.
+	RestoreClients ClientRestorer
 }
+
+// ClientRestoreRequest describes the first-run pass's client-generate run.
+type ClientRestoreRequest struct {
+	WorkspaceRoot string
+	Config        *wsproto.Config
+	// Out receives the run's human progress: stdout, or stderr when the
+	// invoking command writes machine output on stdout.
+	Out io.Writer
+	// Display carries the invoking command's human-output preferences.
+	Display LifecycleDisplay
+}
+
+// ClientRestorer runs client-generate over every project as an ordinary
+// cached engine run: a cache hit restores a client, a miss renders it. The
+// caller in internal/cli supplies it (cli.RestoreGeneratedClients).
+type ClientRestorer func(context.Context, ClientRestoreRequest) error
 
 // EnsureWorkspaceBootstrap runs `putnami install` once when a fresh checkout, a
 // new worktree, or a CI runner has no current install state, so the first
@@ -153,7 +175,49 @@ func EnsureWorkspaceBootstrap(ctx context.Context, wsRoot string, cfg *wsproto.C
 		return nil
 	}
 	// A successful Install wrote the marker (see Install in install.go).
+	restoreGeneratedClients(ctx, wsRoot, cfg, opts)
 	return nil
+}
+
+// restoreGeneratedClients is the first-run pass's client restore (ADR 0087).
+// A generated client is built, not committed, so the worktree the install
+// just prepared holds none. It runs client-generate once, after the implicit
+// install, as an ordinary cached engine run.
+//
+// It runs once per fresh worktree, like the install it follows: only after an
+// install this process ran, and at most once per workspace per process. It
+// cannot start another implicit install: the bootstrap already marked the
+// workspace for this process and, through the environment, for every putnami
+// a job starts.
+//
+// It skips the run when:
+//   - the caller supplies no restorer;
+//   - the command is client-generate, which does the same work itself;
+//   - the run is hosted: its gate plans the clients its builds need, and a
+//     second engine run would miss the remote cache the gate reads;
+//   - the workspace does not load, or declares no generated client.
+//
+// It is best-effort: a failure prints one line and the command still runs.
+func restoreGeneratedClients(ctx context.Context, wsRoot string, cfg *wsproto.Config, opts BootstrapOptions) {
+	if opts.RestoreClients == nil || opts.Command == shared.ClientGenerateCommand || runcredential.Hosted() {
+		return
+	}
+	ws, err := workspace.Load(wsRoot)
+	if err != nil {
+		slog.Debug("generated clients: load workspace", "error", err)
+		return
+	}
+	if !shared.DeclaresGeneratedClient(ws) {
+		return
+	}
+	out := io.Writer(os.Stdout)
+	if protocolcli.OutputMode(opts.Output).IsMachineReadable() {
+		out = os.Stderr
+	}
+	err = opts.RestoreClients(ctx, ClientRestoreRequest{WorkspaceRoot: wsRoot, Config: cfg, Out: out, Display: opts.Display})
+	if err != nil {
+		iox.Fprintf(os.Stderr, "  Generated clients were not restored: %v\n", err)
+	}
 }
 
 // runBootstrapInstall runs the implicit install with its human output routed to

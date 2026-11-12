@@ -57,7 +57,7 @@
     },
     {
       "id": "runtime-capability-gate",
-      "text": "Generation fails an operation whose contract declares a response cache policy the client runtimes of this protocol version do not implement, with clientgen.unsupported-runtime-capability; regenerating cannot fix it, upgrading the runtime can."
+      "text": "A generated client whose contract declares a response cache policy or an SSE continuation requires the matching runtime capability when it loads, and a client runtime that does not implement it stops the load; regenerating cannot fix it, upgrading the runtime can."
     },
     {
       "id": "named-omissions",
@@ -65,11 +65,11 @@
     },
     {
       "id": "empty-first-party-contract",
-      "text": "A provider may declare its service identity and no first-party operation at all: every route owned by an external authority, or none served. The committed contract sidecar is that declaration, so the check is satisfied on a cold clone with no configuration or target, and requires nothing. Only a genuinely empty set qualifies: one declared operation or one the check could not read still owes its verdict, and a consumer is told to classify."
+      "text": "A provider may declare its service identity and no first-party operation at all: every route owned by an external authority, or none served. The committed contract sidecar is that declaration, so the check reads it the same on a cold clone, names no client for it and requires nothing. Only a genuinely empty set qualifies: a contract with one declared operation, or one the check could not read, is not empty, and a consumer of an empty contract is told to classify its callsite."
     },
     {
       "id": "handwritten-client-guard",
-      "text": "Go AST and TypeScript lexical analysis inventory each production HTTP, Connect, SSE and WebSocket callsite across aliases and project-scoped endpoint configuration. Sources come only from indexed project trees in the Git candidate cut; comments, strings, tests and ignored generated files do not trigger, and framework runtime authority is bound to exact callsite identities. A failing diagnostic names the service and the client to depend on, or the target to declare: a failed job emits no report."
+      "text": "Go AST and TypeScript lexical analysis inventory each production HTTP, Connect, SSE and WebSocket callsite across aliases and project-scoped endpoint configuration. Sources come only from indexed project trees in the Git candidate cut; comments, strings, tests and generated files do not trigger, and framework runtime authority is bound to exact callsite identities. A failing diagnostic names the service and the generated binding to call, or the client project to create: a failed job emits no report."
     },
     {
       "id": "native-validation-gate",

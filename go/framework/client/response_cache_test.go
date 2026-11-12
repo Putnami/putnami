@@ -635,6 +635,7 @@ func TestTheCacheKeyMatchesTheSharedVectors(t *testing.T) {
 
 func TestTheRuntimeImplementsExactlyThePublishedCapabilities(t *testing.T) {
 	spectest.Proves(t, "go/typed-service-clients", responseCacheRequirement, "the-runtime-implements-exactly-the-published-capabilities")
+	spectest.Proves(t, "tooling/cross-language-rest-clients", "runtime-capability-gate", "a-generated-client-fails-to-load-on-a-runtime-without-its-capability")
 	implemented := clientcontract.RuntimeCapabilitiesImplementedBy(clientcontract.GeneratedLanguageGo)
 	if !reflect.DeepEqual(RuntimeCapabilities(), implemented) {
 		t.Fatalf("runtime capabilities = %v, contract = %v", RuntimeCapabilities(), implemented)

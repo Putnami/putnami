@@ -26,7 +26,7 @@ func TestSchemaIdentityAndVersionMatchContract(t *testing.T) {
 }
 
 func TestSchemaPropertiesMatchGoWireTypes(t *testing.T) {
-	spectest.Proves(t, "client-contract/first-party-generated-clients", "generated-inventory", "published-schemas-match-the-wire-types")
+	spectest.Proves(t, "client-contract/first-party-generated-clients", "strict-provider-authority", "published-schemas-match-the-wire-types")
 	schema := loadSchema(t)
 	defs := schema["$defs"].(map[string]any)
 	cases := []struct {
@@ -69,67 +69,10 @@ func TestSchemaPropertiesMatchGoWireTypes(t *testing.T) {
 	}
 }
 
-func TestGeneratedManifestSchemaMatchesGoWireTypes(t *testing.T) {
-	data, err := os.ReadFile("schemas/generated-client-manifest-v1.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var schema map[string]any
-	if err := json.Unmarshal(data, &schema); err != nil {
-		t.Fatal(err)
-	}
-	if got := schema["$id"]; got != GeneratedManifestSchemaURL {
-		t.Fatalf("schema $id = %v, want %q", got, GeneratedManifestSchemaURL)
-	}
-	defs := schema["$defs"].(map[string]any)
-	cases := []struct {
-		definition any
-		value      any
-	}{
-		{schema, GeneratedClientManifestV1{}},
-		{defs["binding"], GeneratedBinding{}},
-		{defs["bindingClient"], GeneratedBindingClient{}},
-		{defs["operation"], GeneratedOperation{}},
-		{defs["file"], GeneratedFile{}},
-	}
-	for _, tc := range cases {
-		got := schemaPropertyNames(tc.definition)
-		want := goJSONFieldNames(reflect.TypeOf(tc.value))
-		if !reflect.DeepEqual(got, want) {
-			t.Fatalf("properties drift for %T: schema=%v Go=%v", tc.value, got, want)
-		}
-	}
-}
-
-// TestGeneratedManifestSchemaEnumeratesTheImplementedRuntimeCapabilities pins
-// the published capability vocabulary to the one the Go reader enforces, so a
-// capability cannot be added to one without the other.
-func TestGeneratedManifestSchemaEnumeratesTheImplementedRuntimeCapabilities(t *testing.T) {
-	spectest.Proves(t, "client-contract/first-party-generated-clients", "response-cache-policy", "the-published-schemas-carry-the-cache-policy-and-the-capability-vocabulary")
-	data, err := os.ReadFile("schemas/generated-client-manifest-v1.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	var schema struct {
-		Properties struct {
-			RuntimeCapabilities struct {
-				Items struct {
-					Enum []string `json:"enum"`
-				} `json:"items"`
-			} `json:"runtimeCapabilities"`
-		} `json:"properties"`
-	}
-	if err := json.Unmarshal(data, &schema); err != nil {
-		t.Fatal(err)
-	}
-	got := schema.Properties.RuntimeCapabilities.Items.Enum
-	want := make([]string, 0, len(ImplementedRuntimeCapabilities))
-	for _, capability := range ImplementedRuntimeCapabilities {
-		want = append(want, string(capability))
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("runtime capability enum drift: schema=%v Go=%v", got, want)
-	}
+// TestThePublishedSchemaCarriesTheCachePolicy pins the published cache policy
+// to the one the Go reader enforces.
+func TestThePublishedSchemaCarriesTheCachePolicy(t *testing.T) {
+	spectest.Proves(t, "client-contract/first-party-generated-clients", "response-cache-policy", "the-published-schema-carries-the-cache-policy")
 	defs := loadSchema(t)["$defs"].(map[string]any)
 	resilience := defs["resilience"].(map[string]any)["properties"].(map[string]any)
 	if _, ok := resilience["cache"]; !ok {

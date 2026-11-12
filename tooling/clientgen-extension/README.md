@@ -205,12 +205,11 @@ that file of the identifiers it uses — so repointing `const url = ...` at a
 different host revokes the entry, while an unrelated edit elsewhere in the file
 does not.
 
-For every consumer that imports and calls a generated registration symbol, the
-machine report records the provider, service, available operation, consumer
-project, client and method symbols, auth profiles, stream direction and
-transports. Those edges prove that the generated operation is available through
-the registered binding; they do not claim that application code invoked every
-operation.
+For every first-party provider, the machine report lists its clients: each
+client project that names the provider's service in `generatedFrom`, and the
+in-module Go client its `clientgen.json` declares, with the import path and the
+binding symbols to call. The guard spells them from committed files only: the
+contract, the generation options, and the client's `go.mod` or `package.json`.
 
 When the source guard finds a handwritten first-party transport, the failing
 diagnostic names the service and what to call instead: the generated package
@@ -328,12 +327,12 @@ On a miss the check pays its full cost, and the cost is bounded by doing less
 work rather than by storing the answer:
 
 - it builds nothing and generates nothing;
-- one workspace source scan per check answers both the consumer-edge question
-  and the handwritten-transport question, instead of one scan each;
+- one workspace source scan per check finds both the tracked generated files
+  and the handwritten transports;
 - a Go file is fully parsed only when its import block names a transport
   package, which the real parser decides by reading the header and stopping;
-- a TypeScript file is masked once, and its import specifiers and transport
-  callsites are read from that one mask;
+- a TypeScript file is masked once, and its transport callsites are read from
+  that one mask;
 - the global transports are looked for only in a masked source that names them;
 - the expressions the scanner derives from identifier and module names are
   compiled once per process instead of once per file.
@@ -342,7 +341,7 @@ The report carries `timings` — one entry per phase, also emitted as
 `clientgen.phase.<name>` metric events — so a slow guard is diagnosed from the
 record rather than estimated. Measured on this repository before the nested
 provider build and mirror render were removed (2151 indexed production
-sources, 114 inventoried callsites, 35 consumer edges): the
+sources, 114 inventoried callsites): the
 nested provider build was 14.9 s and the mirror render 7.8 s of a 24.2 s guard
 under load; the scan, which is what remains, was 1.3 s.
 

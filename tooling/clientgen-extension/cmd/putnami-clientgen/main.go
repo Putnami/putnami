@@ -116,7 +116,7 @@ func generateModuleTarget(ctx *pctx.Context, _ *jsonl.Emitter, _ []string) (stri
 // runCheck is the guard: clientgen-check, and the validate contribution. It
 // builds nothing and renders nothing. It reads the Git candidate cut its
 // `git:**` key holds and the membership the orchestrator resolved from
-// committed manifests, so a cold clone and a tree the session just built
+// the committed workspace and scope manifests, so a cold clone and a tree the session just built
 // reach one verdict.
 func runCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
 	if ctx.WorkspaceRoot == "" {
@@ -142,14 +142,12 @@ func runCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 	// the counts that say HOW MUCH is unverified would disappear exactly
 	// when they are needed. The summary is emitted on both paths.
 	emit.SummaryWithData(
-		fmt.Sprintf("%d generated-client finding(s), %d censused pending transport(s), %d/%d operation targets covered",
-			len(report.Findings), len(report.PendingTransports), report.Coverage.Covered, report.Coverage.Required),
+		fmt.Sprintf("%d generated-client finding(s), %d censused pending transport(s)",
+			len(report.Findings), len(report.PendingTransports)),
 		map[string]any{
 			"findings":          len(report.Findings),
 			"pendingTransports": len(report.PendingTransports),
-			"coverage":          report.Coverage,
 			"providers":         len(report.Providers),
-			"consumerEdges":     len(report.ConsumerEdges),
 			"timings":           report.Timings,
 		})
 	if !report.Clean() {

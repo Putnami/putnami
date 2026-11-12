@@ -94,7 +94,6 @@
         "../observe/internal/observe/testdata/demos/turbo.txtar",
         "../../protocols/evidence/**",
         "../../protocols/codehost/**",
-        "git:../../**/client.putnami.json",
         "git:../../**/schema/openapi.json",
         "command-surface.json"
       ]
