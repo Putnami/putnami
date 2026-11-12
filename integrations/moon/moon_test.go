@@ -245,6 +245,18 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, true)
+	// Before the sync, the projects the import moves to a language extension
+	// are bare members: moon lists them, and their extension runs them. docs,
+	// which moon does not list, is no project.
+	before := probe(t, root)
+	if len(before) != 3 || before["apps/web"].SourceName != "web" {
+		t.Errorf("before the sync, probe %+v", before)
+	}
+	for _, dir := range []string{"apps/api", "packages/pricing"} {
+		if p, ok := before[dir]; !ok || p.SourceName != "" || len(p.Extensions) != 0 {
+			t.Errorf("before the sync %s = %+v (listed %v), want a bare member", dir, p, ok)
+		}
+	}
 	result, err := Sync(context.Background(), root)
 	if err != nil {
 		t.Fatal(err)

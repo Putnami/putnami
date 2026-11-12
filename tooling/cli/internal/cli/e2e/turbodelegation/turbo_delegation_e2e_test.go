@@ -353,3 +353,32 @@ func TestAnImportedTurborepoMovesOnlyTheTasksTypeScriptRunsAndListsTheOthers(t *
 		}
 	}
 }
+
+// TestTheWorkspaceAdoptsOnlyThePackagesThePnpmWorkspaceLists pins that a directory that holds a package.json and that pnpm-workspace.yaml does
+// not list, such as a test fixture, becomes no project: neither init --from
+// turbo nor projects sync adds it.
+func TestTheWorkspaceAdoptsOnlyThePackagesThePnpmWorkspaceLists(t *testing.T) {
+	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "only-listed-members-become-projects", "a-directory-the-tool-does-not-list-becomes-no-project")
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	demo := readDemo(t)
+	root := turboWorkspace(t, demo, buildRuntime(t), "")
+	stubTurbo(t)
+	clitest.WriteFile(t, filepath.Join(root, "apps/api/test/fixture/package.json"), `{"name": "fixture", "version": "1.0.0"}`)
+	if code, out := clitest.RunGateArgs(t, root, "init", "--from", "turbo", "--mode", "delegate", "--apply"); code != 0 {
+		t.Fatalf("init --from turbo --apply exit %d:\n%s", code, out)
+	}
+	listed := []string{"apps/api", "packages/pricing"}
+	if got := clitest.ProjectPaths(t, root); !slices.Equal(got, listed) {
+		t.Errorf("init --from turbo made the projects %v, want the ones pnpm-workspace.yaml lists %v", got, listed)
+	}
+
+	clitest.WriteFile(t, filepath.Join(root, "tools/scripts/package.json"), `{"name": "scripts", "version": "1.0.0"}`)
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if got := clitest.ProjectPaths(t, root); !slices.Equal(got, listed) {
+		t.Errorf("projects sync made the projects %v, want the ones pnpm-workspace.yaml lists %v", got, listed)
+	}
+}

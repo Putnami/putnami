@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "projects-become-projects",
-      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and as the name rush receives, the projects the putnami observe Rush detector says it depends on, each edge attributed to build-graph, the extension @putnami/rush, the tag rush and the workspace root as stack root. In import mode, options.@putnami/rush.mode of putnami.workspace.json or its default, it answers only the projects whose putnami.json names @putnami/rush, which keep a target on Rush."
+      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and the name rush receives, the projects the observe Rush detector says it depends on, attributed build-graph, extension @putnami/rush, tag rush, the workspace root as stack root. In import mode, the default, it answers a project whose putnami.json names @putnami/rush as such, and every other rush.json project as bare, with no extension and no source name. A directory rush.json does not list is no project."
     },
     {
       "id": "sync-writes-the-project-graph",

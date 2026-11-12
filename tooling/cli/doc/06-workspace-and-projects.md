@@ -96,6 +96,19 @@ how `includes` is populated when adopting Putnami in an existing monorepo.
 Autonomous scope directories are kept as scope entries rather than direct
 projects.
 
+When the workspace declares the extension of a monorepo tool (`@putnami/turbo`,
+`@putnami/nx`, `@putnami/moon`, `@putnami/rush`, `@putnami/bazel` or
+`@putnami/pants`), that tool's list bounds the scan: a directory is a member
+only when the tool lists it, or when it holds its own `putnami.json`. The list
+is the pnpm, Bun, Yarn or npm workspace members for Turborepo, the Nx graph,
+moon's project list, `rush.json`, the Bazel packages outside `.bazelignore` and
+`REPO.bazel` `ignore_directories`, and the Pants `BUILD` directories. A
+directory with a manifest the tool does not list, such as a test fixture's
+`package.json`, is no project; the sync prints how many it left out and names
+the first five. When the tool cannot list its members, the sync warns, keeps
+only the directories with their own `putnami.json`, and ignores `--prune` for
+that run.
+
 Three exclusions are core's and cannot be overridden: `.git`, `.putnami`, and any
 directory git ignores entirely. Everything else an extension lists in
 `workspace.excludes` is honored as a walk exclusion.

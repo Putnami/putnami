@@ -20,7 +20,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-packages-of-a-bazel-workspace-become-projects-with-their-edges"
+              "the-packages-of-a-bazel-workspace-become-projects-with-their-edges",
+              "a-directory-bazel-ignores-becomes-no-project"
             ]
           }
         },

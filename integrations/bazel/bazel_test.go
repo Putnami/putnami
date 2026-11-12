@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -276,6 +277,24 @@ func TestThePackagesOfABazelWorkspaceBecomeProjects(t *testing.T) {
 	// A directory that is no Bazel workspace answers nothing.
 	if result := probe(t, t.TempDir()); len(result.Projects) != 0 {
 		t.Errorf("no workspace: %+v", result.Projects)
+	}
+}
+
+func TestADirectoryBazelIgnoresBecomesNoProject(t *testing.T) {
+	spectest.Proves(t, feature, "packages-become-projects", "a-directory-bazel-ignores-becomes-no-project")
+	d := readDemo(t)
+	for _, withExport := range []bool{true, false} {
+		root := repository(t, d, withExport)
+		stackstest.WriteFile(t, root, "REPO.bazel", "ignore_directories([\"tools\"])\n")
+		stackstest.WriteFile(t, root, "tools/BUILD", "")
+		var got []string
+		for _, p := range probe(t, root).Projects {
+			got = append(got, p.Path)
+		}
+		slices.Sort(got)
+		if want := []string{"api", "pricing", "web"}; !reflect.DeepEqual(got, want) {
+			t.Errorf("with the export %v: projects %v, want %v", withExport, got, want)
+		}
 	}
 }
 

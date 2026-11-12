@@ -23,10 +23,12 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/tooling/observe/detect/memberglob"
 )
 
 // Ecosystem is the evidence ecosystem slug of a Bazel package.
@@ -318,10 +320,9 @@ func label(dir string) string {
 }
 
 // buildDirs walks the repository for the directories that hold a BUILD or
-// BUILD.bazel file, past hidden directories, node_modules, the bazel-*
-// convenience links of the root and the directories .bazelignore names.
+// BUILD.bazel file and that the walk does not skip.
 func buildDirs(root string) ([]string, []diag.Diagnostic) {
-	ignored := bazelIgnore(root)
+	skip := newSkipper(root)
 	found := map[string]bool{}
 	var diags []diag.Diagnostic
 	walked := 0
@@ -340,9 +341,7 @@ func buildDirs(root string) ([]string, []diag.Diagnostic) {
 		}
 		rel = filepath.ToSlash(rel)
 		if entry.IsDir() {
-			name := entry.Name()
-			if rel != "." && (strings.HasPrefix(name, ".") || name == "node_modules" || ignored[rel] ||
-				(!strings.Contains(rel, "/") && strings.HasPrefix(name, "bazel-"))) {
+			if skip.dir(rel) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -358,6 +357,43 @@ func buildDirs(root string) ([]string, []diag.Diagnostic) {
 	}
 	sort.Strings(dirs)
 	return dirs, diags
+}
+
+// Ignored reports whether the repository-relative directory dir, or a
+// directory above it, is one the BUILD file walk skips: a hidden directory,
+// node_modules, a bazel-* convenience link of the root, a directory
+// .bazelignore names or one an ignore_directories glob of REPO.bazel
+// matches. Bazel loads no package there.
+func Ignored(root, dir string) bool {
+	skip := newSkipper(root)
+	parts := strings.Split(path.Clean(dir), "/")
+	for i := range parts {
+		if rel := strings.Join(parts[:i+1], "/"); rel != "." && skip.dir(rel) {
+			return true
+		}
+	}
+	return false
+}
+
+// skipper tells the directories the BUILD file walk skips.
+type skipper struct {
+	ignored map[string]bool
+	globs   [][]string
+}
+
+func newSkipper(root string) skipper {
+	return skipper{ignored: bazelIgnore(root), globs: ignoreDirectories(root)}
+}
+
+// dir reports whether the walk skips the repository-relative directory rel,
+// "." being the root, which it never skips.
+func (s skipper) dir(rel string) bool {
+	if rel == "." {
+		return false
+	}
+	name := path.Base(rel)
+	return strings.HasPrefix(name, ".") || name == "node_modules" || s.ignored[rel] ||
+		(!strings.Contains(rel, "/") && strings.HasPrefix(name, "bazel-")) || matchesAny(s.globs, rel)
 }
 
 // bazelIgnore reads the directories .bazelignore names, one per line,
@@ -376,6 +412,46 @@ func bazelIgnore(root string) map[string]bool {
 		out[path.Clean(strings.Trim(line, "/"))] = true
 	}
 	return out
+}
+
+// ignoreDirectoriesCall is the ignore_directories call of a REPO.bazel file
+// and its list of globs.
+var ignoreDirectoriesCall = regexp.MustCompile(`(?s)\bignore_directories\s*\(\s*\[(.*?)\]`)
+
+// stringLiteral is one Starlark string literal of that list.
+var stringLiteral = regexp.MustCompile(`"([^"\\]*)"|'([^'\\]*)'`)
+
+// ignoreDirectories reads the globs of the ignore_directories call of
+// REPO.bazel, as segments; Bazel loads no package below a directory one
+// matches. The detector does not evaluate Starlark: it reads the string
+// literals of the call's list.
+func ignoreDirectories(root string) [][]string {
+	data, err := os.ReadFile(filepath.Join(root, "REPO.bazel"))
+	if err != nil {
+		return nil
+	}
+	var globs [][]string
+	for _, call := range ignoreDirectoriesCall.FindAllStringSubmatch(string(data), -1) {
+		for _, literal := range stringLiteral.FindAllStringSubmatch(call[1], -1) {
+			if segments, ok := memberglob.Segments(literal[1] + literal[2]); ok {
+				globs = append(globs, segments)
+			}
+		}
+	}
+	return globs
+}
+
+func matchesAny(globs [][]string, rel string) bool {
+	if len(globs) == 0 {
+		return false
+	}
+	parts := strings.Split(rel, "/")
+	for _, glob := range globs {
+		if memberglob.Match(glob, parts) {
+			return true
+		}
+	}
+	return false
 }
 
 func isBuildFile(name string) bool {

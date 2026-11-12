@@ -155,6 +155,7 @@
     "cli/init-from-a-monorepo-tool#moon-delegate-runs-through-moon",
     "cli/init-from-a-monorepo-tool#moon-import-runs-the-language-extensions",
     "cli/init-from-a-monorepo-tool#nx-impact-runs-through-nx",
+    "cli/init-from-a-monorepo-tool#only-listed-members-become-projects",
     "cli/init-from-a-monorepo-tool#pants-impact-runs-through-pants",
     "cli/init-from-a-monorepo-tool#rush-impact-runs-through-rush",
     "cli/init-from-a-monorepo-tool#rush-import-runs-through-putnami",

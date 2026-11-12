@@ -86,9 +86,10 @@ func ExtensionFor(mode string, p detect.Project) string {
 // Detect names the moon projects among the candidate paths that run
 // @putnami/moon in the workspace's mode: each named by its moon project id,
 // with the workspace root for stack root and moon's edges. A project the mode
-// imports into a language extension is left to that extension, unless its
-// putnami.json names @putnami/moon too: it keeps a task on moon (ADR 0017 of
-// tooling/stacks). A candidate that is no moon project is not answered.
+// imports into a language extension is bare, a member whose tasks that
+// extension runs, unless its putnami.json names @putnami/moon too: it keeps a
+// task on moon (ADR 0017 of tooling/stacks). A candidate that is no moon
+// project, such as a test fixture that holds a package.json, is not answered.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	if !detect.IsWorkspace(root) {
 		return nil, nil
@@ -105,7 +106,11 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 	var out []stacks.Component
 	for _, dir := range request.Paths {
 		p, ok := projects[dir]
-		if !ok || (ExtensionFor(mode, p) != ExtensionName && !keepsTasks(root, dir)) {
+		if !ok {
+			continue
+		}
+		if ExtensionFor(mode, p) != ExtensionName && !keepsTasks(root, dir) {
+			out = append(out, stacks.Component{Path: dir, Bare: true})
 			continue
 		}
 		var deps []string

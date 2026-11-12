@@ -53,6 +53,23 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 	if err != nil {
 		return fmt.Errorf("scan projects: %w", err)
 	}
+	// An adopted monorepo tool's list bounds the scan: a manifest the tool
+	// does not list, such as a test fixture, marks no project.
+	discovered, unlisted, listErr := keepListedMembers(ctx, wsRoot, adapters, discovered)
+	if listErr != nil {
+		iox.Fprintf(os.Stdout,
+			"  warning: %v; only directories with their own %s are members this run, and --prune is ignored\n",
+			listErr, wsproto.ConfigFilename)
+	}
+	if len(unlisted) > 0 {
+		shown := unlisted[:min(len(unlisted), 5)]
+		more := ""
+		if len(unlisted) > len(shown) {
+			more = ", …"
+		}
+		iox.Fprintf(os.Stdout, "  %d director%s with a manifest the monorepo tool does not list: no project (%s%s)\n",
+			len(unlisted), plural(len(unlisted), "y", "ies"), strings.Join(shown, ", "), more)
+	}
 
 	// Build set of all currently known projects (root + scopes)
 	existing := allKnownProjects(wsRoot, cfg)
@@ -67,6 +84,9 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 		if !existing[p] {
 			added = append(added, p)
 		}
+	}
+	if prune && listErr != nil {
+		prune = false
 	}
 	if prune {
 		if reason := pruneRefusalReason(wsRoot, adapters); reason != "" {
@@ -200,6 +220,77 @@ func ProjectsSync(ctx context.Context, wsRoot string, cfg *wsproto.Config, args 
 	}
 
 	return nil
+}
+
+// keepListedMembers bounds the scanned directories by the member list of the
+// monorepo tool the workspace adopted with putnami init --from: the tool's
+// probe answers exactly the members its own configuration lists (rush.json,
+// the moon projects, the Nx graph, the package-manager workspaces, the Bazel
+// packages outside REPO.bazel ignore_directories, the Pants BUILD files). A
+// scanned directory with its own putnami.json stays a member; any other one
+// is kept only when an adopted tool's probe answers it. A workspace that
+// adopted no tool keeps every scanned directory.
+//
+// It returns the kept directories and the ones it left out, sorted. When a
+// tool's probe fails, only the putnami.json directories are kept and the
+// error says why: adding the tool's unlisted directories would be the defect
+// this rule exists for.
+func keepListedMembers(ctx context.Context, wsRoot string, adapters workspaceAdapters, scanned []string) (kept, unlisted []string, err error) {
+	var tools []workspace.ProviderBinding
+	for _, binding := range adapters.boundTo(ctx) {
+		if isMonorepoToolExtension(binding.Scope.Extension) {
+			tools = append(tools, binding)
+		}
+	}
+	if len(tools) == 0 {
+		return scanned, nil, nil
+	}
+	candidates := []string{wsproto.ProbeRootPath}
+	for _, dir := range scanned {
+		if normalized, ok := wsproto.NormalizeProbePath(dir); ok {
+			candidates = append(candidates, normalized)
+		}
+	}
+	sort.Strings(candidates)
+	listed := make(map[string]bool, len(scanned))
+	for _, tool := range tools {
+		outcome, probeErr := workspace.RunProbe([]workspace.ProbeProvider{tool.Provider}, wsproto.ProbeRequest{
+			Reason: wsproto.ProbeReasonRefresh,
+			Paths:  slices.Compact(candidates),
+		}, nil)
+		if probeErr != nil {
+			err = fmt.Errorf("%s could not list its members: %w", tool.Scope.Extension, probeErr)
+			break
+		}
+		for _, result := range outcome.Results {
+			for _, project := range result.Projects {
+				listed[project.Path] = true
+			}
+		}
+	}
+	for _, dir := range scanned {
+		normalized, _ := wsproto.NormalizeProbePath(dir)
+		switch {
+		case workspace.MarkedByConfig(wsRoot, dir):
+			kept = append(kept, dir)
+		case err == nil && listed[normalized]:
+			kept = append(kept, dir)
+		case err == nil:
+			unlisted = append(unlisted, dir)
+		}
+	}
+	return kept, unlisted, err
+}
+
+// isMonorepoToolExtension reports whether name is the extension of a tool
+// putnami init --from adopts.
+func isMonorepoToolExtension(name string) bool {
+	for _, source := range initSources {
+		if source.starter.packageName == name {
+			return true
+		}
+	}
+	return false
 }
 
 // nameCollidingMembers writes a name for each new member that resolves to the
