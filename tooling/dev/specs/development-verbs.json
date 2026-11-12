@@ -14,11 +14,21 @@
   "requirements": [
     {
       "id": "eleven-ordered-verbs",
-      "text": "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it. It declares no provider, hook or agent content, and no command, command group or task beyond the version, compose and qualify commands, claims CLI contract 15 and passes the strict validation of the package-time gate."
+      "text": [
+        "The manifest declares build, test, lint, serve, run, format, package, publish, deploy, generate and validate in that order, each with the description, aliases and related commands help shows for it.",
+        "It declares no provider, hook or agent content, and no command, command group or task beyond the version, compose and qualify commands, claims CLI contract 15 and passes the strict validation of the package-time gate."
+      ]
     },
     {
       "id": "dev-is-the-sole-declarer",
-      "text": "The core CLI gives no command a default trait, so the verbs' defaults are the ones declared here. Serve and run require a runnable project, package injects the project's publish channels, publish injects them and changes a registry, and deploy changes a cloud. Build declares the files kind, test verification, lint diagnostics and validate criteria. Serve declares the serve workload and run the once workload. Format rewrites sources and deploy consumes the release set. Generate declares none."
+      "text": [
+        "The core CLI gives no command a default trait, so the verbs' defaults are the ones declared here.",
+        "Serve and run require a runnable project, package injects the project's publish channels, publish injects them and changes a registry, and deploy changes a cloud.",
+        "Build declares the files kind, test verification, lint diagnostics and validate criteria.",
+        "Serve declares the serve workload and run the once workload.",
+        "Format rewrites sources and deploy consumes the release set.",
+        "Generate declares none."
+      ]
     },
     {
       "id": "language-extensions-depend",
@@ -26,7 +36,10 @@
     },
     {
       "id": "handshake-only-runtime",
-      "text": "The executable answers the runtime handshake with the extension's name, its stamped version, its platform and the contracts it was built against. It refuses every invocation other than the handshake, the version commands and the compose up and qualify run commands with exit status 2 and nothing on standard output, and a handshake it cannot write exits 1."
+      "text": [
+        "The executable answers the runtime handshake with the extension's name, its stamped version, its platform and the contracts it was built against.",
+        "It refuses every invocation other than the handshake, the version commands and the compose up and qualify run commands with exit status 2 and nothing on standard output, and a handshake it cannot write exits 1."
+      ]
     }
   ],
   "decisions": [

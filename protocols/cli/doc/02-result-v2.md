@@ -839,9 +839,11 @@ different digest means a declaration changed between them.
 and in every directory between the root and a project: `putnami.features.json`,
 `decisions.json`, `specs.baseline.json`, `putnami.architecture.json`,
 `architecture.baseline.json`, and every regular `specs/*.json` and
-`decisions/*.json`. The set covers every project, not the run's selection, so
-a code change that widens an `--impacted` selection leaves the digest
-unchanged. Files are read from disk,
+`decisions/*.json` and `features/*.json`. A `specs/`, `decisions/` or
+`features/` directory that holds a `putnami.json` is a project, and none of its
+files count. The set covers every project, not the run's selection, so a code
+change that widens an `--impacted` selection leaves the digest unchanged. Files
+are read from disk,
 so an uncommitted edit counts, and no git call is involved.
 
 **The canonical byte stream.** The digest is `sha256` of:

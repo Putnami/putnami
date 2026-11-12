@@ -886,7 +886,7 @@ func collectFeatureAuthorityDeclarations(ws *workspace.Workspace, graphs []nativ
 			if name == "" {
 				name = project.ID
 			}
-			projectByManifest[path.Join(project.Path, featureproto.ManifestFilename)] = name
+			projectByManifest[project.Path] = name
 		}
 	}
 	for _, source := range manifests {
@@ -894,13 +894,13 @@ func collectFeatureAuthorityDeclarations(ws *workspace.Workspace, graphs []nativ
 			canonical := featureproto.CanonicalManifest(&featureproto.Manifest{Features: []featureproto.Feature{authored}}).Features[0]
 			declarations = append(declarations, featureAuthorityEntry{id: canonical.ID, declaration: FeatureAuthorityDeclaration{
 				Kind: featureAuthorityManifest, Source: source.Path,
-				Project: projectByManifest[source.Path], Name: canonical.Name,
+				Project: projectByManifest[featureengine.ManifestRoot(source.Path)], Name: canonical.Name,
 				Outcome: canonical.Outcome, Owner: canonical.Owner,
 				Type: canonical.Type, Target: canonical.Target,
 				Relations: canonical.Relations, Requirements: canonical.Requirements,
 				Surface: canonical.Surface,
 				Provenance: &featureproto.DesignProvenance{
-					Path: source.Path, Symbol: fmt.Sprintf("features[%d]", index),
+					Path: source.Path, Symbol: source.Field(fmt.Sprintf("features[%d]", index)),
 				},
 			}})
 		}
@@ -1570,7 +1570,7 @@ func relatedUnclassified(ws *workspace.Workspace, feature featureengine.FeatureA
 	}
 	if ws != nil {
 		for _, project := range ws.Projects {
-			if project == nil || path.Join(project.Path, featureproto.ManifestFilename) != feature.Source {
+			if project == nil || project.Path != featureengine.ManifestRoot(feature.Source) {
 				continue
 			}
 			for _, owner := range []string{project.ID, project.Name, project.SourceName} {

@@ -22,63 +22,135 @@
   "requirements": [
     {
       "id": "label-states",
-      "text": "settings.states maps each state to labels, the first one applied by a transition; labels with settings.stateLabelPrefix are state labels too. An opened issue is blocked, in_progress or open by the first of those whose label it carries, else open. A closed issue is canceled by a canceled label or a duplicate link, done otherwise. A transition swaps the state labels and closes or reopens the issue; in_progress, blocked and canceled without a label are unsupported. create and update refuse a state label."
+      "text": [
+        "settings.states maps each state to labels, the first one applied by a transition; labels with settings.stateLabelPrefix are state labels too.",
+        "An opened issue is blocked, in_progress or open by the first of those whose label it carries, else open.",
+        "A closed issue is canceled by a canceled label or a duplicate link, done otherwise.",
+        "A transition swaps the state labels and closes or reopens the issue; in_progress, blocked and canceled without a label are unsupported. create and update refuse a state label."
+      ]
     },
     {
       "id": "content-revision",
-      "text": "A revision is v and the first 32 hex digits of the SHA-256 of the JSON array of title, whole description, state, duplicate link, sorted labels and sorted assignee usernames, so a comment never moves it and every change a task shows does. update, transition and assign compare expectedRevision with the issue read just before the write and answer conflict with the current revision before anything is written; the manifest declares them preconditions checked."
+      "text": [
+        "A revision is v and the first 32 hex digits of the SHA-256 of the JSON array of title, whole description, state, duplicate link, sorted labels and sorted assignee usernames, so a comment never moves it and every change a task shows does. update, transition and assign compare expectedRevision with the issue read just before the write and answer conflict with the current revision before anything is written;",
+        "the manifest declares them preconditions checked."
+      ]
     },
     {
       "id": "paged-find",
-      "text": "find reads the project's issues oldest first, filtered by GitLab on state, labels and text, then by the provider on semantic states. Each read starts at the creation millisecond of the last issue considered, and the cursor holds it with the ids seen at it, or past 48 their count, skipping by position only issues of that millisecond. So every issue present throughout a traversal is listed once and the traversal ends, except that closing issues inside a tie of over 48 can hide others of it."
+      "text": [
+        "find reads the project's issues oldest first, filtered by GitLab on state, labels and text, then by the provider on semantic states.",
+        "Each read starts at the creation millisecond of the last issue considered, and the cursor holds it with the ids seen at it, or past 48 their count, skipping by position only issues of that millisecond.",
+        "So every issue present throughout a traversal is listed once and the traversal ends, except that closing issues inside a tie of over 48 can hide others of it."
+      ]
     },
     {
       "id": "reconciled-writes",
-      "text": "create ends the description with a hidden comment holding the key's hash and the request digest, and first looks for the key among the newest issues the credential's account opened, keyScanPages pages of 100, then in GitLab's search. A repeat returns that issue, created false; other content is a conflict; another account's issue never answers. Every write is sent once; after a lost answer or a 5xx the provider reads GitLab back and answers what it cannot establish unresolved. update keeps the marker."
+      "text": [
+        "create ends the description with a hidden comment holding the key's hash and the request digest, and first looks for the key among the newest issues the credential's account opened, keyScanPages pages of 100, then in GitLab's search.",
+        "A repeat returns that issue, created false; other content is a conflict; another account's issue never answers.",
+        "Every write is sent once; after a lost answer or a 5xx the provider reads GitLab back and answers what it cannot establish unresolved. update keeps the marker."
+      ]
     },
     {
       "id": "literal-bodies",
-      "text": "Titles, task bodies, merge request descriptions and review bodies reach GitLab as data: every line starting with a slash, fenced code included, is escaped, so GitLab runs no quick action and stores the text whole; a read removes the escape exactly. A transition to done of an issue closed as a duplicate reopens it, then closes it, since the link keeps it canceled. A label named None or Any, keywords of GitLab's filter, is matched by the provider."
+      "text": [
+        "Titles, task bodies, merge request descriptions and review bodies reach GitLab as data: every line starting with a slash, fenced code included, is escaped, so GitLab runs no quick action and stores the text whole;",
+        "a read removes the escape exactly.",
+        "A transition to done of an issue closed as a duplicate reopens it, then closes it, since the link keeps it canceled.",
+        "A label named None or Any, keywords of GitLab's filter, is matched by the provider."
+      ]
     },
     {
       "id": "informational-assign",
-      "text": "assign replaces an issue's assignees with the users the request names by username, @me naming the credential's account; a username GitLab does not know is invalid and nothing is written. GitLab keeps only the assignees it can assign, one on a tier without multiple assignees, and the answer lists the assignees the issue actually has. An assignee is information, never an exclusive claim."
+      "text": [
+        "assign replaces an issue's assignees with the users the request names by username, @me naming the credential's account;",
+        "a username GitLab does not know is invalid and nothing is written.",
+        "GitLab keeps only the assignees it can assign, one on a tier without multiple assignees, and the answer lists the assignees the issue actually has.",
+        "An assignee is information, never an exclusive claim."
+      ]
     },
     {
       "id": "exact-proposal-identity",
-      "text": "A proposal is the merge request !<iid> whose source branch, in the bound project, and target are the request's exact head and base; GitLab keeps one open per pair, so a repeated or lost upsert never opens two. A fork head or another repository is invalid and sends nothing. A head commit not on the branch is a conflict before any write; one the branch has is awaited about 10s, then head.lagging, retryable. The revision covers title, description, state, draft, base, head, head commit, labels and assignees."
+      "text": [
+        "A proposal is the merge request !<iid> whose source branch, in the bound project, and target are the request's exact head and base;",
+        "GitLab keeps one open per pair, so a repeated or lost upsert never opens two.",
+        "A fork head or another repository is invalid and sends nothing.",
+        "A head commit not on the branch is a conflict before any write; one the branch has is awaited about 10s, then head.lagging, retryable.",
+        "The revision covers title, description, state, draft, base, head, head commit, labels and assignees."
+      ]
     },
     {
       "id": "draft-by-title",
-      "text": "GitLab marks a merge request as a draft by a title prefix: upsert writes Draft: before the title of a draft and leaves it off a ready one, a proposal's title never shows the prefix, and an upsert without draft keeps the merge request's draft state. A requested title that starts with a prefix GitLab reads as a draft is invalid and nothing is written."
+      "text": [
+        "GitLab marks a merge request as a draft by a title prefix: upsert writes Draft: before the title of a draft and leaves it off a ready one, a proposal's title never shows the prefix, and an upsert without draft keeps the merge request's draft state.",
+        "A requested title that starts with a prefix GitLab reads as a draft is invalid and nothing is written."
+      ]
     },
     {
       "id": "note-reviews",
-      "text": "A review is a merge request note holding its body, a hidden verdict and commit, and the idempotency marker: a repeated key returns its note, other content is a conflict, another account's note never answers, and a lost post is read back, else unresolved, never posted twice. approve first approves at the reviewed head, which GitLab refuses once the head moved; request_changes first withdraws the account's approval. status lists every review note and every current approval."
+      "text": [
+        "A review is a merge request note holding its body, a hidden verdict and commit, and the idempotency marker: a repeated key returns its note, other content is a conflict, another account's note never answers, and a lost post is read back, else unresolved, never posted twice. approve first approves at the reviewed head, which GitLab refuses once the head moved;",
+        "request_changes first withdraws the account's approval. status lists every review note and every current approval."
+      ]
     },
     {
       "id": "pipeline-checks",
-      "text": "status reports the commit statuses of the head commit, pipeline jobs and external statuses alike; of each name the latest, by id, decides, since GitLab lists every pipeline's. success passes; failed and canceled fail unless the job may fail; skipped, and a manual job allowed to fail, are skipped; any other, a blocking manual job included, is pending. The summary is failing when one fails, pending when one is not finished, passing when every one passed or was skipped, and none without any."
+      "text": [
+        "status reports the commit statuses of the head commit, pipeline jobs and external statuses alike;",
+        "of each name the latest, by id, decides, since GitLab lists every pipeline's. success passes;",
+        "failed and canceled fail unless the job may fail;",
+        "skipped, and a manual job allowed to fail, are skipped;",
+        "any other, a blocking manual job included, is pending.",
+        "The summary is failing when one fails, pending when one is not finished, passing when every one passed or was skipped, and none without any."
+      ]
     },
     {
       "id": "proposal-comments",
-      "text": "comments lists, by ascending note id and once across pages, every note people wrote on a merge request and no system note: a review note's body without its markers, naming itself as its review; a diff note with its path, its line in the new file and the head commit it was written on; a discussion note. A diff note on a deleted line or on a whole file keeps its path without a line."
+      "text": [
+        "comments lists, by ascending note id and once across pages, every note people wrote on a merge request and no system note: a review note's body without its markers, naming itself as its review;",
+        "a diff note with its path, its line in the new file and the head commit it was written on;",
+        "a discussion note.",
+        "A diff note on a deleted line or on a whole file keeps its path without a line."
+      ]
     },
     {
       "id": "reported-publication",
-      "text": "Every proposal answer lists its labels and assignees, [] when absent. upsert applies assignAuthor and inheritLabelPrefixes, which only add: a tier keeping one assignee keeps the present one, and of each scoped key::value one label is added, none when the merge request has that key. A failed addition after the write is unresolved, naming the merge request. References are GitLab's: #<iid>, project#<iid>, group/project#<iid>, issue URLs on the bound host; !<iid> adds nothing, a foreign URL is never read."
+      "text": [
+        "Every proposal answer lists its labels and assignees, [] when absent. upsert applies assignAuthor and inheritLabelPrefixes, which only add: a tier keeping one assignee keeps the present one, and of each scoped key::value one label is added, none when the merge request has that key.",
+        "A failed addition after the write is unresolved, naming the merge request.",
+        "References are GitLab's: #<iid>, project#<iid>, group/project#<iid>, issue URLs on the bound host; !<iid> adds nothing, a foreign URL is never read."
+      ]
     },
     {
       "id": "guarded-merge",
-      "text": "merge is denied unless settings.allowMerge is true and merges only at the expected head, sent as GitLab's sha, so a moved head is a conflict, as is a merge GitLab refuses. A named method sets the merge request's squash flag; where the project or a rule its squash_on_merge shows overrides it, merge is unsupported. Every answer that merges nothing leaves the flag as it was, or is unresolved. settings.removeSourceBranch deletes the source branch in the merge call itself."
+      "text": [
+        "merge is denied unless settings.allowMerge is true and merges only at the expected head, sent as GitLab's sha, so a moved head is a conflict, as is a merge GitLab refuses.",
+        "A named method sets the merge request's squash flag; where the project or a rule its squash_on_merge shows overrides it, merge is unsupported.",
+        "Every answer that merges nothing leaves the flag as it was, or is unresolved. settings.removeSourceBranch deletes the source branch in the merge call itself."
+      ]
     },
     {
       "id": "honest-failures",
-      "text": "Failures keep their meaning: a missing issue, a project the credential cannot see and a reference another source issued are not found; an outage or a request that never left the process is unavailable, retryable, and writes nothing; a rate limit is unavailable, retryable and never repeated; 401 and 403 are denied; 400 and 422 are invalid with GitLab's message; a read without a definite answer is sent up to 3 times and a write once."
+      "text": [
+        "Failures keep their meaning: a missing issue, a project the credential cannot see and a reference another source issued are not found;",
+        "an outage or a request that never left the process is unavailable, retryable, and writes nothing;",
+        "a rate limit is unavailable, retryable and never repeated;",
+        "401 and 403 are denied;",
+        "400 and 422 are invalid with GitLab's message;",
+        "a read without a definite answer is sent up to 3 times and a write once."
+      ]
     },
     {
       "id": "credential-safety",
-      "text": "The token is GITLAB_TOKEN when GITLAB_HOST names the bound host, or is unset for gitlab.com; then what glab config get token --host prints; then, in a pipeline whose CI_SERVER_HOST is the host, CI_JOB_TOKEN sent as JOB-TOKEN. Without one every call is denied and nothing is sent. The token reaches only https://<host>/api/v4 or a loopback PUTNAMI_GITLAB_API_URL, and the runtime removes it and every GitLab token shape from all it writes. A 401 or 403 names where the token came from."
+      "text": [
+        "The token is GITLAB_TOKEN when GITLAB_HOST names the bound host, or is unset for gitlab.com;",
+        "then what glab config get token --host prints;",
+        "then, in a pipeline whose CI_SERVER_HOST is the host, CI_JOB_TOKEN sent as JOB-TOKEN.",
+        "Without one every call is denied and nothing is sent.",
+        "The token reaches only https://<host>/api/v4 or a loopback PUTNAMI_GITLAB_API_URL, and the runtime removes it and every GitLab token shape from all it writes.",
+        "A 401 or 403 names where the token came from."
+      ]
     },
     {
       "id": "truthful-manifest",

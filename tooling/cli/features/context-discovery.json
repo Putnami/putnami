@@ -1,0 +1,185 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/context-discovery",
+    "type": "feature",
+    "name": "Context discovery",
+    "outcome": "A user or script can discover workspace structure and project context, and ask who owns a path and why one project impacts another, through public CLI commands that share one authority, and an extension can contribute a workspace-answering provider operation to the collaboration routing without re-deriving any of it",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "generated-context",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-human-constraints-file-is-preserved",
+            "an-existing-entrypoint-keeps-every-byte-outside-the-block",
+            "an-edited-block-is-preserved",
+            "init-writes-the-guidance-block",
+            "context-generation-writes-no-mcp-registration",
+            "context-pack-prints-the-documents-and-writes-nothing",
+            "the-check-flag-is-unknown"
+          ]
+        }
+      },
+      {
+        "id": "workspace-map",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "printing-the-map-writes-nothing",
+            "the-printed-json-is-the-map-document",
+            "a-selection-narrows-the-printed-map",
+            "the-print-flag-is-unknown"
+          ]
+        }
+      },
+      {
+        "id": "build-writes-no-workspace-map",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-build-session-writes-nothing-under-the-map-directory",
+            "context-map-writes-no-file"
+          ]
+        }
+      },
+      {
+        "id": "provider-workspace-facts",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-declaring-operation-receives-the-resolved-view",
+            "a-non-declaring-operation-receives-neither",
+            "unknown-selectors-and-missing-resolvers-fail-closed"
+          ]
+        }
+      },
+      {
+        "id": "read-preparation",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "cold-and-warm-reads-use-the-exact-lock-without-full-install",
+            "automatic-reads-never-invoke-cloud-credential-minting",
+            "offline-missing-artifacts-degrade-explicitly-without-latest",
+            "failed-exact-preparation-never-exposes-an-ambient-extension",
+            "human-and-agent-artifact-ownership-files-are-preserved"
+          ]
+        }
+      },
+      {
+        "id": "settled-decisions-guidance",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-block-names-the-decision-files-and-lists-no-decision",
+            "the-block-line-follows-the-registry-form"
+          ]
+        }
+      },
+      {
+        "id": "agent-context-languages",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-claimed-project-reports-the-declared-language",
+            "a-project-claimed-by-two-providers-reports-both-sorted",
+            "a-provider-that-declares-no-language-adds-none",
+            "an-unclaimed-project-reports-none-whatever-its-files"
+          ]
+        }
+      },
+      {
+        "id": "mcp-registration-removal",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-putnami-written-entry-is-removed",
+            "the-file-goes-when-nothing-else-remains",
+            "a-changed-entry-is-kept-with-a-warning",
+            "an-unparseable-file-is-a-warning-and-stays-untouched",
+            "init-and-the-first-use-install-write-no-mcp-json"
+          ]
+        }
+      },
+      {
+        "id": "host-registration-removal",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-installer-registers-no-host-server",
+            "a-registration-the-installer-wrote-is-removed",
+            "a-customized-registration-is-kept"
+          ]
+        }
+      },
+      {
+        "id": "project-graph-queries",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "owner-names-the-projects-that-own-a-path",
+            "deps-lists-direct-and-transitive-edges-both-ways",
+            "why-prints-the-impact-path-and-task-scope",
+            "why-reports-when-no-path-exists",
+            "each-query-prints-jsonl"
+          ]
+        }
+      }
+    ],
+    "surface": {
+      "commands": [
+        "context generate",
+        "context map",
+        "context pack",
+        "projects deps",
+        "projects owner",
+        "projects why"
+      ]
+    }
+  }
+}

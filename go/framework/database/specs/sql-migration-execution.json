@@ -16,7 +16,10 @@
   "requirements": [
     {
       "id": "atomic-record",
-      "text": "Each migration body and its success state-store record commit in one transaction under the datasource advisory lock; failure rolls back that transaction and is never returned as applied."
+      "text": [
+        "Each migration body and its success state-store record commit in one transaction under the datasource advisory lock;",
+        "failure rolls back that transaction and is never returned as applied."
+      ]
     },
     {
       "id": "deterministic-execution",

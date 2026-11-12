@@ -412,8 +412,8 @@ content, separately from `tree`:
 
 The digest covers `putnami.features.json`, `decisions.json`,
 `specs.baseline.json`, `putnami.architecture.json`,
-`architecture.baseline.json`, every `specs/*.json` and every
-`decisions/*.json`, in the workspace root,
+`architecture.baseline.json`, every `specs/*.json`, every `decisions/*.json`
+and every `features/*.json`, in the workspace root,
 every project directory, and every directory between the two. Editing only one
 of those files changes it; editing only code does not, even when the edit widens
 an `--impacted` selection. Compare two sessions of one branch:

@@ -16,11 +16,18 @@
   "requirements": [
     {
       "id": "read-only-rehearsal",
-      "text": "The rehearsal reads the candidate cut and the files that decide the verdict. It mutates no file, publishes nothing, and neither tags, pushes, rewrites history nor changes repository visibility, and that property is enforced over its own source. It enumerates the candidate cut through the public-cut helpers, which run git to list it, so the guarantee is that nothing it runs can change the tree, not that it spawns no process."
+      "text": [
+        "The rehearsal reads the candidate cut and the files that decide the verdict.",
+        "It mutates no file, publishes nothing, and neither tags, pushes, rewrites history nor changes repository visibility, and that property is enforced over its own source.",
+        "It enumerates the candidate cut through the public-cut helpers, which run git to list it, so the guarantee is that nothing it runs can change the tree, not that it spawns no process."
+      ]
     },
     {
       "id": "ten-evidence-items",
-      "text": "The gate owns the fixed set of required evidence items: version and artifact manifest, checksums and provenance, support report, migration report, scrub result, golden-path result, governance checklist, label/scope bootstrap plan, publish order, and rollback plan. The release plan may not add, rename or drop one."
+      "text": [
+        "The gate owns the fixed set of required evidence items: version and artifact manifest, checksums and provenance, support report, migration report, scrub result, golden-path result, governance checklist, label/scope bootstrap plan, publish order, and rollback plan.",
+        "The release plan may not add, rename or drop one."
+      ]
     },
     {
       "id": "no-vacuous-check",
@@ -28,7 +35,10 @@
     },
     {
       "id": "recorded-verdict",
-      "text": "The verdict is rendered deterministically for a tree and compared with the committed report. The gate fails when the recorded verdict no longer matches the tree, never because a check is blocked."
+      "text": [
+        "The verdict is rendered deterministically for a tree and compared with the committed report.",
+        "The gate fails when the recorded verdict no longer matches the tree, never because a check is blocked."
+      ]
     },
     {
       "id": "named-blockers",
@@ -56,7 +66,10 @@
     },
     {
       "id": "keyed-verdict-inputs",
-      "text": "Every file that can move the verdict — the recorded report, the release plan, the files a check reads, and the target of every declared requirement — is a declared cache-key input of the owning project, so a changed tree can never be answered from a cached run of the drift check. The gate asserts that coverage against the matcher the cache key itself uses."
+      "text": [
+        "Every file that can move the verdict — the recorded report, the release plan, the files a check reads, and the target of every declared requirement — is a declared cache-key input of the owning project, so a changed tree can never be answered from a cached run of the drift check.",
+        "The gate asserts that coverage against the matcher the cache key itself uses."
+      ]
     },
     {
       "id": "provenance-contract",
@@ -64,7 +77,10 @@
     },
     {
       "id": "canonical-migration-evidence",
-      "text": "Migration evidence is the canonical compatibility guide and accepted budget decision plus the lock, machine-result and extension-contract prior-release corpora. Every corpus is non-empty, every fixture has re-derivable provenance, and its recorded SHA-256 matches the candidate bytes."
+      "text": [
+        "Migration evidence is the canonical compatibility guide and accepted budget decision plus the lock, machine-result and extension-contract prior-release corpora.",
+        "Every corpus is non-empty, every fixture has re-derivable provenance, and its recorded SHA-256 matches the candidate bytes."
+      ]
     }
   ],
   "decisions": [

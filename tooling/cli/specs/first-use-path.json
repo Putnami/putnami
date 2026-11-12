@@ -15,27 +15,54 @@
   "requirements": [
     {
       "id": "pasted-block-reaches-the-command",
-      "text": "The documented block is the installer line, export PATH=\"$HOME/.putnami/bin:$PATH\", putnami init --project webapp --extension ts and putnami serve webapp. When the shell that ran install.sh cannot reach putnami, the installer's footer prints the export PATH line for its install directory as the first line under Next, before putnami --help. When that shell reaches putnami, the footer prints no PATH line."
+      "text": [
+        "The documented block is the installer line, export PATH=\"$HOME/.putnami/bin:$PATH\", putnami init --project webapp --extension ts and putnami serve webapp.",
+        "When the shell that ran install.sh cannot reach putnami, the installer's footer prints the export PATH line for its install directory as the first line under Next, before putnami --help.",
+        "When that shell reaches putnami, the footer prints no PATH line."
+      ]
     },
     {
       "id": "first-use-smoke-machine",
-      "text": "scripts/smoke-first-use.sh reads the first fenced bash block of the getting-started page. It refuses a page without one, or a block that does not install with the documented installer line and end with putnami serve <project>. It builds an image that adds only curl and its certificates to the base image and runs its legs there as a non-root user. It refuses an image that holds bun, git, node or go, or a PATH directory the user can write to. Without Docker it names SMOKE_FIRST_USE_MODE=host."
+      "text": [
+        "scripts/smoke-first-use.sh reads the first fenced bash block of the getting-started page.",
+        "It refuses a page without one, or a block that does not install with the documented installer line and end with putnami serve <project>.",
+        "It builds an image that adds only curl and its certificates to the base image and runs its legs there as a non-root user.",
+        "It refuses an image that holds bun, git, node or go, or a PATH directory the user can write to.",
+        "Without Docker it names SMOKE_FIRST_USE_MODE=host."
+      ]
     },
     {
       "id": "first-use-smoke-legs",
-      "text": "The smoke runs the block as printed, in a shell that stops at the first failed command. It requires HTTP 200 from /, /about and /guestbook, then exit status 0 from putnami lint,test,build on the starter and from init and lint,test,build of a Go api, whose / answers 200. It fails when ~/.bun exists, when Bun or Go is missing under the Putnami home, or when a workspace holds a copy of Go. A channel other than latest is passed as PUTNAMI_VERSION. Every failure names its leg and exits non-zero."
+      "text": [
+        "The smoke runs the block as printed, in a shell that stops at the first failed command.",
+        "It requires HTTP 200 from /, /about and /guestbook, then exit status 0 from putnami lint,test,build on the starter and from init and lint,test,build of a Go api, whose / answers 200.",
+        "It fails when ~/.bun exists, when Bun or Go is missing under the Putnami home, or when a workspace holds a copy of Go.",
+        "A channel other than latest is passed as PUTNAMI_VERSION.",
+        "Every failure names its leg and exits non-zero."
+      ]
     },
     {
       "id": "first-use-smoke-stop",
-      "text": "After a served starter stops, the smoke fails when a process of the smoke still runs: one whose command line names the smoke's workdir or Putnami home, or whose working directory is below either. It does not compare what the starter's port serves, because the page of a webapp changes on every request and a freed port can go to an unrelated listener, even one that serves the same page. It reports who answers on the port. Every failure names its leg and exits non-zero."
+      "text": [
+        "After a served starter stops, the smoke fails when a process of the smoke still runs: one whose command line names the smoke's workdir or Putnami home, or whose working directory is below either.",
+        "It does not compare what the starter's port serves, because the page of a webapp changes on every request and a freed port can go to an unrelated listener, even one that serves the same page.",
+        "It reports who answers on the port.",
+        "Every failure names its leg and exits non-zero."
+      ]
     },
     {
       "id": "init-lists-members-once",
-      "text": "putnami init --project lists the project it creates once in the workspace config, also when the dependency install that follows fails and leaves the config as init wrote it. Init writes no root package.json, with or without --project."
+      "text": [
+        "putnami init --project lists the project it creates once in the workspace config, also when the dependency install that follows fails and leaves the config as init wrote it.",
+        "Init writes no root package.json, with or without --project."
+      ]
     },
     {
       "id": "no-install-provider-nothing-to-install",
-      "text": "In a workspace where no extension that the workspace declares provides the workspace-install job, there is nothing to install: install and deps install succeed and print one line saying so, and the implicit install before a job command succeeds and prints nothing. A declared extension that does not load is not that case: the install fails and names the extension with its reason, and a failed install, implicit or explicit, records no install marker."
+      "text": [
+        "In a workspace where no extension that the workspace declares provides the workspace-install job, there is nothing to install: install and deps install succeed and print one line saying so, and the implicit install before a job command succeeds and prints nothing.",
+        "A declared extension that does not load is not that case: the install fails and names the extension with its reason, and a failed install, implicit or explicit, records no install marker."
+      ]
     }
   ],
   "decisions": [

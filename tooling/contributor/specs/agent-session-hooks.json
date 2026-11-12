@@ -14,27 +14,52 @@
   "requirements": [
     {
       "id": "session-start-sheet",
-      "text": "SessionStart syncs the session, reads the mission's checkpoint through memory.mission when memory is bound, and prints the mission sheet: the repository and key putnami agent ask takes, the title, the plan, the open decisions and the checkpoint, within 4 KiB, with every agent or owner text quoted with \"> \". Waiting messages follow whole while the context stays within 9,500 bytes. A sheet the provider did not refresh says its date; a workspace without missions gets none."
+      "text": [
+        "SessionStart syncs the session, reads the mission's checkpoint through memory.mission when memory is bound, and prints the mission sheet: the repository and key putnami agent ask takes, the title, the plan, the open decisions and the checkpoint, within 4 KiB, with every agent or owner text quoted with \"> \".",
+        "Waiting messages follow whole while the context stays within 9,500 bytes.",
+        "A sheet the provider did not refresh says its date; a workspace without missions gets none."
+      ]
     },
     {
       "id": "tool-use-capture",
-      "text": "PostToolUse records a TodoWrite, TaskCreate, TaskUpdate or update_plan plan change. It runs no git and calls no provider, ignores a subagent's plan, and spools the call when another hook holds the session lock."
+      "text": [
+        "PostToolUse records a TodoWrite, TaskCreate, TaskUpdate or update_plan plan change.",
+        "It runs no git and calls no provider, ignores a subagent's plan, and spools the call when another hook holds the session lock."
+      ]
     },
     {
       "id": "decision-commands",
-      "text": "putnami agent ask and putnami agent reply call missions.ask and missions.reply through the host channel for the current session and record the outcome themselves: the id of an asked decision rides the session's next sync, and a reply recorded or found closed leaves a marker. A recorded reply wins over an ack line for the same message."
+      "text": [
+        "putnami agent ask and putnami agent reply call missions.ask and missions.reply through the host channel for the current session and record the outcome themselves: the id of an asked decision rides the session's next sync, and a reply recorded or found closed leaves a marker.",
+        "A recorded reply wins over an ack line for the same message."
+      ]
     },
     {
       "id": "stop-publication",
-      "text": "Stop sends the state, the changed plan, the delivered message ids, the asked decisions and the [ack <id>] lines of the last message in one sync. A waiting message continues the turn once: additional context on Claude Code, a block on Codex. A message is delivered once the hook wrote it; the next sync reports it, and a hook stopped before keeps it for the next. A Codex Stop waits up to 180 s only for an open decision this session asked. StopFailure publishes the error. A refused reply is dropped for good."
+      "text": [
+        "Stop sends the state, the changed plan, the delivered message ids, the asked decisions and the [ack <id>] lines of the last message in one sync.",
+        "A waiting message continues the turn once: additional context on Claude Code, a block on Codex.",
+        "A message is delivered once the hook wrote it; the next sync reports it, and a hook stopped before keeps it for the next.",
+        "A Codex Stop waits up to 180 s only for an open decision this session asked.",
+        "StopFailure publishes the error.",
+        "A refused reply is dropped for good."
+      ]
     },
     {
       "id": "idle-wake",
-      "text": "The Claude Code idle wake pairs with the Stop of its own event, waits only when that Stop did not continue the turn, syncs at the provider's pace within 5 s to 10 min, and ends after 10 minutes or when a new turn starts. It exits 75 with the message on stderr only when a message waits, and never waits for an SDK host."
+      "text": [
+        "The Claude Code idle wake pairs with the Stop of its own event, waits only when that Stop did not continue the turn, syncs at the provider's pace within 5 s to 10 min, and ends after 10 minutes or when a new turn starts.",
+        "It exits 75 with the message on stderr only when a message waits, and never waits for an SDK host."
+      ]
     },
     {
       "id": "fail-open",
-      "text": "Every hook path other than a waking idle wake exits 0. A failure, a missing host channel, a bad payload or an outcome other than ok prints no error and leaves one line in hook.log, which rotates at 1 MiB. A failed call closes the channel so the next one dials again, and what the sync did not deliver stays queued. A plan the provider refuses goes once without it."
+      "text": [
+        "Every hook path other than a waking idle wake exits 0.",
+        "A failure, a missing host channel, a bad payload or an outcome other than ok prints no error and leaves one line in hook.log, which rotates at 1 MiB.",
+        "A failed call closes the channel so the next one dials again, and what the sync did not deliver stays queued.",
+        "A plan the provider refuses goes once without it."
+      ]
     },
     {
       "id": "bounded-calls",
@@ -42,7 +67,12 @@
     },
     {
       "id": "mission-target",
-      "text": "A session reports to issue-<n> once agent attach --issue <n> declared it for the checkout and branch, else to branch:<branch>. The repository is the lowercase owner/name of the origin remote, without host or credential; a local path or a remote without an owner names none. The session store lives under the Putnami home, never in the checkout. A git failure, such as a timeout, is never a detached HEAD: attach fails and the session rereads its identity."
+      "text": [
+        "A session reports to issue-<n> once agent attach --issue <n> declared it for the checkout and branch, else to branch:<branch>.",
+        "The repository is the lowercase owner/name of the origin remote, without host or credential; a local path or a remote without an owner names none.",
+        "The session store lives under the Putnami home, never in the checkout.",
+        "A git failure, such as a timeout, is never a detached HEAD: attach fails and the session rereads its identity."
+      ]
     },
     {
       "id": "host-channel",
@@ -54,11 +84,20 @@
     },
     {
       "id": "usage-report",
-      "text": "Every sync but post_tool_use's carries the session's token usage: for Claude Code, the sum of the usage of each assistant message of the session's transcript and of its subagents' transcripts, each message once, read incrementally within a per-hook byte bound; for Codex, the last cumulative count of its rollout, without its subagent threads."
+      "text": [
+        "Every sync but post_tool_use's carries the session's token usage: for Claude Code, the sum of the usage of each assistant message of the session's transcript and of its subagents' transcripts, each message once, read incrementally within a per-hook byte bound;",
+        "for Codex, the last cumulative count of its rollout, without its subagent threads."
+      ]
     },
     {
       "id": "agent-stage",
-      "text": "putnami agent stage <name> records the loop stage of the current session, the one the host names in the environment or else the last active session of the checkout and branch, and syncs it at once when the session reports to a mission; every later sync carries it. It prints the tokens spent so far, once its transcript was read. An unknown stage exits 2. No session exits 1 and says why: the workspace has no session hooks, or the host did not run them for the session it names."
+      "text": [
+        "putnami agent stage <name> records the loop stage of the current session, the one the host names in the environment or else the last active session of the checkout and branch, and syncs it at once when the session reports to a mission;",
+        "every later sync carries it.",
+        "It prints the tokens spent so far, once its transcript was read.",
+        "An unknown stage exits 2.",
+        "No session exits 1 and says why: the workspace has no session hooks, or the host did not run them for the session it names."
+      ]
     }
   ],
   "decisions": [

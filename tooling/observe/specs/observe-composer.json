@@ -16,19 +16,35 @@
   "requirements": [
     {
       "id": "components-from-manifests",
-      "text": "The detector walks the repository, skipping .git, vendor, node_modules and hidden directories, and reports one project per directory that holds a composer.json, in path order, named by the manifest's name and typed application when its type is project, library otherwise. Its answer is a workspace probe result under the @putnami/observe extension name that passes the probe protocol's strict validation, so the detector can move to its own extension without a contract change."
+      "text": [
+        "The detector walks the repository, skipping .git, vendor, node_modules and hidden directories, and reports one project per directory that holds a composer.json, in path order, named by the manifest's name and typed application when its type is project, library otherwise.",
+        "Its answer is a workspace probe result under the @putnami/observe extension name that passes the probe protocol's strict validation, so the detector can move to its own extension without a contract change."
+      ]
     },
     {
       "id": "path-repository-edges",
-      "text": "A path repository of any manifest, its url a directory or a glob pattern relative to that manifest, provides the package of each matched directory's composer.json. A require or require-dev entry naming a package a path repository provides is an edge to that package's directory. The pattern is matched inside the repository, whatever directory holds the checkout. A package no path repository provides, an absolute url, a path outside the repository and an entry naming the component itself are not edges."
+      "text": [
+        "A path repository of any manifest, its url a directory or a glob pattern relative to that manifest, provides the package of each matched directory's composer.json.",
+        "A require or require-dev entry naming a package a path repository provides is an edge to that package's directory.",
+        "The pattern is matched inside the repository, whatever directory holds the checkout.",
+        "A package no path repository provides, an absolute url, a path outside the repository and an entry naming the component itself are not edges."
+      ]
     },
     {
       "id": "areas",
-      "text": "Each directory directly under a component's PSR-4 autoload and autoload-dev roots, or under src/ when the manifest declares no PSR-4 root, is an area of that component named by the directory, so src/Controller and tests/Controller are the paths of one Controller area. A root inside another component belongs to that component. A repository path maps to the deepest component directory that holds it and to the area whose path holds it, or to no area."
+      "text": [
+        "Each directory directly under a component's PSR-4 autoload and autoload-dev roots, or under src/ when the manifest declares no PSR-4 root, is an area of that component named by the directory, so src/Controller and tests/Controller are the paths of one Controller area.",
+        "A root inside another component belongs to that component.",
+        "A repository path maps to the deepest component directory that holds it and to the area whose path holds it, or to no area."
+      ]
     },
     {
       "id": "analysis-inputs",
-      "text": "Each component's metadata carries the composer.lock beside its manifest, its PSR-4 source roots, its test roots (autoload-dev roots not also autoloaded, and PHPUnit test suite directories), and the first of phpunit.xml, phpunit.dist.xml and phpunit.xml.dist beside it, in PHPUnit's lookup order, with the JUnit, Clover and Cobertura outputs it names. The lockfile is a watched file. A composer.json or PHPUnit configuration that does not parse is a diagnostic."
+      "text": [
+        "Each component's metadata carries the composer.lock beside its manifest, its PSR-4 source roots, its test roots (autoload-dev roots not also autoloaded, and PHPUnit test suite directories), and the first of phpunit.xml, phpunit.dist.xml and phpunit.xml.dist beside it, in PHPUnit's lookup order, with the JUnit, Clover and Cobertura outputs it names.",
+        "The lockfile is a watched file.",
+        "A composer.json or PHPUnit configuration that does not parse is a diagnostic."
+      ]
     }
   ],
   "decisions": [

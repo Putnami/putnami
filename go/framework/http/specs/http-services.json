@@ -19,7 +19,12 @@
   "requirements": [
     {
       "id": "streamed-responses",
-      "text": "Stream transfers one reader to the response writer without buffering or JSON conversion, preserving the supplied media type. The writer closes closable sources on completion, write failure, or request cancellation. BodyBytes refuses a streamed response without reading it and compression leaves it untouched. Request transactions still finalize before headers, while scoped resources stay open through the body copy."
+      "text": [
+        "Stream transfers one reader to the response writer without buffering or JSON conversion, preserving the supplied media type.",
+        "The writer closes closable sources on completion, write failure, or request cancellation.",
+        "BodyBytes refuses a streamed response without reading it and compression leaves it untouched.",
+        "Request transactions still finalize before headers, while scoped resources stay open through the body copy."
+      ]
     },
     {
       "id": "routing",
@@ -27,11 +32,17 @@
     },
     {
       "id": "method-fallbacks",
-      "text": "A HEAD request falls back to the GET handler, and a HEAD request answers the status and headers of the response its handler returns with no body: the server writes none of that body, reads no streamed body, and logs no failed write for it. An OPTIONS request to a known path with no OPTIONS route is answered through the composed middleware chain so a configured CORS middleware sees the preflight."
+      "text": [
+        "A HEAD request falls back to the GET handler, and a HEAD request answers the status and headers of the response its handler returns with no body: the server writes none of that body, reads no streamed body, and logs no failed write for it.",
+        "An OPTIONS request to a known path with no OPTIONS route is answered through the composed middleware chain so a configured CORS middleware sees the preflight."
+      ]
     },
     {
       "id": "middleware-order",
-      "text": "Server middleware wraps every registered route in registration order, is composed once before the first request, and a middleware that does not call next short-circuits the chain. A middleware added with UseOutermost runs before every middleware added earlier, so it sees the requests an inner middleware refuses."
+      "text": [
+        "Server middleware wraps every registered route in registration order, is composed once before the first request, and a middleware that does not call next short-circuits the chain.",
+        "A middleware added with UseOutermost runs before every middleware added earlier, so it sees the requests an inner middleware refuses."
+      ]
     },
     {
       "id": "request-scope",
@@ -39,7 +50,10 @@
     },
     {
       "id": "graceful-shutdown",
-      "text": "Stop drains in-flight requests under the configured shutdown timeout; an unset timeout resolves to the documented ten-second default rather than an already-expired deadline, and a negative value defers to the caller's context."
+      "text": [
+        "Stop drains in-flight requests under the configured shutdown timeout;",
+        "an unset timeout resolves to the documented ten-second default rather than an already-expired deadline, and a negative value defers to the caller's context."
+      ]
     },
     {
       "id": "bounded-streams",
@@ -47,47 +61,92 @@
     },
     {
       "id": "readiness-marker",
-      "text": "The listening log record carries the canonical server readiness marker with the port the listener actually bound, and the server reports that endpoint to the application from Start until Stop, so the application's ready record carries it too. A listener that is not addressable writes no marker and reports no endpoint rather than announcing an address nobody can reach."
+      "text": [
+        "The listening log record carries the canonical server readiness marker with the port the listener actually bound, and the server reports that endpoint to the application from Start until Stop, so the application's ready record carries it too.",
+        "A listener that is not addressable writes no marker and reports no endpoint rather than announcing an address nobody can reach."
+      ]
     },
     {
       "id": "websocket-framing",
-      "text": "A negotiated WebSocket connection reassembles continuation frames under the framework body bound, answers a ping, reports a peer close with its code, and refuses the framing RFC 6455 forbids with the close code that names the violation: reserved bits and opcodes, an unmasked client frame, a fragmented or oversized control frame, an orphan continuation, and invalid UTF-8 text. A route echoes only a subprotocol the client offered and refuses an upgrade whose vocabulary it cannot speak."
+      "text": [
+        "A negotiated WebSocket connection reassembles continuation frames under the framework body bound, answers a ping, reports a peer close with its code, and refuses the framing RFC 6455 forbids with the close code that names the violation: reserved bits and opcodes, an unmasked client frame, a fragmented or oversized control frame, an orphan continuation, and invalid UTF-8 text.",
+        "A route echoes only a subprotocol the client offered and refuses an upgrade whose vocabulary it cannot speak."
+      ]
     },
     {
       "id": "upgrade-admitted-wires",
-      "text": "A stream route may admit on the upgrade. Its security and validation chain runs on the upgrade request and refuses with an HTTP response before any socket exists. The route speaks exactly its declared subprotocol, or none: another offer, or no offer when one is declared, is refused with 400, and every admitted socket reaches the wire's own driver, never the raw stream or SSE. A binary message is written under the same bound as text."
+      "text": [
+        "A stream route may admit on the upgrade.",
+        "Its security and validation chain runs on the upgrade request and refuses with an HTTP response before any socket exists.",
+        "The route speaks exactly its declared subprotocol, or none: another offer, or no offer when one is declared, is refused with 400, and every admitted socket reaches the wire's own driver, never the raw stream or SSE.",
+        "A binary message is written under the same bound as text."
+      ]
     },
     {
       "id": "health-mounting",
-      "text": "A health plugin added to an application registers GET /_/health on the application's single server when the application configures, in any plugin order, and registers it once however often the application configures. The route answers 503 until the application starts. An application that holds no server, or several, fails configure with an error that names RegisterOn. A plugin the caller mounted, through RegisterOn or by taking its handler, registers nothing more."
+      "text": [
+        "A health plugin added to an application registers GET /_/health on the application's single server when the application configures, in any plugin order, and registers it once however often the application configures.",
+        "The route answers 503 until the application starts.",
+        "An application that holds no server, or several, fails configure with an error that names RegisterOn.",
+        "A plugin the caller mounted, through RegisterOn or by taking its handler, registers nothing more."
+      ]
     },
     {
       "id": "idle-connections",
-      "text": "An idle keep-alive connection, HTTP/1.1 or HTTP/2 including h2c, stays open for the server's IdleTimeout and never for its ReadTimeout. An unset IdleTimeout resolves to 620 seconds, above the 600-second idle timeout that Google Cloud application load balancers hold on their backend connections, so a proxy in front of the server closes an idle connection first. An explicit IdleTimeout still closes an idle connection when it expires."
+      "text": [
+        "An idle keep-alive connection, HTTP/1.1 or HTTP/2 including h2c, stays open for the server's IdleTimeout and never for its ReadTimeout.",
+        "An unset IdleTimeout resolves to 620 seconds, above the 600-second idle timeout that Google Cloud application load balancers hold on their backend connections, so a proxy in front of the server closes an idle connection first.",
+        "An explicit IdleTimeout still closes an idle connection when it expires."
+      ]
     },
     {
       "id": "caller-withdrawal",
-      "text": "Each request context ends with context.DeadlineExceeded at nine tenths of the write timeout: a stalled handler answers 5xx at ERROR, and a success returned after the deadline rolled its work back answers 500. A handler that answers its canceled context answers 499 with the code canceled, logged at INFO with the outcome canceled. WebSocket upgrades, Server-Sent Events, and gRPC or Connect streams run without the deadline."
+      "text": [
+        "Each request context ends with context.DeadlineExceeded at nine tenths of the write timeout: a stalled handler answers 5xx at ERROR, and a success returned after the deadline rolled its work back answers 500.",
+        "A handler that answers its canceled context answers 499 with the code canceled, logged at INFO with the outcome canceled.",
+        "WebSocket upgrades, Server-Sent Events, and gRPC or Connect streams run without the deadline."
+      ]
     },
     {
       "id": "route-write-timeout",
-      "text": "A route registered WithWriteTimeout(d) is written within d instead of the server write timeout, and its request context ends with context.DeadlineExceeded at nine tenths of d, so its success returned past the server bound answers 2xx. Every other route keeps the server bound, a mounted subtree takes its mount's bound, and long-lived requests still run without a deadline. A bound of zero or less panics at registration."
+      "text": [
+        "A route registered WithWriteTimeout(d) is written within d instead of the server write timeout, and its request context ends with context.DeadlineExceeded at nine tenths of d, so its success returned past the server bound answers 2xx.",
+        "Every other route keeps the server bound, a mounted subtree takes its mount's bound, and long-lived requests still run without a deadline.",
+        "A bound of zero or less panics at registration."
+      ]
     },
     {
       "id": "failed-writes",
-      "text": "A response write that fails after the request context ended with context.Canceled, such as a client that resets a download mid-body or closes its connection, logs the failure at INFO. A write that fails while the request context is live logs at ERROR. Over HTTP/2, a failed write waits up to 100 ms for the stream context to end before it is classified."
+      "text": [
+        "A response write that fails after the request context ended with context.Canceled, such as a client that resets a download mid-body or closes its connection, logs the failure at INFO.",
+        "A write that fails while the request context is live logs at ERROR.",
+        "Over HTTP/2, a failed write waits up to 100 ms for the stream context to end before it is classified."
+      ]
     },
     {
       "id": "request-log-status",
-      "text": "A handler that writes to the response writer, such as a gateway-mounted Connect handler, is logged with the status it wrote, not the response it returns. A 5xx logs at ERROR with the outcome failure, a 499 at INFO with the outcome canceled, any other status at INFO with the outcome success. A body written without a status logs 200. A 5xx returned after a lower written status logs that status at ERROR with the outcome failure."
+      "text": [
+        "A handler that writes to the response writer, such as a gateway-mounted Connect handler, is logged with the status it wrote, not the response it returns.",
+        "A 5xx logs at ERROR with the outcome failure, a 499 at INFO with the outcome canceled, any other status at INFO with the outcome success.",
+        "A body written without a status logs 200.",
+        "A 5xx returned after a lower written status logs that status at ERROR with the outcome failure."
+      ]
     },
     {
       "id": "error-envelope",
-      "text": "A route that does not exist answers 404 in the canonical error envelope {code, error, message} with the code not_found. A panic that Recovery catches answers 500 with the code internal and the message Internal Server Error, and so does a request scope that cannot be created, resolved or committed. NotFound, Unauthorized, Forbidden and InternalError write that envelope with the codes not_found, unauthorized, forbidden and internal."
+      "text": [
+        "A route that does not exist answers 404 in the canonical error envelope {code, error, message} with the code not_found.",
+        "A panic that Recovery catches answers 500 with the code internal and the message Internal Server Error, and so does a request scope that cannot be created, resolved or committed.",
+        "NotFound, Unauthorized, Forbidden and InternalError write that envelope with the codes not_found, unauthorized, forbidden and internal."
+      ]
     },
     {
       "id": "refusal-envelope",
-      "text": "A path that a non-OPTIONS route matches, called with a method it does not route, answers 405 with the code http.method_not_allowed and an Allow header naming its methods, HEAD when it routes GET, and OPTIONS; a preflight names the same. The rate limiter's 429 carries the code http.too_many_requests, and a stream route or WebSocket upgrade it refuses answers 400 with the code http.bad_request, each in the canonical error envelope."
+      "text": [
+        "A path that a non-OPTIONS route matches, called with a method it does not route, answers 405 with the code http.method_not_allowed and an Allow header naming its methods, HEAD when it routes GET, and OPTIONS;",
+        "a preflight names the same.",
+        "The rate limiter's 429 carries the code http.too_many_requests, and a stream route or WebSocket upgrade it refuses answers 400 with the code http.bad_request, each in the canonical error envelope."
+      ]
     }
   ],
   "decisions": [

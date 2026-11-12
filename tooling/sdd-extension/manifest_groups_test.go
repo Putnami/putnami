@@ -86,7 +86,7 @@ func sddCommandGroups() []groupSpec {
 					name:    "list",
 					summary: "List the compact catalog of authored product features",
 					description: "List every explicitly authored product feature — native design declarations plus durable " +
-						"putnami.features.json entries at the workspace and exact project roots — with its outcome, owner, " +
+						"entries in putnami.features.json or features/*.json at the workspace and exact project roots — with its outcome, owner, " +
 						"implementing projects, and exact declaration sources. Project selection is applied first and bounds " +
 						"the work as well as the answer: only the selected projects' design graphs are read, while durable " +
 						"declarations stay workspace-wide so identity and duplicate detection never depend on the selection. " +

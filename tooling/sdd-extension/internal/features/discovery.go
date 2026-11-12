@@ -85,8 +85,9 @@ func evaluateWorkspace(ws *workspace.Workspace, revision Revision, scope *Scope,
 	return Aggregate(Request{Workspace: ws, Reader: reader, Revision: revision, Scope: scope, ResolveSurfaces: resolveSurfaces})
 }
 
-// DiscoverAuthoredManifests reads only putnami.features.json at the workspace
-// root and exact project roots. It deliberately does not scan source trees,
+// DiscoverAuthoredManifests reads only the authored intent at the workspace
+// root and exact project roots: putnami.features.json, or the direct JSON
+// children of features/. It deliberately does not scan source trees,
 // specs, fixtures, or generated directories, and it does not read evidence or
 // capability manifests. That keeps a durable declaration as the sole
 // non-framework authority for this projection.
@@ -122,6 +123,9 @@ func DiscoverAuthoredManifestsWith(ws *workspace.Workspace, reader Reader) Autho
 	valid := make([]featureproto.ManifestSource, 0, len(manifests))
 	for _, source := range manifests {
 		local := featureproto.ValidateManifest(source.Manifest)
+		for i := range local {
+			local[i].Field = source.Field(local[i].Field)
+		}
 		var sourced []diag.Diagnostic
 		appendPathDiagnostics(&sourced, source.Path, local)
 		diagnostics = append(diagnostics, sourced...)
@@ -438,13 +442,11 @@ func sortedKeys(set map[string]bool) []string {
 }
 
 // featureManifestRoot recovers the discovery root that owns one durable
-// feature manifest. This is exact string arithmetic against its canonical
-// location rather than a guess about directory layout.
+// feature manifest or feature document. This is exact string arithmetic
+// against its canonical location rather than a guess about directory layout.
 func featureManifestRoot(workspacePath string) string {
-	if workspacePath == featureproto.ManifestFilename {
-		return ""
-	}
-	return strings.TrimSuffix(strings.TrimSuffix(workspacePath, featureproto.ManifestFilename), "/")
+	root, _ := featureproto.ManifestRoot(workspacePath)
+	return root
 }
 
 func discoverRoots(request Request) ([]discoveryRoot, []diag.Diagnostic) {
@@ -475,27 +477,103 @@ func discoverRoots(request Request) ([]discoveryRoot, []diag.Diagnostic) {
 	return roots, diagnostics
 }
 
+// discoverManifests reads each root's authored intent in the form it holds:
+// putnami.features.json, or one feature document per direct JSON child of
+// features/. A root that holds both contributes nothing and one finding, so
+// neither form silently hides the other's features. A features/ directory
+// that is itself a discovery root is that project, never a feature directory.
 func discoverManifests(request Request, roots []discoveryRoot, seenPaths map[string]bool) ([]featureproto.ManifestSource, []diag.Diagnostic) {
 	var manifests []featureproto.ManifestSource
 	var diagnostics []diag.Diagnostic
+	rootPaths := make(map[string]bool, len(roots))
+	for _, root := range roots {
+		rootPaths[root.path] = true
+	}
 	for _, root := range roots {
 		manifestPath := joinWorkspacePath(root.path, featureproto.ManifestFilename)
 		if seenPaths[manifestPath] {
 			continue
 		}
 		seenPaths[manifestPath] = true
-		data, ok := readDiscoveredFile(request.Reader, root.path, featureproto.ManifestFilename, manifestPath, true, &diagnostics)
-		if !ok {
+		data, single := readDiscoveredFile(request.Reader, root.path, featureproto.ManifestFilename, manifestPath, true, &diagnostics)
+		var documents []featureDocumentFile
+		directory := false
+		if !rootPaths[joinWorkspacePath(root.path, featureproto.FeatureDirectory)] {
+			documents, directory = readFeatureDocuments(request.Reader, root.path, &diagnostics)
+		}
+		if single && directory {
+			diagnostics = append(diagnostics, featureproto.ManifestFormConflict(root.path))
 			continue
 		}
-		manifest, findings := featureproto.ParseManifest(data)
-		appendPathDiagnostics(&diagnostics, manifestPath, findings)
-		if manifest != nil {
-			manifests = append(manifests, featureproto.ManifestSource{Path: manifestPath, Manifest: manifest})
+		if single {
+			manifest, findings := featureproto.ParseManifest(data)
+			appendPathDiagnostics(&diagnostics, manifestPath, findings)
+			if manifest != nil {
+				manifests = append(manifests, featureproto.ManifestSource{Path: manifestPath, Manifest: manifest})
+			}
+		}
+		for _, document := range documents {
+			parsed, findings := featureproto.ParseFeatureDocument(document.data)
+			appendPathDiagnostics(&diagnostics, document.path, findings)
+			if parsed != nil {
+				manifests = append(manifests, featureproto.ManifestSource{Document: true, Path: document.path, Manifest: parsed.Manifest()})
+			}
 		}
 	}
 	sort.Slice(manifests, func(i, j int) bool { return manifests[i].Path < manifests[j].Path })
 	return manifests, diagnostics
+}
+
+// featureDocumentFile is one read direct JSON child of a root's features/.
+type featureDocumentFile struct {
+	path string
+	data []byte
+}
+
+// readFeatureDocuments reads the direct JSON children of root's features/
+// directory in name order. It reports whether the root holds the per-feature
+// form: a features/ directory with at least one JSON child, whether or not
+// each child could be read.
+func readFeatureDocuments(reader Reader, root string, diagnostics *[]diag.Diagnostic) ([]featureDocumentFile, bool) {
+	directoryPath := joinWorkspacePath(root, featureproto.FeatureDirectory)
+	entries, err := reader.ReadDir(root, featureproto.FeatureDirectory)
+	if err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			*diagnostics = append(*diagnostics, readDiagnostic(directoryPath, err))
+		}
+		return nil, false
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name < entries[j].Name })
+	var names []string
+	for _, entry := range entries {
+		if !entry.IsDirectory && strings.HasSuffix(entry.Name, ".json") {
+			names = append(names, entry.Name)
+		}
+	}
+	if len(names) == 0 {
+		return nil, false
+	}
+	if len(names) > MaxFeatureDocuments {
+		*diagnostics = append(*diagnostics, diag.Errorf(featureproto.ErrorCodeSensitiveContent, directoryPath,
+			"feature directory exceeds the bounded document limit"))
+		return nil, true
+	}
+	var documents []featureDocumentFile
+	for _, name := range names {
+		if validateRelativePath(name, false) != "" || strings.Contains(name, "/") {
+			*diagnostics = append(*diagnostics, diag.Errorf(featureproto.ErrorCodeInvalidPath, directoryPath,
+				"feature document name is not one contained path segment"))
+			continue
+		}
+		relative := path.Join(featureproto.FeatureDirectory, name)
+		workspacePath := joinWorkspacePath(root, relative)
+		data, ok := readDiscoveredFile(reader, root, relative, workspacePath, false, diagnostics)
+		if !ok {
+			continue
+		}
+		documents = append(documents, featureDocumentFile{path: workspacePath, data: data})
+	}
+	return documents, true
 }
 
 func readDiscoveredFile(reader Reader, root, relative, workspacePath string, optional bool, diagnostics *[]diag.Diagnostic) ([]byte, bool) {

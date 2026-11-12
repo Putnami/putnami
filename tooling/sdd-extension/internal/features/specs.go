@@ -17,6 +17,10 @@ import (
 // rather than a scale requirement.
 const MaxSpecFiles = 1024
 
+// MaxFeatureDocuments bounds the direct JSON children one features/ directory
+// may carry.
+const MaxFeatureDocuments = 1024
+
 // DiscoveredSpec is one strictly parsed durable specification together with the
 // provenance the protocol deliberately does not carry: the exact
 // workspace-relative file it was read from and the workspace or project root

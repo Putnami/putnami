@@ -14,15 +14,31 @@
   "requirements": [
     {
       "id": "deps-edit-reads-no-replaced-version",
-      "text": "deps-edit adds a module by resolving each spec with go list -m and requiring the result with go mod edit, and removes one with go mod edit -droprequire. It never runs go get, so a go.mod that requires a version no proxy serves is edited. A spec names a module path. A spec without a version that names no go.work member takes the latest, or keeps the version go.mod requires when it is newer. An add refuses the version none and names the deps remove command."
+      "text": [
+        "deps-edit adds a module by resolving each spec with go list -m and requiring the result with go mod edit, and removes one with go mod edit -droprequire.",
+        "It never runs go get, so a go.mod that requires a version no proxy serves is edited.",
+        "A spec names a module path.",
+        "A spec without a version that names no go.work member takes the latest, or keeps the version go.mod requires when it is newer.",
+        "An add refuses the version none and names the deps remove command."
+      ]
     },
     {
       "id": "deps-tidy-resolves-as-the-workspace-does",
-      "text": "deps-edit tidies a copy of go.mod that adds the go.work replace directives the module lacks, then writes go.mod and go.sum without them. A pin of every version of a module to a release is added only for each version a workspace go.mod requires that a proxy answers does not exist, and the output names it; any other lookup error fails the edit. A failed go step restores every go.mod and go.sum the run edited, each through a rename."
+      "text": [
+        "deps-edit tidies a copy of go.mod that adds the go.work replace directives the module lacks, then writes go.mod and go.sum without them.",
+        "A pin of every version of a module to a release is added only for each version a workspace go.mod requires that a proxy answers does not exist, and the output names it;",
+        "any other lookup error fails the edit.",
+        "A failed go step restores every go.mod and go.sum the run edited, each through a rename."
+      ]
     },
     {
       "id": "deps-run-the-pinned-go",
-      "text": "deps-edit runs its go commands with the go the extension's tasks resolve: the release the workspace lock pins, else a go on PATH. It installs none. With no go, it edits nothing and emits one error naming putnami install. A hosted run, whose dependencies are offline, is refused."
+      "text": [
+        "deps-edit runs its go commands with the go the extension's tasks resolve: the release the workspace lock pins, else a go on PATH.",
+        "It installs none.",
+        "With no go, it edits nothing and emits one error naming putnami install.",
+        "A hosted run, whose dependencies are offline, is refused."
+      ]
     },
     {
       "id": "prune-names-the-module-the-target-declares",
@@ -30,11 +46,21 @@
     },
     {
       "id": "deps-dry-run-writes-no-file",
-      "text": "Under the param dry-run, true when the command runs with --dry-run, deps-edit makes each edit and its tidy on a copy of go.mod and go.sum, then logs each requirement and replace directive the edit adds, drops or changes in go.mod and the number of go.sum lines it adds and drops, and emits those lines as one summary the CLI always prints. It writes no file of the workspace."
+      "text": [
+        "Under the param dry-run, true when the command runs with --dry-run, deps-edit makes each edit and its tidy on a copy of go.mod and go.sum, then logs each requirement and replace directive the edit adds, drops or changes in go.mod and the number of go.sum lines it adds and drops, and emits those lines as one summary the CLI always prints.",
+        "It writes no file of the workspace."
+      ]
     },
     {
       "id": "deps-add-resolves-a-workspace-member-from-the-tree",
-      "text": "Bare add specs resolve uniquely declared governing go.work modules without registry access. Preserve a valid required version and existing replacements; otherwise use a major placeholder and relative member replacement. Explicit versions and nonmembers retain registry lookup. Reject malformed, missing, ambiguous and self members before Go runs. Read member go.mod identities only. Apply within the existing rollback transaction."
+      "text": [
+        "Bare add specs resolve uniquely declared governing go.work modules without registry access.",
+        "Preserve a valid required version and existing replacements; otherwise use a major placeholder and relative member replacement.",
+        "Explicit versions and nonmembers retain registry lookup.",
+        "Reject malformed, missing, ambiguous and self members before Go runs.",
+        "Read member go.mod identities only.",
+        "Apply within the existing rollback transaction."
+      ]
     }
   ],
   "decisions": [

@@ -1,0 +1,280 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/agent-workflow-lifecycle",
+    "type": "feature",
+    "name": "Agent workflow lifecycle",
+    "outcome": "A workspace that opts into an extension's agent content receives the files of the extension release it pinned through init, install and upgrade, and never loses a file it owns",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "optin",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-absent-declaration-skips-the-phase"
+          ]
+        }
+      },
+      {
+        "id": "legacy-declarations-refused",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "every-pass-refuses-a-legacy-entry",
+            "install-and-upgrade-refuse-legacy-state-with-nothing-written"
+          ]
+        }
+      },
+      {
+        "id": "record-last",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-failure-leaves-files-and-record-untouched"
+          ]
+        }
+      },
+      {
+        "id": "collision-aborts",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "one-collision-aborts-before-the-first-write"
+          ]
+        }
+      },
+      {
+        "id": "no-secret-leak",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "failure-messages-redact-credentials-and-locations"
+          ]
+        }
+      },
+      {
+        "id": "idempotent",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-repeated-run-changes-no-byte"
+          ]
+        }
+      },
+      {
+        "id": "explicit-lock-migration",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "vnext-check-and-apply-are-explicit-and-idempotent",
+            "a-lock-that-pins-toolchains-is-refused-in-both-modes"
+          ]
+        }
+      },
+      {
+        "id": "reinit-preserves-optin",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-force-unions-the-declaration"
+          ]
+        }
+      },
+      {
+        "id": "undeclared-artifact-retired",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "upgrade-removes-a-withdrawn-owners-files-pin-and-record",
+            "an-edited-file-is-released-not-overwritten"
+          ]
+        }
+      },
+      {
+        "id": "extension-agent-content",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-opted-in-extension-installs-upgrades-and-retires-its-content",
+            "an-extension-without-the-opt-in-activates-nothing",
+            "the-first-run-pass-restores-pinned-extension-content",
+            "a-local-extension-builds-its-content-and-is-never-pinned"
+          ]
+        }
+      },
+      {
+        "id": "extension-agent-content-integrity",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "extension-content-collisions-abort-before-the-first-write",
+            "extension-content-is-bound-to-the-extension-pin",
+            "an-interrupted-extension-content-run-converges"
+          ]
+        }
+      },
+      {
+        "id": "superseded-owners-refused",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-clone-that-still-records-a-superseded-artifact-is-refused",
+            "deleting-the-record-hands-the-files-to-the-content"
+          ]
+        }
+      },
+      {
+        "id": "legacy-pins-dropped",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-explicit-install-drops-every-pin",
+            "the-implicit-bootstrap-keeps-the-lock",
+            "a-hosted-install-that-would-drop-a-pin-fails"
+          ]
+        }
+      },
+      {
+        "id": "starter-agent-content-opt-in",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "no-built-in-starter-opts-into-agent-content",
+            "init-installs-the-extension-and-its-content",
+            "a-failed-starter-install-points-at-install",
+            "extensions-install-opts-into-the-content-it-ships",
+            "extensions-install-writes-no-opt-in-without-content",
+            "extensions-install-opts-in-only-the-extension-it-names",
+            "extensions-install-materializes-only-the-content-it-names",
+            "extensions-install-keeps-the-opt-in-when-the-content-fails",
+            "extensions-install-reports-the-opt-in-and-the-content"
+          ]
+        }
+      },
+      {
+        "id": "host-hooks-written-on-explicit-lifecycle",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-opted-in-bound-installed-extension-gets-its-hooks",
+            "a-repeated-run-changes-nothing",
+            "no-opt-in-or-no-binding-writes-nothing",
+            "an-explicit-install-writes-the-hooks",
+            "the-implicit-bootstrap-writes-no-hooks"
+          ]
+        }
+      },
+      {
+        "id": "host-hooks-ownership-by-command",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "putnami-handlers-are-replaced-in-place",
+            "the-person-s-entries-keep-their-bytes",
+            "an-unusable-file-is-left-untouched",
+            "retirement-removes-putnami-handlers"
+          ]
+        }
+      },
+      {
+        "id": "host-hooks-exit-guard",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "only-exit-75-wakes",
+            "matchers-follow-each-host",
+            "a-source-workspace-runs-its-putnamiw"
+          ]
+        }
+      },
+      {
+        "id": "user-scope-skills",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-user-scope-install-writes-only-the-named-skills",
+            "a-user-scope-reinstall-writes-nothing",
+            "a-user-scope-collision-writes-nothing",
+            "a-user-scope-remove-removes-what-it-wrote"
+          ]
+        }
+      }
+    ]
+  }
+}

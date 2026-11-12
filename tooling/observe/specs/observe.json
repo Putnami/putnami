@@ -20,47 +20,90 @@
   "requirements": [
     {
       "id": "runs-without-a-workspace",
-      "text": "@putnami/observe declares the observe command group whose default subcommand is interactive and workspace-optional, so a person who installed the extension in the user scope runs putnami observe in a directory that has no putnami.workspace.json. The manifest passes the extension protocol's strict validation."
+      "text": [
+        "@putnami/observe declares the observe command group whose default subcommand is interactive and workspace-optional, so a person who installed the extension in the user scope runs putnami observe in a directory that has no putnami.workspace.json.",
+        "The manifest passes the extension protocol's strict validation."
+      ]
     },
     {
       "id": "ci-detection",
-      "text": "The evidence protocol's markers name the CI system; only GitHub Actions and GitLab CI fill the subject and the run. The subject names the code host, its numeric project id (GITHUB_REPOSITORY_ID, CI_PROJECT_ID), the repository path for display, the commit the job built and measured (the resolved head), the branch and the pull or merge request number; the run names its id, job, attempt and page. A GitHub or GitLab job without a numeric project id gets a diagnostic. --head and --base override what the CI says."
+      "text": [
+        "The evidence protocol's markers name the CI system; only GitHub Actions and GitLab CI fill the subject and the run.",
+        "The subject names the code host, its numeric project id (GITHUB_REPOSITORY_ID, CI_PROJECT_ID), the repository path for display, the commit the job built and measured (the resolved head), the branch and the pull or merge request number;",
+        "the run names its id, job, attempt and page.",
+        "A GitHub or GitLab job without a numeric project id gets a diagnostic. --head and --base override what the CI says."
+      ]
     },
     {
       "id": "diff-base",
-      "text": "The base is --base, else the merge request diff base (CI_MERGE_REQUEST_DIFF_BASE_SHA), else the pull request base commit from the event payload or its target branch (GITHUB_BASE_REF) on origin, else the push's previous commit unless all zeros. A missing base is fetched; a shallow clone is deepened in bounded steps until the merge base of base and head is reachable. Changed files are the diff from that merge base to the head, renames detected. A base that cannot be resolved or reached is a diagnostic."
+      "text": [
+        "The base is --base, else the merge request diff base (CI_MERGE_REQUEST_DIFF_BASE_SHA), else the pull request base commit from the event payload or its target branch (GITHUB_BASE_REF) on origin, else the push's previous commit unless all zeros.",
+        "A missing base is fetched; a shallow clone is deepened in bounded steps until the merge base of base and head is reachable.",
+        "Changed files are the diff from that merge base to the head, renames detected.",
+        "A base that cannot be resolved or reached is a diagnostic."
+      ]
     },
     {
       "id": "report-discovery",
-      "text": "Without flags, observe walks the repository, skipping .git, node_modules and vendor, within bounds, and keeps each test or coverage report it recognizes by content, in a format observe reads. --junit and --coverage take comma-separated paths or glob patterns, resolved against the invocation directory, and replace discovery for their kind. A missing, unreadable or unrecognized report is a diagnostic. observe exits 0 whatever it observes, 2 on a usage error, 1 when its job context or output fails."
+      "text": [
+        "Without flags, observe walks the repository, skipping .git, node_modules and vendor, within bounds, and keeps each test or coverage report it recognizes by content, in a format observe reads. --junit and --coverage take comma-separated paths or glob patterns, resolved against the invocation directory, and replace discovery for their kind.",
+        "A missing, unreadable or unrecognized report is a diagnostic. observe exits 0 whatever it observes, 2 on a usage error, 1 when its job context or output fails."
+      ]
     },
     {
       "id": "evidence-document",
-      "text": "--evidence <path>, resolved against the invocation directory, writes a protocol/evidence v1 document: the subject, the CI run, the producer, the changed files and the components the change analyses found. The document is validated before it is written; one that does not validate is written nowhere and is a diagnostic, as is a path that cannot be written."
+      "text": [
+        "--evidence <path>, resolved against the invocation directory, writes a protocol/evidence v1 document: the subject, the CI run, the producer, the changed files and the components the change analyses found.",
+        "The document is validated before it is written; one that does not validate is written nowhere and is a diagnostic, as is a path that cannot be written."
+      ]
     },
     {
       "id": "caller-directory-writes",
-      "text": "In the caller's directory, observe writes only the Git history it fetches to reach the merge base of a shallow clone, which --no-fetch turns off, and the file --evidence names; the working tree, the index and HEAD stay as they were, and its fetches start no automatic Git maintenance that would repack the history after it exits. Everything else it prints: a text summary, or one JSON document with --output=json."
+      "text": [
+        "In the caller's directory, observe writes only the Git history it fetches to reach the merge base of a shallow clone, which --no-fetch turns off, and the file --evidence names;",
+        "the working tree, the index and HEAD stay as they were, and its fetches start no automatic Git maintenance that would repack the history after it exits.",
+        "Everything else it prints: a text summary, or one JSON document with --output=json."
+      ]
     },
     {
       "id": "external-specs",
-      "text": "observe reads the specs a repository keeps in the formats the features protocol reads: Spec Kit (`specs/<feature>/spec.md`), OpenSpec (`openspec/specs/<capability>/spec.md`), Kiro (`.kiro/specs/<feature>/requirements.md`) and Gherkin (`.feature` files). It reports each spec with its format, its path, the component that owns it, its requirements by id and name, and whether the change touches it. A spec it cannot read is a diagnostic, and the rest are still reported."
+      "text": [
+        "observe reads the specs a repository keeps in the formats the features protocol reads: Spec Kit (`specs/<feature>/spec.md`), OpenSpec (`openspec/specs/<capability>/spec.md`), Kiro (`.kiro/specs/<feature>/requirements.md`) and Gherkin (`.feature` files).",
+        "It reports each spec with its format, its path, the component that owns it, its requirements by id and name, and whether the change touches it.",
+        "A spec it cannot read is a diagnostic, and the rest are still reported."
+      ]
     },
     {
       "id": "short-log-summary",
-      "text": "The text summary names the CI and repository, the commit, the base and the count of changed files, then the changed components and their dependents, the changed-line coverage, the count of dependency changes with the license changes, the vulnerabilities introduced and fixed and the changes an SBOM side leaves unknown, then the warnings, errors and publish diagnostics. --details prints the detailed summary; --output=json and the evidence document keep the whole analysis."
+      "text": [
+        "The text summary names the CI and repository, the commit, the base and the count of changed files, then the changed components and their dependents, the changed-line coverage, the count of dependency changes with the license changes, the vulnerabilities introduced and fixed and the changes an SBOM side leaves unknown, then the warnings, errors and publish diagnostics. --details prints the detailed summary;",
+        "--output=json and the evidence document keep the whole analysis."
+      ]
     },
     {
       "id": "next-command",
-      "text": "The text summary ends with one line that names the next command: the report URL when an upload answered one; else, outside a CI, putnami observe --open; else, in a CI job whose reporter is @putnami/cloud and that holds no PUTNAMI_CLOUD_TOKEN, the PUTNAMI_CLOUD_TOKEN setting and putnami cloud token create, which creates it; else --upload."
+      "text": [
+        "The text summary ends with one line that names the next command: the report URL when an upload answered one;",
+        "else, outside a CI, putnami observe --open;",
+        "else, in a CI job whose reporter is @putnami/cloud and that holds no PUTNAMI_CLOUD_TOKEN, the PUTNAMI_CLOUD_TOKEN setting and putnami cloud token create, which creates it;",
+        "else --upload."
+      ]
     },
     {
       "id": "laptop-repository-key",
-      "text": "Outside a CI, the subject is read from the origin remote: a github.com or GitLab remote names the provider, the host and the repository path. With --upload or --open, the numeric project id comes from the code host API (GitHub GET /repos/{owner}/{repo}, GitLab GET /projects/{path}), with GITHUB_TOKEN or PUTNAMI_GITLAB_TOKEN when set; an id the API does not answer is a diagnostic that names the token. The head is HEAD and the branch the current one."
+      "text": [
+        "Outside a CI, the subject is read from the origin remote: a github.com or GitLab remote names the provider, the host and the repository path.",
+        "With --upload or --open, the numeric project id comes from the code host API (GitHub GET /repos/{owner}/{repo}, GitLab GET /projects/{path}), with GITHUB_TOKEN or PUTNAMI_GITLAB_TOKEN when set;",
+        "an id the API does not answer is a diagnostic that names the token.",
+        "The head is HEAD and the branch the current one."
+      ]
     },
     {
       "id": "laptop-base",
-      "text": "Outside a CI and without --base, the base is the remote default branch, origin/HEAD, so putnami observe on a laptop needs no flag. A clone without origin/HEAD keeps the diagnostic of a missing base."
+      "text": [
+        "Outside a CI and without --base, the base is the remote default branch, origin/HEAD, so putnami observe on a laptop needs no flag.",
+        "A clone without origin/HEAD keeps the diagnostic of a missing base."
+      ]
     }
   ],
   "decisions": [

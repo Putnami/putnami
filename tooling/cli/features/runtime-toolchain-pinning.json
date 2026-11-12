@@ -1,0 +1,167 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/runtime-toolchain-pinning",
+    "type": "feature",
+    "name": "Lock-pinned extension runtime toolchains",
+    "outcome": "An extension prepares its runtime and runs its tasks with the exact toolchain the workspace lock pins, and results are keyed under that identity",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "exact-lock-resolution",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-mismatching-ambient-binary-is-never-substituted",
+            "an-optional-mismatch-publishes-an-empty-binding",
+            "a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home",
+            "a-first-party-uv-runtime-resolves-the-install-under-the-putnami-home"
+          ]
+        }
+      },
+      {
+        "id": "minimal-child-environment",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-pinned-tool-answers-every-bare-name-lookup",
+            "a-home-candidate-resolves-without-home-in-the-environment"
+          ]
+        }
+      },
+      {
+        "id": "identity-keys-results",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-task-cache-key-follows-the-resolved-identity",
+            "a-prepared-runtime-digest-follows-the-resolved-identity"
+          ]
+        }
+      },
+      {
+        "id": "workspace-installed-candidates",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-environment-candidate-finds-a-tool-inside-the-workspace",
+            "the-fetch-provisions-like-the-install"
+          ]
+        }
+      },
+      {
+        "id": "provisioning-runs-unpinned",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "workspace-install-resolves-an-unusable-pin-unavailable",
+            "another-command-never-runs-on-a-provisioning-resolution",
+            "install-runs-on-a-lock-that-does-not-pin-the-toolchain-yet",
+            "a-local-extension-prepares-unpinned-only-in-a-provisioning-run",
+            "project-setup-resolves-an-unusable-pin-unavailable"
+          ]
+        }
+      },
+      {
+        "id": "unplanned-toolchains-do-not-stop-the-run",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "only-a-planned-job-fails-on-an-unsatisfied-toolchain",
+            "a-build-with-no-project-of-the-extension-runs-without-its-pin",
+            "planning-fails-before-any-key-when-a-planned-job-needs-an-unresolved-toolchain"
+          ]
+        }
+      },
+      {
+        "id": "provisioning-reports-the-installed-toolchain",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-toolchain-the-install-provided-is-reported-at-info",
+            "a-toolchain-still-missing-after-the-install-keeps-the-warning",
+            "a-run-without-workspace-install-reports-nothing",
+            "a-run-that-plans-no-job-keeps-the-warning"
+          ]
+        }
+      },
+      {
+        "id": "mismatch-names-the-install",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-pinned-release-no-candidate-matches-names-putnami-install-unless-it-does-not-help"
+          ]
+        }
+      },
+      {
+        "id": "pinned-archives-are-provisioned",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-pinned-archive-is-verified-and-unpacked",
+            "a-digest-or-probe-mismatch-is-refused",
+            "a-complete-folder-is-reused-without-a-request",
+            "a-held-release-is-not-downloaded",
+            "a-folder-of-another-layout-keeps-its-entries",
+            "a-hosted-or-offline-run-installs-nothing",
+            "a-pin-with-no-host-archive-installs-nothing-when-optional"
+          ]
+        }
+      },
+      {
+        "id": "provisioned-candidate-resolves-the-pin",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-provisioned-candidate-resolves-the-archive-executable",
+            "a-missing-folder-or-a-pin-below-format-5-names-putnami-install"
+          ]
+        }
+      }
+    ]
+  }
+}

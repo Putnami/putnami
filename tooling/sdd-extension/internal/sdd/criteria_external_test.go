@@ -18,7 +18,7 @@ func TestExternalSpecReachesTheGate(t *testing.T) {
 			ProtocolVersion: featureproto.SpecProtocolVersion,
 			Feature:         "billing/invoice-export",
 			Outcomes:        []string{"O"},
-			Requirements:    []featureproto.SpecRequirement{{ID: "export", Text: "Text."}},
+			Requirements:    []featureproto.SpecRequirement{{ID: "export", Text: featureproto.SpecText{"Text."}}},
 		},
 	}
 	repository := &specRepository{
@@ -46,7 +46,7 @@ func TestCriteriaGroupsCarryTheAuthoredTarget(t *testing.T) {
 			ProtocolVersion: featureproto.SpecProtocolVersion,
 			Feature:         feature,
 			Outcomes:        []string{"O"},
-			Requirements:    []featureproto.SpecRequirement{{ID: "export", Text: "Text."}},
+			Requirements:    []featureproto.SpecRequirement{{ID: "export", Text: featureproto.SpecText{"Text."}}},
 		}}
 	}
 	authored := func(id string, target featureproto.MaturityStage) featureproto.Feature {

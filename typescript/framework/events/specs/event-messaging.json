@@ -19,7 +19,10 @@
   "requirements": [
     {
       "id": "at-least-once",
-      "text": "Delivery is at-least-once and duplicates are a normal outcome. The in-memory broker can deliberately redeliver a sample of handled messages when a developer opts in, so a non-idempotent handler is found locally rather than in production."
+      "text": [
+        "Delivery is at-least-once and duplicates are a normal outcome.",
+        "The in-memory broker can deliberately redeliver a sample of handled messages when a developer opts in, so a non-idempotent handler is found locally rather than in production."
+      ]
     },
     {
       "id": "payload-validation",
@@ -31,7 +34,10 @@
     },
     {
       "id": "dead-letter-or-drop",
-      "text": "Once retries are exhausted, a handler that declared a dead-letter queue routes the message to `<topic>.dlq` with the original topic, attempt, and error as attributes; a handler that did not declares the message dropped."
+      "text": [
+        "Once retries are exhausted, a handler that declared a dead-letter queue routes the message to `<topic>.dlq` with the original topic, attempt, and error as attributes;",
+        "a handler that did not declares the message dropped."
+      ]
     },
     {
       "id": "no-silent-loss",
@@ -47,7 +53,10 @@
     },
     {
       "id": "graceful-drain",
-      "text": "Stopping the broker refuses new publishes but keeps draining both in-flight and queued deliveries until they finish or the drain timeout elapses, and reports what was still pending when it timed out. Each queued delivery still waiting at the deadline and each retry that stop cancels is recorded dropped with reason `broker_stopped`."
+      "text": [
+        "Stopping the broker refuses new publishes but keeps draining both in-flight and queued deliveries until they finish or the drain timeout elapses, and reports what was still pending when it timed out.",
+        "Each queued delivery still waiting at the deadline and each retry that stop cancels is recorded dropped with reason `broker_stopped`."
+      ]
     },
     {
       "id": "isolated-invocation",
@@ -66,5 +75,7 @@
       "text": "The delivery lifecycle records match the shared cross-language corpus, so the TypeScript and Go brokers cannot drift on record vocabulary, ordering, or the attempt numbers they report."
     }
   ],
-  "decisions": ["typescript/framework/events/doc/adr/0001-delivery-is-at-least-once-and-loss-is-recorded.md"]
+  "decisions": [
+    "typescript/framework/events/doc/adr/0001-delivery-is-at-least-once-and-loss-is-recorded.md"
+  ]
 }

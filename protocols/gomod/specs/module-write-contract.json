@@ -16,7 +16,12 @@
   "requirements": [
     {
       "id": "the-version-and-endpoints-are-pinned",
-      "text": "The protocol version is 1. The blob upload path is /<module>/-/blobs/upload, with content type application/zip. The version path is /<module>/@v/<version>, and the release path is the version path followed by /release, both with content type application/json. A test pins each value, so a change is a reviewed bump."
+      "text": [
+        "The protocol version is 1.",
+        "The blob upload path is /<module>/-/blobs/upload, with content type application/zip.",
+        "The version path is /<module>/@v/<version>, and the release path is the version path followed by /release, both with content type application/json.",
+        "A test pins each value, so a change is a reviewed bump."
+      ]
     },
     {
       "id": "the-field-names-are-the-servers",
@@ -28,7 +33,10 @@
     },
     {
       "id": "the-fixture-corpus-is-the-contract",
-      "text": "Every valid fixture of the blob upload response, the publish request and the release response parses with no error. Every invalid fixture fails: a malformed digest, an unknown field, a missing go_mod, a missing module or version, and a visibility other than public."
+      "text": [
+        "Every valid fixture of the blob upload response, the publish request and the release response parses with no error.",
+        "Every invalid fixture fails: a malformed digest, an unknown field, a missing go_mod, a missing module or version, and a visibility other than public."
+      ]
     },
     {
       "id": "a-release-answers-the-requested-version",
@@ -36,11 +44,18 @@
     },
     {
       "id": "the-version-is-bound-to-the-stored-zip",
-      "text": "The SDK publisher (tooling/extension-sdk) uploads the zip, then PUTs the version under its bearer, and a second publish of the same bytes reuses the version. It refuses an upload answer whose digest is not its zip's. On a 409 it reuses the version only when the caller allows an existing version."
+      "text": [
+        "The SDK publisher (tooling/extension-sdk) uploads the zip, then PUTs the version under its bearer, and a second publish of the same bytes reuses the version.",
+        "It refuses an upload answer whose digest is not its zip's.",
+        "On a 409 it reuses the version only when the caller allows an existing version."
+      ]
     },
     {
       "id": "publishing-releases-nothing",
-      "text": "The Go extension's publish job (go/extension) sends a publish request that parses strictly, with no dist_tag, and calls no release, in a full bootstrap and in an unmanaged publish. In the full bootstrap the request has no visibility member."
+      "text": [
+        "The Go extension's publish job (go/extension) sends a publish request that parses strictly, with no dist_tag, and calls no release, in a full bootstrap and in an unmanaged publish.",
+        "In the full bootstrap the request has no visibility member."
+      ]
     }
   ],
   "decisions": [

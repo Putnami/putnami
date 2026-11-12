@@ -10,4 +10,5 @@
 **/specs.baseline.json @fdumay
 **/specs/*.json @fdumay
 **/putnami.features.json @fdumay
+**/features/*.json @fdumay
 /putnami.workspace.json @fdumay

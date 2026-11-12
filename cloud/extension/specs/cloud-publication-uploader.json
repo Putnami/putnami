@@ -12,7 +12,10 @@
   "requirements": [
     {
       "id": "cloud-uploads-its-registries-in-the-provider-session",
-      "text": "On a hosted run that serves publication-v1, the credential provider offers uploader-v1 and uploads every ecosystem of the plan to its publication origins. It mints the plan's bearer itself, uploads with the SDK upload kit, and answers the digest each registry stores."
+      "text": [
+        "On a hosted run that serves publication-v1, the credential provider offers uploader-v1 and uploads every ecosystem of the plan to its publication origins.",
+        "It mints the plan's bearer itself, uploads with the SDK upload kit, and answers the digest each registry stores."
+      ]
     }
   ]
 }

@@ -16,7 +16,11 @@
   "requirements": [
     {
       "id": "cache-aside-fetch",
-      "text": "cache(name).fetch runs the loader on a miss and returns the stored value on a hit, without running the loader again. The stored key is the cache name, a colon and the key: a static string, the result of a key function over the fetch arguments, or the JSON of the arguments when no key is set. A synchronous loader is cached the same way."
+      "text": [
+        "cache(name).fetch runs the loader on a miss and returns the stored value on a hit, without running the loader again.",
+        "The stored key is the cache name, a colon and the key: a static string, the result of a key function over the fetch arguments, or the JSON of the arguments when no key is set.",
+        "A synchronous loader is cached the same way."
+      ]
     },
     {
       "id": "single-flight",
@@ -24,7 +28,10 @@
     },
     {
       "id": "expiration",
-      "text": "An entry stored with a positive TTL is not served once the TTL elapses, in memory and on disk, and the next fetch runs the loader again. An entry stored without a TTL carries no expiration and stays served."
+      "text": [
+        "An entry stored with a positive TTL is not served once the TTL elapses, in memory and on disk, and the next fetch runs the loader again.",
+        "An entry stored without a TTL carries no expiration and stays served."
+      ]
     },
     {
       "id": "eviction",
@@ -40,15 +47,24 @@
     },
     {
       "id": "build-version-retention",
-      "text": "evictOldVersionsInDir keeps the five most recently modified build-version directories and removes the older ones. It removes nothing when the directory holds five or fewer, and it resolves without error when the directory does not exist."
+      "text": [
+        "evictOldVersionsInDir keeps the five most recently modified build-version directories and removes the older ones.",
+        "It removes nothing when the directory holds five or fewer, and it resolves without error when the directory does not exist."
+      ]
     },
     {
       "id": "layered-storage",
-      "text": "LayeredCacheStorage refuses an empty layer list. It reads layers in order and returns the first hit, copies a hit from a slower layer into the faster layers with its remaining TTL, and writes every set to all layers."
+      "text": [
+        "LayeredCacheStorage refuses an empty layer list.",
+        "It reads layers in order and returns the first hit, copies a hit from a slower layer into the faster layers with its remaining TTL, and writes every set to all layers."
+      ]
     },
     {
       "id": "http-cache-control",
-      "text": "CacheMiddleware sets the Cache-Control header built from its options: a raw cacheControl string wins over every shorthand, privateMaxAge wins over maxAge, and s-maxage and stale-while-revalidate are appended. When no option applies, the response carries no Cache-Control header."
+      "text": [
+        "CacheMiddleware sets the Cache-Control header built from its options: a raw cacheControl string wins over every shorthand, privateMaxAge wins over maxAge, and s-maxage and stale-while-revalidate are appended.",
+        "When no option applies, the response carries no Cache-Control header."
+      ]
     },
     {
       "id": "http-conditional-request",

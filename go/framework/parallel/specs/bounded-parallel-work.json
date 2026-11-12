@@ -21,11 +21,18 @@
     },
     {
       "id": "dispatch-throughput-budget",
-      "text": "Bounded dispatch stays within its throughput budget: mapping a trivial worker over a large batch sustains at least 50 000 items per second. The budget is an order-of-magnitude tripwire with roughly thirty times headroom over the measured rate, not a service objective \u2014 it catches a structural regression in the dispatch path, never runner noise."
+      "text": [
+        "Bounded dispatch stays within its throughput budget: mapping a trivial worker over a large batch sustains at least 50 000 items per second.",
+        "The budget is an order-of-magnitude tripwire with roughly thirty times headroom over the measured rate, not a service objective \u2014 it catches a structural regression in the dispatch path, never runner noise."
+      ]
     },
     {
       "id": "failure",
-      "text": "The first worker error wins atomically, cancels the shared child context, and suppresses partial results. With a positive limit, the dispatcher stops launching workers when cancellation is observed; with a non-positive limit, an already-created goroutine skips the user function when cancellation is visible before invocation."
+      "text": [
+        "The first worker error wins atomically, cancels the shared child context, and suppresses partial results.",
+        "With a positive limit, the dispatcher stops launching workers when cancellation is observed;",
+        "with a non-positive limit, an already-created goroutine skips the user function when cancellation is visible before invocation."
+      ]
     },
     {
       "id": "ordering",

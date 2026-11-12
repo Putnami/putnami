@@ -18,31 +18,58 @@
   "requirements": [
     {
       "id": "projects-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Nx detector knows as a project, from nx graph --file graph.json when the root holds it, else nx.json and each project.json and workspace package.json: its Nx project name as source name, the projects it depends on, the extension @putnami/nx, the tag nx, and metadata naming the project for nx run. Any other candidate is no member of the extension."
+      "text": [
+        "The probe answers, for each candidate directory the observe Nx detector knows as a project, from nx graph --file graph.json when the root holds it, else nx.json and each project.json and workspace package.json: its Nx project name as source name, the projects it depends on, the extension @putnami/nx, the tag nx, and metadata naming the project for nx run.",
+        "Any other candidate is no member of the extension."
+      ]
     },
     {
       "id": "sync-writes-the-project-graph",
-      "text": "The workspace sync task writes in each Nx project's putnami.json the extension, the project IDs it depends on, and in disable.jobs each of build, test and lint the project has no target for, owning those entries and their @putnami/nx: and @putnami/typescript: forms. It reads the mode from options[\"@putnami/nx\"].mode, import by default, retracts a former project, rewrites a file only when a member it owns changes, and with dryRun writes nothing and reports each diff; it reads declaredExtensions as declared."
+      "text": [
+        "The workspace sync task writes in each Nx project's putnami.json the extension, the project IDs it depends on, and in disable.jobs each of build, test and lint the project has no target for, owning those entries and their @putnami/nx: and @putnami/typescript: forms.",
+        "It reads the mode from options[\"@putnami/nx\"].mode, import by default, retracts a former project, rewrites a file only when a member it owns changes, and with dryRun writes nothing and reports each diff;",
+        "it reads declaredExtensions as declared."
+      ]
     },
     {
       "id": "import-maps-typescript-targets",
-      "text": "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, and its build, test and lint targets that run only what that extension runs (bun build or tsc, see import-maps-a-tsc-build-target; bun test, vitest or jest; biome; eslint, see import-keeps-eslint) run as its task, with @putnami/nx:<task> off. Every other target, such as prettier, stays on Nx, is listed, and @putnami/typescript:<task> is off."
+      "text": [
+        "In import mode, a project with package.json and a tsconfig*.json or a .ts source is TypeScript: its putnami.json names @putnami/typescript beside @putnami/nx, and its build, test and lint targets that run only what that extension runs (bun build or tsc, see import-maps-a-tsc-build-target;",
+        "bun test, vitest or jest;",
+        "biome;",
+        "eslint, see import-keeps-eslint) run as its task, with @putnami/nx:<task> off.",
+        "Every other target, such as prettier, stays on Nx, is listed, and @putnami/typescript:<task> is off."
+      ]
     },
     {
       "id": "import-maps-vitest-and-jest-tests",
-      "text": "In import mode, the test target of a TypeScript project whose script runs vitest or jest, or whose Nx executor is @nx/vite:test or @nx/jest:jest, runs as @putnami/typescript:test, and the sync writes that runner in options[\"@putnami/typescript:test\"].runner of its putnami.json. The sync owns that member: it removes it from a project whose test target no longer maps to Vitest or Jest, and from a former project."
+      "text": [
+        "In import mode, the test target of a TypeScript project whose script runs vitest or jest, or whose Nx executor is @nx/vite:test or @nx/jest:jest, runs as @putnami/typescript:test, and the sync writes that runner in options[\"@putnami/typescript:test\"].runner of its putnami.json.",
+        "The sync owns that member: it removes it from a project whose test target no longer maps to Vitest or Jest, and from a former project."
+      ]
     },
     {
       "id": "import-keeps-eslint",
-      "text": "A lint target that runs eslint or eslint . alone, plainly or through npx, bunx, pnpm exec or yarn, or @nx/eslint:lint with no option but lintFilePatterns naming the project root, runs as @putnami/typescript:lint and sets options[\"@putnami/typescript\"].lint.linter to eslint unless the project chose a linter. Other ESLint arguments keep the target on Nx, listed. The sync removes the eslint it wrote when the target stops mapping and on retract."
+      "text": [
+        "A lint target that runs eslint or eslint . alone, plainly or through npx, bunx, pnpm exec or yarn, or @nx/eslint:lint with no option but lintFilePatterns naming the project root, runs as @putnami/typescript:lint and sets options[\"@putnami/typescript\"].lint.linter to eslint unless the project chose a linter.",
+        "Other ESLint arguments keep the target on Nx, listed.",
+        "The sync removes the eslint it wrote when the target stops mapping and on retract."
+      ]
     },
     {
       "id": "delegate-imports-listed-projects",
-      "text": "In delegate mode, the sync reads options[\"@putnami/nx\"].import, or the import parameter in its place: project paths and globs matched against each project's directory, a leading / ignored, * ? [...] within one segment. Each selected project is written as import mode writes it, the others stay delegated, and an entry that selects none is listed as nx.import_unmatched. Import mode reads no list. validate fails with nx.sync_stale when a putnami.json does not match the list."
+      "text": [
+        "In delegate mode, the sync reads options[\"@putnami/nx\"].import, or the import parameter in its place: project paths and globs matched against each project's directory, a leading / ignored, * ? [...] within one segment.",
+        "Each selected project is written as import mode writes it, the others stay delegated, and an entry that selects none is listed as nx.import_unmatched.",
+        "Import mode reads no list. validate fails with nx.sync_stale when a putnami.json does not match the list."
+      ]
     },
     {
       "id": "unmapped-targets-are-listed",
-      "text": "The sync writes nothing it cannot map. It lists each target it maps to no Putnami task, such as serve or e2e, and in import mode each build, test or lint target that keeps running through Nx, with the project, the target and the reason, and each such target keeps running through nx run."
+      "text": [
+        "The sync writes nothing it cannot map.",
+        "It lists each target it maps to no Putnami task, such as serve or e2e, and in import mode each build, test or lint target that keeps running through Nx, with the project, the target and the reason, and each such target keeps running through nx run."
+      ]
     },
     {
       "id": "validate-fails-on-a-stale-graph",
@@ -50,11 +77,19 @@
     },
     {
       "id": "tasks-delegate-to-nx",
-      "text": "Each delegated task compares nx --version with the nx version the root package.json states, then runs nx run <project>:<target> at the workspace root, where Nx's dependsOn runs the upstream targets and its cache answers them. Each task depends only on its project's graph step, which runs no nx. Putnami's cache is off for every task, the result records delegatedTo nx, and a failing step fails with stacks.step_failed."
+      "text": [
+        "Each delegated task compares nx --version with the nx version the root package.json states, then runs nx run <project>:<target> at the workspace root, where Nx's dependsOn runs the upstream targets and its cache answers them.",
+        "Each task depends only on its project's graph step, which runs no nx.",
+        "Putnami's cache is off for every task, the result records delegatedTo nx, and a failing step fails with stacks.step_failed."
+      ]
     },
     {
       "id": "reports-from-project-options",
-      "text": "The sync writes, as the project's test reports, the JUnit file and the Cobertura or LCOV report its jest or vitest configuration names (jest-junit outputDirectory and outputName, coverageDirectory or reportsDirectory, <rootDir> as the project), at the workspace root for jest-junit under @nx/jest. The test task removes them before its run and reads them into the test and coverage summary. A project whose configuration names none has the exit code alone as result, and the sync lists it."
+      "text": [
+        "The sync writes, as the project's test reports, the JUnit file and the Cobertura or LCOV report its jest or vitest configuration names (jest-junit outputDirectory and outputName, coverageDirectory or reportsDirectory, <rootDir> as the project), at the workspace root for jest-junit under @nx/jest.",
+        "The test task removes them before its run and reads them into the test and coverage summary.",
+        "A project whose configuration names none has the exit code alone as result, and the sync lists it."
+      ]
     },
     {
       "id": "manifest-follows-the-profile",
@@ -62,19 +97,33 @@
     },
     {
       "id": "import-marks-the-node-runtime",
-      "text": "In import mode, an imported TypeScript project whose package.json start script runs node, or whose Nx serve target runs the @nx/js:node executor, gets options[\"@putnami/typescript\"].runtime node in its putnami.json. The sync never changes a runtime the project already declares."
+      "text": [
+        "In import mode, an imported TypeScript project whose package.json start script runs node, or whose Nx serve target runs the @nx/js:node executor, gets options[\"@putnami/typescript\"].runtime node in its putnami.json.",
+        "The sync never changes a runtime the project already declares."
+      ]
     },
     {
       "id": "import-maps-a-tsc-build-target",
-      "text": "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone, or when it is an @nx/js:tsc target that import-maps-an-nx-js-tsc-build-target maps. Any other tsc target keeps running through Nx and is listed with its reason."
+      "text": [
+        "In import mode, a TypeScript project's build target moves to @putnami/typescript, which compiles it with tsc, when it runs the package.json build script and that script runs tsc alone, or when it is an @nx/js:tsc target that import-maps-an-nx-js-tsc-build-target maps.",
+        "Any other tsc target keeps running through Nx and is listed with its reason."
+      ]
     },
     {
       "id": "import-maps-an-nx-js-tsc-build-target",
-      "text": "An @nx/js:tsc build maps when, with nx.json targetDefaults and its default configuration applied, it sets no assets, external or other emit option and generatePackageJson false, its tsConfig is the config the tsc build compiles, its outputPath that config's outDir, inside the project, its rootDir (else the project root) the config's rootDir, and no .tsbuildinfo goes unnamed. The sync then owns options[\"@putnami/typescript\"].compiler tsc unless the project sets another. Others stay on Nx with their reason."
+      "text": [
+        "An @nx/js:tsc build maps when, with nx.json targetDefaults and its default configuration applied, it sets no assets, external or other emit option and generatePackageJson false, its tsConfig is the config the tsc build compiles, its outputPath that config's outDir, inside the project, its rootDir (else the project root) the config's rootDir, and no .tsbuildinfo goes unnamed.",
+        "The sync then owns options[\"@putnami/typescript\"].compiler tsc unless the project sets another.",
+        "Others stay on Nx with their reason."
+      ]
     },
     {
       "id": "import-adopts-typescript-conventions",
-      "text": "In import mode, an imported TypeScript project gets the conventions of D-066: exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json that declares no exports, names a file outside src/, holds src/index.ts and is private, when its build moves to the Bun build; a tsconfig.json extending the root's when it holds no tsconfig*.json. The sync lists each write and each manifest it does not edit, and a dry sync shows each diff."
+      "text": [
+        "In import mode, an imported TypeScript project gets the conventions of D-066: exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json that declares no exports, names a file outside src/, holds src/index.ts and is private, when its build moves to the Bun build;",
+        "a tsconfig.json extending the root's when it holds no tsconfig*.json.",
+        "The sync lists each write and each manifest it does not edit, and a dry sync shows each diff."
+      ]
     }
   ],
   "decisions": [

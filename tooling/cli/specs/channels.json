@@ -17,11 +17,18 @@
   "requirements": [
     {
       "id": "archives-follow-the-put-projection",
-      "text": "CLI upgrade, pin, cold pinned launch and extension upgrade read native Put archive projections with the host credential. A cold CLI pin resolves that credential through the selected executable without recursive pin relaunch, then verifies the pinned digest before execution. A refusal of a request that went out without the credential it asked for names the credential command and its reason. --branch no longer exists."
+      "text": [
+        "CLI upgrade, pin, cold pinned launch and extension upgrade read native Put archive projections with the host credential.",
+        "A cold CLI pin resolves that credential through the selected executable without recursive pin relaunch, then verifies the pinned digest before execution.",
+        "A refusal of a request that went out without the credential it asked for names the credential command and its reason. --branch no longer exists."
+      ]
     },
     {
       "id": "tagged-publish-is-a-cohort",
-      "text": "A publish on a tagged commit republishes every member of the tag's line at the tag's version and creates an immutable channel named after the tag in the portable encoding. It refuses a dirty tree, whose content the tag would not name."
+      "text": [
+        "A publish on a tagged commit republishes every member of the tag's line at the tag's version and creates an immutable channel named after the tag in the portable encoding.",
+        "It refuses a dirty tree, whose content the tag would not name."
+      ]
     },
     {
       "id": "protected-channels",
@@ -33,11 +40,17 @@
     },
     {
       "id": "project-declares-its-distribution-visibility",
-      "text": "A project states the member level of every artifact it publishes with distribution.visibility in its own putnami.json. That level wins over the putnami.ci.json distribution.members[] rules, and publish refuses a rule that disagrees with it."
+      "text": [
+        "A project states the member level of every artifact it publishes with distribution.visibility in its own putnami.json.",
+        "That level wins over the putnami.ci.json distribution.members[] rules, and publish refuses a rule that disagrees with it."
+      ]
     },
     {
       "id": "mirror-intent-follows-the-release",
-      "text": "publish carries distribution.registries.<ecosystem>.mirror.to in the same release request, including an already-current publication. The CLI does not widen visibility, choose eligible members or send mirror credentials; the provider durably accepts authorized copies of public immutable members."
+      "text": [
+        "publish carries distribution.registries.<ecosystem>.mirror.to in the same release request, including an already-current publication.",
+        "The CLI does not widen visibility, choose eligible members or send mirror credentials; the provider durably accepts authorized copies of public immutable members."
+      ]
     }
   ],
   "decisions": [

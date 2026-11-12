@@ -18,7 +18,11 @@
   "requirements": [
     {
       "id": "swiftpm-export-targets",
-      "text": "A directory that holds Package.swift is a Swift package. When it also holds swiftpm.json, as swift package describe --type json writes it, each of its targets is a component at the package directory joined with the target's path, named by the target, of source workspace and ecosystem swift. The package directory is a component named by the package that depends on each of its targets other than test targets."
+      "text": [
+        "A directory that holds Package.swift is a Swift package.",
+        "When it also holds swiftpm.json, as swift package describe --type json writes it, each of its targets is a component at the package directory joined with the target's path, named by the target, of source workspace and ecosystem swift.",
+        "The package directory is a component named by the package that depends on each of its targets other than test targets."
+      ]
     },
     {
       "id": "swiftpm-export-unreadable",
@@ -26,11 +30,19 @@
     },
     {
       "id": "swiftpm-export-edges",
-      "text": "Each name in a target's target_dependencies is an edge to that target of the same package. Each name in its product_dependencies is an edge to the local package that declares that product: a .package(path:) of its Package.swift, or a fileSystem dependency of the export matched by its identity, the lowercased last segment of its path. A product of a remote package is no edge."
+      "text": [
+        "Each name in a target's target_dependencies is an edge to that target of the same package.",
+        "Each name in its product_dependencies is an edge to the local package that declares that product: a .package(path:) of its Package.swift, or a fileSystem dependency of the export matched by its identity, the lowercased last segment of its path.",
+        "A product of a remote package is no edge."
+      ]
     },
     {
       "id": "swiftpm-static-read",
-      "text": "Without swiftpm.json, each directory under Sources and Tests of the package is a target component, a test target under Tests. Each .package(path:) of Package.swift, relative to the package directory, is a local package: each target under Sources depends on it, and each target under Tests depends on every target under Sources. The name: argument of Package( names the package."
+      "text": [
+        "Without swiftpm.json, each directory under Sources and Tests of the package is a target component, a test target under Tests.",
+        "Each .package(path:) of Package.swift, relative to the package directory, is a local package: each target under Sources depends on it, and each target under Tests depends on every target under Sources.",
+        "The name: argument of Package( names the package."
+      ]
     },
     {
       "id": "swiftpm-static-read-diagnostic",
@@ -38,31 +50,54 @@
     },
     {
       "id": "swift-walk",
-      "text": "The detectors walk the repository for Package.swift files and .xcodeproj directories. The walk skips hidden directories, .build, Pods, Carthage, DerivedData, SourcePackages and node_modules, and does not enter an .xcodeproj or .xcworkspace directory."
+      "text": [
+        "The detectors walk the repository for Package.swift files and .xcodeproj directories.",
+        "The walk skips hidden directories, .build, Pods, Carthage, DerivedData, SourcePackages and node_modules, and does not enter an .xcodeproj or .xcworkspace directory."
+      ]
     },
     {
       "id": "xcode-projects",
-      "text": "Each .xcodeproj directory is a component at the directory that holds it, named by the project, of source manifest and ecosystem xcode. Each XCLocalSwiftPackageReference of its project.pbxproj is an edge to the package at its relativePath, relative to that directory. A project.pbxproj that cannot be read is the observe.xcode_project_unreadable warning, and the project stays a component with no edge."
+      "text": [
+        "Each .xcodeproj directory is a component at the directory that holds it, named by the project, of source manifest and ecosystem xcode.",
+        "Each XCLocalSwiftPackageReference of its project.pbxproj is an edge to the package at its relativePath, relative to that directory.",
+        "A project.pbxproj that cannot be read is the observe.xcode_project_unreadable warning, and the project stays a component with no edge."
+      ]
     },
     {
       "id": "swift-test-placement",
-      "text": "A JUnit case whose class or suite name is Module.Class, as xcbeautify, fastlane scan and swift test --xunit-output write it, goes to the component of the test target named Module: a test target of a Swift package, or a unit or UI test target of an Xcode project. A name without a module is looked for in every test target."
+      "text": [
+        "A JUnit case whose class or suite name is Module.Class, as xcbeautify, fastlane scan and swift test --xunit-output write it, goes to the component of the test target named Module: a test target of a Swift package, or a unit or UI test target of an Xcode project.",
+        "A name without a module is looked for in every test target."
+      ]
     },
     {
       "id": "swift-test-file",
-      "text": "The file of a case placed by its class name is Class.swift under the test target's directory, else the Swift file there that declares Class. The directory of an Xcode test target is the one named by the target beside the project, else the project's directory."
+      "text": [
+        "The file of a case placed by its class name is Class.swift under the test target's directory, else the Swift file there that declares Class.",
+        "The directory of an Xcode test target is the one named by the target beside the project, else the project's directory."
+      ]
     },
     {
       "id": "swift-package-resolved",
-      "text": "A Package.resolved, wherever it lies, is a lockfile of ecosystem swift: each pin of format versions 2 and 3 gives its identity, and of version 1 its package, with state.version, else state.revision. A file that does not parse is the observe.lockfile_unreadable warning of the change analyses."
+      "text": [
+        "A Package.resolved, wherever it lies, is a lockfile of ecosystem swift: each pin of format versions 2 and 3 gives its identity, and of version 1 its package, with state.version, else state.revision.",
+        "A file that does not parse is the observe.lockfile_unreadable warning of the change analyses."
+      ]
     },
     {
       "id": "swift-podfile-lock",
-      "text": "A Podfile.lock is a lockfile of ecosystem cocoapods: each entry of PODS gives its pod, a subspec read as its root pod, and the version in parentheses. A pod that EXTERNAL SOURCES installs from a :path: is the repository's own code and is left out."
+      "text": [
+        "A Podfile.lock is a lockfile of ecosystem cocoapods: each entry of PODS gives its pod, a subspec read as its root pod, and the version in parentheses.",
+        "A pod that EXTERNAL SOURCES installs from a :path: is the repository's own code and is left out."
+      ]
     },
     {
       "id": "swift-change-analysis",
-      "text": "On a repository with an Xcode app project that uses a local package Pricing, and a local package Networking that Pricing uses, where a change edits Networking and bumps a pin in Package.resolved and a pod in Podfile.lock, the analyses list the app, Pricing and Networking with their edges, mark Networking changed and Pricing and the app dependent; the JUnit and Cobertura reports land on the components, with no unattributed case and no unmapped file; and both bumps are dependency changes."
+      "text": [
+        "On a repository with an Xcode app project that uses a local package Pricing, and a local package Networking that Pricing uses, where a change edits Networking and bumps a pin in Package.resolved and a pod in Podfile.lock, the analyses list the app, Pricing and Networking with their edges, mark Networking changed and Pricing and the app dependent;",
+        "the JUnit and Cobertura reports land on the components, with no unattributed case and no unmapped file;",
+        "and both bumps are dependency changes."
+      ]
     }
   ],
   "decisions": [

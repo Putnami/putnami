@@ -17,7 +17,11 @@
   "requirements": [
     {
       "id": "self-mounting",
-      "text": "A platform plugin added to an application mounts its endpoints on the application's single server when the application configures, in any plugin order, and mounts them once however often the application configures. An application that holds no server, or several, fails configure with an error that names RegisterOn. A plugin mounted through RegisterOn registers nothing more."
+      "text": [
+        "A platform plugin added to an application mounts its endpoints on the application's single server when the application configures, in any plugin order, and mounts them once however often the application configures.",
+        "An application that holds no server, or several, fails configure with an error that names RegisterOn.",
+        "A plugin mounted through RegisterOn registers nothing more."
+      ]
     },
     {
       "id": "liveness-is-trivial",
@@ -25,7 +29,11 @@
     },
     {
       "id": "lifecycle-state",
-      "text": "The health and readiness aggregates report unavailable before the application starts and after it stops, and report degraded with per-probe detail when any probe fails. Readiness also reports unavailable until the application completed startup: every plugin Starter and every module OnStart hook returned without an error. A starter or hook that is still running keeps it unavailable, and a failed startup never makes it ready."
+      "text": [
+        "The health and readiness aggregates report unavailable before the application starts and after it stops, and report degraded with per-probe detail when any probe fails.",
+        "Readiness also reports unavailable until the application completed startup: every plugin Starter and every module OnStart hook returned without an error.",
+        "A starter or hook that is still running keeps it unavailable, and a failed startup never makes it ready."
+      ]
     },
     {
       "id": "deferred-discovery",

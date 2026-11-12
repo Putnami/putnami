@@ -13,6 +13,7 @@ reopens another:
 | Document | Constant | Accepted `protocolVersion` |
 |---|---|---|
 | `putnami.features.json` | `ManifestProtocolVersion` | `1`, `2` or `3` |
+| `features/<feature>.json` | `ManifestProtocolVersion` | `1`, `2` or `3` |
 | `schema/feature-evidence/*.json` | `EvidenceProtocolVersion` | exactly `1` |
 | `specs/*.json` | `SpecProtocolVersion` | exactly `1` |
 | verification report | `VerificationReportProtocolVersion` | exactly `1` |
@@ -79,7 +80,8 @@ at `modeled` rather than expanding the statement into synthetic evidence.
 
 ## Authored intent
 
-At a workspace or exact project root, `putnami.features.json` contains:
+A workspace or exact project root holds its authored features in one of two
+forms, never both. The single file `putnami.features.json` contains:
 
 ```json
 {
@@ -89,6 +91,37 @@ At a workspace or exact project root, `putnami.features.json` contains:
   "features": []
 }
 ```
+
+The directory form holds one feature document per file under `features/`, so
+adding a feature adds a file instead of editing one that every other feature
+edits. Each direct `*.json` child of `features/` carries the manifest header
+and one feature:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "billing",
+  "feature": {
+    "id": "billing/invoice-export",
+    "type": "feature",
+    "name": "Invoice export",
+    "outcome": "A customer exports an issued invoice",
+    "owner": "billing",
+    "target": "modeled"
+  }
+}
+```
+
+A reader merges the documents into the root's manifest. `ParseFeatureDocument`
+reads one document with the manifest's versions and strictness, and
+`FeatureDocument.Manifest` returns the one-feature manifest it stands for. A
+finding names its position in the document, such as
+`features/invoice-export.json#feature.requirements[0]`. The filename takes no
+part in identity; name it after the local part of the feature ID. A root that
+holds both forms contributes no feature and reports
+`features.manifest_form_conflict`. A `features/` directory that is itself a
+project root is that project, never a feature directory.
 
 Feature IDs are lower-case slash-separated semantic IDs whose first segment is
 the manifest namespace. Types (`feature`, `journey`), relation kinds (`parent`,
@@ -584,7 +617,10 @@ can never retarget or orphan a spec.
   "requirements": [
     {
       "id": "export-format",
-      "text": "An export states its format in the response content type and never guesses it from the file name."
+      "text": [
+        "An export states its format in the response content type.",
+        "It never guesses the format from the file name."
+      ]
     },
     {
       "id": "retention",
@@ -732,8 +768,8 @@ itself; a workspace that does not declare it has none of them.
 `putnami features list` (optionally with query terms) pages through
 short catalog entries and `putnami features inspect` retrieves one compact authored
 feature. These commands merge only explicit authority from
-native design feature nodes and durable `putnami.features.json` files at the
-workspace or exact project roots. `features inspect` preserves every sorted
+native design feature nodes and durable `putnami.features.json` files or
+`features/*.json` documents at the workspace or exact project roots. `features inspect` preserves every sorted
 declaration source and durable manifest field; technical categories and critical
 paths appear only when a native graph declares them. A catalog entry carries
 counts and a one-line summary instead. A spec, nested file, directory name, or

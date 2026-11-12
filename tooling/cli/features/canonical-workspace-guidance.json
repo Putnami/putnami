@@ -1,0 +1,109 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/canonical-workspace-guidance",
+    "type": "feature",
+    "name": "Canonical workspace guidance",
+    "outcome": "A new contributor can discover the supported commands, choose the correct validation gate, find workspace facts through the CLI, and recover from failures using generated and public guidance",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "generated-help",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-rendered-help-surface-is-pinned",
+            "command-help-includes-structured-and-extension-flags"
+          ]
+        }
+      },
+      {
+        "id": "a-bare-cache-runs-nothing",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-bare-root-exits-with-its-subcommands-and-touches-no-store",
+            "root-help-lists-its-subcommands"
+          ]
+        }
+      },
+      {
+        "id": "onboarding-path",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-canonical-guide-covers-the-catalog",
+            "generated-context-presents-the-workflow-path"
+          ]
+        }
+      },
+      {
+        "id": "generated-agent-guidance",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "generated-bootstrap-routes-discovery-to-the-cli"
+          ]
+        }
+      },
+      {
+        "id": "support-maturity-separation",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "stability-and-maturity-are-stated-separately"
+          ]
+        }
+      },
+      {
+        "id": "internal-model-boundary",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-guide-declares-cli-model-internal"
+          ]
+        }
+      },
+      {
+        "id": "experimental-python",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "python-is-documented-experimental-and-opt-in"
+          ]
+        }
+      }
+    ]
+  }
+}

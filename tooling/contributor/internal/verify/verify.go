@@ -159,6 +159,9 @@ type verifyRun struct {
 	// intentEdits memoizes, per base, the first changed path that edits
 	// feature intent, or "" when none does.
 	intentEdits map[string]string
+	// projectRoots memoizes the workspace root and the directories that hold
+	// a tracked putnami.json.
+	projectRoots map[string]bool
 }
 
 type checkedRef struct {

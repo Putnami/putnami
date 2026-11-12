@@ -270,6 +270,7 @@
       "traits": {"kind": "criteria"},
       "activationFiles": [
         "putnami.features.json",
+        "features/*.json",
         "specs/*.json"
       ],
       "run": [
@@ -570,7 +571,7 @@
           ]
         },
         "list": {
-          "description": "List every explicitly authored product feature \u2014 native design declarations plus durable putnami.features.json entries at the workspace and exact project roots \u2014 with its outcome, owner, implementing projects, and exact declaration sources. Project selection is applied first and bounds the work as well as the answer: only the selected projects' design graphs are read, while durable declarations stay workspace-wide so identity and duplicate detection never depend on the selection. An optional query then filters ids, names, outcomes, and owners",
+          "description": "List every explicitly authored product feature \u2014 native design declarations plus durable entries in putnami.features.json or features/*.json at the workspace and exact project roots \u2014 with its outcome, owner, implementing projects, and exact declaration sources. Project selection is applied first and bounds the work as well as the answer: only the selected projects' design graphs are read, while durable declarations stay workspace-wide so identity and duplicate detection never depend on the selection. An optional query then filters ids, names, outcomes, and owners",
           "command": "sdd-features-list",
           "interactive": true,
           "positionals": [
@@ -1001,7 +1002,7 @@
       "declares": {}
     },
     "feature-coverage-validate": {
-      "description": "Check that every workspace project carries a feature authored in its own putnami.features.json, a spec under its own specs/, or a reviewed featureAuthority in its putnami.json: an owner that names an authored feature, or none with a reason. A project that carries none fails unless options.sdd.featureCoverage.debt in putnami.workspace.json names it. The list is exact: an entry whose project is covered, or that names no project, fails until it is removed. A workspace that declares no options.sdd.featureCoverage has not adopted the gate and passes with a note. The task reads the manifests and specs through the workspace's Git candidate cut and each project's putnami.json from the job context, and its key is the input `git:**`, which holds that cut and the workspace membership with each project's config: declaring a feature, a spec or a featureAuthority moves the key, and an ignored file covers nothing.",
+      "description": "Check that every workspace project carries a feature authored in its own putnami.features.json or features/*.json, a spec under its own specs/, or a reviewed featureAuthority in its putnami.json: an owner that names an authored feature, or none with a reason. A project that carries none fails unless options.sdd.featureCoverage.debt in putnami.workspace.json names it. The list is exact: an entry whose project is covered, or that names no project, fails until it is removed. A workspace that declares no options.sdd.featureCoverage has not adopted the gate and passes with a note. The task reads the manifests and specs through the workspace's Git candidate cut and each project's putnami.json from the job context, and its key is the input `git:**`, which holds that cut and the workspace membership with each project's config: declaring a feature, a spec or a featureAuthority moves the key, and an ignored file covers nothing.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1044,7 +1045,8 @@
         "manifest": {
           "from": "project",
           "files": [
-            "putnami.features.json"
+            "putnami.features.json",
+            "features/*.json"
           ]
         },
         "repository": {
@@ -1423,6 +1425,7 @@
           "from": "workspace",
           "files": [
             "**/putnami.features.json",
+            "**/features/*.json",
             "**/specs/*.json",
             "**/putnami.json",
             "putnami.workspace.json",
@@ -1463,6 +1466,7 @@
           "from": "workspace",
           "files": [
             "**/putnami.features.json",
+            "**/features/*.json",
             "**/specs/*.json",
             "**/putnami.json",
             "putnami.workspace.json",
@@ -1472,7 +1476,8 @@
         "manifest": {
           "from": "project",
           "files": [
-            "putnami.features.json"
+            "putnami.features.json",
+            "features/*.json"
           ]
         },
         "specs": {

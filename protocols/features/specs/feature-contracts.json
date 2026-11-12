@@ -14,43 +14,104 @@
   "requirements": [
     {
       "id": "strict-versioned-documents",
-      "text": "The manifest reader accepts versions 1 to 3, the spec and projection readers only 1, and the evidence and report readers refuse 2. The manifest and spec readers refuse a missing, null, string, decimal, exponent, duplicated or unknown version; the projection reader an unknown, decimal or exponent one. Each refuses an unknown field and an explicit null. A version 1 manifest refuses the verification field. A spec refuses the fields that would mint a feature, a stage, an owner, evidence or a graph node."
+      "text": [
+        "The manifest reader accepts versions 1 to 3, the spec and projection readers only 1, and the evidence and report readers refuse 2.",
+        "The manifest and spec readers refuse a missing, null, string, decimal, exponent, duplicated or unknown version; the projection reader an unknown, decimal or exponent one.",
+        "Each refuses an unknown field and an explicit null.",
+        "A version 1 manifest refuses the verification field.",
+        "A spec refuses the fields that would mint a feature, a stage, an owner, evidence or a graph node."
+      ]
     },
     {
       "id": "canonical-bytes-across-languages",
-      "text": "Serializing a feature manifest, a spec, a verification report or a criteria projection gives canonical bytes: repeated runs and parse and serialize round trips give the same bytes, and the caller's data is never reordered. Go reproduces the committed feature, spec and verification goldens byte for byte. The TypeScript readers validate the verification report and evidence goldens and reproduce their bytes whatever the order of their observations or records."
+      "text": [
+        "Serializing a feature manifest, a spec, a verification report or a criteria projection gives canonical bytes: repeated runs and parse and serialize round trips give the same bytes, and the caller's data is never reordered.",
+        "Go reproduces the committed feature, spec and verification goldens byte for byte.",
+        "The TypeScript readers validate the verification report and evidence goldens and reproduce their bytes whatever the order of their observations or records."
+      ]
     },
     {
       "id": "conformance-corpus",
-      "text": "Every valid fixture and equivalence golden passes its strict reader. Every invalid fixture fails the reader its name prefix selects: features-, spec-, verification- or evidence-. The three fixtures that only a workspace can decide fail the repository validators. The conformance runners accept each equivalence golden, reproduce its bytes and round-trip it unchanged. The conformance pack names its corpus, and every vector it lists exists. The TypeScript reader refuses every invalid verification fixture."
+      "text": [
+        "Every valid fixture and equivalence golden passes its strict reader.",
+        "Every invalid fixture fails the reader its name prefix selects: features-, spec-, verification- or evidence-.",
+        "The three fixtures that only a workspace can decide fail the repository validators.",
+        "The conformance runners accept each equivalence golden, reproduce its bytes and round-trip it unchanged.",
+        "The conformance pack names its corpus, and every vector it lists exists.",
+        "The TypeScript reader refuses every invalid verification fixture."
+      ]
     },
     {
       "id": "acceptance-verdicts",
-      "text": "Evaluation joins each spec requirement to the manifest requirement of the same id: one without a criterion is unexecutable, and one the manifest does not declare is unmapped. An acceptance requirement is verified only when every declared check passed. A skipped, unobserved or duplicated check leaves it missing, and a failed check contradicts it. An observation of an undeclared check is reported and grants nothing. An observation of another feature is never joined. Authored order never changes the result."
+      "text": [
+        "Evaluation joins each spec requirement to the manifest requirement of the same id: one without a criterion is unexecutable, and one the manifest does not declare is unmapped.",
+        "An acceptance requirement is verified only when every declared check passed.",
+        "A skipped, unobserved or duplicated check leaves it missing, and a failed check contradicts it.",
+        "An observation of an undeclared check is reported and grants nothing.",
+        "An observation of another feature is never joined.",
+        "Authored order never changes the result."
+      ]
     },
     {
       "id": "objective-verdicts",
-      "text": "A threshold check is judged by recomputing the authored objective from the measured value, inclusive at the target. A producer's own passed verdict, or a measurement of another metric, aggregation or unit, leaves it missing. A rolling objective is verified only by a window as long as declared, in the declared environment, ending by the evaluation instant, within the freshness bound; otherwise it is stale. A missed objective contradicts it. An objective nobody authored leaves it missing and grants nothing."
+      "text": [
+        "A threshold check is judged by recomputing the authored objective from the measured value, inclusive at the target.",
+        "A producer's own passed verdict, or a measurement of another metric, aggregation or unit, leaves it missing.",
+        "A rolling objective is verified only by a window as long as declared, in the declared environment, ending by the evaluation instant, within the freshness bound;",
+        "otherwise it is stale.",
+        "A missed objective contradicts it.",
+        "An objective nobody authored leaves it missing and grants nothing."
+      ]
     },
     {
       "id": "only-enforce-blocks",
-      "text": "Only enforce mode blocks a group. It blocks on a requirement that is unmapped, unexecutable, missing, stale or contradicted, and on an error finding over the group's own inputs, but not on a warning. A requirement whose checks no source could observe is counted as unobserved and never blocks. The verification record keeps that state through its strict reader."
+      "text": [
+        "Only enforce mode blocks a group.",
+        "It blocks on a requirement that is unmapped, unexecutable, missing, stale or contradicted, and on an error finding over the group's own inputs, but not on a warning.",
+        "A requirement whose checks no source could observe is counted as unobserved and never blocks.",
+        "The verification record keeps that state through its strict reader."
+      ]
     },
     {
       "id": "findings-name-file-positions",
-      "text": "A finding names the file position of what it refuses, such as features[0].requirements[1].verification.checks[1], after the file path when a repository validator reports it. A duplicate names the position of its first declaration, and a text over 512 bytes states the bound. A spec without outcomes, with a non-canonical id, blank text, a control character, a duplicate decision or a decision link outside doc/adr is refused. The spec field set matches its published schema."
+      "text": [
+        "A finding names the file position of what it refuses, such as features[0].requirements[1].verification.checks[1], after the file path when a repository validator reports it.",
+        "A duplicate names the position of its first declaration, and a text over 512 bytes states the bound.",
+        "A spec without outcomes, with a non-canonical id, blank text, a control character, a duplicate decision or a decision link outside doc/adr is refused.",
+        "The spec field set matches its published schema."
+      ]
     },
     {
       "id": "proof-fragments",
-      "text": "A test binds itself to one declared check. When it ends, its binding writes one fragment with the feature, requirement and check, the declaring file and test, and the runner's verdict: passed, failed or skipped. A measurement carries its observed window and no verdict, and only a passing test writes one. Without the adapter's fragment directory nothing is written. Go's spectest.Proves and @putnami/spectest's specTest both hold this; Go collapses identical concurrent observations into one fragment."
+      "text": [
+        "A test binds itself to one declared check.",
+        "When it ends, its binding writes one fragment with the feature, requirement and check, the declaring file and test, and the runner's verdict: passed, failed or skipped.",
+        "A measurement carries its observed window and no verdict, and only a passing test writes one.",
+        "Without the adapter's fragment directory nothing is written.",
+        "Go's spectest.Proves and @putnami/spectest's specTest both hold this; Go collapses identical concurrent observations into one fragment."
+      ]
     },
     {
       "id": "one-report-per-project",
-      "text": "The test job merges the fragments into one verification report per project. A declaration outside the reporting project is set aside. Observations of one check reduce to one: a failure beats a pass, and a pass beats a skip. A fragment with a verdict and a measurement keeps only its verdict. An observation the wire refuses is dropped alone. The written report passes the strict reader, and a run without observations writes none. Each member of a Go or Python batch gets only its own observations."
+      "text": [
+        "The test job merges the fragments into one verification report per project.",
+        "A declaration outside the reporting project is set aside.",
+        "Observations of one check reduce to one: a failure beats a pass, and a pass beats a skip.",
+        "A fragment with a verdict and a measurement keeps only its verdict.",
+        "An observation the wire refuses is dropped alone.",
+        "The written report passes the strict reader, and a run without observations writes none.",
+        "Each member of a Go or Python batch gets only its own observations."
+      ]
     },
     {
       "id": "ratchets-and-decisions",
-      "text": "Against the committed specs baseline, a project that leaves enforce mode or loses a recorded executable requirement is an error naming the baseline file; growth is only counted, and a missing baseline is initial adoption. The decision registry reader refuses a wrong version, an unknown member, an explicit null and a trailing value. A decision that could not be enforced is a registry error. A decision check judges one JSON file, compares numbers by value and counts an unreadable file as a violation."
+      "text": [
+        "Against the committed specs baseline, a project that leaves enforce mode or loses a recorded executable requirement is an error naming the baseline file;",
+        "growth is only counted, and a missing baseline is initial adoption.",
+        "The decision registry reader refuses a wrong version, an unknown member, an explicit null and a trailing value.",
+        "A decision that could not be enforced is a registry error.",
+        "A decision check judges one JSON file, compares numbers by value and counts an unreadable file as a violation."
+      ]
     },
     {
       "id": "one-file-per-decision",
@@ -58,79 +119,183 @@
     },
     {
       "id": "external-spec-reference",
-      "text": "A version 3 manifest entry may name an external spec with a closed {format, path} object. The format is openspec, speckit, kiro or gherkin. The path is workspace-relative and cannot escape the workspace. Versions 1 and 2 refuse the member as an unknown field. A criteria group for an external spec carries its format, and a group with no format keeps the specs/*.json path rule."
+      "text": [
+        "A version 3 manifest entry may name an external spec with a closed {format, path} object.",
+        "The format is openspec, speckit, kiro or gherkin.",
+        "The path is workspace-relative and cannot escape the workspace.",
+        "Versions 1 and 2 refuse the member as an unknown field.",
+        "A criteria group for an external spec carries its format, and a group with no format keeps the specs/*.json path rule."
+      ]
+    },
+    {
+      "id": "one-file-per-feature",
+      "text": [
+        "A root holds its features in putnami.features.json or as one feature document per features/<feature>.json, never both; a root that holds both is refused with features.manifest_form_conflict.",
+        "A feature document carries the manifest protocolVersion and namespace and one feature, and reads as the one-feature manifest it stands for.",
+        "Its findings name positions under feature, not features[0].",
+        "A spec requirement text is one string or an array of sentences joined by one space, bounded as one statement."
+      ]
     },
     {
       "id": "groups-name-the-feature-target",
-      "text": "A criteria group names the target maturity its feature's manifest entry declares. The gate copies it into the record group, and specs verify into a group no session evaluated. A spec whose feature no manifest declares, or a projection the gate cannot read, gives a group with no target. The member is additive under version 1: a group without it keeps its exact bytes and still reads. Both readers refuse a target outside the maturity ladder."
+      "text": [
+        "A criteria group names the target maturity its feature's manifest entry declares.",
+        "The gate copies it into the record group, and specs verify into a group no session evaluated.",
+        "A spec whose feature no manifest declares, or a projection the gate cannot read, gives a group with no target.",
+        "The member is additive under version 1: a group without it keeps its exact bytes and still reads.",
+        "Both readers refuse a target outside the maturity ladder."
+      ]
     },
     {
       "id": "spec-reader-contract",
-      "text": "A reader turns the bytes of one external spec into a spec, a record per requirement and findings, with no network, model, clock or filesystem. The contract wraps every reader: a finding names its file and line, also on an outcome or a non-goal the reader located, a text over 512 bytes stays whole with an enforce finding that names a split, two requirements with one ID name both positions, and the same bytes give the same result."
+      "text": [
+        "A reader turns the bytes of one external spec into a spec, a record per requirement and findings, with no network, model, clock or filesystem.",
+        "The contract wraps every reader: a finding names its file and line, also on an outcome or a non-goal the reader located, a text over 512 bytes stays whole with an enforce finding that names a split, two requirements with one ID name both positions, and the same bytes give the same result."
+      ]
     },
     {
       "id": "requirement-identity-mapping",
-      "text": "A requirement name becomes an ID by one mapping: decompose it to Unicode NFKD and drop combining marks, lowercase ASCII letters, keep ASCII digits, turn each other run into one hyphen, trim the ends. A name with nothing left or over 128 bytes has no ID: it takes requirement-<ordinal> and is unanchored. An anchor stands alone above its requirement, and its ID follows the native segment grammar."
+      "text": [
+        "A requirement name becomes an ID by one mapping: decompose it to Unicode NFKD and drop combining marks, lowercase ASCII letters, keep ASCII digits, turn each other run into one hyphen, trim the ends.",
+        "A name with nothing left or over 128 bytes has no ID: it takes requirement-<ordinal> and is unanchored.",
+        "An anchor stands alone above its requirement, and its ID follows the native segment grammar."
+      ]
     },
     {
       "id": "spec-format-policy",
-      "text": "options.sdd.specFormats resolves as the project's list, then the workspace's, then empty, and a project's list replaces the workspace's. A wrong type, an unknown format or a repeated format is an error, never a fallback."
+      "text": [
+        "options.sdd.specFormats resolves as the project's list, then the workspace's, then empty, and a project's list replaces the workspace's.",
+        "A wrong type, an unknown format or a repeated format is an error, never a fallback."
+      ]
     },
     {
       "id": "scenarios-never-change-checks",
-      "text": "Where a reader attaches scenarios to a requirement, comparing them with its declared checks gives one warning per scenario with no check and per check with no scenario. Where a format's scenarios belong to the file, they are compared with every check its requirements declare. With neither list, nothing is compared. The comparison never adds, removes or changes a check."
+      "text": [
+        "Where a reader attaches scenarios to a requirement, comparing them with its declared checks gives one warning per scenario with no check and per check with no scenario.",
+        "Where a format's scenarios belong to the file, they are compared with every check its requirements declare.",
+        "With neither list, nothing is compared.",
+        "The comparison never adds, removes or changes a check."
+      ]
     },
     {
       "id": "enforce-only-findings",
-      "text": "Reading does not depend on the verification mode. A reader marks what blocks only in enforce: an unanchored requirement, which report does not mention, and an enforce finding, which report keeps as a warning and enforce raises to an error at the same position."
+      "text": [
+        "Reading does not depend on the verification mode.",
+        "A reader marks what blocks only in enforce: an unanchored requirement, which report does not mention, and an enforce finding, which report keeps as a warning and enforce raises to an error at the same position."
+      ]
     },
     {
       "id": "speckit-projection",
-      "text": "The Spec Kit reader reads only the spec.md its reference names. SC items become outcomes, Out of Scope items non-goals and FR items of the requirements section requirements, in file order, with a nested item in its parent's text. It skips HTML comments, fenced code and unknown sections. User story scenarios belong to the file. Other files change nothing. A reference with no spec.md, a spec with no SC item, or an unclosed comment or fence is an error."
+      "text": [
+        "The Spec Kit reader reads only the spec.md its reference names.",
+        "SC items become outcomes, Out of Scope items non-goals and FR items of the requirements section requirements, in file order, with a nested item in its parent's text.",
+        "It skips HTML comments, fenced code and unknown sections.",
+        "User story scenarios belong to the file.",
+        "Other files change nothing.",
+        "A reference with no spec.md, a spec with no SC item, or an unclosed comment or fence is an error."
+      ]
     },
     {
       "id": "speckit-requirement-identity",
-      "text": "A Spec Kit requirement takes the ID of the anchor on the line above it. Without one it takes its lowercased label, such as fr-001, and is unanchored. An anchor above a user story scenario names its check. An anchor above neither, or one that breaks the segment grammar, is an error at its line."
+      "text": [
+        "A Spec Kit requirement takes the ID of the anchor on the line above it.",
+        "Without one it takes its lowercased label, such as fr-001, and is unanchored.",
+        "An anchor above a user story scenario names its check.",
+        "An anchor above neither, or one that breaks the segment grammar, is an error at its line."
+      ]
     },
     {
       "id": "speckit-findings",
-      "text": "Each NEEDS CLARIFICATION marker outside a comment or code is an enforce finding at its line. A Feature Branch, Created or Status line and a Key Entities section are one derived-fact warning each, and project nothing. An FR label outside the requirements section, or in a form the reader does not take, is a warning at its line."
+      "text": [
+        "Each NEEDS CLARIFICATION marker outside a comment or code is an enforce finding at its line.",
+        "A Feature Branch, Created or Status line and a Key Entities section are one derived-fact warning each, and project nothing.",
+        "An FR label outside the requirements section, or in a form the reader does not take, is a warning at its line."
+      ]
     },
     {
       "id": "openspec-projection",
-      "text": "The OpenSpec reader reads only the spec.md at its reference, or the file its reference names, and refuses a reference under openspec/changes. Purpose paragraphs, or the leading prose without a Purpose, become outcomes. Each Requirement heading under Requirements becomes a requirement with its body on one line, without metadata lines. Scenarios attach to their requirement. Links to doc/adr/*.md become decisions. HTML comments, fenced code and unknown sections project nothing."
+      "text": [
+        "The OpenSpec reader reads only the spec.md at its reference, or the file its reference names, and refuses a reference under openspec/changes.",
+        "Purpose paragraphs, or the leading prose without a Purpose, become outcomes.",
+        "Each Requirement heading under Requirements becomes a requirement with its body on one line, without metadata lines.",
+        "Scenarios attach to their requirement.",
+        "Links to doc/adr/*.md become decisions.",
+        "HTML comments, fenced code and unknown sections project nothing."
+      ]
     },
     {
       "id": "openspec-requirement-identity",
-      "text": "An OpenSpec requirement takes the ID of the anchor on the line above it, otherwise its normalized name. A name with no ID and no anchor takes requirement-<ordinal> and is unanchored. Two requirements with one ID fail with both positions. An anchor above no requirement, or one that breaks the segment grammar, is an error at its line."
+      "text": [
+        "An OpenSpec requirement takes the ID of the anchor on the line above it, otherwise its normalized name.",
+        "A name with no ID and no anchor takes requirement-<ordinal> and is unanchored.",
+        "Two requirements with one ID fail with both positions.",
+        "An anchor above no requirement, or one that breaks the segment grammar, is an error at its line."
+      ]
     },
     {
       "id": "openspec-findings",
-      "text": "Real OpenSpec specs, brownfield ones included, parse with findings at file and line. No Purpose and no leading prose is an error. A Purpose paragraph over 512 bytes stays whole with an enforce finding that names a split. A placeholder Purpose stays the outcome with a warning. A Status, Dates, Branch, Routes or Entities section is one derived-fact warning each and projects nothing. The same bytes give the same result."
+      "text": [
+        "Real OpenSpec specs, brownfield ones included, parse with findings at file and line.",
+        "No Purpose and no leading prose is an error.",
+        "A Purpose paragraph over 512 bytes stays whole with an enforce finding that names a split.",
+        "A placeholder Purpose stays the outcome with a warning.",
+        "A Status, Dates, Branch, Routes or Entities section is one derived-fact warning each and projects nothing.",
+        "The same bytes give the same result."
+      ]
     },
     {
       "id": "kiro-projection",
-      "text": "The Kiro reader reads only the requirements.md its reference names. Each Introduction paragraph becomes an outcome, cut at sentence ends when over 512 bytes. Each acceptance criterion under a Requirement N heading becomes one requirement, in file order, with its wrapped and nested lines. A user story, design.md, tasks.md and a steering file project nothing, and no link becomes a decision."
+      "text": [
+        "The Kiro reader reads only the requirements.md its reference names.",
+        "Each Introduction paragraph becomes an outcome, cut at sentence ends when over 512 bytes.",
+        "Each acceptance criterion under a Requirement N heading becomes one requirement, in file order, with its wrapped and nested lines.",
+        "A user story, design.md, tasks.md and a steering file project nothing, and no link becomes a decision."
+      ]
     },
     {
       "id": "kiro-requirement-identity",
-      "text": "A Kiro criterion takes the ID of the anchor on the line above it. Without one it takes its group's ID and its ordinal, such as requirement-2-3, and is unanchored, even under an anchored group. A group takes the anchor above its heading, else requirement-n in the heading's label. An anchor that stands above neither is an error."
+      "text": [
+        "A Kiro criterion takes the ID of the anchor on the line above it.",
+        "Without one it takes its group's ID and its ordinal, such as requirement-2-3, and is unanchored, even under an anchored group.",
+        "A group takes the anchor above its heading, else requirement-n in the heading's label.",
+        "An anchor that stands above neither is an error."
+      ]
     },
     {
       "id": "kiro-findings",
-      "text": "A criterion in an EARS form or a FOR ALL property has no finding. Any other criterion is projected with a warning at its line, so a parse never drops or crashes on text. A group with no criterion and a section that restates a derived fact are one warning each. An Introduction sentence over 512 bytes stays whole with an enforce finding. A missing outcome, a file with no group and an unclosed comment or fence are errors at a line."
+      "text": [
+        "A criterion in an EARS form or a FOR ALL property has no finding.",
+        "Any other criterion is projected with a warning at its line, so a parse never drops or crashes on text.",
+        "A group with no criterion and a section that restates a derived fact are one warning each.",
+        "An Introduction sentence over 512 bytes stays whole with an enforce finding.",
+        "A missing outcome, a file with no group and an unclosed comment or fence are errors at a line."
+      ]
     },
     {
       "id": "gherkin-projection",
-      "text": "The Gherkin reader reads every .feature file its reference names, in path order. Each paragraph of a Feature description is an outcome, else the Feature name. A Rule is a requirement of its name and description. A Feature with no Rule, or with scenarios outside its rules, is a requirement of its name. Background, steps, tables, doc strings and comments project nothing."
+      "text": [
+        "The Gherkin reader reads every .feature file its reference names, in path order.",
+        "Each paragraph of a Feature description is an outcome, else the Feature name.",
+        "A Rule is a requirement of its name and description.",
+        "A Feature with no Rule, or with scenarios outside its rules, is a requirement of its name.",
+        "Background, steps, tables, doc strings and comments project nothing."
+      ]
     },
     {
       "id": "gherkin-identity",
-      "text": "A Rule or a requirement Feature takes the ID of its @putnami-id tag, else its normalized name, and a name with no ID takes requirement-<ordinal> and is unanchored. A scenario takes the check of its @putnami-check tag, else its normalized name. Such a tag may share its line with other tags. One that breaks its grammar, repeats, or stands above another keyword is an error at its line, and no tag is inherited."
+      "text": [
+        "A Rule or a requirement Feature takes the ID of its @putnami-id tag, else its normalized name, and a name with no ID takes requirement-<ordinal> and is unanchored.",
+        "A scenario takes the check of its @putnami-check tag, else its normalized name.",
+        "Such a tag may share its line with other tags.",
+        "One that breaks its grammar, repeats, or stands above another keyword is an error at its line, and no tag is inherited."
+      ]
     },
     {
       "id": "gherkin-scenarios",
-      "text": "A Scenario or a Scenario Outline counts once, whatever its Examples rows, and belongs to its Rule, else to its Feature. A scenario with no declared check and a declared check with no scenario are warnings at their lines."
+      "text": [
+        "A Scenario or a Scenario Outline counts once, whatever its Examples rows, and belongs to its Rule, else to its Feature.",
+        "A scenario with no declared check and a declared check with no scenario are warnings at their lines."
+      ]
     },
     {
       "id": "gherkin-languages",
@@ -142,7 +307,12 @@
     },
     {
       "id": "native-gaps",
-      "text": "SpecNativeGaps lists what a native rewrite of an external spec adds: each unanchored positional requirement, each section that restates a derived fact, each link in the projected prose that is not a doc/adr/*.md decision, and each scenario that does not match a declared check. A gap names its kind, its position in the file and the step that removes it. It is information, never a finding. A native spec has no gap, and the same projection gives the same gaps."
+      "text": [
+        "SpecNativeGaps lists what a native rewrite of an external spec adds: each unanchored positional requirement, each section that restates a derived fact, each link in the projected prose that is not a doc/adr/*.md decision, and each scenario that does not match a declared check.",
+        "A gap names its kind, its position in the file and the step that removes it.",
+        "It is information, never a finding.",
+        "A native spec has no gap, and the same projection gives the same gaps."
+      ]
     }
   ],
   "decisions": [

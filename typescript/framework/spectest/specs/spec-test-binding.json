@@ -15,7 +15,10 @@
   "requirements": [
     {
       "id": "honest-verdict",
-      "text": "specTest and observeMeasurement wrap bun:test and never change the verdict the runner gives: a suite whose bound body fails still fails, with or without a fragment directory. The fragment they write is the features protocol's, which @putnami/spectest proves under features/feature-contracts."
+      "text": [
+        "specTest and observeMeasurement wrap bun:test and never change the verdict the runner gives: a suite whose bound body fails still fails, with or without a fragment directory.",
+        "The fragment they write is the features protocol's, which @putnami/spectest proves under features/feature-contracts."
+      ]
     }
   ],
   "decisions": []

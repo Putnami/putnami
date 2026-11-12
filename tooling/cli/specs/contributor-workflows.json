@@ -21,31 +21,56 @@
   "requirements": [
     {
       "id": "one-contributor-extension",
-      "text": "One @putnami/contributor extension ships build, spec, design, review, check and epic, the explicit content-bump utility, three worker profiles (fix-standard, fix-heavy and reviewer) and shared references for both hosts. Build owns one loop and continues until the requested outcome, concrete blocker or mandate boundary. A workspace opts in with extension:@putnami/contributor."
+      "text": [
+        "One @putnami/contributor extension ships build, spec, design, review, check and epic, the explicit content-bump utility, three worker profiles (fix-standard, fix-heavy and reviewer) and shared references for both hosts.",
+        "Build owns one loop and continues until the requested outcome, concrete blocker or mandate boundary.",
+        "A workspace opts in with extension:@putnami/contributor."
+      ]
     },
     {
       "id": "explicit-only-invocation",
-      "text": "The epic workflow and the configured content-bump utility are explicit-only on both hosts. Other canonical workflows remain implicitly available for the requested objective. Implicit selection grants no backlog processing, task mutation, Git publication, merge or deployment authority; local implementation checkpoints remain within the authorized work."
+      "text": [
+        "The epic workflow and the configured content-bump utility are explicit-only on both hosts.",
+        "Other canonical workflows remain implicitly available for the requested objective.",
+        "Implicit selection grants no backlog processing, task mutation, Git publication, merge or deployment authority; local implementation checkpoints remain within the authorized work."
+      ]
     },
     {
       "id": "canonical-entry-points",
-      "text": "Only canonical workflow entries and active configured utilities are materialized. Removed plan, execute, fix, code-review, fix-loop, adr, prototype and putnami-* entries and the fix-light and epic-analyst workers have no metadata, resource directories or duplicate implementations. Unchanged owned legacy files are removed during upgrade; edited files remain protected and their collision is explicit."
+      "text": [
+        "Only canonical workflow entries and active configured utilities are materialized.",
+        "Removed plan, execute, fix, code-review, fix-loop, adr, prototype and putnami-* entries and the fix-light and epic-analyst workers have no metadata, resource directories or duplicate implementations.",
+        "Unchanged owned legacy files are removed during upgrade; edited files remain protected and their collision is explicit."
+      ]
     },
     {
       "id": "provider-neutral-content",
-      "text": "No shipped file invokes a backend client, names a tracker label, a hosted repository address, a private memory identity or storage layout, or this repository's identity. Skills reach tasks, proposals and memory through putnami tasks, proposals or memory operations."
+      "text": [
+        "No shipped file invokes a backend client, names a tracker label, a hosted repository address, a private memory identity or storage layout, or this repository's identity.",
+        "Skills reach tasks, proposals and memory through putnami tasks, proposals or memory operations."
+      ]
     },
     {
       "id": "repository-policy",
-      "text": "Instructions name worker profiles, never models; a worker profile's host metadata supplies its model, and a workflow profile may name another one for the stage it runs in a separate agent."
+      "text": [
+        "Instructions name worker profiles, never models;",
+        "a worker profile's host metadata supplies its model, and a workflow profile may name another one for the stage it runs in a separate agent."
+      ]
     },
     {
       "id": "intent-first-publication",
-      "text": "When an outcome changes a feature declaration, spec, specs baseline, architecture manifest, decisions file or ADR, build commits those declarations alone and pushes them to its draft before any code. It goes on without waiting, reads reviews and comments before each later checkpoint and before ready, answers a comment on a declaration on the proposal, and gives a declaration changed after its approval its own commit. A change with no declaration keeps the milestone order."
+      "text": [
+        "When an outcome changes a feature declaration, spec, specs baseline, architecture manifest, decisions file or ADR, build commits those declarations alone and pushes them to its draft before any code.",
+        "It goes on without waiting, reads reviews and comments before each later checkpoint and before ready, answers a comment on a declaration on the proposal, and gives a declaration changed after its approval its own commit.",
+        "A change with no declaration keeps the milestone order."
+      ]
     },
     {
       "id": "intent-first-validation",
-      "text": "Before build pushes a declarations commit, it runs test and validate on the projects that commit impacts, and it pushes nothing while one of them fails on an error other than one the code resolves: a missing proof of a requirement, a decision check on a file the code changes, or an architecture edge the commit declares. The push body names each error it tolerates."
+      "text": [
+        "Before build pushes a declarations commit, it runs test and validate on the projects that commit impacts, and it pushes nothing while one of them fails on an error other than one the code resolves: a missing proof of a requirement, a decision check on a file the code changes, or an architecture edge the commit declares.",
+        "The push body names each error it tolerates."
+      ]
     },
     {
       "id": "change-finalize-parity",
@@ -53,39 +78,75 @@
     },
     {
       "id": "canonical-consumer-migration",
-      "text": "Both hosts install canonical source/package content with exact resource links, one build recipe index, repeat-install idempotence and edited-file protection. Legacy workflows and shell implementations are deleted; the active audit language relay only calls the native evaluator. Workflow records require advertised native support. Stage changes, reviews, adapters and publication rechecks never execute another gate; actual released adoption is distinct."
+      "text": [
+        "Both hosts install canonical source/package content with exact resource links, one build recipe index, repeat-install idempotence and edited-file protection.",
+        "Legacy workflows and shell implementations are deleted; the active audit language relay only calls the native evaluator.",
+        "Workflow records require advertised native support.",
+        "Stage changes, reviews, adapters and publication rechecks never execute another gate; actual released adoption is distinct."
+      ]
     },
     {
       "id": "one-contribution-loop",
-      "text": "Build runs the loop talk, declare, show, code, check, prove, validate, merge from a core under 2,000 tokens and one reference per stage, read only at that stage. It reports each stage with putnami agent stage and sizes its plan with putnami change estimate before code. Code starts without the owner unless the plan spans several slices with important design or spec decisions or touches a sensitive zone; the owner then approves the study and a cost envelope first."
+      "text": [
+        "Build runs the loop talk, declare, show, code, check, prove, validate, merge from a core under 2,000 tokens and one reference per stage, read only at that stage.",
+        "It reports each stage with putnami agent stage and sizes its plan with putnami change estimate before code.",
+        "Code starts without the owner unless the plan spans several slices with important design or spec decisions or touches a sensitive zone;",
+        "the owner then approves the study and a cost envelope first."
+      ]
     },
     {
       "id": "workflow-profiles",
-      "text": "A workflow profile in the contributor policy states, for each loop stage and for review, whether it runs in the main session or in a separate agent, and the worker profile, model and effort of that agent. --profile, then the task label the policy names, selects it, else the default profile, which runs only review in a separate agent. The tier labels and tier workers are gone."
+      "text": [
+        "A workflow profile in the contributor policy states, for each loop stage and for review, whether it runs in the main session or in a separate agent, and the worker profile, model and effort of that agent. --profile, then the task label the policy names, selects it, else the default profile, which runs only review in a separate agent.",
+        "The tier labels and tier workers are gone."
+      ]
     },
     {
       "id": "epic-orchestration",
-      "text": "The epic skill splits an outcome into issues with dependencies, gets one owner approval of the plan and its envelope, and launches one build session per issue, wave by wave, through a launch recipe whose target is a local workspace or a cloud session. It never codes. A child stops at 50 % over its share, an unplanned sensitive zone, a design change or an ADR conflict. A child stacks on at most one unmerged ready parent and rebases onto the base after the parent's squash merge."
+      "text": [
+        "The epic skill splits an outcome into issues with dependencies, gets one owner approval of the plan and its envelope, and launches one build session per issue, wave by wave, through a launch recipe whose target is a local workspace or a cloud session.",
+        "It never codes.",
+        "A child stops at 50 % over its share, an unplanned sensitive zone, a design change or an ADR conflict.",
+        "A child stacks on at most one unmerged ready parent and rebases onto the base after the parent's squash merge."
+      ]
     },
     {
       "id": "review-cycle",
-      "text": "A fresh reviewer agent reviews the frozen candidate. P1 and P2 findings block, P3 findings are listed in the proposal, and a contradiction with an ADR blocks. The main session fixes, a fresh reviewer checks only the P1 and P2 fixes, and after two rounds a disagreement goes to the owner with both positions."
+      "text": [
+        "A fresh reviewer agent reviews the frozen candidate.",
+        "P1 and P2 findings block, P3 findings are listed in the proposal, and a contradiction with an ADR blocks.",
+        "The main session fixes, a fresh reviewer checks only the P1 and P2 fixes, and after two rounds a disagreement goes to the owner with both positions."
+      ]
     },
     {
       "id": "external-spec-authoring",
-      "text": "In a project whose feature names an external spec, the spec skill edits the external spec that `specs inspect` resolves, in the file its format reads and in its conventions, and starts no native spec. It anchors each requirement it creates or renumbers, keeps checks in `putnami.features.json`, and proposes `specs init --from` only when the owner asks."
+      "text": [
+        "In a project whose feature names an external spec, the spec skill edits the external spec that `specs inspect` resolves, in the file its format reads and in its conventions, and starts no native spec.",
+        "It anchors each requirement it creates or renumbers, keeps checks in `putnami.features.json`, and proposes `specs init --from` only when the owner asks."
+      ]
     },
     {
       "id": "user-scope-skills",
-      "text": "@putnami/contributor names build, check, design, spec and context in `agentContent.userScope`. Each of those skills first looks for putnami.workspace.json. In a workspace, a copy loaded from outside it follows the workspace's own copy of the skill, and stops with one line when the workspace ships none. Without a workspace, build, check and design stop with one line that says they need one; no skill asks the person to create putnami.workspace.json."
+      "text": [
+        "@putnami/contributor names build, check, design, spec and context in `agentContent.userScope`.",
+        "Each of those skills first looks for putnami.workspace.json.",
+        "In a workspace, a copy loaded from outside it follows the workspace's own copy of the skill, and stops with one line when the workspace ships none.",
+        "Without a workspace, build, check and design stop with one line that says they need one; no skill asks the person to create putnami.workspace.json."
+      ]
     },
     {
       "id": "context-without-a-workspace",
-      "text": "The context skill answers what a change touches: in a workspace from `putnami context`, `putnami projects` and `putnami <verb> --impacted --dry-run`; without one from `putnami observe --output=json`: the changed components, the components that depend on them, their tests and coverage, and the specs observe reports."
+      "text": [
+        "The context skill answers what a change touches: in a workspace from `putnami context`, `putnami projects` and `putnami <verb> --impacted --dry-run`;",
+        "without one from `putnami observe --output=json`: the changed components, the components that depend on them, their tests and coverage, and the specs observe reports."
+      ]
     },
     {
       "id": "spec-without-a-workspace",
-      "text": "Without a workspace, the spec skill finds the specs the repository keeps from `putnami observe --output=json`, edits one in its own format and conventions (Spec Kit, OpenSpec, Kiro or Gherkin), creates a new one in the format the repository already uses, and runs `putnami observe` to read it back. It writes no native spec and no putnami.workspace.json."
+      "text": [
+        "Without a workspace, the spec skill finds the specs the repository keeps from `putnami observe --output=json`, edits one in its own format and conventions (Spec Kit, OpenSpec, Kiro or Gherkin), creates a new one in the format the repository already uses, and runs `putnami observe` to read it back.",
+        "It writes no native spec and no putnami.workspace.json."
+      ]
     }
   ],
   "decisions": [

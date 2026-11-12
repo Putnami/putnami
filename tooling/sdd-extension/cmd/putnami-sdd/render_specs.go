@@ -76,7 +76,7 @@ func printSpecContextHuman(w io.Writer, report sdd.SpecContextReport) {
 		fmt.Fprintln(w, "    none authored yet")
 	}
 	for _, requirement := range report.Spec.Requirements {
-		fmt.Fprintf(w, "    [%s] %s\n", requirement.ID, requirement.Text)
+		fmt.Fprintf(w, "    [%s] %s\n", requirement.ID, requirement.Text.String())
 	}
 	if len(report.Decisions) > 0 {
 		fmt.Fprintln(w, "  Decisions:")

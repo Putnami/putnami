@@ -23,7 +23,10 @@
     },
     {
       "id": "a-rendered-project-passes-lint",
-      "text": "A project rendered from go-server passes the linters putnami lint runs: golangci-lint with the Go extension's config/.golangci.yml, then staticcheck, at the versions go/extension/tools/versions.json pins. Neither reports a finding."
+      "text": [
+        "A project rendered from go-server passes the linters putnami lint runs: golangci-lint with the Go extension's config/.golangci.yml, then staticcheck, at the versions go/extension/tools/versions.json pins.",
+        "Neither reports a finding."
+      ]
     }
   ],
   "decisions": [

@@ -445,7 +445,7 @@ func (scan *gherkinScan) requirement(block *gherkinBlock, text string) {
 	if scenarios == nil {
 		scenarios = []SpecScenario{}
 	}
-	scan.reading.Spec.Requirements = append(scan.reading.Spec.Requirements, SpecRequirement{ID: id, Text: text})
+	scan.reading.Spec.Requirements = append(scan.reading.Spec.Requirements, SpecRequirement{ID: id, Text: SpecText{text}})
 	scan.reading.Requirements = append(scan.reading.Requirements, SpecRequirementRecord{Position: block.position, Unanchored: unanchored, Scenarios: scenarios})
 }
 

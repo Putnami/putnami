@@ -71,8 +71,8 @@ func (repository *specRepository) draftFromExternalSpec(feature string, from fea
 	reference, field, manifest, found := repository.specReferenceOf(feature)
 	if !found {
 		return specDraft{}, []diag.Diagnostic{diag.Errorf(SpecCodeInitFromMismatch, "feature",
-				"feature %q names no external spec in %s; --from reads only the spec a manifest entry names",
-				feature, featureproto.ManifestFilename)},
+				"feature %q names no external spec in its authored declaration; --from reads only the spec a manifest entry names",
+				feature)},
 			protocolcli.Usagef("feature %q names no external spec", feature)
 	}
 	if reference != from {
@@ -121,7 +121,7 @@ func (repository *specRepository) specReferenceOf(feature string) (featureproto.
 		}
 		for index, declared := range source.Manifest.Features {
 			if declared.ID == feature && declared.Spec != nil {
-				return *declared.Spec, fmt.Sprintf("%s#features[%d].spec", source.Path, index), source.Path, true
+				return *declared.Spec, source.Path + "#" + source.Field(fmt.Sprintf("features[%d].spec", index)), source.Path, true
 			}
 		}
 	}

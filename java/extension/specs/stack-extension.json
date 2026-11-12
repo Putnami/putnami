@@ -28,39 +28,76 @@
   "requirements": [
     {
       "id": "components-become-projects",
-      "text": "The probe answers, for each candidate directory a Gradle or Maven build knows as a component: its name (the Gradle path without its first colon, ':' turned into '/', or the artifactId), its edges, the extension, the tag java, its type and metadata naming the build's reference, the variant, its stack root and the expected Java version. A component is an application when its build applies the application or Spring Boot plugin, Android aside; any other is a library."
+      "text": [
+        "The probe answers, for each candidate directory a Gradle or Maven build knows as a component: its name (the Gradle path without its first colon, ':' turned into '/', or the artifactId), its edges, the extension, the tag java, its type and metadata naming the build's reference, the variant, its stack root and the expected Java version.",
+        "A component is an application when its build applies the application or Spring Boot plugin, Android aside; any other is a library."
+      ]
     },
     {
       "id": "nested-builds-are-stack-roots",
-      "text": "A Gradle build's root is the nearest directory with a settings file; a Maven build's root is the outermost pom.xml that lists the module, or the module's own. It is its components' stack root, and an input-only project when it is no component. A build inside another one, such as buildSrc, and a build file under a src, target or build directory are no builds of their own. A directory both builds claim is the Gradle build's."
+      "text": [
+        "A Gradle build's root is the nearest directory with a settings file; a Maven build's root is the outermost pom.xml that lists the module, or the module's own.",
+        "It is its components' stack root, and an input-only project when it is no component.",
+        "A build inside another one, such as buildSrc, and a build file under a src, target or build directory are no builds of their own.",
+        "A directory both builds claim is the Gradle build's."
+      ]
     },
     {
       "id": "variants-follow-the-build",
-      "text": "A Maven module is variant maven. A Gradle project whose build file applies an Android plugin or holds an android block is android, or android-coverage with unit test coverage on; one that applies java-platform is gradle-platform, version-catalog gradle-catalog; any other is gradle, or gradle-jacoco when it applies jacoco. A variant is a part of the profile applied before the project's override."
+      "text": [
+        "A Maven module is variant maven.",
+        "A Gradle project whose build file applies an Android plugin or holds an android block is android, or android-coverage with unit test coverage on;",
+        "one that applies java-platform is gradle-platform, version-catalog gradle-catalog;",
+        "any other is gradle, or gradle-jacoco when it applies jacoco.",
+        "A variant is a part of the profile applied before the project's override."
+      ]
     },
     {
       "id": "toolchain-is-provided",
-      "text": "The toolchain check runs javac -version against .java-version, read up to its first character that is neither a digit nor a dot. When javac is missing or outside it, the task installs under the Putnami home the Temurin JDK it accepts (8, 11, 17, 21 or 25, 21 first), checked by SHA-256, and runs it first on PATH and as JAVA_HOME. 8, 1.8 and 1.8.0 accept the 1.8.0_512 a Java 8 javac prints. Offline, a task installs nothing."
+      "text": [
+        "The toolchain check runs javac -version against .java-version, read up to its first character that is neither a digit nor a dot.",
+        "When javac is missing or outside it, the task installs under the Putnami home the Temurin JDK it accepts (8, 11, 17, 21 or 25, 21 first), checked by SHA-256, and runs it first on PATH and as JAVA_HOME. 8, 1.8 and 1.8.0 accept the 1.8.0_512 a Java 8 javac prints.",
+        "Offline, a task installs nothing."
+      ]
     },
     {
       "id": "gradle-toolchains-are-provided",
-      "text": "Each Gradle step reads the Java majors the build's toolchains ask for: JavaLanguageVersion.of(N) and jvmToolchain(N), as a number, a string, a JavaVersion constant or a libs catalog version, in its build files, script plugins, buildSrc and build-logic, and the daemon JVM criteria. For each major but the one running Gradle, it installs the pinned JDK, unless offline, and appends -Porg.gradle.java.installations.paths=<homes>."
+      "text": [
+        "Each Gradle step reads the Java majors the build's toolchains ask for: JavaLanguageVersion.of(N) and jvmToolchain(N), as a number, a string, a JavaVersion constant or a libs catalog version, in its build files, script plugins, buildSrc and build-logic, and the daemon JVM criteria.",
+        "For each major but the one running Gradle, it installs the pinned JDK, unless offline, and appends -Porg.gradle.java.installations.paths=<homes>."
+      ]
     },
     {
       "id": "android-sdk-is-provided",
-      "text": "A task or workspace-install of a Gradle build that applies the Android plugin keeps ANDROID_HOME, ANDROID_SDK_ROOT or sdk.dir in local.properties. Else, when options[\"@putnami/java\"].android.acceptSdkLicenses is true, it installs the pinned command-line tools by SHA-256, accepts the licenses with sdkmanager and sets ANDROID_HOME and ANDROID_SDK_ROOT. Else an Android component's task fails naming the option. Offline, it installs nothing."
+      "text": [
+        "A task or workspace-install of a Gradle build that applies the Android plugin keeps ANDROID_HOME, ANDROID_SDK_ROOT or sdk.dir in local.properties.",
+        "Else, when options[\"@putnami/java\"].android.acceptSdkLicenses is true, it installs the pinned command-line tools by SHA-256, accepts the licenses with sdkmanager and sets ANDROID_HOME and ANDROID_SDK_ROOT.",
+        "Else an Android component's task fails naming the option.",
+        "Offline, it installs nothing."
+      ]
     },
     {
       "id": "gradle-without-a-wrapper",
-      "text": "A step that names {root}/gradlew in a build that has no wrapper, or gradle when none is on PATH, runs a pinned Gradle distribution installed under the Putnami home and checked by the SHA-256 services.gradle.org publishes: 9.8.2 on JDK 17 to 25, 8.14.6 on an older JDK. Offline, a Gradle that is not installed fails the task. The test filter reaches it as it reaches gradlew."
+      "text": [
+        "A step that names {root}/gradlew in a build that has no wrapper, or gradle when none is on PATH, runs a pinned Gradle distribution installed under the Putnami home and checked by the SHA-256 services.gradle.org publishes: 9.8.2 on JDK 17 to 25, 8.14.6 on an older JDK.",
+        "Offline, a Gradle that is not installed fails the task.",
+        "The test filter reaches it as it reaches gradlew."
+      ]
     },
     {
       "id": "maven-follows-its-wrapper",
-      "text": "A step that names mvn runs the release the distributionUrl of .mvn/wrapper/maven-wrapper.properties names, whatever mvn is on PATH, installed under the Putnami home and checked against the distributionSha256Sum it states, else the SHA-512, then the SHA-256, its host publishes. An archive with no checksum, another digest, or a URL that is not http or https or carries credentials is refused. Without the file, the mvn on PATH runs, else Maven 3.9.11."
+      "text": [
+        "A step that names mvn runs the release the distributionUrl of .mvn/wrapper/maven-wrapper.properties names, whatever mvn is on PATH, installed under the Putnami home and checked against the distributionSha256Sum it states, else the SHA-512, then the SHA-256, its host publishes.",
+        "An archive with no checksum, another digest, or a URL that is not http or https or carries credentials is refused.",
+        "Without the file, the mvn on PATH runs, else Maven 3.9.11."
+      ]
     },
     {
       "id": "workspace-install-prepares-each-build",
-      "text": "putnami install runs workspace-install at each stack root, in path order, except the projects disable.tags excludes: it installs the JDKs, then the build tool, then fills the dependency cache: an init script resolves every resolvable configuration of every Gradle project, one it cannot resolve whole being a warning and a build that does not configure an error, and Maven runs go-offline, best effort, with a warning that names what it misses. Force refreshes the dependencies."
+      "text": [
+        "putnami install runs workspace-install at each stack root, in path order, except the projects disable.tags excludes: it installs the JDKs, then the build tool, then fills the dependency cache: an init script resolves every resolvable configuration of every Gradle project, one it cannot resolve whole being a warning and a build that does not configure an error, and Maven runs go-offline, best effort, with a warning that names what it misses.",
+        "Force refreshes the dependencies."
+      ]
     },
     {
       "id": "workspace-install-offline-installs-nothing",
@@ -72,11 +109,21 @@
     },
     {
       "id": "reports-become-the-summary",
-      "text": "The test task reads the JUnit reports, build/test-results/test (testDebugUnitTest for Android) or target/surefire-reports, and the JaCoCo XML report into the test and coverage summary. A component with no file under src/test expects no report. A missing JaCoCo report is read as none, except for android-coverage, where it fails the task with stacks.report_missing."
+      "text": [
+        "The test task reads the JUnit reports, build/test-results/test (testDebugUnitTest for Android) or target/surefire-reports, and the JaCoCo XML report into the test and coverage summary.",
+        "A component with no file under src/test expects no report.",
+        "A missing JaCoCo report is read as none, except for android-coverage, where it fails the task with stacks.report_missing."
+      ]
     },
     {
       "id": "filters-the-tests",
-      "text": "test --test, short -t, runs the tests the filter names. gradlew or gradle gets --init-script <script> -Dputnami.testFilter=<filter>, global options after the last task; the script, in the task's output, gives every test task the filter as --tests does, with failOnNoMatchingTests off. mvn, mvnw or mvnd gets -Dtest=<filter> -Dsurefire.failIfNoSpecifiedTests=false -DskipITs; another program, none. A component it selects no test in passes with zero tests. The filter keys the task."
+      "text": [
+        "test --test, short -t, runs the tests the filter names. gradlew or gradle gets --init-script <script> -Dputnami.testFilter=<filter>, global options after the last task;",
+        "the script, in the task's output, gives every test task the filter as --tests does, with failOnNoMatchingTests off. mvn, mvnw or mvnd gets -Dtest=<filter> -Dsurefire.failIfNoSpecifiedTests=false -DskipITs;",
+        "another program, none.",
+        "A component it selects no test in passes with zero tests.",
+        "The filter keys the task."
+      ]
     },
     {
       "id": "lint-skips-the-lockfiles",
@@ -84,7 +131,11 @@
     },
     {
       "id": "serve-runs-the-application",
-      "text": "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) under its stack root's lock, copies it aside, and runs the copy with the words of --args as its arguments and PORT and SERVER_PORT set to the port flag, until the user stops it; it reports the server ready once the port accepts connections. A library runs nothing."
+      "text": [
+        "putnami serve builds an application's runnable form (installDist for the Gradle application plugin, the Spring Boot jar otherwise) under its stack root's lock, copies it aside, and runs the copy with the words of --args as its arguments and PORT and SERVER_PORT set to the port flag, until the user stops it;",
+        "it reports the server ready once the port accepts connections.",
+        "A library runs nothing."
+      ]
     },
     {
       "id": "run-runs-the-application-once",
@@ -92,7 +143,10 @@
     },
     {
       "id": "package-assembles-an-image",
-      "text": "putnami package --docker assembles, with no Docker daemon, the OCI image of an application: its runnable form on the Eclipse Temurin JRE of its Java major, pinned by digest, or on a base the project pins by digest, run as a non-root user with PORT and SERVER_PORT set to the port flag, 8080 by default. A library packages nothing."
+      "text": [
+        "putnami package --docker assembles, with no Docker daemon, the OCI image of an application: its runnable form on the Eclipse Temurin JRE of its Java major, pinned by digest, or on a base the project pins by digest, run as a non-root user with PORT and SERVER_PORT set to the port flag, 8080 by default.",
+        "A library packages nothing."
+      ]
     },
     {
       "id": "publish-pushes-the-image",
@@ -100,11 +154,18 @@
     },
     {
       "id": "checks-documentation-links",
-      "text": "lint checks every relative link and anchor of the component's README.md files and doc/ trees with the SDK's documentation link check, a directory below it that holds a Gradle build, settings or Maven POM file answering for its own, and a broken one fails lint, unless the docs-links flag is false. The check needs no JDK."
+      "text": [
+        "lint checks every relative link and anchor of the component's README.md files and doc/ trees with the SDK's documentation link check, a directory below it that holds a Gradle build, settings or Maven POM file answering for its own, and a broken one fails lint, unless the docs-links flag is false.",
+        "The check needs no JDK."
+      ]
     },
     {
       "id": "overrides-are-honored",
-      "text": "options[\"@putnami/java\"] in a component's own putnami.json overrides its variant's profile: an object merges, any other value replaces the variant's whole. The steps run and the files the java:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task. An unknown member, a change to id, markers or variants, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+      "text": [
+        "options[\"@putnami/java\"] in a component's own putnami.json overrides its variant's profile: an object merges, any other value replaces the variant's whole.",
+        "The steps run and the files the java:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task.",
+        "An unknown member, a change to id, markers or variants, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+      ]
     },
     {
       "id": "manifest-follows-the-profile",

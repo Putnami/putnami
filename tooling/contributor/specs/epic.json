@@ -15,19 +15,34 @@
   "requirements": [
     {
       "id": "epic-plan-validation",
-      "text": "putnami epic plan reads .putnami/<epic>/epic.json, or the file --plan-file names, as protocolVersion 1 of the epic plan format. It refuses invalid UTF-8, a repeated or unknown member, a missing member, a value of the wrong type or out of its bounds, an issue key two issues share, a dependency on an unknown key or on the issue itself, and a cycle, with exit 1 and the path of the first value it refuses. The JSON Schema of the format states the members and bounds the decoder applies."
+      "text": [
+        "putnami epic plan reads .putnami/<epic>/epic.json, or the file --plan-file names, as protocolVersion 1 of the epic plan format.",
+        "It refuses invalid UTF-8, a repeated or unknown member, a missing member, a value of the wrong type or out of its bounds, an issue key two issues share, a dependency on an unknown key or on the issue itself, and a cycle, with exit 1 and the path of the first value it refuses.",
+        "The JSON Schema of the format states the members and bounds the decoder applies."
+      ]
     },
     {
       "id": "epic-waves",
-      "text": "Each issue is sized from its slices with the change estimate table, and the epic's ranges are the sums of its issues'. An issue's wave is 1 when it has no dependency, else one more than the latest wave of its dependencies; issues of a wave keep plan order. The command prints the epic, its envelope and one line per issue by wave, or with --output=json the result document."
+      "text": [
+        "Each issue is sized from its slices with the change estimate table, and the epic's ranges are the sums of its issues'.",
+        "An issue's wave is 1 when it has no dependency, else one more than the latest wave of its dependencies; issues of a wave keep plan order.",
+        "The command prints the epic, its envelope and one line per issue by wave, or with --output=json the result document."
+      ]
     },
     {
       "id": "epic-status",
-      "text": "putnami epic status reads the epic plan, its launch records (local or cloud), and each issue's task, proposal and sessions through tasks, proposals and missions. It reports each issue's target, state and tokens, the epic's tokens against its envelope, and the issues that may launch: all dependencies merged, or one not merged with a ready proposal, while the envelope is not spent and fewer issues run than its parallel sessions. A contract the workspace does not bind is reported, not guessed."
+      "text": [
+        "putnami epic status reads the epic plan, its launch records (local or cloud), and each issue's task, proposal and sessions through tasks, proposals and missions.",
+        "It reports each issue's target, state and tokens, the epic's tokens against its envelope, and the issues that may launch: all dependencies merged, or one not merged with a ready proposal, while the envelope is not spent and fewer issues run than its parallel sessions.",
+        "A contract the workspace does not bind is reported, not guessed."
+      ]
     },
     {
       "id": "epic-cloud-child",
-      "text": "A cloud child runs build --push-only: it pushes its branch at each checkpoint, declarations first, and opens no proposal. The epic skill has the owner start the cloud session, and the epic session reviews and gates the pushed head in a local worktree before it publishes the proposal with change finalize."
+      "text": [
+        "A cloud child runs build --push-only: it pushes its branch at each checkpoint, declarations first, and opens no proposal.",
+        "The epic skill has the owner start the cloud session, and the epic session reviews and gates the pushed head in a local worktree before it publishes the proposal with change finalize."
+      ]
     }
   ],
   "decisions": [

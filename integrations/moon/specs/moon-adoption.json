@@ -15,35 +15,67 @@
   "requirements": [
     {
       "id": "projects-and-tasks-are-read",
-      "text": "The extension reads the moon project graph from moon-graph.json, the moon project-graph --json export, at the workspace root when present, else from .moon/workspace.yml and each moon.yml. A project's tasks, each with the command line it runs (its script, else its command and args), are its moon.yml tasks over those it inherits from .moon/tasks.yml and the .moon/tasks/*.yml files that match it, after its workspace.inheritedTasks. An export's own tasks win."
+      "text": [
+        "The extension reads the moon project graph from moon-graph.json, the moon project-graph --json export, at the workspace root when present, else from .moon/workspace.yml and each moon.yml.",
+        "A project's tasks, each with the command line it runs (its script, else its command and args), are its moon.yml tasks over those it inherits from .moon/tasks.yml and the .moon/tasks/*.yml files that match it, after its workspace.inheritedTasks.",
+        "An export's own tasks win."
+      ]
     },
     {
       "id": "sync-writes-each-project",
-      "text": "The sync task writes in each moon project's putnami.json the tag moon, the extension the mode maps it to, the project IDs of the projects moon says it depends on, build, test or lint in disable.jobs when the project has no moon task named or tagged that way, and for a project moon runs the root files its tasks read (.moon configuration, .prototools, lockfile) as filePatterns. It keeps the members it does not own, retracts a former project, and lists each moon task it maps to no Putnami command."
+      "text": [
+        "The sync task writes in each moon project's putnami.json the tag moon, the extension the mode maps it to, the project IDs of the projects moon says it depends on, build, test or lint in disable.jobs when the project has no moon task named or tagged that way, and for a project moon runs the root files its tasks read (.moon configuration, .prototools, lockfile) as filePatterns.",
+        "It keeps the members it does not own, retracts a former project, and lists each moon task it maps to no Putnami command."
+      ]
     },
     {
       "id": "import-maps-to-language-extensions",
-      "text": "With mode import in the workspace options of @putnami/moon, or no mode, a project whose moon language is typescript, go, python, php, ruby or rust runs that language's Putnami extension, which the sync declares in the workspace's extensions; any other project runs the delegated @putnami/moon tasks, so no Putnami cache sits over moon's. With mode delegate every project runs @putnami/moon; another value fails the sync and the probe with stacks.adoption_mode_invalid."
+      "text": [
+        "With mode import in the workspace options of @putnami/moon, or no mode, a project whose moon language is typescript, go, python, php, ruby or rust runs that language's Putnami extension, which the sync declares in the workspace's extensions;",
+        "any other project runs the delegated @putnami/moon tasks, so no Putnami cache sits over moon's.",
+        "With mode delegate every project runs @putnami/moon; another value fails the sync and the probe with stacks.adoption_mode_invalid."
+      ]
     },
     {
       "id": "import-keeps-the-tool-that-checks-the-code",
-      "text": "In import mode, a moon task moves to its language extension only when that extension runs its program, with no argument it would drop: for TypeScript the shared rule, with the test runner and the ESLint linter recorded; go build or go test; cargo build or nextest; pytest; rspec or rubocop; phpunit or phpstan. A task with tags, a profile or a subset, a Go, Rust or Python lint and a cargo test keep running through moon run, the project naming @putnami/moon too, and the sync lists them."
+      "text": [
+        "In import mode, a moon task moves to its language extension only when that extension runs its program, with no argument it would drop: for TypeScript the shared rule, with the test runner and the ESLint linter recorded;",
+        "go build or go test;",
+        "cargo build or nextest;",
+        "pytest;",
+        "rspec or rubocop;",
+        "phpunit or phpstan.",
+        "A task with tags, a profile or a subset, a Go, Rust or Python lint and a cargo test keep running through moon run, the project naming @putnami/moon too, and the sync lists them."
+      ]
     },
     {
       "id": "import-adopts-typescript-conventions",
-      "text": "In import mode, a TypeScript project gets the conventions of D-066: exports {\".\": \"./src/index.ts\"} when its build moves to the Bun build, its package.json is private and names a build output, and a tsconfig.json extending the root's when it holds no tsconfig*.json; the sync lists each write and a dry sync shows its diff."
+      "text": [
+        "In import mode, a TypeScript project gets the conventions of D-066: exports {\".\": \"./src/index.ts\"} when its build moves to the Bun build, its package.json is private and names a build output, and a tsconfig.json extending the root's when it holds no tsconfig*.json;",
+        "the sync lists each write and a dry sync shows its diff."
+      ]
     },
     {
       "id": "tasks-delegate-to-moon",
-      "text": "Each lint, test and build task of @putnami/moon runs moon run <project>:<task> at the workspace root, where <task> is the moon task named that way, else the first, by name, tagged that way. Each task depends only on its project's graph step, which runs nothing. Putnami's cache is off for every task, the result records delegatedTo moon, and a failing step fails with stacks.step_failed."
+      "text": [
+        "Each lint, test and build task of @putnami/moon runs moon run <project>:<task> at the workspace root, where <task> is the moon task named that way, else the first, by name, tagged that way.",
+        "Each task depends only on its project's graph step, which runs nothing.",
+        "Putnami's cache is off for every task, the result records delegatedTo moon, and a failing step fails with stacks.step_failed."
+      ]
     },
     {
       "id": "reports-from-options",
-      "text": "The test task reads the JUnit and coverage reports the project's own options name under options[\"@putnami/moon\"].tasks.test.reports into the test and coverage summary, as the stack core reads any report. A project whose options name none has its exit code alone for result, and the sync lists it."
+      "text": [
+        "The test task reads the JUnit and coverage reports the project's own options name under options[\"@putnami/moon\"].tasks.test.reports into the test and coverage summary, as the stack core reads any report.",
+        "A project whose options name none has its exit code alone for result, and the sync lists it."
+      ]
     },
     {
       "id": "validate-fails-on-a-stale-graph",
-      "text": "putnami validate compares each moon project's putnami.json with what the sync would write, writes nothing, and fails with moon.sync_stale when a sync would change one. Without moon-graph.json and without .moon/workspace.yml it warns and passes."
+      "text": [
+        "putnami validate compares each moon project's putnami.json with what the sync would write, writes nothing, and fails with moon.sync_stale when a sync would change one.",
+        "Without moon-graph.json and without .moon/workspace.yml it warns and passes."
+      ]
     },
     {
       "id": "manifest-follows-the-profile",

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/ci-document",
+    "type": "feature",
+    "name": "CI document",
+    "outcome": "A repository declares in one reviewed file the commands its CI runs, and the guidance the CLI generates names them as the gate",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "commands-not-gate",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "guidance-follows-blocking-commands",
+            "the-gate-keeps-the-documents-order",
+            "an-unusable-document-falls-back-to-the-default-documents-commands",
+            "cache-verify-runs-the-gate"
+          ]
+        }
+      }
+    ]
+  }
+}

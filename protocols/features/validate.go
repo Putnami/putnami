@@ -122,10 +122,83 @@ var productPromiseClaims = map[AttestationClaim]bool{
 // ManifestSource associates a parsed manifest with its canonical
 // workspace-relative discovery path for deterministic aggregate diagnostics.
 type ManifestSource struct {
+	// Document says Path holds one FeatureDocument and Manifest is the
+	// one-feature manifest it stands for, so a finding names the document's
+	// feature instead of features[0].
+	Document bool
 	// Path is the canonical workspace-relative manifest discovery path.
 	Path string
 	// Manifest is the strictly parsed authored-intent document found at Path.
 	Manifest *Manifest
+}
+
+// Field returns field as a position in the file at Path: a field of
+// features[0] in a feature document names feature.
+func (source ManifestSource) Field(field string) string {
+	if source.Document {
+		return FeatureDocumentField(field)
+	}
+	return field
+}
+
+// FeatureDocumentField maps a position in the one-feature manifest a
+// FeatureDocument stands for to the same position in the document:
+// features[0] becomes feature. Any other field is returned unchanged.
+func FeatureDocumentField(field string) string {
+	const prefix = "features[0]"
+	if field == prefix {
+		return "feature"
+	}
+	if rest, ok := strings.CutPrefix(field, prefix); ok && (strings.HasPrefix(rest, ".") || strings.HasPrefix(rest, "[")) {
+		return "feature" + rest
+	}
+	return field
+}
+
+// ValidateFeatureDocument validates one feature document by the rules of the
+// one-feature manifest it stands for, and names each finding by its position
+// in the document.
+func ValidateFeatureDocument(input *FeatureDocument) []diag.Diagnostic {
+	if input == nil {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "feature document is nil")}
+	}
+	diagnostics := ValidateManifest(input.Manifest())
+	for i := range diagnostics {
+		diagnostics[i].Field = FeatureDocumentField(diagnostics[i].Field)
+	}
+	return diagnostics
+}
+
+// ManifestRoot returns the discovery root that owns the authored intent at
+// workspacePath, in either form: <root>/putnami.features.json or
+// <root>/features/<name>.json. The workspace root is "". It reports false for
+// any other path.
+func ManifestRoot(workspacePath string) (string, bool) {
+	dir, name := path.Split(workspacePath)
+	dir = strings.TrimSuffix(dir, "/")
+	if name == ManifestFilename {
+		return dir, true
+	}
+	if !strings.HasSuffix(name, ".json") {
+		return "", false
+	}
+	parent, base := path.Split(dir)
+	if base != FeatureDirectory {
+		return "", false
+	}
+	return strings.TrimSuffix(parent, "/"), true
+}
+
+// ManifestFormConflict is the finding for a discovery root that holds both
+// ManifestFilename and FeatureDirectory. Neither form contributes: a reader
+// that picked one would silently drop the other's features.
+func ManifestFormConflict(root string) diag.Diagnostic {
+	field := ManifestFilename
+	if root != "" {
+		field = root + "/" + ManifestFilename
+	}
+	return diag.Errorf(ErrorCodeManifestFormConflict, field,
+		"a root holds %s or %s/<feature>.json, never both: move every feature into one form", ManifestFilename, FeatureDirectory)
 }
 
 // EvidenceSource associates a parsed evidence fragment with its canonical
@@ -764,9 +837,7 @@ func validateSpec(input *Spec, textBound int) []diag.Diagnostic {
 		} else {
 			seenRequirements[requirement.ID] = field
 		}
-		if !boundedText(requirement.Text, textBound) {
-			diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidRequirement, field+".text", "requirement %q text must be %s", requirement.ID, textRule(textBound)))
-		}
+		diagnostics = append(diagnostics, validateRequirementText(field+".text", requirement, textBound)...)
 	}
 
 	seenDecisions := make(map[string]string)
@@ -781,6 +852,27 @@ func validateSpec(input *Spec, textBound int) []diag.Diagnostic {
 	}
 	sortDiagnostics(diagnostics)
 	return diagnostics
+}
+
+// validateRequirementText bounds the statement, the sentences joined by one
+// space, as one text, and refuses an empty array or a blank sentence. A
+// string is one sentence, so its finding names the text itself.
+func validateRequirementText(field string, requirement SpecRequirement, textBound int) []diag.Diagnostic {
+	if len(requirement.Text) == 0 {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidRequirement, field, "requirement %q text must hold at least one sentence", requirement.ID)}
+	}
+	if len(requirement.Text) > 1 {
+		for i, sentence := range requirement.Text {
+			if !boundedText(sentence, math.MaxInt) {
+				return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidRequirement, fmt.Sprintf("%s[%d]", field, i),
+					"requirement %q sentences must be non-blank, without control characters", requirement.ID)}
+			}
+		}
+	}
+	if !boundedText(requirement.Text.String(), textBound) {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidRequirement, field, "requirement %q text must be %s", requirement.ID, textRule(textBound))}
+	}
+	return nil
 }
 
 // textRule states what a spec text must be, with the bound only when one holds.
@@ -912,13 +1004,14 @@ func ValidateRepository(manifestSources []ManifestSource, evidenceSources []Evid
 			canonicalSource = ""
 		}
 		for _, finding := range ValidateManifest(source.Manifest) {
+			finding.Field = source.Field(finding.Field)
 			diagnostics = append(diagnostics, withSource(canonicalSource, finding))
 		}
 		if source.Manifest == nil {
 			continue
 		}
 		for i, feature := range source.Manifest.Features {
-			location := sourceField(canonicalSource, fmt.Sprintf("features[%d]", i))
+			location := sourceField(canonicalSource, source.Field(fmt.Sprintf("features[%d]", i)))
 			featureDeclarations[feature.ID] = append(featureDeclarations[feature.ID], featureAt{feature: feature, field: location, source: canonicalSource})
 		}
 	}

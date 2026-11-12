@@ -4,8 +4,10 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	protocaps "go.putnami.dev/protocol/capabilities"
@@ -72,34 +74,101 @@ func collectFeatureProofMappings(root *Module) ([]protofeatures.GeneratedEvidenc
 	return mappings, nil
 }
 
-// readAuthoredFeatureManifest reads putnami.features.json from the project
-// root. Absence is not an error here: it makes every mapping an unknown-feature
+// readAuthoredFeatureManifest reads the project's authored intent:
+// putnami.features.json, or the feature documents under features/ merged into
+// one manifest in filename order. A project that holds both is an error.
+// Absence is not an error here: it makes every mapping an unknown-feature
 // failure in the resolver, which is a clearer report than "no manifest" from a
 // project that declared no proof at all.
 func readAuthoredFeatureManifest(projectRoot string) (*protofeatures.Manifest, error) {
-	path := filepath.Join(projectRoot, protofeatures.ManifestFilename)
+	data, single, err := readAuthoredFile(filepath.Join(projectRoot, protofeatures.ManifestFilename), protofeatures.ManifestFilename)
+	if err != nil {
+		return nil, err
+	}
+	documents, err := readFeatureDocuments(projectRoot)
+	if err != nil {
+		return nil, err
+	}
+	if single && len(documents) > 0 {
+		finding := protofeatures.ManifestFormConflict("")
+		return nil, fmt.Errorf("authored feature manifest is not valid:\n%s", formatFeatureDiagnostics([]diag.Diagnostic{finding}))
+	}
+	if single {
+		manifest, findings := protofeatures.ParseAndValidateManifest(data)
+		if manifest == nil || diag.HasErrors(findings) {
+			return nil, fmt.Errorf("authored feature manifest %s is not valid:\n%s", protofeatures.ManifestFilename, formatFeatureDiagnostics(findings))
+		}
+		return manifest, nil
+	}
+	if len(documents) == 0 {
+		return nil, nil
+	}
+	var merged *protofeatures.Manifest
+	for _, name := range slices.Sorted(maps.Keys(documents)) {
+		document, findings := protofeatures.ParseAndValidateFeatureDocument(documents[name])
+		if document == nil || diag.HasErrors(findings) {
+			return nil, fmt.Errorf("authored feature document %s/%s is not valid:\n%s", protofeatures.FeatureDirectory, name, formatFeatureDiagnostics(findings))
+		}
+		if merged == nil {
+			merged = document.Manifest()
+			continue
+		}
+		merged.Features = append(merged.Features, document.Feature)
+	}
+	return merged, nil
+}
+
+// readAuthoredFile reads one bounded regular file and reports whether it
+// exists.
+func readAuthoredFile(path, name string) ([]byte, bool, error) {
 	info, err := os.Stat(path)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, err
+	}
+	if !info.Mode().IsRegular() {
+		return nil, false, fmt.Errorf("authored feature manifest %s is not a regular file", name)
+	}
+	if info.Size() > maxAuthoredManifestBytes {
+		return nil, false, fmt.Errorf("authored feature manifest %s exceeds the bounded describe read limit", name)
+	}
+	data, err := os.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, false, err
+	}
+	return data, true, nil
+}
+
+// readFeatureDocuments reads the direct JSON children of the project's
+// features/ directory, keyed by filename. A features/ directory that holds a
+// putnami.json is a nested project, never a feature directory.
+func readFeatureDocuments(projectRoot string) (map[string][]byte, error) {
+	directory := filepath.Join(projectRoot, protofeatures.FeatureDirectory)
+	if _, err := os.Stat(filepath.Join(directory, "putnami.json")); err == nil {
+		return nil, nil
+	}
+	entries, err := os.ReadDir(directory)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("authored feature manifest %s is not a regular file", protofeatures.ManifestFilename)
+	documents := make(map[string][]byte)
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		name := protofeatures.FeatureDirectory + "/" + entry.Name()
+		data, _, err := readAuthoredFile(filepath.Join(directory, entry.Name()), name)
+		if err != nil {
+			return nil, err
+		}
+		documents[entry.Name()] = data
 	}
-	if info.Size() > maxAuthoredManifestBytes {
-		return nil, fmt.Errorf("authored feature manifest %s exceeds the bounded describe read limit", protofeatures.ManifestFilename)
-	}
-	data, err := os.ReadFile(filepath.Clean(path))
-	if err != nil {
-		return nil, err
-	}
-	manifest, findings := protofeatures.ParseAndValidateManifest(data)
-	if manifest == nil || diag.HasErrors(findings) {
-		return nil, fmt.Errorf("authored feature manifest %s is not valid:\n%s", protofeatures.ManifestFilename, formatFeatureDiagnostics(findings))
-	}
-	return manifest, nil
+	return documents, nil
 }
 
 // buildFeatureEvidenceDocument emits generated evidence for the explicit

@@ -18,7 +18,10 @@
   "requirements": [
     {
       "id": "describe",
-      "text": "Describe mode validates and configures a lazy dependency container, runs only describers, writes only below its output directory, and never starts runtime plugins. Build-triggered migration bundles use the authored project identity; programmatic describe calls retain the runtime application name."
+      "text": [
+        "Describe mode validates and configures a lazy dependency container, runs only describers, writes only below its output directory, and never starts runtime plugins.",
+        "Build-triggered migration bundles use the authored project identity; programmatic describe calls retain the runtime application name."
+      ]
     },
     {
       "id": "phase-order",
@@ -30,23 +33,39 @@
     },
     {
       "id": "startup-failure",
-      "text": "Concurrent plugin start failures are aggregated before cleanup; a start timeout cancels sibling startup, waits a bounded interval for starters to drain, and avoids racing cleanup with a cooperative starter."
+      "text": [
+        "Concurrent plugin start failures are aggregated before cleanup;",
+        "a start timeout cancels sibling startup, waits a bounded interval for starters to drain, and avoids racing cleanup with a cooperative starter."
+      ]
     },
     {
       "id": "completed-startup-readiness",
-      "text": "Start notifies every StartupObserver plugin, then writes its ready record: a runtime-protocol workload readiness claim under the reserved putnami.ready key, with the endpoints every EndpointReporter plugin bound. Both happen only after every plugin Starter and every module OnStart hook returned without an error. A starter or hook that is still running delays both, and a failed or timed-out start does neither."
+      "text": [
+        "Start notifies every StartupObserver plugin, then writes its ready record: a runtime-protocol workload readiness claim under the reserved putnami.ready key, with the endpoints every EndpointReporter plugin bound.",
+        "Both happen only after every plugin Starter and every module OnStart hook returned without an error.",
+        "A starter or hook that is still running delays both, and a failed or timed-out start does neither."
+      ]
     },
     {
       "id": "darc-runtime-evidence",
-      "text": "A reference refuses a fact its import does not name, and a registered darc component contributes exactly one describe-owned capability row per import and mode, carrying the declared contract verbatim in deterministic bytes. The row is evidence and never authority: emitting it cannot create a cross-domain permission."
+      "text": [
+        "A reference refuses a fact its import does not name, and a registered darc component contributes exactly one describe-owned capability row per import and mode, carrying the declared contract verbatim in deterministic bytes.",
+        "The row is evidence and never authority: emitting it cannot create a cross-domain permission."
+      ]
     },
     {
       "id": "no-source-claim",
-      "text": "A scheduler stamp whose capability packages all carry sourceBindingUnavailable with an empty sourceBinding and a sourceRoot makes no source claim: describe emits the capability manifest bytes it emits for a bound stamp, writes no feature evidence, and removes stale scratch evidence. A marked package that carries a binding, a mix of marked and bound packages, an unmarked package without a valid binding, and a package without sourceRoot are refused."
+      "text": [
+        "A scheduler stamp whose capability packages all carry sourceBindingUnavailable with an empty sourceBinding and a sourceRoot makes no source claim: describe emits the capability manifest bytes it emits for a bound stamp, writes no feature evidence, and removes stale scratch evidence.",
+        "A marked package that carries a binding, a mix of marked and bound packages, an unmarked package without a valid binding, and a package without sourceRoot are refused."
+      ]
     },
     {
       "id": "default-plugins",
-      "text": "A plugin factory registered with RegisterDefaultPlugin adds its plugin to every application New creates afterwards, before any plugin the workload adds, and runs once per application. A factory that returns nil adds nothing, and a nil factory is ignored."
+      "text": [
+        "A plugin factory registered with RegisterDefaultPlugin adds its plugin to every application New creates afterwards, before any plugin the workload adds, and runs once per application.",
+        "A factory that returns nil adds nothing, and a nil factory is ignored."
+      ]
     }
   ],
   "decisions": [

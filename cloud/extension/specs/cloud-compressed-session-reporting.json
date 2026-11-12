@@ -13,11 +13,18 @@
   "requirements": [
     {
       "id": "gzip-only-after-an-advertising-answer",
-      "text": "The session reporter, on the ingest and on the local-sessions route, and the log reporter send a chunk with Content-Encoding: gzip only when the latest answer of the same destination carried Accept-Encoding: gzip with a nonzero weight. The first chunk to a destination, a chunk after an answer without that header, and a chunk after a request that got no answer go uncompressed."
+      "text": [
+        "The session reporter, on the ingest and on the local-sessions route, and the log reporter send a chunk with Content-Encoding: gzip only when the latest answer of the same destination carried Accept-Encoding: gzip with a nonzero weight.",
+        "The first chunk to a destination, a chunk after an answer without that header, and a chunk after a request that got no answer go uncompressed."
+      ]
     },
     {
       "id": "the-chunk-bytes-are-what-the-receiver-stores",
-      "text": "A gzip body decodes to the chunk's bytes. A chunk with no bytes, such as a final marker, and a chunk that gzip does not shrink go uncompressed. A resent sequence therefore compares equal whether it is compressed or not, and the log reporter's offset and SHA-256 headers describe the chunk's bytes."
+      "text": [
+        "A gzip body decodes to the chunk's bytes.",
+        "A chunk with no bytes, such as a final marker, and a chunk that gzip does not shrink go uncompressed.",
+        "A resent sequence therefore compares equal whether it is compressed or not, and the log reporter's offset and SHA-256 headers describe the chunk's bytes."
+      ]
     },
     {
       "id": "unadvertised-gzip-acceptance-fails-closed",

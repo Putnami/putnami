@@ -114,7 +114,7 @@ func TestRuleIsARequirementOfItsNameAndDescription(t *testing.T) {
 	if projection.Spec == nil {
 		t.Fatalf("findings = %v", projection.Findings)
 	}
-	got := []string{projection.Spec.Requirements[0].Text, projection.Spec.Requirements[1].Text}
+	got := []string{projection.Spec.Requirements[0].Text.String(), projection.Spec.Requirements[1].Text.String()}
 	if strings.Join(got, "|") != "Totals are exact: No rounding. Cents stay.|Bare" || gherkinRequirements(projection) != "totals-are-exact@2: bare@6:" {
 		t.Fatalf("got %q, %s", got, gherkinRequirements(projection))
 	}
@@ -124,7 +124,7 @@ func TestFeatureWithNoRuleIsItsOwnRequirement(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "gherkin-projection", "a-feature-with-no-rule-is-its-own-requirement")
 	projection := readGherkin(t, "Feature: Export\n  Exports run.\n  Scenario: One\n")
-	if got := gherkinRequirements(projection); got != "export@1:one@3" || projection.Spec.Requirements[0].Text != "Export" {
+	if got := gherkinRequirements(projection); got != "export@1:one@3" || projection.Spec.Requirements[0].Text.String() != "Export" {
 		t.Fatalf("got %s", got)
 	}
 	if got := gherkinRequirements(readGherkin(t, "Feature: F\n  Rule: R\n")); got != "r@2:" {

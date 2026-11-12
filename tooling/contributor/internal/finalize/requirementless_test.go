@@ -154,6 +154,7 @@ func TestAHostedDeliveryWithNoRequirementRefusesASpecEdit(t *testing.T) {
 	for name, extra := range map[string]map[string]string{
 		"cli/specs/export.json":     {"cli/specs/export.json": `{"protocolVersion":1}` + "\n"},
 		"cli/putnami.features.json": {"cli/putnami.features.json": `{"protocolVersion":2}` + "\n"},
+		"cli/features/export.json":  {"cli/features/export.json": `{"protocolVersion":2}` + "\n"},
 	} {
 		t.Run(name, func(t *testing.T) {
 			f, git, provider, opts := requirementlessFinalizer(t, extra)

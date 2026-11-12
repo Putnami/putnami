@@ -1,0 +1,34 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/deploy-environments",
+    "type": "feature",
+    "name": "Deploy environments",
+    "outcome": "A user synchronizes a declared environment on the release set its channel points at, with each workload receiving the exact members it owns",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "deploy-follows-the-environment-channel",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "env-channel-is-resolved-once",
+            "workload-rules-select-first-match",
+            "deploy-jobs-receive-the-members",
+            "one-deploy-task-carries-every-workload-it-covers",
+            "a-consumes-release-set-command-binds-the-environment",
+            "a-release-set-consumer-narrows-to-channel-members",
+            "release-set-flags-are-refused-without-a-consumer"
+          ]
+        }
+      }
+    ]
+  }
+}

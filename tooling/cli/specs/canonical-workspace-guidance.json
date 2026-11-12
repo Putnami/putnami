@@ -19,7 +19,10 @@
     },
     {
       "id": "a-bare-cache-runs-nothing",
-      "text": "putnami cache, putnami cli and putnami tree typed without a subcommand run none: each exits with a usage error that lists its subcommands, so typing putnami cache to discover them cannot wipe the shared cache store. The help of a built-in command root lists the subcommands the command catalog declares for it, each with the summary it declares and the default one marked."
+      "text": [
+        "putnami cache, putnami cli and putnami tree typed without a subcommand run none: each exits with a usage error that lists its subcommands, so typing putnami cache to discover them cannot wipe the shared cache store.",
+        "The help of a built-in command root lists the subcommands the command catalog declares for it, each with the summary it declares and the default one marked."
+      ]
     },
     {
       "id": "onboarding-path",

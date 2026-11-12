@@ -210,6 +210,22 @@
           }
         },
         {
+          "id": "one-file-per-feature",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-feature-document-stands-for-a-one-feature-manifest",
+              "a-feature-document-finding-names-its-feature",
+              "a-root-that-holds-both-forms-is-refused",
+              "requirement-text-is-a-string-or-an-array-of-sentences"
+            ]
+          }
+        },
+        {
           "id": "groups-name-the-feature-target",
           "stage": "coded",
           "evidenceKinds": [

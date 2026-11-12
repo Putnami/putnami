@@ -1,0 +1,99 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/channels",
+    "type": "feature",
+    "name": "Distribution channels",
+    "outcome": "A user moves the CLI, the extensions, and the framework dependencies onto a distribution channel through the registries the workspace declares, with the credential that channel needs",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "archives-follow-the-put-projection",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "archive-download-sends-the-credential",
+            "private-cli-pin-and-cold-launch-use-the-native-registry",
+            "pin-mints-its-credential-and-names-the-credential-command-on-refusal",
+            "branch-selector-is-gone"
+          ]
+        }
+      },
+      {
+        "id": "tagged-publish-is-a-cohort",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "cohort-selects-every-line-member",
+            "immutable-channel-is-requested",
+            "a-dirty-tree-is-refused"
+          ]
+        }
+      },
+      {
+        "id": "protected-channels",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "publish-refuses-a-protected-channel"
+          ]
+        }
+      },
+      {
+        "id": "visibility-is-carried-not-computed",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "chain-resolves-selectors-to-coordinates"
+          ]
+        }
+      },
+      {
+        "id": "project-declares-its-distribution-visibility",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "putnami-json-declares-the-member-level",
+            "publish-refuses-a-members-rule-that-disagrees"
+          ]
+        }
+      },
+      {
+        "id": "mirror-intent-follows-the-release",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "already-current-release-carries-mirror-intent"
+          ]
+        }
+      }
+    ]
+  }
+}

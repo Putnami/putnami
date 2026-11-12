@@ -17,7 +17,10 @@
   "requirements": [
     {
       "id": "deterministic-order",
-      "text": "Contributed kinds execute in lexicographic order and the registry aggregates per-kind results in that same order; per-kind execution order is the owning runner's, specified by go/sql-migration-execution."
+      "text": [
+        "Contributed kinds execute in lexicographic order and the registry aggregates per-kind results in that same order;",
+        "per-kind execution order is the owning runner's, specified by go/sql-migration-execution."
+      ]
     },
     {
       "id": "runner-ownership",

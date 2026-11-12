@@ -17,15 +17,25 @@
     },
     {
       "id": "vocabulary-default-traits",
-      "text": "A job's side effects are the traits its manifest declares, or its verb's default traits when it declares none. The model keeps no side-effect floor: a vocabulary that gives publish no side effect leaves it with none."
+      "text": [
+        "A job's side effects are the traits its manifest declares, or its verb's default traits when it declares none.",
+        "The model keeps no side-effect floor: a vocabulary that gives publish no side effect leaves it with none."
+      ]
     },
     {
       "id": "command-kinds-and-traits",
-      "text": "A job whose manifest declares no traits takes its verb's default traits whole, kind and workload included. Declared traits replace them wholesale: a command that declares traits without a kind or a workload has none, and one that declares its own keeps it."
+      "text": [
+        "A job whose manifest declares no traits takes its verb's default traits whole, kind and workload included.",
+        "Declared traits replace them wholesale: a command that declares traits without a kind or a workload has none, and one that declares its own keeps it."
+      ]
     },
     {
       "id": "declared-verification-producers",
-      "text": "A task produces the verification report when it belongs to a verification-kind command and declares a command-output file at the reserved filename, and the criteria projection when it belongs to a criteria-kind command and declares one. No command name decides. A stepless verification job also writes the report."
+      "text": [
+        "A task produces the verification report when it belongs to a verification-kind command and declares a command-output file at the reserved filename, and the criteria projection when it belongs to a criteria-kind command and declares one.",
+        "No command name decides.",
+        "A stepless verification job also writes the report."
+      ]
     }
   ]
 }

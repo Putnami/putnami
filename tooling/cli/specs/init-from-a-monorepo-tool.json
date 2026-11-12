@@ -19,31 +19,54 @@
   "requirements": [
     {
       "id": "init-from-pants",
-      "text": "putnami init --from pants, at the root of a repository that holds pants.toml, writes a workspace that declares @putnami/pants, installs it, and runs putnami projects sync, which writes each package's putnami.json through the extension's sync task and names by path two directories that share a name. Without pants.toml it fails with a usage error that names the file, and an unknown --from value fails with a usage error that lists the supported tools. --from does not combine with --project or --extension."
+      "text": [
+        "putnami init --from pants, at the root of a repository that holds pants.toml, writes a workspace that declares @putnami/pants, installs it, and runs putnami projects sync, which writes each package's putnami.json through the extension's sync task and names by path two directories that share a name.",
+        "Without pants.toml it fails with a usage error that names the file, and an unknown --from value fails with a usage error that lists the supported tools. --from does not combine with --project or --extension."
+      ]
     },
     {
       "id": "pants-impact-runs-through-pants",
-      "text": "On the Pants fixture of the putnami observe detector, with @putnami/pants and pants on PATH, projects sync writes each package's edges. putnami test --impacted runs pants test at the workspace root on each changed package and each package that depends on it, never on one it depends on; a requirements or lockfile change, wherever the file lies, runs the packages that use it. It reads their reports and neither looks up nor stores a Putnami cache entry."
+      "text": [
+        "On the Pants fixture of the putnami observe detector, with @putnami/pants and pants on PATH, projects sync writes each package's edges. putnami test --impacted runs pants test at the workspace root on each changed package and each package that depends on it, never on one it depends on;",
+        "a requirements or lockfile change, wherever the file lies, runs the packages that use it.",
+        "It reads their reports and neither looks up nor stores a Putnami cache entry."
+      ]
     },
     {
       "id": "init-from-bazel",
-      "text": "putnami init --from bazel, at the root of a repository that holds MODULE.bazel, WORKSPACE or WORKSPACE.bazel, writes a workspace that declares @putnami/bazel, installs it, and runs putnami projects sync, which writes each package's putnami.json through the extension's sync task. Without one of those files it fails with a usage error that names them."
+      "text": [
+        "putnami init --from bazel, at the root of a repository that holds MODULE.bazel, WORKSPACE or WORKSPACE.bazel, writes a workspace that declares @putnami/bazel, installs it, and runs putnami projects sync, which writes each package's putnami.json through the extension's sync task.",
+        "Without one of those files it fails with a usage error that names them."
+      ]
     },
     {
       "id": "bazel-impact-runs-through-bazel",
-      "text": "On the Bazel fixture of the putnami observe detector, with @putnami/bazel and bazel on PATH, projects sync writes each package's edges. putnami test --impacted runs bazel coverage at the workspace root on each changed package and each package that depends on it, never on one it depends on; a MODULE.bazel change runs every package. It reads their reports and neither looks up nor stores a Putnami cache entry."
+      "text": [
+        "On the Bazel fixture of the putnami observe detector, with @putnami/bazel and bazel on PATH, projects sync writes each package's edges. putnami test --impacted runs bazel coverage at the workspace root on each changed package and each package that depends on it, never on one it depends on;",
+        "a MODULE.bazel change runs every package.",
+        "It reads their reports and neither looks up nor stores a Putnami cache entry."
+      ]
     },
     {
       "id": "init-from-nx",
-      "text": "putnami init --from nx, at the root of a repository that holds nx.json, writes a workspace that declares @putnami/nx, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs putnami projects sync, which writes each Nx project's putnami.json through the extension's sync task. Without nx.json it fails with a usage error that names the file."
+      "text": [
+        "putnami init --from nx, at the root of a repository that holds nx.json, writes a workspace that declares @putnami/nx, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs putnami projects sync, which writes each Nx project's putnami.json through the extension's sync task.",
+        "Without nx.json it fails with a usage error that names the file."
+      ]
     },
     {
       "id": "init-asks-the-mode",
-      "text": "For a tool that offers both modes, putnami init --from <tool> asks import or delegate in a terminal, with import preselected, and imports without a terminal. --mode import|delegate skips the question; a value the tool does not offer, Pants offering delegate alone, fails with a usage error that lists its modes, and --mode without --from is a usage error."
+      "text": [
+        "For a tool that offers both modes, putnami init --from <tool> asks import or delegate in a terminal, with import preselected, and imports without a terminal. --mode import|delegate skips the question;",
+        "a value the tool does not offer, Pants offering delegate alone, fails with a usage error that lists its modes, and --mode without --from is a usage error."
+      ]
     },
     {
       "id": "init-rerun-shows-a-diff",
-      "text": "Rerun in a workspace that already exists, putnami init --from <tool> runs the workspace sync tasks as a dry run with the mode it resolves and the extensions --apply would declare, which each reads as declared, so it prints what --apply would change and the mode change, and writes nothing. With --apply it records the mode and runs putnami projects sync."
+      "text": [
+        "Rerun in a workspace that already exists, putnami init --from <tool> runs the workspace sync tasks as a dry run with the mode it resolves and the extensions --apply would declare, which each reads as declared, so it prints what --apply would change and the mode change, and writes nothing.",
+        "With --apply it records the mode and runs putnami projects sync."
+      ]
     },
     {
       "id": "init-leaving-import-removes-its-extensions",
@@ -55,7 +78,10 @@
     },
     {
       "id": "init-from-moon",
-      "text": "putnami init --from moon, at the root of a repository that holds .moon/workspace.yml, writes a workspace that declares @putnami/moon, records the mode in its options, installs it and runs putnami projects sync, which writes each moon project's putnami.json, then installs the language extensions the sync declared. Without .moon/workspace.yml it fails with a usage error naming the file."
+      "text": [
+        "putnami init --from moon, at the root of a repository that holds .moon/workspace.yml, writes a workspace that declares @putnami/moon, records the mode in its options, installs it and runs putnami projects sync, which writes each moon project's putnami.json, then installs the language extensions the sync declared.",
+        "Without .moon/workspace.yml it fails with a usage error naming the file."
+      ]
     },
     {
       "id": "moon-import-runs-the-language-extensions",
@@ -67,11 +93,17 @@
     },
     {
       "id": "init-from-turbo",
-      "text": "putnami init --from turbo, at the root of a repository that holds turbo.json, writes a workspace that declares @putnami/turbo, and @putnami/typescript in import mode, records the mode in options[\"@putnami/turbo\"].mode, installs the extensions, and runs putnami projects sync. Without turbo.json it fails with a usage error that names the file."
+      "text": [
+        "putnami init --from turbo, at the root of a repository that holds turbo.json, writes a workspace that declares @putnami/turbo, and @putnami/typescript in import mode, records the mode in options[\"@putnami/turbo\"].mode, installs the extensions, and runs putnami projects sync.",
+        "Without turbo.json it fails with a usage error that names the file."
+      ]
     },
     {
       "id": "turbo-delegate-impact",
-      "text": "On the Turborepo fixture of the putnami observe detector, after putnami init --from turbo --mode delegate --apply, a change to one package makes putnami test run turbo run test on that package and on each package that depends on it, never on one it depends on; it stores no Putnami cache entry and records delegatedTo turbo."
+      "text": [
+        "On the Turborepo fixture of the putnami observe detector, after putnami init --from turbo --mode delegate --apply, a change to one package makes putnami test run turbo run test on that package and on each package that depends on it, never on one it depends on;",
+        "it stores no Putnami cache entry and records delegatedTo turbo."
+      ]
     },
     {
       "id": "turbo-import-graph",
@@ -79,7 +111,11 @@
     },
     {
       "id": "init-import-adds-projects",
-      "text": "putnami init --from nx|turbo --import <path>,<path> in delegate mode adds each path not listed yet to options[\"@putnami/<tool>\"].import and declares @putnami/typescript. In a workspace that exists, it previews the change and the sync's dry run with that list, and writes only with --apply, which records it, installs the extensions and runs projects sync. A new workspace records it with the mode. --import with another tool, no path, or import mode is a usage error."
+      "text": [
+        "putnami init --from nx|turbo --import <path>,<path> in delegate mode adds each path not listed yet to options[\"@putnami/<tool>\"].import and declares @putnami/typescript.",
+        "In a workspace that exists, it previews the change and the sync's dry run with that list, and writes only with --apply, which records it, installs the extensions and runs projects sync.",
+        "A new workspace records it with the mode. --import with another tool, no path, or import mode is a usage error."
+      ]
     },
     {
       "id": "delegate-import-runs-one-project-on-putnami",
@@ -87,15 +123,25 @@
     },
     {
       "id": "init-from-rush",
-      "text": "putnami init --from rush, at the root of a repository that holds rush.json, declares @putnami/rush, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs projects sync, whose Rush sync task writes each Rush project's putnami.json. In import mode the TypeScript install writes the root package.json with the projects as workspaces. Without rush.json it is a usage error that names the file."
+      "text": [
+        "putnami init --from rush, at the root of a repository that holds rush.json, declares @putnami/rush, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs projects sync, whose Rush sync task writes each Rush project's putnami.json.",
+        "In import mode the TypeScript install writes the root package.json with the projects as workspaces.",
+        "Without rush.json it is a usage error that names the file."
+      ]
     },
     {
       "id": "rush-import-runs-through-putnami",
-      "text": "On the Rush fixture of the putnami observe detector, an import writes each Rush project as a TypeScript project whose dependencies are the edges putnami observe reads, keeps a script whose tool @putnami/typescript does not run on rushx and lists it, then putnami lint,test,build passes and no task runs rush. A command-line.json bulk command whose name is not build, test or lint appears as unmapped, and validate fails with rush.sync_stale once a script changes."
+      "text": [
+        "On the Rush fixture of the putnami observe detector, an import writes each Rush project as a TypeScript project whose dependencies are the edges putnami observe reads, keeps a script whose tool @putnami/typescript does not run on rushx and lists it, then putnami lint,test,build passes and no task runs rush.",
+        "A command-line.json bulk command whose name is not build, test or lint appears as unmapped, and validate fails with rush.sync_stale once a script changes."
+      ]
     },
     {
       "id": "rush-impact-runs-through-rush",
-      "text": "On the Rush fixture of the putnami observe detector, with @putnami/rush and rush on PATH, putnami init --from rush --mode delegate --apply writes each project's edges. After a change to one project, putnami build --impacted runs rush build --to <package> at the workspace root on that project and each project that depends on it, never on one it depends on, records delegatedTo rush, and neither looks up nor stores a Putnami cache entry."
+      "text": [
+        "On the Rush fixture of the putnami observe detector, with @putnami/rush and rush on PATH, putnami init --from rush --mode delegate --apply writes each project's edges.",
+        "After a change to one project, putnami build --impacted runs rush build --to <package> at the workspace root on that project and each project that depends on it, never on one it depends on, records delegatedTo rush, and neither looks up nor stores a Putnami cache entry."
+      ]
     }
   ],
   "decisions": [

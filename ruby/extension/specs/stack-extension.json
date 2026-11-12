@@ -27,15 +27,29 @@
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares ruby --version with .ruby-version or .tool-versions, in the component then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless check is warn. A bundle --version other than the BUNDLED WITH of Gemfile.lock warns with the same code, because the core checks before the install step that fixes it. Lint then runs bundle exec rubocop in the component; test runs from the stack root on the component's test directory."
+      "text": [
+        "Each task first compares ruby --version with .ruby-version or .tool-versions, in the component then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless check is warn.",
+        "A bundle --version other than the BUNDLED WITH of Gemfile.lock warns with the same code, because the core checks before the install step that fixes it.",
+        "Lint then runs bundle exec rubocop in the component; test runs from the stack root on the component's test directory."
+      ]
     },
     {
       "id": "test-runner-per-component",
-      "text": "The probe names each component's profile variant: rspec when it holds a spec/**/*_spec.rb file, which runs bundle exec rspec on its spec directory with the RspecJunitFormatter; minitest when it holds a test/**/*_test.rb file and no spec file, which runs bundle exec rails test on its test directory; untested when it holds no Ruby file under spec/ or test/, whose test runs nothing and passes; rspec otherwise. Such a file is a workspace input, so it changes the variant and the key."
+      "text": [
+        "The probe names each component's profile variant: rspec when it holds a spec/**/*_spec.rb file, which runs bundle exec rspec on its spec directory with the RspecJunitFormatter;",
+        "minitest when it holds a test/**/*_test.rb file and no spec file, which runs bundle exec rails test on its test directory;",
+        "untested when it holds no Ruby file under spec/ or test/, whose test runs nothing and passes;",
+        "rspec otherwise.",
+        "Such a file is a workspace input, so it changes the variant and the key."
+      ]
     },
     {
       "id": "reports-become-the-summary",
-      "text": "The test task reads its JUnit report and the SimpleCov Cobertura report at the stack root's coverage/coverage.xml. The coverage summary counts only the files under the component's directory outside a nested component; a covered file in no component is the warning stacks.coverage_unmapped. A failed case fails the task with stacks.test_failed, a missing JUnit report with stacks.report_missing, and a bundle with no SimpleCov warns with stacks.coverage_unavailable."
+      "text": [
+        "The test task reads its JUnit report and the SimpleCov Cobertura report at the stack root's coverage/coverage.xml.",
+        "The coverage summary counts only the files under the component's directory outside a nested component; a covered file in no component is the warning stacks.coverage_unmapped.",
+        "A failed case fails the task with stacks.test_failed, a missing JUnit report with stacks.report_missing, and a bundle with no SimpleCov warns with stacks.coverage_unavailable."
+      ]
     },
     {
       "id": "lint-reads-the-ruby-files",
@@ -43,7 +57,11 @@
     },
     {
       "id": "overrides-are-honored",
-      "text": "options[\"@putnami/ruby\"] in a component's own putnami.json overrides the profile after its variant: an object merges, null removes the member, and any other value replaces the profile's whole. The steps run and the files the ruby:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task. An unknown member fails the task with stacks.project_config_invalid."
+      "text": [
+        "options[\"@putnami/ruby\"] in a component's own putnami.json overrides the profile after its variant: an object merges, null removes the member, and any other value replaces the profile's whole.",
+        "The steps run and the files the ruby:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task.",
+        "An unknown member fails the task with stacks.project_config_invalid."
+      ]
     },
     {
       "id": "manifest-follows-the-profile",
@@ -51,11 +69,19 @@
     },
     {
       "id": "installs-its-bundle",
-      "text": "Before lint and test, the install step runs bundle check at the component's stack root with the selected Ruby, then bundle install when the bundle is incomplete or bundle --version is not the BUNDLED WITH of Gemfile.lock, one run per root at a time; bundle install then switches to the locked Bundler. Offline, it runs bundle install --local, from the gems on the machine and in the gem cache workspace-fetch fills, and a Bundler mismatch alone installs nothing."
+      "text": [
+        "Before lint and test, the install step runs bundle check at the component's stack root with the selected Ruby, then bundle install when the bundle is incomplete or bundle --version is not the BUNDLED WITH of Gemfile.lock, one run per root at a time;",
+        "bundle install then switches to the locked Bundler.",
+        "Offline, it runs bundle install --local, from the gems on the machine and in the gem cache workspace-fetch fills, and a Bundler mismatch alone installs nothing."
+      ]
     },
     {
       "id": "workspace-install-runs-bundler",
-      "text": "workspace-install runs bundle install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose bundle check passes with the Bundler its Gemfile.lock states, which the force flag installs again. A run with offline dependencies runs bundle install --local, which reads the gem cache workspace-fetch fills. With no Ruby it warns and passes."
+      "text": [
+        "workspace-install runs bundle install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose bundle check passes with the Bundler its Gemfile.lock states, which the force flag installs again.",
+        "A run with offline dependencies runs bundle install --local, which reads the gem cache workspace-fetch fills.",
+        "With no Ruby it warns and passes."
+      ]
     },
     {
       "id": "upgrades-the-dependencies",
@@ -63,43 +89,80 @@
     },
     {
       "id": "checks-documentation-links",
-      "text": "lint checks every relative link and anchor of the component's README.md files and doc/ trees, and a broken one fails it, unless the docs-links flag is false. The check needs neither Ruby nor Bundler."
+      "text": [
+        "lint checks every relative link and anchor of the component's README.md files and doc/ trees, and a broken one fails it, unless the docs-links flag is false.",
+        "The check needs neither Ruby nor Bundler."
+      ]
     },
     {
       "id": "filters-the-tests",
-      "text": "test with the test flag, short -t, passes its value to RSpec as -e and to rails test as -n with the value quoted as a regular expression, so a component in which it selects no test passes. The value is part of the task's key, so a filtered result never answers an unfiltered run."
+      "text": [
+        "test with the test flag, short -t, passes its value to RSpec as -e and to rails test as -n with the value quoted as a regular expression, so a component in which it selects no test passes.",
+        "The value is part of the task's key, so a filtered result never answers an unfiltered run."
+      ]
     },
     {
       "id": "pins-a-ruby-release",
-      "text": "When the workspace holds a Ruby component, toolchain-resolve answers ruby with a shipped release: a stable 3.2, 3.3, 3.4 or 4.0 patch of a fixed rv-ruby release, with an archive and a SHA-256 per platform. It picks among the releases every component accepts, else those the root accepts: a committed accepted pin, else the highest. With no Ruby component, no accepted release, or no archive for the platform, such as Windows, it answers no pin."
+      "text": [
+        "When the workspace holds a Ruby component, toolchain-resolve answers ruby with a shipped release: a stable 3.2, 3.3, 3.4 or 4.0 patch of a fixed rv-ruby release, with an archive and a SHA-256 per platform.",
+        "It picks among the releases every component accepts, else those the root accepts: a committed accepted pin, else the highest.",
+        "With no Ruby component, no accepted release, or no archive for the platform, such as Windows, it answers no pin."
+      ]
     },
     {
       "id": "machine-ruby-comes-first",
-      "text": "Each task runs the ruby on PATH when its version satisfies the stated version. When ruby is missing, or outside the statement, the task puts the Ruby the workspace lock pins first on PATH, so its bundle runs too, and repeats the check. A project whose toolchain.check is warn keeps the ruby on PATH. With no pinned Ruby installed, the check fails as it did before."
+      "text": [
+        "Each task runs the ruby on PATH when its version satisfies the stated version.",
+        "When ruby is missing, or outside the statement, the task puts the Ruby the workspace lock pins first on PATH, so its bundle runs too, and repeats the check.",
+        "A project whose toolchain.check is warn keeps the ruby on PATH.",
+        "With no pinned Ruby installed, the check fails as it did before."
+      ]
     },
     {
       "id": "fetches-the-locked-gems",
-      "text": "workspace-fetch runs bundle cache at each stack root with a Gemfile.lock, with no install, a frozen lockfile, a private install path and a private local configuration, so it downloads the locked gems into the extension's gem cache, runs none of their code and writes nothing in the repository. It never prunes the cache, which every root shares. A stack root with no Gemfile.lock is skipped. With no Ruby it warns and passes."
+      "text": [
+        "workspace-fetch runs bundle cache at each stack root with a Gemfile.lock, with no install, a frozen lockfile, a private install path and a private local configuration, so it downloads the locked gems into the extension's gem cache, runs none of their code and writes nothing in the repository.",
+        "It never prunes the cache, which every root shares.",
+        "A stack root with no Gemfile.lock is skipped.",
+        "With no Ruby it warns and passes."
+      ]
     },
     {
       "id": "serves-an-application",
-      "text": "serve runs bundle exec rails server -b 0.0.0.0 when the application holds bin/rails, else bundle exec rackup -o 0.0.0.0, with the words of --args and the port flag, default 3000 and 0 for a free port, in the directory of an application after the toolchain check and the install step, with PORT set, and emits a ready event once the server accepts connections. An application is a component whose directory holds config.ru; a library is skipped."
+      "text": [
+        "serve runs bundle exec rails server -b 0.0.0.0 when the application holds bin/rails, else bundle exec rackup -o 0.0.0.0, with the words of --args and the port flag, default 3000 and 0 for a free port, in the directory of an application after the toolchain check and the install step, with PORT set, and emits a ready event once the server accepts connections.",
+        "An application is a component whose directory holds config.ru; a library is skipped."
+      ]
     },
     {
       "id": "runs-an-application-once",
-      "text": "run executes bundle exec ruby with the entrypoint flag, default bin/rails, in the directory of an application after the toolchain check and the install step, passes it the words of the args flag, and exits with its exit code. A library is skipped."
+      "text": [
+        "run executes bundle exec ruby with the entrypoint flag, default bin/rails, in the directory of an application after the toolchain check and the install step, passes it the words of the args flag, and exits with its exit code.",
+        "A library is skipped."
+      ]
     },
     {
       "id": "packages-an-application-image",
-      "text": "package assembles an OCI image of an application without Docker: its production bundle under /usr/local/bundle, its files under /app without tests, run output or secrets, and tmp/ and log/ owned by its non-root user, on the digest-pinned ruby:<version>-slim-trixie of the host Ruby's minor or a named base, else ruby.base_not_pinned. It runs rails server or rackup in production on PORT, the port flag, 8080 by default. Packaging one tree twice gives the same image. A library packages nothing."
+      "text": [
+        "package assembles an OCI image of an application without Docker: its production bundle under /usr/local/bundle, its files under /app without tests, run output or secrets, and tmp/ and log/ owned by its non-root user, on the digest-pinned ruby:<version>-slim-trixie of the host Ruby's minor or a named base, else ruby.base_not_pinned.",
+        "It runs rails server or rackup in production on PORT, the port flag, 8080 by default.",
+        "Packaging one tree twice gives the same image.",
+        "A library packages nothing."
+      ]
     },
     {
       "id": "refuses-a-foreign-packaging-host",
-      "text": "package fails with ruby.package_host_mismatch, before it installs anything, when the packaging host is not a glibc Linux machine whose CPU is the architecture of the platform flag, default linux/amd64; the message names the host and the target and says to package on a Linux runner of the target architecture."
+      "text": [
+        "package fails with ruby.package_host_mismatch, before it installs anything, when the packaging host is not a glibc Linux machine whose CPU is the architecture of the platform flag, default linux/amd64;",
+        "the message names the host and the target and says to package on a Linux runner of the target architecture."
+      ]
     },
     {
       "id": "publishes-an-application-image",
-      "text": "publish with the docker channel pushes the packaged image to registries.oci.publish, or to the docker-registry flag, through the shared publisher, and reports it as a release-set member. A library publishes nothing."
+      "text": [
+        "publish with the docker channel pushes the packaged image to registries.oci.publish, or to the docker-registry flag, through the shared publisher, and reports it as a release-set member.",
+        "A library publishes nothing."
+      ]
     }
   ],
   "decisions": [

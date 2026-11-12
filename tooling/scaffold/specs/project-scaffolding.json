@@ -20,7 +20,10 @@
   "requirements": [
     {
       "id": "manifest-selects-the-template",
-      "text": "A project is packaged as a template only when it carries a putnami.template.json; a missing or unparseable manifest fails the job with a diagnostic instead of producing an archive. The archive is named and published under the manifest name encoded as the registry encodes it (@scope/name becomes scope-name), and a name that still is not one file name after encoding fails the job and writes nothing."
+      "text": [
+        "A project is packaged as a template only when it carries a putnami.template.json; a missing or unparseable manifest fails the job with a diagnostic instead of producing an archive.",
+        "The archive is named and published under the manifest name encoded as the registry encodes it (@scope/name becomes scope-name), and a name that still is not one file name after encoding fails the job and writes nothing."
+      ]
     },
     {
       "id": "resolved-version",
@@ -44,11 +47,18 @@
     },
     {
       "id": "content-only-extension-packaging",
-      "text": "A content-only extension is packaged by the SDK's extension package step into one platform-independent archive, written with identical bytes under every key of the SDK's distribution matrix as <encoded-name>-<os>-<arch>.tar.gz on the archives channel; a dry run writes nothing. An extension that runs something, or breaks its content policy, is refused and writes nothing."
+      "text": [
+        "A content-only extension is packaged by the SDK's extension package step into one platform-independent archive, written with identical bytes under every key of the SDK's distribution matrix as <encoded-name>-<os>-<arch>.tar.gz on the archives channel;",
+        "a dry run writes nothing.",
+        "An extension that runs something, or breaks its content policy, is refused and writes nothing."
+      ]
     },
     {
       "id": "shared-metadata-index",
-      "text": "Packaging records the template-archives channel inside the archives directory it owns, so a sibling packager's record in its own directory survives untouched and the derived index reports both. The task alone writes the archive publication manifest, stating its whole document."
+      "text": [
+        "Packaging records the template-archives channel inside the archives directory it owns, so a sibling packager's record in its own directory survives untouched and the derived index reports both.",
+        "The task alone writes the archive publication manifest, stating its whole document."
+      ]
     },
     {
       "id": "declared-output-ownership",

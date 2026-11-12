@@ -15,15 +15,28 @@
   "requirements": [
     {
       "id": "rush-projects-are-components",
-      "text": "A root rush.json, JSON with comments, makes a Rush monorepo. Each entry of its projects list is a component of source orchestrator and ecosystem node, its id its projectFolder, its name its packageName. An entry without a name, with a folder that is absolute, the root or outside the repository, or with a folder or name an earlier entry took, is a diagnostic and is left out. A rush.json that cannot be read or parsed is a warning and gives no component, so the other detectors answer."
+      "text": [
+        "A root rush.json, JSON with comments, makes a Rush monorepo.",
+        "Each entry of its projects list is a component of source orchestrator and ecosystem node, its id its projectFolder, its name its packageName.",
+        "An entry without a name, with a folder that is absolute, the root or outside the repository, or with a folder or name an earlier entry took, is a diagnostic and is left out.",
+        "A rush.json that cannot be read or parsed is a warning and gives no component, so the other detectors answer."
+      ]
     },
     {
       "id": "rush-project-edges",
-      "text": "A Rush project depends on another when one of the dependencies, devDependencies, optionalDependencies or peerDependencies of its package.json names that project with the workspace: protocol, an alias included, or with a version range that project's version satisfies. A dependency whose key the project lists in decoupledLocalDependencies or cyclicDependencyProjects is no edge. A package.json that cannot be read is a diagnostic: its project stays a component without edges."
+      "text": [
+        "A Rush project depends on another when one of the dependencies, devDependencies, optionalDependencies or peerDependencies of its package.json names that project with the workspace: protocol, an alias included, or with a version range that project's version satisfies.",
+        "A dependency whose key the project lists in decoupledLocalDependencies or cyclicDependencyProjects is no edge.",
+        "A package.json that cannot be read is a diagnostic: its project stays a component without edges."
+      ]
     },
     {
       "id": "rush-lockfiles",
-      "text": "The package manager rush.json names selects the lockfile: pnpmVersion common/config/rush/pnpm-lock.yaml, npmVersion common/config/rush/npm-shrinkwrap.json, yarnVersion common/config/rush/yarn.lock. In pnpm mode, each common/config/subspaces/<name>/pnpm-lock.yaml is a lockfile too. The existing pnpm, npm and yarn readers read them; Rush's temporary projects, named @rush-temp/, and file: or link: packages are no dependency."
+      "text": [
+        "The package manager rush.json names selects the lockfile: pnpmVersion common/config/rush/pnpm-lock.yaml, npmVersion common/config/rush/npm-shrinkwrap.json, yarnVersion common/config/rush/yarn.lock.",
+        "In pnpm mode, each common/config/subspaces/<name>/pnpm-lock.yaml is a lockfile too.",
+        "The existing pnpm, npm and yarn readers read them; Rush's temporary projects, named @rush-temp/, and file: or link: packages are no dependency."
+      ]
     },
     {
       "id": "rush-change-analysis",
