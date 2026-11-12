@@ -1,0 +1,289 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/init-from-a-monorepo-tool",
+    "type": "feature",
+    "name": "Initialize a workspace from a monorepo tool",
+    "outcome": "A team turns a repository its monorepo tool already describes into a Putnami workspace with one command, putnami init --from <tool>, and its packages become projects with their edges",
+    "owner": "tooling",
+    "target": "coded",
+    "requirements": [
+      {
+        "id": "init-from-pants",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-pants-declares-the-pants-extension-and-syncs-the-projects"
+          ]
+        }
+      },
+      {
+        "id": "pants-impact-runs-through-pants",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-change-to-one-pants-package-runs-it-and-its-dependents-through-pants-uncached"
+          ]
+        }
+      },
+      {
+        "id": "init-from-bazel",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-bazel-declares-the-bazel-extension-and-syncs-the-projects"
+          ]
+        }
+      },
+      {
+        "id": "bazel-impact-runs-through-bazel",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-change-to-one-bazel-package-runs-it-and-its-dependents-through-bazel-uncached"
+          ]
+        }
+      },
+      {
+        "id": "init-from-nx",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-nx-declares-the-nx-extension-records-the-mode-and-syncs"
+          ]
+        }
+      },
+      {
+        "id": "init-asks-the-mode",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-asks-the-mode-with-import-preselected"
+          ]
+        }
+      },
+      {
+        "id": "init-rerun-shows-a-diff",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-rerun-previews-and-writes-only-with-apply"
+          ]
+        }
+      },
+      {
+        "id": "init-leaving-import-removes-its-extensions",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-switch-to-delegate-removes-the-extensions-no-project-names"
+          ]
+        }
+      },
+      {
+        "id": "nx-impact-runs-through-nx",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-change-to-one-nx-project-runs-it-and-its-dependents-through-nx-uncached"
+          ]
+        }
+      },
+      {
+        "id": "init-from-moon",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-moon-declares-the-moon-extension-and-syncs-the-projects"
+          ]
+        }
+      },
+      {
+        "id": "moon-import-runs-the-language-extensions",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-moon-in-import-mode-maps-the-projects-and-passes-lint-test-build"
+          ]
+        }
+      },
+      {
+        "id": "moon-delegate-runs-through-moon",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-change-to-one-moon-project-runs-it-and-its-dependents-through-moon-uncached"
+          ]
+        }
+      },
+      {
+        "id": "init-from-turbo",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-turbo-declares-the-turbo-extension-and-records-the-mode"
+          ]
+        }
+      },
+      {
+        "id": "turbo-delegate-impact",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-change-to-one-turbo-package-runs-it-and-its-dependents-through-turbo-uncached"
+          ]
+        }
+      },
+      {
+        "id": "turbo-import-graph",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-imported-turborepo-maps-typescript-packages-and-lists-unmapped-tasks"
+          ]
+        }
+      },
+      {
+        "id": "only-listed-members-become-projects",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-directory-the-tool-does-not-list-becomes-no-project"
+          ]
+        }
+      },
+      {
+        "id": "init-import-adds-projects",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-import-adds-projects-to-the-list-and-previews-without-apply"
+          ]
+        }
+      },
+      {
+        "id": "delegate-import-runs-one-project-on-putnami",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-delegated-nx-workspace-imports-pricing-and-passes-lint-test-build",
+            "a-delegated-turborepo-imports-pricing-and-passes-lint-test-build"
+          ]
+        }
+      },
+      {
+        "id": "init-from-rush",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-from-rush-declares-the-extensions-of-the-mode-and-syncs-the-projects"
+          ]
+        }
+      },
+      {
+        "id": "rush-import-runs-through-putnami",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-imported-rush-repository-passes-lint-test-build-with-the-graph-observe-reads"
+          ]
+        }
+      },
+      {
+        "id": "rush-impact-runs-through-rush",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-change-to-one-rush-project-runs-rush-build-on-it-and-its-dependents-uncached"
+          ]
+        }
+      }
+    ]
+  }
+}

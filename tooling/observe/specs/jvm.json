@@ -19,35 +19,66 @@
   "requirements": [
     {
       "id": "gradle-projects-are-components",
-      "text": "A root settings.gradle.kts or settings.gradle makes a Gradle repository. Each project an include call names with string literals is a component of source workspace and ecosystem gradle, named by its project path: :libs:core is libs/core, unless the settings set its projectDir with file(\"dir\") or File(settingsDir or rootDir, \"dir\"). The root project is one only when the root holds src. An included project without its directory is the observe.gradle_project_missing warning."
+      "text": [
+        "A root settings.gradle.kts or settings.gradle makes a Gradle repository.",
+        "Each project an include call names with string literals is a component of source workspace and ecosystem gradle, named by its project path: :libs:core is libs/core, unless the settings set its projectDir with file(\"dir\") or File(settingsDir or rootDir, \"dir\").",
+        "The root project is one only when the root holds src.",
+        "An included project without its directory is the observe.gradle_project_missing warning."
+      ]
     },
     {
       "id": "gradle-project-edges",
-      "text": "In a project's build.gradle.kts or build.gradle, outside comments, each project(\":x\"), project(path: \":x\"), project(path = \":x\") or findProject(\":x\") reference, and each type-safe accessor projects.x, where projects.fooBar names :foo-bar and projects.libs.core names :libs:core, is an edge from the project to the project it names. A relative path is relative to the project. A reference to a project the settings do not include is no edge."
+      "text": [
+        "In a project's build.gradle.kts or build.gradle, outside comments, each project(\":x\"), project(path: \":x\"), project(path = \":x\") or findProject(\":x\") reference, and each type-safe accessor projects.x, where projects.fooBar names :foo-bar and projects.libs.core names :libs:core, is an edge from the project to the project it names.",
+        "A relative path is relative to the project.",
+        "A reference to a project the settings do not include is no edge."
+      ]
     },
     {
       "id": "gradle-dynamic-settings",
-      "text": "An include argument or a projectDir value that is not a string literal, such as a variable, a template, a loop or a function reference, is the observe.gradle_dynamic_settings warning naming the settings file, and the projects the settings name with literals stay components. The word include inside a string or a comment is no include."
+      "text": [
+        "An include argument or a projectDir value that is not a string literal, such as a variable, a template, a loop or a function reference, is the observe.gradle_dynamic_settings warning naming the settings file, and the projects the settings name with literals stay components.",
+        "The word include inside a string or a comment is no include."
+      ]
     },
     {
       "id": "maven-modules-are-components",
-      "text": "A root pom.xml makes a Maven repository. The modules or subprojects a POM lists, in the project and its profiles, are read recursively from the pom.xml of their directory or the POM file they name. Each POM whose packaging is not pom is a component of source workspace and ecosystem maven, named groupId:artifactId, the groupId inherited from its parent. A module without a POM or outside the repository is observe.maven_module_missing, a POM that does not parse observe.maven_pom_invalid."
+      "text": [
+        "A root pom.xml makes a Maven repository.",
+        "The modules or subprojects a POM lists, in the project and its profiles, are read recursively from the pom.xml of their directory or the POM file they name.",
+        "Each POM whose packaging is not pom is a component of source workspace and ecosystem maven, named groupId:artifactId, the groupId inherited from its parent.",
+        "A module without a POM or outside the repository is observe.maven_module_missing, a POM that does not parse observe.maven_pom_invalid."
+      ]
     },
     {
       "id": "maven-dependency-edges",
-      "text": "Each dependency of a component's POM, in the project or in its profiles, whose groupId and artifactId name another module of the repository is an edge to that module. ${project.groupId}, ${pom.groupId}, ${project.parent.groupId} and the POM's own properties are resolved first. A dependency of dependencyManagement or of a plugin is no edge."
+      "text": [
+        "Each dependency of a component's POM, in the project or in its profiles, whose groupId and artifactId name another module of the repository is an edge to that module. ${project.groupId}, ${pom.groupId}, ${project.parent.groupId} and the POM's own properties are resolved first.",
+        "A dependency of dependencyManagement or of a plugin is no edge."
+      ]
     },
     {
       "id": "jvm-report-placement",
-      "text": "A JUnit case whose class name, without its $ nested part, names a .java or .kt file under src/test/java, src/test/kotlin, src/androidTest/java or src/androidTest/kotlin of a component goes to that component, the report's own component first. A JaCoCo file, its package path and source file name, maps to the first component whose src/main/java or src/main/kotlin holds it, the report's own component first."
+      "text": [
+        "A JUnit case whose class name, without its $ nested part, names a .java or .kt file under src/test/java, src/test/kotlin, src/androidTest/java or src/androidTest/kotlin of a component goes to that component, the report's own component first.",
+        "A JaCoCo file, its package path and source file name, maps to the first component whose src/main/java or src/main/kotlin holds it, the report's own component first."
+      ]
     },
     {
       "id": "jvm-report-discovery",
-      "text": "Discovery recognizes a JaCoCo XML report by its report root and finds the reports Gradle, Android and Maven write: build/test-results, build/outputs/androidTest-results, build/reports/jacoco, target/surefire-reports, target/failsafe-reports and target/site/jacoco. It skips the build outputs that hold no report: build/intermediates, build/generated, build/tmp and build/kotlin, and target/classes, target/test-classes, target/generated-sources and target/generated-test-sources."
+      "text": [
+        "Discovery recognizes a JaCoCo XML report by its report root and finds the reports Gradle, Android and Maven write: build/test-results, build/outputs/androidTest-results, build/reports/jacoco, target/surefire-reports, target/failsafe-reports and target/site/jacoco.",
+        "It skips the build outputs that hold no report: build/intermediates, build/generated, build/tmp and build/kotlin, and target/classes, target/test-classes, target/generated-sources and target/generated-test-sources."
+      ]
     },
     {
       "id": "gradle-dependency-changes",
-      "text": "A gradle.lockfile or settings-gradle.lockfile gives each group:artifact:version line its group:artifact and version. A version catalog, a .versions.toml file in a gradle directory, gives each library its group:artifact and each plugin its id, at the version its entry, version.ref or rich version (strictly, require, prefer) states; an entry without one is no package. Both are dependency changes of ecosystem maven, and a maven package URL of an SBOM matches them by group:artifact."
+      "text": [
+        "A gradle.lockfile or settings-gradle.lockfile gives each group:artifact:version line its group:artifact and version.",
+        "A version catalog, a .versions.toml file in a gradle directory, gives each library its group:artifact and each plugin its id, at the version its entry, version.ref or rich version (strictly, require, prefer) states;",
+        "an entry without one is no package.",
+        "Both are dependency changes of ecosystem maven, and a maven package URL of an SBOM matches them by group:artifact."
+      ]
     },
     {
       "id": "gradle-change-analysis",

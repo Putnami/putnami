@@ -16,23 +16,42 @@
   "requirements": [
     {
       "id": "dart-packages-are-components",
-      "text": "Past node_modules, Pods, hidden directories and a build directory with no pubspec.yaml, each directory whose pubspec.yaml names a package is a component of ecosystem dart named by its pubspec. A member of any pubspec.yaml workspace list, or a package the root melos.yaml globs match less its ignore globs, is of source workspace, others of source manifest. A root pubspec.yaml that declares a workspace or sits beside melos.yaml is no component. An unreadable pubspec or melos.yaml is a diagnostic."
+      "text": [
+        "Past node_modules, Pods, hidden directories and a build directory with no pubspec.yaml, each directory whose pubspec.yaml names a package is a component of ecosystem dart named by its pubspec.",
+        "A member of any pubspec.yaml workspace list, or a package the root melos.yaml globs match less its ignore globs, is of source workspace, others of source manifest.",
+        "A root pubspec.yaml that declares a workspace or sits beside melos.yaml is no component.",
+        "An unreadable pubspec or melos.yaml is a diagnostic."
+      ]
     },
     {
       "id": "dart-package-edges",
-      "text": "A component depends on another when an entry of its dependencies, dev_dependencies or dependency_overrides gives a path that resolves to the other's directory, or, inside a pub workspace or a melos repository, when the entry names the other's package with no source of its own. A git, sdk or hosted source, a path outside the repository or to no component, and the component itself are no edge."
+      "text": [
+        "A component depends on another when an entry of its dependencies, dev_dependencies or dependency_overrides gives a path that resolves to the other's directory, or, inside a pub workspace or a melos repository, when the entry names the other's package with no source of its own.",
+        "A git, sdk or hosted source, a path outside the repository or to no component, and the component itself are no edge."
+      ]
     },
     {
       "id": "pub-lockfile",
-      "text": "pubspec.lock is a lockfile of ecosystem pub: each entry of its packages gives its name and version, and an entry of source path or sdk is the repository's own code or the SDK's and is no dependency. A lockfile that does not read is the observe.lockfile_unreadable warning. In a pub workspace the root pubspec.lock pins the packages of every member; it lies in no component, and its change names none."
+      "text": [
+        "pubspec.lock is a lockfile of ecosystem pub: each entry of its packages gives its name and version, and an entry of source path or sdk is the repository's own code or the SDK's and is no dependency.",
+        "A lockfile that does not read is the observe.lockfile_unreadable warning.",
+        "In a pub workspace the root pubspec.lock pins the packages of every member; it lies in no component, and its change names none."
+      ]
     },
     {
       "id": "dart-package-reports",
-      "text": "The paths of an LCOV report under a package, such as the coverage/lcov.info flutter test --coverage writes, read first from that package's directory. A JUnit case of a tojunit report, whose class name is its test file's path without _test.dart with each / written as a ., goes to the package that holds that file, else to the package that holds the report."
+      "text": [
+        "The paths of an LCOV report under a package, such as the coverage/lcov.info flutter test --coverage writes, read first from that package's directory.",
+        "A JUnit case of a tojunit report, whose class name is its test file's path without _test.dart with each / written as a ., goes to the package that holds that file, else to the package that holds the report."
+      ]
     },
     {
       "id": "dart-change-analysis",
-      "text": "On a melos repository with apps/mobile, a Flutter app that depends on packages/pricing through a path, and packages/ui, where a change edits pricing and bumps a package in pubspec.lock, the analyses list the three packages with the edge to pricing, mark mobile dependent and ui unaffected; the coverage/lcov.info of each package and the tojunit report land on the packages, with no unattributed case and no unmapped file; and the bump is a pub dependency change."
+      "text": [
+        "On a melos repository with apps/mobile, a Flutter app that depends on packages/pricing through a path, and packages/ui, where a change edits pricing and bumps a package in pubspec.lock, the analyses list the three packages with the edge to pricing, mark mobile dependent and ui unaffected;",
+        "the coverage/lcov.info of each package and the tojunit report land on the packages, with no unattributed case and no unmapped file;",
+        "and the bump is a pub dependency change."
+      ]
     }
   ],
   "decisions": [

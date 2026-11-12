@@ -1,0 +1,128 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/portable-runner",
+    "type": "feature",
+    "name": "Portable runner",
+    "outcome": "A user can run an ordinary verification command locally or through an optional runner provider by changing one placement option, and receives the same canonical session either way",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "optional-placement",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "absent-provider-runs-once-locally"
+          ]
+        }
+      },
+      {
+        "id": "immutable-source",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "captured-worktree-bytes-survive-later-edits"
+          ]
+        }
+      },
+      {
+        "id": "portable-request",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "unsupported-shapes-rejected-before-submission",
+            "unready-provider-is-an-error-not-a-fallback",
+            "executing-engine-refuses-divergent-plan",
+            "a-workload-or-rewriting-command-is-refused-before-submission"
+          ]
+        }
+      },
+      {
+        "id": "commit-request",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "commit-request-plans-and-runs-the-checkout",
+            "commit-request-refuses-another-checkout",
+            "the-executing-engine-refuses-a-workload-or-rewriting-command"
+          ]
+        }
+      },
+      {
+        "id": "isolated-execution",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "dirty-snapshot-executes-remotely-and-imports",
+            "remote-failure-keeps-exit-code-and-message",
+            "impacted-selection-frozen",
+            "edit-after-submit-has-no-effect"
+          ]
+        }
+      },
+      {
+        "id": "durable-lifecycle",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "lost-acknowledgement-resolves-by-key",
+            "duplicate-submit-is-one-attempt",
+            "cli-restart-resumes-by-reference",
+            "stream-disconnect-replays-from-cursor",
+            "interrupt-cancels-and-cleans-up",
+            "expired-artifacts-surfaced-not-rerun",
+            "corrupt-import-keeps-remote-verdict",
+            "nested-sessions-accounted-once",
+            "sessions-list-finds-judged-revision",
+            "provider-exit-is-seen-while-a-child-holds-output"
+          ]
+        }
+      },
+      {
+        "id": "input-admission",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "required-ignored-input-is-bound",
+            "capture-binds-only-ignored-paths",
+            "env-keyed-task-refused-before-submission",
+            "executing-engine-refuses-divergent-bound-set",
+            "second-snapshot-transfers-only-changed-blobs",
+            "undeclared-fallback-inputs-are-reported-not-bound"
+          ]
+        }
+      }
+    ]
+  }
+}

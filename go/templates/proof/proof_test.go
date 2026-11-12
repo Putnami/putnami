@@ -286,14 +286,15 @@ func TestEveryGoTemplateDeclaresTheChecksThisProofObserves(t *testing.T) {
 
 // TestARenderLeavesOutWhatTheArchiveLeavesOut pins the render rule that keeps a
 // template's own declarations out of the project created from it: the rendered
-// project holds no putnami.features.json, specs/ or specs.baseline.json, and
+// project holds no putnami.features.json, features/, specs/ or
+// specs.baseline.json, and
 // its putnami.json is the one putnami.json.template renders.
 func TestARenderLeavesOutWhatTheArchiveLeavesOut(t *testing.T) {
 	for _, tpl := range discoverTemplates(t, filepath.Dir(workingDirectory(t))) {
 		vars := testVars(tpl)
 		project := filepath.Join(t.TempDir(), vars.projectPath)
 		renderTemplate(t, tpl.dir, project, vars)
-		for _, name := range []string{"putnami.features.json", "specs", "specs.baseline.json"} {
+		for _, name := range []string{"putnami.features.json", "features", "specs", "specs.baseline.json"} {
 			if _, err := os.Stat(filepath.Join(project, name)); !errors.Is(err, fs.ErrNotExist) {
 				t.Errorf("the rendered %s holds %s, which the archive leaves out (%v)", tpl.name, name, err)
 			}

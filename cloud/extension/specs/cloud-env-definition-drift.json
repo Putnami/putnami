@@ -23,7 +23,11 @@
     },
     {
       "id": "status-names-enable-for-an-omitted-workload",
-      "text": "putnami cloud env status reads the accepted definition's workloads from Control's channel-follow answer and prints a workload that putnami.ci.json declares and that definition omits as degraded, with the fix putnami cloud env enable <env>, unless the workload is already failing. Control accepts the definition from the default-branch head, so the fix takes effect once the declaration is on the default branch. When Control does not report the workloads, the command does not judge them."
+      "text": [
+        "putnami cloud env status reads the accepted definition's workloads from Control's channel-follow answer and prints a workload that putnami.ci.json declares and that definition omits as degraded, with the fix putnami cloud env enable <env>, unless the workload is already failing.",
+        "Control accepts the definition from the default-branch head, so the fix takes effect once the declaration is on the default branch.",
+        "When Control does not report the workloads, the command does not judge them."
+      ]
     }
   ]
 }

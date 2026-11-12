@@ -41,7 +41,7 @@ func discoverExternalSpecs(ws *workspace.Workspace, scope *Scope, manifests []fe
 				continue
 			}
 			selected := scope.SeedRoot(root) || scope.SelectedFeature(feature.ID)
-			field := fmt.Sprintf("%s#features[%d].spec", source.Path, index)
+			field := source.Path + "#" + source.Field(fmt.Sprintf("features[%d].spec", index))
 			report := func(findings ...diag.Diagnostic) {
 				if selected {
 					result.diagnostics = append(result.diagnostics, findings...)

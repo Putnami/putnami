@@ -1,0 +1,52 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-feature.json",
+  "title": "Putnami authored feature document",
+  "$comment": "One feature of a root that holds features/<feature>.json instead of putnami.features.json. The reader merges every document of the directory into one manifest. The filename takes no part in identity; name it after the local part of the feature id.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "namespace", "feature"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "protocolVersion": {
+      "$comment": "The manifest versions. Readers require an exact JSON integer token, 1, 2 or 3; 1.0 and 1e0 are invalid. Only version 2 or later may carry a requirement verification criterion or a feature surface. Only version 3 may carry an external spec reference.",
+      "type": "integer",
+      "enum": [1, 2, 3]
+    },
+    "namespace": { "$ref": "putnami-features.json#/$defs/segmentID" },
+    "feature": { "$ref": "putnami-features.json#/$defs/feature" }
+  },
+  "allOf": [
+    {
+      "$comment": "A version 1 or 2 document cannot carry the version 3 external spec reference.",
+      "if": {
+        "required": ["protocolVersion"],
+        "properties": { "protocolVersion": { "enum": [1, 2] } }
+      },
+      "then": {
+        "properties": {
+          "feature": { "not": { "required": ["spec"] } }
+        }
+      }
+    },
+    {
+      "$comment": "A version 1 document cannot carry the version 2 verification criterion or feature surface.",
+      "if": {
+        "required": ["protocolVersion"],
+        "properties": { "protocolVersion": { "const": 1 } }
+      },
+      "then": {
+        "properties": {
+          "feature": {
+            "not": { "required": ["surface"] },
+            "properties": {
+              "requirements": {
+                "items": { "not": { "required": ["verification"] } }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

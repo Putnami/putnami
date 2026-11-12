@@ -71,7 +71,8 @@ func addSubcommandPaths(into map[string]bool, prefix string, subcommands map[str
 
 // resolveFeatureSurfaces checks every command path a feature
 // lists against the extension manifest that sits at the same project root as
-// the declaring putnami.features.json, and nothing else. A root without an
+// the declaring putnami.features.json or features/ directory, and nothing
+// else. A root without an
 // extension manifest is not resolved: it serves no extension surface this
 // check can read. No other extension, lock or installed state is consulted, so
 // the verdict is a function of the worktree and holds in every installation.
@@ -109,7 +110,7 @@ func resolveFeatureSurfaces(reader Reader, manifests []featureproto.ManifestSour
 			if feature.Surface == nil {
 				continue
 			}
-			field := source.Path + "#" + "features[" + strconv.Itoa(index) + "]" + ".surface"
+			field := source.Path + "#" + source.Field("features["+strconv.Itoa(index)+"].surface")
 			diagnostics = append(diagnostics, unservedNames(field+".commands", "command", feature.Surface.Commands, served.commands, manifestPath)...)
 		}
 	}

@@ -1,0 +1,161 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/windows-consumers",
+    "type": "feature",
+    "name": "Windows consumer install and golden path",
+    "outcome": "A user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with one PowerShell line that verifies what it downloads and needs no administrator rights, then initializes and serves the TypeScript starter as on macOS and Linux, with every Windows prerequisite named where it is missing",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "powershell-installer-trust",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-download-is-verified-before-it-is-used",
+            "the-installer-never-elevates"
+          ]
+        }
+      },
+      {
+        "id": "windows-shells-get-the-powershell-installer",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "install-sh-sends-a-windows-shell-to-install-ps1"
+          ]
+        }
+      },
+      {
+        "id": "one-binary-switch-on-windows",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-installer-follows-the-switch-contract",
+            "a-running-cli-is-replaced-by-a-rename-aside",
+            "a-failed-move-in-restores-the-old-binary",
+            "a-failed-restore-names-the-kept-binary",
+            "the-installer-keeps-the-old-binary-when-a-restore-fails"
+          ]
+        }
+      },
+      {
+        "id": "windows-executables-by-name",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "pin-records-windows-amd64-from-any-host",
+            "pin-reads-the-windows-archive-executable",
+            "an-installed-runtime-resolves-under-its-exe-name",
+            "an-unsuffixed-runtime-is-named-not-run"
+          ]
+        }
+      },
+      {
+        "id": "lf-checkout-policy",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-writes-the-lf-policy",
+            "init-keeps-an-existing-gitattributes",
+            "doctor-names-crlf-files-with-the-fix"
+          ]
+        }
+      },
+      {
+        "id": "windows-release-smoke",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-windows-smoke-runs-the-public-commands",
+            "the-windows-smoke-runs-the-one-liner-as-script-text",
+            "the-windows-smoke-takes-the-inputs-of-the-shell-smoke",
+            "the-windows-smoke-runs-in-a-neutral-environment",
+            "the-windows-smoke-names-prerequisites-before-any-request",
+            "the-windows-smoke-fails-under-the-legs-of-the-shell-smoke",
+            "the-windows-smoke-stops-the-server-with-ctrl-break"
+          ]
+        }
+      },
+      {
+        "id": "windows-prerequisites-are-named",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "doctor-names-each-long-path-setting-with-its-fix",
+            "doctor-names-a-missing-visual-cpp-runtime-with-its-fix",
+            "a-missing-sh-names-git-for-windows"
+          ]
+        }
+      },
+      {
+        "id": "providers-run-the-prepared-runtime",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-cache-provider-launches-the-prepared-runtime",
+            "an-unprepared-cache-provider-runtime-builds-locally-with-a-notice",
+            "a-runner-provider-launches-the-prepared-runtime"
+          ]
+        }
+      },
+      {
+        "id": "powershell-installer-run-form",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-site-bakes-one-line-of-install-ps1",
+            "the-run-form-holds-the-rules-of-install-sh",
+            "the-run-form-resolves-before-installing",
+            "the-run-form-refuses-before-installing",
+            "the-run-form-pins-like-install-sh",
+            "a-failed-pin-does-not-run-the-command",
+            "the-run-form-runs-the-command-in-the-callers-directory",
+            "the-run-form-ends-with-the-commands-status",
+            "the-run-form-exits-only-from-a-file",
+            "the-docs-give-the-tested-windows-run-forms"
+          ]
+        }
+      }
+    ]
+  }
+}

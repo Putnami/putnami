@@ -43,7 +43,7 @@ type SpecGap struct {
 const (
 	specGapDerivedStep  = "delete the section: Putnami derives this fact, and a native spec has no place for it"
 	specGapLinkStep     = "record the decision in a doc/adr/*.md file and link that file; any other link stays context, and a native spec drops it from its decisions"
-	specGapScenarioStep = "write an anchor that names the check above the scenario, or change verification.checks in putnami.features.json"
+	specGapScenarioStep = "write an anchor that names the check above the scenario, or change verification.checks in the feature declaration"
 )
 
 // SpecNativeGaps lists what a native rewrite of feature's external spec adds,
@@ -120,7 +120,7 @@ func specContextLinkGaps(projection SpecProjection, reference SpecReference) []S
 		texts = append(texts, located{text, at(projection.nonGoalPositions, i)})
 	}
 	for i, requirement := range projection.Spec.Requirements {
-		texts = append(texts, located{requirement.Text, &projection.Requirements[i].Position})
+		texts = append(texts, located{requirement.Text.String(), &projection.Requirements[i].Position})
 	}
 	var gaps []SpecGap
 	seen := make(map[string]bool)

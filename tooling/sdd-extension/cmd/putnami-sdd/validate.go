@@ -56,9 +56,10 @@ func runFeaturesValidate(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (st
 // runSpecsValidate is the second step: the specs that detail those features,
 // their decision links, and the completeness gaps around them.
 //
-// Its declared inputs are the project's own putnami.features.json and its
-// direct specs/*.json children — exactly the documents this evaluation reads,
-// which is what makes it cacheable at all. The narrowing that follows is stated
+// Its declared inputs are the project's own authored features, in
+// putnami.features.json or features/*.json, and its direct specs/*.json
+// children — exactly the documents this evaluation reads, which is what makes
+// it cacheable at all. The narrowing that follows is stated
 // rather than hidden: a workspace-wide question ("is this feature id declared
 // twice ANYWHERE?") is not this task's to answer, because answering it would
 // mean reading every project's manifest under a key that names one project's

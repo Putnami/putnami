@@ -16,23 +16,43 @@
   "requirements": [
     {
       "id": "dotnet-projects-are-components",
-      "text": "Each .csproj, .fsproj or .vbproj a .sln or .slnx at the root lists is a component of source workspace; each other one, walking past .git, bin, obj, node_modules, packages, TestResults and hidden directories, of source manifest. Its id is the project file's directory, its name the file name without extension, its ecosystem dotnet; the first project file in name order names a directory. A solution folder makes no component; a solution that does not parse, or lists a missing project file, is a warning."
+      "text": [
+        "Each .csproj, .fsproj or .vbproj a .sln or .slnx at the root lists is a component of source workspace;",
+        "each other one, walking past .git, bin, obj, node_modules, packages, TestResults and hidden directories, of source manifest.",
+        "Its id is the project file's directory, its name the file name without extension, its ecosystem dotnet; the first project file in name order names a directory.",
+        "A solution folder makes no component; a solution that does not parse, or lists a missing project file, is a warning."
+      ]
     },
     {
       "id": "dotnet-project-references",
-      "text": "A component depends on another when one of its project files holds a ProjectReference whose Include path, relative to the project file's directory with \\ or / separators, names a project file in the other component's directory. A reference that holds an MSBuild property, that leaves the repository or names no component, and one to the component itself, is no edge."
+      "text": [
+        "A component depends on another when one of its project files holds a ProjectReference whose Include path, relative to the project file's directory with \\ or / separators, names a project file in the other component's directory.",
+        "A reference that holds an MSBuild property, that leaves the repository or names no component, and one to the component itself, is no edge."
+      ]
     },
     {
       "id": "dotnet-test-assemblies",
-      "text": "A test case of a TRX or JUnit report whose file and class name name no repository file goes to the project of the test assembly its suite names: the suite name's last path segment ends in .dll or .exe, and without that extension equals the AssemblyName the project file states literally, else the project file name without its extension. A TRX report is found by its TestRun root, under any file name ending in .trx, and --junit names one too."
+      "text": [
+        "A test case of a TRX or JUnit report whose file and class name name no repository file goes to the project of the test assembly its suite names: the suite name's last path segment ends in .dll or .exe, and without that extension equals the AssemblyName the project file states literally, else the project file name without its extension.",
+        "A TRX report is found by its TestRun root, under any file name ending in .trx, and --junit names one too."
+      ]
     },
     {
       "id": "dotnet-lockfiles",
-      "text": "Each packages.lock.json is a lockfile of ecosystem nuget: each package each target framework of its dependencies resolves, direct, transitive or central, at its resolved version; a Project entry is the repository's own code and is left out. In a repository whose head holds no packages.lock.json, each Directory.Packages.props is one too: each PackageVersion item with a literal Include and Version. A file that does not parse is the observe.lockfile_unreadable warning of the change analyses."
+      "text": [
+        "Each packages.lock.json is a lockfile of ecosystem nuget: each package each target framework of its dependencies resolves, direct, transitive or central, at its resolved version;",
+        "a Project entry is the repository's own code and is left out.",
+        "In a repository whose head holds no packages.lock.json, each Directory.Packages.props is one too: each PackageVersion item with a literal Include and Version.",
+        "A file that does not parse is the observe.lockfile_unreadable warning of the change analyses."
+      ]
     },
     {
       "id": "dotnet-change-analysis",
-      "text": "On a solution whose Api and Worker reference Pricing, with Pricing.Tests and a tools project outside it, where a change edits Pricing and bumps a package only the tools project uses, the analyses list the five projects with the edges to Pricing and mark Api, Worker and Pricing.Tests dependent; the TRX and Coverlet Cobertura reports under TestResults land on Pricing.Tests and Pricing, with no unattributed case and no unmapped file; and the bump is a nuget change of the tools project's lock file."
+      "text": [
+        "On a solution whose Api and Worker reference Pricing, with Pricing.Tests and a tools project outside it, where a change edits Pricing and bumps a package only the tools project uses, the analyses list the five projects with the edges to Pricing and mark Api, Worker and Pricing.Tests dependent;",
+        "the TRX and Coverlet Cobertura reports under TestResults land on Pricing.Tests and Pricing, with no unattributed case and no unmapped file;",
+        "and the bump is a nuget change of the tools project's lock file."
+      ]
     }
   ],
   "decisions": [

@@ -30,7 +30,10 @@
     },
     {
       "id": "orphan-sources-fail",
-      "text": "Sources contributed for a kind with no registered runner fail explicit apply, status, and verify with an `UnknownKindError` naming the contributing namespaces. Only the automatic start-up apply opts into tolerating them."
+      "text": [
+        "Sources contributed for a kind with no registered runner fail explicit apply, status, and verify with an `UnknownKindError` naming the contributing namespaces.",
+        "Only the automatic start-up apply opts into tolerating them."
+      ]
     },
     {
       "id": "deterministic-kind-order",
@@ -49,5 +52,7 @@
       "text": "Reading the sources for a kind returns a copy, so a caller cannot mutate the registry's contribution list by holding the result."
     }
   ],
-  "decisions": ["typescript/framework/migration/doc/adr/0001-kinds-are-contracts-not-backends.md"]
+  "decisions": [
+    "typescript/framework/migration/doc/adr/0001-kinds-are-contracts-not-backends.md"
+  ]
 }

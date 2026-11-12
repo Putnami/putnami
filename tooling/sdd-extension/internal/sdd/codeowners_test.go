@@ -79,13 +79,14 @@ func TestCodeownersFileFollowsTheDeclarations(t *testing.T) {
 ` + codeownersGovernanceComment + `**/specs.baseline.json @lead
 **/specs/*.json @lead
 **/putnami.features.json @lead
+**/features/*.json @lead
 /putnami.workspace.json @lead
 `
 	if got := readCodeowners(t, root); got != want {
 		t.Fatalf("CODEOWNERS =\n%s\nwant\n%s", got, want)
 	}
-	if len(report.Rules) != 7 || report.Rules[1].Source != "go/putnami.json" {
-		t.Fatalf("rules = %+v, want 7 rules with the scope rule sourced from go/putnami.json", report.Rules)
+	if len(report.Rules) != 8 || report.Rules[1].Source != "go/putnami.json" {
+		t.Fatalf("rules = %+v, want 8 rules with the scope rule sourced from go/putnami.json", report.Rules)
 	}
 }
 

@@ -20,7 +20,10 @@
     },
     {
       "id": "credential-validation",
-      "text": "JWT and JWKS identities require valid signatures and configured expiry, issuer, and audience policy; opaque-token introspection is bounded and inactive, failed, or mismatched results do not produce an identity."
+      "text": [
+        "JWT and JWKS identities require valid signatures and configured expiry, issuer, and audience policy;",
+        "opaque-token introspection is bounded and inactive, failed, or mismatched results do not produce an identity."
+      ]
     },
     {
       "id": "fail-closed-configuration",
@@ -28,7 +31,11 @@
     },
     {
       "id": "optional-authentication",
-      "text": "A rule declares Optional to serve a request that presents no credential: no resolved identity and an absent or empty Authorization header. An authenticated caller is authorized exactly as by a required rule, a request whose non-empty Authorization header resolved no identity returns 401, and a rule that does not declare Optional requires authentication. The rule reports the choice through phttp.SecurityOptionalAuthentication, the only claim that lets a first-party contract offer an anonymous alternative."
+      "text": [
+        "A rule declares Optional to serve a request that presents no credential: no resolved identity and an absent or empty Authorization header.",
+        "An authenticated caller is authorized exactly as by a required rule, a request whose non-empty Authorization header resolved no identity returns 401, and a rule that does not declare Optional requires authentication.",
+        "The rule reports the choice through phttp.SecurityOptionalAuthentication, the only claim that lets a first-party contract offer an anonymous alternative."
+      ]
     },
     {
       "id": "jwks-overlap-and-revocation",

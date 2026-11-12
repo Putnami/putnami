@@ -39,7 +39,10 @@
     },
     {
       "id": "upload-constraints",
-      "text": "A bucket's declared maximum size and allowed MIME types are enforced on upload, including for a streamed body, which is rejected while streaming once it exceeds the limit rather than after being buffered. A signed upload URL is refused unless its content type is on the bucket's MIME allowlist."
+      "text": [
+        "A bucket's declared maximum size and allowed MIME types are enforced on upload, including for a streamed body, which is rejected while streaming once it exceeds the limit rather than after being buffered.",
+        "A signed upload URL is refused unless its content type is on the bucket's MIME allowlist."
+      ]
     },
     {
       "id": "error-body-not-serialized",
@@ -58,5 +61,7 @@
       "text": "Backends are shared between the clients that resolve them and are closed only when the last managed client is removed, so one client's shutdown does not break another's."
     }
   ],
-  "decisions": ["typescript/framework/storage/doc/adr/0001-one-bucket-contract-across-backends.md"]
+  "decisions": [
+    "typescript/framework/storage/doc/adr/0001-one-bucket-contract-across-backends.md"
+  ]
 }

@@ -18,6 +18,7 @@ func TestIsTemplateRootPackagingExclusion(t *testing.T) {
 		{name: "node_modules", want: true},
 		{name: "putnami.json", want: true},
 		{name: "putnami.features.json", want: true},
+		{name: "features", want: true},
 		{name: "specs", want: true},
 		{name: "specs.baseline.json", want: true},
 		{name: ".gitignore", want: true},

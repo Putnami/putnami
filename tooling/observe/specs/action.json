@@ -16,7 +16,12 @@
   "requirements": [
     {
       "id": "action-installs-the-cli",
-      "text": "The action runs one bash step on a Linux or macOS runner. It installs the Putnami CLI with https://putnami.dev/install.sh, puts ~/.putnami/bin on the PATH, and installs @putnami/observe in the user scope, all from the channel input, stable when empty, which reads latest as putnami upgrade reads it; it installs @putnami/cloud too when the token input is set. On a Windows runner the step fails with a message that names Linux and macOS, and installs nothing."
+      "text": [
+        "The action runs one bash step on a Linux or macOS runner.",
+        "It installs the Putnami CLI with https://putnami.dev/install.sh, puts ~/.putnami/bin on the PATH, and installs @putnami/observe in the user scope, all from the channel input, stable when empty, which reads latest as putnami upgrade reads it;",
+        "it installs @putnami/cloud too when the token input is set.",
+        "On a Windows runner the step fails with a message that names Linux and macOS, and installs nothing."
+      ]
     },
     {
       "id": "action-channel-is-a-channel",
@@ -24,23 +29,40 @@
     },
     {
       "id": "action-maps-inputs-to-flags",
-      "text": "The step runs putnami observe with --evidence at a file under RUNNER_TEMP and gives that path as the evidence output. Each of the junit, coverage, sbom, base-sbom and base inputs that is not empty becomes the flag of the same name with its value; an empty input passes no flag. The action checks out nothing and sets no fetch depth."
+      "text": [
+        "The step runs putnami observe with --evidence at a file under RUNNER_TEMP and gives that path as the evidence output.",
+        "Each of the junit, coverage, sbom, base-sbom and base inputs that is not empty becomes the flag of the same name with its value; an empty input passes no flag.",
+        "The action checks out nothing and sets no fetch depth."
+      ]
     },
     {
       "id": "action-token-uploads-and-publishes",
-      "text": "With the token input set, the step runs putnami observe with --upload and PUTNAMI_CLOUD_TOKEN set to the token, and the publish input defaults to true; without it, publish defaults to false. publish set to true or false overrides the default. publish true adds --publish, and the run's GITHUB_TOKEN reaches putnami observe only with the token too: only then does the job need statuses: write and pull-requests: write. Another publish value fails the step before the install."
+      "text": [
+        "With the token input set, the step runs putnami observe with --upload and PUTNAMI_CLOUD_TOKEN set to the token, and the publish input defaults to true;",
+        "without it, publish defaults to false. publish set to true or false overrides the default. publish true adds --publish, and the run's GITHUB_TOKEN reaches putnami observe only with the token too: only then does the job need statuses: write and pull-requests: write.",
+        "Another publish value fails the step before the install."
+      ]
     },
     {
       "id": "action-tokens-reach-observe-only",
-      "text": "The token input and the run's token reach putnami observe only, never the installer or the extension installs. A PUTNAMI_CLOUD_TOKEN or GITHUB_TOKEN the job sets in the step's environment is not read, and a PUTNAMI_CLOUD_TOKEN there without the token input gives a warning that names the token input."
+      "text": [
+        "The token input and the run's token reach putnami observe only, never the installer or the extension installs.",
+        "A PUTNAMI_CLOUD_TOKEN or GITHUB_TOKEN the job sets in the step's environment is not read, and a PUTNAMI_CLOUD_TOKEN there without the token input gives a warning that names the token input."
+      ]
     },
     {
       "id": "action-release",
-      "text": "A release of version X.Y.Z, a semantic version without a pre-release or build suffix, replaces the root of the Putnami/observe-action default branch with the action directory and the repository licence, commits it, tags it vX.Y.Z and moves vX to it in one atomic push: the branch and both tags move together or none does. A version that is not X.Y.Z stops the release before any tag is read, and a vX.Y.Z tag that already exists stops it before any push."
+      "text": [
+        "A release of version X.Y.Z, a semantic version without a pre-release or build suffix, replaces the root of the Putnami/observe-action default branch with the action directory and the repository licence, commits it, tags it vX.Y.Z and moves vX to it in one atomic push: the branch and both tags move together or none does.",
+        "A version that is not X.Y.Z stops the release before any tag is read, and a vX.Y.Z tag that already exists stops it before any push."
+      ]
     },
     {
       "id": "action-release-runs-from-main",
-      "text": "The release workflow runs on a manual dispatch from main only, in the GitHub environment observe-action, which holds the only token that writes to Putnami/observe-action; the environment's branch policy allows main only, so a dispatch from another branch gets no token."
+      "text": [
+        "The release workflow runs on a manual dispatch from main only, in the GitHub environment observe-action, which holds the only token that writes to Putnami/observe-action;",
+        "the environment's branch policy allows main only, so a dispatch from another branch gets no token."
+      ]
     }
   ],
   "decisions": [

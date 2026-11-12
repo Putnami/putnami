@@ -19,7 +19,11 @@
     },
     {
       "id": "strict-manifest",
-      "text": "The parser refuses an unknown field, also a nested one, and invalid JSON. Validation names each defect with its own code: a wrong protocol version, a missing name, an enum without values or with a repeated name or wire value, an empty discriminator, no variants, a repeated tag, a variant with both or neither of struct and fields, an unknown reference, a name used twice, a bad field type and a default of the wrong kind. A typed default of the right kind is accepted."
+      "text": [
+        "The parser refuses an unknown field, also a nested one, and invalid JSON.",
+        "Validation names each defect with its own code: a wrong protocol version, a missing name, an enum without values or with a repeated name or wire value, an empty discriminator, no variants, a repeated tag, a variant with both or neither of struct and fields, an unknown reference, a name used twice, a bad field type and a default of the wrong kind.",
+        "A typed default of the right kind is accepted."
+      ]
     },
     {
       "id": "canonical-bytes",
@@ -31,7 +35,10 @@
     },
     {
       "id": "one-ir-many-lowerings",
-      "text": "From the equivalence golden, the JSON Schema emitter reproduces testdata/contracts.schema.json byte for byte, and the Go emitter reproduces testdata/contracts.golden.go, which parses as Go; both give the same bytes on every run. @putnami/application reproduces the same JSON Schema bytes, serializes them deterministically and emits the TypeScript types of testdata/contracts.golden.ts."
+      "text": [
+        "From the equivalence golden, the JSON Schema emitter reproduces testdata/contracts.schema.json byte for byte, and the Go emitter reproduces testdata/contracts.golden.go, which parses as Go;",
+        "both give the same bytes on every run. @putnami/application reproduces the same JSON Schema bytes, serializes them deterministically and emits the TypeScript types of testdata/contracts.golden.ts."
+      ]
     },
     {
       "id": "markdown-reference",
@@ -39,11 +46,17 @@
     },
     {
       "id": "committed-lowerings",
-      "text": "putnami contracts generate writes the canonical schema/contracts.json, its Go types, its JSON Schema and schema/contracts.md with the same bytes on every run, and fails with exit 2, leaving them untouched, when the manifest is invalid. putnami contracts check exits 0 when the committed files match, and 2 on drift or on a breaking change against the prior manifest, such as a renamed enum wire value. An addition is compatible."
+      "text": [
+        "putnami contracts generate writes the canonical schema/contracts.json, its Go types, its JSON Schema and schema/contracts.md with the same bytes on every run, and fails with exit 2, leaving them untouched, when the manifest is invalid. putnami contracts check exits 0 when the committed files match, and 2 on drift or on a breaking change against the prior manifest, such as a renamed enum wire value.",
+        "An addition is compatible."
+      ]
     },
     {
       "id": "contract-types-become-components",
-      "text": "A route type that names a contract node becomes a referenced OpenAPI component: an enum lists its values, a union is a oneOf with its discriminator and one tag per variant, and an unreferenced node is not projected. The Go generator does this through Options.Contract and its client reader keeps the enums and unions. @putnami/application does it through contractStruct, and its validation refuses a union value with a missing or unknown tag or a wrong variant field."
+      "text": [
+        "A route type that names a contract node becomes a referenced OpenAPI component: an enum lists its values, a union is a oneOf with its discriminator and one tag per variant, and an unreferenced node is not projected.",
+        "The Go generator does this through Options.Contract and its client reader keeps the enums and unions. @putnami/application does it through contractStruct, and its validation refuses a union value with a missing or unknown tag or a wrong variant field."
+      ]
     }
   ],
   "decisions": [

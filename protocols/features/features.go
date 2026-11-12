@@ -4,7 +4,14 @@
 // local tooling.
 package features
 
-import "go.putnami.dev/protocol/capabilities"
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"go.putnami.dev/protocol/capabilities"
+)
 
 const (
 	// ManifestProtocolVersion is the current authored feature-manifest wire
@@ -29,9 +36,16 @@ const (
 	// run-scoped feature verification reports.
 	VerificationReportProtocolVersion = 1
 
-	// ManifestFilename is the only authored feature-intent filename discovered
-	// at a workspace or exact project root.
+	// ManifestFilename is the single-file form of authored feature intent,
+	// discovered at a workspace or exact project root.
 	ManifestFilename = "putnami.features.json"
+	// FeatureDirectory is the per-feature form of authored feature intent, at
+	// a workspace or exact project root. Each direct JSON child is one
+	// FeatureDocument, and a reader merges them. A root holds this directory or
+	// ManifestFilename, never both. A document's filename never participates
+	// in feature identity. A features/ directory that is itself a project root
+	// is that project, never a feature directory.
+	FeatureDirectory = "features"
 
 	// EvidenceDirectory is the committed directory containing evidence fragments.
 	EvidenceDirectory = "schema/feature-evidence"
@@ -52,6 +66,9 @@ const (
 
 	// ManifestSchemaURL is the canonical authored-intent JSON Schema URI.
 	ManifestSchemaURL = "https://putnami.dev/schemas/putnami-features.json"
+	// FeatureDocumentSchemaURL is the canonical JSON Schema URI of one
+	// per-feature document under FeatureDirectory.
+	FeatureDocumentSchemaURL = "https://putnami.dev/schemas/putnami-feature.json"
 	// EvidenceSchemaURL is the canonical feature-evidence JSON Schema URI.
 	EvidenceSchemaURL = "https://putnami.dev/schemas/putnami-feature-evidence.json"
 	// SpecSchemaURL is the canonical durable-specification JSON Schema URI.
@@ -224,6 +241,35 @@ type Manifest struct {
 	Namespace string `json:"namespace"`
 	// Features lists the product features and journeys declared by the repository.
 	Features []Feature `json:"features"`
+}
+
+// FeatureDocument is one strict per-feature authored-intent document under
+// FeatureDirectory. It carries the header of a Manifest and exactly one
+// feature, so adding a feature adds a file instead of editing a shared one.
+// Its protocol versions and every feature rule are those of Manifest.
+type FeatureDocument struct {
+	// Schema is the optional URI of the JSON schema describing the document.
+	Schema string `json:"$schema,omitempty"`
+	// ProtocolVersion selects the authored-intent wire-contract version.
+	ProtocolVersion int `json:"protocolVersion"`
+	// Namespace is the repository-local prefix the feature ID begins with.
+	Namespace string `json:"namespace"`
+	// Feature is the one product feature or journey the document declares.
+	Feature Feature `json:"feature"`
+}
+
+// Manifest returns the one-feature manifest the document stands for. Readers
+// merge documents through it, so a feature document and a manifest entry obey
+// the same rules.
+func (document *FeatureDocument) Manifest() *Manifest {
+	if document == nil {
+		return nil
+	}
+	return &Manifest{
+		ProtocolVersion: document.ProtocolVersion,
+		Namespace:       document.Namespace,
+		Features:        []Feature{document.Feature},
+	}
 }
 
 // Feature declares repository-local product intent. Current maturity is never
@@ -620,6 +666,56 @@ type Spec struct {
 type SpecRequirement struct {
 	// ID is the spec-local stable requirement identity.
 	ID string `json:"id"`
-	// Text is the bounded requirement statement.
-	Text string `json:"text"`
+	// Text is the bounded requirement statement, as one string or as an array
+	// of sentences.
+	Text SpecText `json:"text"`
+}
+
+// SpecText is a requirement statement held as its sentences in authored
+// order. The wire accepts one string, which is one sentence, or an array of
+// strings, so a diff of a long requirement names the sentence that changed.
+// The statement is the sentences joined by one space; the split carries no
+// meaning of its own.
+type SpecText []string
+
+// String returns the statement: the sentences joined by one space.
+func (text SpecText) String() string {
+	return strings.Join(text, " ")
+}
+
+// UnmarshalJSON reads a string as one sentence and an array of strings as
+// its sentences. Any other JSON value is refused.
+func (text *SpecText) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) > 0 && trimmed[0] == '"' {
+		var sentence string
+		if err := json.Unmarshal(trimmed, &sentence); err != nil {
+			return err
+		}
+		*text = SpecText{sentence}
+		return nil
+	}
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		var sentences []string
+		if err := json.Unmarshal(trimmed, &sentences); err != nil {
+			return err
+		}
+		*text = SpecText(sentences)
+		return nil
+	}
+	return fmt.Errorf("requirement text must be a string or an array of strings")
+}
+
+// MarshalJSON writes one sentence as a string and two or more as an array, so
+// a string round-trips as a string and an array of sentences as an array. An
+// empty text is the empty string.
+func (text SpecText) MarshalJSON() ([]byte, error) {
+	switch len(text) {
+	case 0:
+		return json.Marshal("")
+	case 1:
+		return json.Marshal(text[0])
+	default:
+		return json.Marshal([]string(text))
+	}
 }

@@ -361,11 +361,11 @@ func (scan *specKitScan) requirement(text string, position SpecPosition) bool {
 		id, _ = requirementIDFromName(label, len(scan.reading.Spec.Requirements)+1)
 	}
 	spec := scan.reading.Spec
-	spec.Requirements = append(spec.Requirements, SpecRequirement{ID: id, Text: body})
+	spec.Requirements = append(spec.Requirements, SpecRequirement{ID: id, Text: SpecText{body}})
 	scan.reading.Requirements = append(scan.reading.Requirements, SpecRequirementRecord{Position: position, Unanchored: unanchored})
 	index := len(spec.Requirements) - 1
 	scan.extend = func(more string) {
-		spec.Requirements[index].Text = strings.TrimSpace(spec.Requirements[index].Text + " " + more)
+		spec.Requirements[index].Text = SpecText{strings.TrimSpace(spec.Requirements[index].Text.String() + " " + more)}
 	}
 	return true
 }

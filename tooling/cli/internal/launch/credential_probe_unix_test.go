@@ -62,17 +62,31 @@ func fakePinnedCLI(t *testing.T, help string, code int) (path, record string) {
 // prints.
 const credentialLineWithoutLevel = "  --credential-fd <n>          Read the run credential from descriptor <n>; keeps it out of every environment and file"
 
-// topLevelHelp returns the top-level help the CLI prints today, which the
-// surface golden pins, with the run credential's flag line replaced by what
-// line returns for it. An empty replacement drops the line.
+// helpListing is the shape of the CLI's top-level help around the run
+// credential's flag line: the flag rows of a category, the flag and its value
+// name in a padded column, then the description. The run credential's row is
+// built from runcredential.Flag and runcredential.FlagDescription, the values
+// the CLI's help prints, which internal/cli's
+// TestTopLevelHelpAdvertisesTheCustodyLevel proves on the help it renders.
+var helpListing = []string{
+	"putnami 1.4.2 — polyglot build orchestrator",
+	"",
+	"Execution:",
+	"  --max-parallel <n>           Maximum parallel jobs",
+	fmt.Sprintf("  %-28s %s", runcredential.Flag+" <n>", runcredential.FlagDescription),
+	"  --retry <n>                  Retry a failed job",
+	"",
+	"Help:",
+	"  putnami help <command>   Command help",
+	"",
+}
+
+// topLevelHelp returns helpListing with the run credential's flag line
+// replaced by what line returns for it. An empty replacement drops the line.
 func topLevelHelp(t *testing.T, line func(current string) string) string {
 	t.Helper()
-	golden, err := os.ReadFile(filepath.Join("..", "cli", "testdata", "surface", "help-top-level.golden"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	var kept []string
-	for _, current := range strings.Split(string(golden), "\n") {
+	for _, current := range helpListing {
 		if strings.HasPrefix(strings.TrimSpace(current), runcredential.Flag+" ") {
 			if current = line(current); current == "" {
 				continue
@@ -95,13 +109,13 @@ func atLevel(level int) func(string) string {
 	}
 }
 
-// The probe reads the help surface the CLI ships: the golden lists the flag
-// as the first word of a line, which advertises this CLI's custody level.
+// The probe reads the help listing the CLI ships: the flag is the first word
+// of a line, which advertises this CLI's custody level.
 func TestCredentialProbeReadsTheHelpListing(t *testing.T) {
 	t.Parallel()
 	level, listed := runcredential.AdvertisedCustodyLevel([]byte(topLevelHelp(t, currentLine)))
 	if !listed || level != runcredential.CustodyLevel {
-		t.Fatalf("the top-level help golden advertises custody level %d (flag listed %t), want %d",
+		t.Fatalf("the help listing advertises custody level %d (flag listed %t), want %d",
 			level, listed, runcredential.CustodyLevel)
 	}
 	if _, listed := runcredential.AdvertisedCustodyLevel([]byte(topLevelHelp(t, withoutFlag))); listed {

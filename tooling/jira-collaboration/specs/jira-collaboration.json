@@ -19,7 +19,11 @@
   "requirements": [
     {
       "id": "state-by-category",
-      "text": "A task's state is read from its status category: To Do is open, In Progress is in_progress, Done is done, and Done with the resolution Won't Do or Duplicate is canceled; providerState is the status name. A transition takes the first transition Jira offers into the target category, sets the resolution Won't Do for canceled, and leaves a task already in the state as it is. blocked has no category: a transition or create to it is unsupported, and find matches nothing for it."
+      "text": [
+        "A task's state is read from its status category: To Do is open, In Progress is in_progress, Done is done, and Done with the resolution Won't Do or Duplicate is canceled;",
+        "providerState is the status name.",
+        "A transition takes the first transition Jira offers into the target category, sets the resolution Won't Do for canceled, and leaves a task already in the state as it is. blocked has no category: a transition or create to it is unsupported, and find matches nothing for it."
+      ]
     },
     {
       "id": "content-revision",
@@ -27,11 +31,21 @@
     },
     {
       "id": "jql-find",
-      "text": "find reads the bound project with JQL built from the request's text, states and labels, oldest key first. The caller's text and labels are quoted and cannot add a clause. Pages cover every issue present throughout a traversal exactly once, whatever page sizes the caller asks for."
+      "text": [
+        "find reads the bound project with JQL built from the request's text, states and labels, oldest key first.",
+        "The caller's text and labels are quoted and cannot add a clause.",
+        "Pages cover every issue present throughout a traversal exactly once, whatever page sizes the caller asks for."
+      ]
     },
     {
       "id": "reconciled-writes",
-      "text": "create records the key as a hidden label and the request digest as an issue property. A repeated key returns its ticket, even before Jira's search shows it; the key with other content is a conflict. Every write is sent once; after a lost answer or a 5xx the provider reads Jira back, never opens a second ticket, and answers an outcome it cannot establish unresolved, naming what settles it. The label never appears in a task's labels, and a request carrying one is refused."
+      "text": [
+        "create records the key as a hidden label and the request digest as an issue property.",
+        "A repeated key returns its ticket, even before Jira's search shows it; the key with other content is a conflict.",
+        "Every write is sent once;",
+        "after a lost answer or a 5xx the provider reads Jira back, never opens a second ticket, and answers an outcome it cannot establish unresolved, naming what settles it.",
+        "The label never appears in a task's labels, and a request carrying one is refused."
+      ]
     },
     {
       "id": "honest-failures",

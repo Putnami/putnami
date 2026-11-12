@@ -249,7 +249,7 @@ func TestHelpReadsTheLoadedVocabularyFirst(t *testing.T) {
 	if got := scope.related("test"); got != nil {
 		t.Errorf("related(test) = %v: a command no vocabulary names relates to nothing", got)
 	}
-	if got, want := scope.related("cache verify"), relatedCommands["cache verify"]; len(want) == 0 || !slices.Equal(got, want) {
+	if got, want := scope.related("cache verify"), catalogRelated("cache verify"); len(want) == 0 || !slices.Equal(got, want) {
 		t.Errorf("related(cache verify) = %v, want the catalog's %v", got, want)
 	}
 	if got := scope.commandAliases(map[string]string{"u": "test"}); got.vocabulary["x"] != "bundle" || got.user["u"] != "test" {
@@ -276,7 +276,7 @@ func TestHelpWithoutAVocabularyListsNoAlias(t *testing.T) {
 	if aliases := nilScope.commandAliases(nil); aliases.vocabulary != nil {
 		t.Errorf("outside a workspace no vocabulary alias applies: %v", aliases.vocabulary)
 	}
-	if got, want := nilScope.related("cache verify"), relatedCommands["cache verify"]; !slices.Equal(got, want) {
+	if got, want := nilScope.related("cache verify"), catalogRelated("cache verify"); !slices.Equal(got, want) {
 		t.Errorf("related(cache verify) = %v, want the catalog's %v", got, want)
 	}
 	scope := helpScopeOf(&extension.DiscoveryResult{Extensions: []*extension.ExtensionDescription{

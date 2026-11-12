@@ -20,23 +20,41 @@
   "requirements": [
     {
       "id": "opt-in-activation",
-      "text": "A project is validated only when the command's activationFiles match its tree AND the project names this extension in its own extensions array; because the second condition fails silently, this repository asserts that every project authoring a feature manifest or a spec declares it."
+      "text": [
+        "A project is validated only when the command's activationFiles match its tree AND the project names this extension in its own extensions array;",
+        "because the second condition fails silently, this repository asserts that every project authoring a feature manifest or a spec declares it."
+      ]
     },
     {
       "id": "declared-inputs-cover-the-read-set",
-      "text": "A validation task declares cache inputs only when they cover everything it reads: specs-validate carries a workspace-wide identity port beside its two project ports, architecture-validate reads no git history in the cached path, and decisions-validate, recipes-validate, codeowners-sync, docs-links-validate and features-validate read only the Git candidate cut their `git:**` input holds. That key holds each file's executable bit, and features-validate reads every project at version 0.0.0 and names no commit."
+      "text": [
+        "A validation task declares cache inputs only when they cover everything it reads: specs-validate carries a workspace-wide identity port beside its two project ports, architecture-validate reads no git history in the cached path, and decisions-validate, recipes-validate, codeowners-sync, docs-links-validate and features-validate read only the Git candidate cut their `git:**` input holds.",
+        "That key holds each file's executable bit, and features-validate reads every project at version 0.0.0 and names no commit."
+      ]
     },
     {
       "id": "architecture-adoption-policy",
-      "text": "Automatic architecture evaluation resolves only workspace options.sdd.verification.architecture. Enforce lets coherent findings block; report preserves the typed report and warns without blocking; off skips evaluation. Mode, provenance, and evaluation state are always reported. Policy and structural errors fail closed. The workspace file keys the cache; interactive architecture commands are unchanged."
+      "text": [
+        "Automatic architecture evaluation resolves only workspace options.sdd.verification.architecture.",
+        "Enforce lets coherent findings block; report preserves the typed report and warns without blocking; off skips evaluation.",
+        "Mode, provenance, and evaluation state are always reported.",
+        "Policy and structural errors fail closed.",
+        "The workspace file keys the cache; interactive architecture commands are unchanged."
+      ]
     },
     {
       "id": "unpromised-finding-ids-warn",
-      "text": "When the workspace commits architecture.baseline.json or architecture.waivers.json, validate-workspace warns with architecture.finding_ids_not_promised and names the file: those files list finding IDs, which the architecture protocol does not promise. The warning never changes the verdict."
+      "text": [
+        "When the workspace commits architecture.baseline.json or architecture.waivers.json, validate-workspace warns with architecture.finding_ids_not_promised and names the file: those files list finding IDs, which the architecture protocol does not promise.",
+        "The warning never changes the verdict."
+      ]
     },
     {
       "id": "one-engine-two-surfaces",
-      "text": "Each vertical stops at a Build<Something>Result builder that returns a report and never writes to stdout; a subcommand renders that one value as a version 2 envelope or as text, so the two modes cannot answer differently and neither evaluates the workspace a second time."
+      "text": [
+        "Each vertical stops at a Build<Something>Result builder that returns a report and never writes to stdout;",
+        "a subcommand renders that one value as a version 2 envelope or as text, so the two modes cannot answer differently and neither evaluates the workspace a second time."
+      ]
     },
     {
       "id": "refuse-rather-than-widen",
@@ -44,7 +62,11 @@
     },
     {
       "id": "predictable-spec-scaffolding",
-      "text": "specs init derives specs/<leaf>.json from the final segment of the complete feature ID while preserving that complete identity in the document and report. Dry-run and create use the same canonical bytes and path; creation remains contained and exclusive, never renames an existing spec, and refuses an occupied leaf instead of overwriting it or inventing another filename."
+      "text": [
+        "specs init derives specs/<leaf>.json from the final segment of the complete feature ID while preserving that complete identity in the document and report.",
+        "Dry-run and create use the same canonical bytes and path;",
+        "creation remains contained and exclusive, never renames an existing spec, and refuses an occupied leaf instead of overwriting it or inventing another filename."
+      ]
     },
     {
       "id": "settled-decisions-are-enforced",
@@ -56,31 +78,61 @@
     },
     {
       "id": "verdict-policies-are-checked",
-      "text": "validate-workspace reads every putnami.verdict-policy.json with the ci protocol's strict parser: an unknown kind, value, key or maturity, a map by maturity without modeled, and a map on a key that concerns no feature fail with the protocol's code. A file that is not at the root, in a project or in a scope above a project fails with sdd.verdict_policy_location, an unreadable file fails closed, and no file is adoption. The key names the file itself, putnami.workspace.json and every putnami.json."
+      "text": [
+        "validate-workspace reads every putnami.verdict-policy.json with the ci protocol's strict parser: an unknown kind, value, key or maturity, a map by maturity without modeled, and a map on a key that concerns no feature fail with the protocol's code.",
+        "A file that is not at the root, in a project or in a scope above a project fails with sdd.verdict_policy_location, an unreadable file fails closed, and no file is adoption.",
+        "The key names the file itself, putnami.workspace.json and every putnami.json."
+      ]
     },
     {
       "id": "codeowners-follow-declared-owners",
-      "text": "validate-workspace writes .github/CODEOWNERS from options.sdd.owners: putnami.workspace.json gives the catch-all rule, a scope or project putnami.json gives its directory a rule placed after the rules above it, and the spec-governance files stay with the workspace owners. An unchanged file is not rewritten, an invalid declaration or one without a catch-all fails without writing, and a workspace that declares no owners is left alone."
+      "text": [
+        "validate-workspace writes .github/CODEOWNERS from options.sdd.owners: putnami.workspace.json gives the catch-all rule, a scope or project putnami.json gives its directory a rule placed after the rules above it, and the spec-governance files stay with the workspace owners.",
+        "An unchanged file is not rewritten, an invalid declaration or one without a catch-all fails without writing, and a workspace that declares no owners is left alone."
+      ]
     },
     {
       "id": "every-document-has-working-links",
-      "text": "validate-workspace checks every relative link and anchor in every README.md file and doc/ tree of the workspace, whatever the selection, with the rule each language extension's lint-docs task applies. A missing file, a path whose case differs on disk, an anchor no heading of the target defines, or a path that leaves the workspace fails naming the file, line and link. A project whose lint options set docs-links false is skipped. Links with a scheme and absolute paths are not checked."
+      "text": [
+        "validate-workspace checks every relative link and anchor in every README.md file and doc/ tree of the workspace, whatever the selection, with the rule each language extension's lint-docs task applies.",
+        "A missing file, a path whose case differs on disk, an anchor no heading of the target defines, or a path that leaves the workspace fails naming the file, line and link.",
+        "A project whose lint options set docs-links false is skipped.",
+        "Links with a scheme and absolute paths are not checked."
+      ]
     },
     {
       "id": "squash-keeps-the-breaking-marker",
-      "text": "validate-workspace compares the squash message in PUTNAMI_PROPOSAL_MESSAGE with the commits from the impacted baseline to HEAD, reading both as Git and the version bump do. A commit that declares a break the message drops fails, named by id and subject; a message that declares it, or a range with no break, passes. A non-conventional title declares nothing. An unset message passes with a note; a missing baseline or a shallow clone fails. Base commits never count, and the step is never cached."
+      "text": [
+        "validate-workspace compares the squash message in PUTNAMI_PROPOSAL_MESSAGE with the commits from the impacted baseline to HEAD, reading both as Git and the version bump do.",
+        "A commit that declares a break the message drops fails, named by id and subject; a message that declares it, or a range with no break, passes.",
+        "A non-conventional title declares nothing.",
+        "An unset message passes with a note; a missing baseline or a shallow clone fails.",
+        "Base commits never count, and the step is never cached."
+      ]
     },
     {
       "id": "squash-names-no-agent",
-      "text": "When options.sdd.agentAttribution is forbid, validate-workspace reads the squash message in PUTNAMI_PROPOSAL_MESSAGE line by line. A Generated by or with line naming an agent, a Co-Authored-By trailer for an agent, or a link to an agent's session fails, named by line and form; a path such as .claude/, a human co-author and a generator that is not an agent pass. An unset or allow policy, or an unset message, passes with a note; any other option value fails. The step is never cached."
+      "text": [
+        "When options.sdd.agentAttribution is forbid, validate-workspace reads the squash message in PUTNAMI_PROPOSAL_MESSAGE line by line.",
+        "A Generated by or with line naming an agent, a Co-Authored-By trailer for an agent, or a link to an agent's session fails, named by line and form;",
+        "a path such as .claude/, a human co-author and a generator that is not an agent pass.",
+        "An unset or allow policy, or an unset message, passes with a note; any other option value fails.",
+        "The step is never cached."
+      ]
     },
     {
       "id": "verify-names-an-empty-evaluation",
-      "text": "specs verify reads a recorded session whose verdict holds no group and no diagnostic as a session that selected no project stating a requirement: each selected spec is still reported against zero observations, with a warning that names that fact and the command that evaluates the spec. A recorded verdict that carries a diagnostic never reads that way."
+      "text": [
+        "specs verify reads a recorded session whose verdict holds no group and no diagnostic as a session that selected no project stating a requirement: each selected spec is still reported against zero observations, with a warning that names that fact and the command that evaluates the spec.",
+        "A recorded verdict that carries a diagnostic never reads that way."
+      ]
     },
     {
       "id": "authoring-never-grants-a-permission",
-      "text": "The two architecture authoring subcommands write only the mechanical half of a declaration: architecture init scaffolds a domain carrying the id, owner and projects the caller stated and refuses a domain another manifest already declares, and architecture sync removes a project entry the workspace no longer contains and a binding the graph no longer observes while refusing to grant an edge no declared import covers; the reconciliation is whole-workspace, so it rejects project selection."
+      "text": [
+        "The two architecture authoring subcommands write only the mechanical half of a declaration: architecture init scaffolds a domain carrying the id, owner and projects the caller stated and refuses a domain another manifest already declares, and architecture sync removes a project entry the workspace no longer contains and a binding the graph no longer observes while refusing to grant an edge no declared import covers;",
+        "the reconciliation is whole-workspace, so it rejects project selection."
+      ]
     },
     {
       "id": "spec-findings-name-file-positions",
@@ -92,35 +144,69 @@
     },
     {
       "id": "features-name-their-surface",
-      "text": "A feature declaration may name, under surface, the command paths that carry it. features-validate reports a listed name that the declaring project's own extension manifest does not serve as features.unresolved_surface; a project without a manifest is not resolved. features inspect returns the surface as declared."
+      "text": [
+        "A feature declaration may name, under surface, the command paths that carry it. features-validate reports a listed name that the declaring project's own extension manifest does not serve as features.unresolved_surface;",
+        "a project without a manifest is not resolved. features inspect returns the surface as declared."
+      ]
     },
     {
       "id": "every-project-carries-feature-coverage",
-      "text": "With options.sdd.featureCoverage declared, validate-workspace judges every project, with or without a putnami.json. A project passes when its root declares a feature or hosts a spec in the candidate cut, or when its featureAuthority resolves. Any other project fails, named, unless the debt list names it. A debt entry whose project passes, or that names no project, fails. A malformed block fails closed; an absent one is adoption."
+      "text": [
+        "With options.sdd.featureCoverage declared, validate-workspace judges every project, with or without a putnami.json.",
+        "A project passes when its root declares a feature or hosts a spec in the candidate cut, or when its featureAuthority resolves.",
+        "Any other project fails, named, unless the debt list names it.",
+        "A debt entry whose project passes, or that names no project, fails.",
+        "A malformed block fails closed; an absent one is adoption."
+      ]
     },
     {
       "id": "coverage-debt-only-shrinks",
-      "text": "With options.sdd.featureCoverage declared and an impacted baseline, validate-workspace reads the debt list at the merge base of the baseline and HEAD, and fails each entry of the current list that the merge base does not list, named. A removed or kept entry passes. A run without an impacted baseline, or a merge base that declares no options.sdd.featureCoverage, passes with a note; a shallow clone fails. This step is never served from cache, and feature-coverage-validate keeps its key and reads no history."
+      "text": [
+        "With options.sdd.featureCoverage declared and an impacted baseline, validate-workspace reads the debt list at the merge base of the baseline and HEAD, and fails each entry of the current list that the merge base does not list, named.",
+        "A removed or kept entry passes.",
+        "A run without an impacted baseline, or a merge base that declares no options.sdd.featureCoverage, passes with a note; a shallow clone fails.",
+        "This step is never served from cache, and feature-coverage-validate keeps its key and reads no history."
+      ]
     },
     {
       "id": "a-stale-specs-baseline-fails",
-      "text": "Once any specs.baseline.json is committed, specs-ratchet-validate fails with sdd.stale_specs_baseline, naming each file, when a committed baseline differs from the bytes putnami specs baseline --update would write: a floor grown beyond the file, an enforced project without its file, or a file in another layout. A workspace that commits no baseline is initial adoption and passes with a warning."
+      "text": [
+        "Once any specs.baseline.json is committed, specs-ratchet-validate fails with sdd.stale_specs_baseline, naming each file, when a committed baseline differs from the bytes putnami specs baseline --update would write: a floor grown beyond the file, an enforced project without its file, or a file in another layout.",
+        "A workspace that commits no baseline is initial adoption and passes with a warning."
+      ]
     },
     {
       "id": "feature-authority-answers-resolve",
-      "text": "A featureAuthority resolves when it is none with a reason, an owner that names an authored feature, dependents when a project that depends on it, directly or not, declares a feature or hosts a spec at its root, or a provider whose project id names a workspace member that passes on its own answer. A debt entry is no answer. A dependents or provider answer that does not resolve fails with sdd.uncovered_project, naming why."
+      "text": [
+        "A featureAuthority resolves when it is none with a reason, an owner that names an authored feature, dependents when a project that depends on it, directly or not, declares a feature or hosts a spec at its root, or a provider whose project id names a workspace member that passes on its own answer.",
+        "A debt entry is no answer.",
+        "A dependents or provider answer that does not resolve fails with sdd.uncovered_project, naming why."
+      ]
     },
     {
       "id": "external-specs-share-one-discovery",
-      "text": "Discovery reads native specs and the external specs manifests name through one result, so one spec per feature covers both and a feature with both fails specs validate. Two features cannot name overlapping paths. The criteria projection carries the format, so the spec gate accepts an external path. A scoped run keeps the external spec of a feature it selects. A workspace with no reference reads no external file and keeps its outputs. Native and Spec Kit specs coexist under specs/ without a finding."
+      "text": [
+        "Discovery reads native specs and the external specs manifests name through one result, so one spec per feature covers both and a feature with both fails specs validate.",
+        "Two features cannot name overlapping paths.",
+        "The criteria projection carries the format, so the spec gate accepts an external path.",
+        "A scoped run keeps the external spec of a feature it selects.",
+        "A workspace with no reference reads no external file and keeps its outputs.",
+        "Native and Spec Kit specs coexist under specs/ without a finding."
+      ]
     },
     {
       "id": "a-spec-format-needs-an-opt-in",
-      "text": "A manifest that names a format its project's specFormats omits fails specs validate in every verification mode, on the manifest entry, and the file is not read. A format with no shipped reader fails the same way and says so."
+      "text": [
+        "A manifest that names a format its project's specFormats omits fails specs validate in every verification mode, on the manifest entry, and the file is not read.",
+        "A format with no shipped reader fails the same way and says so."
+      ]
     },
     {
       "id": "enforce-needs-anchors",
-      "text": "A project in enforce fails on each positional requirement with no anchor, and on each finding a reader marks for enforce, such as a NEEDS CLARIFICATION marker or a text over 512 bytes, at its file and line. A project in report projects the requirement with no finding about it, and keeps the marker a warning."
+      "text": [
+        "A project in enforce fails on each positional requirement with no anchor, and on each finding a reader marks for enforce, such as a NEEDS CLARIFICATION marker or a text over 512 bytes, at its file and line.",
+        "A project in report projects the requirement with no finding about it, and keeps the marker a warning."
+      ]
     },
     {
       "id": "external-spec-files-key-the-spec-tasks",
@@ -128,27 +214,47 @@
     },
     {
       "id": "openspec-specs-reach-the-gate",
-      "text": "A project that lists openspec in options.sdd.specFormats has the spec.md its manifest entry names read as that feature's spec by specs validate, with no native file. A renamed requirement whose ID is in the baseline fails the ratchet, exactly as for a native spec."
+      "text": [
+        "A project that lists openspec in options.sdd.specFormats has the spec.md its manifest entry names read as that feature's spec by specs validate, with no native file.",
+        "A renamed requirement whose ID is in the baseline fails the ratchet, exactly as for a native spec."
+      ]
     },
     {
       "id": "kiro-specs-reach-the-gate",
-      "text": "A project that lists kiro reads a feature's .kiro/specs/<feature> directory through the same discovery and candidate cut as any spec. Under enforce each unanchored criterion fails at its line, and anchored criteria keep their IDs when the file is reordered, so the ratchet holds."
+      "text": [
+        "A project that lists kiro reads a feature's .kiro/specs/<feature> directory through the same discovery and candidate cut as any spec.",
+        "Under enforce each unanchored criterion fails at its line, and anchored criteria keep their IDs when the file is reordered, so the ratchet holds."
+      ]
     },
     {
       "id": "gherkin-specs-reach-the-gate",
-      "text": "A project that lists gherkin reads a feature's .feature file or directory through the same discovery and candidate cut as any spec. Rules and scenarios line up with the declared requirements and checks, a mismatch stays a warning, and a tag-anchored spec keeps its IDs when the file is reordered, so the ratchet holds."
+      "text": [
+        "A project that lists gherkin reads a feature's .feature file or directory through the same discovery and candidate cut as any spec.",
+        "Rules and scenarios line up with the declared requirements and checks, a mismatch stays a warning, and a tag-anchored spec keeps its IDs when the file is reordered, so the ratchet holds."
+      ]
     },
     {
       "id": "init-from-copies-the-external-spec",
-      "text": "specs init <feature> --from <format>:<path> writes one new native spec whose outcomes, non-goals, requirement IDs and texts, and decision links are copied from the external spec that feature's manifest entry names, with no other text. It refuses a --from that is not that reference, a feature with a native spec, an unanchored positional requirement and a text over the bound, at the source file and line. The native spec and its source give one specs verify verdict."
+      "text": [
+        "specs init <feature> --from <format>:<path> writes one new native spec whose outcomes, non-goals, requirement IDs and texts, and decision links are copied from the external spec that feature's manifest entry names, with no other text.",
+        "It refuses a --from that is not that reference, a feature with a native spec, an unanchored positional requirement and a text over the bound, at the source file and line.",
+        "The native spec and its source give one specs verify verdict."
+      ]
     },
     {
       "id": "specs-surface-names-the-source",
-      "text": "specs list names each spec's source: native, or its market format, as the source member in JSON and after the path in human output. specs inspect of an external spec gives source.format and lists its native gaps with their positions and steps. Gaps never change an exit code and are never validate findings. A workspace with only native specs keeps its output, apart from source: native on each specs list row."
+      "text": [
+        "specs list names each spec's source: native, or its market format, as the source member in JSON and after the path in human output. specs inspect of an external spec gives source.format and lists its native gaps with their positions and steps.",
+        "Gaps never change an exit code and are never validate findings.",
+        "A workspace with only native specs keeps its output, apart from source: native on each specs list row."
+      ]
     },
     {
       "id": "structurizr-models-import-as-manifests",
-      "text": "architecture import --from structurizr <file> maps the containers and container-less systems of a Structurizr DSL or JSON workspace to domains, path-mapped elements to projects, and cross-domain relationships to reference imports bound only to observed edges; it lists each element it cannot map with the reason, writes only with --apply and then only adds, so a hand edit survives a rerun and an edge the model does not allow stays an architecture validate violation."
+      "text": [
+        "architecture import --from structurizr <file> maps the containers and container-less systems of a Structurizr DSL or JSON workspace to domains, path-mapped elements to projects, and cross-domain relationships to reference imports bound only to observed edges;",
+        "it lists each element it cannot map with the reason, writes only with --apply and then only adds, so a hand edit survives a rerun and an edge the model does not allow stays an architecture validate violation."
+      ]
     }
   ],
   "decisions": [

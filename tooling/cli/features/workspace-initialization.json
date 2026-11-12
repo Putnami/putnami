@@ -1,0 +1,86 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/workspace-initialization",
+    "type": "feature",
+    "name": "Lazy workspace initialization",
+    "outcome": "A fresh worktree provides its workspace graph without a full installation, while installation restores independent artifacts concurrently and reports completed actions compactly",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "graph-readiness",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "concurrent-preparation-shares-one-index-refresh",
+            "a-load-reloads-an-index-published-after-its-first-read"
+          ]
+        }
+      },
+      {
+        "id": "parallel-probes",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "parallel-probes-merge-deterministically"
+          ]
+        }
+      },
+      {
+        "id": "parallel-artifacts",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "parallel-restoration-commits-results-in-stable-order"
+          ]
+        }
+      },
+      {
+        "id": "install-state-inputs",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-declared-install-input-stales-the-install",
+            "an-undeclared-lockfile-leaves-the-install-current",
+            "the-putnami-lock-always-counts",
+            "a-changed-declaration-counts-after-the-sync-that-records-it"
+          ]
+        }
+      },
+      {
+        "id": "compact-progress",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "default-install-shows-only-completed-actions",
+            "verbose-and-failures-retain-diagnostics",
+            "implicit-install-preserves-machine-stdout"
+          ]
+        }
+      }
+    ]
+  }
+}

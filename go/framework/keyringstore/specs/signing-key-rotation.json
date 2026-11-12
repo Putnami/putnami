@@ -28,7 +28,10 @@
     },
     {
       "id": "non-disclosure",
-      "text": "The store's own errors and logs never contain private key material: a failure that has a key in hand reports the key's identity (kid), never its private parameters. The public JWKS projection and signing evidence are owned by go/authentication-authorization's secret-non-disclosure."
+      "text": [
+        "The store's own errors and logs never contain private key material: a failure that has a key in hand reports the key's identity (kid), never its private parameters.",
+        "The public JWKS projection and signing evidence are owned by go/authentication-authorization's secret-non-disclosure."
+      ]
     }
   ],
   "decisions": [

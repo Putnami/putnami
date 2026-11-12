@@ -11,7 +11,11 @@
   "requirements": [
     {
       "id": "plan-lists-workloads-from-job-context",
-      "text": "`putnami cloud infra plan` plans every workspace project whose type is application, sorted by name, or the one project it names, and prints what the core `infra plan` printed for each: human text, or one result envelope under `--output`. A job context without `workspaceProjects`, or with a project that has no `type`, fails. A missing type is never read as application."
+      "text": [
+        "`putnami cloud infra plan` plans every workspace project whose type is application, sorted by name, or the one project it names, and prints what the core `infra plan` printed for each: human text, or one result envelope under `--output`.",
+        "A job context without `workspaceProjects`, or with a project that has no `type`, fails.",
+        "A missing type is never read as application."
+      ]
     }
   ]
 }

@@ -20,15 +20,27 @@
   "requirements": [
     {
       "id": "streamed-binary-payloads",
-      "text": "BinaryStream declares bounded, unbuffered unary HTTP octets with a sender-chosen concrete Content-Type. It publishes wildcard binary content with x-putnami-streamed and a positive x-putnami-max-bytes. The provider applies that limit per route, answers the declared 413, and leaves unrelated JSON limits unchanged. Handlers and generated clients consume incrementally without JSON decoding or replay; callers close response readers."
+      "text": [
+        "BinaryStream declares bounded, unbuffered unary HTTP octets with a sender-chosen concrete Content-Type.",
+        "It publishes wildcard binary content with x-putnami-streamed and a positive x-putnami-max-bytes.",
+        "The provider applies that limit per route, answers the declared 413, and leaves unrelated JSON limits unchanged.",
+        "Handlers and generated clients consume incrementally without JSON decoding or replay; callers close response readers."
+      ]
     },
     {
       "id": "single-declaration",
-      "text": "An endpoint definition carries its method, path, schemas, responses, errors, security, and middleware. The api plugin binds it and exposes the same metadata to contract consumers. Returns keeps status 200; ReturnsStatus declares another 2xx primary response, which OpenAPI publishes without a synthetic 200 and client generation uses for its response type."
+      "text": [
+        "An endpoint definition carries its method, path, schemas, responses, errors, security, and middleware.",
+        "The api plugin binds it and exposes the same metadata to contract consumers.",
+        "Returns keeps status 200; ReturnsStatus declares another 2xx primary response, which OpenAPI publishes without a synthetic 200 and client generation uses for its response type."
+      ]
     },
     {
       "id": "validation-pipeline",
-      "text": "A bound endpoint validates path parameters, then query parameters, then the request body, then resolves injected dependencies; any validation failure answers 400 with the code http.bad_request and the failing field details, as does a body that is not JSON, and a dependency-resolution failure answers a generic 500 without leaking the underlying error."
+      "text": [
+        "A bound endpoint validates path parameters, then query parameters, then the request body, then resolves injected dependencies;",
+        "any validation failure answers 400 with the code http.bad_request and the failing field details, as does a body that is not JSON, and a dependency-resolution failure answers a generic 500 without leaking the underlying error."
+      ]
     },
     {
       "id": "json-body-fidelity",
@@ -40,7 +52,11 @@
     },
     {
       "id": "document-only",
-      "text": "An endpoint finalized as document-only is never bound to the transport, so publishing its schema cannot shadow a handler mounted elsewhere. It is documented in the OpenAPI document, because the route is genuinely served; it is absent from the Protobuf service and from the Connect bridge, because those map an api-plugin handler that a document-only endpoint does not have."
+      "text": [
+        "An endpoint finalized as document-only is never bound to the transport, so publishing its schema cannot shadow a handler mounted elsewhere.",
+        "It is documented in the OpenAPI document, because the route is genuinely served;",
+        "it is absent from the Protobuf service and from the Connect bridge, because those map an api-plugin handler that a document-only endpoint does not have."
+      ]
     },
     {
       "id": "catch-all-paths",
@@ -56,19 +72,34 @@
     },
     {
       "id": "spec-disclosure",
-      "text": "The served OpenAPI route is unauthenticated and describes the API's security model, so it is sent with Cache-Control no-store unless the workload explicitly opts into a cacheable directive. Before the document exists the route answers 503 with the code http.service_unavailable; a document that fails to render answers 500 with the code internal and a fixed message, and its cause is logged, never sent."
+      "text": [
+        "The served OpenAPI route is unauthenticated and describes the API's security model, so it is sent with Cache-Control no-store unless the workload explicitly opts into a cacheable directive.",
+        "Before the document exists the route answers 503 with the code http.service_unavailable;",
+        "a document that fails to render answers 500 with the code internal and a fixed message, and its cause is logged, never sent."
+      ]
     },
     {
       "id": "build-time-artifacts",
-      "text": "The OpenAPI document and the .proto document are written by build-time describe below the requested output directory; neither plugin writes into the project tree while the service is starting or running."
+      "text": [
+        "The OpenAPI document and the .proto document are written by build-time describe below the requested output directory;",
+        "neither plugin writes into the project tree while the service is starting or running."
+      ]
     },
     {
       "id": "generation-refuses-unhonorable-declarations",
-      "text": "Generation refuses a declaration no first-party runtime can honor instead of emitting a client that compiles and then fails at its first call: a stream with no honorable transport, a transport encoding no runtime implements, an integer with no declared format, a declared error with no stable wire code, and a request body on GET or HEAD. A first-party integer declares its width both as a format and as exact decimal bounds."
+      "text": [
+        "Generation refuses a declaration no first-party runtime can honor instead of emitting a client that compiles and then fails at its first call: a stream with no honorable transport, a transport encoding no runtime implements, an integer with no declared format, a declared error with no stable wire code, and a request body on GET or HEAD.",
+        "A first-party integer declares its width both as a format and as exact decimal bounds."
+      ]
     },
     {
       "id": "generated-from-contract",
-      "text": "A typed client is generated from the provider's canonical OpenAPI document read in memory from the owning plugin. The runtime response and describe artifact use the same bytes; when publication only applies its JSON object-key layout and trailing-newline rules, the published schema and workspace generator preserve those bytes and their hash. Generating twice produces byte-identical, gofmt-clean source that compiles against the real client runtime, and a route the provider stops declaring leaves no residue."
+      "text": [
+        "A typed client is generated from the provider's canonical OpenAPI document read in memory from the owning plugin.",
+        "The runtime response and describe artifact use the same bytes;",
+        "when publication only applies its JSON object-key layout and trailing-newline rules, the published schema and workspace generator preserve those bytes and their hash.",
+        "Generating twice produces byte-identical, gofmt-clean source that compiles against the real client runtime, and a route the provider stops declaring leaves no residue."
+      ]
     },
     {
       "id": "optional-fields",
@@ -76,83 +107,170 @@
     },
     {
       "id": "producer-attribution",
-      "text": "Each generated operation records the project and feature that produced it, taken from the module owning the endpoint's api plugin; an operation whose owner declares no feature stays unattributed rather than inheriting a neighbouring operation's lineage."
+      "text": [
+        "Each generated operation records the project and feature that produced it, taken from the module owning the endpoint's api plugin;",
+        "an operation whose owner declares no feature stays unattributed rather than inheriting a neighbouring operation's lineage."
+      ]
     },
     {
       "id": "shared-contract-source",
-      "text": "The Go and TypeScript client emitters read the same provider document, and the repository asserts that a provider's committed specification and its committed generated clients stay in sync. The Go reader conforms to the shared first-party corpus: every document the corpus calls valid is read, and every document it calls invalid fails carrying the diagnostic code the corpus names."
+      "text": [
+        "The Go and TypeScript client emitters read the same provider document, and the repository asserts that a provider's committed specification and its committed generated clients stay in sync.",
+        "The Go reader conforms to the shared first-party corpus: every document the corpus calls valid is read, and every document it calls invalid fails carrying the diagnostic code the corpus names."
+      ]
     },
     {
       "id": "first-party-websocket-streams",
-      "text": "A first-party stream endpoint is served over the published WebSocket service protocol. The mandatory init frame is admitted before any handler runs: declared credential profiles, ordinary headers and bounded propagation values are reconstructed onto the request the endpoint's own security chain sees, and the conversation state is re-read after that chain. Every frame follows the published transition table, and the provider never emits one its own contract refuses."
+      "text": [
+        "A first-party stream endpoint is served over the published WebSocket service protocol.",
+        "The mandatory init frame is admitted before any handler runs: declared credential profiles, ordinary headers and bounded propagation values are reconstructed onto the request the endpoint's own security chain sees, and the conversation state is re-read after that chain.",
+        "Every frame follows the published transition table, and the provider never emits one its own contract refuses."
+      ]
     },
     {
       "id": "connect-descriptor-parity",
-      "text": "The published protobuf descriptor, the published JSON schema and the neutral IR describe one declaration. The projection carries each field's exact wire number, kind, proto3 presence, map key and value type, and integer width; a declaration proto3 cannot carry is refused, never narrowed or degraded. A Connect transport is advertised only when a mounted bridge serves it, and its path is the protobuf method identity. The reader refuses any disagreement between the three views."
+      "text": [
+        "The published protobuf descriptor, the published JSON schema and the neutral IR describe one declaration.",
+        "The projection carries each field's exact wire number, kind, proto3 presence, map key and value type, and integer width;",
+        "a declaration proto3 cannot carry is refused, never narrowed or degraded.",
+        "A Connect transport is advertised only when a mounted bridge serves it, and its path is the protobuf method identity.",
+        "The reader refuses any disagreement between the three views."
+      ]
     },
     {
       "id": "websocket-stream-emission",
-      "text": "A declared stream is emitted from its shape, never from a consumer flag. A server stream emits the entrypoint of the first declared transport this client can carry, SSE or WebSocket, with the same method signature either way; a client stream and a bidirectional stream emit a typed WebSocket handle whose send and receive types are the declared message schemas, and whose single declared result is delivered before the end of the stream. The emitted code carries no frame sequence and no phase table."
+      "text": [
+        "A declared stream is emitted from its shape, never from a consumer flag.",
+        "A server stream emits the entrypoint of the first declared transport this client can carry, SSE or WebSocket, with the same method signature either way;",
+        "a client stream and a bidirectional stream emit a typed WebSocket handle whose send and receive types are the declared message schemas, and whose single declared result is delivered before the end of the stream.",
+        "The emitted code carries no frame sequence and no phase table."
+      ]
     },
     {
       "id": "declared-transport-order",
-      "text": "An operation declares its own wire preference order and whether its server stream can be continued. The declared order narrows and reorders the transports the bound server actually serves, and never publishes one it does not; a transport named twice, or one this provider cannot carry for the route's shape, fails projection with the route named. Resume is published on the WebSocket transport of a safe server stream only, and refused on every other shape."
+      "text": [
+        "An operation declares its own wire preference order and whether its server stream can be continued.",
+        "The declared order narrows and reorders the transports the bound server actually serves, and never publishes one it does not;",
+        "a transport named twice, or one this provider cannot carry for the route's shape, fails projection with the route named.",
+        "Resume is published on the WebSocket transport of a safe server stream only, and refused on every other shape."
+      ]
     },
     {
       "id": "declared-stream-resume",
-      "text": "The Go provider issues a single-use, rotating grant with each admission of a resumable server stream, bound to the operation and client identity that earned it and bounded by a time to live, a continuation budget and a per-endpoint capacity. Redeeming it continues the sequence the stream left and tells the handler where to produce from, so a consumer sees neither a gap nor a duplicate. A continuation runs the endpoint's security chain again; every other token buys nothing."
+      "text": [
+        "The Go provider issues a single-use, rotating grant with each admission of a resumable server stream, bound to the operation and client identity that earned it and bounded by a time to live, a continuation budget and a per-endpoint capacity.",
+        "Redeeming it continues the sequence the stream left and tells the handler where to produce from, so a consumer sees neither a gap nor a duplicate.",
+        "A continuation runs the endpoint's security chain again; every other token buys nothing."
+      ]
     },
     {
       "id": "binary-payloads",
-      "text": "A raw octet payload is declared with its wire media type and a strictly positive byte bound, and published as that media type carrying x-putnami-max-bytes. The provider refuses an undeclared media type and a payload past the bound before it reads the body, and declares both refusals. format: binary is refused everywhere a JSON document reaches; the emitted client carries octets with no JSON or base64 hop, and refuses a transport that cannot carry them unchanged."
+      "text": [
+        "A raw octet payload is declared with its wire media type and a strictly positive byte bound, and published as that media type carrying x-putnami-max-bytes.",
+        "The provider refuses an undeclared media type and a payload past the bound before it reads the body, and declares both refusals. format: binary is refused everywhere a JSON document reaches;",
+        "the emitted client carries octets with no JSON or base64 hop, and refuses a transport that cannot carry them unchanged."
+      ]
     },
     {
       "id": "declared-connect-encoding-order",
-      "text": "An operation may declare its Connect payload encoding order. The contract carries one Connect transport per encoding and a generated client dispatches the first one it can carry, so the declared order decides which encoding travels. It narrows and reorders the encodings the mounted bridge serves, in place of the first Connect entry; an encoding named twice, one the bridge does not serve, or an order on a route that publishes no Connect transport fails projection with the route named."
+      "text": [
+        "An operation may declare its Connect payload encoding order.",
+        "The contract carries one Connect transport per encoding and a generated client dispatches the first one it can carry, so the declared order decides which encoding travels.",
+        "It narrows and reorders the encodings the mounted bridge serves, in place of the first Connect entry;",
+        "an encoding named twice, one the bridge does not serve, or an order on a route that publishes no Connect transport fails projection with the route named."
+      ]
     },
     {
       "id": "declared-response-cache",
-      "text": "ClientOperationOptions.Resilience.Cache publishes a response cache unchanged, beside Cache() which keeps setting Cache-Control. A cache on a stream or non-idempotent operation, a key field naming no declared input, or an invalidation field naming no non-octet string, integer or boolean property of the success body, fails publication with the route named. The emitted Go client embeds the policy, pins the response-cache runtime capability and runs it against the real runtime; its manifest repeats the policy."
+      "text": [
+        "ClientOperationOptions.Resilience.Cache publishes a response cache unchanged, beside Cache() which keeps setting Cache-Control.",
+        "A cache on a stream or non-idempotent operation, a key field naming no declared input, or an invalidation field naming no non-octet string, integer or boolean property of the success body, fails publication with the route named.",
+        "The emitted Go client embeds the policy, pins the response-cache runtime capability and runs it against the real runtime; its manifest repeats the policy."
+      ]
     },
     {
       "id": "multiple-success-statuses",
-      "text": "An operation declaring several success statuses generates a Go method returning Status, the status the provider answered, and its declared body decoded under that status's schema: one Body when every body-carrying status shares a schema, else Body<status> per status, nil on a bodyless status. Connect dispatch and a raw octet response are refused. go.omitOperations leaves named operations out of the Go target instead of failing it, names each in the client and its manifest, and fails on an unknown name."
+      "text": [
+        "An operation declaring several success statuses generates a Go method returning Status, the status the provider answered, and its declared body decoded under that status's schema: one Body when every body-carrying status shares a schema, else Body<status> per status, nil on a bodyless status.",
+        "Connect dispatch and a raw octet response are refused. go.omitOperations leaves named operations out of the Go target instead of failing it, names each in the client and its manifest, and fails on an unknown name."
+      ]
     },
     {
       "id": "opaque-json",
-      "text": "json.RawMessage and any publish {\"x-putnami-json\": \"any\"}; a string-keyed map of either publishes {\"type\": \"object\", \"additionalProperties\": true}; the body validator accepts null for them. The error envelope declares details the same way, so no error response has an empty schema. A route carrying opaque JSON is left out of the protobuf descriptor. The Go client holds these values as json.RawMessage, keeps null apart from absent, carries bytes unchanged, and refuses an opaque parameter or Connect dispatch."
+      "text": [
+        "json.RawMessage and any publish {\"x-putnami-json\": \"any\"};",
+        "a string-keyed map of either publishes {\"type\": \"object\", \"additionalProperties\": true};",
+        "the body validator accepts null for them.",
+        "The error envelope declares details the same way, so no error response has an empty schema.",
+        "A route carrying opaque JSON is left out of the protobuf descriptor.",
+        "The Go client holds these values as json.RawMessage, keeps null apart from absent, carries bytes unchanged, and refuses an opaque parameter or Connect dispatch."
+      ]
     },
     {
       "id": "optional-credential",
-      "text": "A route whose rule reports OptionalAuthentication() true publishes its credential alternatives first and an anonymous one, an empty allOf, last; the rule's scopes and roles merge into credentialed alternatives only, and one credential profile derives that profile then anonymous. An anonymous alternative on a required rule or before a credentialed one, and credentials on an unsecured route, fail publication naming the route. A generated client presents the credential when bound, else calls anonymously."
+      "text": [
+        "A route whose rule reports OptionalAuthentication() true publishes its credential alternatives first and an anonymous one, an empty allOf, last;",
+        "the rule's scopes and roles merge into credentialed alternatives only, and one credential profile derives that profile then anonymous.",
+        "An anonymous alternative on a required rule or before a credentialed one, and credentials on an unsecured route, fail publication naming the route.",
+        "A generated client presents the credential when bound, else calls anonymously."
+      ]
     },
     {
       "id": "provider-owned-websocket-wires",
-      "text": "A byte stream is Body(api.ByteStream()) and Returns(api.ByteStream()) handled by api.ByteTunnel, an io.ReadWriter; a provider-owned subprotocol is .Subprotocol(token) on a bidirectional StreamOf endpoint. Both admit on the upgrade, where the security chain refuses with an HTTP status, speak exactly their token, and close with declared codes. The contract publishes the wire as the only transport, bad declarations panic at registration, and the Go client returns a ByteStream or a FrameStream."
+      "text": [
+        "A byte stream is Body(api.ByteStream()) and Returns(api.ByteStream()) handled by api.ByteTunnel, an io.ReadWriter;",
+        "a provider-owned subprotocol is .Subprotocol(token) on a bidirectional StreamOf endpoint.",
+        "Both admit on the upgrade, where the security chain refuses with an HTTP status, speak exactly their token, and close with declared codes.",
+        "The contract publishes the wire as the only transport, bad declarations panic at registration, and the Go client returns a ByteStream or a FrameStream."
+      ]
     },
     {
       "id": "explicit-client-binding",
-      "text": "A generated first-party Go client exposes New<ClientName>Binding(client.ServiceBinding), or NewClientBinding for the default client name, returning the typed client and an error for configuration sources and other callers before DI exists. The constructor retains the private provider descriptor and uses the same safe runtime binding as registration, preserving credentials, resilience, schema validation and typed errors. Its symbol is reserved against schema collisions; generation remains deterministic."
+      "text": [
+        "A generated first-party Go client exposes New<ClientName>Binding(client.ServiceBinding), or NewClientBinding for the default client name, returning the typed client and an error for configuration sources and other callers before DI exists.",
+        "The constructor retains the private provider descriptor and uses the same safe runtime binding as registration, preserving credentials, resilience, schema validation and typed errors.",
+        "Its symbol is reserved against schema collisions; generation remains deterministic."
+      ]
     },
     {
       "id": "external-contract-operations",
-      "text": "Client(ClientOperationOptions{External: authority}) marks a route an external authority owns. It stays served and in the OpenAPI document with x-putnami-external-contract and no x-putnami-client, served and documented by the standard pipeline. It has no protobuf method or Connect URL; the Go reader and generated client skip it while sibling routes stay generated and callable. A blank authority, External beside another option, or External without WithClientService fails Configure before any route binds."
+      "text": [
+        "Client(ClientOperationOptions{External: authority}) marks a route an external authority owns.",
+        "It stays served and in the OpenAPI document with x-putnami-external-contract and no x-putnami-client, served and documented by the standard pipeline.",
+        "It has no protobuf method or Connect URL; the Go reader and generated client skip it while sibling routes stay generated and callable.",
+        "A blank authority, External beside another option, or External without WithClientService fails Configure before any route binds."
+      ]
     },
     {
       "id": "caller-resolved-bindings",
-      "text": "A generated first-party client can bind caller-resolved URL, credential audience and operation paths without a configured service registry. One shared page client reaches distinct owners while preserving declared security, query/envelope shape, exact integers and owned cleanup."
+      "text": [
+        "A generated first-party client can bind caller-resolved URL, credential audience and operation paths without a configured service registry.",
+        "One shared page client reaches distinct owners while preserving declared security, query/envelope shape, exact integers and owned cleanup."
+      ]
     },
     {
       "id": "declared-sse-continuation",
-      "text": "An operation declares how its SSE transport continues: a cursor naming a required plain-string output field and a declared plain-string query parameter, or best effort. The projection publishes it on the SSE transport of a safe server stream only, and refuses every other shape, a malformed declaration and a cursor its schemas cannot carry with the route named. A generated Go client of such an operation requires the sse-continuation runtime capability and continues the stream through the runtime."
+      "text": [
+        "An operation declares how its SSE transport continues: a cursor naming a required plain-string output field and a declared plain-string query parameter, or best effort.",
+        "The projection publishes it on the SSE transport of a safe server stream only, and refuses every other shape, a malformed declaration and a cursor its schemas cannot carry with the route named.",
+        "A generated Go client of such an operation requires the sse-continuation runtime capability and continues the stream through the runtime."
+      ]
     },
     {
       "id": "negotiated-sse-wire",
-      "text": "A first-party server stream that declares a continuation acknowledges a request that asks for putnami.sse.v1 on the admitted response head and ends it with the exact complete frame once the handler returns, every message was written and the consumer stayed. A failure ends it with the typed error, a cancellation or a draining provider with nothing, and a request that does not negotiate, or a route without a continuation, keeps the legacy framing byte for byte."
+      "text": [
+        "A first-party server stream that declares a continuation acknowledges a request that asks for putnami.sse.v1 on the admitted response head and ends it with the exact complete frame once the handler returns, every message was written and the consumer stayed.",
+        "A failure ends it with the typed error, a cancellation or a draining provider with nothing, and a request that does not negotiate, or a route without a continuation, keeps the legacy framing byte for byte."
+      ]
     },
     {
       "id": "declared-error-details",
-      "text": "MayThrowDetails(code, type) declares an error code and the type of its details member, without a retry classification, and refuses the implicit http.bad_request and http.internal_server codes. The contract publishes the type as that code's schema at the status errors.HTTPStatusForCode gives it; the error response documents details as the type, or anyOf the types in code order. A handler attaches it with errors.Any(\"details\", value), and the emitted Go client decodes it onto the typed error."
+      "text": [
+        "MayThrowDetails(code, type) declares an error code and the type of its details member, without a retry classification, and refuses the implicit http.bad_request and http.internal_server codes.",
+        "The contract publishes the type as that code's schema at the status errors.HTTPStatusForCode gives it;",
+        "the error response documents details as the type, or anyOf the types in code order.",
+        "A handler attaches it with errors.Any(\"details\", value), and the emitted Go client decodes it onto the typed error."
+      ]
     }
   ],
   "decisions": [

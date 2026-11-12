@@ -109,7 +109,7 @@ func TestSpecsInitFromWritesTheTextTheSourceStates(t *testing.T) {
 				return ws
 			},
 			outcomes:     []string{"Customers receive invoices, as [the invoice format](../../../doc/adr/0001-invoice-format.md) decides."},
-			requirements: []featureproto.SpecRequirement{{ID: "issue-an-invoice", Text: "The system SHALL issue an invoice."}},
+			requirements: []featureproto.SpecRequirement{{ID: "issue-an-invoice", Text: featureproto.SpecText{"The system SHALL issue an invoice."}}},
 			decisions:    []string{"app/doc/adr/0001-invoice-format.md"},
 		},
 		{
@@ -117,8 +117,8 @@ func TestSpecsInitFromWritesTheTextTheSourceStates(t *testing.T) {
 			ws:       func(t *testing.T) *workspace.Workspace { return kiroWorkspace(t, "report", kiroAnchors) },
 			outcomes: []string{"Customers receive invoices."},
 			requirements: []featureproto.SpecRequirement{
-				{ID: "issue-an-invoice", Text: "WHEN an order closes THE system SHALL issue an invoice"},
-				{ID: "number-invoices", Text: "THE system SHALL number invoices"},
+				{ID: "issue-an-invoice", Text: featureproto.SpecText{"WHEN an order closes THE system SHALL issue an invoice"}},
+				{ID: "number-invoices", Text: featureproto.SpecText{"THE system SHALL number invoices"}},
 			},
 		},
 		{
@@ -128,7 +128,7 @@ func TestSpecsInitFromWritesTheTextTheSourceStates(t *testing.T) {
 			},
 			outcomes: []string{"An accountant exports a closed month in under 30 seconds."},
 			requirements: []featureproto.SpecRequirement{{ID: "export-a-month",
-				Text: "System MUST export the invoices of one calendar month as a CSV file with one row per invoice."}},
+				Text: featureproto.SpecText{"System MUST export the invoices of one calendar month as a CSV file with one row per invoice."}}},
 			nonGoals: []string{"Exporting to a spreadsheet format other than CSV."},
 		},
 	} {

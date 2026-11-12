@@ -503,7 +503,7 @@ func TestEquivalenceCorpusValidatesAsOneRepository(t *testing.T) {
 }
 
 func TestSchemasAreStrictDocumentsWithoutDerivedState(t *testing.T) {
-	for _, name := range []string{"putnami-features.json", "putnami-feature-evidence.json", "putnami-spec.json", "putnami-feature-verification.json"} {
+	for _, name := range []string{"putnami-features.json", "putnami-feature.json", "putnami-feature-evidence.json", "putnami-spec.json", "putnami-feature-verification.json"} {
 		data, err := os.ReadFile(filepath.Join("schemas", name))
 		if err != nil {
 			t.Fatal(err)

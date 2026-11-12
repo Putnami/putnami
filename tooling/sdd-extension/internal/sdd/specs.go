@@ -552,8 +552,8 @@ func BuildSpecInitResult(ws *workspace.Workspace, selector string, options SpecI
 	}
 	if len(report.Declarations) == 0 {
 		report.Diagnostics = append(report.Diagnostics, diag.Errorf(featureproto.ErrorCodeUnknownFeature, "feature",
-			"no authored declaration mints feature %q; declare it in %s first",
-			selector, featureproto.ManifestFilename))
+			"no authored declaration mints feature %q; declare it in %s or %s/<feature>.json first",
+			selector, featureproto.ManifestFilename, featureproto.FeatureDirectory))
 		return report, protocolcli.WithResultData(
 			protocolcli.NotFoundf("no authored feature declaration mints %q", selector), report)
 	}

@@ -25,7 +25,10 @@
     },
     {
       "id": "unit-of-work",
-      "text": "A request unit of work begins at most one transaction per enrolled pool and finalizes every owned transaction once at the request boundary, including after cancellation and rollback-only outcomes; WithTx inside that request joins the enrolled transaction without taking finalization ownership."
+      "text": [
+        "A request unit of work begins at most one transaction per enrolled pool and finalizes every owned transaction once at the request boundary, including after cancellation and rollback-only outcomes;",
+        "WithTx inside that request joins the enrolled transaction without taking finalization ownership."
+      ]
     },
     {
       "id": "multi-datasource-boundary",
@@ -41,7 +44,10 @@
     },
     {
       "id": "autocommit-context",
-      "text": "A query on a context marked Autocommit runs on its own pooled connection, outside the request unit of work and every WithTx transaction the context carries; WithTx under such a context begins and owns its own transaction."
+      "text": [
+        "A query on a context marked Autocommit runs on its own pooled connection, outside the request unit of work and every WithTx transaction the context carries;",
+        "WithTx under such a context begins and owns its own transaction."
+      ]
     }
   ],
   "decisions": [

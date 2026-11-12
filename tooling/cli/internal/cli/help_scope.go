@@ -217,7 +217,7 @@ func (s *helpScope) related(command string) []string {
 	if verb, ok := s.verb(command); ok {
 		return verb.Related
 	}
-	return relatedCommands[command]
+	return catalogRelated(command)
 }
 
 // listsFlag reports whether help lists a global flag: one the core gives its
@@ -271,8 +271,9 @@ func (s *helpScope) declaresGroup(name string) bool {
 // flagCategories returns the global-flag categories help lists, dropping a
 // category left empty.
 func (s *helpScope) flagCategories() []FlagCategory {
-	out := make([]FlagCategory, 0, len(allFlagCategories))
-	for _, category := range allFlagCategories {
+	categories := flagCategoriesFromCatalog()
+	out := make([]FlagCategory, 0, len(categories))
+	for _, category := range categories {
 		flags := make([]FlagInfo, 0, len(category.Flags))
 		for _, flag := range category.Flags {
 			if s.listsFlag(flag) {
@@ -291,8 +292,9 @@ func (s *helpScope) flagCategories() []FlagCategory {
 // (commandmeta.RefusesGlobalFlag), and each job-only one it declares, which its
 // Command Flags list.
 func (s *helpScope) flagCategoriesFor(path string) []FlagCategory {
-	out := make([]FlagCategory, 0, len(allFlagCategories))
-	for _, category := range s.flagCategories() {
+	categories := s.flagCategories()
+	out := make([]FlagCategory, 0, len(categories))
+	for _, category := range categories {
 		flags := slices.DeleteFunc(slices.Clone(category.Flags), func(flag FlagInfo) bool {
 			return commandmeta.RefusesGlobalFlag(path, flag.Long) || (flag.JobOnly && declaresFlag(path, flag.Long))
 		})

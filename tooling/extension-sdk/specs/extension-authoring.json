@@ -18,7 +18,10 @@
   "requirements": [
     {
       "id": "release-plan-compatibility",
-      "text": "The job-context release-set plan accepts additive unknown fields at the supported protocol version, rejects unsupported versions naming received and supported versions, and preserves single-document framing, size limits and validation of known fields. A reused member carries the reuse head's artifact record, built at the plan's reuse source revision, rebound to the plan's revision and the run's one source tree, and a plan that reuses nothing emits no reuse field."
+      "text": [
+        "The job-context release-set plan accepts additive unknown fields at the supported protocol version, rejects unsupported versions naming received and supported versions, and preserves single-document framing, size limits and validation of known fields.",
+        "A reused member carries the reuse head's artifact record, built at the plan's reuse source revision, rebound to the plan's revision and the run's one source tree, and a plan that reuses nothing emits no reuse field."
+      ]
     },
     {
       "id": "log-forwarding-fidelity",
@@ -38,7 +41,15 @@
     },
     {
       "id": "architecture-authored-in-code",
-      "text": "An ARC/DARC manifest can be authored in Go. Build applies the protocol verdict and refuses invalid domains; ReferenceFact omits placeholder data metadata only on reference-only exports; canonical bytes round-trip through the strict reader; mode constructors emit only their own members; permissions remain explicit; and Pin fails on hand edits."
+      "text": [
+        "An ARC/DARC manifest can be authored in Go.",
+        "Build applies the protocol verdict and refuses invalid domains;",
+        "ReferenceFact omits placeholder data metadata only on reference-only exports;",
+        "canonical bytes round-trip through the strict reader;",
+        "mode constructors emit only their own members;",
+        "permissions remain explicit;",
+        "and Pin fails on hand edits."
+      ]
     },
     {
       "id": "subprocess-control",
@@ -46,7 +57,10 @@
     },
     {
       "id": "host-identity-scrub",
-      "text": "The platform-identity variable list covers the managed-runtime identity variables, excludes credential- and endpoint-bearing variables, is sorted and unique, is matched case-sensitively, and is returned as an independent copy that a caller cannot mutate in place. A second scrub removes the two variables that describe a job of a hosted run and nothing else."
+      "text": [
+        "The platform-identity variable list covers the managed-runtime identity variables, excludes credential- and endpoint-bearing variables, is sorted and unique, is matched case-sensitively, and is returned as an independent copy that a caller cannot mutate in place.",
+        "A second scrub removes the two variables that describe a job of a hosted run and nothing else."
+      ]
     },
     {
       "id": "checkout-independent-generation-paths",
@@ -66,15 +80,27 @@
     },
     {
       "id": "infra-aggregation-neutrality",
-      "text": "Infra aggregation merges the dependency closure, skips libraries, treats an unclassified project as a workload, ignores generator scratch, normalizes v1 generated manifests to v2, reports a conflict as a diagnostic, and applies a language's compatibility hook to defaults and authored runtimes without failing the task. A workload's deployment declaration is that aggregate, leaves the defaults sidecar alone, and is removed, never stale, when a library or an error finding writes none."
+      "text": [
+        "Infra aggregation merges the dependency closure, skips libraries, treats an unclassified project as a workload, ignores generator scratch, normalizes v1 generated manifests to v2, reports a conflict as a diagnostic, and applies a language's compatibility hook to defaults and authored runtimes without failing the task.",
+        "A workload's deployment declaration is that aggregate, leaves the defaults sidecar alone, and is removed, never stale, when a library or an error finding writes none."
+      ]
     },
     {
       "id": "shared-package-metadata-writer",
-      "text": "Every packager records the channels it produced inside the output directory it owns, so no writer shares a path with a sibling; the channel index is derived over those records in sorted directory order, drops empty and duplicate names, skips a damaged record, still reports one an earlier run left, and reports not-exist when none exists. The archive publication manifest has a single owner that states its whole document."
+      "text": [
+        "Every packager records the channels it produced inside the output directory it owns, so no writer shares a path with a sibling;",
+        "the channel index is derived over those records in sorted directory order, drops empty and duplicate names, skips a damaged record, still reports one an earlier run left, and reports not-exist when none exists.",
+        "The archive publication manifest has a single owner that states its whole document."
+      ]
     },
     {
       "id": "local-image-publication-boundary",
-      "text": "Image packaging owns a cache-restorable local OCI candidate and never output-registry identity, credentials, or publication evidence; project-base composition consumes that local candidate; Docker publish alone resolves the target, publishes and remotely verifies the digest, then writes publish-owned immutable evidence without mutating package bytes. Private publish may use a numeric loopback broker while preserving the logical repository, digest reference, and registry evidence."
+      "text": [
+        "Image packaging owns a cache-restorable local OCI candidate and never output-registry identity, credentials, or publication evidence;",
+        "project-base composition consumes that local candidate;",
+        "Docker publish alone resolves the target, publishes and remotely verifies the digest, then writes publish-owned immutable evidence without mutating package bytes.",
+        "Private publish may use a numeric loopback broker while preserving the logical repository, digest reference, and registry evidence."
+      ]
     },
     {
       "id": "ecosystem-profiles",
@@ -82,55 +108,112 @@
     },
     {
       "id": "oci-publish-by-digest",
-      "text": "Verified uploads and reuse emit a member at the full repository path, excluding only the registry host. Native images require an exact selected plan coordinate, project and version; standalone images retain their content version. Private image publication writes only the digest; workload Docker publication may tag its version. Channels belong to the release. The target is --docker-registry, else the workspace registry. Publication makes one manifest existence check, with no extra push or digest lookup."
+      "text": [
+        "Verified uploads and reuse emit a member at the full repository path, excluding only the registry host.",
+        "Native images require an exact selected plan coordinate, project and version; standalone images retain their content version.",
+        "Private image publication writes only the digest; workload Docker publication may tag its version.",
+        "Channels belong to the release.",
+        "The target is --docker-registry, else the workspace registry.",
+        "Publication makes one manifest existence check, with no extra push or digest lookup."
+      ]
     },
     {
       "id": "dry-run-member-probe",
-      "text": "A dry-run publication asks its registry, with GET or HEAD only, whether it holds the member at the version the real publish would write, and emits one member-probe event per member: absent, identical when the registry digest equals the local artifact, naming a staged one, tag-move when the managed OCI registry holds the version tag at other content, conflict when the publish cannot reuse the held version, unverified when the registry cannot answer. An anonymous answer is marked. The orchestrator decides."
+      "text": [
+        "A dry-run publication asks its registry, with GET or HEAD only, whether it holds the member at the version the real publish would write, and emits one member-probe event per member: absent, identical when the registry digest equals the local artifact, naming a staged one, tag-move when the managed OCI registry holds the version tag at other content, conflict when the publish cannot reuse the held version, unverified when the registry cannot answer.",
+        "An anonymous answer is marked.",
+        "The orchestrator decides."
+      ]
     },
     {
       "id": "agent-content-packaging",
-      "text": "An extension's agent content is built by the same agent-artifact builder as a standalone artifact, under the extension's own name and version and its declared content policy. Packaging a content-only extension writes the built tree and the packaged contribution form, refuses what it cannot certify, and returns only a reproducible, platform-independent archive this CLI's own loader reads."
+      "text": [
+        "An extension's agent content is built by the same agent-artifact builder as a standalone artifact, under the extension's own name and version and its declared content policy.",
+        "Packaging a content-only extension writes the built tree and the packaged contribution form, refuses what it cannot certify, and returns only a reproducible, platform-independent archive this CLI's own loader reads."
+      ]
     },
     {
       "id": "agent-content-staging",
-      "text": "A packager that ships an executable stages an extension's agent content with the same builder: the tree built from the authored source under agentContent.path and the packaged form bound by its digest, leaving a manifest without agent content untouched. It refuses a contribution without a source, another name, an occupied path, and content the policy forbids, writing nothing; verification refuses any staged byte, file or symlink the digests do not bind."
+      "text": [
+        "A packager that ships an executable stages an extension's agent content with the same builder: the tree built from the authored source under agentContent.path and the packaged form bound by its digest, leaving a manifest without agent content untouched.",
+        "It refuses a contribution without a source, another name, an occupied path, and content the policy forbids, writing nothing;",
+        "verification refuses any staged byte, file or symlink the digests do not bind."
+      ]
     },
     {
       "id": "publication-outbox",
-      "text": "A publication job packs its managed artifacts into PUTNAMI_PUBLICATION_OUTBOX, writes outbox.json last, and uploads nothing. The descriptor is strict and bounded; every path stays in the outbox. The engine reads each artifact once, refuses a size or digest the descriptor does not state, and uploads the verified bytes, retrying a transient upload failure up to 3 times. A version at the same digest is reused. Each uploader takes the bearer as an argument and sends it only to its registry; no error carries it."
+      "text": [
+        "A publication job packs its managed artifacts into PUTNAMI_PUBLICATION_OUTBOX, writes outbox.json last, and uploads nothing.",
+        "The descriptor is strict and bounded; every path stays in the outbox.",
+        "The engine reads each artifact once, refuses a size or digest the descriptor does not state, and uploads the verified bytes, retrying a transient upload failure up to 3 times.",
+        "A version at the same digest is reused.",
+        "Each uploader takes the bearer as an argument and sends it only to its registry; no error carries it."
+      ]
     },
     {
       "id": "upload-kit-uploads-what-the-engine-verified",
-      "text": "publicationupload.Upload uploads one npm, go, oci, put or archive member to the registry its caller resolved and answers the digest the registry stores, with an archive's platforms. It reads only the files the request's member names, never outbox.json, and refuses a size or digest other than an entry's before any request. It asks the bearer at most once, for that registry, sends it nowhere else and puts it in no error. A version held at the same digest is reused."
+      "text": [
+        "publicationupload.Upload uploads one npm, go, oci, put or archive member to the registry its caller resolved and answers the digest the registry stores, with an archive's platforms.",
+        "It reads only the files the request's member names, never outbox.json, and refuses a size or digest other than an entry's before any request.",
+        "It asks the bearer at most once, for that registry, sends it nowhere else and puts it in no error.",
+        "A version held at the same digest is reused."
+      ]
     },
     {
       "id": "upload-kit-tells-a-mismatch-from-a-conflict",
-      "text": "An error of publicationupload.Upload for an artifact whose size or digest is not its member entry's matches ErrArtifactMismatch under errors.Is, and one for a registry that already holds another artifact at the member's version matches ErrArtifactConflict. Any other failure matches neither, and a marked error keeps its text."
+      "text": [
+        "An error of publicationupload.Upload for an artifact whose size or digest is not its member entry's matches ErrArtifactMismatch under errors.Is, and one for a registry that already holds another artifact at the member's version matches ErrArtifactConflict.",
+        "Any other failure matches neither, and a marked error keeps its text."
+      ]
     },
     {
       "id": "tree-fingerprint",
-      "text": "The treefingerprint package computes the tree fingerprint the CLI prints and records. One SHA-256 covers HEAD, the bytes on disk at every tracked path that differs from it, recursing through checked-out submodules, and every untracked non-ignored file, in the versioned stream the CLI protocol documents. Git display settings and variables that select another repository or inject configuration do not change it. Outside a worktree or before the first commit it returns an error."
+      "text": [
+        "The treefingerprint package computes the tree fingerprint the CLI prints and records.",
+        "One SHA-256 covers HEAD, the bytes on disk at every tracked path that differs from it, recursing through checked-out submodules, and every untracked non-ignored file, in the versioned stream the CLI protocol documents.",
+        "Git display settings and variables that select another repository or inject configuration do not change it.",
+        "Outside a worktree or before the first commit it returns an error."
+      ]
     },
     {
       "id": "host-rpc-client",
-      "text": "The Go client Dial reads PUTNAMI_HOST_RPC and PUTNAMI_HOST_RPC_TOKEN; without them it returns a NoHostError that names putnami and the missing variables. Every request carries the token and a fresh id. A host refusal is a typed error with its code, and the client stays usable. An answer to another id, a frame over 32 MiB, a broken connection or a context that ends before the whole answer arrives breaks the client; an answer that arrived whole stands."
+      "text": [
+        "The Go client Dial reads PUTNAMI_HOST_RPC and PUTNAMI_HOST_RPC_TOKEN; without them it returns a NoHostError that names putnami and the missing variables.",
+        "Every request carries the token and a fresh id.",
+        "A host refusal is a typed error with its code, and the client stays usable.",
+        "An answer to another id, a frame over 32 MiB, a broken connection or a context that ends before the whole answer arrives breaks the client; an answer that arrived whole stands."
+      ]
     },
     {
       "id": "host-rpc-workspace-owners-client",
-      "text": "The Go client's WorkspaceOwners sends the paths and returns one entry per path, in request order, each with its owners. It refuses an empty list and a path outside io/fs form before it sends anything. An answer with another count of entries, or an entry for another path, is an error that leaves the client usable."
+      "text": [
+        "The Go client's WorkspaceOwners sends the paths and returns one entry per path, in request order, each with its owners.",
+        "It refuses an empty list and a path outside io/fs form before it sends anything.",
+        "An answer with another count of entries, or an entry for another path, is an error that leaves the client usable."
+      ]
     },
     {
       "id": "host-rpc-version-lines-client",
-      "text": "The Go client's VersionLines sends the scope and returns the host's answer, with an empty commit list for a line without commits. An answer without a source revision or a line, with another line than the scope names, or with a tagged line that lacks its tag or has a release, or an untagged line without one, is an error that leaves the client usable."
+      "text": [
+        "The Go client's VersionLines sends the scope and returns the host's answer, with an empty commit list for a line without commits.",
+        "An answer without a source revision or a line, with another line than the scope names, or with a tagged line that lacks its tag or has a release, or an untagged line without one, is an error that leaves the client usable."
+      ]
     },
     {
       "id": "host-rpc-workspace-probe-client",
-      "text": "The Go client's WorkspaceProbe sends workspace.probe and returns the host's root, projects and diagnostics, with empty lists where the host found none. An answer without a root, or with projects out of path order or repeated, is an error that leaves the client usable."
+      "text": [
+        "The Go client's WorkspaceProbe sends workspace.probe and returns the host's root, projects and diagnostics, with empty lists where the host found none.",
+        "An answer without a root, or with projects out of path order or repeated, is an error that leaves the client usable."
+      ]
     },
     {
       "id": "resolve-a-path-against-the-typed-directory",
-      "text": "The context package's ResolvePath resolves a path argument as the user typed it. An empty or absolute path is returned unchanged. A relative path is joined to the context's InvocationDir, else to UserScope.CallerDir, and is returned unchanged when the context has neither or is nil, so it resolves against the process directory as before. The function reads no file and no environment variable."
+      "text": [
+        "The context package's ResolvePath resolves a path argument as the user typed it.",
+        "An empty or absolute path is returned unchanged.",
+        "A relative path is joined to the context's InvocationDir, else to UserScope.CallerDir, and is returned unchanged when the context has neither or is nil, so it resolves against the process directory as before.",
+        "The function reads no file and no environment variable."
+      ]
     }
   ],
   "decisions": [

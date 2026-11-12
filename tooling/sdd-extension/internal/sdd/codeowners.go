@@ -91,6 +91,7 @@ var specGovernancePatterns = []string{
 	"**/" + featureproto.SpecsBaselineFilename,
 	"**/specs/*.json",
 	"**/putnami.features.json",
+	"**/features/*.json",
 	"/" + wsproto.WorkspaceConfigFilename,
 }
 

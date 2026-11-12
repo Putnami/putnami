@@ -149,7 +149,7 @@ func TestSpecKitListItemsContinueAndSectionsEnd(t *testing.T) {
 	}
 	spec := projection.Spec
 	if strings.Join(spec.NonGoals, "|") != "First goal.|Second goal." || len(spec.Requirements) != 2 ||
-		spec.Requirements[0].Text != "Bold colon wraps." || spec.Requirements[1].ID != "fr-002" || spec.Outcomes[0] != "Windows line." {
+		spec.Requirements[0].Text.String() != "Bold colon wraps." || spec.Requirements[1].ID != "fr-002" || spec.Outcomes[0] != "Windows line." {
 		t.Fatalf("spec = %+v", spec)
 	}
 }
@@ -316,7 +316,7 @@ func TestANestedItemStaysInItsRequirement(t *testing.T) {
 		t.Fatalf("findings = %v", projection.Findings)
 	}
 	spec := projection.Spec
-	if len(spec.Requirements) != 3 || spec.Requirements[0].Text != "System MUST export in: - CSV - JSON Both are UTF-8." ||
+	if len(spec.Requirements) != 3 || spec.Requirements[0].Text.String() != "System MUST export in: - CSV - JSON Both are UTF-8." ||
 		spec.Requirements[2].ID != "fr-003" || strings.Join(spec.NonGoals, "|") != "Goal: - detail|Other." {
 		t.Fatalf("spec = %+v", spec)
 	}

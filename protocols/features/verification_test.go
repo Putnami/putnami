@@ -182,6 +182,73 @@ func TestEveryCommittedManifestIsOnTheCriteriaWire(t *testing.T) {
 	}
 }
 
+// TestCommittedFeatureDocumentsValidate reads every committed features/
+// directory of a workspace or project root: each document validates on the
+// criteria wire, and no root also holds putnami.features.json.
+func TestCommittedFeatureDocumentsValidate(t *testing.T) {
+	skipped := map[string]bool{
+		".cache": true, ".context": true, ".gen": true, ".git": true, ".putnami": true,
+		"compiled": true, "dist": true, "node_modules": true, "vendor": true,
+		"fixtures": true, "testdata": true,
+	}
+	root := filepath.Join("..", "..")
+	checked := 0
+	err := filepath.WalkDir(root, func(name string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() {
+			return nil
+		}
+		if skipped[entry.Name()] {
+			return fs.SkipDir
+		}
+		if entry.Name() != FeatureDirectory || isWorkspaceOrProjectRoot(name) || !isWorkspaceOrProjectRoot(filepath.Dir(name)) {
+			return nil
+		}
+		if _, statErr := os.Stat(filepath.Join(filepath.Dir(name), ManifestFilename)); statErr == nil {
+			t.Errorf("%s holds both %s and %s/", filepath.Dir(name), ManifestFilename, FeatureDirectory)
+		}
+		documents, globErr := filepath.Glob(filepath.Join(name, "*.json"))
+		if globErr != nil {
+			return globErr
+		}
+		for _, path := range documents {
+			//nolint:gosec // the walk only reaches this repository's committed documents
+			data, readErr := os.ReadFile(path)
+			if readErr != nil {
+				return readErr
+			}
+			document, findings := ParseAndValidateFeatureDocument(data)
+			switch {
+			case document == nil || diag.HasErrors(findings):
+				t.Errorf("committed feature document %s does not validate: %v", path, findings)
+			case document.ProtocolVersion != ManifestCriteriaProtocolVersion:
+				t.Errorf("committed feature document %s is version %d, want %d", path, document.ProtocolVersion, ManifestCriteriaProtocolVersion)
+			}
+			checked++
+		}
+		return fs.SkipDir
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if checked == 0 {
+		t.Fatal("no committed feature document was reached; the check is vacuous")
+	}
+}
+
+// isWorkspaceOrProjectRoot reports whether a directory holds putnami.json or
+// putnami.workspace.json.
+func isWorkspaceOrProjectRoot(directory string) bool {
+	for _, name := range []string{"putnami.json", "putnami.workspace.json"} {
+		if _, err := os.Stat(filepath.Join(directory, name)); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
 func TestVerificationCriterionShapeIsClosed(t *testing.T) {
 	for _, test := range []struct {
 		name    string
@@ -554,9 +621,9 @@ func TestEvaluationJoinsOnRequirementIdentity(t *testing.T) {
 		{ID: "sink-wiring", Stage: MaturityWired, EvidenceKinds: []EvidenceKind{EvidenceKindCapability}},
 	}
 	spec := []SpecRequirement{
-		{ID: "lifecycle", Text: "Flushing a logger visits every configured sink."},
-		{ID: "sink-wiring", Text: "A configured sink is wired before the first record."},
-		{ID: "retention", Text: "A record stays retrievable for the configured retention period."},
+		{ID: "lifecycle", Text: SpecText{"Flushing a logger visits every configured sink."}},
+		{ID: "sink-wiring", Text: SpecText{"A configured sink is wired before the first record."}},
+		{ID: "retention", Text: SpecText{"A record stays retrievable for the configured retention period."}},
 	}
 	observations := []VerificationObservation{statusObservation("lifecycle", "flush-visits-every-sink", ObservationPassed)}
 

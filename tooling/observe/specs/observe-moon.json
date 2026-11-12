@@ -17,19 +17,38 @@
   "requirements": [
     {
       "id": "moon-graph-export",
-      "text": "When the root holds moon-graph.json, or --moon-graph names a file, and it is a moon project graph export, each project of graph.nodes, or of data when a node is an index, is a component of source orchestrator at its source, and each graph.edges entry between two projects but a root one an edge from the first to the second; a sourceless or duplicate project is skipped. A missing default file is no finding; a named missing one, or a non-export named or beside .moon/workspace.yml, is a warning."
+      "text": [
+        "When the root holds moon-graph.json, or --moon-graph names a file, and it is a moon project graph export, each project of graph.nodes, or of data when a node is an index, is a component of source orchestrator at its source, and each graph.edges entry between two projects but a root one an edge from the first to the second;",
+        "a sourceless or duplicate project is skipped.",
+        "A missing default file is no finding; a named missing one, or a non-export named or beside .moon/workspace.yml, is a warning."
+      ]
     },
     {
       "id": "moon-projects",
-      "text": "Else a root .moon/workspace.yml makes a moon workspace, of source workspace. Its projects key is a list of globs, a map of id to directory, or both under globs and sources. A directory a glob matches, or holding a moon.yml one matches, less hidden, node_modules and ! globs, is a project named by its last segment, or its path with globFormat source-path; a mapped one by its key; moon.yml id renames it. A workspace.yml that does not read is a warning, leaving the repository to the other detectors."
+      "text": [
+        "Else a root .moon/workspace.yml makes a moon workspace, of source workspace.",
+        "Its projects key is a list of globs, a map of id to directory, or both under globs and sources.",
+        "A directory a glob matches, or holding a moon.yml one matches, less hidden, node_modules and ! globs, is a project named by its last segment, or its path with globFormat source-path;",
+        "a mapped one by its key;",
+        "moon.yml id renames it.",
+        "A workspace.yml that does not read is a warning, leaving the repository to the other detectors."
+      ]
     },
     {
       "id": "moon-edges",
-      "text": "dependsOn in a project's moon.yml names its edges, each a project id or alias as a string or as an object with an id, and so does the project of each <project>:<task> target in the deps of its tasks. A package.json dependency that names another project's package is an edge, as moon infers it. A dependency on the project itself or on no project, and a task, package or root-scope one on the root project, is no edge. A moon.yml that does not read is a warning, and its project keeps no declared edge."
+      "text": [
+        "dependsOn in a project's moon.yml names its edges, each a project id or alias as a string or as an object with an id, and so does the project of each <project>:<task> target in the deps of its tasks.",
+        "A package.json dependency that names another project's package is an edge, as moon infers it.",
+        "A dependency on the project itself or on no project, and a task, package or root-scope one on the root project, is no edge.",
+        "A moon.yml that does not read is a warning, and its project keeps no declared edge."
+      ]
     },
     {
       "id": "moon-probe-answer",
-      "text": "The detection is a workspace probe answer under the @putnami/observe extension name: one project per moon project in path order, its moon id as source name, its moon.yml, else the export it came from, as source file, its dependencies as project paths, its metadata naming the id, the ecosystem moon and its component source, orchestrator or workspace, and the files whose content changes the answer. The answer passes the probe protocol's strict validation."
+      "text": [
+        "The detection is a workspace probe answer under the @putnami/observe extension name: one project per moon project in path order, its moon id as source name, its moon.yml, else the export it came from, as source file, its dependencies as project paths, its metadata naming the id, the ecosystem moon and its component source, orchestrator or workspace, and the files whose content changes the answer.",
+        "The answer passes the probe protocol's strict validation."
+      ]
     },
     {
       "id": "moon-change-analysis",

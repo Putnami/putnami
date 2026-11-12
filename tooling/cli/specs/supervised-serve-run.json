@@ -15,31 +15,58 @@
   "requirements": [
     {
       "id": "serve-env-reaches-only-serve-steps",
-      "text": "--serve-env - reads one JSON object of string variables from stdin and hands them to the process of each serve-workload step: a selected project's uncacheable serve step that no planned job depends on. A finite step of the same pipeline, a dependency's step, the job context, a param, a cache key, the output and the session never receive them. The flag is a job-only global flag, refused on an extension subcommand, a hosted or portable run, and a plan without a serve-workload step."
+      "text": [
+        "--serve-env - reads one JSON object of string variables from stdin and hands them to the process of each serve-workload step: a selected project's uncacheable serve step that no planned job depends on.",
+        "A finite step of the same pipeline, a dependency's step, the job context, a param, a cache key, the output and the session never receive them.",
+        "The flag is a job-only global flag, refused on an extension subcommand, a hosted or portable run, and a plan without a serve-workload step."
+      ]
     },
     {
       "id": "a-manifest-env-conflict-is-refused",
-      "text": "A run is refused as a usage error before any step starts when a serve-workload step's task declares in its own manifest env a variable the document sets, because the task's env would replace it. A name in the PUTNAMI_ namespace, a repeated name, a value that is not a string, a document over 1 MiB and a stdin that is a character device, such as a terminal, are refused the same way. A refusal names the variable, the task and the project, never a value."
+      "text": [
+        "A run is refused as a usage error before any step starts when a serve-workload step's task declares in its own manifest env a variable the document sets, because the task's env would replace it.",
+        "A name in the PUTNAMI_ namespace, a repeated name, a value that is not a string, a document over 1 MiB and a stdin that is a character device, such as a terminal, are refused the same way.",
+        "A refusal names the variable, the task and the project, never a value."
+      ]
     },
     {
       "id": "ready-claims-are-never-elided",
-      "text": "A ready task:event and a serve step's process event are priority records of the bounded session stream, in Go and TypeScript alike: admitted from the failure reserve, they stay live after ordinary records spent their partition. The reserve is shared with every failure-priority record. One arriving once it is spent is elided from the live stream, counted as a failure elision and kept in the session artifact."
+      "text": [
+        "A ready task:event and a serve step's process event are priority records of the bounded session stream, in Go and TypeScript alike: admitted from the failure reserve, they stay live after ordinary records spent their partition.",
+        "The reserve is shared with every failure-priority record.",
+        "One arriving once it is spent is elided from the live stream, counted as a failure elision and kept in the session artifact."
+      ]
     },
     {
       "id": "a-supervised-serve-run-splits-its-output",
-      "text": "With --output=jsonl and --serve-env -, stdout carries the session stream unchanged and stderr is the serve log: each task's start, output, end and failure details as putnami serve renders them in text mode, and a watched run's [watch] lines. The serve log carries no session summary: no opening line, counts, hint, cache report or interrupt notice, and no workspace load warning, because the supervisor reports its own session and its own load."
+      "text": [
+        "With --output=jsonl and --serve-env -, stdout carries the session stream unchanged and stderr is the serve log: each task's start, output, end and failure details as putnami serve renders them in text mode, and a watched run's [watch] lines.",
+        "The serve log carries no session summary: no opening line, counts, hint, cache report or interrupt notice, and no workspace load warning, because the supervisor reports its own session and its own load."
+      ]
     },
     {
       "id": "a-serve-step-names-its-process-group",
-      "text": "The job runner emits one task:event of type process for each serve-workload step it starts, before any event the step writes: group is the process group the step runs in and leaderStart the start time of its leader, which a reused pid reads differently. A finite step emits none, and a producer line of type process is dropped."
+      "text": [
+        "The job runner emits one task:event of type process for each serve-workload step it starts, before any event the step writes: group is the process group the step runs in and leaderStart the start time of its leader, which a reused pid reads differently.",
+        "A finite step emits none, and a producer line of type process is dropped."
+      ]
     },
     {
       "id": "an-ephemeral-port-waits-on-the-announced-port",
-      "text": "Under watch, a serve run with --port 0 waits between restarts on the port of the last ready claim that announced one, the first http or https endpoint, else the first endpoint; before any claim it waits on nothing. A pinned port waits on that port and a run without a port parameter on the default port, and neither consults a claim."
+      "text": [
+        "Under watch, a serve run with --port 0 waits between restarts on the port of the last ready claim that announced one, the first http or https endpoint, else the first endpoint;",
+        "before any claim it waits on nothing.",
+        "A pinned port waits on that port and a run without a port parameter on the default port, and neither consults a claim."
+      ]
     },
     {
       "id": "a-lost-supervisor-stops-the-run",
-      "text": "On Unix, a supervised serve run watches the process that started it, read at its start. Once that process exits, killed outright or not, the run cancels as SIGTERM cancels it, without a signal's forced exit: it stops its serve step and exits, watched or not, and records a supervisor's stop. Once the run plans, a write to a stdout or stderr whose reader is gone fails instead of ending it. On Windows, putnami's Job Object ends the supervisor's tree, the run included."
+      "text": [
+        "On Unix, a supervised serve run watches the process that started it, read at its start.",
+        "Once that process exits, killed outright or not, the run cancels as SIGTERM cancels it, without a signal's forced exit: it stops its serve step and exits, watched or not, and records a supervisor's stop.",
+        "Once the run plans, a write to a stdout or stderr whose reader is gone fails instead of ending it.",
+        "On Windows, putnami's Job Object ends the supervisor's tree, the run included."
+      ]
     }
   ]
 }

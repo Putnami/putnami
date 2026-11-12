@@ -21,27 +21,50 @@
     },
     {
       "id": "what-satisfies-a-dependency",
-      "text": "Only putnami.workspace.json satisfies a dependency, by name or by a path whose manifest has that name. A global-configuration key that names a graph member is ignored with one warning. An undeclared workspace project of a dependency's name is set aside, whether or not the lock pins the dependency, and never loads in its place."
+      "text": [
+        "Only putnami.workspace.json satisfies a dependency, by name or by a path whose manifest has that name.",
+        "A global-configuration key that names a graph member is ignored with one warning.",
+        "An undeclared workspace project of a dependency's name is set aside, whether or not the lock pins the dependency, and never loads in its place."
+      ]
     },
     {
       "id": "an-explicit-channel-flows-down",
-      "text": "An explicit channel, in the portable channel alphabet and other than latest, from --channel, PUTNAMI_CHANNEL or the install record during init, or from a name@channel argument, flows down: every dependency below the requested extension resolves on it at every hop, and its own constraint is checked against the resolved version. A semantic version or a range is not a channel. Otherwise a non-empty constraint resolves as written, the registry picking the highest match, and an empty one on latest."
+      "text": [
+        "An explicit channel, in the portable channel alphabet and other than latest, from --channel, PUTNAMI_CHANNEL or the install record during init, or from a name@channel argument, flows down: every dependency below the requested extension resolves on it at every hop, and its own constraint is checked against the resolved version.",
+        "A semantic version or a range is not a channel.",
+        "Otherwise a non-empty constraint resolves as written, the registry picking the highest match, and an empty one on latest."
+      ]
     },
     {
       "id": "the-lock-wins-while-it-satisfies-the-graph",
-      "text": "A locked dependency resolves from its lock entry while it satisfies every constraint known when it resolves. An explicit channel named on the command line re-resolves the requested subgraph, --latest and putnami upgrade re-resolve the graph, and a locked version that misses a constraint resolves again and the move is reported."
+      "text": [
+        "A locked dependency resolves from its lock entry while it satisfies every constraint known when it resolves.",
+        "An explicit channel named on the command line re-resolves the requested subgraph, --latest and putnami upgrade re-resolve the graph, and a locked version that misses a constraint resolves again and the move is reported."
+      ]
     },
     {
       "id": "an-unmet-range-fails",
-      "text": "A resolved version that misses a semantic-version range, or a channel answer without a resolved version when a range must be checked, fails the install. The error names the dependency, its version and each dependent with its constraint, also for a dependency the workspace declares by name."
+      "text": [
+        "A resolved version that misses a semantic-version range, or a channel answer without a resolved version when a range must be checked, fails the install.",
+        "The error names the dependency, its version and each dependent with its constraint, also for a dependency the workspace declares by name."
+      ]
     },
     {
       "id": "the-order-is-deterministic",
-      "text": "The graph resolves level by level, whatever order the workers finish in: dependents resolved under an explicit channel first, then dependents by manifest name, then dependencies by name. A node resolves once, at its first level, and a dependency reached earlier from outside a channel's subgraph keeps its request, and the channel only checks it. A later-level constraint is only checked, and a cycle installs each extension once."
+      "text": [
+        "The graph resolves level by level, whatever order the workers finish in: dependents resolved under an explicit channel first, then dependents by manifest name, then dependencies by name.",
+        "A node resolves once, at its first level, and a dependency reached earlier from outside a channel's subgraph keeps its request, and the channel only checks it.",
+        "A later-level constraint is only checked, and a cycle installs each extension once."
+      ]
     },
     {
       "id": "the-graph-loads",
-      "text": "Discovery loads every locked dependency of a loaded extension from the artifact store, after the declared extensions. An extension that only the root package.json development dependencies declare does not load, installed in node_modules or not. Context generation, option ownership and the missing-extension check include dependencies. A dependency that does not load is reported with the extension that requires it, and removing its only dependent stops loading it."
+      "text": [
+        "Discovery loads every locked dependency of a loaded extension from the artifact store, after the declared extensions.",
+        "An extension that only the root package.json development dependencies declare does not load, installed in node_modules or not.",
+        "Context generation, option ownership and the missing-extension check include dependencies.",
+        "A dependency that does not load is reported with the extension that requires it, and removing its only dependent stops loading it."
+      ]
     },
     {
       "id": "restore-follows-the-lock",
@@ -53,7 +76,10 @@
     },
     {
       "id": "a-dependency-serves-no-reserved-provider",
-      "text": "A dependency the workspace does not declare loses every reserved provider command: credential provider, cache provider, runner provider, session reporter, log reporter and Cloud release set. Discovery records each removal and putnami extensions list names it."
+      "text": [
+        "A dependency the workspace does not declare loses every reserved provider command: credential provider, cache provider, runner provider, session reporter, log reporter and Cloud release set.",
+        "Discovery records each removal and putnami extensions list names it."
+      ]
     },
     {
       "id": "update-moves-the-graph",
@@ -61,11 +87,17 @@
     },
     {
       "id": "a-channel-never-moves-a-pin-backwards",
-      "text": "When putnami extensions update, putnami templates update, putnami upgrade, install --latest or install name@channel resolves a locked artifact again on a channel (latest, an empty constraint, * or a channel name), it never moves the pin to an older build or to one whose version does not compare with it: it keeps the pin, leaves its lock entry as it is and names the channel and the build it serves. Only an exact version or a range moves a pin backwards, and ↑ marks only a newer version."
+      "text": [
+        "When putnami extensions update, putnami templates update, putnami upgrade, install --latest or install name@channel resolves a locked artifact again on a channel (latest, an empty constraint, * or a channel name), it never moves the pin to an older build or to one whose version does not compare with it: it keeps the pin, leaves its lock entry as it is and names the channel and the build it serves.",
+        "Only an exact version or a range moves a pin backwards, and ↑ marks only a newer version."
+      ]
     },
     {
       "id": "remove-keeps-the-graph-whole",
-      "text": "putnami extensions remove refuses when the name is still reachable from the workspace declarations without it, and names the members on that path, so the root of a cycle can be removed. Otherwise it removes the lock entry of the name and of each dependency those declarations no longer reach."
+      "text": [
+        "putnami extensions remove refuses when the name is still reachable from the workspace declarations without it, and names the members on that path, so the root of a cycle can be removed.",
+        "Otherwise it removes the lock entry of the name and of each dependency those declarations no longer reach."
+      ]
     },
     {
       "id": "hosted-installs-the-locked-graph",

@@ -9,6 +9,8 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/runcredential"
 )
 
 type streamCaptureResult struct {
@@ -70,6 +72,35 @@ func TestCaptureStdout_DrainsConcurrently(t *testing.T) {
 	}
 }
 
+// captureStructuredHelp keeps direct help-renderer assertions in memory. The
+// general captureStdout helper exercises the real process stream for tests
+// which need it; these render checks only need the bytes emitted through the
+// iox stdout seam.
+func captureStructuredHelp(t *testing.T, fn func()) string {
+	t.Helper()
+
+	output, err := iox.CaptureStdout(func() error {
+		fn()
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("capture structured help: %v", err)
+	}
+	return output
+}
+
+func TestStructuredHelpCaptureMatchesProcessStdout(t *testing.T) {
+	want := captureStdout(t, func() {
+		printSubcommandHelp("workspace", "init", nil)
+	})
+	got := captureStructuredHelp(t, func() {
+		printSubcommandHelp("workspace", "init", nil)
+	})
+	if got != want {
+		t.Fatalf("in-memory structured-help capture changed rendered bytes:\n%s", firstGoldenDiff(want, got))
+	}
+}
+
 func TestSortedExtensionFlags_Empty(t *testing.T) {
 	t.Parallel()
 	flags := map[string]extension.FlagDefinition{}
@@ -97,13 +128,13 @@ func TestSortedExtensionFlags_Sorted(t *testing.T) {
 
 func TestAllFlagCategories_NotEmpty(t *testing.T) {
 	t.Parallel()
-	if len(allFlagCategories) == 0 {
-		t.Error("allFlagCategories should not be empty")
+	if len(flagCategoriesFromCatalog()) == 0 {
+		t.Error("flagCategoriesFromCatalog() should not be empty")
 	}
 
 	// Verify expected categories exist
 	found := make(map[string]bool)
-	for _, cat := range allFlagCategories {
+	for _, cat := range flagCategoriesFromCatalog() {
 		found[cat.Name] = true
 		if len(cat.Flags) == 0 {
 			t.Errorf("category %q has no flags", cat.Name)
@@ -119,23 +150,18 @@ func TestAllFlagCategories_NotEmpty(t *testing.T) {
 
 func TestRelatedCommands_CacheVerifyHasRelated(t *testing.T) {
 	t.Parallel()
-	related, ok := relatedCommands["cache verify"]
-	if !ok {
-		t.Fatal("cache verify should have related commands")
-	}
-	if len(related) == 0 {
+	if related := catalogRelated("cache verify"); len(related) == 0 {
 		t.Error("cache verify should have at least one related command")
 	}
-	if _, ok := relatedCommands["build"]; ok {
-		t.Error("build has related commands in the catalog, want only a vocabulary to relate a job command")
+	if related := catalogRelated("build"); related != nil {
+		t.Errorf("build has related commands %v in the catalog, want only a vocabulary to relate a job command", related)
 	}
 }
 
 func TestRelatedCommands_NonexistentCommand(t *testing.T) {
 	t.Parallel()
-	_, ok := relatedCommands["nonexistent"]
-	if ok {
-		t.Error("nonexistent command should not have related commands")
+	if related := catalogRelated("nonexistent"); related != nil {
+		t.Errorf("nonexistent command has related commands %v, want none", related)
 	}
 }
 
@@ -360,6 +386,22 @@ func TestExtensionFlagHelpLine_ListsTheNegationOfAFlagOnByDefault(t *testing.T) 
 	} {
 		if got := extensionFlagHelpLine(tc.name, tc.flag); got != tc.want {
 			t.Errorf("extensionFlagHelpLine(%s) = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
+// A pin relaunch reads the custody level from the pinned CLI's top-level help
+// (runcredential.AdvertisedCustodyLevel), so the help this CLI prints, in a
+// workspace or outside one, must list the run credential's flag at this CLI's
+// level. internal/launch's probe tests read a listing built from the same flag
+// and description.
+func TestTopLevelHelpAdvertisesTheCustodyLevel(t *testing.T) {
+	t.Parallel()
+	for _, scope := range []*helpScope{nil, {}} {
+		level, listed := runcredential.AdvertisedCustodyLevel([]byte(renderHelp(scope)))
+		if !listed || level != runcredential.CustodyLevel {
+			t.Errorf("the top-level help (workspace scope %t) advertises custody level %d (flag listed %t), want %d",
+				scope != nil, level, listed, runcredential.CustodyLevel)
 		}
 	}
 }

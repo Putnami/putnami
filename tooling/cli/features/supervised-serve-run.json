@@ -1,0 +1,116 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/supervised-serve-run",
+    "type": "feature",
+    "name": "Supervised serve run",
+    "outcome": "A supervisor starts a workload with one putnami serve run, hands its serve step the process environment the workload needs on stdin, and reads from the session stream which process group the workload runs in and when it is ready, however many ordinary log lines the workload writes",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "serve-env-reaches-only-serve-steps",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-flag-is-execution-only",
+            "the-engine-names-only-the-terminal-serve-step",
+            "only-the-serve-step-process-receives-the-env",
+            "a-supervised-serve-run-hands-the-env-to-the-serve-step-alone"
+          ]
+        }
+      },
+      {
+        "id": "a-manifest-env-conflict-is-refused",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-refusal-names-the-variable-and-the-task",
+            "the-cli-refuses-the-run-before-any-step-starts",
+            "a-terminal-stdin-is-refused"
+          ]
+        }
+      },
+      {
+        "id": "ready-claims-are-never-elided",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-ready-claim-uses-the-failure-reserve",
+            "a-ready-claim-shares-the-bounded-failure-reserve"
+          ]
+        }
+      },
+      {
+        "id": "a-supervised-serve-run-splits-its-output",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "stdout-keeps-the-stream-and-stderr-renders-the-serve-steps",
+            "the-serve-log-carries-no-session-summary",
+            "the-serve-log-carries-no-load-warning"
+          ]
+        }
+      },
+      {
+        "id": "a-serve-step-names-its-process-group",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-process-event-precedes-every-producer-event"
+          ]
+        }
+      },
+      {
+        "id": "an-ephemeral-port-waits-on-the-announced-port",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-release-wait-reads-the-announced-port"
+          ]
+        }
+      },
+      {
+        "id": "a-lost-supervisor-stops-the-run",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-changed-parent-pid-cancels-the-run",
+            "a-supervisor-lost-before-the-watch-cancels-the-run",
+            "a-killed-supervisor-stops-the-serve-step"
+          ]
+        }
+      }
+    ]
+  }
+}

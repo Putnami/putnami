@@ -30,7 +30,10 @@
     },
     {
       "id": "bounded-test-output",
-      "text": "Go and TypeScript test tasks use the same pass, fail and skip summary vocabulary; causal failure diagnostics obey the CLI report count and message limits with explicit omission accounting, while attributed transcript log events survive batch splitting as session detail."
+      "text": [
+        "Go and TypeScript test tasks use the same pass, fail and skip summary vocabulary;",
+        "causal failure diagnostics obey the CLI report count and message limits with explicit omission accounting, while attributed transcript log events survive batch splitting as session detail."
+      ]
     },
     {
       "id": "doctor-gate",
@@ -42,7 +45,10 @@
     },
     {
       "id": "doctor-names-a-missing-readme",
-      "text": "Doctor reports a project that has no README.md at its root as an advisory doctor.missing_readme finding, whose remediation names the purpose, commands and documentation a README states. A template project, which ships README.md.template for the project it renders, and a generated client project are exempt."
+      "text": [
+        "Doctor reports a project that has no README.md at its root as an advisory doctor.missing_readme finding, whose remediation names the purpose, commands and documentation a README states.",
+        "A template project, which ships README.md.template for the project it renders, and a generated client project are exempt."
+      ]
     },
     {
       "id": "redaction",
@@ -50,7 +56,10 @@
     },
     {
       "id": "terminal-outcome",
-      "text": "An interactive extension subcommand that passes its deadline prints a line naming the command and exits 1, whatever code its process returned. One whose process ends from a signal exits 1 and prints the signal, except SIGINT, which exits 130 with no line."
+      "text": [
+        "An interactive extension subcommand that passes its deadline prints a line naming the command and exits 1, whatever code its process returned.",
+        "One whose process ends from a signal exits 1 and prints the signal, except SIGINT, which exits 130 with no line."
+      ]
     },
     {
       "id": "bounded-machine-detail",
@@ -58,27 +67,52 @@
     },
     {
       "id": "opening-session-identity",
-      "text": "The opening scheduler:parallel event carries optional event.sessionId after its v2 plan is written and before tasks start. Verification and publish-containing runs use the same path and prepare once. Live and retained streams agree; sessionless schedulers omit the ID. Readers bind their invocation's event to .putnami/sessions/<sessionId>/plan.json as advisory, untrusted input. Envelopes, budgets, nested attribution and verdicts are unchanged; missing or elided events provide no early evidence."
+      "text": [
+        "The opening scheduler:parallel event carries optional event.sessionId after its v2 plan is written and before tasks start.",
+        "Verification and publish-containing runs use the same path and prepare once.",
+        "Live and retained streams agree; sessionless schedulers omit the ID.",
+        "Readers bind their invocation's event to .putnami/sessions/<sessionId>/plan.json as advisory, untrusted input.",
+        "Envelopes, budgets, nested attribution and verdicts are unchanged; missing or elided events provide no early evidence."
+      ]
     },
     {
       "id": "session-record-durability",
-      "text": "Export emits every recorded session still present, oldest first by recorded start time, deduplicated by session id, forwarding the recorded document verbatim so a member a newer producer added survives. --since filters on the recorded start time and is inclusive at the boundary. Retention is configurable per workspace and its default is unchanged."
+      "text": [
+        "Export emits every recorded session still present, oldest first by recorded start time, deduplicated by session id, forwarding the recorded document verbatim so a member a newer producer added survives. --since filters on the recorded start time and is inclusive at the boundary.",
+        "Retention is configurable per workspace and its default is unchanged."
+      ]
     },
     {
       "id": "gated-tree-identity",
-      "text": "`putnami tree fingerprint` prints one digest covering HEAD, the bytes at every tracked path that differs from it (recursing through submodules), and the content of every untracked non-ignored file, from anywhere inside the worktree and without a workspace. A recorded session carries that same digest, captured before its first task ran, together with the dirty verdict and the head it was taken against. A producer that cannot determine the tree records no tree block rather than claiming a clean one."
+      "text": [
+        "`putnami tree fingerprint` prints one digest covering HEAD, the bytes at every tracked path that differs from it (recursing through submodules), and the content of every untracked non-ignored file, from anywhere inside the worktree and without a workspace.",
+        "A recorded session carries that same digest, captured before its first task ran, together with the dirty verdict and the head it was taken against.",
+        "A producer that cannot determine the tree records no tree block rather than claiming a clean one."
+      ]
     },
     {
       "id": "recorded-run-context",
-      "text": "A failed declared check in a recorded session carries a stable diagnostic code; a spec-verification sanction uses features.unresolved_requirement or features.verification_unreadable. The session carries a digest of the declaration files its declared checks read, taken before its first task and separate from the tree fingerprint: a declaration edit moves it, a code edit does not."
+      "text": [
+        "A failed declared check in a recorded session carries a stable diagnostic code; a spec-verification sanction uses features.unresolved_requirement or features.verification_unreadable.",
+        "The session carries a digest of the declaration files its declared checks read, taken before its first task and separate from the tree fingerprint: a declaration edit moves it, a code edit does not."
+      ]
     },
     {
       "id": "session-summary-view",
-      "text": "Summary reduces each recorded session to one row: id, start, commands, selection, tasks total/executed/reused, run.cpu.actualMs, wall and outcome, in export's order and with its deduplication. A run a task spawned names its parent and is marked nested, never counted as a run of its own: --command keeps top-level sessions whose command set is exactly the named list, in any order, and never a nested run whatever it ran. Structured output carries the rows as an array at every count."
+      "text": [
+        "Summary reduces each recorded session to one row: id, start, commands, selection, tasks total/executed/reused, run.cpu.actualMs, wall and outcome, in export's order and with its deduplication.",
+        "A run a task spawned names its parent and is marked nested, never counted as a run of its own: --command keeps top-level sessions whose command set is exactly the named list, in any order, and never a nested run whatever it ran.",
+        "Structured output carries the rows as an array at every count."
+      ]
     },
     {
       "id": "task-input-digest",
-      "text": "Every task record that reached a verdict carries inputDigest: the cache key it was keyed on, spelled sha256: and 64 lowercase hex, so it moves exactly when the key does. A skipped record and a task with no cache identity carry none. Summary --by-digest groups the selected sessions' records by digest in first-recorded order, with records, executed, reused and failed counts and each occurrence's session and reuse; records without a digest are counted apart."
+      "text": [
+        "Every task record that reached a verdict carries inputDigest: the cache key it was keyed on, spelled sha256: and 64 lowercase hex, so it moves exactly when the key does.",
+        "A skipped record and a task with no cache identity carry none.",
+        "Summary --by-digest groups the selected sessions' records by digest in first-recorded order, with records, executed, reused and failed counts and each occurrence's session and reuse;",
+        "records without a digest are counted apart."
+      ]
     }
   ],
   "decisions": [

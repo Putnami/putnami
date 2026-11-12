@@ -15,27 +15,51 @@
   "requirements": [
     {
       "id": "madr-records",
-      "text": "Decision records are the .md files under the directories --decisions names, comma-separated and relative to the repository root, else docs/decisions and docs/adr, walked recursively past hidden directories. An entry outside the repository is a diagnostic and is not read. README.md, index.md and a file whose name holds template are not records, and a directory that does not exist is no diagnostic."
+      "text": [
+        "Decision records are the .md files under the directories --decisions names, comma-separated and relative to the repository root, else docs/decisions and docs/adr, walked recursively past hidden directories.",
+        "An entry outside the repository is a diagnostic and is not read.",
+        "README.md, index.md and a file whose name holds template are not records, and a directory that does not exist is no diagnostic."
+      ]
     },
     {
       "id": "madr-fields",
-      "text": "A record's title is its front matter title, else its first level-one heading, else its file name. Its status is the front matter status, else the value of a Status line, plain, in a list item or in bold, else the first line of a Status section; the first word, lowercased, gives proposed, accepted, rejected, deprecated or superseded, and anything else unknown. Its date is the front matter date, else the value of a Date line, kept when it is a valid YYYY-MM-DD date."
+      "text": [
+        "A record's title is its front matter title, else its first level-one heading, else its file name.",
+        "Its status is the front matter status, else the value of a Status line, plain, in a list item or in bold, else the first line of a Status section;",
+        "the first word, lowercased, gives proposed, accepted, rejected, deprecated or superseded, and anything else unknown.",
+        "Its date is the front matter date, else the value of a Date line, kept when it is a valid YYYY-MM-DD date."
+      ]
     },
     {
       "id": "madr-scope",
-      "text": "A record's scope is its front matter scope, a list or one pattern, else the list items of its Scope section, each one path pattern, with its backticks removed when it is quoted in them, else up to its first space. No scope is valid: the record then governs nothing."
+      "text": [
+        "A record's scope is its front matter scope, a list or one pattern, else the list items of its Scope section, each one path pattern, with its backticks removed when it is quoted in them, else up to its first space.",
+        "No scope is valid: the record then governs nothing."
+      ]
     },
     {
       "id": "decision-scope-matching",
-      "text": "A scope pattern is relative to the repository root; a leading ./ or / and a trailing / are dropped, and a pattern with a drive letter or a .. segment matches nothing. A pattern without * or ? governs the path itself and every path under it. Otherwise * and ? match within one segment, a ** segment matches any number of segments, and every other character, [ included, matches itself."
+      "text": [
+        "A scope pattern is relative to the repository root; a leading ./ or / and a trailing / are dropped, and a pattern with a drive letter or a .. segment matches nothing.",
+        "A pattern without * or ? governs the path itself and every path under it.",
+        "Otherwise * and ? match within one segment, a ** segment matches any number of segments, and every other character, [ included, matches itself."
+      ]
     },
     {
       "id": "decisions-in-the-evidence",
-      "text": "The observation and the evidence document list, sorted by path, every record whose scope matches a changed file, with the changed files it governs, and every record the change adds, modifies, renames or deletes, a record moved out of the decision directories included, with that file status; records are read at the head and a deleted one at the base. A record that cannot be read is a diagnostic. A repository without decision records gets no decisions and no diagnostic."
+      "text": [
+        "The observation and the evidence document list, sorted by path, every record whose scope matches a changed file, with the changed files it governs, and every record the change adds, modifies, renames or deletes, a record moved out of the decision directories included, with that file status;",
+        "records are read at the head and a deleted one at the base.",
+        "A record that cannot be read is a diagnostic.",
+        "A repository without decision records gets no decisions and no diagnostic."
+      ]
     },
     {
       "id": "deleted-accepted-decision",
-      "text": "A change that deletes an accepted decision record gets the warning observe.decision_deleted naming the record. A superseded or deprecated decision is listed with that status, like any other."
+      "text": [
+        "A change that deletes an accepted decision record gets the warning observe.decision_deleted naming the record.",
+        "A superseded or deprecated decision is listed with that status, like any other."
+      ]
     },
     {
       "id": "decisions-summary",

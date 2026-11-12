@@ -135,7 +135,8 @@ func workflowNativePath(file, kind string) {
 	require(file != "" && !filepath.IsAbs(file) && !strings.Contains(file, "\\") && path.Clean(file) == file &&
 		file != ".." && !strings.HasPrefix(file, "../"), kind+" must use a workspace-relative slash path")
 	if kind == "manifest" {
-		require(path.Base(file) == features.ManifestFilename, "workflow manifest path must name putnami.features.json")
+		_, authored := features.ManifestRoot(file)
+		require(authored, "workflow manifest path must name putnami.features.json or a features/<feature>.json document")
 	} else if kind == "spec" {
 		require(path.Ext(file) == ".json" && path.Base(path.Dir(file)) == features.SpecDirectory,
 			"workflow spec path must be a direct specs JSON child")
@@ -173,13 +174,13 @@ func (r *verifyRun) workflowSources(value any) map[string]workflowSource {
 		r.workflowTrackedSource(specPath, "spec")
 		manifestBytes, _ := r.workflowBytes(source.get("manifest"), "workflow manifest")
 		specBytes, _ := r.workflowBytes(source.get("spec"), "workflow spec")
-		projectDir := path.Dir(manifestPath)
+		projectDir, _ := features.ManifestRoot(manifestPath)
+		if projectDir == "" {
+			projectDir = "."
+		}
 		require(path.Dir(specPath) == path.Join(projectDir, features.SpecDirectory),
 			"workflow spec and feature manifest have different native owners")
-		manifest, diagnostics := features.ParseAndValidateManifest(manifestBytes)
-		if len(diagnostics) > 0 {
-			workflowNativeError("manifest", diagnostics)
-		}
+		manifest := workflowAuthoredManifest(manifestPath, manifestBytes, "manifest")
 		spec, diagnostics := features.ParseAndValidateSpec(specBytes)
 		if len(diagnostics) > 0 {
 			workflowNativeError("spec", diagnostics)
@@ -1174,7 +1175,8 @@ func (r *verifyRun) workflowIntentEdit(base string) string {
 	found := ""
 	for _, changed := range changes {
 		if path.Base(changed) == features.ManifestFilename ||
-			path.Ext(changed) == ".json" && path.Base(path.Dir(changed)) == features.SpecDirectory {
+			path.Ext(changed) == ".json" && path.Base(path.Dir(changed)) == features.SpecDirectory ||
+			r.workflowFeatureDocument(changed) {
 			found = changed
 			break
 		}
@@ -1203,13 +1205,15 @@ func (r *verifyRun) workflowIntentEdit(base string) string {
 // the workspace root and a manifest at a project root, beside a tracked
 // putnami.json.
 func (r *verifyRun) workflowExternalSpecPaths() []string {
-	projects := map[string]bool{".": true}
-	for _, project := range r.fileList("ls-files", "-z", "--", "putnami.json", "**/putnami.json") {
-		projects[path.Dir(project)] = true
-	}
 	var specs []string
-	for _, manifestPath := range r.fileList("ls-files", "-z", "--", features.ManifestFilename, "**/"+features.ManifestFilename) {
-		if !projects[path.Dir(manifestPath)] {
+	candidates := r.fileList("ls-files", "-z", "--", features.ManifestFilename, "**/"+features.ManifestFilename,
+		features.FeatureDirectory+"/*.json", "**/"+features.FeatureDirectory+"/*.json")
+	for _, manifestPath := range candidates {
+		if path.Base(manifestPath) == features.ManifestFilename {
+			if !r.workflowProjectRoots()[path.Dir(manifestPath)] {
+				continue
+			}
+		} else if !r.workflowFeatureDocument(manifestPath) {
 			continue
 		}
 		data, err := os.ReadFile(r.path(manifestPath))
@@ -1219,10 +1223,7 @@ func (r *verifyRun) workflowExternalSpecPaths() []string {
 		if err != nil {
 			failErr(err)
 		}
-		manifest, diagnostics := features.ParseAndValidateManifest(data)
-		if len(diagnostics) > 0 {
-			workflowNativeError("manifest "+manifestPath, diagnostics)
-		}
+		manifest := workflowAuthoredManifest(manifestPath, data, "manifest "+manifestPath)
 		for _, feature := range manifest.Features {
 			if feature.Spec != nil {
 				specs = append(specs, path.Clean(feature.Spec.Path))
@@ -1230,4 +1231,46 @@ func (r *verifyRun) workflowExternalSpecPaths() []string {
 		}
 	}
 	return specs
+}
+
+// workflowProjectRoots returns the workspace root, as ".", and every directory
+// that holds a tracked putnami.json. A verifier run lists them once.
+func (r *verifyRun) workflowProjectRoots() map[string]bool {
+	if r.projectRoots != nil {
+		return r.projectRoots
+	}
+	r.projectRoots = map[string]bool{".": true}
+	for _, project := range r.fileList("ls-files", "-z", "--", "putnami.json", "**/putnami.json") {
+		r.projectRoots[path.Dir(project)] = true
+	}
+	return r.projectRoots
+}
+
+// workflowFeatureDocument reports whether file is a feature document: a direct
+// JSON child of features/ at the workspace root or at a directory that holds a
+// putnami.json, where features/ is not itself such a directory.
+func (r *verifyRun) workflowFeatureDocument(file string) bool {
+	if path.Ext(file) != ".json" || path.Base(path.Dir(file)) != features.FeatureDirectory {
+		return false
+	}
+	roots := r.workflowProjectRoots()
+	return roots[path.Dir(path.Dir(file))] && !roots[path.Dir(file)]
+}
+
+// workflowAuthoredManifest parses the authored intent at file in its form: a
+// putnami.features.json manifest, or one feature document as the one-feature
+// manifest it stands for.
+func workflowAuthoredManifest(file string, data []byte, kind string) *features.Manifest {
+	if path.Base(file) == features.ManifestFilename {
+		manifest, diagnostics := features.ParseAndValidateManifest(data)
+		if len(diagnostics) > 0 {
+			workflowNativeError(kind, diagnostics)
+		}
+		return manifest
+	}
+	document, diagnostics := features.ParseAndValidateFeatureDocument(data)
+	if len(diagnostics) > 0 {
+		workflowNativeError(kind, diagnostics)
+	}
+	return document.Manifest()
 }

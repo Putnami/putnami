@@ -18,11 +18,19 @@
   "requirements": [
     {
       "id": "acquire-time-search-path",
-      "text": "The physical pool carries no search_path startup parameter; every operation of a datasource-bound client reserves a connection, pipelines SELECT set_config('search_path', $1, false) with the datasource's search_path \u2014 or RESET search_path for a datasource on the server default \u2014 before its own statement on that same connection, releases the connection, and rejects with the set's error when the set failed, so a result is never returned under an unverified search_path."
+      "text": [
+        "The physical pool carries no search_path startup parameter;",
+        "every operation of a datasource-bound client reserves a connection, pipelines SELECT set_config('search_path', $1, false) with the datasource's search_path \u2014 or RESET search_path for a datasource on the server default \u2014 before its own statement on that same connection, releases the connection, and rejects with the set's error when the set failed, so a result is never returned under an unverified search_path."
+      ]
     },
     {
       "id": "datasource-bound-acquire",
-      "text": "database(name) returns a datasource-bound client, never the shared driver pool: tagged-template queries, unsafe, file and notify set the path per operation; reserve() and begin() set it on the pinned connection they hand out; cancel and query modes reach the inner driver query; identifier and row builders forward to the physical pool untouched."
+      "text": [
+        "database(name) returns a datasource-bound client, never the shared driver pool: tagged-template queries, unsafe, file and notify set the path per operation;",
+        "reserve() and begin() set it on the pinned connection they hand out;",
+        "cancel and query modes reach the inner driver query;",
+        "identifier and row builders forward to the physical pool untouched."
+      ]
     },
     {
       "id": "one-pool-per-physical-database",
@@ -34,8 +42,13 @@
     },
     {
       "id": "tuning-agreement",
-      "text": "Datasources that resolve to one physical pool must declare the same poolSize, connectTimeout, idleTimeout, maxLifetime, statementTimeoutMs, idleInTransactionTimeoutMs and debug; a difference rejects database(name) with an error naming both datasources and each differing field, never a larger ceiling or a second pool."
+      "text": [
+        "Datasources that resolve to one physical pool must declare the same poolSize, connectTimeout, idleTimeout, maxLifetime, statementTimeoutMs, idleInTransactionTimeoutMs and debug;",
+        "a difference rejects database(name) with an error naming both datasources and each differing field, never a larger ceiling or a second pool."
+      ]
     }
   ],
-  "decisions": ["typescript/framework/database/doc/adr/0003-shared-physical-pool-per-database.md"]
+  "decisions": [
+    "typescript/framework/database/doc/adr/0003-shared-physical-pool-per-database.md"
+  ]
 }

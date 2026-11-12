@@ -20,7 +20,7 @@ func basicSpec(feature string) *Spec {
 		Feature:         feature,
 		Outcomes:        []string{"A customer reaches the stated result"},
 		Requirements: []SpecRequirement{
-			{ID: "export-format", Text: "An export states its format in the response content type."},
+			{ID: "export-format", Text: SpecText{"An export states its format in the response content type."}},
 		},
 	}
 }
@@ -237,13 +237,13 @@ func TestSpecLocalValidationBoundaries(t *testing.T) {
 	}
 
 	spec = basicSpec("billing/invoicing")
-	spec.Requirements[0].Text = "   "
+	spec.Requirements[0].Text = SpecText{"   "}
 	if findings := ValidateSpec(spec); !hasCode(findings, ErrorCodeInvalidRequirement) {
 		t.Fatalf("blank requirement text accepted: %v", findings)
 	}
 
 	spec = basicSpec("billing/invoicing")
-	spec.Requirements = append(spec.Requirements, SpecRequirement{ID: "export-format", Text: "A second sentence for the same identity."})
+	spec.Requirements = append(spec.Requirements, SpecRequirement{ID: "export-format", Text: SpecText{"A second sentence for the same identity."}})
 	if got := countCode(ValidateSpec(spec), ErrorCodeInvalidRequirement); got != 1 {
 		t.Fatalf("duplicate requirement ID reported %d times: %v", got, ValidateSpec(spec))
 	}
@@ -276,9 +276,9 @@ func TestSpecDiagnosticsNameFilePositions(t *testing.T) {
 	spectest.Proves(t, "features/feature-contracts", "findings-name-file-positions", "spec-findings-name-their-position-and-bound")
 	spec := basicSpec("billing/invoicing")
 	spec.Requirements = []SpecRequirement{
-		{ID: "zeta-export", Text: "An export states its format in the response content type."},
-		{ID: "alpha-export", Text: strings.Repeat("x", 513)},
-		{ID: "zeta-export", Text: "A second sentence for the same identity."},
+		{ID: "zeta-export", Text: SpecText{"An export states its format in the response content type."}},
+		{ID: "alpha-export", Text: SpecText{strings.Repeat("x", 513)}},
+		{ID: "zeta-export", Text: SpecText{"A second sentence for the same identity."}},
 	}
 	spec.Decisions = []string{"protocols/features/doc/adr/0001-second-protocol.txt", "doc/adr/0001-workspace-decision.md"}
 	findings := ValidateSpec(spec)

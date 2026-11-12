@@ -51,6 +51,7 @@ export const TEMPLATE_ROOT_EXCLUSIONS: readonly string[] = [
   'node_modules',
   'putnami.json',
   'putnami.features.json',
+  'features',
   'specs',
   'specs.baseline.json',
 ];
@@ -82,7 +83,7 @@ export interface Template {
     extension?: string;
     testVariables?: Record<string, string>;
   };
-  /** The features its `putnami.features.json` declares, none without one. */
+  /** The features it declares in `putnami.features.json` or `features/`, none without either. */
   features: TemplateFeature[];
 }
 
@@ -164,13 +165,23 @@ export function discoverTemplates(templatesDir: string, extension: string): Temp
   return templates;
 }
 
-/** Reads the features `<dir>/putnami.features.json` declares, none when it is absent. */
+/**
+ * Reads the features a template declares: those of `<dir>/putnami.features.json`,
+ * or one per `<dir>/features/*.json` document, none when it holds neither.
+ */
 function readFeatures(dir: string): TemplateFeature[] {
   const path = join(dir, 'putnami.features.json');
-  if (!existsSync(path)) {
+  if (existsSync(path)) {
+    return (JSON.parse(readFileSync(path, 'utf8')) as { features?: TemplateFeature[] }).features ?? [];
+  }
+  const directory = join(dir, 'features');
+  if (!existsSync(directory)) {
     return [];
   }
-  return (JSON.parse(readFileSync(path, 'utf8')) as { features?: TemplateFeature[] }).features ?? [];
+  return readdirSync(directory)
+    .filter((name) => name.endsWith('.json'))
+    .sort()
+    .map((name) => (JSON.parse(readFileSync(join(directory, name), 'utf8')) as { feature: TemplateFeature }).feature);
 }
 
 /**

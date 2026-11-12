@@ -60,6 +60,77 @@ func TestDiscoverAuthoredManifestsSkipsInvalidDocumentWithoutHidingHealthyRoot(t
 	}
 }
 
+func TestDiscoverAuthoredManifestsReadsOneDocumentPerFeature(t *testing.T) {
+	root := t.TempDir()
+	writeDiscoveryFixture(t, filepath.Join(root, "tooling", "features", "run.json"), modeledDocumentJSON("tooling/run", "tooling"))
+	writeDiscoveryFixture(t, filepath.Join(root, "tooling", "features", "init.json"), modeledDocumentJSON("tooling/init", "tooling"))
+	writeDiscoveryFixture(t, filepath.Join(root, "tooling", "features", "notes.md"), "not a feature document")
+	writeDiscoveryFixture(t, filepath.Join(root, "tooling", "features", "nested", "deep.json"), modeledDocumentJSON("tooling/deep", "tooling"))
+	writeDiscoveryFixture(t, filepath.Join(root, "broken", "features", "bad.json"),
+		`{"protocolVersion":1,"namespace":"broken","feature":{"id":"broken/bad","type":"feature","name":"","outcome":"Outcome","owner":"team","target":"modeled"}}`)
+
+	ws := workspace.NewWorkspace(root, &workspaceproto.Config{Name: "fixture"}, []*workspace.Project{
+		{Name: "tooling", Path: "tooling"},
+		{Name: "broken", Path: "broken"},
+	})
+	result := DiscoverAuthoredManifests(ws)
+	var paths []string
+	for _, source := range result.Manifests {
+		if !source.Document || len(source.Manifest.Features) != 1 {
+			t.Fatalf("source %s is not a one-feature document: %#v", source.Path, source)
+		}
+		paths = append(paths, source.Path)
+	}
+	if got := strings.Join(paths, ","); got != "tooling/features/init.json,tooling/features/run.json" {
+		t.Fatalf("manifest paths = %q, want the valid direct JSON children of each features/", got)
+	}
+	if len(result.Diagnostics) == 0 || !strings.HasPrefix(result.Diagnostics[0].Field, "broken/features/bad.json#feature.name") {
+		t.Fatalf("diagnostics = %#v, want the invalid name positioned in its document", result.Diagnostics)
+	}
+}
+
+func TestDiscoverAuthoredManifestsRefusesARootThatHoldsBothForms(t *testing.T) {
+	root := t.TempDir()
+	writeDiscoveryFixture(t, filepath.Join(root, "tooling", featureproto.ManifestFilename), modeledManifestJSON("tooling/run", "tooling"))
+	writeDiscoveryFixture(t, filepath.Join(root, "tooling", "features", "init.json"), modeledDocumentJSON("tooling/init", "tooling"))
+	writeDiscoveryFixture(t, filepath.Join(root, "healthy", "features", "catalog.json"), modeledDocumentJSON("healthy/catalog", "healthy"))
+
+	ws := workspace.NewWorkspace(root, &workspaceproto.Config{Name: "fixture"}, []*workspace.Project{
+		{Name: "tooling", Path: "tooling"},
+		{Name: "healthy", Path: "healthy"},
+	})
+	result := DiscoverAuthoredManifests(ws)
+	if len(result.Manifests) != 1 || result.Manifests[0].Path != "healthy/features/catalog.json" {
+		t.Fatalf("manifests = %#v, want only the root that holds one form", result.Manifests)
+	}
+	if len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != featureproto.ErrorCodeManifestFormConflict ||
+		result.Diagnostics[0].Field != "tooling/putnami.features.json" {
+		t.Fatalf("diagnostics = %#v, want one form conflict at tooling", result.Diagnostics)
+	}
+}
+
+func TestDiscoverAuthoredManifestsReadsAProjectNamedFeaturesAsAProject(t *testing.T) {
+	root := t.TempDir()
+	writeDiscoveryFixture(t, filepath.Join(root, "protocols", "features", featureproto.ManifestFilename), modeledManifestJSON("features/contracts", "features"))
+	writeDiscoveryFixture(t, filepath.Join(root, "protocols", "features", "package.json"), `{"name":"features"}`)
+
+	ws := workspace.NewWorkspace(root, &workspaceproto.Config{Name: "fixture"}, []*workspace.Project{
+		{Name: "protocols", Path: "protocols"},
+		{Name: "features", Path: "protocols/features"},
+	})
+	result := DiscoverAuthoredManifests(ws)
+	if len(result.Diagnostics) != 0 {
+		t.Fatalf("diagnostics = %#v", result.Diagnostics)
+	}
+	if len(result.Manifests) != 1 || result.Manifests[0].Path != "protocols/features/putnami.features.json" || result.Manifests[0].Document {
+		t.Fatalf("manifests = %#v, want the nested project's own manifest only", result.Manifests)
+	}
+}
+
+func modeledDocumentJSON(id, namespace string) string {
+	return `{"protocolVersion":1,"namespace":"` + namespace + `","feature":{"id":"` + id + `","type":"feature","name":"Name","outcome":"Outcome","owner":"team","target":"modeled"}}`
+}
+
 func modeledManifestJSON(id, namespace string) string {
 	return `{"protocolVersion":1,"namespace":"` + namespace + `","features":[{"id":"` + id + `","type":"feature","name":"Name","outcome":"Outcome","owner":"team","target":"modeled"}]}`
 }

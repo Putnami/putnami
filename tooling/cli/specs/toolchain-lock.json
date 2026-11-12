@@ -17,15 +17,25 @@
   "requirements": [
     {
       "id": "extensions-answer-pins",
-      "text": "putnami install, putnami init, putnami projects create and the implicit install send, before any workspace-install, one toolchain-resolve request to each installed extension whose manifest lists runtime.resolves. The request names those identities, the lock's committed entries for them, the host platform and whether the run is offline. The CLI validates each answer with the workspace protocol's rules before it uses it."
+      "text": [
+        "putnami install, putnami init, putnami projects create and the implicit install send, before any workspace-install, one toolchain-resolve request to each installed extension whose manifest lists runtime.resolves.",
+        "The request names those identities, the lock's committed entries for them, the host platform and whether the run is offline.",
+        "The CLI validates each answer with the workspace protocol's rules before it uses it."
+      ]
     },
     {
       "id": "install-pins-before-installers",
-      "text": "An explicit putnami install, putnami init or putnami projects create sets the lock's toolchains to exactly the answered pins: an identity an answer omits, or that no installed extension answers for, is removed. A lock whose toolchains change is written at format 5 and its other entries keep their content, so a format 4 lock that pins toolchains becomes format 5."
+      "text": [
+        "An explicit putnami install, putnami init or putnami projects create sets the lock's toolchains to exactly the answered pins: an identity an answer omits, or that no installed extension answers for, is removed.",
+        "A lock whose toolchains change is written at format 5 and its other entries keep their content, so a format 4 lock that pins toolchains becomes format 5."
+      ]
     },
     {
       "id": "implicit-install-fills-missing-pins",
-      "text": "The implicit install a command runs first keeps a committed format 5 pin as committed, takes the answer for every other identity it asks for, and removes no pin. When no pin changes, it writes nothing."
+      "text": [
+        "The implicit install a command runs first keeps a committed format 5 pin as committed, takes the answer for every other identity it asks for, and removes no pin.",
+        "When no pin changes, it writes nothing."
+      ]
     },
     {
       "id": "hosted-runs-write-no-pins",
@@ -33,11 +43,17 @@
     },
     {
       "id": "failed-answers-stop-the-install",
-      "text": "An answer's problem fails the command with the problem's message and remedy before any installer runs. A failed, timed-out or invalid answer fails it naming the extension, and two extensions that answer one identity with different pins fail it naming both."
+      "text": [
+        "An answer's problem fails the command with the problem's message and remedy before any installer runs.",
+        "A failed, timed-out or invalid answer fails it naming the extension, and two extensions that answer one identity with different pins fail it naming both."
+      ]
     },
     {
       "id": "init-records-pins",
-      "text": "putnami init runs the toolchain pins phase putnami install runs, so the lock pins what the new workspace's extensions answer before the commands init prints next run. A failed phase fails init."
+      "text": [
+        "putnami init runs the toolchain pins phase putnami install runs, so the lock pins what the new workspace's extensions answer before the commands init prints next run.",
+        "A failed phase fails init."
+      ]
     }
   ],
   "decisions": [

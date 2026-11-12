@@ -30,6 +30,7 @@ const (
 	ErrorCodeInvalidDecision              = "features.invalid_decision"
 	ErrorCodeDuplicateEvidence            = "features.duplicate_evidence"
 	ErrorCodeDuplicateSpec                = "features.duplicate_spec"
+	ErrorCodeManifestFormConflict         = "features.manifest_form_conflict"
 	ErrorCodeInvalidVerification          = "features.invalid_verification"
 	ErrorCodeInvalidSurface               = "features.invalid_surface"
 	ErrorCodeInvalidSpecReference         = "features.invalid_spec_reference"
@@ -87,7 +88,7 @@ var ValidDiagnosticCodes = map[string]bool{
 	ErrorCodeInvalidID: true, ErrorCodeDuplicateFeature: true, ErrorCodeInvalidType: true,
 	ErrorCodeInvalidStage: true, ErrorCodeInvalidRelation: true, ErrorCodeDanglingRelation: true,
 	ErrorCodeRelationCycle: true, ErrorCodeInvalidRequirement: true, ErrorCodeInvalidDecision: true,
-	ErrorCodeDuplicateEvidence: true, ErrorCodeDuplicateSpec: true,
+	ErrorCodeDuplicateEvidence: true, ErrorCodeDuplicateSpec: true, ErrorCodeManifestFormConflict: true,
 	ErrorCodeInvalidVerification: true, ErrorCodeInvalidSurface: true, ErrorCodeUnresolvedSurface: true, ErrorCodeInvalidObservation: true,
 	ErrorCodeDuplicateObservation: true,
 	ErrorCodeUnknownFeature:       true, ErrorCodeUnknownRequirement: true, ErrorCodeStageMismatch: true,
@@ -130,6 +131,40 @@ func ParseManifest(data []byte) (*Manifest, []diag.Diagnostic) {
 		return nil, []diag.Diagnostic{*finding}
 	}
 	return &manifest, nil
+}
+
+// ParseFeatureDocument strictly parses one per-feature authored-intent
+// document. It accepts the manifest versions, refuses a field a later version
+// defines, and names every finding by its position in the document, such as
+// feature.requirements[0].
+func ParseFeatureDocument(data []byte) (*FeatureDocument, []diag.Diagnostic) {
+	if err := requireExactProtocolVersion(data, MinimumManifestProtocolVersion, ManifestCriteriaProtocolVersion, ManifestProtocolVersion); err != nil {
+		return nil, []diag.Diagnostic{versionOrParseDiagnostic(err)}
+	}
+	var document FeatureDocument
+	if err := decodeStrictJSON(data, &document); err != nil {
+		return nil, []diag.Diagnostic{parseDiagnostic(err)}
+	}
+	if err := rejectExplicitNulls(data); err != nil {
+		return nil, []diag.Diagnostic{parseDiagnostic(err)}
+	}
+	if finding := rejectForwardManifestFields(document.Manifest()); finding != nil {
+		finding.Field = FeatureDocumentField(finding.Field)
+		return nil, []diag.Diagnostic{*finding}
+	}
+	return &document, nil
+}
+
+// ParseAndValidateFeatureDocument performs strict parsing followed by the
+// semantic validation of the one-feature manifest the document stands for.
+func ParseAndValidateFeatureDocument(data []byte) (*FeatureDocument, []diag.Diagnostic) {
+	document, diagnostics := ParseFeatureDocument(data)
+	if document == nil {
+		return nil, diagnostics
+	}
+	diagnostics = append(diagnostics, ValidateFeatureDocument(document)...)
+	sortDiagnostics(diagnostics)
+	return document, diagnostics
 }
 
 // ParseEvidenceDocument strictly parses one evidence fragment.

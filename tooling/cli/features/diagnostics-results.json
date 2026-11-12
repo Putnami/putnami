@@ -1,0 +1,228 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/diagnostics-results",
+    "type": "feature",
+    "name": "Diagnostics and results",
+    "outcome": "A user or agent can diagnose a failed or unsafe run from structured diagnostics, doctor guidance, session reports, and stable exit outcomes, and can collect and summarize the recorded sessions before a disposable worktree takes them with it",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "located-diagnostics",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "severity-code-and-location-extract",
+            "locations-normalize-and-survive-to-results"
+          ]
+        }
+      },
+      {
+        "id": "failure-presentation",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "human-failure-output-is-prioritized-and-bounded"
+          ]
+        }
+      },
+      {
+        "id": "bounded-test-output",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "report-diagnostics-obey-limits-with-omission-accounting",
+            "attributed-events-survive-batch-splitting"
+          ]
+        }
+      },
+      {
+        "id": "doctor-gate",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "doctor-is-deterministic",
+            "production-blocks-unwaived-and-fails-closed"
+          ]
+        }
+      },
+      {
+        "id": "doctor-machine",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "machine-load-is-a-ratio-or-unknown"
+          ]
+        }
+      },
+      {
+        "id": "doctor-names-a-missing-readme",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "doctor-reports-a-project-without-a-readme",
+            "templates-and-generated-clients-are-exempt"
+          ]
+        }
+      },
+      {
+        "id": "redaction",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "doctor-and-run-diagnostics-redact-secrets"
+          ]
+        }
+      },
+      {
+        "id": "terminal-outcome",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-interactive-run-that-passes-its-deadline-exits-one-and-names-it",
+            "an-interactive-child-that-ends-from-a-signal-exits-one-and-names-it",
+            "an-interactive-child-that-ends-from-sigint-is-an-interrupted-run"
+          ]
+        }
+      },
+      {
+        "id": "bounded-machine-detail",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-stream-is-bounded-failure-first-sanitized-and-recorded",
+            "the-output-mode-never-changes-the-run-verdict"
+          ]
+        }
+      },
+      {
+        "id": "opening-session-identity",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-opening-event-names-the-written-plan-before-tasks-and-prepares-once",
+            "sessionless-scheduler-events-omit-session-identity"
+          ]
+        }
+      },
+      {
+        "id": "session-record-durability",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "recorded-sessions-export-verbatim-oldest-first-and-deduplicated",
+            "the-export-order-comes-from-the-recorded-start-not-the-session-id",
+            "since-filters-on-the-recorded-start-inclusively",
+            "retention-is-configurable-and-its-default-is-unchanged"
+          ]
+        }
+      },
+      {
+        "id": "gated-tree-identity",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "one-digest-covers-head-the-tracked-diff-and-untracked-content",
+            "a-recorded-session-names-the-tree-it-opened-on",
+            "a-producer-that-cannot-determine-the-tree-records-nothing"
+          ]
+        }
+      },
+      {
+        "id": "recorded-run-context",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "declared-check-failures-carry-a-code",
+            "the-declaration-digest-moves-with-declarations-only"
+          ]
+        }
+      },
+      {
+        "id": "session-summary-view",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "one-row-per-session-oldest-first-and-deduplicated",
+            "nested-runs-are-marked-and-never-counted-as-gates",
+            "rows-carry-tasks-cpu-wall-selection-and-outcome"
+          ]
+        }
+      },
+      {
+        "id": "task-input-digest",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "same-tree-same-digest-touched-input-moves-only-its-consumers",
+            "absent-on-skipped-present-on-every-reuse-kind",
+            "summary-groups-records-by-digest"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -18,7 +18,10 @@
     },
     {
       "id": "eviction",
-      "text": "A positive MaxEntries bound evicts capacity entries without evicting merely because an existing key is overwritten; capacity evictions are counted separately from deletion and expiration."
+      "text": [
+        "A positive MaxEntries bound evicts capacity entries without evicting merely because an existing key is overwritten;",
+        "capacity evictions are counted separately from deletion and expiration."
+      ]
     },
     {
       "id": "ownership",

@@ -1,8 +1,11 @@
 package cli
 
 import (
+	"flag"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -20,11 +23,38 @@ import (
 // @putnami/go:validate).
 var commandSurfacePath = filepath.Join("..", "..", "command-surface.json")
 
+// updateSurfaceGoldens rewrites command-surface.json from the catalog instead
+// of comparing it. The environment opt-in reaches it through ./putnamiw.
+var updateSurfaceGoldens = flag.Bool("update-surface-goldens", os.Getenv("PUTNAMI_UPDATE_SURFACE_GOLDENS") == "1",
+	"rewrite command-surface.json from the command catalog")
+
+// firstGoldenDiff reports the first differing line so a failure names the drift
+// instead of dumping two full renderings into the test log.
+func firstGoldenDiff(want, got string) string {
+	wantLines := strings.Split(want, "\n")
+	gotLines := strings.Split(got, "\n")
+	for i := 0; i < len(wantLines) || i < len(gotLines); i++ {
+		var wantLine, gotLine string
+		if i < len(wantLines) {
+			wantLine = wantLines[i]
+		}
+		if i < len(gotLines) {
+			gotLine = gotLines[i]
+		}
+		if wantLine != gotLine {
+			return "first difference at line " + strconv.Itoa(i+1) + ":\n  want: " + wantLine + "\n  got:  " + gotLine
+		}
+	}
+	return "renderings differ only in length"
+}
+
 // TestGoldenCommandSurfaceDocument pins the committed command surface to the
 // catalog's rendering, so a change to the commands or flags users type always
 // shows in the reviewed diff, and the compatibility check reads what the
-// catalog declares. PUTNAMI_UPDATE_SURFACE_GOLDENS=1 rewrites it, with the
-// other goldens.
+// catalog declares. It is the one committed rendering of the catalog: each
+// help and completion renderer is proven on a small catalog instead
+// (help_render_test.go, completion_render_test.go).
+// PUTNAMI_UPDATE_SURFACE_GOLDENS=1 rewrites it.
 func TestGoldenCommandSurfaceDocument(t *testing.T) {
 	t.Parallel()
 	surface, err := commandmeta.Surface()
@@ -43,10 +73,10 @@ func TestGoldenCommandSurfaceDocument(t *testing.T) {
 	}
 	want, err := os.ReadFile(commandSurfacePath)
 	if err != nil {
-		t.Fatalf("read %s: %v (regenerate with: PUTNAMI_UPDATE_SURFACE_GOLDENS=1 ./putnamiw test --projects @putnami/cli --run Golden --no-cache --no-enforce-coverage)", commandSurfacePath, err)
+		t.Fatalf("read %s: %v (regenerate with: PUTNAMI_UPDATE_SURFACE_GOLDENS=1 ./putnamiw test --projects @putnami/cli --run TestGoldenCommandSurfaceDocument --no-cache --no-enforce-coverage)", commandSurfacePath, err)
 	}
 	if string(want) != string(got) {
-		t.Errorf("command-surface.json drifted from the command catalog.\n%s\nRegenerate with:\n  PUTNAMI_UPDATE_SURFACE_GOLDENS=1 ./putnamiw test --projects @putnami/cli --run Golden --no-cache --no-enforce-coverage",
+		t.Errorf("command-surface.json drifted from the command catalog.\n%s\nRegenerate with:\n  PUTNAMI_UPDATE_SURFACE_GOLDENS=1 ./putnamiw test --projects @putnami/cli --run TestGoldenCommandSurfaceDocument --no-cache --no-enforce-coverage",
 			firstGoldenDiff(string(want), string(got)))
 	}
 	if _, err := protocolcli.ParseCommandSurface(want); err != nil {

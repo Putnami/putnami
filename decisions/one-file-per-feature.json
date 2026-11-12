@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "one-file-per-feature",
+  "statement": "a root holds its authored features in putnami.features.json or as one document per features/<feature>.json, never both, and a spec requirement text is a string or an array of sentences joined by one space; specs.baseline.json stays committed",
+  "settled": "2026-11-11",
+  "settledBy": "fdumay",
+  "adr": "protocols/features/doc/adr/0008-a-root-may-hold-one-file-per-feature.md",
+  "reviewOnly": true
+}

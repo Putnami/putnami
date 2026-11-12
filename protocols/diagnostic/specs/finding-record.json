@@ -14,11 +14,17 @@
   "requirements": [
     {
       "id": "the-record-has-four-json-members",
-      "text": "A diagnostic marshals to the JSON members severity, code, message and field, in that order, and leaves field out when it is empty. The severities Error, Warning and Info are the strings error, warning and info."
+      "text": [
+        "A diagnostic marshals to the JSON members severity, code, message and field, in that order, and leaves field out when it is empty.",
+        "The severities Error, Warning and Info are the strings error, warning and info."
+      ]
     },
     {
       "id": "the-constructors-fill-the-record",
-      "text": "Errorf builds a diagnostic of severity error with the given code and field and the message formatted from its arguments. Warningf builds a diagnostic of severity warning and keeps an empty field empty."
+      "text": [
+        "Errorf builds a diagnostic of severity error with the given code and field and the message formatted from its arguments.",
+        "Warningf builds a diagnostic of severity warning and keeps an empty field empty."
+      ]
     },
     {
       "id": "string-shows-the-field-only-when-set",
@@ -26,7 +32,11 @@
     },
     {
       "id": "only-an-error-blocks",
-      "text": "HasErrors is false for no diagnostic and for warnings alone, and true once one diagnostic is an error. Errors returns the error diagnostics in their order and drops warnings and infos. ErrorText renders each error as String after two spaces and a dash, one per line, and returns the empty string when no diagnostic is an error."
+      "text": [
+        "HasErrors is false for no diagnostic and for warnings alone, and true once one diagnostic is an error.",
+        "Errors returns the error diagnostics in their order and drops warnings and infos.",
+        "ErrorText renders each error as String after two spaces and a dash, one per line, and returns the empty string when no diagnostic is an error."
+      ]
     },
     {
       "id": "severities-rank-error-warning-info",

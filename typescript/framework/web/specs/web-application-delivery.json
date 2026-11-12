@@ -17,7 +17,10 @@
   "requirements": [
     {
       "id": "entrypoint-boundary",
-      "text": "Publication builds the default SSR entry and browser entry as separate graphs; the browser graph exports client helpers but contains no SSR implementation or server-only runtime import."
+      "text": [
+        "Publication builds the default SSR entry and browser entry as separate graphs;",
+        "the browser graph exports client helpers but contains no SSR implementation or server-only runtime import."
+      ]
     },
     {
       "id": "route-graph",
@@ -29,7 +32,10 @@
     },
     {
       "id": "fragment-history-steps",
-      "text": "A back or forward step that changes or drops only the fragment keeps the loaded data and runs no loader, unless a route's `shouldRevalidate` returns true; a submission or a `revalidate()` call still runs the loaders."
+      "text": [
+        "A back or forward step that changes or drops only the fragment keeps the loaded data and runs no loader, unless a route's `shouldRevalidate` returns true;",
+        "a submission or a `revalidate()` call still runs the loaders."
+      ]
     },
     {
       "id": "redirect-outside-the-router",
@@ -41,11 +47,17 @@
     },
     {
       "id": "layout-loader-endpoint",
-      "text": "On client navigation, a layout loader fetches the JSON endpoint the server registers at the layout's path: each dynamic segment is filled from the matched params and URL-encoded, a trailing catch-all is dropped, and the mounted basename and the request query string are kept; a missing required param fails the loader without a request, and the server answers that endpoint with the same loader and params as the server render."
+      "text": [
+        "On client navigation, a layout loader fetches the JSON endpoint the server registers at the layout's path: each dynamic segment is filled from the matched params and URL-encoded, a trailing catch-all is dropped, and the mounted basename and the request query string are kept;",
+        "a missing required param fails the loader without a request, and the server answers that endpoint with the same loader and params as the server render."
+      ]
     },
     {
       "id": "generation-configuration",
-      "text": "Generation resolves shared and React settings independently, gives nested project react settings precedence over package metadata, and retains flat package.json#putnami compatibility. A known React-only key placed directly at options[\"@putnami/web:generate\"].<key> fails before route scanning or artifact writes and names options[\"@putnami/web:generate\"].react.<key> as the corrected path."
+      "text": [
+        "Generation resolves shared and React settings independently, gives nested project react settings precedence over package metadata, and retains flat package.json#putnami compatibility.",
+        "A known React-only key placed directly at options[\"@putnami/web:generate\"].<key> fails before route scanning or artifact writes and names options[\"@putnami/web:generate\"].react.<key> as the corrected path."
+      ]
     },
     {
       "id": "ssr-response",
@@ -57,11 +69,18 @@
     },
     {
       "id": "hydration-containment",
-      "text": "Hydration serializes loader, action, error, basename, timeout, and bounded role/scope state with script-safe escaping; a chunk or hydration failure preserves or restores server HTML instead of blanking the page; the server and the generated client routes build the same element for a page, so a server-rendered page hydrates in place without a recoverable error."
+      "text": [
+        "Hydration serializes loader, action, error, basename, timeout, and bounded role/scope state with script-safe escaping;",
+        "a chunk or hydration failure preserves or restores server HTML instead of blanking the page;",
+        "the server and the generated client routes build the same element for a page, so a server-rendered page hydrates in place without a recoverable error."
+      ]
     },
     {
       "id": "explicit-render-mode",
-      "text": "Only page().static() selects SSG or ISR; static loaders execute in a request-free context, request access raises StaticRenderViolation, dynamic paths cannot escape the output root, and routes without finite paths remain live."
+      "text": [
+        "Only page().static() selects SSG or ISR;",
+        "static loaders execute in a request-free context, request access raises StaticRenderViolation, dynamic paths cannot escape the output root, and routes without finite paths remain live."
+      ]
     },
     {
       "id": "static-build-version",
@@ -73,11 +92,17 @@
     },
     {
       "id": "server-data-boundary",
-      "text": "Loader and action builders validate and coerce declared input, resolve declared dependencies from the active request scope, and execute their handlers only on the server; browser builder middleware methods cannot import or execute server middleware."
+      "text": [
+        "Loader and action builders validate and coerce declared input, resolve declared dependencies from the active request scope, and execute their handlers only on the server;",
+        "browser builder middleware methods cannot import or execute server middleware."
+      ]
     },
     {
       "id": "security-propagation",
-      "text": "Security middleware declared on a layout or page wraps its SSR page, loader JSON endpoint, action endpoint, and not-found boundary, including lazy descendants; routes outside that layout remain unaffected."
+      "text": [
+        "Security middleware declared on a layout or page wraps its SSR page, loader JSON endpoint, action endpoint, and not-found boundary, including lazy descendants;",
+        "routes outside that layout remain unaffected."
+      ]
     },
     {
       "id": "browser-security-hint",
@@ -85,7 +110,10 @@
     },
     {
       "id": "csrf-and-csp",
-      "text": "React routes apply CSP with a per-request nonce, nosniff, Referrer-Policy, and action CSRF validation by default; state-changing submissions require the cookie token echoed by the client header or no-JavaScript form field unless the application explicitly opts out."
+      "text": [
+        "React routes apply CSP with a per-request nonce, nosniff, Referrer-Policy, and action CSRF validation by default;",
+        "state-changing submissions require the cookie token echoed by the client header or no-JavaScript form field unless the application explicitly opts out."
+      ]
     },
     {
       "id": "cache-isolation",

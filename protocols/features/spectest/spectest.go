@@ -104,7 +104,7 @@ func Proves(t *testing.T, feature, requirement, check string) {
 // declared threshold check: the bounded semantic metric name,
 // the reduction that produced Value (value, count, sum, avg, min, max, p50,
 // p95, p99, ratio), and its unit. The authored target lives in
-// putnami.features.json only; nothing here can state a verdict.
+// the authored feature declaration only; nothing here can state a verdict.
 type Measurement struct {
 	Name        string
 	Aggregation string

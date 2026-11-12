@@ -92,7 +92,8 @@ func HostOwners(root string, owners WorkspaceOwners) RequirementOwners {
 
 // featurelessProject reports whether the project at projectPath declares
 // featureAuthority.none and authors no feature both on the branch and at
-// base, so a change cannot exempt its own project. A project new on the
+// base, so a change cannot exempt its own project. A project authors a
+// feature when it holds putnami.features.json or a features/ directory. A project new on the
 // branch has only its head state. The branch state is the project's
 // putnami.json on disk, read with the function the workspace loader calls.
 // The loader keeps a config its diagnostics flag, so they do not matter here.
@@ -103,8 +104,10 @@ func featurelessProject(root, base, projectPath string) (bool, error) {
 	if config == nil || !featureless(config.FeatureAuthority) {
 		return false, nil
 	}
-	if _, err := os.Stat(filepath.Join(root, projectPath, features.ManifestFilename)); !errors.Is(err, fs.ErrNotExist) {
-		return false, nil
+	for _, name := range []string{features.ManifestFilename, features.FeatureDirectory} {
+		if _, err := os.Stat(filepath.Join(root, projectPath, name)); !errors.Is(err, fs.ErrNotExist) {
+			return false, nil
+		}
 	}
 	manifest, found, err := fileAt(root, base, path.Join(projectPath, wsproto.ConfigFilename))
 	if err != nil || !found {
@@ -116,8 +119,12 @@ func featurelessProject(root, base, projectPath string) (bool, error) {
 	if err := json.Unmarshal(manifest, &baseConfig); err != nil || !featureless(baseConfig.FeatureAuthority) {
 		return false, nil
 	}
-	_, authored, err := fileAt(root, base, path.Join(projectPath, features.ManifestFilename))
-	return err == nil && !authored, err
+	for _, name := range []string{features.ManifestFilename, features.FeatureDirectory} {
+		if _, authored, err := fileAt(root, base, path.Join(projectPath, name)); err != nil || authored {
+			return false, err
+		}
+	}
+	return true, nil
 }
 
 func featureless(authority *wsproto.ProjectFeatureAuthority) bool {
@@ -139,7 +146,8 @@ func workspacePrefix(dir string) (string, error) {
 }
 
 // fileAt returns the bytes of file, relative to dir, at revision. found is
-// false when revision has no such file.
+// false when revision has no such file or directory; for a directory, the
+// bytes are git's listing of it.
 func fileAt(dir, revision, file string) (content []byte, found bool, err error) {
 	if !gitread.ValidRevisionArgument(revision) {
 		return nil, false, fmt.Errorf("invalid revision %q", revision)

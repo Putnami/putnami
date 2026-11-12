@@ -25,11 +25,19 @@
     },
     {
       "id": "change-impact",
-      "text": "A changed file claims its nearest directory owner (symlinks, grouped paths canonicalized), asset, declared-input and scope-config readers, then the tasks of each that read it; a file no task reads claims nothing. Dependency edges, and contract edges whose committed contract changed, carry the tasks whose `^` reference names a source task; ordering-only edges carry none. A rebuilt extension reaches consumers for its own tasks; an unattributable claim or workspace-wide input keeps a project whole."
+      "text": [
+        "A changed file claims its nearest directory owner (symlinks, grouped paths canonicalized), asset, declared-input and scope-config readers, then the tasks of each that read it;",
+        "a file no task reads claims nothing.",
+        "Dependency edges, and contract edges whose committed contract changed, carry the tasks whose `^` reference names a source task; ordering-only edges carry none.",
+        "A rebuilt extension reaches consumers for its own tasks; an unattributable claim or workspace-wide input keeps a project whole."
+      ]
     },
     {
       "id": "a-verdict-policy-selects-only-the-tasks-that-name-it",
-      "text": "A changed putnami.verdict-policy.json file, at the workspace root, in a scope or in a project, claims only the tasks whose input pattern names it in its last segment. Owning one keeps no project whole, an extension project included, and it is no changed file of its project, which still owns it by path."
+      "text": [
+        "A changed putnami.verdict-policy.json file, at the workspace root, in a scope or in a project, claims only the tasks whose input pattern names it in its last segment.",
+        "Owning one keeps no project whole, an extension project included, and it is no changed file of its project, which still owns it by path."
+      ]
     },
     {
       "id": "canonical-identity",
@@ -41,7 +49,11 @@
     },
     {
       "id": "import-visibility",
-      "text": "Every dependency edge carries the manifest family it came from — a declaration, a go.mod require or replace, a package.json dependency, or a generated client's contract — without changing which edges the graph carries. A project is importable within its own scope, the nearest ancestor directory whose putnami.json contributes scope configuration; an import that leaves it is reported unless the imported project is public or a generated client, and a contract edge is always allowed."
+      "text": [
+        "Every dependency edge carries the manifest family it came from — a declaration, a go.mod require or replace, a package.json dependency, or a generated client's contract — without changing which edges the graph carries.",
+        "A project is importable within its own scope, the nearest ancestor directory whose putnami.json contributes scope configuration;",
+        "an import that leaves it is reported unless the imported project is public or a generated client, and a contract edge is always allowed."
+      ]
     }
   ],
   "decisions": [

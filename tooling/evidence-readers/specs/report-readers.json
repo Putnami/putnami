@@ -21,19 +21,37 @@
   "requirements": [
     {
       "id": "junit-reads-every-case",
-      "text": "ReadJUnit reads a testsuites or testsuite root, up to MaxSuiteDepth nested suites, into one case per testcase element in document order, with its name, classname, enclosing suites, file, line, duration in milliseconds and failure or skip. A case's file is its file attribute, else the one of its nearest enclosing suite that states one. A failure or error element fails the case, a skipped element skips it, and a case with neither passed."
+      "text": [
+        "ReadJUnit reads a testsuites or testsuite root, up to MaxSuiteDepth nested suites, into one case per testcase element in document order, with its name, classname, enclosing suites, file, line, duration in milliseconds and failure or skip.",
+        "A case's file is its file attribute, else the one of its nearest enclosing suite that states one.",
+        "A failure or error element fails the case, a skipped element skips it, and a case with neither passed."
+      ]
     },
     {
       "id": "coverage-reads-every-instrumented-line",
-      "text": "The LCOV, Cobertura, Clover, JaCoCo and Go cover readers return one entry per source file, in the order the report first names it, with its instrumented lines in increasing order and their hit counts. A line stated twice keeps its largest count. A file's totals are counted from its lines and functions; a file whose report lists none keeps the totals the report states (LCOV's LF, LH, FNF and FNH, a Clover file's methods metrics, a JaCoCo source file's LINE and METHOD counters)."
+      "text": [
+        "The LCOV, Cobertura, Clover, JaCoCo and Go cover readers return one entry per source file, in the order the report first names it, with its instrumented lines in increasing order and their hit counts.",
+        "A line stated twice keeps its largest count.",
+        "A file's totals are counted from its lines and functions;",
+        "a file whose report lists none keeps the totals the report states (LCOV's LF, LH, FNF and FNH, a Clover file's methods metrics, a JaCoCo source file's LINE and METHOD counters)."
+      ]
     },
     {
       "id": "go-cover-blocks-become-lines",
-      "text": "ReadGoCover reads set, count and atomic profiles, a profile concatenated from several runs included. A block the profile states more than once sums its counts in count and atomic mode and keeps the largest in set mode. A block with statements marks each line from its start line to its end line, a line takes the largest count of the blocks that span it, and a block without statements marks none."
+      "text": [
+        "ReadGoCover reads set, count and atomic profiles, a profile concatenated from several runs included.",
+        "A block the profile states more than once sums its counts in count and atomic mode and keeps the largest in set mode.",
+        "A block with statements marks each line from its start line to its end line, a line takes the largest count of the blocks that span it, and a block without statements marks none."
+      ]
     },
     {
       "id": "jacoco-reads-source-files",
-      "text": "ReadJaCoCo reads a JaCoCo XML report, root report, its packages nested in any depth of groups, into one file per sourcefile element: its path is the package name and the source file name, the default package giving the name alone. A line element with covered instructions (ci) is a covered line, with hits 1, since JaCoCo records no execution count; one with missed instructions only is uncovered, and one with neither is no line. Kover writes the same format."
+      "text": [
+        "ReadJaCoCo reads a JaCoCo XML report, root report, its packages nested in any depth of groups, into one file per sourcefile element: its path is the package name and the source file name, the default package giving the name alone.",
+        "A line element with covered instructions (ci) is a covered line, with hits 1, since JaCoCo records no execution count;",
+        "one with missed instructions only is uncovered, and one with neither is no line.",
+        "Kover writes the same format."
+      ]
     },
     {
       "id": "paths-as-the-report-states",
@@ -41,31 +59,63 @@
     },
     {
       "id": "malformed-reports-are-diagnostics",
-      "text": "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record, an unknown TRX outcome, elements nested deeper than MaxSuiteDepth) returns no case and no file, and one error diagnostic of code readers.malformed. A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a missing file. No input makes a reader panic."
+      "text": [
+        "A report that does not decode, whose root is not its format's, or that states an impossible value (a line below 1, a negative count, a malformed record, an unknown TRX outcome, elements nested deeper than MaxSuiteDepth) returns no case and no file, and one error diagnostic of code readers.malformed.",
+        "A report larger than MaxReportBytes, or whose files mark more than MaxLineMarks lines, returns readers.too_large, and ReadFile returns readers.missing for a missing file.",
+        "No input makes a reader panic."
+      ]
     },
     {
       "id": "cyclonedx-reads-components",
-      "text": "ReadSBOM reads a CycloneDX 1.4, 1.5 or 1.6 JSON document into one package per component, nested ones included, with its name, version, package URL and licence ids, names and expressions. A vulnerability goes to each component an affects ref names, by bom-ref or by package URL with or without its version, with the highest severity of its ratings, unknown without one. Another spec version is readers.malformed."
+      "text": [
+        "ReadSBOM reads a CycloneDX 1.4, 1.5 or 1.6 JSON document into one package per component, nested ones included, with its name, version, package URL and licence ids, names and expressions.",
+        "A vulnerability goes to each component an affects ref names, by bom-ref or by package URL with or without its version, with the highest severity of its ratings, unknown without one.",
+        "Another spec version is readers.malformed."
+      ]
     },
     {
       "id": "spdx-reads-packages",
-      "text": "ReadSBOM reads an SPDX 2.3 JSON document into one package per package the document does not describe as itself, with its name, version and package URL, its concluded licence, else its declared one, unless NOASSERTION or NONE, and its SECURITY advisory references as vulnerabilities, named by the last segment of their locator, with an unknown severity. Another SPDX version is readers.malformed."
+      "text": [
+        "ReadSBOM reads an SPDX 2.3 JSON document into one package per package the document does not describe as itself, with its name, version and package URL, its concluded licence, else its declared one, unless NOASSERTION or NONE, and its SECURITY advisory references as vulnerabilities, named by the last segment of their locator, with an unknown severity.",
+        "Another SPDX version is readers.malformed."
+      ]
     },
     {
       "id": "trx-reads-every-result",
-      "text": "ReadTRX reads a TestRun root into one case per top-level UnitTestResult in document order: its testName, its TestMethod's className up to a comma, a suite named by its codeBase's file name, and its duration. Passed, PassedButRunAborted, Completed and Warning pass; Failed fails; Error, Timeout and Aborted fail as an error; NotExecuted, Inconclusive, NotRunnable, Pending, Disconnected and InProgress skip. Totals are the ResultSummary counters, skipped being total less executed; other outcomes are malformed."
+      "text": [
+        "ReadTRX reads a TestRun root into one case per top-level UnitTestResult in document order: its testName, its TestMethod's className up to a comma, a suite named by its codeBase's file name, and its duration.",
+        "Passed, PassedButRunAborted, Completed and Warning pass;",
+        "Failed fails;",
+        "Error, Timeout and Aborted fail as an error;",
+        "NotExecuted, Inconclusive, NotRunnable, Pending, Disconnected and InProgress skip.",
+        "Totals are the ResultSummary counters, skipped being total less executed; other outcomes are malformed."
+      ]
     },
     {
       "id": "archunit-cases-are-rules",
-      "text": "ArchUnitRule reads a JUnit case as an ArchUnit rule: a passing case is a kept rule named by the case; a skipped or errored one is none. A failing case is a broken rule named by its Rule '...' clause, counting the N of was violated (N times). Each later line of the message is a violation, an indented line continuing it: its class is the first <...> name cut before its member, its file and line those of in (File.java:N). UsesArchUnit reports whether a source imports com.tngtech.archunit."
+      "text": [
+        "ArchUnitRule reads a JUnit case as an ArchUnit rule: a passing case is a kept rule named by the case; a skipped or errored one is none.",
+        "A failing case is a broken rule named by its Rule '...' clause, counting the N of was violated (N times).",
+        "Each later line of the message is a violation, an indented line continuing it: its class is the first <...> name cut before its member, its file and line those of in (File.java:N).",
+        "UsesArchUnit reports whether a source imports com.tngtech.archunit."
+      ]
     },
     {
       "id": "deptrac-junit-reads-layers",
-      "text": "ReadDeptrac reads the report of deptrac --formatter=junit into one rule per layer testsuite, in document order, named by the layer: kept when none of its cases fails, broken otherwise. Each failure element is one violation, its message Depender:N must not depend on Dependent (A on B) read into the depending class and the line N. The Unmatched skipped violations suite is no rule. A report that does not decode, or whose root is not testsuites, is readers.malformed."
+      "text": [
+        "ReadDeptrac reads the report of deptrac --formatter=junit into one rule per layer testsuite, in document order, named by the layer: kept when none of its cases fails, broken otherwise.",
+        "Each failure element is one violation, its message Depender:N must not depend on Dependent (A on B) read into the depending class and the line N. The Unmatched skipped violations suite is no rule.",
+        "A report that does not decode, or whose root is not testsuites, is readers.malformed."
+      ]
     },
     {
       "id": "import-linter-text-reads-contracts",
-      "text": "ReadImportLinter reads the text lint-imports prints, colour codes stripped, into one rule per contract line Name KEPT or Name BROKEN, in order. Under Broken contracts, each import chain of a contract, a line - importer -> imported (l.N) and its indented continuation, is one violation of the first importer at the first N; a broken contract without a chain counts one. Output without its Analyzed N files, M dependencies line or a contract line is readers.malformed."
+      "text": [
+        "ReadImportLinter reads the text lint-imports prints, colour codes stripped, into one rule per contract line Name KEPT or Name BROKEN, in order.",
+        "Under Broken contracts, each import chain of a contract, a line - importer -> imported (l.N) and its indented continuation, is one violation of the first importer at the first N;",
+        "a broken contract without a chain counts one.",
+        "Output without its Analyzed N files, M dependencies line or a contract line is readers.malformed."
+      ]
     }
   ]
 }

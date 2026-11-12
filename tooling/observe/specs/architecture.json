@@ -14,7 +14,11 @@
   "requirements": [
     {
       "id": "architecture-report-discovery",
-      "text": "A deptrac report is a JUnit XML report whose first testsuite states an empty package and the localhost hostname and whose first case is named Layer - Class after its suite; an import-linter report is the text of lint-imports, with its Analyzed N files, M dependencies line, found among .txt files whose name holds lint. --architecture names those reports and replaces their discovery. A deptrac report is no test report."
+      "text": [
+        "A deptrac report is a JUnit XML report whose first testsuite states an empty package and the localhost hostname and whose first case is named Layer - Class after its suite;",
+        "an import-linter report is the text of lint-imports, with its Analyzed N files, M dependencies line, found among .txt files whose name holds lint. --architecture names those reports and replaces their discovery.",
+        "A deptrac report is no test report."
+      ]
     },
     {
       "id": "archunit-cases-are-architecture",
@@ -22,7 +26,13 @@
     },
     {
       "id": "violations-are-placed",
-      "text": "A violation's file is the source file of its class or module: an ArchUnit class under the JVM main, then test, source roots; a deptrac class through the longest PSR-4 prefix of the composer.json files of the root and the components; an import-linter module as a .py file or package under a component or its src. It goes to the component holding that file. A rule read twice, an ArchUnit rule by its test case, is one rule, broken when either is."
+      "text": [
+        "A violation's file is the source file of its class or module: an ArchUnit class under the JVM main, then test, source roots;",
+        "a deptrac class through the longest PSR-4 prefix of the composer.json files of the root and the components;",
+        "an import-linter module as a .py file or package under a component or its src.",
+        "It goes to the component holding that file.",
+        "A rule read twice, an ArchUnit rule by its test case, is one rule, broken when either is."
+      ]
     },
     {
       "id": "architecture-change-analysis",

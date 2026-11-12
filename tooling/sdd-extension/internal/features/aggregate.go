@@ -116,7 +116,7 @@ func Aggregate(request Request) Result {
 			authored = append(authored, authoredFeature{
 				feature:              featureproto.CanonicalManifest(&featureproto.Manifest{Features: []featureproto.Feature{declared}}).Features[0],
 				path:                 source.Path,
-				field:                fmt.Sprintf("%s#features[%d]", source.Path, index),
+				field:                source.Path + "#" + source.Field(fmt.Sprintf("features[%d]", index)),
 				requirementPositions: positions,
 			})
 		}
@@ -315,7 +315,7 @@ func validateSnapshotMetadataBounds(manifests []featureproto.ManifestSource, evi
 		check(source.Path, source.Path, maxProtocolPathBytes)
 		check(source.Path+"#namespace", source.Manifest.Namespace, maxSemanticMetadataBytes)
 		for featureIndex, feature := range source.Manifest.Features {
-			field := fmt.Sprintf("%s#features[%d]", source.Path, featureIndex)
+			field := source.Path + "#" + source.Field(fmt.Sprintf("features[%d]", featureIndex))
 			check(field+".id", feature.ID, maxSemanticMetadataBytes)
 			for relationIndex, relation := range feature.Relations {
 				check(fmt.Sprintf("%s.relations[%d].target", field, relationIndex), relation.Target, maxSemanticMetadataBytes)

@@ -37,6 +37,7 @@
         "git:**/package.json",
         "git:**/schema/capabilities.json",
         "git:**/putnami.features.json",
+        "git:**/features/*.json",
         "git:**/specs/*.json",
         "../../protocols/architecture/fixtures/valid/cloud-pilot/runtime.json",
         "../../protocols/architecture/fixtures/valid/cloud-pilot/observability.json",

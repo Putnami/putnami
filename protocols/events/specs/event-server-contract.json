@@ -28,43 +28,83 @@
     },
     {
       "id": "push-wrapper",
-      "text": "A push delivery is a wrapper with a subscription and a base64 message.data that decodes to one envelope. A wrapper without subscription or data, with data that is not base64 or does not decode to an envelope with a topic, or with a publishTime that is not a timestamp is refused. The Go and TypeScript receivers answer 400 to a wrapper without subscription and to a body they cannot decode."
+      "text": [
+        "A push delivery is a wrapper with a subscription and a base64 message.data that decodes to one envelope.",
+        "A wrapper without subscription or data, with data that is not base64 or does not decode to an envelope with a topic, or with a publishTime that is not a timestamp is refused.",
+        "The Go and TypeScript receivers answer 400 to a wrapper without subscription and to a body they cannot decode."
+      ]
     },
     {
       "id": "push-admission",
-      "text": "A receiver admits a push only from an allowlisted pusher with a verified token. The Go and TypeScript receivers answer 401 without a bearer token and 403 to a pusher outside the allowlist, whose push never reaches a handler, and refuse an unverified email. The TypeScript receiver answers 401 to an unverifiable token, and an empty Go allowlist admits nobody. Both drop caller-supplied auth.* attributes from the envelope and keep the others."
+      "text": [
+        "A receiver admits a push only from an allowlisted pusher with a verified token.",
+        "The Go and TypeScript receivers answer 401 without a bearer token and 403 to a pusher outside the allowlist, whose push never reaches a handler, and refuse an unverified email.",
+        "The TypeScript receiver answers 401 to an unverifiable token, and an empty Go allowlist admits nobody.",
+        "Both drop caller-supplied auth.* attributes from the envelope and keep the others."
+      ]
     },
     {
       "id": "the-receiver-status-is-the-outcome",
-      "text": "A receiver's status tells the provider what to do: 2xx acks, 429 and every status outside 2xx and 4xx retries, and any other 4xx dead-letters. The Go and TypeScript receivers answer 204 to a handled push and to one no handler matches, and 500 when the handler fails; the Go receiver answers 429 to a handler that asks for a redelivery."
+      "text": [
+        "A receiver's status tells the provider what to do: 2xx acks, 429 and every status outside 2xx and 4xx retries, and any other 4xx dead-letters.",
+        "The Go and TypeScript receivers answer 204 to a handled push and to one no handler matches, and 500 when the handler fails;",
+        "the Go receiver answers 429 to a handler that asks for a redelivery."
+      ]
     },
     {
       "id": "conformance-manifest",
-      "text": "conformance/manifest.json names putnami.events.v1 and the conformance suite, and lists the cases discovery.capabilities.valid, http.publish.valid, sse.subscribe.realtime, websocket.subscribe.realtime, grpc.capabilities.valid, grpc.publish.subscribe, push.receiver.valid and push.receiver.auth-rejected. Each manifest fixture gets its verdict: a repeated case id is duplicate-case and an unknown transport invalid-enum."
+      "text": [
+        "conformance/manifest.json names putnami.events.v1 and the conformance suite, and lists the cases discovery.capabilities.valid, http.publish.valid, sse.subscribe.realtime, websocket.subscribe.realtime, grpc.capabilities.valid, grpc.publish.subscribe, push.receiver.valid and push.receiver.auth-rejected.",
+        "Each manifest fixture gets its verdict: a repeated case id is duplicate-case and an unknown transport invalid-enum."
+      ]
     },
     {
       "id": "the-proto-is-non-normative",
-      "text": "The schemas and the fixtures are the contract. The gRPC proto is reference documentation: it carries the NON-NORMATIVE banner, declares no go_package, and documents package putnami.events.v1 with the EventServer service and its Capabilities, Subscribe, Publish and Health RPCs."
+      "text": [
+        "The schemas and the fixtures are the contract.",
+        "The gRPC proto is reference documentation: it carries the NON-NORMATIVE banner, declares no go_package, and documents package putnami.events.v1 with the EventServer service and its Capabilities, Subscribe, Publish and Health RPCs."
+      ]
     },
     {
       "id": "managed-publish-requests",
-      "text": "The Go module embeds the managed publish v1 corpus, and its two schemas are JSON. Each valid request validates and each invalid one is refused: a bad or missing protocol or type, a missing or empty id, dedupe key, topic or topic version, a missing payload, a channel, a physical topic, and a reserved attribute: workspace, environment, workload, service, channel, topology generation, trace context, auth.* or putnami.*. The Go framework and @putnami/events give each request the same verdict."
+      "text": [
+        "The Go module embeds the managed publish v1 corpus, and its two schemas are JSON.",
+        "Each valid request validates and each invalid one is refused: a bad or missing protocol or type, a missing or empty id, dedupe key, topic or topic version, a missing payload, a channel, a physical topic, and a reserved attribute: workspace, environment, workload, service, channel, topology generation, trace context, auth.* or putnami.*.",
+        "The Go framework and @putnami/events give each request the same verdict."
+      ]
     },
     {
       "id": "a-managed-publish-is-one-authenticated-post",
-      "text": "A managed publisher sends POST /events/publish with a bearer workload token, Content-Type application/json and the traceparent and tracestate it holds. The body is the publish frame, with no channel, workspaceId or topologyGenerationId member. The Go and TypeScript transports send that request, and refuse a channel, a reserved attribute or a missing topic version before sending anything; the Go transport builds each valid fixture's request."
+      "text": [
+        "A managed publisher sends POST /events/publish with a bearer workload token, Content-Type application/json and the traceparent and tracestate it holds.",
+        "The body is the publish frame, with no channel, workspaceId or topologyGenerationId member.",
+        "The Go and TypeScript transports send that request, and refuse a channel, a reserved attribute or a missing topic version before sending anything;",
+        "the Go transport builds each valid fixture's request."
+      ]
     },
     {
       "id": "a-retry-resends-the-same-bytes",
-      "text": "A retry sends the bytes of the first attempt: the two retry fixtures are byte-for-byte identical, and a retry whose bytes differ is refused with retry-request-mutated. The Go and TypeScript transports resend identical bytes after a retryable and an ambiguous attempt and keep the id and the dedupe key; the Go transport generates an id for an envelope without one and uses it as the dedupe key."
+      "text": [
+        "A retry sends the bytes of the first attempt: the two retry fixtures are byte-for-byte identical, and a retry whose bytes differ is refused with retry-request-mutated.",
+        "The Go and TypeScript transports resend identical bytes after a retryable and an ambiguous attempt and keep the id and the dedupe key;",
+        "the Go transport generates an id for an envelope without one and uses it as the dedupe key."
+      ]
     },
     {
       "id": "publish-answers-have-four-classes",
-      "text": "An answer is accepted only as a structured 200 that names the request's id, permanent as a structured 400, 401 or 403 with retryable false, and retryable as a structured 429 or 503 with retryable true, retried after its Retry-After. Anything else is ambiguous: a reset, a malformed or mismatched success, an unstructured 5xx, and a structured error without retryable. The Go and TypeScript transports classify each answer so."
+      "text": [
+        "An answer is accepted only as a structured 200 that names the request's id, permanent as a structured 400, 401 or 403 with retryable false, and retryable as a structured 429 or 503 with retryable true, retried after its Retry-After.",
+        "Anything else is ambiguous: a reset, a malformed or mismatched success, an unstructured 5xx, and a structured error without retryable.",
+        "The Go and TypeScript transports classify each answer so."
+      ]
     },
     {
       "id": "one-outcome-corpus",
-      "text": "Each outcome vector validates and names one class, and the corpus holds them all: 200 accepted, 400, 401 and 403 permanent, 429 and 503 retryable, a timeout and an unstructured 502 ambiguous. A vector that calls a known accepted, permanent or retryable answer ambiguous is refused with invalid-outcome-class. The Go framework and @putnami/events find the four classes, and @putnami/events checks that a retry keeps the route and the request bytes."
+      "text": [
+        "Each outcome vector validates and names one class, and the corpus holds them all: 200 accepted, 400, 401 and 403 permanent, 429 and 503 retryable, a timeout and an unstructured 502 ambiguous.",
+        "A vector that calls a known accepted, permanent or retryable answer ambiguous is refused with invalid-outcome-class.",
+        "The Go framework and @putnami/events find the four classes, and @putnami/events checks that a retry keeps the route and the request bytes."
+      ]
     }
   ],
   "decisions": [

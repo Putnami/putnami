@@ -24,35 +24,63 @@
   "requirements": [
     {
       "id": "crates-become-projects",
-      "text": "The probe answers, for each directory the observe Cargo detector knows as a crate: its package name, the directories of the crates it depends on by path, the extension @putnami/rust, the tag rust, and metadata naming the crate, its stack root and the expected toolchain version. The stack root is the workspace root for a member of the root Cargo workspace, the nearest enclosing directory whose [workspace] names it as a member, else its own directory."
+      "text": [
+        "The probe answers, for each directory the observe Cargo detector knows as a crate: its package name, the directories of the crates it depends on by path, the extension @putnami/rust, the tag rust, and metadata naming the crate, its stack root and the expected toolchain version.",
+        "The stack root is the workspace root for a member of the root Cargo workspace, the nearest enclosing directory whose [workspace] names it as a member, else its own directory."
+      ]
     },
     {
       "id": "nested-roots-reach-the-key",
-      "text": "A virtual Cargo workspace below the workspace root is an input-only project: metadata naming its root and no crate, tasks that run no step, and a rust:<task> selector that answers the stack-root files of that task in its directory. Each crate of a nested workspace depends on the project at its stack root, so a change to the root's Cargo.lock reruns its crates' test and build and not their lint. A crate the root package depends on gets no such edge and is left out with stacks.stack_root_unsupported."
+      "text": [
+        "A virtual Cargo workspace below the workspace root is an input-only project: metadata naming its root and no crate, tasks that run no step, and a rust:<task> selector that answers the stack-root files of that task in its directory.",
+        "Each crate of a nested workspace depends on the project at its stack root, so a change to the root's Cargo.lock reruns its crates' test and build and not their lint.",
+        "A crate the root package depends on gets no such edge and is left out with stacks.stack_root_unsupported."
+      ]
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares rustc --version with the version rust-toolchain.toml or rust-toolchain states, in the crate then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless toolchain.check is warn, a missing rustc with stacks.toolchain_missing. It then runs each profile step in the crate's directory with no shell, one task at a time per stack root; a step that exits non-zero fails with stacks.step_failed."
+      "text": [
+        "Each task first compares rustc --version with the version rust-toolchain.toml or rust-toolchain states, in the crate then at its stack root: a mismatch fails with stacks.toolchain_mismatch unless toolchain.check is warn, a missing rustc with stacks.toolchain_missing.",
+        "It then runs each profile step in the crate's directory with no shell, one task at a time per stack root; a step that exits non-zero fails with stacks.step_failed."
+      ]
     },
     {
       "id": "reports-become-the-summary",
-      "text": "After its steps, the test task copies the JUnit reports the profile names into its output directory and reads them, with the LCOV report, through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed; a JUnit or coverage pattern that matches no report fails it with stacks.report_missing."
+      "text": [
+        "After its steps, the test task copies the JUnit reports the profile names into its output directory and reads them, with the LCOV report, through the evidence readers into the test and coverage summary.",
+        "A failed case fails the task with stacks.test_failed; a JUnit or coverage pattern that matches no report fails it with stacks.report_missing."
+      ]
     },
     {
       "id": "cases-are-attributed",
-      "text": "Each JUnit case of the test task is attributed by its nextest binary id, its class name else its suite name (pricing::integration, api::bin/api), to the crate of that package, with - and _ read as one. A case of another crate is left out of the summary; a case whose id names no crate is counted and reported with the warning stacks.test_unattributed."
+      "text": [
+        "Each JUnit case of the test task is attributed by its nextest binary id, its class name else its suite name (pricing::integration, api::bin/api), to the crate of that package, with - and _ read as one.",
+        "A case of another crate is left out of the summary; a case whose id names no crate is counted and reported with the warning stacks.test_unattributed."
+      ]
     },
     {
       "id": "coverage-is-attributed",
-      "text": "Each file of a coverage report, an absolute path as cargo-llvm-cov writes it or a path relative to the crate, is attributed to the crate whose directory holds it, the deepest one. The lines of another crate's file are left out of the summary; the lines of a file in no crate are left out and reported with the warning stacks.coverage_unmapped."
+      "text": [
+        "Each file of a coverage report, an absolute path as cargo-llvm-cov writes it or a path relative to the crate, is attributed to the crate whose directory holds it, the deepest one.",
+        "The lines of another crate's file are left out of the summary; the lines of a file in no crate are left out and reported with the warning stacks.coverage_unmapped."
+      ]
     },
     {
       "id": "inputs-are-per-task",
-      "text": "lint reads the crate's sources, its test, bench and example targets, the Cargo manifests and configuration, and the rustfmt and clippy configurations; test reads the sources, targets, manifests, nextest configuration and lockfiles; build reads the sources, manifests and lockfiles. After its steps, build copies the stack root's target/debug/<crate> binary into its output when cargo wrote one."
+      "text": [
+        "lint reads the crate's sources, its test, bench and example targets, the Cargo manifests and configuration, and the rustfmt and clippy configurations;",
+        "test reads the sources, targets, manifests, nextest configuration and lockfiles;",
+        "build reads the sources, manifests and lockfiles.",
+        "After its steps, build copies the stack root's target/debug/<crate> binary into its output when cargo wrote one."
+      ]
     },
     {
       "id": "overrides-are-honored",
-      "text": "options[\"@putnami/rust\"] in a crate's own putnami.json overrides the profile: an object merges, any other value replaces the profile's whole. The steps run and the files the rust:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task. An unknown member, a change to id or markers, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+      "text": [
+        "options[\"@putnami/rust\"] in a crate's own putnami.json overrides the profile: an object merges, any other value replaces the profile's whole.",
+        "The steps run and the files the rust:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task.",
+        "An unknown member, a change to id or markers, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+      ]
     },
     {
       "id": "manifest-follows-the-profile",
@@ -60,7 +88,11 @@
     },
     {
       "id": "provides-its-toolchain",
-      "text": "A task whose rustc is missing, or outside the version a rust-toolchain file states, installs that version, or the extension's default, with the rustup the extension pins by SHA-256, in a rustup home under the Putnami home, once per version. A rustc on PATH that satisfies the statement runs and nothing is installed. An offline run installs nothing and reports stacks.toolchain_missing."
+      "text": [
+        "A task whose rustc is missing, or outside the version a rust-toolchain file states, installs that version, or the extension's default, with the rustup the extension pins by SHA-256, in a rustup home under the Putnami home, once per version.",
+        "A rustc on PATH that satisfies the statement runs and nothing is installed.",
+        "An offline run installs nothing and reports stacks.toolchain_missing."
+      ]
     },
     {
       "id": "provides-its-test-tools",
@@ -76,19 +108,31 @@
     },
     {
       "id": "run-forwards-the-exit-code",
-      "text": "putnami run runs cargo run --package <crate> --locked, with --bin <name> when --entrypoint names one of its binaries, once after the toolchain check, with no cache and no stack-root lock. The words of --args reach the program, --port sets PORT, and the task returns the program's exit code as its exit-code result; a non-zero exit fails the task."
+      "text": [
+        "putnami run runs cargo run --package <crate> --locked, with --bin <name> when --entrypoint names one of its binaries, once after the toolchain check, with no cache and no stack-root lock.",
+        "The words of --args reach the program, --port sets PORT, and the task returns the program's exit code as its exit-code result; a non-zero exit fails the task."
+      ]
     },
     {
       "id": "serve-sets-the-port",
-      "text": "putnami serve runs the same command until the user stops it, with no stack-root lock, PORT set from --port, 3000 by default and a free port for 0, and announces the server ready once the port accepts connections. A program that exits on its own fails the task with its exit code."
+      "text": [
+        "putnami serve runs the same command until the user stops it, with no stack-root lock, PORT set from --port, 3000 by default and a free port for 0, and announces the server ready once the port accepts connections.",
+        "A program that exits on its own fails the task with its exit code."
+      ]
     },
     {
       "id": "package-builds-each-platform",
-      "text": "package compiles the crate's binary in release mode with cargo zigbuild for the platforms its channels need: --platform for docker, linux/amd64 by default, and --platforms for archives, the five archive platforms by default. A Linux binary links against glibc 2.36, the libc of the image base, and a library crate compiles nothing."
+      "text": [
+        "package compiles the crate's binary in release mode with cargo zigbuild for the platforms its channels need: --platform for docker, linux/amd64 by default, and --platforms for archives, the five archive platforms by default.",
+        "A Linux binary links against glibc 2.36, the libc of the image base, and a library crate compiles nothing."
+      ]
     },
     {
       "id": "package-provides-its-cross-tools",
-      "text": "The compile step uses the Rust the extension installs, adds each rustup target it needs, and installs cargo-zigbuild and zig under the Putnami home, whatever the PATH holds, each pinned by version and SHA-256 per platform. An offline run installs nothing and fails naming what is missing."
+      "text": [
+        "The compile step uses the Rust the extension installs, adds each rustup target it needs, and installs cargo-zigbuild and zig under the Putnami home, whatever the PATH holds, each pinned by version and SHA-256 per platform.",
+        "An offline run installs nothing and fails naming what is missing."
+      ]
     },
     {
       "id": "package-writes-archives",
@@ -100,11 +144,17 @@
     },
     {
       "id": "package-dry-run-builds-nothing",
-      "text": "package --dry-run checks the platforms its flags name, compiles nothing, writes no archive and no image layout, and writes the channel record; package --crates still stages the crate, which cargo publish --dry-run checks."
+      "text": [
+        "package --dry-run checks the platforms its flags name, compiles nothing, writes no archive and no image layout, and writes the channel record;",
+        "package --crates still stages the crate, which cargo publish --dry-run checks."
+      ]
     },
     {
       "id": "publish-sends-the-staged-crate",
-      "text": "package --crates copies the stack root without its build output and writes the release version into each manifest and each normal path dependency, leaving the checkout untouched. publish --crates runs cargo publish from that copy, dependencies first; a version the registry already holds is reused, and --dry-run uploads nothing."
+      "text": [
+        "package --crates copies the stack root without its build output and writes the release version into each manifest and each normal path dependency, leaving the checkout untouched. publish --crates runs cargo publish from that copy, dependencies first;",
+        "a version the registry already holds is reused, and --dry-run uploads nothing."
+      ]
     },
     {
       "id": "publish-pushes-the-image",
@@ -112,27 +162,50 @@
     },
     {
       "id": "fetches-the-locked-crates",
-      "text": "workspace-fetch reads and closes the credential descriptor of a hosted run before it starts any process, and uses nothing it held. At each stack root that holds a Cargo.lock it runs cargo fetch --locked with RUSTC_WRAPPER and RUSTC_WORKSPACE_WRAPPER empty and RUSTC set to the selected rustc: no build script, procedural macro, wrapper or compiler the repository names runs, and the repository is not written. A root with no Cargo.lock is left out with the warning rust.lockfile_missing, which names it."
+      "text": [
+        "workspace-fetch reads and closes the credential descriptor of a hosted run before it starts any process, and uses nothing it held.",
+        "At each stack root that holds a Cargo.lock it runs cargo fetch --locked with RUSTC_WRAPPER and RUSTC_WORKSPACE_WRAPPER empty and RUSTC set to the selected rustc: no build script, procedural macro, wrapper or compiler the repository names runs, and the repository is not written.",
+        "A root with no Cargo.lock is left out with the warning rust.lockfile_missing, which names it."
+      ]
     },
     {
       "id": "offline-tasks-stay-offline",
-      "text": "When PUTNAMI_OFFLINE_DEPENDENCIES is 1, every job of the runtime but publish-crates sets CARGO_NET_OFFLINE=true before it starts a process, so each cargo of lint, test, build, run, serve, package and workspace-install reads only the crates workspace-fetch downloaded. No job sets CARGO_HOME: workspace-fetch and the tasks read the cargo home of the environment."
+      "text": [
+        "When PUTNAMI_OFFLINE_DEPENDENCIES is 1, every job of the runtime but publish-crates sets CARGO_NET_OFFLINE=true before it starts a process, so each cargo of lint, test, build, run, serve, package and workspace-install reads only the crates workspace-fetch downloaded.",
+        "No job sets CARGO_HOME: workspace-fetch and the tasks read the cargo home of the environment."
+      ]
     },
     {
       "id": "workspace-install-runs-cargo-fetch",
-      "text": "workspace-install runs cargo fetch, which writes a missing Cargo.lock, at each stack root of the workspace's projects, except a project disable.tags excludes and a root where cargo fetch --locked --offline passes, unless the force flag is set; then it installs cargo-nextest and cargo-llvm-cov when the PATH holds neither. Offline, it runs cargo fetch --locked --offline at each root that holds a Cargo.lock, writes and installs nothing, and leaves a root with no Cargo.lock out with rust.lockfile_missing."
+      "text": [
+        "workspace-install runs cargo fetch, which writes a missing Cargo.lock, at each stack root of the workspace's projects, except a project disable.tags excludes and a root where cargo fetch --locked --offline passes, unless the force flag is set;",
+        "then it installs cargo-nextest and cargo-llvm-cov when the PATH holds neither.",
+        "Offline, it runs cargo fetch --locked --offline at each root that holds a Cargo.lock, writes and installs nothing, and leaves a root with no Cargo.lock out with rust.lockfile_missing."
+      ]
     },
     {
       "id": "upgrades-the-lockfile",
-      "text": "deps-upgrade runs cargo update at each stack root of the workspace's projects, with the cargo the toolchain check selects: each locked version moves to the newest one its semver requirement accepts, as bundle update, composer update, pub upgrade and swift package update do. With offline dependencies it fails with rust.cargo_update_failed, which says that cargo update needs the network, and runs no cargo."
+      "text": [
+        "deps-upgrade runs cargo update at each stack root of the workspace's projects, with the cargo the toolchain check selects: each locked version moves to the newest one its semver requirement accepts, as bundle update, composer update, pub upgrade and swift package update do.",
+        "With offline dependencies it fails with rust.cargo_update_failed, which says that cargo update needs the network, and runs no cargo."
+      ]
     },
     {
       "id": "checks-documentation-links",
-      "text": "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the SDK's documentation link check, and a broken one fails lint. The docs-links flag, on by default, turns the check off. A crate below the project, marked by its Cargo.toml, answers for its own documents."
+      "text": [
+        "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the SDK's documentation link check, and a broken one fails lint.",
+        "The docs-links flag, on by default, turns the check off.",
+        "A crate below the project, marked by its Cargo.toml, answers for its own documents."
+      ]
     },
     {
       "id": "filters-the-tests",
-      "text": "test with the test flag, short -t, passes its value to nextest as -E 'test(~<value>)', with the characters a name matcher reads only escaped, with or without coverage, so it selects the tests whose name contains the value. It adds --no-tests=pass when cargo nextest run --help lists --no-tests, so a crate in which the filter selects no test passes. A last step that runs no nextest gets no argument. The value is part of the task's key, so a filtered result never answers an unfiltered run."
+      "text": [
+        "test with the test flag, short -t, passes its value to nextest as -E 'test(~<value>)', with the characters a name matcher reads only escaped, with or without coverage, so it selects the tests whose name contains the value.",
+        "It adds --no-tests=pass when cargo nextest run --help lists --no-tests, so a crate in which the filter selects no test passes.",
+        "A last step that runs no nextest gets no argument.",
+        "The value is part of the task's key, so a filtered result never answers an unfiltered run."
+      ]
     }
   ],
   "decisions": [

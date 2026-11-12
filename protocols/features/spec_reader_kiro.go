@@ -187,12 +187,12 @@ func (scan *kiroScan) criterion(text string, indent int, position SpecPosition) 
 		scan.anchor = nil
 	}
 	spec := scan.reading.Spec
-	spec.Requirements = append(spec.Requirements, SpecRequirement{ID: id, Text: strings.TrimSpace(text)})
+	spec.Requirements = append(spec.Requirements, SpecRequirement{ID: id, Text: SpecText{strings.TrimSpace(text)}})
 	scan.reading.Requirements = append(scan.reading.Requirements, SpecRequirementRecord{Position: position, Unanchored: unanchored})
 	index := len(spec.Requirements) - 1
 	scan.indent = indent
 	scan.extend = func(more string) {
-		spec.Requirements[index].Text = strings.TrimSpace(spec.Requirements[index].Text + " " + more)
+		spec.Requirements[index].Text = SpecText{strings.TrimSpace(spec.Requirements[index].Text.String() + " " + more)}
 	}
 }
 
@@ -303,8 +303,8 @@ func (scan *kiroScan) finish() {
 	}
 	for index := range spec.Requirements {
 		requirement := &spec.Requirements[index]
-		requirement.Text = strings.Join(strings.Fields(requirement.Text), " ")
-		if !isEARSCriterion(requirement.Text) {
+		requirement.Text = SpecText{strings.Join(strings.Fields(requirement.Text.String()), " ")}
+		if !isEARSCriterion(requirement.Text.String()) {
 			scan.reading.Findings = append(scan.reading.Findings, diag.Warningf(WarningCodeSpecCriterionMalformed,
 				scan.reading.Requirements[index].Position.Field(),
 				"this criterion is in no EARS form, such as WHEN <trigger> THE <system> SHALL <response>: it stays a requirement"))

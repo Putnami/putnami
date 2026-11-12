@@ -144,10 +144,10 @@ func TestWrappedOrNestedCriterionStaysWhole(t *testing.T) {
 		t.Fatalf("ids = %s", got)
 	}
 	texts := projection.Spec.Requirements
-	if texts[0].Text != "WHEN an order closes, THE system SHALL issue: - a PDF - a receipt and log it" {
-		t.Errorf("first = %q", texts[0].Text)
+	if texts[0].Text.String() != "WHEN an order closes, THE system SHALL issue: - a PDF - a receipt and log it" {
+		t.Errorf("first = %q", texts[0].Text.String())
 	}
-	if texts[1].Text != "THE system SHALL retry" || texts[2].Text != "THE system SHALL stop" {
+	if texts[1].Text.String() != "THE system SHALL retry" || texts[2].Text.String() != "THE system SHALL stop" {
 		t.Errorf("texts = %+v", texts)
 	}
 }
@@ -168,7 +168,7 @@ func TestTabInACriterionFoldsToASpace(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "features/feature-contracts", "kiro-projection", "a-wrapped-or-nested-criterion-stays-whole")
 	projection := readKiro(t, "## Introduction\n\nWhy.\n\n### Requirement 1\n\n#### Acceptance Criteria\n\n1. THE system\tSHALL run\n")
-	if got := kiroIDs(t, projection); got != "requirement-1-1" || projection.Spec.Requirements[0].Text != "THE system SHALL run" {
+	if got := kiroIDs(t, projection); got != "requirement-1-1" || projection.Spec.Requirements[0].Text.String() != "THE system SHALL run" {
 		t.Fatalf("spec = %+v", projection.Spec)
 	}
 }
@@ -196,7 +196,7 @@ func TestDottedCriterionNumberOpensACriterion(t *testing.T) {
 	if got := kiroIDs(t, projection); got != "requirement-1-1 requirement-1-2" {
 		t.Fatalf("ids = %s", got)
 	}
-	if text := projection.Spec.Requirements[1].Text; text != "THE system SHALL stop" {
+	if text := projection.Spec.Requirements[1].Text.String(); text != "THE system SHALL stop" {
 		t.Fatalf("text = %q", text)
 	}
 }
@@ -209,7 +209,7 @@ func TestKiroCommentsAndCodeAreNotSpecText(t *testing.T) {
 	if got := kiroIDs(t, projection); got != "requirement-1-1" {
 		t.Fatalf("ids = %s", got)
 	}
-	if text := projection.Spec.Requirements[0].Text; text != "THE system SHALL run now" || projection.Spec.Outcomes[0] != "Why." {
+	if text := projection.Spec.Requirements[0].Text.String(); text != "THE system SHALL run now" || projection.Spec.Outcomes[0] != "Why." {
 		t.Fatalf("spec = %+v", projection.Spec)
 	}
 }

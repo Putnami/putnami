@@ -25,11 +25,17 @@
   "requirements": [
     {
       "id": "optin",
-      "text": "A command materializes agent content only when putnami.workspace.json opts into it in agentArtifacts; an absent or empty declaration skips the agent phase without any lock read or output, though install still drops any pin under agentArtifacts, and a starter that opts into nothing adds nothing."
+      "text": [
+        "A command materializes agent content only when putnami.workspace.json opts into it in agentArtifacts;",
+        "an absent or empty declaration skips the agent phase without any lock read or output, though install still drops any pin under agentArtifacts, and a starter that opts into nothing adds nothing."
+      ]
     },
     {
       "id": "legacy-declarations-refused",
-      "text": "An agentArtifacts entry in a form earlier releases installed, a registry artifact (`name` or `name:channel`) or an in-tree project path (`/path`), is never installed: every agent-content command refuses it with nothing written and gives only the steps that apply: replace it with an `extension:<name>` entry for the extension whose content supersedes it, or delete it when that entry exists, and declare that extension when it is not. A declared extension or a first-party successor is named."
+      "text": [
+        "An agentArtifacts entry in a form earlier releases installed, a registry artifact (`name` or `name:channel`) or an in-tree project path (`/path`), is never installed: every agent-content command refuses it with nothing written and gives only the steps that apply: replace it with an `extension:<name>` entry for the extension whose content supersedes it, or delete it when that entry exists, and declare that extension when it is not.",
+        "A declared extension or a first-party successor is named."
+      ]
     },
     {
       "id": "record-last",
@@ -49,7 +55,11 @@
     },
     {
       "id": "explicit-lock-migration",
-      "text": "putnami migrate vnext --check and --apply provide a read-only preview and an atomic, idempotent projection of a lock below format 5 to format 5 without changing existing pins. Both refuse a lock that pins toolchains and name putnami install. Install never performs that projection as a side effect: it writes format 5 only when it writes toolchain pins."
+      "text": [
+        "putnami migrate vnext --check and --apply provide a read-only preview and an atomic, idempotent projection of a lock below format 5 to format 5 without changing existing pins.",
+        "Both refuse a lock that pins toolchains and name putnami install.",
+        "Install never performs that projection as a side effect: it writes format 5 only when it writes toolchain pins."
+      ]
     },
     {
       "id": "reinit-preserves-optin",
@@ -57,43 +67,85 @@
     },
     {
       "id": "undeclared-artifact-retired",
-      "text": "An adopting command retires an owner the clone recorded but the workspace no longer opts into: it removes the files that record still manages and that are unchanged, keeps and reports any the user edited without managing them further, then drops its lock pin, when there is one, and finally the record. Every opted-in contribution is verified and planned before the first removal, so one that cannot be verified, or that collides on a path retirement does not free, fails the run with nothing removed."
+      "text": [
+        "An adopting command retires an owner the clone recorded but the workspace no longer opts into: it removes the files that record still manages and that are unchanged, keeps and reports any the user edited without managing them further, then drops its lock pin, when there is one, and finally the record.",
+        "Every opted-in contribution is verified and planned before the first removal, so one that cannot be verified, or that collides on a path retirement does not free, fails the run with nothing removed."
+      ]
     },
     {
       "id": "extension-agent-content",
-      "text": "An `agentArtifacts` entry `extension:<name>` opts into the agent content the declared extension <name> ships; declaring the extension alone activates nothing. The content takes the extension's resolved version and is never pinned under agentArtifacts: it follows the extension on upgrade, is retired when the entry is removed, and for a local extension is built from its authored source on every run."
+      "text": [
+        "An `agentArtifacts` entry `extension:<name>` opts into the agent content the declared extension <name> ships; declaring the extension alone activates nothing.",
+        "The content takes the extension's resolved version and is never pinned under agentArtifacts: it follows the extension on upgrade, is retired when the entry is removed, and for a local extension is built from its authored source on every run."
+      ]
     },
     {
       "id": "extension-agent-content-integrity",
-      "text": "Every byte of an installed extension's content is bound through the extension's lock pin, its manifest digest and its content manifest digest, and a mismatch fails before the workspace is read. Collisions, symlinked destinations and overlaps with another extension abort with zero writes, a repeated install changes nothing, and an interrupted run converges on a rerun."
+      "text": [
+        "Every byte of an installed extension's content is bound through the extension's lock pin, its manifest digest and its content manifest digest, and a mismatch fails before the workspace is read.",
+        "Collisions, symlinked destinations and overlaps with another extension abort with zero writes, a repeated install changes nothing, and an interrupted run converges on a rerun."
+      ]
     },
     {
       "id": "superseded-owners-refused",
-      "text": "While a workspace opts into an extension's agent content, every agent-content command refuses it when this clone still records an artifact that content supersedes (agentContent.supersedes), writes nothing and names each ownership record to delete. With those deleted, the next run keeps every file that already has the content's bytes and reports every other one as a collision."
+      "text": [
+        "While a workspace opts into an extension's agent content, every agent-content command refuses it when this clone still records an artifact that content supersedes (agentContent.supersedes), writes nothing and names each ownership record to delete.",
+        "With those deleted, the next run keeps every file that already has the content's bytes and reports every other one as a collision."
+      ]
     },
     {
       "id": "legacy-pins-dropped",
-      "text": "No declaration uses a pin under agentArtifacts in putnami.lock.json: an `extension:<name>` entry follows its extension's own pin. An explicit putnami install drops every such pin and leaves the ownership records to upgrade. The implicit bootstrap keeps the committed lock as it is, and a hosted install that would drop a pin fails before any phase runs, with the lock unchanged, and asks for putnami install without the run credential."
+      "text": [
+        "No declaration uses a pin under agentArtifacts in putnami.lock.json: an `extension:<name>` entry follows its extension's own pin.",
+        "An explicit putnami install drops every such pin and leaves the ownership records to upgrade.",
+        "The implicit bootstrap keeps the committed lock as it is, and a hosted install that would drop a pin fails before any phase runs, with the lock unchanged, and asks for putnami install without the run credential."
+      ]
     },
     {
       "id": "starter-agent-content-opt-in",
-      "text": "No built-in starter opts into agent content, so `putnami init` declares none. `putnami extensions install @putnami/contributor` declares the extension and materializes only its content, and reports each write; an extension without content, or installed as a dependency, gets no opt-in. A starter that names one has init do the same. When the content step fails, both declarations stay, no agent file is written, and `putnami install` is the next step."
+      "text": [
+        "No built-in starter opts into agent content, so `putnami init` declares none.",
+        "`putnami extensions install @putnami/contributor` declares the extension and materializes only its content, and reports each write;",
+        "an extension without content, or installed as a dependency, gets no opt-in.",
+        "A starter that names one has init do the same.",
+        "When the content step fails, both declarations stay, no agent file is written, and `putnami install` is the next step."
+      ]
     },
     {
       "id": "host-hooks-written-on-explicit-lifecycle",
-      "text": "An explicit install, init or upgrade writes an extension's declared hostHooks into .claude/settings.json and .codex/hooks.json when the workspace opts into its agent content, binds the contract the hooks require, and has it installed. A repeated run changes nothing. The implicit bootstrap, the first-run pass and context generate never write them. A change to .codex/hooks.json reports that Codex runs the hooks only after /hooks trusts them."
+      "text": [
+        "An explicit install, init or upgrade writes an extension's declared hostHooks into .claude/settings.json and .codex/hooks.json when the workspace opts into its agent content, binds the contract the hooks require, and has it installed.",
+        "A repeated run changes nothing.",
+        "The implicit bootstrap, the first-run pass and context generate never write them.",
+        "A change to .codex/hooks.json reports that Codex runs the hooks only after /hooks trusts them."
+      ]
     },
     {
       "id": "host-hooks-ownership-by-command",
-      "text": "A handler is Putnami's when its command runs a known launcher as a command word, followed by a command path an installed extension declares; a launcher that is another command's argument is not. A run replaces it in place and never adds a second one; every other entry keeps its bytes and place. Without the opt-in or binding, a run removes Putnami's handlers and anything only they filled. A file that cannot be read, parsed or safely edited, or is a link, stays untouched with a warning."
+      "text": [
+        "A handler is Putnami's when its command runs a known launcher as a command word, followed by a command path an installed extension declares;",
+        "a launcher that is another command's argument is not.",
+        "A run replaces it in place and never adds a second one; every other entry keeps its bytes and place.",
+        "Without the opt-in or binding, a run removes Putnami's handlers and anything only they filled.",
+        "A file that cannot be read, parsed or safely edited, or is a link, stays untouched with a warning."
+      ]
     },
     {
       "id": "host-hooks-exit-guard",
-      "text": "Every hook command starts with PUTNAMI_NO_AUTO_INSTALL=1, so a hook never installs. No CLI exit code reaches the host as is: an ordinary hook ends with || true, and a Claude Code wake hook exits 2 when its command exits 75 and 0 otherwise. Claude Code matchers are A|B and Codex matchers ^(A|B)$. A source workspace runs \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
+      "text": [
+        "Every hook command starts with PUTNAMI_NO_AUTO_INSTALL=1, so a hook never installs.",
+        "No CLI exit code reaches the host as is: an ordinary hook ends with || true, and a Claude Code wake hook exits 2 when its command exits 75 and 0 otherwise.",
+        "Claude Code matchers are A|B and Codex matchers ^(A|B)$.",
+        "A source workspace runs \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
+      ]
     },
     {
       "id": "user-scope-skills",
-      "text": "`extensions install --user <name>` writes only the skills the extension's `agentContent.userScope` names, under the user's home (`.claude/skills/<skill>`, `.agents/skills/<skill>`), from the content its pin binds, under the workspace's ownership rules: a file it did not write or that was edited is kept and reported, and one collision writes nothing. An unchanged pin writes nothing; `remove --user` removes what it wrote. Nothing is written in the current directory."
+      "text": [
+        "`extensions install --user <name>` writes only the skills the extension's `agentContent.userScope` names, under the user's home (`.claude/skills/<skill>`, `.agents/skills/<skill>`), from the content its pin binds, under the workspace's ownership rules: a file it did not write or that was edited is kept and reported, and one collision writes nothing.",
+        "An unchanged pin writes nothing; `remove --user` removes what it wrote.",
+        "Nothing is written in the current directory."
+      ]
     }
   ],
   "decisions": [
