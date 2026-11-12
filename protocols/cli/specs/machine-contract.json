@@ -85,11 +85,12 @@
     {
       "id": "the-bounded-stream-keeps-its-promises",
       "text": [
-        "The bounded JSONL profile has a fixed budget per mode, keeps its hard partitions in arrival order, and keeps room for failures once the ordinary budget is spent.",
-        "Normal mode suppresses debug detail, test cases included, and verbose mode admits it.",
-        "Failure priority and debug detail are closed vocabularies whose classifiers agree on decoded records.",
-        "Values are sanitized: control characters go, credentials are redacted and member names stay.",
-        "Validation refuses raw invalid UTF-8 and an unpaired surrogate."
+        "The bounded JSONL profile has a fixed budget per mode, hard partitions in arrival order, and room for failures once the ordinary budget is spent.",
+        "Every task:start and task:end is live, outside the budget.",
+        "Normal mode drops debug detail, test cases included; verbose admits it.",
+        "Lifecycle, failure priority and debug detail are closed vocabularies whose classifiers agree.",
+        "Sanitizing drops control characters, redacts credentials and keeps member names.",
+        "Validation refuses invalid UTF-8 and unpaired surrogates."
       ]
     },
     {

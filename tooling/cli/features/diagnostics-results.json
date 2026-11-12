@@ -130,7 +130,8 @@
           "kind": "acceptance",
           "checks": [
             "the-stream-is-bounded-failure-first-sanitized-and-recorded",
-            "the-output-mode-never-changes-the-run-verdict"
+            "the-output-mode-never-changes-the-run-verdict",
+            "every-task-streams-its-start-and-its-end"
           ]
         }
       },

@@ -63,7 +63,7 @@
     },
     {
       "id": "bounded-machine-detail",
-      "text": "Machine JSONL retains a complete sanitized session artifact without changing task or run semantics."
+      "text": "Machine JSONL retains a complete sanitized session artifact without changing task or run semantics, and streams one task:start and one task:end per task whatever the run size."
     },
     {
       "id": "opening-session-identity",

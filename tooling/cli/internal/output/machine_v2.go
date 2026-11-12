@@ -367,11 +367,7 @@ func (r *machineV2Renderer) emitRecord(records ...protocolcli.SessionStreamRecor
 			}
 			continue
 		}
-		admitted := r.state.admit(
-			protocolcli.IsMachineOutputFailurePriority(sanitized[i]),
-			protocolcli.IsMachineOutputDebugDetail(sanitized[i]),
-			int64(len(line)+1),
-		)
+		admitted := r.state.admit(sanitized[i], int64(len(line)+1))
 		if r.stream && admitted {
 			r.writeLocked(line)
 		}

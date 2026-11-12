@@ -2,6 +2,7 @@ package output
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -147,6 +148,38 @@ func splitErrorDetailLines(message string) (details []string, generic []string) 
 	}
 	return details, generic
 }
+
+// failingLine is the line of a failed job's output that names the failure: the
+// first one that says error, failure, fatal, panic or exception, outside a line
+// a tool logged at a level below error. A job's error is often the tail of a
+// tool's own output, whose first lines are its progress log, so without such a
+// line it is the last one, the nearest to the exit. It returns "" for no line.
+func failingLine(lines []string) string {
+	last := ""
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		last = line
+		if !belowErrorLevel.MatchString(line) && failureWord.MatchString(noFailure.ReplaceAllString(line, "")) {
+			return line
+		}
+	}
+	return last
+}
+
+var (
+	// failureWord matches a word that names a failure, and an identifier
+	// ending in Error or Exception such as ServiceMissingError.
+	failureWord = regexp.MustCompile(`(?i)\b(error|failure|failed|fatal|panic|exception)\b|[a-z](error|exception)\b`)
+	// noFailure matches a count of none, such as "0 errors" or "0 failed".
+	noFailure = regexp.MustCompile(`(?i)\b(0|no) (errors?|failures?|failed)\b`)
+	// belowErrorLevel matches a log level below error that a tool marked the
+	// line with: "[INFO]" anywhere, or "INFO" and "warning:" first, after an
+	// optional timestamp.
+	belowErrorLevel = regexp.MustCompile(`(?i)\[(trace|debug|info|notice|warn|warning)\]|^(\d[\d:.TZ+-]*\s+)?(trace|debug|info|notice|warn|warning)\b`)
+)
 
 func genericExitSummary(lines []string) string {
 	if len(lines) == 0 {

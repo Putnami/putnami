@@ -2,7 +2,6 @@ package output
 
 import (
 	"sort"
-	"strings"
 	"time"
 
 	"go.putnami.dev/cli/model/jobs"
@@ -102,10 +101,10 @@ func (r *TextRenderer) renderFailureRecap(results map[string]*jobs.JobResult) {
 		}
 		errMsg := ""
 		if result.Error != nil && result.Error.Message != "" {
-			// Take the first actionable error line only for recap.
+			// The recap quotes one line: the one that names the failure.
 			lines, _ := splitErrorDetailLines(result.Error.Message)
-			if len(lines) > 0 {
-				errMsg = " — " + strings.TrimSpace(lines[0])
+			if line := failingLine(lines); line != "" {
+				errMsg = " — " + line
 			}
 		}
 		iox.Fprintf(r.errOut, "    %s%s\n", key, errMsg)

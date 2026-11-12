@@ -139,8 +139,8 @@ func TestMachineOutputFailurePriorityVocabulary(t *testing.T) {
 		record SessionStreamRecord
 		want   bool
 	}{
-		{"failed task", SessionStreamRecord{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusFailed}}, true},
-		{"canceled task", SessionStreamRecord{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusCanceled}}, true},
+		{"failed task", SessionStreamRecord{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusFailed}}, false},
+		{"canceled task", SessionStreamRecord{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusCanceled}}, false},
 		{"successful task", SessionStreamRecord{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusSuccess}}, false},
 		{"error level", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"level": "error"}}, true},
 		{"diagnostic error", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"type": "diagnostic", "severity": "error"}}, true},
@@ -161,6 +161,29 @@ func TestMachineOutputFailurePriorityVocabulary(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			if got := IsMachineOutputFailurePriority(testCase.record); got != testCase.want {
 				t.Errorf("IsMachineOutputFailurePriority() = %v, want %v", got, testCase.want)
+			}
+		})
+	}
+}
+
+func TestMachineOutputLifecycleVocabulary(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "the-bounded-stream-keeps-its-promises", "classifiers-are-closed-and-agree")
+	tests := []struct {
+		name   string
+		record SessionStreamRecord
+		want   bool
+	}{
+		{"task start", SessionStreamRecord{Record: RecordTaskStart}, true},
+		{"failed task", SessionStreamRecord{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusFailed}}, true},
+		{"successful task", SessionStreamRecord{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusSuccess}}, true},
+		{"error event", SessionStreamRecord{Record: RecordTaskEvent, Event: map[string]any{"level": "error"}}, false},
+		{"test case", SessionStreamRecord{Record: RecordTestCase, TestCase: &TestCase{Status: TestCaseStatusFailed}}, false},
+		{"session end", SessionStreamRecord{Record: RecordSessionEnd}, false},
+	}
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			if got := IsMachineOutputLifecycle(testCase.record); got != testCase.want {
+				t.Errorf("IsMachineOutputLifecycle() = %v, want %v", got, testCase.want)
 			}
 		})
 	}
@@ -203,6 +226,7 @@ func TestMachineOutputClassifiersAgreeOnDecodedRecords(t *testing.T) {
 		{Record: RecordTestCase, TestCase: &TestCase{Name: "TestA", Suite: "a", Status: TestCaseStatusFailed, Output: "boom"}},
 		{Record: RecordTestCase},
 		{Record: RecordTaskEnd, Task: &TaskRecord{Status: TaskStatusFailed, TestCasesDropped: 3}},
+		{Record: RecordTaskStart},
 		{Record: RecordTaskEvent, Event: map[string]any{"type": "log", "level": "debug"}},
 		{Record: RecordTaskEvent, Event: map[string]any{"type": "log", "level": "error"}},
 		{Record: RecordTaskEvent, Event: map[string]any{"type": "ready", "target": "server"}},
@@ -222,6 +246,9 @@ func TestMachineOutputClassifiersAgreeOnDecodedRecords(t *testing.T) {
 		}
 		if got, want := failurePriorityRecord(root), IsMachineOutputFailurePriority(record); got != want {
 			t.Errorf("%s: failurePriorityRecord = %v, IsMachineOutputFailurePriority = %v", data, got, want)
+		}
+		if got, want := lifecycleRecord(root), IsMachineOutputLifecycle(record); got != want {
+			t.Errorf("%s: lifecycleRecord = %v, IsMachineOutputLifecycle = %v", data, got, want)
 		}
 	}
 }
