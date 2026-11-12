@@ -145,6 +145,9 @@ type SyncResult struct {
 	// Conventions list each file an import rewrote to adopt Putnami's
 	// TypeScript conventions, and each manifest it did not (D-066).
 	Conventions []string
+	// Notes say how Putnami runs a target that moved differently from Nx,
+	// such as the projects --impacted lints.
+	Notes []string
 }
 
 // Sync writes the project graph of the Nx workspace at root into each
@@ -202,6 +205,7 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	}
 	typeScript := slices.Contains(opts.Declared, TypeScriptExtension) || declaresExtension(root, TypeScriptExtension)
 	var conventions []stacks.ConventionProject
+	lintMoved := false
 	for _, p := range detection.Projects {
 		projectMode := mode
 		if imports.Selects(p.Path) {
@@ -215,6 +219,7 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.Name, BunBuild: plan.bunBuild, PublishedBy: stacks.PackagePublished(root, p.Path)})
 		}
 		result.Unmapped = append(result.Unmapped, plan.unmapped...)
+		lintMoved = lintMoved || plan.lintMoved
 		file := path.Join(p.Path, wsproto.ConfigFilename)
 		change, err := writeProject(root, file, plan, components, opts.DryRun)
 		if err != nil {
@@ -257,6 +262,9 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 		result.Changes = append(result.Changes, Change{File: w.File, Before: w.Before, After: w.After})
 	}
 	result.Conventions = append(append(result.Conventions, notes...), warnings...)
+	if lintMoved {
+		result.Notes = append(result.Notes, stacks.LintDependentsNote)
+	}
 	return result, nil
 }
 
@@ -399,6 +407,9 @@ type projectPlan struct {
 	// bunBuild reports a build the TypeScript extension takes over with its
 	// Bun build, which writes nothing in the project (D-066).
 	bunBuild bool
+	// lintMoved reports a lint target the TypeScript extension takes over;
+	// testMoved a test target it takes over, which type-checked nothing.
+	lintMoved, testMoved bool
 }
 
 // planProject maps the targets of one project in the mode.
@@ -420,9 +431,15 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 	for _, task := range lifecycleTasks {
 		target, ok := targets[task]
 		covered := ok && isTS && coveredByTypeScript(root, p.Path, task, target)
-		plan.bunBuild = plan.bunBuild || (task == "build" && covered)
 		reason := ""
-		if ok && task == "build" && !covered {
+		if task == "build" && covered {
+			// The Bun build writes nothing in the project: it moves only
+			// when it writes the entries the package.json names.
+			reason = stacks.BunBuildKeptReason(root, p.Path, stacks.PackagePublished(root, p.Path), task+" keeps running through nx run")
+			covered = reason == ""
+			plan.bunBuild = plan.bunBuild || covered
+		}
+		if ok && task == "build" && !covered && reason == "" {
 			// A tsc build moves when the TypeScript extension compiles it
 			// with that tsc (ADR 0010 of @putnami/typescript).
 			var tscCovered, compiler bool
@@ -440,9 +457,11 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 			plan.disabled = append(plan.disabled, ExtensionName+":"+task)
 			if task == "test" {
 				plan.runner = testRunner(target)
+				plan.testMoved = true
 			}
-			if task == "lint" && lintsWithESLint(root, p.Path, target) {
-				plan.eslint = true
+			if task == "lint" {
+				plan.eslint = lintsWithESLint(root, p.Path, target)
+				plan.lintMoved = true
 			}
 		case typeScript && hasManifest(root, p.Path):
 			// The TypeScript extension claims the project too: the target
@@ -963,6 +982,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	stacks.SetTypeScriptRunner(doc, plan.runner)
 	setCompiler(doc, plan.typeScript && plan.compiler)
 	stacks.SetTypeScriptLinter(doc, plan.eslint)
+	stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
 	if plan.nodeRuntime {
 		markNodeRuntime(doc)
 	}
@@ -990,6 +1010,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	stacks.SetTypeScriptRunner(doc, "")
 	setCompiler(doc, false)
 	stacks.SetTypeScriptLinter(doc, false)
+	stacks.SetTypeScriptTestTypesOff(doc, false)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
 	}
@@ -1251,6 +1272,9 @@ func report(emit *jsonl.Emitter, result SyncResult, dry bool) {
 	reportUnmatched(emit, result)
 	for _, note := range result.Conventions {
 		emit.Diagnostic("warning", note, "", 0)
+	}
+	for _, note := range result.Notes {
+		emit.Diagnostic("info", note, "", 0)
 	}
 	if !dry {
 		return

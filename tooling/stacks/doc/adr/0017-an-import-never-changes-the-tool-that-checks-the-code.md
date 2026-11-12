@@ -2,6 +2,9 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-11
+- **Amended**: 2026-11-12, rules 6 and 9: a moved task does what its script
+  did, and a Bun build moves only when it writes the entries its
+  `package.json` names.
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), the import mode of
   `@putnami/nx`, `@putnami/turbo`, `@putnami/rush` and `@putnami/moon`;
   `putnami init --from`
@@ -92,7 +95,12 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
 6. **D-066 follows the build.** An import rewrites the entry of a project
    the repository does not publish, whose `main` names a build output, only
    when its `build` moves to the Bun build: that build writes nothing in the
-   project. A `tsc` build, or one that stays on the tool, writes the output
+   project. A `bun build` moves only when that build writes the entries the
+   `package.json` names: its `exports`, else its `main`, `types` and
+   `typings`, all under `src/`, or a `main` the import rewrites. A project
+   the repository publishes, one whose `exports` name a build output, and one
+   with no `src/index.ts` keep their `bun build` on the tool, which writes
+   what its dependents read. A `tsc` build, or one that stays on the tool, writes the output
    the `main` names, so the entry stays. A project with no `tsconfig*.json`
    gets a `tsconfig.json` that extends the root's; one that holds another
    `tsconfig*.json` keeps its configuration, which its test runner or linter
@@ -106,6 +114,15 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    --mode delegate --apply` in a workspace that imported, with no import
    list, removes from the workspace config each extension the import
    declared that no `putnami.json` names after the sync.
+
+9. **A moved task does what its script did.** The TypeScript test
+   type-checks every file of the project. A test that moves gets
+   `types: false` in `options["@putnami/typescript:test"]`, since no script
+   the rule moves type-checks. The sync owns that value and removes a
+   `false` it no longer writes. The TypeScript lint reads only the project's
+   own files, so `putnami lint --impacted` lints the projects a change
+   touches and not their dependents (ADR 0044 of `tooling/cli`); the sync
+   says so when a lint moves.
 
 ## Rejected alternatives
 

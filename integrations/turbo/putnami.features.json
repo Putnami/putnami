@@ -183,6 +183,19 @@
               "an-import-adds-source-exports-and-a-tsconfig"
             ]
           }
+        },
+        {
+          "id": "a-moved-task-does-what-its-script-did",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-imported-task-does-what-its-script-did"
+            ]
+          }
         }
       ]
     }

@@ -135,6 +135,7 @@ func synchronize(ctx context.Context, root string, dry bool, given string) (Sync
 	extensions := map[string]bool{}
 	var packages []stacks.GraphPackage
 	var conventions []stacks.ConventionProject
+	lintMoved := false
 	for _, p := range detection.Projects {
 		if p.Dir == wsproto.ProbeRootPath {
 			notes = append(notes, rootProjectNote(p))
@@ -164,7 +165,7 @@ func synchronize(ctx context.Context, root string, dry bool, given string) (Sync
 			DependsOn: p.DependsOn,
 			Extension: extension,
 			Disabled:  disabled,
-			Edit:      editSteps(mapped, delegated, typeScriptOptions(p, "", false)),
+			Edit:      editSteps(mapped, delegated, typeScriptOptions(p, importPlan{})),
 		}
 		if delegated {
 			pkg.Inputs = rootInputs(root, p.Dir)
@@ -176,7 +177,8 @@ func synchronize(ctx context.Context, root string, dry bool, given string) (Sync
 		extensions[extension] = true
 		plan := planImport(root, p, mapped)
 		pkg.Extension, pkg.Also, pkg.Disabled = plan.extension, plan.also, plan.disabled
-		pkg.Edit = editSteps(plan.kept, true, typeScriptOptions(p, plan.runner, plan.eslint))
+		pkg.Edit = editSteps(plan.kept, true, typeScriptOptions(p, plan))
+		lintMoved = lintMoved || plan.lintMoved
 		if len(plan.kept) > 0 {
 			pkg.Inputs = rootInputs(root, p.Dir)
 		}
@@ -193,6 +195,9 @@ func synchronize(ctx context.Context, root string, dry bool, given string) (Sync
 	}
 	result.GraphResult = graph
 	result.Warnings = append(notes, result.Warnings...)
+	if lintMoved {
+		result.Warnings = append(result.Warnings, stacks.LintDependentsNote)
+	}
 	result.Export = detect.WorkspaceFile
 	switch {
 	case resolved.options.GraphFile != "":
@@ -268,15 +273,17 @@ func editSteps(mapped map[string]string, delegated bool, then func(map[string]an
 	}
 }
 
-// typeScriptOptions writes, for a TypeScript project, the test runner and
-// the ESLint linter its moved tasks run, and removes those it does not.
-func typeScriptOptions(p detect.Project, runner string, eslint bool) func(map[string]any) {
+// typeScriptOptions writes, for a TypeScript project, what its moved tasks
+// run: the test runner, with no type check, and the ESLint linter. It
+// removes those it does not.
+func typeScriptOptions(p detect.Project, plan importPlan) func(map[string]any) {
 	if p.Language != "typescript" {
 		return nil
 	}
 	return func(doc map[string]any) {
-		stacks.SetTypeScriptRunner(doc, runner)
-		stacks.SetTypeScriptLinter(doc, eslint)
+		stacks.SetTypeScriptRunner(doc, plan.runner)
+		stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
+		stacks.SetTypeScriptLinter(doc, plan.eslint)
 	}
 }
 

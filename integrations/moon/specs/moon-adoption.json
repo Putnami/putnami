@@ -95,6 +95,14 @@
     {
       "id": "manifest-follows-the-profile",
       "text": "The manifest passes the stack core's conformance kit: its markers are the profile's, it lists the moon:lint, moon:test and moon:build selectors, each command runs the graph step, which depends on the graph step upstream, then its task, which depends on its own graph step alone, and every task sets cache.enabled to false."
+    },
+    {
+      "id": "a-moved-task-does-what-its-script-did",
+      "text": [
+        "In import mode, a TypeScript task that moves to @putnami/typescript does what it did: a test script moves with options[\"@putnami/typescript:test\"].types false, since the task type-checked nothing.",
+        "A bun build task moves only when Putnami's Bun build writes the entries the package.json names: none outside src/, or entries D-066 rewrites; otherwise it stays on moon and the sync says why.",
+        "When a lint moves, the sync says that putnami lint --impacted lints the projects a change touches, not their dependents."
+      ]
     }
   ],
   "decisions": [

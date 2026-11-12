@@ -41,12 +41,16 @@ func TestADelegatedTurborepoImportsPricingAndPassesLintTestBuild(t *testing.T) {
 
 	// A delegated workspace that loads @putnami/typescript and @putnami/dev
 	// from this tree. pricing's scripts run what @putnami/typescript runs,
-	// and its tests import the runner's globals from bun:test.
+	// and its tests import the runner's globals from bun:test. pricing is
+	// private, so the import names its sources as its entry and its Bun
+	// build moves: a published package keeps the dist/index.js its main
+	// names, which that build does not write, and its build on Turborepo.
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"),
 		`{"name": "shop", "extensions": ["/turbo-extension", "/.ext/typescript", "/.ext/dev"], "includes": [], "options": {"@putnami/turbo": {"mode": "delegate"}}}`)
 	clitest.WriteFile(t, filepath.Join(root, "packages/pricing/package.json"), `{
   "name": "@demo/pricing",
   "version": "1.0.0",
+  "private": true,
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
