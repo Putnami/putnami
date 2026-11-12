@@ -149,9 +149,9 @@ type testOutput struct {
 }
 
 // stubBazel puts first on PATH a bazel that prints its version, prints the
-// demo's export for query, and for coverage //<pkg>:all writes the
-// build-event file of that package's test runs, whose JUnit and coverage
-// outputs lie in an output tree outside the workspace, as Bazel's do. It logs
+// demo's export for query, and for test //<pkg>:all writes the build-event
+// file of that package's test runs, whose JUnit outputs lie in an output tree
+// outside the workspace, as Bazel's do. It logs
 // each call with its working directory and returns the log.
 func stubBazel(t *testing.T, demo map[string]map[string]string) string {
 	t.Helper()
@@ -167,17 +167,10 @@ func stubBazel(t *testing.T, demo map[string]map[string]string) string {
 		logDir := filepath.Dir(logRel)
 		pkg, target := filepath.Dir(logDir), filepath.Base(logDir)
 		clitest.WriteFile(t, filepath.Join(testlogs, logRel), content)
-		var coverage strings.Builder
-		for _, record := range strings.SplitAfter(demo["bazel"]["out/_coverage/_coverage_report.dat"], "end_of_record\n") {
-			if strings.HasPrefix(record, "SF:"+pkg+"/") {
-				coverage.WriteString(record)
-			}
-		}
-		clitest.WriteFile(t, filepath.Join(testlogs, logDir, "coverage.dat"), coverage.String())
 		uri := func(name string) string { return "file://" + filepath.ToSlash(filepath.Join(testlogs, logDir, name)) }
 		var e testResultEvent
 		e.ID.TestResult.Label, e.TestResult.Status = "//"+pkg+":"+target, "PASSED"
-		e.TestResult.TestActionOutput = []testOutput{{"test.xml", uri("test.xml")}, {"test.lcov", uri("coverage.dat")}}
+		e.TestResult.TestActionOutput = []testOutput{{"test.xml", uri("test.xml")}}
 		event, err := json.Marshal(e)
 		if err != nil {
 			t.Fatal(err)
@@ -195,7 +188,7 @@ case "$1" in --version) echo "bazel 7.4.1"; exit 0;; esac
 for a in "$@"; do last="$a"; done
 case "$1" in
   query) cat '`+ci+`/bazel-graph.json';;
-  coverage)
+  test)
     pkg="${last#//}"; pkg="${pkg%:all}"; flat="$(echo "$pkg" | tr / _)"
     for a in "$@"; do case "$a" in --build_event_json_file=*) bep="${a#--build_event_json_file=}";; esac; done
     mkdir -p "$(dirname "$bep")"
@@ -210,7 +203,7 @@ esac
 }
 
 // bazelTests runs putnami test --impacted from base and returns the packages
-// bazel coverage ran on, sorted, and the run's output. Every bazel call runs
+// bazel test ran on, sorted, and the run's output. Every bazel call runs
 // at the workspace root.
 func bazelTests(t *testing.T, root, base, log string) ([]string, string) {
 	t.Helper()
@@ -227,11 +220,11 @@ func bazelTests(t *testing.T, root, base, log string) ([]string, string) {
 	var tested []string
 	for _, line := range strings.Split(strings.TrimSpace(string(logged)), "\n") {
 		dir, call, _ := strings.Cut(line, " bazel ")
-		if !strings.HasPrefix(call, "coverage ") {
+		if !strings.HasPrefix(call, "test ") {
 			continue
 		}
 		if real, _ := filepath.EvalSymlinks(dir); real != rootReal {
-			t.Errorf("bazel coverage ran in %s, want the workspace root", dir)
+			t.Errorf("bazel test ran in %s, want the workspace root", dir)
 		}
 		tested = append(tested, call[strings.LastIndex(call, " ")+1:])
 	}
@@ -294,7 +287,7 @@ func TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel(t *testing.T
 	pricingChange := commit(t, root, "change pricing")
 	tested, out := bazelTests(t, root, base, log)
 	if want := []string{"//api:all", "//pricing:all"}; !slices.Equal(tested, want) {
-		t.Errorf("bazel coverage ran on %v, want %v: the changed package and its dependent\n%s", tested, want, out)
+		t.Errorf("bazel test ran on %v, want %v: the changed package and its dependent\n%s", tested, want, out)
 	}
 	var collected []string
 	_ = filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
@@ -318,7 +311,7 @@ func TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel(t *testing.T
 	apiChange := commit(t, root, "change api")
 	tested, out = bazelTests(t, root, pricingChange, log)
 	if want := []string{"//api:all"}; !slices.Equal(tested, want) {
-		t.Errorf("bazel coverage ran on %v, want %v: a dependency runs no bazel\n%s", tested, want, out)
+		t.Errorf("bazel test ran on %v, want %v: a dependency runs no bazel\n%s", tested, want, out)
 	}
 
 	// A change to MODULE.bazel runs every package that holds a test; web
@@ -334,7 +327,7 @@ func TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel(t *testing.T
 	commit(t, root, "add gazelle and a lint script")
 	tested, out = bazelTests(t, root, apiChange, log)
 	if want := []string{"//api:all", "//pricing:all"}; !slices.Equal(tested, want) {
-		t.Errorf("bazel coverage ran on %v, want %v: the packages that read MODULE.bazel\n%s", tested, want, out)
+		t.Errorf("bazel test ran on %v, want %v: the packages that read MODULE.bazel\n%s", tested, want, out)
 	}
 
 	// An edge the BUILD files gain fails validate until the sync records it.

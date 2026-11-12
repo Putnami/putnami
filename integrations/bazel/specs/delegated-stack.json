@@ -4,8 +4,8 @@
   "feature": "monorepo/bazel-delegated-stack",
   "outcomes": [
     "Each Bazel package that holds a rule is a Putnami project, delegated to Bazel, with an edge to each package the query export says it depends on",
-    "putnami test and build run bazel coverage and bazel build on each affected package, and Bazel's cache decides what reruns",
-    "The test task reads the JUnit and LCOV reports of the run's test targets into the test and coverage summary"
+    "putnami test and build run bazel test and bazel build on each affected package, and Bazel's cache decides what reruns",
+    "The test task reads the JUnit reports of the run's test targets into the test summary, and their LCOV reports into the coverage summary when a project opts into coverage"
   ],
   "nonGoals": [
     "Importing Bazel targets as Putnami tasks, or caching a Bazel result in Putnami's cache",
@@ -26,7 +26,7 @@
     {
       "id": "sync-writes-the-package-graph",
       "text": [
-        "The workspace sync task reads bazel-graph.json at the root, or runs bazel query //..., and writes in each package's putnami.json the extension, the project IDs of the packages it depends on, the root's module, lock, rc and version files as filePatterns, and test in disable.jobs without a test rule.",
+        "The workspace sync task reads bazel-graph.json at the root, or runs bazel query //..., and writes in each package's putnami.json the extension, the project IDs of the packages it depends on, the root's module, lock, rc and version files as filePatterns, and test in disable.jobs without a test rule that //<package>:all selects, one not tagged manual.",
         "It retracts a former package, rewrites a file only when a member it owns changes, and warns and writes nothing without the export and bazel."
       ]
     },
@@ -40,7 +40,7 @@
     {
       "id": "tasks-delegate-to-bazel",
       "text": [
-        "Each task compares bazel --version with .bazelversion, then runs at the workspace root bazel coverage --build_event_json_file=<output>/build-events.json //<package>:all, or bazel build //<package>:all, where :all names the rules of one package.",
+        "Each task compares bazel --version with .bazelversion, then runs at the workspace root bazel test --build_event_json_file=<output>/build-events.json //<package>:all, or bazel build //<package>:all, where :all names the rules of one package.",
         "Each task depends only on its package's graph step, which runs no bazel.",
         "Putnami's cache is off for every task, and the result records delegatedTo bazel.",
         "A failing step fails with stacks.step_failed."
@@ -51,7 +51,7 @@
       "text": [
         "After its steps, whatever their outcome, the test task copies into its output the test.xml and coverage.dat of each test run the build-event file lists and reads them into the test and coverage summary, merging a source file across runs.",
         "It never removes a Bazel output, so Bazel's cache serves the next run.",
-        "A failed case fails the task with stacks.test_failed, a run with no JUnit report fails it with stacks.report_missing, and a missing coverage report fails nothing."
+        "A failed case fails the task with stacks.test_failed, a run with no JUnit report fails it with stacks.report_missing, a missing coverage report fails nothing, and a coverage file that is no LCOV tracefile is skipped with a warning."
       ]
     },
     {

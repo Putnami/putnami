@@ -24,6 +24,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -70,9 +71,10 @@ type Package struct {
 	Label string
 	// DependsOn lists the directories of the packages it depends on.
 	DependsOn []string
-	// Tested reports that the export lists a test rule of the package: a
-	// rule whose class ends in _test, or a test_suite. A package the BUILD
-	// files give, without the export, is not known to be tested.
+	// Tested reports that the export lists a test rule of the package that
+	// //<package>:all selects: a rule whose class ends in _test, or a
+	// test_suite, not tagged manual. A package the BUILD files give, without
+	// the export, is not known to be tested.
 	Tested bool
 }
 
@@ -177,14 +179,32 @@ func (d Detection) TestTarget(report string) (string, bool) {
 
 // rule is the part of a query target the detector reads.
 type rule struct {
-	Name      string   `json:"name"`
-	RuleClass string   `json:"ruleClass"`
-	RuleInput []string `json:"ruleInput"`
+	Name      string      `json:"name"`
+	RuleClass string      `json:"ruleClass"`
+	RuleInput []string    `json:"ruleInput"`
+	Attribute []attribute `json:"attribute"`
+}
+
+// attribute is the part of a rule attribute the detector reads.
+type attribute struct {
+	Name            string   `json:"name"`
+	StringListValue []string `json:"stringListValue"`
 }
 
 // isTest reports whether a rule class is a test rule: bazel test runs it.
 func isTest(class string) bool {
 	return strings.HasSuffix(class, "_test") || class == "test_suite"
+}
+
+// selected reports whether a target pattern such as //<package>:all selects
+// the rule: a rule tagged manual runs only when a pattern names it.
+func (r rule) selected() bool {
+	for _, a := range r.Attribute {
+		if a.Name == "tags" && slices.Contains(a.StringListValue, "manual") {
+			return false
+		}
+	}
+	return true
 }
 
 // target is one target of the export: a rule, a source file, a generated
@@ -250,7 +270,7 @@ func (d *Detection) fromExport(root string, rules []rule) {
 			continue
 		}
 		d.targets[logDir(dir, name)] = dir
-		if isTest(r.RuleClass) {
+		if isTest(r.RuleClass) && r.selected() {
 			tested[dir] = true
 		}
 		if edges[dir] == nil {

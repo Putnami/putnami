@@ -613,3 +613,35 @@ func TestTheSyncJobWritesNothingInADryRun(t *testing.T) {
 		t.Errorf("a dry run names what would change: %s", events.String())
 	}
 }
+
+// A file name may hold an @, as a systemd unit template does: the address of
+// the target generated for it names its BUILD file's directory, and only
+// @key=value parameters follow an address (#1081).
+func TestTheSyncTakesAProjectDirectoryFromTheBuildFileNotATargetName(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	root := t.TempDir()
+	stackstest.WriteFile(t, root, "pants.toml", "[GLOBAL]\npants_version = \"2.25.0\"\n")
+	stackstest.WriteFile(t, root, "packaging/deb/systemd/BUILD", "files(name=\"service_files\", sources=[\"*.service\"])\n")
+	stackstest.WriteFile(t, root, "packaging/deb/systemd/st2actionrunner@.service", "[Unit]\n")
+	stackstest.WriteFile(t, root, "src/python/app/BUILD", "python_sources(resolve=parametrize(\"a\", \"b\"))\n")
+	stackstest.WriteFile(t, root, "src/python/app/main.py", "")
+	stackstest.WriteFile(t, root, "pants-graph.json", `[
+  {"address": "packaging/deb/systemd:service_files", "target_type": "files", "dependencies": ["packaging/deb/systemd/st2actionrunner@.service:service_files"], "sources": []},
+  {"address": "packaging/deb/systemd/st2actionrunner@.service:service_files", "target_type": "file", "dependencies": [], "sources": ["packaging/deb/systemd/st2actionrunner@.service"]},
+  {"address": "src/python/app/main.py@resolve=a", "target_type": "python_source", "dependencies": ["packaging/deb/systemd/st2actionrunner@.service:service_files"], "sources": ["src/python/app/main.py"]},
+  {"address": "src/python/app:app@resolve=b", "target_type": "python_sources", "dependencies": ["src/python/app/main.py@resolve=a"], "sources": []}
+]`)
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"packaging/deb/systemd/putnami.json", "src/python/app/putnami.json"}; !reflect.DeepEqual(result.Written, want) {
+		t.Errorf("written = %v, want %v", result.Written, want)
+	}
+	if _, err := os.Stat(filepath.Join(root, "packaging/deb/systemd/st2actionrunner")); !os.IsNotExist(err) {
+		t.Errorf("a target name became a directory: %v", err)
+	}
+	if deps := readProjectFile(t, root, "src/python/app")["dependencies"]; !reflect.DeepEqual(deps, []any{"/packaging/deb/systemd"}) {
+		t.Errorf("app dependencies = %v, want the directory of the BUILD file", deps)
+	}
+}

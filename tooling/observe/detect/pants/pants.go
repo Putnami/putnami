@@ -322,10 +322,12 @@ type graph struct {
 //
 // An address is [//]path[:target][#generated][@parameters]. The path of a
 // target generated for one file is that file, and its target name starts with
-// one ../ per directory between the file and the BUILD file.
+// one ../ per directory between the file and the BUILD file. A file name may
+// hold an @, as a systemd unit template does: only an @ that the key=value
+// parameters follow ends the path.
 func (g graph) dir(address string) (string, bool) {
 	spec := strings.TrimPrefix(address, "//")
-	cut := strings.IndexAny(spec, ":#@")
+	cut := pathEnd(spec)
 	p, name := spec, ""
 	if cut >= 0 {
 		p = spec[:cut]
@@ -347,6 +349,26 @@ func (g graph) dir(address string) (string, bool) {
 		}
 	}
 	return wsproto.NormalizeProbePath(p)
+}
+
+// parameters matches the parameters of an address after their @:
+// key=value pairs separated by commas.
+var parameters = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*=[^,:#@/]*(,[A-Za-z_][A-Za-z0-9_.-]*=[^,:#@/]*)*$`)
+
+// pathEnd is the index of the : or # that ends the path of an address spec,
+// or of the @ its parameters follow; -1 when the spec is a path alone.
+func pathEnd(spec string) int {
+	for i := 0; i < len(spec); i++ {
+		switch spec[i] {
+		case ':', '#':
+			return i
+		case '@':
+			if parameters.MatchString(spec[i+1:]) {
+				return i
+			}
+		}
+	}
+	return -1
 }
 
 // isFile reports whether the path of an address names a file: when its target
