@@ -7,6 +7,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"go.putnami.dev/sdk/extension/gitcandidate"
@@ -160,6 +161,42 @@ func (w *worktree) candidateRegularFiles(skip func(name string) bool) []string {
 		}
 	}
 	return files
+}
+
+// regularFilesIn lists the base names of the regular files directly in the
+// workspace-relative slash directory dir, sorted. A symbolic link is not
+// listed. An absent directory, or inside a Git work tree one that holds no
+// candidate, is fs.ErrNotExist.
+func (w *worktree) regularFilesIn(dir string) ([]string, error) {
+	if w.tree == nil {
+		entries, err := os.ReadDir(w.path(dir))
+		if err != nil {
+			return nil, err
+		}
+		names := make([]string, 0, len(entries))
+		for _, entry := range entries {
+			if entry.Type().IsRegular() {
+				names = append(names, entry.Name())
+			}
+		}
+		return names, nil
+	}
+	if !w.isDir(dir) {
+		return nil, &fs.PathError{Op: "readdir", Path: w.path(dir), Err: fs.ErrNotExist}
+	}
+	prefix := dir + "/"
+	paths := w.tree.Paths()
+	var names []string
+	for i := sort.SearchStrings(paths, prefix); i < len(paths) && strings.HasPrefix(paths[i], prefix); i++ {
+		name := paths[i][len(prefix):]
+		if strings.Contains(name, "/") {
+			continue
+		}
+		if mode, _ := w.tree.Lstat(paths[i]); mode.IsRegular() {
+			names = append(names, name)
+		}
+	}
+	return names, nil
 }
 
 // excludedDecisionDirectory reports whether a directory named name is never

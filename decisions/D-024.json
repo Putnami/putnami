@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-024",
+  "statement": "publication uploads to the Putnami registries go through the @putnami/cloud uploader, which can optimize transfer and cost; a publication job uploads to any other registry itself, with its environment's credentials",
+  "settled": "2026-10-22",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

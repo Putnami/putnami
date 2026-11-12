@@ -614,52 +614,77 @@ The reasoning, including the alternatives that were rejected, is recorded in
 ### The decision registry
 
 A spec's `decisions` array links the prose that explains a choice. A
-committed `decisions.json` (`ParseDecisionRegistry` … `EvaluateDecisionCheck`
-here, JSON schema `putnami-decisions.json`) is the other half: the
-**enforceable** statement, which `validate` can prove.
+committed decision registry is the other half: the **enforceable** statement,
+which `validate` can prove.
 
-A registry's scope is its directory. The one at the workspace root holds the
-decisions every project follows; the one in a project directory holds that
-project's own. Every path a registry names — its check globs and its `adr`
-link — is relative to its directory and cannot leave it. Ids are unique across
-all registries of a workspace. `DecisionRegistryPath` and
-`DecisionScopeRelative` spell those two rules.
+A registry takes one of two forms:
+
+- a `decisions/` directory with one file per decision, named by its id:
+  `decisions/<id>.json` (`ParseAndValidateDecisionFile`, JSON schema
+  `putnami-decision.json`). This is the form to write: two pull requests that
+  each record a decision add two files and never conflict.
+- one `decisions.json` that lists every decision (`ParseDecisionRegistry`,
+  JSON schema `putnami-decisions.json`). Workspaces adopted with this form keep
+  it.
+
+A scope holds one form, never both. `ReadScopeDecisions` reads a scope in
+either form and refuses a scope that holds both, naming the move to make.
+
+A registry's scope is the directory that holds `decisions/` or
+`decisions.json`. The one at the workspace root holds the decisions every
+project follows; the one in a project directory holds that project's own.
+Every path a decision names — its check globs and its `adr` link — is relative
+to the scope directory and cannot leave it. Ids are unique across all
+registries of a workspace, and two ids that differ only in case are refused
+too, because their files collide on a case-insensitive file system.
+`DecisionFilePath`, `DecisionRegistryPath` and `DecisionScopeRelative` spell
+those rules. A new decision takes a slug id that says what it settles; the
+`D-0NN` ids recorded before the directory form keep their numbers.
+
+`decisions/scale-to-zero.json`:
 
 ```json
 {
-  "$schema": "https://putnami.dev/schemas/putnami-decisions.json",
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
-  "decisions": [
-    {
-      "id": "D-001",
-      "statement": "serverless workloads scale to zero when idle",
-      "settled": "2026-09-03",
-      "settledBy": "fdumay",
-      "adr": "protocols/infra/doc/adr/0003-deployers-own-runtime-cost-policy.md",
-      "check": {
-        "kind": "json-value",
-        "files": ["**/infra/requirements.json"],
-        "pointer": "/scaling/minInstances",
-        "rule": "equals",
-        "value": 0,
-        "whenMissing": "satisfied"
-      }
-    },
-    {
-      "id": "D-002",
-      "statement": "every pull request names what it deletes",
-      "settled": "2026-09-03",
-      "settledBy": "fdumay",
-      "reviewOnly": true
-    }
-  ]
+  "id": "scale-to-zero",
+  "statement": "serverless workloads scale to zero when idle",
+  "settled": "2026-09-03",
+  "settledBy": "fdumay",
+  "adr": "protocols/infra/doc/adr/0003-deployers-own-runtime-cost-policy.md",
+  "check": {
+    "kind": "json-value",
+    "files": ["**/infra/requirements.json"],
+    "pointer": "/scaling/minInstances",
+    "rule": "equals",
+    "value": 0,
+    "whenMissing": "satisfied"
+  }
 }
 ```
 
-Every entry carries a stable id, the one-line statement, the date it was
+`decisions/pull-requests-name-deletions.json`:
+
+```json
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "pull-requests-name-deletions",
+  "statement": "every pull request names what it deletes",
+  "settled": "2026-09-03",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}
+```
+
+The `decisions.json` form wraps the same entries, without `$schema` and
+`protocolVersion`, in a `decisions` array beside its own `$schema` and
+`protocolVersion`.
+
+Every decision carries a stable id, the one-line statement, the date it was
 settled and who settled it, plus **exactly one** of:
 
-- a `check` — v1 has one kind, `json-value`. Every file in the registry's
+- a `check` — v1 has one kind, `json-value`. Every file in the scope
   directory matching any glob in `files` is read; `pointer` is resolved per RFC 6901 (`~0` and `~1`
   included); `equals` is violated when the resolved value differs and
   `notEquals` when it matches. Numbers compare by value, so `0`, `0.0` and `-0`
@@ -675,18 +700,21 @@ settled and who settled it, plus **exactly one** of:
 decision was taken and never restates the statement, so there is no second copy
 of a rule to drift.
 
-The registry validates itself and fails closed: duplicate ids, a missing field,
-a `settled` date that is not `YYYY-MM-DD`, an unknown `kind`, `rule` or
-`whenMissing`, a check with no glob, or an `adr` outside the `doc/adr`
-convention all produce `features.invalid_decision_registry`. An **absent**
-`decisions.json` is adoption, never a failure. The `@putnami/sdd` extension
-proves every registry as the `decisions-validate` step of `validate-workspace`.
-`putnami context generate` names the `decisions.json` files in one line of the
+The registry validates itself and fails closed: duplicate ids, a decision file
+not named by its id, a missing field, a `settled` date that is not
+`YYYY-MM-DD`, an unknown `kind`, `rule` or `whenMissing`, a check with no
+glob, an `adr` outside the `doc/adr` convention, or a scope that holds both
+forms all produce `features.invalid_decision_registry`. An **absent** registry
+is adoption, never a failure. The `@putnami/sdd` extension proves every
+registry as the `decisions-validate` step of `validate-workspace`.
+`putnami context generate` names the registries in one line of the
 workspace's `AGENTS.md` guidance block and lists no decision. The registries
 hold the decisions in full.
 
 The reasoning is recorded in
-[`tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md`](../../tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md).
+[`tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md`](../../tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md),
+and the move to one file per decision in
+[`doc/adr/0007-one-file-per-decision.md`](doc/adr/0007-one-file-per-decision.md).
 
 ## Agent and review consumption
 

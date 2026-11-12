@@ -125,7 +125,9 @@
               "a-project-registry-judges-only-its-directory",
               "a-violated-decision-fails-naming-it",
               "an-absent-registry-is-adoption",
-              "an-unusable-registry-fails-closed"
+              "an-unusable-registry-fails-closed",
+              "a-decision-file-is-the-file-to-edit",
+              "a-scope-with-both-forms-fails"
             ]
           }
         },

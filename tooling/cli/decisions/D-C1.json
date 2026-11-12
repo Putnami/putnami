@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-C1",
+  "statement": "the remote cache trust floor rises to ci only for a command that publishes to a registry; a deploy, whose side effects are cloud, raises none",
+  "settled": "2026-10-19",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

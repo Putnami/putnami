@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-016",
+  "statement": "the change noun carries the change workflow: change verify, change finalize and change language replace tree verify, proposals finalize and contributor language",
+  "settled": "2026-10-18",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

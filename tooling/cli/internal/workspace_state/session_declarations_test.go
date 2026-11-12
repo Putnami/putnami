@@ -22,6 +22,7 @@ func declarationWorkspace(t *testing.T) string {
 		"tooling/putnami.features.json":              `{"features":[]}`,
 		"tooling/cli/putnami.features.json":          `{"features":[{"id":"cli/x"}]}`,
 		"tooling/cli/specs/x.json":                   `{"feature":"cli/x"}`,
+		"tooling/cli/decisions/cache-trust.json":     `{"id":"cache-trust"}`,
 		"tooling/cli/specs.baseline.json":            `{"executableRequirements":[]}`,
 		"tooling/cli/putnami.architecture.json":      `{"rules":[]}`,
 		"tooling/cli/main.go":                        "package main\n",
@@ -53,8 +54,8 @@ func TestDeclarationDigestMovesWithDeclarationsOnly(t *testing.T) {
 		"the-declaration-digest-moves-with-declarations-only")
 	root := declarationWorkspace(t)
 	before, files := declarationDigestOf(t, root)
-	if files != 6 {
-		t.Fatalf("files = %d, want the 6 declaration files and no code or test fixture", files)
+	if files != 7 {
+		t.Fatalf("files = %d, want the 7 declaration files and no code or test fixture", files)
 	}
 
 	for _, code := range []string{"tooling/cli/main.go", "go/lib/lib.go", "tooling/cli/internal/testdata/specs/y.json"} {
@@ -67,7 +68,7 @@ func TestDeclarationDigestMovesWithDeclarationsOnly(t *testing.T) {
 	}
 
 	for _, declaration := range []string{
-		"decisions.json", "tooling/putnami.features.json", "tooling/cli/specs/x.json",
+		"decisions.json", "tooling/putnami.features.json", "tooling/cli/specs/x.json", "tooling/cli/decisions/cache-trust.json",
 		"tooling/cli/specs.baseline.json", "tooling/cli/putnami.architecture.json",
 	} {
 		previous, _ := declarationDigestOf(t, root)
@@ -82,8 +83,8 @@ func TestDeclarationDigestMovesWithDeclarationsOnly(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "tooling", "cli", "specs", "z.json"), []byte(`{}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, got := declarationDigestOf(t, root); got != 7 {
-		t.Errorf("files = %d after adding a spec, want 7", got)
+	if _, got := declarationDigestOf(t, root); got != 8 {
+		t.Errorf("files = %d after adding a spec, want 8", got)
 	}
 }
 

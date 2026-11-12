@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-065",
+  "statement": "an adoption in import mode lets Putnami install the dependencies: the language extension writes the members where the repository's package manager reads them and installs with that manager and its lockfile (D-068)",
+  "settled": "2026-11-10",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

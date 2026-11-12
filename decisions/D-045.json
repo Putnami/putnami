@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-045",
+  "statement": "native and external specs are discovered together, so one spec per feature covers both and a feature with both fails specs validate",
+  "settled": "2026-11-04",
+  "settledBy": "fdumay",
+  "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+  "reviewOnly": true
+}

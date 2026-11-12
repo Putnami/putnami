@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-036",
+  "statement": "an epic session plans issues in dependency order, launches one build session per issue in waves under one epic envelope the owner approves, and never codes",
+  "settled": "2026-11-02",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0010-an-epic-session-runs-issues-in-waves.md",
+  "reviewOnly": true
+}

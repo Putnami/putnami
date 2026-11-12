@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-002",
+  "statement": "every pull request names what it deletes",
+  "settled": "2026-09-03",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

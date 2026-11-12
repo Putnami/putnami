@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-027",
+  "statement": "a change runs one loop of stages, talk, declare, show, code, check, prove, validate and merge; no other list of stages exists, and deployment after merge is CI/CD, not a stage",
+  "settled": "2026-10-28",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+  "reviewOnly": true
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W1",
+  "statement": "Windows support targets windows/amd64 on Windows 10 1803 or later and Windows 11; windows/arm64 is added only when a host can prove it",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

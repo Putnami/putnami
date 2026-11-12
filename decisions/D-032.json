@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-032",
+  "statement": "the issue holds the intent and labels, the mission holds the live state, the pull request description is the archive, and a change's screenshots and reports live under .putnami/, outside Git",
+  "settled": "2026-10-28",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0009-one-contribution-loop-from-talk-to-merge.md",
+  "reviewOnly": true
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "one-file-per-decision",
+  "statement": "a scope records each settled decision in its own decisions/<id>.json file, and a new decision takes a slug id",
+  "settled": "2026-11-11",
+  "settledBy": "fdumay",
+  "adr": "protocols/features/doc/adr/0007-one-file-per-decision.md",
+  "reviewOnly": true
+}

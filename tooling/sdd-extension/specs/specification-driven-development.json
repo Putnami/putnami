@@ -48,7 +48,7 @@
     },
     {
       "id": "settled-decisions-are-enforced",
-      "text": "validate-workspace proves the root and every project decisions.json against the worktree: a json-value check judges the files its globs name inside its registry's directory, a violation fails naming the decision's id, statement, settled date and registry, ids are unique across registries, a reviewOnly decision reaches the agent context and never fails, an absent registry is adoption, and an unusable one fails closed."
+      "text": "validate-workspace proves the root and every project registry, a decisions/<id>.json file per decision or one decisions.json but never both, against the worktree: a json-value check judges the files its globs name inside the scope directory, a violation fails naming the decision's id, statement, settled date and file, ids are unique across registries ignoring case, a reviewOnly decision reaches the agent context and never fails, an absent registry is adoption, and an unusable one fails closed."
     },
     {
       "id": "recipe-indexes-are-checked",
@@ -157,6 +157,7 @@
     "tooling/cli/doc/adr/0008-executable-architecture-command-boundary.md",
     "tooling/cli/doc/adr/0015-specs-ratchet-keeps-its-own-discovery.md",
     "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md",
+    "protocols/features/doc/adr/0007-one-file-per-decision.md",
     "tooling/sdd-extension/doc/adr/0001-the-squash-commit-keeps-the-breaking-marker.md",
     "tooling/sdd-extension/doc/adr/0002-the-squash-commit-names-no-agent.md",
     "tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md",

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-020",
+  "statement": "the core's dev noun is deleted: dev extension validate becomes extensions validate <path>, and dev template <action> becomes templates validate|test|package <path>",
+  "settled": "2026-10-18",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

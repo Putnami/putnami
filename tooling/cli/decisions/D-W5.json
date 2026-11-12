@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W5",
+  "statement": "the cache key carries an OS-class field only on Windows, so Linux and macOS keys stay byte-identical; hashed relative paths use slash form and slash order",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

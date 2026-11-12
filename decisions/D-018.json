@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-018",
+  "statement": "@putnami/dev owns the version noun; version list|use, which list and switch the installed CLI binaries, become cli list|use",
+  "settled": "2026-10-18",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

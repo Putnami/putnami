@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-R3",
+  "statement": "a batch line that several members share leaves the session reporter's upload just before the task:end of the first member that fails, and is dropped when every member passes",
+  "settled": "2026-10-28",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

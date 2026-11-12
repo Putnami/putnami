@@ -25,23 +25,27 @@ import (
 // in the tree at the time and `validate` read none of them. Prose does not
 // hold against an agent; a check that fails does.
 //
-// A decisions.json file is that check's input. Each entry carries a stable id,
-// the one-line statement, the date it was settled, who settled it, and either
-// a CHECK that `validate` can prove or the mark `reviewOnly`. Changing a
-// settled value then means editing the registry in the same change, which puts
+// The committed decisions are that check's input. Each one carries a stable
+// id, the one-line statement, the date it was settled, who settled it, and
+// either a CHECK that `validate` can prove or the mark `reviewOnly`. Changing a
+// settled value then means editing the decision in the same change, which puts
 // the re-decision in the diff a reviewer reads instead of hiding it in the
 // code.
 //
 // A registry has a SCOPE: the directory it sits in. The one at the workspace
 // root holds the decisions every project follows; the one in a project
-// directory holds the decisions of that project. Every path a registry names —
-// its check globs and its `adr` link — is relative to its own directory and
+// directory holds the decisions of that project. Every path a decision names —
+// its check globs and its `adr` link — is relative to the scope directory and
 // cannot leave it, so a project registry can only judge its own project's
 // files. Ids stay unique across every registry of a workspace, because a
-// failure message and a pull request cite an id, not a file. One registry per
-// scope keeps a decision next to the code it binds: the agent orienting on a
-// project reads that project's decisions, and two teams settling decisions in
-// two projects never edit the same file.
+// failure message and a pull request cite an id, not a file.
+//
+// A scope holds its registry in one of two forms, never both:
+//
+//   - a `decisions/` directory with one `<id>.json` file per decision
+//     (decision_files.go). Two changes that each settle a decision add two
+//     files and edit none, so they merge without a conflict;
+//   - one `decisions.json` file that lists every decision of the scope.
 //
 // The FORMAT lives here and the CONTENT lives in each repository: this package
 // owns the wire and the semantics of a check, every workspace commits its own
@@ -55,7 +59,7 @@ import (
 // restates the other, so there is no second copy of a rule to drift.
 
 const (
-	// DecisionsFilename is the file name of a committed decision registry, at
+	// DecisionsFilename is the file name of the single-file registry form, at
 	// the workspace root or in a project directory.
 	DecisionsFilename = "decisions.json"
 	// DecisionsProtocolVersion selects the exact registry wire contract.
@@ -300,31 +304,31 @@ func ValidateDecisionRegistry(input *DecisionRegistry) []diag.Diagnostic {
 func validateDecision(field string, decision Decision, seen map[string]bool) []diag.Diagnostic {
 	var diagnostics []diag.Diagnostic
 	if len(decision.ID) > decisionIDMaxLength || !decisionIDPattern.MatchString(decision.ID) {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, field+".id",
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, decisionMember(field, "id"),
 			"decision id must be at most %d characters of letters, digits, '.', '_' or '-'", decisionIDMaxLength))
 	} else if seen[decision.ID] {
 		// A duplicate id makes the registry undecidable: two statements answer
 		// to the same citation, and a failure message would name a decision a
 		// reader cannot find.
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, field+".id",
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, decisionMember(field, "id"),
 			"decision id %q is duplicated", decision.ID))
 	}
 	if !boundedText(decision.Statement, decisionStatementMaxLength) {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, field+".statement",
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, decisionMember(field, "statement"),
 			"statement must be one non-empty line of at most %d characters without control characters", decisionStatementMaxLength))
 	}
 	if parsed, err := time.Parse(DecisionsSettledLayout, decision.Settled); err != nil || parsed.Format(DecisionsSettledLayout) != decision.Settled {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, field+".settled",
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, decisionMember(field, "settled"),
 			"settled must be a calendar date spelled YYYY-MM-DD, got %q", decision.Settled))
 	}
 	if !boundedText(decision.SettledBy, decisionSettledByMaxLength) {
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, field+".settledBy",
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, decisionMember(field, "settledBy"),
 			"settledBy must be non-empty bounded text without control characters"))
 	}
-	if decision.ADR != "" && len(validateDecisionLink(field+".adr", decision.ADR)) > 0 {
+	if decision.ADR != "" && len(validateDecisionLink(decisionMember(field, "adr"), decision.ADR)) > 0 {
 		// The shared link rule is the spec one, and its message says
 		// "workspace-relative"; a registry's link is relative to the registry.
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, field+".adr",
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, decisionMember(field, "adr"),
 			"adr must be a %s/<name>%s record relative to the registry's directory, at most %d characters",
 			DecisionDirectory, DecisionExtension, decisionLinkMaxLength))
 	}
@@ -336,12 +340,21 @@ func validateDecision(field string, decision Decision, seen map[string]bool) []d
 		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, field,
 			"a decision must carry a check validate can prove, or the reviewOnly mark"))
 	case decision.ReviewOnly != nil && !*decision.ReviewOnly:
-		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, field+".reviewOnly",
+		diagnostics = append(diagnostics, diag.Errorf(ErrorCodeInvalidDecisionRegistry, decisionMember(field, "reviewOnly"),
 			"reviewOnly must be true when present; false states neither a check nor a review-only decision"))
 	case decision.Check != nil:
-		diagnostics = append(diagnostics, validateDecisionCheck(field+".check", decision.Check)...)
+		diagnostics = append(diagnostics, validateDecisionCheck(decisionMember(field, "check"), decision.Check)...)
 	}
 	return diagnostics
+}
+
+// decisionMember names member under field, or member alone when field is the
+// whole document.
+func decisionMember(field, member string) string {
+	if field == "" {
+		return member
+	}
+	return field + "." + member
 }
 
 func validateDecisionCheck(field string, check *DecisionCheck) []diag.Diagnostic {

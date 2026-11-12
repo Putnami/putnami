@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-046",
+  "statement": "specs init <feature> --from <format>:<path> writes one new native spec with O_EXCL, supports --dry-run, carries only text copied from the source, and has no --all and no --force; there is no specs migrate",
+  "settled": "2026-11-04",
+  "settledBy": "fdumay",
+  "adr": "tooling/sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md",
+  "reviewOnly": true
+}

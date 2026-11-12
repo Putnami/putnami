@@ -350,6 +350,103 @@ func TestDecisionsReviewOnlyNeverFails(t *testing.T) {
 	}
 }
 
+// decisionFile writes one decisions/<id>.json file under the scope directory
+// dir, relative to root.
+func decisionFile(t *testing.T, root, dir, id, body string) {
+	t.Helper()
+	writeFixtureFile(t, filepath.Join(root, filepath.FromSlash(dir), featureproto.DecisionsDirname, id+".json"),
+		`{"protocolVersion":1,"id":"`+id+`",`+body+`}`)
+}
+
+const (
+	scaleToZeroBody = `"statement":"serverless workloads scale to zero","settled":"2026-09-03","settledBy":"fdumay",
+		"check":{"kind":"json-value","files":["**/infra/requirements.json"],"pointer":"/scaling/minInstances","rule":"equals","value":0}`
+	reviewOnlyBody = `"statement":"every pull request names what it deletes","settled":"2026-09-03","settledBy":"fdumay","reviewOnly":true`
+)
+
+// TestDecisionsDirectoryFormNamesTheDecisionFile: a decisions/ directory holds
+// one file per decision, two decisions recorded side by side are both read,
+// and a violation names the one file to edit.
+func TestDecisionsDirectoryFormNamesTheDecisionFile(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "settled-decisions-are-enforced", "a-decision-file-is-the-file-to-edit")
+	root := decisionsWorkspace(t)
+	decisionFile(t, root, "", "D-001", scaleToZeroBody)
+	decisionFile(t, root, "", "pull-requests-name-deletions", reviewOnlyBody)
+	writeFixtureFile(t, filepath.Join(root, "sites", "site", "infra", "requirements.json"), `{"scaling":{"minInstances":1}}`)
+
+	report, err := BuildDecisionsResult(fixtureWorkspace("w", root))
+	if err == nil {
+		t.Fatal("a violated decision did not fail the task")
+	}
+	if strings.Join(report.Registries, ",") != "decisions" {
+		t.Fatalf("registries = %v, want the decisions directory", report.Registries)
+	}
+	if report.Summary.Decisions != 2 || report.Summary.Enforced != 1 || report.Summary.ReviewOnly != 1 {
+		t.Fatalf("summary = %+v, want both decision files read", report.Summary)
+	}
+	if len(report.Findings) != 1 || report.Findings[0].Registry != "decisions/D-001.json" {
+		t.Fatalf("findings = %+v, want one sourced on decisions/D-001.json", report.Findings)
+	}
+	if !strings.Contains(report.Findings[0].Message, "change the decision in decisions/D-001.json, not the code") {
+		t.Fatalf("message %q does not name the decision file", report.Findings[0].Message)
+	}
+}
+
+// TestDecisionsBothFormsFailClosed: a scope that holds decisions.json and a
+// decisions/ directory states two registries, and the gate refuses it.
+func TestDecisionsBothFormsFailClosed(t *testing.T) {
+	spectest.Proves(t, "tooling/specification-driven-development", "settled-decisions-are-enforced", "a-scope-with-both-forms-fails")
+	root := decisionsWorkspace(t)
+	committedDecisions(t, root, scaleToZeroRegistry)
+	decisionFile(t, root, "", "cache-trust", reviewOnlyBody)
+
+	report, err := BuildDecisionsResult(fixtureWorkspace("w", root))
+	if err == nil {
+		t.Fatal("a scope with both registry forms passed")
+	}
+	if len(report.Diagnostics) != 1 || report.Diagnostics[0].Field != "decisions.json" ||
+		!strings.Contains(report.Diagnostics[0].Message, "decisions/<id>.json") {
+		t.Fatalf("diagnostics = %+v, want one on decisions.json naming the way out", report.Diagnostics)
+	}
+}
+
+// TestDecisionsIDsAreUniqueIgnoringCase: two decision files whose ids differ
+// only in case collide on a case-insensitive file system, so the gate refuses
+// the second one, wherever it sits.
+func TestDecisionsIDsAreUniqueIgnoringCase(t *testing.T) {
+	root := decisionsWorkspace(t)
+	decisionFile(t, root, "", "cache-trust", reviewOnlyBody)
+	decisionFile(t, root, "api", "Cache-Trust", reviewOnlyBody)
+
+	report, err := BuildDecisionsResult(fixtureWorkspace("w", root, appProject("api", "api")))
+	if err == nil {
+		t.Fatal("two ids that differ only in case passed")
+	}
+	if len(report.Diagnostics) != 1 || report.Diagnostics[0].Field != "api/decisions/Cache-Trust.json#id" ||
+		!strings.Contains(report.Diagnostics[0].Message, "differs only in case from cache-trust, settled in decisions/cache-trust.json") {
+		t.Fatalf("diagnostics = %+v, want one naming the first decision file", report.Diagnostics)
+	}
+}
+
+// TestDecisionsDirectoryFormReadsTheCandidateCut: inside a Git work tree the
+// decision files are the candidates directly in decisions/, so an ignored file
+// or a nested one is not a decision.
+func TestDecisionsDirectoryFormReadsTheCandidateCut(t *testing.T) {
+	root := candidateWorkspace(t)
+	writeFixtureFile(t, filepath.Join(root, ".gitignore"), "decisions/draft-*.json\n")
+	decisionFile(t, root, "", "cache-trust", reviewOnlyBody)
+	writeFixtureFile(t, filepath.Join(root, "decisions", "draft-x.json"), `{"protocolVersion":1,`)
+	writeFixtureFile(t, filepath.Join(root, "decisions", "nested", "other.json"), `{"protocolVersion":1,`)
+
+	report, err := BuildDecisionsResult(fixtureWorkspace("w", root))
+	if err != nil {
+		t.Fatalf("an ignored or nested file was read as a decision: %v %+v", err, report.Diagnostics)
+	}
+	if report.Summary.Decisions != 1 {
+		t.Fatalf("summary = %+v, want the one candidate decision", report.Summary)
+	}
+}
+
 // TestDecisionsFindingsAreOrdered keeps the published diagnostics
 // deterministic: two runs over the same tree report the same findings in the
 // same sequence, which is what makes a failing gate diffable.

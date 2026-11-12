@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W9",
+  "statement": "on Windows, process trees run in a Job Object with KILL_ON_JOB_CLOSE; graceful stop sends CTRL_BREAK_EVENT, then terminates the job after the grace period",
+  "settled": "2026-09-26",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

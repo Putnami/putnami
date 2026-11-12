@@ -33,7 +33,7 @@ the slice reports measure against; a later change to it is a visible drift.
 When the outcome changes a declaration, the reviewer sees the intent before
 the code, and a drift costs one declaration edit, not a rewritten change.
 A declaration is a `putnami.features.json`, a `specs/*.json`, a
-`specs.baseline.json`, a `putnami.architecture.json`, a `decisions.json` or a
+`specs.baseline.json`, a `putnami.architecture.json`, a `decisions/<id>.json` or a
 decision record (ADR).
 
 1. Write the declarations first, and commit them alone: the commit touches no

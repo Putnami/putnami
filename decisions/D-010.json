@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-010",
+  "statement": "the core CLI computes a tree's version before any cache key; the version get|tag and changelog commands belong to @putnami/dev",
+  "settled": "2026-10-14",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-026",
+  "statement": "a protocol owns the feature of its contract and the contract's functional requirements; each project that implements the protocol depends on it and proves those requirements in its own tests, under a check of its own",
+  "settled": "2026-10-25",
+  "settledBy": "fdumay",
+  "adr": "tooling/sdd-extension/doc/adr/0003-every-project-carries-a-feature-a-spec-or-a-feature-authority.md",
+  "reviewOnly": true
+}

@@ -15,7 +15,7 @@ never `Putnami verified` at stage `ready`.
 The v1 record has `version: 1`, a stable `outcome`, an exact `mandate` reference,
 and `sources: [{feature, manifest: ref, spec: ref}]`. `sources` points to
 native feature declarations and specs by exact bytes. A change that carries no
-feature requirement, such as an ADR with `decisions.json`, names no source. Load their entire
+feature requirement, such as an ADR with a `decisions/<id>.json` file, names no source. Load their entire
 requirement inventory; identifiers are qualified as `feature#requirement`
 because requirement IDs are local to a spec. The manifest and spec paths
 must be Git-tracked in the consumer workspace;

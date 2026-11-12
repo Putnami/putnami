@@ -39,7 +39,7 @@
     },
     {
       "id": "settled-decisions-guidance",
-      "text": "The generated block names the decisions.json files in one line and lists no decision: only a registry's first decision, or removal of its last, changes it."
+      "text": "The generated block names where the decisions are in one line and lists no decision: the line follows the registry forms the workspace holds, decisions/<id>.json files, decisions.json files or both, and only a registry's first decision, removal of its last, or a change of form changes it."
     },
     {
       "id": "agent-context-languages",
@@ -64,6 +64,7 @@
     "tooling/cli/doc/adr/0022-analysis-prepares-only-locked-read-surfaces.md",
     "tooling/cli/doc/adr/0024-lazy-workspace-initialization.md",
     "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md",
+    "protocols/features/doc/adr/0007-one-file-per-decision.md",
     "tooling/cli/doc/adr/0055-repository-rules-live-in-agents-constraints.md",
     "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]

@@ -114,8 +114,10 @@ the verdict.
   project.
 
 - **`decisions-validate`** — the decision gate. It reads every
-  committed `decisions.json`: the workspace-root one and the one in each
-  project directory. It proves every entry that carries a `json-value` check
+  committed decision registry: the workspace-root one and the one in each
+  project directory. A registry is a `decisions/` directory with one
+  `<id>.json` file per decision, or one `decisions.json`; a scope that holds
+  both fails. It proves every entry that carries a `json-value` check
   against the files the check's own globs name inside the registry's
   directory, and fails with `features.decision_violated` naming the decision —
   id, statement, settled date and registry — so the reader can tell a bug from
@@ -123,7 +125,7 @@ the verdict.
 
   ```
   decision D-001 "serverless workloads scale to zero when idle" is violated by sites/putnami.dev/infra/requirements.json: scaling.minInstances = 1
-  Settled 2026-09-03 by fdumay. To change it, change the decision in decisions.json, not the code.
+  Settled 2026-09-03 by fdumay. To change it, change the decision in decisions/D-001.json, not the code.
   ```
 
   One diagnostic per violating file, anchored on that file. An entry marked
@@ -663,7 +665,7 @@ the version Git resolved, and the HEAD commit it reports.
 
 `decisions-validate`, `recipes-validate`, `codeowners-sync`,
 `docs-links-validate` and `feature-coverage-validate` read files no narrow
-pattern names: the globs a repository authors in its `decisions.json`, the
+pattern names: the globs a repository authors in its decisions, the
 sample directories an index names, every `putnami.json` above a project, any
 file a link names, and the feature manifest and specs of every project. Each
 reads the repository's **candidate cut** and nothing else: the tracked files

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-004",
+  "statement": "before 1.0, a feature that breaks nothing ships in a patch, and only a breaking change makes a minor",
+  "settled": "2026-10-02",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

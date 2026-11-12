@@ -80,7 +80,8 @@ decision source. An ADR cannot settle a choice outside the mandate or one
 reserved to another owner: record it as pending, with the responsible
 authority. In the owning project's ADR location, state the decision, its
 observable consequences, the alternatives, the affected contracts, the
-migration and the reversal. A machine-checkable rule goes in `decisions.json`,
+migration and the reversal. A machine-checkable rule goes in its own
+`decisions/<id>.json` file, named by a slug id that says what it settles,
 pointing to its ADR.
 
 ## Challenge and return

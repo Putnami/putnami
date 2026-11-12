@@ -198,3 +198,53 @@ func TestProjectDecisionsAreThoseOfTheProjectRegistry(t *testing.T) {
 		t.Fatalf("the workspace root is not a project scope: %+v", rootScope)
 	}
 }
+
+// writeDecisionFile writes one decisions/<id>.json file in the scope
+// directory dir.
+func writeDecisionFile(t *testing.T, dir, id string) {
+	t.Helper()
+	target := filepath.Join(dir, featureproto.DecisionsDirname, id+".json")
+	if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := `{"protocolVersion":1,"id":"` + id + `","statement":"a settled rule","settled":"2026-11-11","settledBy":"fdumay","reviewOnly":true}`
+	if err := os.WriteFile(target, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// TestBlockLineFollowsTheRegistryForm: the line sends an agent to the form its
+// workspace holds. A workspace of decision files is told to add a file per
+// decision, a workspace of decisions.json files keeps the line it had, and a
+// workspace with both is told to keep each directory's form. A decision added
+// beside another changes no byte of the line.
+func TestBlockLineFollowsTheRegistryForm(t *testing.T) {
+	spectest.Proves(t, "cli/context-discovery", "settled-decisions-guidance", "the-block-line-follows-the-registry-form")
+	files := makeLoadableFixture(t)
+	writeDecisionFile(t, files, "D-001")
+	writeDecisionFile(t, filepath.Join(files, "svc", "app"), "app-port")
+	line := decisionsGuidanceForWorkspace(files)
+	if line != decisionsFilesLine || !strings.Contains(line, "`decisions/<id>.json`") || !strings.Contains(line, "slug id") {
+		t.Fatalf("a workspace of decision files got:\n%s", line)
+	}
+	writeDecisionFile(t, files, "cache-trust")
+	if again := decisionsGuidanceForWorkspace(files); again != line {
+		t.Fatalf("an added decision file changed the line:\n%s\n%s", line, again)
+	}
+	if app := projectDecisions(files, "svc/app"); app == nil || app.Registry != "svc/app/decisions" || app.Decisions[0].ID != "app-port" {
+		t.Fatalf("app decisions = %+v, want app-port from svc/app/decisions", app)
+	}
+
+	registries := makeLoadableFixture(t)
+	writeDecisions(t, registries, seededDecisions)
+	if got := decisionsGuidanceForWorkspace(registries); got != decisionsRegistryLine {
+		t.Fatalf("a workspace of decisions.json files got:\n%s", got)
+	}
+
+	mixed := makeLoadableFixture(t)
+	writeDecisions(t, mixed, seededDecisions)
+	writeDecisionFile(t, filepath.Join(mixed, "svc", "app"), "app-port")
+	if got := decisionsGuidanceForWorkspace(mixed); got != decisionsMixedLine {
+		t.Fatalf("a workspace with both forms got:\n%s", got)
+	}
+}

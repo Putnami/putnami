@@ -1,6 +1,6 @@
 # ADR 0030 — Settled decisions live in registries `validate` reads, next to the code they bind
 
-- **Status**: accepted
+- **Status**: accepted, amended by [features ADR 0007](../../../../protocols/features/doc/adr/0007-one-file-per-decision.md): one file per decision
 - **Scope**: `go.putnami.dev/protocol/features` (the `decisions.json` wire),
   `@putnami/sdd` (the `decisions-validate` step of `validate-workspace`),
   `@putnami/cli` (`internal/commands/agentctx`: the generated guidance block

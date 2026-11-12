@@ -42,7 +42,7 @@ exists; never invent a task to use it.
   `spec-verification.json`, and set each current unit to `candidate`. The end
   report names this gate as one that followed no edit. Without that proof,
   publish the unit with `--partial-delivery`. A change that carries no
-  feature requirement, such as an ADR with `decisions.json`, needs no such
+  feature requirement, such as an ADR with a `decisions/<id>.json` file, needs no such
   gate: its workflow names no source, its unit lists no requirement and sits
   at `candidate`, and the hosted checks complete it and close the task.
 - One unit of a larger task: `--partial-delivery`, on the draft and the final

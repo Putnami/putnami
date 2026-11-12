@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-055",
+  "statement": "the Gherkin reader uses the standard library and the upstream keyword table of cucumber/gherkin committed as data, so protocols/features gains no third-party module; a new upstream language is a data update",
+  "settled": "2026-11-05",
+  "settledBy": "a build session, for the owner to review on its proposal",
+  "adr": "protocols/features/doc/adr/0006-the-spec-source-contract.md",
+  "reviewOnly": true
+}

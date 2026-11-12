@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-W12",
+  "statement": "on Windows, the Microsoft Visual C++ runtime (vcruntime140.dll) that Biome needs is a documented prerequisite that doctor checks; Putnami neither bundles nor installs it",
+  "settled": "2026-09-28",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

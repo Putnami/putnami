@@ -53,6 +53,10 @@
       "text": "Against the committed specs baseline, a project that leaves enforce mode or loses a recorded executable requirement is an error naming the baseline file; growth is only counted, and a missing baseline is initial adoption. The decision registry reader refuses a wrong version, an unknown member, an explicit null and a trailing value. A decision that could not be enforced is a registry error. A decision check judges one JSON file, compares numbers by value and counts an unreadable file as a violation."
     },
     {
+      "id": "one-file-per-decision",
+      "text": "A scope holds its decisions in a decisions directory with one <id>.json file per decision, or in one decisions.json, never both: a scope with both is an error that names the way out. A decision file is read as strictly as the registry and its name is its id. The scope's decisions read sorted by id, each from its own file, and one broken file leaves the scope with no decision."
+    },
+    {
       "id": "external-spec-reference",
       "text": "A version 3 manifest entry may name an external spec with a closed {format, path} object. The format is openspec, speckit, kiro or gherkin. The path is workspace-relative and cannot escape the workspace. Versions 1 and 2 refuse the member as an unknown field. A criteria group for an external spec carries its format, and a group with no format keeps the specs/*.json path rule."
     },
@@ -144,6 +148,7 @@
   "decisions": [
     "protocols/features/doc/adr/0001-minimal-spec-contract.md",
     "protocols/features/doc/adr/0002-executable-requirement-criteria.md",
-    "protocols/features/doc/adr/0006-the-spec-source-contract.md"
+    "protocols/features/doc/adr/0006-the-spec-source-contract.md",
+    "protocols/features/doc/adr/0007-one-file-per-decision.md"
   ]
 }

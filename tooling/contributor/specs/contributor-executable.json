@@ -30,7 +30,7 @@
     },
     {
       "id": "requirementless-delivery",
-      "text": "A workflow may name no feature source and a unit may carry no requirement, for a change such as an ADR with decisions.json. Such a unit is current and passes every final check, stage, decisions, stage blockers and receipt, with no producer proof, so its hosted complete delivery closes its task. The verifier refuses it when the change edits a native spec, an external spec a manifest names, or a feature manifest. A unit that carries requirements keeps every check."
+      "text": "A workflow may name no feature source and a unit may carry no requirement, for a change such as an ADR with a decision file. Such a unit is current and passes every final check, stage, decisions, stage blockers and receipt, with no producer proof, so its hosted complete delivery closes its task. The verifier refuses it when the change edits a native spec, an external spec a manifest names, or a feature manifest. A unit that carries requirements keeps every check."
     },
     {
       "id": "change-language-parity",

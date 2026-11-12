@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "D-023",
+  "statement": "Cloud deletes its nine alias subcommands (tokens, distribution, oci, publish-archives, track, report, validate-config, publish-config, publish-migration) in a dedicated Cloud pull request that ships as a breaking Cloud release",
+  "settled": "2026-10-18",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}
