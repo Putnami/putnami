@@ -34,7 +34,7 @@ func sampleVerificationRecord() *SpecVerificationRecord {
 				},
 				Reports: []VerificationReportRef{{
 					Task: "/go/framework/logger:test", Project: "/go/framework/logger",
-					Path:   ".putnami/out/go/framework/logger/test/putnami-feature-verification.json",
+					Path:   ".putnami/out/go/framework/logger/~test/putnami-feature-verification.json",
 					Digest: "sha256:" + strings.Repeat("ab", 32),
 				}},
 			},

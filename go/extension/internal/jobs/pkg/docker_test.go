@@ -193,12 +193,12 @@ func TestDockerSpec_HashSensitivity(t *testing.T) {
 // --- dockerfileFor (workspace-builder path) ---
 
 func TestDockerfileFor_ContentPure(t *testing.T) {
-	got := dockerfileFor("", ".putnami/out/app/build/bin/app", "3000")
+	got := dockerfileFor("", ".putnami/out/app/~build/bin/app", "3000")
 
 	if !strings.Contains(got, "FROM gcr.io/distroless/static:nonroot") {
 		t.Errorf("expected base image, got:\n%s", got)
 	}
-	if !strings.Contains(got, "COPY .putnami/out/app/build/bin/app /app") {
+	if !strings.Contains(got, "COPY .putnami/out/app/~build/bin/app /app") {
 		t.Errorf("expected binary COPY, got:\n%s", got)
 	}
 	// No git-derived bytes: a version or revision label would make the image

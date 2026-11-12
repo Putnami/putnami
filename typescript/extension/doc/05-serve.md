@@ -80,7 +80,7 @@ generate ──→ resolve entrypoint ──→ bundle for node ──→ start 
    `src/main.ts`.
 2. **Bundle** — Bun bundles the entrypoint for Node, as the compile step does
    (see [Build](02-build.md#the-node-runtime)), into the command's output
-   directory, `.putnami/out/<project>/serve/node/`. The bundle resolves the
+   directory, `.putnami/out/<project>/~serve/node/`. The bundle resolves the
    packages it leaves as imports from the project's `node_modules`.
 3. **Start** — `node --enable-source-maps <bundle>`, with the environment, the
    port (`PORT`) and the log forwarding below. `--inspect`, `--inspect-wait`

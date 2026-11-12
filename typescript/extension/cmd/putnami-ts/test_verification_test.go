@@ -161,7 +161,7 @@ func TestRunTestBatch_KeepsPerProjectSpecAttribution(t *testing.T) {
 		if result.Status != "OK" {
 			t.Fatalf("project %s = %+v", member, result)
 		}
-		outputDir := filepath.Join(root, ".putnami", "out", "packages", member, "test")
+		outputDir := filepath.Join(root, ".putnami", "out", "packages", member, "~test")
 		report := readVerificationReport(t, outputDir)
 		if len(report.Observations) != 1 || report.Observations[0].Feature != "gate/"+member ||
 			report.Observations[0].Check != member+"-check" {

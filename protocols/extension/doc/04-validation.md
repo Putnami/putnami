@@ -109,7 +109,7 @@ such as `-v` are reserved for the framework CLI contract.
 ### Command Names and Step IDs
 
 A command name and a pipeline step id are each one path segment: the CLI
-creates, links and removes `.putnami/out/<project>/<command>[/<step>]`, and a
+creates, links and removes `.putnami/out/<project>/~<command>[/<step>]`, and a
 plan name joins the two with `~` (`build~compile`). Both match
 `^[A-Za-z0-9][A-Za-z0-9._-]*$`: ASCII letters, digits, `.`, `_` and `-`,
 starting with a letter or a digit, so no separator, whitespace, control

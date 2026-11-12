@@ -479,7 +479,7 @@ func TestPublishPushesTheImageThroughTheSharedPublisher(t *testing.T) {
 	if err != nil || len(tags) == 0 {
 		t.Fatalf("tags = %v, err = %v", tags, err)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".putnami/out/tools/gen/publish/docker/published-image.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, ".putnami/out/tools/gen/~publish/docker/published-image.json")); err != nil {
 		t.Errorf("no verified record: %v", err)
 	}
 	ctx.Project.Type = typeLibrary

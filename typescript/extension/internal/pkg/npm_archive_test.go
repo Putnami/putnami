@@ -195,7 +195,7 @@ func stageBunFixturePackage(t *testing.T) (string, string, string) {
 	t.Helper()
 	workspace := t.TempDir()
 	projectPath := "packages/probe"
-	packageRoot := filepath.Join(workspace, ".putnami", "out", projectPath, "package")
+	packageRoot := filepath.Join(workspace, ".putnami", "out", projectPath, "~package")
 	for path, content := range map[string]string{
 		filepath.Join(packageRoot, "lib", "cli.js"):       "#!/usr/bin/env node\nconsole.log(\"cli\");\n",
 		filepath.Join(packageRoot, "lib", "index.js"):     "export const probe = 1;\n",
@@ -231,7 +231,7 @@ func TestNormalizeNPMArchiveOnWindowsDecidesFromTheStagedPackage(t *testing.T) {
 
 	// Without the build output there is no "#!" decision to make: the archive
 	// is refused rather than packed with guessed modes.
-	if err := os.RemoveAll(filepath.Join(workspace, ".putnami", "out", projectPath, "package", "lib")); err != nil {
+	if err := os.RemoveAll(filepath.Join(workspace, ".putnami", "out", projectPath, "~package", "lib")); err != nil {
 		t.Fatal(err)
 	}
 	if err := NormalizeNPMArchive("windows", workspace, projectPath, packageDir, archive); err == nil {

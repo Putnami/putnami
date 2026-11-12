@@ -128,7 +128,7 @@ func TestPackageAssemblesTheImageOfAnAOTExecutable(t *testing.T) {
 		t.Errorf("the job left its compiled executable %s behind", m[2])
 	}
 	var manifest pkgmeta.DockerManifest
-	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/server/package/docker/manifest.json"))
+	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/server/~package/docker/manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,7 +163,7 @@ func TestPackageCompilesForTheArm64Platform(t *testing.T) {
 		t.Fatalf("dart compile exe ran as %q", m)
 	}
 	var manifest pkgmeta.DockerManifest
-	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/server/package/docker/manifest.json"))
+	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/server/~package/docker/manifest.json"))
 	if err != nil || json.Unmarshal(data, &manifest) != nil || manifest.Platform != "linux/arm64" {
 		t.Fatalf("manifest = %s, %v", data, err)
 	}
@@ -342,10 +342,10 @@ func TestADryRunPackageRecordsTheChannelAndCompilesNothing(t *testing.T) {
 	if got := ran(t, log); strings.Contains(got, "compile exe") || !strings.Contains(got, "dart --version") {
 		t.Errorf("a dry run checks the SDK and compiles nothing:\n%s", got)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".putnami/out/server/package/docker/channel.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, ".putnami/out/server/~package/docker/channel.json")); err != nil {
 		t.Errorf("no channel record: %v", err)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".putnami/out/server/package/docker/oci")); err == nil {
+	if _, err := os.Stat(filepath.Join(root, ".putnami/out/server/~package/docker/oci")); err == nil {
 		t.Errorf("a dry run assembled an image")
 	}
 }

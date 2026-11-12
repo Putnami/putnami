@@ -38,7 +38,7 @@ func compileRepo(t *testing.T) (root, projectPath, outputPath string) {
 	t.Helper()
 	root = t.TempDir()
 	projectPath = filepath.Join(root, "apps", "hello")
-	outputPath = filepath.Join(root, ".putnami", "out", "apps", "hello", "build", "compile")
+	outputPath = filepath.Join(root, ".putnami", "out", "apps", "hello", "~build", "compile")
 	if err := os.MkdirAll(filepath.Join(projectPath, "src"), 0o755); err != nil {
 		t.Fatal(err)
 	}

@@ -101,7 +101,7 @@ func (f *captureFixture) hitOrFail(t *testing.T, job *ScheduledJob, hash string)
 }
 
 func (f *captureFixture) commandDir(command string) string {
-	return filepath.Join(f.ws.Root, ".putnami", "out", captureTestProject, command)
+	return cachekey.CommandOutputDir(f.ws.Root, captureTestProject, command)
 }
 
 func capturedResult(data map[string]any) *JobResult {

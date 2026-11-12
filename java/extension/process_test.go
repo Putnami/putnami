@@ -157,7 +157,7 @@ func TestPackageAssemblesTheImageOfAnApplication(t *testing.T) {
 	if status, _, err := runProjectJob(t, root, "g/app", PackageDockerJob(s), nil, "--dry-run"); status != "OK" || err != nil {
 		t.Fatalf("dry run: %s %v", status, err)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".putnami/out/g/app/package/docker")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, ".putnami/out/g/app/~package/docker")); err != nil {
 		t.Errorf("a dry run writes the channel record: %v", err)
 	}
 	if status, _, err := runProjectJob(t, root, "g/app", PackageDockerJob(s), nil, "--docker-base-image", "eclipse-temurin:21-jre"); status != "FAILED" || err == nil || !strings.HasPrefix(err.Error(), CodeBaseNotPinned) {

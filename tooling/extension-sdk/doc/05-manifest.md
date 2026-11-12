@@ -78,7 +78,7 @@ Four constructors cover the shapes a declared output can take, so `kind` can nev
 
 Options: `InProject()` (default), `InWorkspace()`, `InCommandOutput()`, `OptionalEmpty()`, `Emptied()`, `FailOnDrift()`, `WarnOnDrift()`, `Describe(text)`.
 
-`InCommandOutput()` resolves against `.putnami/out/<project>/<command>`, which every step of one command **shares** — which is why two steps of the same command must name different files.
+`InCommandOutput()` resolves against `.putnami/out/<project>/~<command>`, which every step of one command **shares** — which is why two steps of the same command must name different files.
 
 `OptionalEmpty()` marks an output that may legitimately be absent, or an empty directory, after a *successful* run (a coverage file when coverage is off). Without it, a missing declared output means the declaration and the task disagree.
 

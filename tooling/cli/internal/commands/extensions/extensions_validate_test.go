@@ -162,7 +162,7 @@ func TestExtensionsValidate_ReservedGlobalFlagFailure(t *testing.T) {
 
 // `putnami extensions validate` refuses a command name and a step id that is
 // not one path segment, a ~ (a plan name joins a command and a step with it)
-// or a path (the CLI creates and removes .putnami/out/<project>/<command>[/<step>])
+// or a path (the CLI creates and removes .putnami/out/<project>/~<command>[/<step>])
 // alike, and names the field that holds it.
 func TestExtensionsValidate_AStepSeparatorInANameIsRefused(t *testing.T) {
 	for name, tc := range map[string]struct{ from, to, want string }{

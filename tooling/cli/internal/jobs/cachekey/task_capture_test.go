@@ -96,7 +96,7 @@ func TestResolveDeclaredOutputsResolvesRootsAbsolutely(t *testing.T) {
 		got[plan.Spec.ID] = plan.Src
 	}
 	want := map[string]string{
-		"cmd":  filepath.Join("/ws", ".putnami", "out", captureTestProject, "build", "lib"),
+		"cmd":  filepath.Join("/ws", ".putnami", "out", captureTestProject, "~build", "lib"),
 		"proj": filepath.Join("/ws", captureTestProject, ".gen"),
 		"ws":   filepath.Join("/ws", "bun.lock"),
 	}

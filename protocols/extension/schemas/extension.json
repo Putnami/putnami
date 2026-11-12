@@ -77,7 +77,7 @@
       "minProperties": 1,
       "propertyNames": {
         "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
-        "description": "A command name is one path segment (`.putnami/out/<project>/<command>`) and one half of a plan name (`build~compile`): ASCII letters, digits, '.', '_' and '-', starting with a letter or a digit."
+        "description": "A command name is one path segment (`.putnami/out/<project>/~<command>`) and one half of a plan name (`build~compile`): ASCII letters, digits, '.', '_' and '-', starting with a letter or a digit."
       },
       "additionalProperties": {
         "$ref": "#/$defs/commandDefinition"
@@ -1039,7 +1039,7 @@
         "id": {
           "type": "string",
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
-          "description": "Step id used by downstream bindings. It is one path segment (`.putnami/out/<project>/<command>/<step>`) and one half of a plan name (`build~compile`): ASCII letters, digits, '.', '_' and '-', starting with a letter or a digit."
+          "description": "Step id used by downstream bindings. It is one path segment (`.putnami/out/<project>/~<command>/<step>`) and one half of a plan name (`build~compile`): ASCII letters, digits, '.', '_' and '-', starting with a letter or a digit."
         },
         "task": {
           "type": "string",

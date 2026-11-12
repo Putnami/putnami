@@ -368,7 +368,7 @@ func TestRecoverReportsReturnsAPresentReportInPlace(t *testing.T) {
 	if got, err := os.ReadFile(report.Path); err != nil || string(got) != recoveryReportBytes {
 		t.Errorf("report bytes = %q (err %v), want the captured report", got, err)
 	}
-	if _, err := os.Stat(filepath.Join(fixture.ws.Root, ".putnami", "out", "billing", "test",
+	if _, err := os.Stat(filepath.Join(fixture.ws.Root, ".putnami", "out", "billing", "~test",
 		features.VerificationReportFilename)); !os.IsNotExist(err) {
 		t.Errorf("recovery materialized the report into the session output tree (stat err %v)", err)
 	}

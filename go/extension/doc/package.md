@@ -149,7 +149,7 @@ putnami package . --deployment
 3. Stamp version into `putnami.extension.json` (if present)
 4. Cross-compile the Go binary for each platform of the declared release matrix (if a Go entrypoint is found), plus every executable declared in `options["@putnami/go"].executables`. Each declared executable is staged in `compiled/` beside the runtime and must be an executable regular file there, or packaging fails
 5. Build the pinned development tools for each platform into `compiled/tools/` — only for the project that owns `tools/versions.json` (the Go extension itself). Each binary's embedded build information must report the pinned version or packaging fails
-6. Create a `.tar.gz` archive per platform in `.putnami/out/{project}/package/archives/`.
+6. Create a `.tar.gz` archive per platform in `.putnami/out/{project}/~package/archives/`.
    A windows-x64 archive is refused when its stage holds a symbolic link, or when the project builds no Go binary and ships no
    `<runtime.executable>.exe`: a Windows CLI creates no link from an archive and runs only the `.exe` runtime
 7. Write `archives/channel.json` (the channel record, inside the directory this task owns) and `metadata.json` (the archive publication manifest: version, artifact name, channels packaged)
@@ -159,7 +159,7 @@ putnami package . --deployment
 1. Stage `putnami.template.json`, `README.md`, `LICENSE.md` and every other top-level entry except dotfiles and `node_modules/`
 2. Stamp version into `putnami.template.json`
 3. Refuse a stage that holds a symbolic link, and name the entry: the CLI installs the same template archive on every OS, and a Windows CLI creates no link from an archive
-4. Write one identical `.tar.gz` archive per platform in `.putnami/out/{project}/package/archives/`
+4. Write one identical `.tar.gz` archive per platform in `.putnami/out/{project}/~package/archives/`
 
 ### docker channel
 
@@ -168,7 +168,7 @@ putnami package . --deployment
    **digest-pinned** `gcr.io/distroless/static:nonroot` base, with the binary
    at `/app`, fixed timestamps, and explicit file modes
 3. Write the image as a self-contained OCI layout under
-   `.putnami/out/{project}/package/docker/oci`, tagged with a
+   `.putnami/out/{project}/~package/docker/oci`, tagged with a
    content-addressed immutable tag `c-<hash>`
 4. Write `manifest.json` with the content hash, the **reproducible candidate
    digest** (known before any push), target platform, local layout path, and an
@@ -218,7 +218,7 @@ A project whose OCI image another extension packages names that producer in
 name and `docker-package-step` to its exact `package` step (for example a CGO
 packager's `cgo` step). The workspace probe carries that route into release-set
 selection fingerprints. Go still owns the Docker upload: `publish --docker`
-pushes the image that step writes under `.putnami/out/{project}/package/docker/`,
+pushes the image that step writes under `.putnami/out/{project}/~package/docker/`,
 after every `package` step of the project. Go-module members keep their own
 package route. Omitted values retain `@putnami/go` / `docker`.
 
@@ -238,7 +238,7 @@ the same outputs.
 1. Copy Go module source to a staging directory
 2. Strip all `replace` directives from `go.mod` (workspace-local paths are not valid for published modules)
 3. Stamp the version into `go.mod` and any internal `putnami.extension.json` `run` entries
-4. Write the prepared module to `.putnami/out/{project}/package/go/`
+4. Write the prepared module to `.putnami/out/{project}/~package/go/`
 
 For a provider-backed `publish --impacted` or `publish --all` with a
 `--channel`, the CLI supplies an immutable release-set plan to the selected
@@ -414,7 +414,7 @@ Every step of the `package` command shares this directory and owns an exact
 subpath of it (see [Declared Outputs](build.md#declared-outputs)):
 
 ```
-.putnami/out/{project}/package/
+.putnami/out/{project}/~package/
 ├── bin/                    # cross-compiled binaries — owned by build-cross-compile
 ├── archives/               # owned by package-archives
 │   ├── {artifact}-linux-x64.tar.gz

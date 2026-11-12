@@ -499,7 +499,7 @@ func TestParse_UserScope(t *testing.T) {
 		data := `{
 			"protocolVersion": 2,
 			"workspaceRoot": "/home/u/.putnami/user",
-			"outputPath": "/home/u/.putnami/user/.putnami/out/audit-run",
+			"outputPath": "/home/u/.putnami/user/.putnami/out/~audit-run",
 			"cacheRoot": "/home/u/.putnami/user/.putnami/cache",
 			"workspace": {"name": "user"},
 			"project": {"name": "user", "fullPath": "/home/u/.putnami/user", "path": "."},` + userScope + `

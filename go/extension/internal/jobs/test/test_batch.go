@@ -17,6 +17,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	featureproto "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	coveragecheck "go.putnami.dev/sdk/extension/coverage"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -900,13 +901,7 @@ func projectOutputDir(ctx *pctx.Context, project pctx.ProjectRef, outputdir stri
 	if jobName == "" {
 		jobName = "test"
 	}
-	outDir := filepath.Join(
-		ctx.WorkspaceRoot,
-		".putnami",
-		"out",
-		filepath.FromSlash(project.Path),
-		jobName,
-	)
+	outDir := wsproto.CommandOutputDir(ctx.WorkspaceRoot, project.Path, jobName)
 	if outputdir == "" {
 		return outDir
 	}

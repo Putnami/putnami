@@ -1000,7 +1000,7 @@ func TestValidateManifest_StepSeparatorInANameIsRefused(t *testing.T) {
 }
 
 // A command name and a step id are each one segment of a path the CLI
-// creates, links and removes (.putnami/out/<project>/<command>[/<step>]), so
+// creates, links and removes (.putnami/out/<project>/~<command>[/<step>]), so
 // strict validation refuses a name that is not one: a separator, whitespace, a
 // control character, a leading - or ., and so . and .. themselves. The schema
 // states the same grammar.

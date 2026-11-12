@@ -8,6 +8,7 @@ import (
 
 	features "go.putnami.dev/protocol/features"
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/scratch"
 	"go.putnami.dev/sdk/extension/specreport"
@@ -88,7 +89,7 @@ func batchOutputPath(wsRoot string, proj pctx.ProjectRef) string {
 	if proj.OutputPath != "" {
 		return proj.OutputPath
 	}
-	return filepath.Join(wsRoot, ".putnami", "out", proj.Path, "test")
+	return wsproto.CommandOutputDir(wsRoot, proj.Path, "test")
 }
 
 // attachBatchSpecVerification merges the fragments one member's suite wrote

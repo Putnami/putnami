@@ -63,9 +63,9 @@ func TestRunBatchDefaultScopeKeepsTheUnionSplit(t *testing.T) {
 			t.Fatalf("project %s = %+v, want OK", result.ProjectID, result)
 		}
 	}
-	assertFileBytes(t, filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "a", "test", "coverage.out"),
+	assertFileBytes(t, filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "a", "~test", "coverage.out"),
 		"mode: set\nexample.com/a/a.go:3.24,3.34 1 1\nexample.com/a/a.go:5.27,5.37 1 0\n")
-	assertFileBytes(t, filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "b", "test", "coverage.out"),
+	assertFileBytes(t, filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "b", "~test", "coverage.out"),
 		"mode: set\nexample.com/b/b.go:3.24,3.34 1 0\n")
 }
 
@@ -170,7 +170,7 @@ func TestRunBatchProjectScopeProfileIsIdenticalAloneAndInABatch(t *testing.T) {
 		{ID: "/a", Name: "a", Path: "a", FullPath: filepath.Join(root, "a")},
 		{ID: "/b", Name: "b", Path: "b", FullPath: filepath.Join(root, "b")},
 	}
-	aProfile := filepath.Join(root, ".putnami", "out", "a", "test", "coverage.out")
+	aProfile := filepath.Join(root, ".putnami", "out", "a", "~test", "coverage.out")
 	batchProfile := func(scope string, selected ...pctx.ProjectRef) []byte {
 		t.Helper()
 		if err := os.RemoveAll(filepath.Join(root, ".putnami", "out")); err != nil {

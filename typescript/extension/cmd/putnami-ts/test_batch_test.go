@@ -67,7 +67,7 @@ func makeTestBatchContext(t *testing.T) (*pctx.Context, string) {
 			Name:       name,
 			Path:       path,
 			FullPath:   full,
-			OutputPath: filepath.Join(root, ".putnami", "out", path, "test"),
+			OutputPath: filepath.Join(root, ".putnami", "out", path, "~test"),
 		})
 	}
 	ctx.SelectedProjects = selected
@@ -129,7 +129,7 @@ func TestRunTestBatchSplitsPerProjectResultsAndOutputDirs(t *testing.T) {
 	}
 	// Per-project output dirs: each JUnit report is captured under its project.
 	for _, name := range []string{"a", "b"} {
-		junit := filepath.Join(root, ".putnami", "out", "packages", name, "test", "results.junit.xml")
+		junit := filepath.Join(root, ".putnami", "out", "packages", name, "~test", "results.junit.xml")
 		if _, err := os.Stat(junit); err != nil {
 			t.Fatalf("project %s JUnit not written to its own output dir: %v", name, err)
 		}

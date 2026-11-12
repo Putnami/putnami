@@ -196,7 +196,7 @@ skip a library.
 `putnami package` runs on an application and compiles nothing for a library.
 Each channel has a flag, and the project's `publish` field adds to them.
 
-| Flag | Output, under `.putnami/out/<project>/package` |
+| Flag | Output, under `.putnami/out/<project>/~package` |
 |---|---|
 | `--archives` | `archives/<artifact>-<platform>.tar.gz`, the binary at the root, and `metadata.json` |
 | `--docker` | `docker/oci`, an OCI layout, and `docker/manifest.json` |

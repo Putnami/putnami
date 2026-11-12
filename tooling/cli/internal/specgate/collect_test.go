@@ -76,14 +76,14 @@ func newGateFixture(t *testing.T, projection, report string) *gateFixture {
 	writeFile(t, filepath.Join(root, "billing", "invoice_test.go"), "package billing\n")
 	fixture := &gateFixture{ws: ws, results: map[string]*jobs.JobResult{}}
 	if projection != "" {
-		writeFile(t, filepath.Join(root, ".putnami", "out", "billing", "validate", "spec-criteria.json"), projection)
+		writeFile(t, filepath.Join(root, ".putnami", "out", "billing", "~validate", "spec-criteria.json"), projection)
 		job := producerJob(project)
 		fixture.planned = append(fixture.planned, job)
 		fixture.results[job.Key()] = resultWithArtifact("success",
 			features.SpecCriteriaProjectionArtifactID, "spec-criteria.json")
 	}
 	if report != "" {
-		writeFile(t, filepath.Join(root, ".putnami", "out", "billing", "test", "putnami-feature-verification.json"), report)
+		writeFile(t, filepath.Join(root, ".putnami", "out", "billing", "~test", "putnami-feature-verification.json"), report)
 		job := fixtureJob(project, "test", "test")
 		fixture.planned = append(fixture.planned, job)
 		fixture.results[job.Key()] = resultWithArtifact("success",
@@ -218,7 +218,7 @@ func TestCollectJoinsProjectionAndObservations(t *testing.T) {
 		t.Error("enforce did not block over the unmapped and unexecutable requirements")
 	}
 	if len(group.Reports) != 1 || !strings.HasPrefix(group.Reports[0].Digest, "sha256:") ||
-		group.Reports[0].Path != ".putnami/out/billing/test/putnami-feature-verification.json" {
+		group.Reports[0].Path != ".putnami/out/billing/~test/putnami-feature-verification.json" {
 		t.Errorf("report refs = %+v", group.Reports)
 	}
 	if group.Counts.SpecRequirements != 3 || group.Counts.Verified != 1 ||
@@ -315,7 +315,7 @@ func TestCollectRejectsUntrustedInputsDeterministically(t *testing.T) {
 	t.Run("symlinked report", func(t *testing.T) {
 		fixture := newGateFixture(t, fixtureProjection, fixtureReport("passed"))
 		fixture.setPolicy("project", "enforce")
-		reportPath := filepath.Join(fixture.ws.Root, ".putnami", "out", "billing", "test", "putnami-feature-verification.json")
+		reportPath := filepath.Join(fixture.ws.Root, ".putnami", "out", "billing", "~test", "putnami-feature-verification.json")
 		outside := filepath.Join(fixture.ws.Root, "outside.json")
 		writeFile(t, outside, fixtureReport("passed"))
 		if err := os.Remove(reportPath); err != nil {
@@ -382,7 +382,7 @@ func TestCollectAcceptsBatchNormalizedArtifactPaths(t *testing.T) {
 	fixture.setPolicy("project", "enforce")
 	testJob := fixture.planned[1]
 	fixture.results[testJob.Key()] = resultWithArtifact("success",
-		features.VerificationReportArtifactID, ".putnami/out/billing/test/putnami-feature-verification.json")
+		features.VerificationReportArtifactID, ".putnami/out/billing/~test/putnami-feature-verification.json")
 
 	group := soleGroup(t, collect(t, fixture))
 	if got := requirementState(t, group, "issue"); got != features.RequirementVerified {
@@ -415,7 +415,7 @@ func TestCollectReadsReusedAndBatchProjectedResults(t *testing.T) {
 	fixture.results[testJob.Key()] = &jobs.JobResult{Status: "success", Canonical: &jobs.TaskResult{
 		Artifacts: []jobs.TaskArtifact{{
 			ID: features.VerificationReportArtifactID, Name: "report", Kind: "report",
-			Path: ".putnami/out/billing/test/putnami-feature-verification.json",
+			Path: ".putnami/out/billing/~test/putnami-feature-verification.json",
 		}},
 	}}
 	group := soleGroup(t, collect(t, fixture))

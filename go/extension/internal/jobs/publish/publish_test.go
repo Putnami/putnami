@@ -58,7 +58,7 @@ func TestGoModule_DryRun(t *testing.T) {
 
 	dir := t.TempDir()
 	projectPath := "mod"
-	pkgDir := filepath.Join(dir, ".putnami", "out", projectPath, "package")
+	pkgDir := filepath.Join(dir, ".putnami", "out", projectPath, "~package")
 	if err := os.MkdirAll(filepath.Join(pkgDir, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestGoModule_RejectsAndRedactsRegistryUserinfo(t *testing.T) {
 	t.Setenv("PUTNAMI_REGISTRY_TOKEN", "test-token")
 	dir := t.TempDir()
 	projectPath := "mod"
-	pkgDir := filepath.Join(dir, ".putnami", "out", projectPath, "package")
+	pkgDir := filepath.Join(dir, ".putnami", "out", projectPath, "~package")
 	if err := os.MkdirAll(filepath.Join(pkgDir, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -343,7 +343,7 @@ func TestManagedGoModuleDryRunUsesPlanWithoutPackageArtifacts(t *testing.T) {
 	if len(requests) != 1 || requests[0].Method != http.MethodGet || requests[0].URL.Path != "/go.putnami.dev/mod/@v/v1.2.3-canary.1.zip" {
 		t.Fatalf("managed dry run sent %d registry requests, want one GET of the planned zip: %+v", len(requests), requests)
 	}
-	if _, statErr := os.Stat(filepath.Join(workspace, ".putnami", "out", "mod", "package", "go", "module.json")); !os.IsNotExist(statErr) {
+	if _, statErr := os.Stat(filepath.Join(workspace, ".putnami", "out", "mod", "~package", "go", "module.json")); !os.IsNotExist(statErr) {
 		t.Fatalf("managed dry run unexpectedly required or created module.json: %v", statErr)
 	}
 }
@@ -952,7 +952,7 @@ func declareGoOrigin(t *testing.T, workspace, origin string) {
 
 func writeGoPublishMetadata(t *testing.T, workspace, version, zipPath, modPath string) {
 	t.Helper()
-	packageDir := filepath.Join(workspace, ".putnami", "out", "mod", "package")
+	packageDir := filepath.Join(workspace, ".putnami", "out", "mod", "~package")
 	if err := os.MkdirAll(filepath.Join(packageDir, "go"), 0o755); err != nil {
 		t.Fatal(err)
 	}

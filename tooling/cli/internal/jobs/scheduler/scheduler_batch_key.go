@@ -123,7 +123,7 @@ func (s *Scheduler) batchConfigDigest(job *ScheduledJob) (string, bool) {
 		s.ws.Root,
 		projRoot,
 		cachekey.JobExtensionRoot(s.ws, job),
-		filepath.Join(s.ws.Root, ".putnami", "out", job.Project.Path, jobCommandName(job)),
+		cachekey.CommandOutputDir(s.ws.Root, job.Project.Path, jobCommandName(job)),
 	)
 	for _, candidate := range policy.ConfigFiles {
 		path := extension.ExpandTemplateVars(candidate, vars)

@@ -1,7 +1,7 @@
 {
   "protocolVersion": 2,
   "workspaceRoot": "/ws",
-  "outputPath": "/ws/.putnami/out/typescript/framework/utils/build",
+  "outputPath": "/ws/.putnami/out/typescript/framework/utils/~build",
   "cacheRoot": "/ws/.putnami/store",
   "workspace": {
     "name": "putnami",

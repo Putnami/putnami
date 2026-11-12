@@ -403,6 +403,6 @@ func newManagedImagePublishFixture(t *testing.T) (*pctx.Context, *pkgmeta.Docker
 		WorkspaceRoot: root,
 		Workspace:     pctx.Workspace{Name: "team"},
 		Project:       pctx.Project{Name: projectPath, Path: projectPath, Type: "image"},
-		OutputPath:    filepath.Join(root, ".putnami", "out", projectPath, "publish"),
+		OutputPath:    filepath.Join(root, ".putnami", "out", projectPath, "~publish"),
 	}, manifest
 }

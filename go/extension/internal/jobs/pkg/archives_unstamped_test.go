@@ -106,7 +106,7 @@ func newUnstampedWorkspace(t *testing.T, manifest, putnamiJSON, readme string) u
 		project: filepath.Join(root, "extension"),
 		// The package step writes its archives below this root whatever the
 		// context's output path is; the binaries share it, as in a real run.
-		output: filepath.Join(root, ".putnami", "out", "extension", "package"),
+		output: filepath.Join(root, ".putnami", "out", "extension", "~package"),
 	}
 	mustWrite(t, filepath.Join(ws.project, "go.mod"), "module example.com/unstamped\n\ngo 1.24.0\n")
 	mustWrite(t, filepath.Join(ws.project, "main.go"), unstampedRuntimeMain)

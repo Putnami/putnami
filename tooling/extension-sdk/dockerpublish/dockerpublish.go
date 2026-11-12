@@ -24,6 +24,7 @@ import (
 
 	extproto "go.putnami.dev/protocol/extension"
 	runtime "go.putnami.dev/protocol/runtime"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -726,7 +727,7 @@ func imagePublicationVersion(ctx *pctx.Context, target imagePublishTarget, fallb
 func clearPublishedImageManifest(ctx *pctx.Context) error {
 	outputDir := ctx.OutputPath
 	if outputDir == "" {
-		outputDir = filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", ctx.Project.Path, "publish")
+		outputDir = wsproto.CommandOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, "publish")
 	}
 	path := pkgmeta.PublishedImageManifestPath(outputDir)
 	if err := os.Remove(path); err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -738,7 +739,7 @@ func clearPublishedImageManifest(ctx *pctx.Context) error {
 func writePublishedImageManifest(ctx *pctx.Context, candidate *pkgmeta.DockerManifest, repository, immutableRef, digest, targetRegistry string) error {
 	outputDir := ctx.OutputPath
 	if outputDir == "" {
-		outputDir = filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", ctx.Project.Path, "publish")
+		outputDir = wsproto.CommandOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, "publish")
 	}
 	if err := pkgmeta.WritePublishedImageManifest(outputDir, pkgmeta.PublishedImageManifest{
 		Image:           repository,

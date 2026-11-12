@@ -36,7 +36,7 @@ const (
 //   - All template files (.template and static)
 //   - README.md, LICENSE.md (if present)
 //
-// Output is written to .putnami/out/{projectPath}/package/ so that
+// Output is written to .putnami/out/{projectPath}/~package/ so that
 // `cloud packages publish` (owned by @putnami/cloud) can pick it up.
 //
 // Content dispatches to it; it is reached only for a project whose

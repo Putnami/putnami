@@ -83,7 +83,7 @@ jobs:
 
       - name: Start the sample image
         run: |
-          image="$(python3 -I -c "import json; print(json.load(open('.putnami/out/rust/samples/application/package/docker/manifest.json'))['tags'][0])")"
+          image="$(python3 -I -c "import json; print(json.load(open('.putnami/out/rust/samples/application/~package/docker/manifest.json'))['tags'][0])")"
           test "$(docker run --rm "$image")" = 1350
 
       - name: Dry-run the publication of the sample crates

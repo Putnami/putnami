@@ -61,7 +61,7 @@ replace (
 	if strings.Contains(staged, "replace") || strings.Contains(staged, "v0.0.0") {
 		t.Errorf("staged go.mod retained a replace or placeholder:\n%s", staged)
 	}
-	metadata, err := os.ReadFile(filepath.Join(workspace, ".putnami", "out", "consumer", "package", "go", "module.json"))
+	metadata, err := os.ReadFile(filepath.Join(workspace, ".putnami", "out", "consumer", "~package", "go", "module.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +84,7 @@ func TestSparseGoPackageUpstreamChangeRepackagesDownstream(t *testing.T) {
 			t.Fatalf("package %s = (%q, %v), want OK", project.path, status, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(workspace, ".putnami", "out", "alpha", "package", "go")); err != nil {
+	if _, err := os.Stat(filepath.Join(workspace, ".putnami", "out", "alpha", "~package", "go")); err != nil {
 		t.Fatalf("selected upstream was not packaged: %v", err)
 	}
 	if _, err := os.Stat(filepath.Join(workspace, ".putnami", "out", "beta")); !os.IsNotExist(err) {
@@ -259,7 +259,7 @@ func goReleaseContext(workspace, path, modulePath string, params pctx.Params) *p
 
 func readStagedGoMod(t *testing.T, workspace, project string) string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(workspace, ".putnami", "out", project, "package", "go", "source", "go.mod"))
+	data, err := os.ReadFile(filepath.Join(workspace, ".putnami", "out", project, "~package", "go", "source", "go.mod"))
 	if err != nil {
 		t.Fatal(err)
 	}

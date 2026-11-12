@@ -23,6 +23,7 @@ import (
 	put "go.putnami.dev/protocol/put"
 	registryproto "go.putnami.dev/protocol/registry"
 	runtimeproto "go.putnami.dev/protocol/runtime"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/gomodpublish"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/publicationoutbox"
@@ -566,7 +567,7 @@ func (run *ReleaseSetRun) checkPackedImage(publish *jobmodel.ScheduledJob, packe
 // beside the publication job's output, where a same-run consumer reads it
 // (pkgmeta.PublishedImageManifestPath).
 func (run *ReleaseSetRun) recordPublishedImage(publish *jobmodel.ScheduledJob, packed extproto.OutboxMember, image *packedImage, digest string) error {
-	outputDir := filepath.Join(run.root, ".putnami", "out", publish.Project.Path, publish.CommandName())
+	outputDir := wsproto.CommandOutputDir(run.root, publish.Project.Path, publish.CommandName())
 	if err := pkgmeta.WritePublishedImageManifest(outputDir, pkgmeta.PublishedImageManifest{
 		Image:           packed.OCI.Repository,
 		ImmutableRef:    packed.OCI.Repository + "@" + digest,

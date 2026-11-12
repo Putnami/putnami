@@ -801,7 +801,7 @@ func TestInvocation_ProducerFailingBeforeItStartsBlocksItsFrontier(t *testing.T)
 	}
 	fixture.producer.Extension.Tasks["provision"] = provision
 
-	blocker := filepath.Join(fixture.ws.Root, ".putnami", "out", "test")
+	blocker := filepath.Join(fixture.ws.Root, ".putnami", "out", "~test")
 	if err := os.MkdirAll(filepath.Dir(blocker), 0o755); err != nil {
 		t.Fatalf("prepare command output root: %v", err)
 	}
@@ -1530,7 +1530,7 @@ func TestInvocation_LeakGuardLeavesDeclaredArtifactPathsPublishable(t *testing.T
 
 	for _, junitPath := range []string{
 		projectPath + "/test/results.junit.xml",
-		".putnami/out/" + projectPath + "/test/results.junit.xml",
+		".putnami/out/" + projectPath + "/~test/results.junit.xml",
 	} {
 		junitEvent, ok := parseRawEvent(`{"v":2,"type":"artifact","id":"junit","name":"JUnit Report","kind":"report","path":"` + junitPath + `"}`)
 		if !ok {

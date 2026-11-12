@@ -35,11 +35,11 @@ func TestParseFile_SelectedProjectOutputPath(t *testing.T) {
 	// The per-project OutputPath is the batch-execution contract: each selected
 	// project carries its own captured output directory so a batched extension
 	// process writes each project's outputs to its own cache entry.
-	if got := ctx.SelectedProjects[0].OutputPath; got != "/ws/.putnami/out/a/build" {
-		t.Errorf("selectedProjects[0].outputPath = %q, want /ws/.putnami/out/a/build", got)
+	if got := ctx.SelectedProjects[0].OutputPath; got != "/ws/.putnami/out/a/~build" {
+		t.Errorf("selectedProjects[0].outputPath = %q, want /ws/.putnami/out/a/~build", got)
 	}
-	if got := ctx.SelectedProjects[1].OutputPath; got != "/ws/.putnami/out/libs/b/build" {
-		t.Errorf("selectedProjects[1].outputPath = %q, want /ws/.putnami/out/libs/b/build", got)
+	if got := ctx.SelectedProjects[1].OutputPath; got != "/ws/.putnami/out/libs/b/~build" {
+		t.Errorf("selectedProjects[1].outputPath = %q, want /ws/.putnami/out/libs/b/~build", got)
 	}
 }
 

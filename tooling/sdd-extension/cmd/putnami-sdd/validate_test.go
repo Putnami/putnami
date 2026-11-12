@@ -208,7 +208,7 @@ func projectJobContext(root string, members ...pctx.ProjectRef) *pctx.Context {
 		WorkspaceRoot:   root,
 		// OutputPath is where the orchestrator points every step of this
 		// command; specs-validate writes its declared criteria projection there.
-		OutputPath: filepath.Join(root, ".putnami", "out", "billing", "validate"),
+		OutputPath: filepath.Join(root, ".putnami", "out", "billing", "~validate"),
 		Workspace:  pctx.Workspace{Name: "gate"},
 		Project: pctx.Project{
 			Name:     "@acme/billing",

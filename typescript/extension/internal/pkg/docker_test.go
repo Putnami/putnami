@@ -167,7 +167,7 @@ func TestPackageDocker_FailsLoudWhenPublicAssetsDeclaredButMissing(t *testing.T)
 
 	// Stage a compile output with a platform binary so packaging reaches the
 	// asset check (it errors earlier without one).
-	compileOut := filepath.Join(ws, ".putnami", "out", projPath, "build", "compile")
+	compileOut := filepath.Join(ws, ".putnami", "out", projPath, "~build", "compile")
 	if err := os.MkdirAll(compileOut, 0o755); err != nil {
 		t.Fatal(err)
 	}

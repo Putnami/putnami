@@ -1820,7 +1820,7 @@ func TestRunPackageNpm_Success(t *testing.T) {
 	projectPath := filepath.Join(dir, "project")
 
 	// Create build output in the workspace .putnami/out location
-	buildDir := filepath.Join(dir, ".putnami", "out", "project", "build", "lib")
+	buildDir := filepath.Join(dir, ".putnami", "out", "project", "~build", "lib")
 	os.MkdirAll(buildDir, 0755)
 	os.WriteFile(filepath.Join(buildDir, "index.js"), []byte("exports.x = 1;"), 0644)
 
@@ -1869,7 +1869,7 @@ func TestRunPackageDocker_DryRun(t *testing.T) {
 	projectPath := filepath.Join(dir, "project")
 
 	// Create compile output in the workspace .putnami/out location
-	compileDir := filepath.Join(dir, ".putnami", "out", "project", "build", "compile")
+	compileDir := filepath.Join(dir, ".putnami", "out", "project", "~build", "compile")
 	os.MkdirAll(compileDir, 0755)
 	os.WriteFile(filepath.Join(compileDir, "serve-linux-x64"), []byte("binary"), 0755)
 

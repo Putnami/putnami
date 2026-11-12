@@ -84,7 +84,7 @@ func TestEnvDoctorPublishNamesEachUndeclaredNamespace(t *testing.T) {
 	writeDoctorProject(t, root, "shop/workloads/api", map[string]any{"name": "shop/workloads/api"},
 		"shop/workloads/api/.gen/config-schema.json", "shop/workloads/api/.gen/migration-bundle/bundle.json")
 	writeDoctorProject(t, root, "shop/workloads/staged", map[string]any{"name": "shop/workloads/staged"},
-		".putnami/out/shop/workloads/staged/build/migration-bundle/bundle.json")
+		".putnami/out/shop/workloads/staged/~build/migration-bundle/bundle.json")
 	writeDoctorProject(t, root, "shop/workloads/bad", map[string]any{
 		"name": "shop/workloads/bad", "options": map[string]any{"@putnami/cloud:publish-migration": map[string]any{"namespace": "a/b"}},
 	})

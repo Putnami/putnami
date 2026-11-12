@@ -92,7 +92,7 @@ func TestTestBatchMergesSpecFragmentsPerProject(t *testing.T) {
 		if result.Status != "OK" {
 			t.Fatalf("project %s = %+v", member, result)
 		}
-		outputDir := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", member, "test")
+		outputDir := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", member, "~test")
 		written, err := os.ReadFile(filepath.Join(outputDir, specreport.ReportFilename))
 		if err != nil {
 			t.Fatalf("%s report missing: %v", member, err)
@@ -134,7 +134,7 @@ func TestTestBatchWithoutFragmentsWritesNoReport(t *testing.T) {
 		if len(results[index].Artifacts) != 0 {
 			t.Fatalf("%s artifacts = %+v, want none", member, results[index].Artifacts)
 		}
-		reportPath := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", member, "test", specreport.ReportFilename)
+		reportPath := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", member, "~test", specreport.ReportFilename)
 		if _, err := os.Stat(reportPath); !os.IsNotExist(err) {
 			t.Fatalf("%s: an observation-free run wrote a report (stat err = %v)", member, err)
 		}

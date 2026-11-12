@@ -76,7 +76,7 @@ func TestRunBatchMemberProfileListsEachBlockOnce(t *testing.T) {
 				}
 			}
 			for _, name := range []string{"a", "b"} {
-				assertFileBytes(t, filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", name, "test", "coverage.out"),
+				assertFileBytes(t, filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", name, "~test", "coverage.out"),
 					"mode: set\n"+
 						"example.com/"+name+"/"+name+".go:3.24,3.34 1 1\n"+
 						"example.com/"+name+"/"+name+".go:5.27,5.37 1 0\n")

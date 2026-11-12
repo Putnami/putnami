@@ -299,7 +299,7 @@ func TestInheritWorkspaceFields_AllFields(t *testing.T) {
 
 func TestFindBuildOutput_PackagePath(t *testing.T) {
 	dir := t.TempDir()
-	pkgPath := filepath.Join(dir, ".putnami", "out", "my-pkg", "package")
+	pkgPath := filepath.Join(dir, ".putnami", "out", "my-pkg", "~package")
 	os.MkdirAll(pkgPath, 0755)
 
 	got := findBuildOutput(dir, "my-pkg")
@@ -310,7 +310,7 @@ func TestFindBuildOutput_PackagePath(t *testing.T) {
 
 func TestFindBuildOutput_BuildPath(t *testing.T) {
 	dir := t.TempDir()
-	buildPath := filepath.Join(dir, ".putnami", "out", "my-pkg", "build")
+	buildPath := filepath.Join(dir, ".putnami", "out", "my-pkg", "~build")
 	os.MkdirAll(buildPath, 0755)
 
 	got := findBuildOutput(dir, "my-pkg")
@@ -355,8 +355,8 @@ func TestFindBuildOutput_NotFound(t *testing.T) {
 func TestFindBuildOutput_PackagePreferred(t *testing.T) {
 	dir := t.TempDir()
 	// Create both package and build paths; package should be preferred
-	pkgPath := filepath.Join(dir, ".putnami", "out", "my-pkg", "package")
-	buildPath := filepath.Join(dir, ".putnami", "out", "my-pkg", "build")
+	pkgPath := filepath.Join(dir, ".putnami", "out", "my-pkg", "~package")
+	buildPath := filepath.Join(dir, ".putnami", "out", "my-pkg", "~build")
 	os.MkdirAll(pkgPath, 0755)
 	os.MkdirAll(buildPath, 0755)
 
@@ -1357,7 +1357,7 @@ func TestPackageNpm_FullPipeline(t *testing.T) {
 	os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(pkgJSON), 0644)
 
 	// Create build output
-	buildOutputDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package")
+	buildOutputDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package")
 	libDir := filepath.Join(buildOutputDir, "lib")
 	os.MkdirAll(libDir, 0755)
 	os.WriteFile(filepath.Join(libDir, "index.js"), []byte("export const x = 1;"), 0644)
@@ -1467,7 +1467,7 @@ func packageNPMTarballUnderUmask(t *testing.T, mask int, pack bool) (string, map
 	if err := os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(manifest), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "lib")
+	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "lib")
 	if err := os.MkdirAll(libDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -1562,7 +1562,7 @@ func TestPackageNpm_StableRelease(t *testing.T) {
 	os.MkdirAll(projRoot, 0755)
 	os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(`{"name":"@test/mylib","version":"1.0.0"}`), 0644)
 
-	buildOutputDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package")
+	buildOutputDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package")
 	libDir := filepath.Join(buildOutputDir, "lib")
 	os.MkdirAll(libDir, 0755)
 	os.WriteFile(filepath.Join(libDir, "index.js"), []byte("export const x = 1;"), 0644)
@@ -1598,7 +1598,7 @@ func TestPackageNpm_NoBuildOutput(t *testing.T) {
 func TestPackageNpm_EmptyLibOutput(t *testing.T) {
 	wsDir := t.TempDir()
 	projectPath := "packages/mylib"
-	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "lib")
+	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "lib")
 	os.MkdirAll(libDir, 0755)
 
 	_, err := PackageNpm(wsDir, projectPath, "@test/mylib", false, nil, "1.0.0")
@@ -1618,7 +1618,7 @@ func TestPackageNpm_WithTypesOutput(t *testing.T) {
 	os.MkdirAll(projRoot, 0755)
 	os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(`{"name":"@test/mylib","version":"1.0.0"}`), 0644)
 
-	buildOutputDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package")
+	buildOutputDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package")
 	libDir := filepath.Join(buildOutputDir, "lib")
 	typesDir := filepath.Join(buildOutputDir, "types")
 	os.MkdirAll(libDir, 0755)
@@ -1668,7 +1668,7 @@ func TestPackageNpm_InjectsExportTypes(t *testing.T) {
 		`"./gen":"./.gen/src/serve.ts"}}`
 	os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(pkgJSON), 0644)
 
-	buildOutputDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package")
+	buildOutputDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package")
 	libDir := filepath.Join(buildOutputDir, "lib")
 	typesDir := filepath.Join(buildOutputDir, "types")
 
@@ -1843,7 +1843,7 @@ func TestPackageNpm_StableNoWsVersion(t *testing.T) {
 	os.MkdirAll(projRoot, 0755)
 	os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(`{"name":"@test/mylib","version":"1.0.0"}`), 0644)
 
-	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "lib")
+	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "lib")
 	os.MkdirAll(libDir, 0755)
 	os.WriteFile(filepath.Join(libDir, "index.js"), []byte("x"), 0644)
 
@@ -1868,7 +1868,7 @@ func TestPackageNpm_WithWorkspaceDeps(t *testing.T) {
 	os.MkdirAll(projRoot, 0755)
 	os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(`{"name":"@test/mylib","version":"1.0.0","dependencies":{"@test/utils":"workspace:^"}}`), 0644)
 
-	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "lib")
+	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "lib")
 	os.MkdirAll(libDir, 0755)
 	os.WriteFile(filepath.Join(libDir, "index.js"), []byte("x"), 0644)
 
@@ -1911,7 +1911,7 @@ func TestPackageNpmWithReleaseSet_DownstreamOnlyPinsOldUpstreamAcrossPublishedSe
 		"optionalDependencies":{"upstream":"catalog:internal"},
 		"devDependencies":{"upstream":"workspace:*"}
 	}`), 0o644)
-	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "lib")
+	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "lib")
 	os.MkdirAll(libDir, 0o755)
 	os.WriteFile(filepath.Join(libDir, "index.js"), []byte("export {};"), 0o644)
 
@@ -1974,7 +1974,7 @@ func TestPackageNpmWithReleaseSet_DownstreamOnlyPinsOldUpstreamAcrossPublishedSe
 	}); err == nil || !strings.Contains(err.Error(), "does not match release-set coordinate") {
 		t.Fatalf("staged coordinate mismatch error = %v", err)
 	}
-	if project.FileExists(filepath.Join(wsDir, ".putnami", "out", "packages/upstream", "package", "npm")) {
+	if project.FileExists(filepath.Join(wsDir, ".putnami", "out", "packages/upstream", "~package", "npm")) {
 		t.Error("unchanged upstream was unexpectedly packaged")
 	}
 }
@@ -1989,7 +1989,7 @@ func TestPackageNpmWithReleaseSet_UpstreamChangeRepackagesDownstreamAgainstCandi
 	os.WriteFile(filepath.Join(wsDir, "putnami.workspace.json"), []byte(`{"projects":["packages/upstream","packages/downstream"]}`), 0o644)
 	os.WriteFile(filepath.Join(wsDir, "packages", "upstream", "package.json"), []byte(`{"name":"upstream"}`), 0o644)
 	os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(`{"name":"downstream","version":"1.0.0","dependencies":{"upstream":"workspace:*"}}`), 0o644)
-	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "lib")
+	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "lib")
 	os.MkdirAll(libDir, 0o755)
 	os.WriteFile(filepath.Join(libDir, "index.js"), []byte("export {};"), 0o644)
 
@@ -2038,7 +2038,7 @@ func TestPackageNpm_StripsOverridesAndResolutions(t *testing.T) {
 	pkgJSON := `{"name":"@test/mylib","version":"1.0.0","dependencies":{"@putnami/application":"latest"},"overrides":{"@putnami/application":"file:../putnami/app"},"resolutions":{"@putnami/application":"file:../putnami/app"}}`
 	os.WriteFile(filepath.Join(projRoot, "package.json"), []byte(pkgJSON), 0644)
 
-	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "lib")
+	libDir := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "lib")
 	os.MkdirAll(libDir, 0755)
 	os.WriteFile(filepath.Join(libDir, "index.js"), []byte("export const x = 1;"), 0644)
 
@@ -2077,7 +2077,7 @@ func TestPackageDocker_DryRun(t *testing.T) {
 	wsDir := t.TempDir()
 	projectPath := "packages/myapp"
 
-	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "build", "compile")
+	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "~build", "compile")
 	os.MkdirAll(compileOutput, 0755)
 	os.WriteFile(filepath.Join(compileOutput, "myapp-linux-x64"), []byte("binary"), 0755)
 
@@ -2107,7 +2107,7 @@ func TestPackageDocker_DryRun(t *testing.T) {
 		t.Errorf("image = %q, want content-addressed tag c-%s", result["image"], contentHash)
 	}
 	// Dry run must not assemble anything.
-	if project.FileExists(filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "docker", "oci")) {
+	if project.FileExists(filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "docker", "oci")) {
 		t.Error("expected no OCI layout to be written on dry run")
 	}
 }
@@ -2116,7 +2116,7 @@ func TestPackageDocker_DryRunDashifiesMultiSegmentName(t *testing.T) {
 	wsDir := t.TempDir()
 	projectPath := "surfaces/admin/workloads/console"
 
-	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "build", "compile")
+	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "~build", "compile")
 	os.MkdirAll(compileOutput, 0755)
 	os.WriteFile(filepath.Join(compileOutput, "console-linux-x64"), []byte("binary"), 0755)
 
@@ -2143,7 +2143,7 @@ func TestPackageDocker_DryRunDefaultTag(t *testing.T) {
 	wsDir := t.TempDir()
 	projectPath := "packages/myapp"
 
-	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "build", "compile")
+	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "~build", "compile")
 	os.MkdirAll(compileOutput, 0755)
 	os.WriteFile(filepath.Join(compileOutput, "myapp-linux-x64"), []byte("binary"), 0755)
 
@@ -2165,7 +2165,7 @@ func TestPackageDocker_DryRunWithAssets(t *testing.T) {
 	wsDir := t.TempDir()
 	projectPath := "packages/myapp"
 
-	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "build", "compile")
+	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "~build", "compile")
 	os.MkdirAll(compileOutput, 0755)
 	os.WriteFile(filepath.Join(compileOutput, "myapp-linux-x64"), []byte("binary"), 0755)
 
@@ -2215,7 +2215,7 @@ func TestPackageDocker_FallbackCompileOutput(t *testing.T) {
 	projectPath := "packages/myapp"
 
 	// Use package/ path instead of build/
-	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "package", "compile")
+	compileOutput := filepath.Join(wsDir, ".putnami", "out", projectPath, "~package", "compile")
 	os.MkdirAll(compileOutput, 0755)
 	os.WriteFile(filepath.Join(compileOutput, "myapp-linux-x64"), []byte("binary"), 0755)
 

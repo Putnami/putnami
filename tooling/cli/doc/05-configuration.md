@@ -594,7 +594,7 @@ application source, invoking Docker, or interpreting a Dockerfile:
 The base must be digest-pinned. The complete base reference, platform, ordered
 runtime configuration, layer bytes, destination paths, and modes form one full
 SHA-256 content version. Packaging always writes the local candidate under
-`.putnami/out/<project>/package/docker/oci`; its manifest records the candidate
+`.putnami/out/<project>/~package/docker/oci`; its manifest records the candidate
 digest, platform, content identity, and relative layout only. It never resolves
 an output registry, requests write credentials, pushes, or claims publication.
 Publishing resolves its target from `registries.oci.publish`, requests the exact

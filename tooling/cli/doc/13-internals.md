@@ -299,7 +299,7 @@ Task commands, args, cwd, and env values use template variables:
 | `{workspaceRoot}` | Absolute workspace root path |
 | `{projectRoot}` | Absolute project directory path |
 | `{extensionRoot}` | Absolute extension directory path |
-| `{outputRoot}` | `.putnami/out/{project}/{command}` |
+| `{outputRoot}` | `.putnami/out/{project}/~{command}` |
 | `{cacheRoot}` | `.putnami/cache/` (per-workspace mutable scratch, **not** the content-addressed store) |
 | `{selectedProjects}` | Comma-separated selected project names for workspace-once jobs |
 | `{selectedProjectIDs}` | Comma-separated selected project IDs for workspace-once jobs |

@@ -54,7 +54,7 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionDependencies(t *t
 		t.Errorf("Composer ran in the repository: %q", lines[0])
 	}
 	var manifest pkgmeta.DockerManifest
-	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/package/docker/manifest.json"))
+	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/~package/docker/manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -329,7 +329,7 @@ func TestADryRunPackageRecordsTheChannelAndRunsNoComposer(t *testing.T) {
 	if lines := readLines(t, log); lines != nil {
 		t.Errorf("Composer ran: %q", lines)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".putnami/out/package/docker/channel.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, ".putnami/out/~package/docker/channel.json")); err != nil {
 		t.Errorf("channel record: %v", err)
 	}
 }

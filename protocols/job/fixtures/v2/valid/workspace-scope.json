@@ -1,7 +1,7 @@
 {
   "protocolVersion": 2,
   "workspaceRoot": "/ws",
-  "outputPath": "/ws/.putnami/out/ws/deps~install",
+  "outputPath": "/ws/.putnami/out/ws/~deps~install",
   "cacheRoot": "/ws/.putnami/store",
   "workspace": {"name": "putnami", "rootPath": "/ws"},
   "project": {"name": "putnami", "path": ".", "fullPath": "/ws"},

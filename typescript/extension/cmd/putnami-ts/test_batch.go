@@ -6,6 +6,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	features "go.putnami.dev/protocol/features"
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	coveragecheck "go.putnami.dev/sdk/extension/coverage"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -200,7 +201,7 @@ func projectBatchOutputPath(ctx *pctx.Context, proj pctx.ProjectRef) string {
 	if proj.OutputPath != "" {
 		return proj.OutputPath
 	}
-	return filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", proj.Path, ctx.Job.Name)
+	return wsproto.CommandOutputDir(ctx.WorkspaceRoot, proj.Path, ctx.Job.Name)
 }
 
 // runProjectSuiteWithRetry runs one project's test suite, retrying once only

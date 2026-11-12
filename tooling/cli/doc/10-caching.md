@@ -949,7 +949,7 @@ task declares as its output while another session writes it.
 
 Each task locks, exclusively:
 
-- its command-output directory, `.putnami/out/<project>/<command>`, always;
+- its command-output directory, `.putnami/out/<project>/~<command>`, always;
 - its project, when it declares a project-rooted output (such as `.gen`);
 - the workspace, when it declares a workspace-rooted output.
 
@@ -997,7 +997,7 @@ serve pipeline, such as config merge and generate, while it serves:
 `putnami serve <consumer>` in a second terminal beside
 `putnami serve <provider>`, when the consumer depends on the provider, or a
 composition that starts the consumer after the provider. Those steps can rewrite
-`.putnami/out/<project>/serve` while the server runs; a cache hit restores
+`.putnami/out/<project>/~serve` while the server runs; a cache hit restores
 the bytes the directory already holds. A finite step of the pipeline keeps
 its lock until its capture, although its command declares the serve
 workload, and the serve-workload step keeps its other locks until its
@@ -1025,7 +1025,7 @@ prints one line to stderr that names that session and its tasks that hold the
 lock, then waits:
 
 ```
-putnami: /tooling/cli:test~test waits for session 20260925-192012-876307 (pid 4242, task /tooling/cli:test~test), which is writing .putnami/out/tooling/cli/test
+putnami: /tooling/cli:test~test waits for session 20260925-192012-876307 (pid 4242, task /tooling/cli:test~test), which is writing .putnami/out/tooling/cli/~test
 ```
 
 When several tasks of that session share the lock, the line names the first
