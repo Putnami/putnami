@@ -201,7 +201,7 @@ func TestPackageAssemblesAnImageOfThePublishedApplication(t *testing.T) {
 		t.Fatalf("dotnet ran with %q", lines)
 	}
 	var manifest pkgmeta.DockerManifest
-	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/src/Api/package/docker/manifest.json"))
+	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/src/Api/~package/docker/manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

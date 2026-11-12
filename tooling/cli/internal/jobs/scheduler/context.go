@@ -315,7 +315,7 @@ func BuildJobContext(
 
 	// Output path — use Path (not Name or ID) for filesystem safety.
 	// Name may contain slashes (@putnami/app), ID has "/" prefix.
-	ctx.OutputPath = filepath.Join(ws.Root, ".putnami", "out", job.Project.Path, cmdName)
+	ctx.OutputPath = cachekey.CommandOutputDir(ws.Root, job.Project.Path, cmdName)
 
 	ctx.Params = cachekey.DeliveredJobParams(job, commandParams, configDefaults)
 	ctx.Version = cachekey.VersionInfoForProject(versions, job.Project)
@@ -339,7 +339,7 @@ func selectedProjectsContext(ws *workspace.Workspace, versions cachekey.RunVersi
 			FullPath: filepath.Join(ws.Root, project.Path),
 			// Mirror BuildJobContext's leader OutputPath derivation so each
 			// batched project writes to its own captured output directory.
-			OutputPath: filepath.Join(ws.Root, ".putnami", "out", project.Path, cmdName),
+			OutputPath: cachekey.CommandOutputDir(ws.Root, project.Path, cmdName),
 			// The declared identity, so a workspace-sync task can tell "this
 			// manifest is where the name came from" from "a scope renamed this
 			// project and the manifest has not caught up". Without it the task

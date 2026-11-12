@@ -227,16 +227,16 @@ func TestRunBatchSplitsCoverageAndAppliesPerProjectGate(t *testing.T) {
 		t.Fatalf("project b diagnostics = %+v, want threshold failure", results[1].Diagnostics)
 	}
 
-	aProfile := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "a", "test", "coverage.out")
-	bProfile := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "b", "test", "coverage.out")
+	aProfile := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "a", "~test", "coverage.out")
+	bProfile := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "b", "~test", "coverage.out")
 	assertProfileOwnership(t, aProfile, "example.com/a/", "example.com/b/")
 	assertProfileOwnership(t, bProfile, "example.com/b/", "example.com/a/")
 	if got := results[0].Artifacts; len(got) != 1 ||
-		got[0].Path != ".putnami/out/a/test/coverage.out" {
+		got[0].Path != ".putnami/out/a/~test/coverage.out" {
 		t.Fatalf("project a artifacts = %+v", got)
 	}
 	if got := results[1].Artifacts; len(got) != 1 ||
-		got[0].Path != ".putnami/out/b/test/coverage.out" {
+		got[0].Path != ".putnami/out/b/~test/coverage.out" {
 		t.Fatalf("project b artifacts = %+v", got)
 	}
 }

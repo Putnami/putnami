@@ -120,7 +120,7 @@ const (
 	// collide even when they run for different projects.
 	OutputRootWorkspace = "workspace"
 	// OutputRootCommandOutput resolves against the per-command output directory
-	// (.putnami/out/<project>/<command>). That directory is SHARED by every
+	// (.putnami/out/<project>/~<command>). That directory is SHARED by every
 	// step of one command, which is exactly why the steps must name their own
 	// files instead of the capture subtracting a baseline to tell them apart.
 	OutputRootCommandOutput = "command-output"

@@ -50,7 +50,7 @@ func newOutputRaceFixture(t *testing.T) *outputRaceFixture {
 	f := &outputRaceFixture{
 		root:     root,
 		extDir:   t.TempDir(),
-		outDir:   filepath.Join(root, ".putnami", "out", "proj", "test"),
+		outDir:   filepath.Join(root, ".putnami", "out", "proj", "~test"),
 		hookFile: filepath.Join(root, "proj", ".gen", "hook.txt"),
 		started:  filepath.Join(root, "started.fifo"),
 		release:  filepath.Join(root, "release"),
@@ -298,7 +298,7 @@ func TestScheduler_SecondSessionWaitsForTheTaskOutputHolder(t *testing.T) {
 	second := runAsync(ctx, secondScheduler)
 
 	message := awaitSecondWaits(t, waits, second)
-	for _, want := range []string{"session " + outputRaceSessionA, "task /proj:test~report", ".putnami/out/proj/test"} {
+	for _, want := range []string{"session " + outputRaceSessionA, "task /proj:test~report", ".putnami/out/proj/~test"} {
 		if !strings.Contains(message, want) {
 			t.Errorf("wait line %q does not name %q", message, want)
 		}
@@ -459,7 +459,7 @@ func (f *outputRaceFixture) serveJob(name, command string, outputs map[string]ex
 }
 
 // serveGenerateOutputs declares the file a finite serve step writes into
-// proj's serve command output, .putnami/out/proj/serve.
+// proj's serve command output, .putnami/out/proj/~serve.
 func serveGenerateOutputs() map[string]extension.DeclaredOutput {
 	return map[string]extension.DeclaredOutput{
 		"stamp": fileDeclaration(extension.OutputRootCommandOutput, "generate.txt", false),
@@ -469,7 +469,7 @@ func serveGenerateOutputs() map[string]extension.DeclaredOutput {
 // serveGenerateScript writes the finite serve step's declared file.
 func (f *outputRaceFixture) serveGenerateScript(t *testing.T, content string) string {
 	t.Helper()
-	file := filepath.Join(f.root, ".putnami", "out", "proj", "serve", "generate.txt")
+	file := filepath.Join(f.root, ".putnami", "out", "proj", "~serve", "generate.txt")
 	path := filepath.Join(f.root, "serve-generate-"+content+".sh")
 	writeExecutable(t, path, "#!/bin/sh\n"+
 		"mkdir -p "+shellQuote(filepath.Dir(file))+"\n"+
@@ -522,7 +522,7 @@ func TestScheduler_AFiniteStepRunsBesideAnotherSessionsServeStep(t *testing.T) {
 	case <-time.After(answerWaitBudget):
 		t.Fatal("the finite step neither finished nor waited")
 	}
-	if got := readFileAt(t, filepath.Join(f.root, ".putnami", "out", "proj", "serve", "generate.txt")); got != "b\n" {
+	if got := readFileAt(t, filepath.Join(f.root, ".putnami", "out", "proj", "~serve", "generate.txt")); got != "b\n" {
 		t.Fatalf("generate.txt = %q, want the finite step's output", got)
 	}
 	if err := os.WriteFile(f.release, []byte("release"), 0o644); err != nil {
@@ -543,7 +543,7 @@ func TestScheduler_AFiniteStepWaitsForAnotherSessionsFiniteStep(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	generated := filepath.Join(f.root, ".putnami", "out", "proj", "serve", "generate.txt")
+	generated := filepath.Join(f.root, ".putnami", "out", "proj", "~serve", "generate.txt")
 	generating := f.serveJob("serve~generate", f.blockingWriter(t, "blocking-generate.sh", generated), serveGenerateOutputs())
 	serving := f.serveJob("serve~serve", f.noopScript(t), nil)
 	serving.DependsOn = []string{generating.Key()}
@@ -557,7 +557,7 @@ func TestScheduler_AFiniteStepWaitsForAnotherSessionsFiniteStep(t *testing.T) {
 	second := runAsync(ctx, secondScheduler)
 
 	message := awaitSecondWaits(t, waits, second)
-	want := fmt.Sprintf("%s waits for session %s (pid %d, task %s), which is writing .putnami/out/proj/serve",
+	want := fmt.Sprintf("%s waits for session %s (pid %d, task %s), which is writing .putnami/out/proj/~serve",
 		merge.Key(), outputRaceSessionA, os.Getpid(), generating.Key())
 	if message != want {
 		t.Errorf("wait line = %q, want %q", message, want)
@@ -584,7 +584,7 @@ func TestScheduler_AServeStepThatDeclaresACommandOutputKeepsIt(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
-	served := filepath.Join(f.root, ".putnami", "out", "proj", "serve", "serve.txt")
+	served := filepath.Join(f.root, ".putnami", "out", "proj", "~serve", "serve.txt")
 	serving := f.serveJob("serve~serve", f.blockingWriter(t, "blocking-serve.sh", served), map[string]extension.DeclaredOutput{
 		"state": fileDeclaration(extension.OutputRootCommandOutput, "serve.txt", false),
 	})
@@ -600,7 +600,7 @@ func TestScheduler_AServeStepThatDeclaresACommandOutputKeepsIt(t *testing.T) {
 	second := runAsync(ctx, secondScheduler)
 
 	message := awaitSecondWaits(t, waits, second)
-	want := fmt.Sprintf("%s waits for session %s (pid %d, task %s), which is writing .putnami/out/proj/serve",
+	want := fmt.Sprintf("%s waits for session %s (pid %d, task %s), which is writing .putnami/out/proj/~serve",
 		generate.Key(), outputRaceSessionA, os.Getpid(), serving.Key())
 	if message != want {
 		t.Errorf("wait line = %q, want %q", message, want)

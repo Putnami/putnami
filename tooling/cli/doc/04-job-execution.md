@@ -931,7 +931,7 @@ Consequences worth knowing:
 | `{workspaceRoot}` | Absolute path to workspace root |
 | `{projectRoot}` | Absolute path to project directory |
 | `{extensionRoot}` | Absolute path to extension directory |
-| `{outputRoot}` | Job output directory (`.putnami/out/{project}/{command}`) |
+| `{outputRoot}` | Job output directory (`.putnami/out/{project}/~{command}`) |
 | `{cacheRoot}` | Per-workspace mutable scratch dir (`.putnami/cache/`), distinct from the machine-global content-addressed store |
 | `{selectedProjects}` | Comma-separated selected project names for workspace-once jobs |
 | `{selectedProjectIDs}` | Comma-separated selected project IDs for workspace-once jobs |

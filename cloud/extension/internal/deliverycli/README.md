@@ -275,7 +275,7 @@ Run the proof in two steps from the repository root:
    For example, on macOS arm64:
 
    ```sh
-   PUTNAMI_RUNNER_NEXT_TEST_BINARY="$PWD/.putnami/out/cloud/extension/build/bin/darwin-arm64/putnami-cloud" \
+   PUTNAMI_RUNNER_NEXT_TEST_BINARY="$PWD/.putnami/out/cloud/extension/~build/bin/darwin-arm64/putnami-cloud" \
      ./putnamiw test --projects @putnami/cloud-extension \
      --run '^TestRunnerNextBuiltCLIAgainstProviderFake$' --no-cache --count 1 \
      --no-enforce-coverage --test-verbose

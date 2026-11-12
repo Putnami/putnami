@@ -193,7 +193,7 @@ func TestGoModuleDryRunProbesTheRegistry(t *testing.T) {
 				ctx.Params = managedGoBootstrapParams(t)
 			}
 			if tc.unstaged {
-				if err := os.Remove(filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "mod", "package", "go", "module.json")); err != nil {
+				if err := os.Remove(filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", "mod", "~package", "go", "module.json")); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -351,7 +351,7 @@ func TestGoRegistryAnswerOutsideTheProtocolIsUnverified(t *testing.T) {
 // channel record, naming the module and the probed version, and no module.
 func writeGoChannelRecord(t *testing.T, workspace string) {
 	t.Helper()
-	dir := filepath.Join(workspace, ".putnami", "out", "mod", "package", "go")
+	dir := filepath.Join(workspace, ".putnami", "out", "mod", "~package", "go")
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}

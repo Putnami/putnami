@@ -1,6 +1,6 @@
 {
   "workspaceRoot": "/ws",
-  "outputPath": "/ws/.putnami/out/p/build",
+  "outputPath": "/ws/.putnami/out/p/~build",
   "cacheRoot": "/ws/.putnami/store",
   "workspace": {"name": "putnami"},
   "project": {"name": "p", "path": "p", "fullPath": "/ws/p"},

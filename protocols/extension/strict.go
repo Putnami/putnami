@@ -35,7 +35,7 @@ var batchPhaseFormat = regexp.MustCompile(`^[a-z][a-z0-9-]*$`)
 
 // commandNameFormat is the grammar of a command name and of a pipeline step
 // id. The CLI uses both as one segment of a path, in
-// .putnami/out/<project>/<command>[/<step>] which it creates, links and
+// .putnami/out/<project>/~<command>[/<step>] which it creates, links and
 // removes, and as one half of a plan name (build~compile). A name is therefore
 // a word of ASCII letters, digits, ".", "_" and "-" that starts with a letter
 // or a digit: it holds no path separator, no whitespace, no control character

@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/dirlink"
 	"go.putnami.dev/typescript/extension/internal/build"
@@ -18,7 +19,7 @@ func nodeBundleDir(ctx *pctx.Context, command string) string {
 	if ctx.OutputPath != "" {
 		return filepath.Join(ctx.OutputPath, "node")
 	}
-	return filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", ctx.Project.Path, command, "node")
+	return filepath.Join(wsproto.CommandOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, command), "node")
 }
 
 // nodeBundler returns the bundler of a serve or run on the node runtime. It

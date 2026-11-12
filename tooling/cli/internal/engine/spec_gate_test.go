@@ -33,7 +33,7 @@ func newSpecGateFixture(t *testing.T, observationStatus string) *specGateFixture
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "gate"}, []*workspace.Project{project})
 
 	writeSpecGateFile(t, filepath.Join(root, "billing", "invoice_test.go"), "package billing\n")
-	writeSpecGateFile(t, filepath.Join(root, ".putnami", "out", "billing", "validate", "spec-criteria.json"), `{
+	writeSpecGateFile(t, filepath.Join(root, ".putnami", "out", "billing", "~validate", "spec-criteria.json"), `{
   "protocolVersion": 1,
   "groups": [{
     "feature": "billing/invoicing",
@@ -45,7 +45,7 @@ func newSpecGateFixture(t *testing.T, observationStatus string) *specGateFixture
     }]
   }]
 }`)
-	writeSpecGateFile(t, filepath.Join(root, ".putnami", "out", "billing", "test", "putnami-feature-verification.json"), `{
+	writeSpecGateFile(t, filepath.Join(root, ".putnami", "out", "billing", "~test", "putnami-feature-verification.json"), `{
   "protocolVersion": 1,
   "observations": [{
     "feature": "billing/invoicing", "requirement": "issue", "check": "issue-check",
@@ -452,7 +452,7 @@ func TestSpecGateFinalizer_AVerificationKindCommandCarriesTheGate(t *testing.T) 
 			// The report now sits in the check command's output tree, written by
 			// a step whose task declares it.
 			outRoot := filepath.Join(fixture.ws.Root, ".putnami", "out", "billing")
-			if err := os.Rename(filepath.Join(outRoot, "test"), filepath.Join(outRoot, "check")); err != nil {
+			if err := os.Rename(filepath.Join(outRoot, "~test"), filepath.Join(outRoot, "~check")); err != nil {
 				t.Fatalf("move report: %v", err)
 			}
 			check := &jobs.ScheduledJob{Project: fixture.ws.Projects[0], Extension: ext,

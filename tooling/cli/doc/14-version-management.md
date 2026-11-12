@@ -207,7 +207,7 @@ GET {registry}/putnami/cli/download?channel=<channel>&os=<os>&arch=<arch>
 
 It streams the platform binary and advertises `X-Resolved-Version` plus a SHA-256 integrity header. A lookup that reads only those headers, such as `upgrade --dry-run` for the CLI, every extension and every template, or the digest of another platform when a lock is refreshed, sends `HEAD` to the same route and receives no archive; it sends `GET` only to a registry that answers `HEAD` with 405 or 501. The binary is put there by `putnami publish`:
 
-1. `package` cross-compiles the CLI and builds platform archives under `.putnami/out/<project>/package/archives/` (the CLI's version string is stamped into the binary at build time via the `@putnami/go.version-var` ldflag).
+1. `package` cross-compiles the CLI and builds platform archives under `.putnami/out/<project>/~package/archives/` (the CLI's version string is stamped into the binary at build time via the `@putnami/go.version-var` ldflag).
 2. `@putnami/cloud`'s `cloud-publish-archives` job uploads those archives to the registry. The CLI project opts in by declaring the `archives` publish channel in `tooling/cli/putnami.json` (`"publish": ["archives"]`); `putnami publish` selects and uploads it with no extra flag.
 
 The CLI and the extensions are ordinary members of the release set, in the `archive` and `put` ecosystems: `publish --channel <c>` carries them into the snapshot with every other member, and the release writes the put registry's channel projection in the same transaction that advances the channel. There is no separate recipe to run afterwards.

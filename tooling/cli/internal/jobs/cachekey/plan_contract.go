@@ -6,6 +6,7 @@ import (
 	"sort"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -106,10 +107,19 @@ func declaredOutputBase(job *jobmodel.ScheduledJob, root string, ws *workspace.W
 	case extension.OutputRootProject:
 		return path.Join(wsRoot, ProjectRelPath(job)), true
 	case extension.OutputRootCommandOutput:
-		return path.Join(wsRoot, ".putnami", "out", ProjectRelPath(job), job.CommandName()), true
+		return path.Join(wsRoot, wsproto.CommandOutputRel(projectPath(job), job.CommandName())), true
 	default:
 		return "", false
 	}
+}
+
+// projectPath is the job's workspace-relative project path, "" for the
+// workspace root project.
+func projectPath(job *jobmodel.ScheduledJob) string {
+	if job == nil || job.Project == nil {
+		return ""
+	}
+	return job.Project.Path
 }
 
 func ProjectRelPath(job *jobmodel.ScheduledJob) string {
@@ -117,4 +127,18 @@ func ProjectRelPath(job *jobmodel.ScheduledJob) string {
 		return "."
 	}
 	return filepath.ToSlash(job.Project.Path)
+}
+
+// CommandOutputDir is the absolute command output directory of a project:
+// <root>/.putnami/out/<project path>/~<command>. It is the one place the
+// scheduler, the runner and the cache name that directory; the layout and why
+// it cannot collide across nested projects live in protocol/workspace.
+func CommandOutputDir(root, projectPath, command string) string {
+	return wsproto.CommandOutputDir(root, projectPath, command)
+}
+
+// CommandOutputRel is CommandOutputDir relative to the workspace root, in
+// slash form.
+func CommandOutputRel(projectPath, command string) string {
+	return wsproto.CommandOutputRel(projectPath, command)
 }

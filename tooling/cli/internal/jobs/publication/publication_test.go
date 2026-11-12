@@ -743,7 +743,7 @@ func TestEngineUploadsManagedMembersAndEmitsPublishedMembers(t *testing.T) {
 			t.Fatalf("released %s/%s at %s", member.Ecosystem, member.Coordinate, member.ArtifactDigest)
 		}
 	}
-	published, err := readPublishedImageManifest(filepath.Join(h.root, ".putnami", "out", "app", "publish"))
+	published, err := readPublishedImageManifest(filepath.Join(h.root, ".putnami", "out", "app", "~publish"))
 	if err != nil || published.Digest != imageDigest || !published.Verified || published.ImmutableRef != testOCIHost+"/team/app@"+imageDigest ||
 		published.TargetRegistry != testOCIHost {
 		t.Fatalf("published image %+v, %v", published, err)
@@ -1145,7 +1145,7 @@ func TestAnAnsweredDigestOtherThanThePackedOneFailsTheUpload(t *testing.T) {
 			if events := uploadEvents(t, upload); len(events) != 0 {
 				t.Fatalf("a refused answer reported %+v", events)
 			}
-			if _, err := os.Stat(pkgmeta.PublishedImageManifestPath(filepath.Join(h.root, ".putnami", "out", "app", "publish"))); !os.IsNotExist(err) {
+			if _, err := os.Stat(pkgmeta.PublishedImageManifestPath(filepath.Join(h.root, ".putnami", "out", "app", "~publish"))); !os.IsNotExist(err) {
 				t.Fatalf("a refused answer recorded a published image (%v)", err)
 			}
 			if slices.Contains(h.session.recorded(), "release") {

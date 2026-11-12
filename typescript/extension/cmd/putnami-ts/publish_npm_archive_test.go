@@ -23,7 +23,7 @@ func TestPackNPMArtifact_WindowsHostPacksTheUnixModes(t *testing.T) {
 
 	workspace := t.TempDir()
 	projectPath := "packages/probe"
-	packageRoot := filepath.Join(workspace, ".putnami", "out", projectPath, "package")
+	packageRoot := filepath.Join(workspace, ".putnami", "out", projectPath, "~package")
 	for path, content := range map[string]string{
 		filepath.Join(packageRoot, "lib", "cli.js"):       "#!/usr/bin/env node\n",
 		filepath.Join(packageRoot, "lib", "index.js"):     "export {};\n",

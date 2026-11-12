@@ -303,7 +303,7 @@ type hookSlot struct {
 }
 
 // commandOutputState is the per-(project, command) synchronization state for a
-// shared .putnami/out/<project>/<command> directory.
+// shared .putnami/out/<project>/~<command> directory.
 type commandOutputState struct {
 	mu           sync.Mutex
 	materialized bool

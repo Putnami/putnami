@@ -22,6 +22,7 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	distributionproto "go.putnami.dev/protocol/distribution"
 	extensionproto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // archiveManifestMediaType is the manifest media type put-server stores for an
@@ -37,7 +38,7 @@ var archivePlatforms = []string{
 	"windows-arm64", "windows-x64",
 }
 
-// packageMetadata mirrors the subset of .putnami/out/<project>/package/
+// packageMetadata mirrors the subset of .putnami/out/<project>/~package/
 // metadata.json (written by the framework's archive packaging step) that the
 // archives publisher reads. The build step owns the file's full shape; we only
 // depend on these fields.
@@ -71,7 +72,7 @@ type ArchivePublishResult struct {
 // PublishArchives backs `putnami cloud packages publish`. It mirrors
 // `db migrations publish`: discover the build artifact — here the per-platform
 // archives the framework's `package --archives` step writes under
-// .putnami/out/<project>/package/archives plus its metadata.json — then upload
+// .putnami/out/<project>/~package/archives plus its metadata.json — then upload
 // each as a content-addressed blob and publish one immutable archive manifest.
 // Release-set v2 owns channel selection; this publisher never moves a package
 // channel or records release membership.
@@ -525,10 +526,10 @@ func archiveManifestPayload(artifacts map[string]archiveBlob) ([]byte, error) {
 // Artifact discovery
 // ---------------------------------------------------------------------------
 
-// packageDir is .putnami/out/<projectPath>/package, where the framework's
+// packageDir is .putnami/out/<projectPath>/~package, where the framework's
 // packaging step writes metadata.json and the per-channel output dirs.
 func packageDir(workspaceRoot, projectPath string) string {
-	return filepath.Join(realWorkspaceRoot(workspaceRoot), ".putnami", "out", filepath.FromSlash(projectPath), "package")
+	return wsproto.CommandOutputDir(realWorkspaceRoot(workspaceRoot), projectPath, "package")
 }
 
 func metadataPath(workspaceRoot, projectPath string) string {

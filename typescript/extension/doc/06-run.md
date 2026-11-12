@@ -36,7 +36,7 @@ If none resolve, the job fails with `NO_RUN_ENTRYPOINT`.
 
 A project that declares `"runtime": "node"` under
 `options["@putnami/typescript"]` in its `putnami.json` runs on Node: Bun
-bundles the entrypoint for Node into `.putnami/out/<project>/run/node/`, as the
+bundles the entrypoint for Node into `.putnami/out/<project>/~run/node/`, as the
 compile step does (see [Build](02-build.md#the-node-runtime)), and the command
 starts `node --enable-source-maps <bundle> <args>` once. The exit code is
 forwarded the same way. `node` must be on `PATH`; otherwise run fails with

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
 )
@@ -342,7 +343,7 @@ func (w WorkspaceRoots) OutputRoot(job *jobmodel.ScheduledJob, root string) (str
 	case extension.OutputRootProject:
 		return filepath.Join(w.Root, ProjectRelPath(job)), true
 	case extension.OutputRootCommandOutput:
-		return filepath.Join(w.Root, ".putnami", "out", ProjectRelPath(job), jobmodel.JobCommandName(job)), true
+		return wsproto.CommandOutputDir(w.Root, projectPath(job), jobmodel.JobCommandName(job)), true
 	default:
 		return "", false
 	}

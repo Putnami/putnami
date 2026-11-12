@@ -219,15 +219,15 @@ func TestBuildJobContext_SelectedProjectsOutputPath(t *testing.T) {
 
 	ctx := BuildJobContext(ws, job, nil, nil, nil)
 
-	if got, want := ctx.SelectedProjects[0].OutputPath, filepath.FromSlash("/workspace/.putnami/out/apps/api/test"); got != want {
+	if got, want := ctx.SelectedProjects[0].OutputPath, filepath.FromSlash("/workspace/.putnami/out/apps/api/~test"); got != want {
 		t.Fatalf("selected[0].outputPath = %q, want %q", got, want)
 	}
-	if got, want := ctx.SelectedProjects[1].OutputPath, filepath.FromSlash("/workspace/.putnami/out/sites/web/test"); got != want {
+	if got, want := ctx.SelectedProjects[1].OutputPath, filepath.FromSlash("/workspace/.putnami/out/sites/web/~test"); got != want {
 		t.Fatalf("selected[1].outputPath = %q, want %q", got, want)
 	}
 	// The leader project's own OutputPath must share the same derivation, so a
 	// batch loop that reconstructs a peer's dir from the command name matches.
-	if got, want := ctx.OutputPath, filepath.FromSlash("/workspace/.putnami/out/apps/api/test"); got != want {
+	if got, want := ctx.OutputPath, filepath.FromSlash("/workspace/.putnami/out/apps/api/~test"); got != want {
 		t.Fatalf("leader outputPath = %q, want %q", got, want)
 	}
 }
@@ -627,7 +627,7 @@ func TestWriteContextFile_FullRoundtrip(t *testing.T) {
 		},
 		Job:        JobContextJob{Name: "build"},
 		Params:     map[string]any{"target": "es2022", "fast": true, "count": float64(5)},
-		OutputPath: "/workspace/.putnami/out/my-app/build",
+		OutputPath: "/workspace/.putnami/out/my-app/~build",
 		CacheRoot:  dir,
 	}
 
@@ -669,7 +669,7 @@ func TestWriteContextFile_FullRoundtrip(t *testing.T) {
 	if parsed.Extension.Name != "@putnami/typescript" {
 		t.Errorf("Extension.Name = %q", parsed.Extension.Name)
 	}
-	if parsed.OutputPath != "/workspace/.putnami/out/my-app/build" {
+	if parsed.OutputPath != "/workspace/.putnami/out/my-app/~build" {
 		t.Errorf("OutputPath = %q", parsed.OutputPath)
 	}
 	if parsed.CacheRoot != dir {
@@ -745,7 +745,7 @@ func TestBuildJobContext_OutputPath(t *testing.T) {
 	ctx := BuildJobContext(ws, job, nil, nil, nil)
 
 	// OutputPath should use Path (not Name) and the base command name (not the step name)
-	expected := filepath.Join("/workspace", ".putnami", "out", "packages/my-lib", "build")
+	expected := filepath.Join("/workspace", ".putnami", "out", "packages/my-lib", "~build")
 	if ctx.OutputPath != expected {
 		t.Errorf("OutputPath = %q, want %q", ctx.OutputPath, expected)
 	}

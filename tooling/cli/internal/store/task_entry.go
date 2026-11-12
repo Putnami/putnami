@@ -80,7 +80,7 @@
 //
 // # A task-owned entry is materialized, never symlinked
 //
-// A CAS-symlink all-hit fast path would point .putnami/out/<project>/<command>
+// A CAS-symlink all-hit fast path would point .putnami/out/<project>/~<command>
 // at one blob's files/ tree, so a fully cached command would materialize zero
 // bytes. It does not fit the task-owned model, and that is a decision, not an
 // oversight:

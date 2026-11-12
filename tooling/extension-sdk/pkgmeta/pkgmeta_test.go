@@ -36,9 +36,9 @@ func TestPackageOutputDir(t *testing.T) {
 		channel string
 		want    string
 	}{
-		{"basic", "/workspace", "my-project", "npm", filepath.FromSlash("/workspace/.putnami/out/my-project/package/npm")},
-		{"docker channel", "/ws", "go.putnami.dev/tooling/cli", "docker", filepath.FromSlash("/ws/.putnami/out/go.putnami.dev/tooling/cli/package/docker")},
-		{"archives channel", "/ws", "app", "archives", filepath.FromSlash("/ws/.putnami/out/app/package/archives")},
+		{"basic", "/workspace", "my-project", "npm", filepath.FromSlash("/workspace/.putnami/out/my-project/~package/npm")},
+		{"docker channel", "/ws", "go.putnami.dev/tooling/cli", "docker", filepath.FromSlash("/ws/.putnami/out/go.putnami.dev/tooling/cli/~package/docker")},
+		{"archives channel", "/ws", "app", "archives", filepath.FromSlash("/ws/.putnami/out/app/~package/archives")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestPackageOutputDir(t *testing.T) {
 
 func TestMetadataPath(t *testing.T) {
 	got := MetadataPath("/workspace", "my-project")
-	want := filepath.FromSlash("/workspace/.putnami/out/my-project/package/metadata.json")
+	want := filepath.FromSlash("/workspace/.putnami/out/my-project/~package/metadata.json")
 	if got != want {
 		t.Errorf("MetadataPath() = %q, want %q", got, want)
 	}

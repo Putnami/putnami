@@ -75,7 +75,7 @@ func newAttestedFixture(t *testing.T) *attestedFixture {
 	// The declaration the restored observation names has to be a real regular
 	// file of the LEDGER project, or provenance containment drops it.
 	writeFile(t, filepath.Join(root, "ledger", "ledger_test.go"), "package ledger\n")
-	writeFile(t, filepath.Join(root, ".putnami", "out", "billing", "validate", "spec-criteria.json"),
+	writeFile(t, filepath.Join(root, ".putnami", "out", "billing", "~validate", "spec-criteria.json"),
 		attestedProjection)
 
 	validate := &jobs.ScheduledJob{Project: billing,
@@ -409,7 +409,7 @@ func TestGreenGroupNeverConsultsTheCache(t *testing.T) {
 	// billing's own test reports the check this time, so the in-session join
 	// closes the group by itself.
 	writeFile(t, filepath.Join(fixture.root, "billing", "invoice_test.go"), "package billing\n")
-	writeFile(t, filepath.Join(fixture.root, ".putnami", "out", "billing", "test",
+	writeFile(t, filepath.Join(fixture.root, ".putnami", "out", "billing", "~test",
 		"putnami-feature-verification.json"), attestingReport("passed", "invoice_test.go"))
 	fixture.results["/billing:test~test"] = resultWithArtifact("success",
 		features.VerificationReportArtifactID, "putnami-feature-verification.json")

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/typescript/extension/internal/build"
 	"go.putnami.dev/typescript/extension/internal/catalog"
 	"go.putnami.dev/typescript/extension/internal/git"
@@ -78,7 +79,7 @@ func packageNpm(workspaceRoot string, projectPath string, stable bool, versionIn
 	}
 
 	// Create package output directory
-	packageDir := filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "package", "npm")
+	packageDir := filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "package"), "npm")
 	os.RemoveAll(packageDir)
 	os.MkdirAll(packageDir, 0755)
 

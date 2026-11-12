@@ -1,5 +1,5 @@
 // Package pkgmeta owns the package→publish file contract
-// (.putnami/out/{project}/package/…): the readers the relocated publishers use,
+// (.putnami/out/{project}/~package/…): the readers the relocated publishers use,
 // and the one writer every ecosystem packager records its channel through.
 //
 // Every packager writes INSIDE the directory it owns. A channel record lives at
@@ -25,11 +25,12 @@ import (
 	"slices"
 	"sort"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/robustio"
 )
 
 // PackageMetadata is the ARCHIVE PUBLICATION MANIFEST at
-// .putnami/out/{project}/package/metadata.json.
+// .putnami/out/{project}/~package/metadata.json.
 //
 // It is written by the archive packager alone — the one task that declares it as
 // an owned output — and it describes the archive set sitting in the sibling
@@ -60,7 +61,7 @@ func (m *PackageMetadata) HasChannel(channel string) bool {
 }
 
 // DockerManifest is the package-owned local image candidate contract at
-// .putnami/out/{project}/package/docker/manifest.json. Version is advisory: the
+// .putnami/out/{project}/~package/docker/manifest.json. Version is advisory: the
 // image identity is ContentHash (the package step tags the candidate
 // c-<contentHash>), and publish derives release identity from its own session.
 // Digest is the locally computed image digest and Layout is the OCI layout
@@ -78,7 +79,7 @@ type DockerManifest struct {
 }
 
 // PublishedImageManifest is the publish-owned remote evidence contract at
-// .putnami/out/{project}/publish/docker/published-image.json. ImmutableRef is
+// .putnami/out/{project}/~publish/docker/published-image.json. ImmutableRef is
 // present only after the publisher has read the exact digest back from the
 // target registry and Verified is therefore always true in a written record.
 type PublishedImageManifest struct {
@@ -93,7 +94,7 @@ type PublishedImageManifest struct {
 	Verified        bool   `json:"verified"`
 }
 
-// GoModuleMetadata represents .putnami/out/{project}/package/go/module.json.
+// GoModuleMetadata represents .putnami/out/{project}/~package/go/module.json.
 type GoModuleMetadata struct {
 	ModulePath string `json:"modulePath"`
 	Version    string `json:"version"`
@@ -103,17 +104,17 @@ type GoModuleMetadata struct {
 	InfoPath   string `json:"infoPath,omitempty"`
 }
 
-// PackageOutputDir returns the path to .putnami/out/{project}/package/{channel}/.
+// PackageOutputDir returns the path to .putnami/out/{project}/~package/{channel}/.
 // projectPath is the project's workspace-relative path (e.g. "typescript/framework/database").
 func PackageOutputDir(workspaceRoot, projectPath, channel string) string {
-	return filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "package", channel)
+	return filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "package"), channel)
 }
 
-// MetadataPath returns the path to .putnami/out/{project}/package/metadata.json,
+// MetadataPath returns the path to .putnami/out/{project}/~package/metadata.json,
 // the archive publication manifest. projectPath is the project's
 // workspace-relative path (e.g. "typescript/framework/database").
 func MetadataPath(workspaceRoot, projectPath string) string {
-	return filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "package", "metadata.json")
+	return filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "package"), "metadata.json")
 }
 
 // WritePackageMetadata writes the archive publication manifest atomically.
@@ -183,7 +184,7 @@ func WriteChannelRecord(outputDir string, record ChannelRecord) error {
 // It returns an error wrapping fs.ErrNotExist when no record exists anywhere
 // under <package>/, which is the "run package first" answer publish relies on.
 func ReadChannelIndex(workspaceRoot, projectPath string) (*ChannelIndex, error) {
-	packageDir := filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "package")
+	packageDir := wsproto.CommandOutputDir(workspaceRoot, projectPath, "package")
 	entries, err := os.ReadDir(packageDir)
 	if err != nil {
 		// A missing package directory already wraps fs.ErrNotExist, so the

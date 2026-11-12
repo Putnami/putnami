@@ -81,7 +81,7 @@ add.
 - `--docker-load`: also load the image into the local Docker daemon.
 - `--dry-run`: record the docker channel without assembling the image.
 
-The image lands in `.putnami/out/<project>/package/docker/`, as an OCI layout
+The image lands in `.putnami/out/<project>/~package/docker/`, as an OCI layout
 with its `manifest.json`.
 
 ## Publish

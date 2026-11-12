@@ -128,7 +128,7 @@ func TestPackageAssemblesAnImageOfAnApplicationAndItsProductionBundle(t *testing
 		t.Errorf("the extensions do not compile with the bundle mapped to the image's: %q", env)
 	}
 	var manifest pkgmeta.DockerManifest
-	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/package/docker/manifest.json"))
+	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/~package/docker/manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestAStaticRubyBuildsExtensionsTheImagesRubyFinds(t *testing.T) {
 		t.Fatalf("package: %s %v", status, err)
 	}
 	var manifest pkgmeta.DockerManifest
-	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/package/docker/manifest.json"))
+	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/~package/docker/manifest.json"))
 	if err != nil || json.Unmarshal(data, &manifest) != nil {
 		t.Fatalf("manifest: %v", err)
 	}
@@ -243,7 +243,7 @@ func TestPackagingTheSameTreeTwiceGivesTheSameImage(t *testing.T) {
 			t.Fatalf("package: %s %v", status, err)
 		}
 		var manifest pkgmeta.DockerManifest
-		data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/package/docker/manifest.json"))
+		data, err := os.ReadFile(filepath.Join(root, ".putnami/out/shop/~package/docker/manifest.json"))
 		if err != nil || json.Unmarshal(data, &manifest) != nil {
 			t.Fatalf("manifest: %v", err)
 		}
@@ -489,7 +489,7 @@ func TestADryRunPackageRecordsTheChannelAndInstallsNothing(t *testing.T) {
 	if lines := readLines(t, log); lines != nil {
 		t.Errorf("bundle ran: %q", lines)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".putnami/out/shop/package/docker/channel.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, ".putnami/out/shop/~package/docker/channel.json")); err != nil {
 		t.Errorf("channel record: %v", err)
 	}
 }

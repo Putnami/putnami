@@ -733,15 +733,15 @@ You can also declare dependencies manually in `putnami.json`. For each workspace
 ## Output Location
 
 Every step of one command shares a single output directory,
-`.putnami/out/{project}/{command}/`, and each step owns an exact subpath of it.
+`.putnami/out/{project}/~{command}/`, and each step owns an exact subpath of it.
 Unless `--output_path` is specified, the binaries are written to:
 
 ```
 # host build (the default)
-.putnami/out/{project}/build/bin/{binary-name}
+.putnami/out/{project}/~build/bin/{binary-name}
 
 # explicit --target / platforms request, and every `package` run
-.putnami/out/{project}/build/bin/{platform-suffix}/{binary-name}
+.putnami/out/{project}/~build/bin/{platform-suffix}/{binary-name}
 ```
 
 The host build is unpartitioned because there is exactly one platform to name,

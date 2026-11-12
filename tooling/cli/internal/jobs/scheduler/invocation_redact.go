@@ -141,8 +141,10 @@ func matchesDeclaredArtifactPath(job *ScheduledJob, output extension.DeclaredOut
 	expected := []string{outputPath}
 	switch output.EffectiveRoot() {
 	case extension.OutputRootCommandOutput:
-		commandPath := path.Join(cachekey.ProjectRelPath(job), job.CommandName(), outputPath)
-		expected = append(expected, commandPath, path.Join(".putnami", "out", commandPath))
+		commandDir := cachekey.CommandOutputRel(job.Project.Path, job.CommandName())
+		expected = append(expected,
+			path.Join(strings.TrimPrefix(commandDir, ".putnami/out/"), outputPath),
+			path.Join(commandDir, outputPath))
 	case extension.OutputRootProject:
 		expected = append(expected, path.Join(cachekey.ProjectRelPath(job), outputPath))
 	case extension.OutputRootWorkspace:

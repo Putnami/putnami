@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/agentartifact"
 
 	"go.putnami.dev/typescript/extension/internal/build"
@@ -47,12 +48,12 @@ func resolveProjectConfig(dir string) string {
 
 func findBuildOutput(workspaceRoot, projectPath string) string {
 	// Package pipeline output
-	pkgPath := filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "package")
+	pkgPath := wsproto.CommandOutputDir(workspaceRoot, projectPath, "package")
 	if project.FileExists(pkgPath) {
 		return pkgPath
 	}
 	// Standalone build output
-	buildPath := filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "build")
+	buildPath := wsproto.CommandOutputDir(workspaceRoot, projectPath, "build")
 	if project.FileExists(buildPath) {
 		return buildPath
 	}

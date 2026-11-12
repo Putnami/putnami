@@ -1,7 +1,7 @@
 {
   "protocolVersion": 2,
   "workspaceRoot": "/home/u/src/repository",
-  "outputPath": "/home/u/src/repository/.putnami/out/compose",
+  "outputPath": "/home/u/src/repository/.putnami/out/~compose",
   "cacheRoot": "/home/u/src/repository/.putnami/cache",
   "workspace": {"name": "repository", "rootPath": "/home/u/src/repository"},
   "project": {"name": "repository", "path": ".", "fullPath": "/home/u/src/repository"},

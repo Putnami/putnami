@@ -175,7 +175,7 @@ const migrationBundleDirName = "migration-bundle"
 // The staged copy therefore wins when it carries a manifest, and .gen remains
 // the fallback for a build produced before the framework staged it.
 func resolveBundleDir(workspaceRoot, appDir, projectRel string) string {
-	staged := filepath.Join(workspaceRoot, ".putnami", "out", projectRel, "build", migrationBundleDirName)
+	staged := filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectRel, "build"), migrationBundleDirName)
 	if _, err := os.Stat(filepath.Join(staged, migrationBundleManifest)); err == nil {
 		return staged
 	}

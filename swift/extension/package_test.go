@@ -101,7 +101,7 @@ func TestPackageAssemblesTheImageOfAStaticExecutable(t *testing.T) {
 		}
 	}
 	var manifest pkgmeta.DockerManifest
-	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/server/package/docker/manifest.json"))
+	data, err := os.ReadFile(filepath.Join(root, ".putnami/out/server/~package/docker/manifest.json"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -224,7 +224,7 @@ func TestADryRunPackageRecordsTheChannelAndRunsNoSwift(t *testing.T) {
 	if ran, _ := os.ReadFile(log); strings.Contains(string(ran), "swift build") || strings.Contains(string(ran), "swift sdk") {
 		t.Errorf("a dry run ran %s", ran)
 	}
-	if _, err := os.Stat(filepath.Join(root, ".putnami/out/server/package/docker/channel.json")); err != nil {
+	if _, err := os.Stat(filepath.Join(root, ".putnami/out/server/~package/docker/channel.json")); err != nil {
 		t.Errorf("no channel record: %v", err)
 	}
 }

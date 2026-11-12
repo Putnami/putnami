@@ -63,7 +63,7 @@ func writeTscWorkspace(t *testing.T) string {
 func tscJob(root, project string) *pctx.Context {
 	return &pctx.Context{
 		WorkspaceRoot: root,
-		OutputPath:    filepath.Join(root, ".putnami", "out", project, "build"),
+		OutputPath:    filepath.Join(root, ".putnami", "out", project, "~build"),
 		Project:       pctx.Project{Name: filepath.Base(project), Path: project},
 		Extension:     pctx.Extension{Name: "@putnami/typescript"},
 		Params:        pctx.Params{},
@@ -119,7 +119,7 @@ func TestBuildTscCompilesWithTheScriptsTscAndLeavesAReferenceAlone(t *testing.T)
 		status, _, err := job(tscJob(root, "libs/lib"), jsonl.New(), nil)
 		expectJobOK(t, "lib "+name, status, err)
 	}
-	if entries, _ := os.ReadDir(filepath.Join(root, ".putnami", "out", "libs/lib", "build")); len(entries) > 0 {
+	if entries, _ := os.ReadDir(filepath.Join(root, ".putnami", "out", "libs/lib", "~build")); len(entries) > 0 {
 		t.Errorf("the Bun steps wrote %d entries for a tsc project", len(entries))
 	}
 

@@ -128,7 +128,7 @@ func TestPublish_DryRunAcceptsCacheRestoredCandidateWithoutSharedMetadata(t *tes
 
 	dir := t.TempDir()
 	projectPath := "proj"
-	pkgDir := filepath.Join(dir, ".putnami", "out", projectPath, "package")
+	pkgDir := filepath.Join(dir, ".putnami", "out", projectPath, "~package")
 	if err := os.MkdirAll(filepath.Join(pkgDir, "docker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -190,7 +190,7 @@ func TestPublish_ImageProjectVerifiesImmutableContentWithoutSessionTags(t *testi
 
 	root := t.TempDir()
 	projectPath := "images/base"
-	packageDir := filepath.Join(root, ".putnami", "out", projectPath, "package")
+	packageDir := filepath.Join(root, ".putnami", "out", projectPath, "~package")
 	if err := os.MkdirAll(filepath.Join(packageDir, "docker"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -212,7 +212,7 @@ func TestPublish_ImageProjectVerifiesImmutableContentWithoutSessionTags(t *testi
 		WorkspaceRoot: root,
 		Project:       pctx.Project{Name: "team/base", Path: projectPath, Type: "image"},
 		Version:       &pctx.Version{Base: "9.9.9", Full: "9.9.9-session"},
-		OutputPath:    filepath.Join(root, ".putnami", "out", projectPath, "publish"),
+		OutputPath:    filepath.Join(root, ".putnami", "out", projectPath, "~publish"),
 	}
 	argv := []string{"--docker-registry=" + host}
 	status, data, err := Publish(ctx, jsonl.New(), argv)
@@ -343,7 +343,7 @@ func TestPublishClearsStaleOwnedEvidenceBeforeDryRunAndFailure(t *testing.T) {
 			if err := os.WriteFile(filepath.Join(dockerDir, "manifest.json"), []byte(tc.manifest), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			outputDir := filepath.Join(root, ".putnami", "out", projectPath, "publish")
+			outputDir := filepath.Join(root, ".putnami", "out", projectPath, "~publish")
 			if err := pkgmeta.WritePublishedImageManifest(outputDir, pkgmeta.PublishedImageManifest{
 				Image: "registry.example.com/team/app", ImmutableRef: "registry.example.com/team/app@" + digest,
 				Digest: digest, CandidateDigest: digest, Verified: true,
@@ -503,7 +503,7 @@ func newDockerPublishFixture(t *testing.T) dockerPublishFixture {
 			WorkspaceRoot: root,
 			Project:       pctx.Project{Name: "team/app", Path: projectPath},
 			Version:       &pctx.Version{Base: "3.1.0", Full: "3.1.0-abc1234"},
-			OutputPath:    filepath.Join(root, ".putnami", "out", projectPath, "publish"),
+			OutputPath:    filepath.Join(root, ".putnami", "out", projectPath, "~publish"),
 			Params: pctx.Params{
 				"registries": json.RawMessage(`{"oci":{"publish":"` + host + `"}}`),
 			},

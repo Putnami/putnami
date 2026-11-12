@@ -1,7 +1,7 @@
 {
   "protocolVersion": 2,
   "workspaceRoot": "/home/u/.putnami/user",
-  "outputPath": "/home/u/.putnami/user/.putnami/out/audit-run",
+  "outputPath": "/home/u/.putnami/user/.putnami/out/~audit-run",
   "cacheRoot": "/home/u/.putnami/user/.putnami/cache",
   "workspace": {"name": "user", "rootPath": "/home/u/.putnami/user"},
   "project": {"name": "user", "path": ".", "fullPath": "/home/u/.putnami/user"},

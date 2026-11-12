@@ -254,7 +254,7 @@ func TestArchiveManifestMatchesRuntimeInfoVersion(t *testing.T) {
 	}
 	workspaceRoot := t.TempDir()
 	projectRoot := filepath.Join(workspaceRoot, "extension")
-	outputRoot := filepath.Join(workspaceRoot, ".putnami", "out", "extension", "package")
+	outputRoot := filepath.Join(workspaceRoot, ".putnami", "out", "extension", "~package")
 	mustWrite(t, filepath.Join(projectRoot, "go.mod"), "module example.com/runtime\n\ngo 1.24.0\n")
 	mustWrite(t, filepath.Join(projectRoot, "putnami.json"), `{
 		"name": "@putnami/runtime-test",

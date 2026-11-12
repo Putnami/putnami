@@ -745,7 +745,7 @@ func newBinFixture(t *testing.T) (*emptyingFixture, string) {
 		"  if [ -n \"$name\" ]; then printf 'binary %s\\n' \"$name\" > \"$PUTNAMI_OUTPUT_PATH/bin/$name\"; fi\n"+
 		"done < pages.txt\n"+
 		"printf '%s\\n' '{\"v\":2,\"type\":\"result\",\"data\":{\"status\":\"OK\"}}'\n")
-	return f, filepath.Join(f.ws.Root, ".putnami", "out", emptyingProject, "build", "bin")
+	return f, filepath.Join(f.ws.Root, ".putnami", "out", emptyingProject, "~build", "bin")
 }
 
 // writeUnowned writes a file at the ceded and at the preserved subpath of bin

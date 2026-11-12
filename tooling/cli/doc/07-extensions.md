@@ -1462,7 +1462,7 @@ Templates are packaged as archives using the `template-archives` publish channel
 putnami package --projects typescript-library
 ```
 
-This creates archives in `.putnami/out/<project>/package/archives/` — one per platform (for resolver compatibility), all containing identical content since templates are platform-independent.
+This creates archives in `.putnami/out/<project>/~package/archives/` — one per platform (for resolver compatibility), all containing identical content since templates are platform-independent.
 
 1. **Publish the archives** using the standard publish pipeline:
 

@@ -369,7 +369,7 @@ func TestPublishJobWritesNothingOutsideTheOutbox(t *testing.T) {
 		workspace := t.TempDir()
 		ctx := &pctx.Context{
 			WorkspaceRoot: workspace,
-			OutputPath:    filepath.Join(workspace, ".putnami", "out", "mod", "publish"),
+			OutputPath:    filepath.Join(workspace, ".putnami", "out", "mod", "~publish"),
 			Project:       pctx.Project{Name: "mod", Path: "mod"},
 			Identity:      &job.TaskIdentity{Project: job.ProjectIdentity{ID: "/mod"}},
 			Version:       &pctx.Version{Base: "1.2.3", Full: "1.2.3-canary.1"},

@@ -14,6 +14,7 @@ import (
 	"go.putnami.dev/cli/model/workspace"
 	diag "go.putnami.dev/protocol/diagnostic"
 	features "go.putnami.dev/protocol/features"
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // maxArtifactBytes bounds one artifact read. It matches the SDD engines' own
@@ -341,7 +342,7 @@ func resolveArtifact(wsRoot string, job *jobs.ScheduledJob, artifactPath string)
 	}
 	outputRoot := filepath.Join(wsRoot, ".putnami", "out")
 	candidates := []string{
-		filepath.Join(outputRoot, filepath.FromSlash(job.Project.Path), job.CommandName(), filepath.FromSlash(artifactPath)),
+		filepath.Join(wsproto.CommandOutputDir(wsRoot, job.Project.Path, job.CommandName()), filepath.FromSlash(artifactPath)),
 	}
 	if strings.HasPrefix(artifactPath, ".putnami/out/") {
 		candidates = append(candidates, filepath.Join(wsRoot, filepath.FromSlash(artifactPath)))

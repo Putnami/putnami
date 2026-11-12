@@ -501,7 +501,7 @@ func archiveCommandFixture(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(projectDir, "putnami.json"), []byte(`{"name":"@putnami/sdd"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	packageDir := filepath.Join(ws, ".putnami", "out", "tooling", "sdd-extension", "package")
+	packageDir := filepath.Join(ws, ".putnami", "out", "tooling", "sdd-extension", "~package")
 	archivesDir := filepath.Join(packageDir, "archives")
 	if err := os.MkdirAll(archivesDir, 0o755); err != nil {
 		t.Fatal(err)
@@ -652,7 +652,7 @@ func TestPublishArchivesCmd(t *testing.T) {
 	if err := PublishArchives(map[string]any{"app": "myext"}, nil, ws, nil, io2); err == nil {
 		t.Fatal("missing metadata must fail")
 	}
-	pkgDir := filepath.Join(ws, ".putnami", "out", "surfaces", "cli", "package")
+	pkgDir := filepath.Join(ws, ".putnami", "out", "surfaces", "cli", "~package")
 	if err := os.MkdirAll(filepath.Join(pkgDir, "archives"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -691,7 +691,7 @@ func TestPublishArchivesCmdUsesExtensionManifestName(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(projDir, "putnami.extension.json"), []byte(`{"name":"@putnami/cloud"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	pkgDir := filepath.Join(ws, ".putnami", "out", "apps", "cli", "package")
+	pkgDir := filepath.Join(ws, ".putnami", "out", "apps", "cli", "~package")
 	if err := os.MkdirAll(filepath.Join(pkgDir, "archives"), 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -802,7 +802,7 @@ func writeArchivePublishWorkspace(t *testing.T) string {
 	t.Helper()
 	workspaceRoot := t.TempDir()
 	projectRoot := filepath.Join(workspaceRoot, "apps", "cli")
-	packageRoot := filepath.Join(workspaceRoot, ".putnami", "out", "apps", "cli", "package")
+	packageRoot := filepath.Join(workspaceRoot, ".putnami", "out", "apps", "cli", "~package")
 	if err := os.MkdirAll(filepath.Join(packageRoot, "archives"), 0o755); err != nil {
 		t.Fatal(err)
 	}

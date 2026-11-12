@@ -89,7 +89,7 @@ func TestBoundedJobEventsKeepsArtifactsAfterOrdinaryPartitionIsFull(t *testing.T
 	}
 	artifact, ok := ParseRawEvent(
 		`{"v":2,"type":"artifact","data":{"id":"putnami-feature-verification","kind":"report",` +
-			`"path":".putnami/out/p/test/putnami-feature-verification.json"}}`)
+			`"path":".putnami/out/p/~test/putnami-feature-verification.json"}}`)
 	if !ok {
 		t.Fatal("artifact fixture did not parse")
 	}
@@ -119,7 +119,7 @@ func TestBoundedJobEventsKeepsArtifactsAfterOrdinaryPartitionIsFull(t *testing.T
 // end is still capped, so retention stays bounded in every direction.
 func TestBoundedJobEventsBoundsArtifactRecordsToo(t *testing.T) {
 	artifact, ok := ParseRawEvent(
-		`{"v":2,"type":"artifact","data":{"id":"a","kind":"report","path":".putnami/out/p/test/a.json"}}`)
+		`{"v":2,"type":"artifact","data":{"id":"a","kind":"report","path":".putnami/out/p/~test/a.json"}}`)
 	if !ok {
 		t.Fatal("artifact fixture did not parse")
 	}

@@ -13,6 +13,7 @@ import (
 	"slices"
 	"strings"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/dockerpublish"
@@ -77,7 +78,7 @@ func assembleImage(ctx *pctx.Context, stack stacks.Stack, flags map[string]strin
 		emit.DiagnosticWithCode("error", err.Error(), "", 0, 0, code)
 		return fmt.Errorf("%s: %w", code, err)
 	}
-	output := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", ctx.Project.Path, "package", dockerChannel)
+	output := filepath.Join(wsproto.CommandOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, "package"), dockerChannel)
 	name := stacks.ImageName(ctx.Project.Name)
 	version := "0.0.0"
 	if ctx.Version != nil && ctx.Version.Full != "" {

@@ -83,7 +83,7 @@ func encodeArtifactName(name string) string {
 //
 // The archive is platform independent. It is written once per registry
 // platform key, <encoded-name>-<os>-<arch>.tar.gz, into
-// .putnami/out/{projectPath}/package/archives/ on the archives channel, the
+// .putnami/out/{projectPath}/~package/archives/ on the archives channel, the
 // same layout and channel the Go packager gives extension archives, so the
 // archive uploader publishes it and every host's install resolves it.
 func ContentExtension(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {

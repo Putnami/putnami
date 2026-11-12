@@ -149,7 +149,7 @@ func TestManagedNPMPublishWritesTheOutboxAndUploadsNothing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	staged, err := os.ReadFile(filepath.Join(dir, ".putnami", "out", "project", "package", "npm", "package.json"))
+	staged, err := os.ReadFile(filepath.Join(dir, ".putnami", "out", "project", "~package", "npm", "package.json"))
 	if err != nil {
 		t.Fatal(err)
 	}

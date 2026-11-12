@@ -111,7 +111,7 @@ func TestRunPublishNpm_DryRun(t *testing.T) {
 		"dry-run": json.RawMessage(`true`),
 	}
 	// Stage a pre-built npm package the publisher reads.
-	npmDir := filepath.Join(dir, ".putnami", "out", "project", "package", "npm")
+	npmDir := filepath.Join(dir, ".putnami", "out", "project", "~package", "npm")
 	if err := os.MkdirAll(npmDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -287,7 +287,7 @@ func TestRunPublishNpm_ManagedRejectsTarballPublishConfigBeforeLease(t *testing.
 		"releaseSetPlan": oneMemberNPMPlan(t, "@test/pkg"),
 	}
 	stageNPMFixture(t, dir)
-	npmDir := filepath.Join(dir, ".putnami", "out", "project", "package", "npm")
+	npmDir := filepath.Join(dir, ".putnami", "out", "project", "~package", "npm")
 	pkg := map[string]any{
 		"name": "@test/pkg", "version": "1.2.3-r42",
 		"publishConfig": map[string]any{
@@ -805,7 +805,7 @@ func downstreamOnlyNPMPlan(t *testing.T) json.RawMessage {
 
 func stageNPMFixture(t *testing.T, workspaceRoot string) {
 	t.Helper()
-	npmDir := filepath.Join(workspaceRoot, ".putnami", "out", "project", "package", "npm")
+	npmDir := filepath.Join(workspaceRoot, ".putnami", "out", "project", "~package", "npm")
 	if err := os.MkdirAll(npmDir, 0o755); err != nil {
 		t.Fatal(err)
 	}

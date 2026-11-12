@@ -634,10 +634,10 @@ same HTTP/2 hook, as the workload's deployment declaration (see
 ## Output Layout
 
 Every step of one command shares a single output directory,
-`.putnami/out/<project>/<command>/`, and each step owns an exact subpath of it:
+`.putnami/out/<project>/~<command>/`, and each step owns an exact subpath of it:
 
 ```text
-.putnami/out/<project>/build/
+.putnami/out/<project>/~build/
 ├── lib/                    # Transpiled JavaScript — owned by the transpile step
 │   ├── *.js
 │   ├── *.js.map

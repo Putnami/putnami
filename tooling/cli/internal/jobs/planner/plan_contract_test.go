@@ -444,3 +444,39 @@ func TestPlanContract_CededSubpathHasOneOwner(t *testing.T) {
 		}
 	}
 }
+
+// TestPlan_ChildProjectNamedAfterAVerbOwnsDisjointCommandOutputs pins that a
+// project directory named after a command (`/a/test`, `/a/build`, `/a/lint`)
+// must not land its command outputs inside its parent's command directory. The
+// plan selects every project and every command, so each child's command output
+// would sit under `/a`'s directory for the command the child is named after.
+func TestPlan_ChildProjectNamedAfterAVerbOwnsDisjointCommandOutputs(t *testing.T) {
+	t.Parallel()
+	const extName = "@test/decl"
+	projects := []*workspace.Project{
+		{ID: "/a", Name: "a", Path: "a", Extensions: []string{extName}},
+		{ID: "/a/test", Name: "a-test", Path: "a/test", Extensions: []string{extName}},
+		{ID: "/a/build", Name: "a-build", Path: "a/build", Extensions: []string{extName}},
+		{ID: "/a/lint", Name: "a-lint", Path: "a/lint", Extensions: []string{extName}},
+	}
+	ws := workspace.NewWorkspace("/ws", nil, projects)
+	ws.Name = "verb-children"
+	// The shipped manifests declare their reports under the command output at
+	// a path named after the verb (`root: command-output, path: lint`), which
+	// is exactly the directory a child named after that verb would own.
+	commandOutput := func(verb string) extension.TaskDefinition {
+		return extension.TaskDefinition{Kind: "command", Command: "true",
+			Declares: declaresOutput(extension.OutputKindDirectory, extension.OutputRootCommandOutput, verb)}
+	}
+	ext := declaringExtension(extName, map[string]extension.TaskDefinition{
+		"test":  commandOutput("test"),
+		"build": commandOutput("build"),
+		"lint":  commandOutput("lint"),
+	})
+
+	for _, commands := range [][]string{{"test"}, {"build"}, {"lint"}, {"test", "build", "lint"}} {
+		if err := planCommands(t, ws, ext, commands...); err != nil {
+			t.Errorf("plan %v over /a and its verb-named children: %v", commands, err)
+		}
+	}
+}

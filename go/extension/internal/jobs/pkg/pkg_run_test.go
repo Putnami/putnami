@@ -501,7 +501,7 @@ func TestPackageWritesOnlyInsideDeclaredOutputs(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "package-channel-index", "packaging-writes-only-inside-the-outputs-its-tasks-declare")
 	workspaceRoot := t.TempDir()
 	projectRoot := filepath.Join(workspaceRoot, "project")
-	outputPath := filepath.Join(workspaceRoot, ".putnami", "out", "project", "package")
+	outputPath := filepath.Join(workspaceRoot, ".putnami", "out", "project", "~package")
 	if err := os.MkdirAll(projectRoot, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -691,7 +691,7 @@ func TestRunReturnsFailedWhenSelectedPackagerFails(t *testing.T) {
 	if _, err := pkgmeta.ReadChannelIndex(workspaceRoot, "project"); !errors.Is(err, fs.ErrNotExist) {
 		t.Fatalf("failed package dispatch recorded a channel: %v", err)
 	}
-	metadataPath := filepath.Join(workspaceRoot, ".putnami", "out", "project", "package", "metadata.json")
+	metadataPath := filepath.Join(workspaceRoot, ".putnami", "out", "project", "~package", "metadata.json")
 	if _, err := os.Stat(metadataPath); !os.IsNotExist(err) {
 		t.Fatalf("failed package dispatch wrote the archive publication manifest: %v", err)
 	}

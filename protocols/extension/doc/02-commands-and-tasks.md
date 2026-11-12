@@ -505,7 +505,17 @@ is what makes the same declaration resolve per project:
 |------|-------------|-----------|
 | `project` | The project directory | Per project |
 | `workspace` | The workspace root | Workspace-global: two tasks that declare the same path collide even across projects |
-| `command-output` | `.putnami/out/<project>/<command>` | Per command: that directory is **shared by every step of one command**, which is exactly why steps must name their own files |
+| `command-output` | `.putnami/out/<project>/~<command>` | Per command: that directory is **shared by every step of one command**, which is exactly why steps must name their own files |
+
+The `~` before the command name keeps one project's command directories out of
+every other project's tree. Projects nest: without the marker, project `/a`'s
+`test` directory (`.putnami/out/a/test`) would hold the whole output tree of a
+project at `/a/test`. A command name starts with a letter or a digit, and a
+project path segment that starts with `~` is written with a second `~`, so a
+marked segment never names a project directory. The workspace root project owns
+`.putnami/out/~<command>`. Extensions compute the directory with
+`CommandOutputDir` in `go.putnami.dev/protocol/workspace` instead of joining
+the segments themselves.
 
 An **invocation-scoped** output (`"scope": "invocation"`) resolves against the
 invocation's private scratch instead, which is not a staging root and is never
@@ -874,7 +884,7 @@ return one result for every selected project in the final result data:
           "id": "coverage",
           "name": "Coverage Profile",
           "kind": "coverage",
-          "path": ".putnami/out/packages/api/test/coverage.out"
+          "path": ".putnami/out/packages/api/~test/coverage.out"
         }
       ],
       "summary": { "errors": 0, "warnings": 0, "infos": 0 }

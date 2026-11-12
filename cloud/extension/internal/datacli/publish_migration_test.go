@@ -59,7 +59,7 @@ func TestPrepareMigrationTakesTheProjectVersionWhenTheStagedManifestHasNone(t *t
 	root := t.TempDir()
 	app := "apps/example-api"
 	appDir := filepath.Join(root, filepath.FromSlash(app))
-	staged := filepath.Join(root, ".putnami", "out", filepath.FromSlash(app), "build", "migration-bundle")
+	staged := filepath.Join(root, ".putnami", "out", filepath.FromSlash(app), "~build", "migration-bundle")
 	for _, dir := range []string{filepath.Join(staged, "payload", "sql", "default", "core"), filepath.Join(appDir, ".gen")} {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			t.Fatal(err)
@@ -230,7 +230,7 @@ func TestPublishPreparedMigrationSanitizesRefusal(t *testing.T) {
 func TestResolveMigrationTargetPrefersTheStagedBundleOverGen(t *testing.T) {
 	root := resolvedTempDir(t)
 	appDir := filepath.Join(root, "apps", "data-api")
-	staged := filepath.Join(root, ".putnami", "out", "apps/data-api", "build", "migration-bundle")
+	staged := filepath.Join(root, ".putnami", "out", "apps/data-api", "~build", "migration-bundle")
 	for dir, body := range map[string]string{
 		filepath.Join(appDir, ".gen", "migration-bundle"): `{"protocol":"migration-bundle.v1","appName":"stale"}`,
 		staged: `{"protocol":"migration-bundle.v1","appName":"fresh"}`,
@@ -520,7 +520,7 @@ func TestMigrationBundleBuiltReadsBothBundleLocations(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(filepath.Join(root, ".putnami", "out", "apps", "staged-api", "build", "migration-bundle", "bundle.json"))
+	write(filepath.Join(root, ".putnami", "out", "apps", "staged-api", "~build", "migration-bundle", "bundle.json"))
 	write(filepath.Join(root, "apps", "gen-api", ".gen", "migration-bundle", "bundle.json"))
 	if err := os.MkdirAll(filepath.Join(root, "apps", "dir-api", ".gen", "migration-bundle", "bundle.json"), 0o755); err != nil {
 		t.Fatal(err)

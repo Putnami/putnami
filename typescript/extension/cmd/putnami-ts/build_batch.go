@@ -3,8 +3,10 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	protocolcli "go.putnami.dev/protocol/cli"
+	wsproto "go.putnami.dev/protocol/workspace"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/typescript/extension/internal/build"
@@ -52,12 +54,12 @@ type buildBatchMetric struct {
 
 // batchOutputPath returns the per-project captured-output directory for one
 // project in a batch. The scheduler prepares each miss's directory at
-// .putnami/out/{project.Path}/{cmd}; the leader's OutputPath ends in that same
-// {cmd} segment, so its base names the command. This mirrors the solo handlers'
+// .putnami/out/{project.Path}/~{cmd}; the leader's OutputPath ends in that same
+// ~{cmd} segment, so its base names the command. This mirrors the solo handlers'
 // filepath.Join(ctx.OutputPath, "lib"|"types"|"compile") exactly.
 func batchOutputPath(ctx *pctx.Context, proj pctx.ProjectRef) string {
-	cmdName := filepath.Base(ctx.OutputPath)
-	return filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", proj.Path, cmdName)
+	cmdName := strings.TrimPrefix(filepath.Base(ctx.OutputPath), wsproto.CommandOutputMarker)
+	return wsproto.CommandOutputDir(ctx.WorkspaceRoot, proj.Path, cmdName)
 }
 
 // perProjectContext returns a shallow copy of the batch leader's context with the

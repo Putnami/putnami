@@ -37,13 +37,13 @@ func TestTemplate_OutputDirMkdirFailureFails(t *testing.T) {
 	tmp := t.TempDir()
 	writeTemplateProject(t, tmp, validManifest)
 
-	// outputDir = <ws>/.putnami/out/mytemplate/package/archives.
-	// Pre-create "package" as a regular file so MkdirAll(archives) fails.
+	// outputDir = <ws>/.putnami/out/mytemplate/~package/archives.
+	// Pre-create "~package" as a regular file so MkdirAll(archives) fails.
 	pkgParent := filepath.Join(tmp, ".putnami", "out", "mytemplate")
 	if err := os.MkdirAll(pkgParent, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(pkgParent, "package"), []byte("not a dir"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(pkgParent, "~package"), []byte("not a dir"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 

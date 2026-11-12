@@ -11,7 +11,7 @@
 // root. The extensions do not take the path from the job context, so a
 // redirect would be ignored:
 //
-//   - COMMAND-OUTPUT — captured FROM the real .putnami/out/<project>/<command>
+//   - COMMAND-OUTPUT — captured FROM the real .putnami/out/<project>/~<command>
 //     directory, NOT redirected into staging. Two facts forbid the redirect.
 //     First, the steps of one command READ each other's trees there:
 //     package-npm reads <command-output>/lib and <command-output>/types,
@@ -19,7 +19,7 @@
 //     staging directory would break those reads. Second, extensions do not even
 //     take the path from the job context — extension-sdk/pkgmeta and
 //     typescript/extension's findBuildOutput RECOMPUTE
-//     <workspaceRoot>/.putnami/out/<project>/<command> from the workspace root,
+//     <workspaceRoot>/.putnami/out/<project>/~<command> from the workspace root,
 //     so a redirected outputPath would be ignored and the declared output would
 //     be written to the real location anyway, turning every capture into
 //     ErrIncompleteCapture.
@@ -733,7 +733,7 @@ func (s *Scheduler) ensureCommandOutputWritable(job *ScheduledJob) error {
 	state.mu.Lock()
 	defer state.mu.Unlock()
 
-	commandDir := filepath.Join(s.ws.Root, ".putnami", "out", state.project, state.command)
+	commandDir := cachekey.CommandOutputDir(s.ws.Root, state.project, state.command)
 	if !state.materialized {
 		if err := store.MaterializeDirSymlink(commandDir); err != nil {
 			return err

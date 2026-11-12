@@ -8,13 +8,14 @@
 // Cross-compilation is handled by the build job's cross-compile phase.
 // This command consumes the pre-built binaries from {OutputPath}/bin/{platform}/.
 //
-// Output is written to .putnami/out/{project}/package/{channel}/
+// Output is written to .putnami/out/{project}/~package/{channel}/
 // This command does NOT upload to any registry — that's the publish step.
 package pkg
 
 import (
 	"path/filepath"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/imagepkg"
@@ -86,8 +87,8 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 		goVersion = plannedGo.Member.Version
 	}
 
-	// Output root: .putnami/out/{project}/package/
-	outputRoot := filepath.Join(ctx.WorkspaceRoot, ".putnami", "out", ctx.Project.Path, "package")
+	// Output root: .putnami/out/{project}/~package/
+	outputRoot := wsproto.CommandOutputDir(ctx.WorkspaceRoot, ctx.Project.Path, "package")
 
 	emit.PhaseStart("package")
 	overallStatus := "success"

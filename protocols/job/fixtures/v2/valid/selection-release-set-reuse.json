@@ -1,7 +1,7 @@
 {
   "protocolVersion": 2,
   "workspaceRoot": "/ws",
-  "outputPath": "/ws/.putnami/out/apps/console/publish",
+  "outputPath": "/ws/.putnami/out/apps/console/~publish",
   "cacheRoot": "/ws/.putnami/store",
   "workspace": {"name": "putnami"},
   "project": {

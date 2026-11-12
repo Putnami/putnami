@@ -71,8 +71,8 @@ func makeBuildBatchContext(t *testing.T) (*pctx.Context, string) {
 		}
 	}
 	// Command segment must be "build" so batchOutputPath(base of OutputPath)
-	// mirrors the scheduler's .putnami/out/{project}/build convention.
-	ctx.OutputPath = filepath.Join(root, ".putnami", "out", "packages/a", "build")
+	// mirrors the scheduler's .putnami/out/{project}/~build convention.
+	ctx.OutputPath = filepath.Join(root, ".putnami", "out", "packages/a", "~build")
 	ctx.SelectedProjects = []pctx.ProjectRef{
 		{ID: "/packages/a", Name: "a", Path: "packages/a", FullPath: filepath.Join(root, "packages/a")},
 		{ID: "/packages/b", Name: "b", Path: "packages/b", FullPath: filepath.Join(root, "packages/b")},
@@ -159,7 +159,7 @@ func TestRunBuildTranspileBatch_WritesEachProjectToItsOwnLibDir(t *testing.T) {
 	}
 	// Each project's transpiled output lands in its own out/{path}/build/lib dir.
 	for _, path := range []string{"packages/a", "packages/b"} {
-		out := filepath.Join(root, ".putnami", "out", path, "build", "lib", "index.js")
+		out := filepath.Join(root, ".putnami", "out", path, "~build", "lib", "index.js")
 		if _, err := os.Stat(out); err != nil {
 			t.Fatalf("missing per-project transpile output %s: %v", out, err)
 		}
@@ -244,7 +244,7 @@ func TestRunBuildTypesBatch_ProducesPerProjectDeclarations(t *testing.T) {
 		}
 	}
 	for _, path := range []string{"packages/a", "packages/b"} {
-		out := filepath.Join(root, ".putnami", "out", path, "build", "types", "index.d.ts")
+		out := filepath.Join(root, ".putnami", "out", path, "~build", "types", "index.d.ts")
 		if _, err := os.Stat(out); err != nil {
 			t.Fatalf("missing per-project types output %s: %v", out, err)
 		}

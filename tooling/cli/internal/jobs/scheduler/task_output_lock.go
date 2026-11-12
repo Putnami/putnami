@@ -241,7 +241,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -434,8 +433,7 @@ func taskOutputLockNames(job *ScheduledJob) []string {
 	if job == nil || job.Project == nil || job.JobDef == nil {
 		return nil
 	}
-	project := cachekey.ProjectRelPath(job)
-	names := []string{"command-output:" + path.Join(project, jobCommandName(job))}
+	names := []string{"command-output:" + cachekey.CommandOutputRel(job.Project.Path, jobCommandName(job))}
 	declaration := taskDeclarationOf(job)
 	if declaration == nil {
 		return names
@@ -514,7 +512,7 @@ func outputLockSubject(name string) string {
 	kind, rest, _ := strings.Cut(name, ":")
 	switch kind {
 	case "command-output":
-		return path.Join(".putnami", "out", rest)
+		return rest
 	case "project":
 		return "the project-rooted outputs of " + rest
 	default:

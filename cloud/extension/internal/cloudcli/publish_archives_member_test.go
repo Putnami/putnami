@@ -161,7 +161,7 @@ func archiveMemberWorkspace(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(project, "putnami.extension.json"), []byte(`{"name":"@putnami/cloud"}`), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	packageRoot := filepath.Join(root, ".putnami", "out", "apps", "cli", "package")
+	packageRoot := filepath.Join(root, ".putnami", "out", "apps", "cli", "~package")
 	archives := filepath.Join(packageRoot, "archives")
 	if err := os.MkdirAll(archives, 0o755); err != nil {
 		t.Fatal(err)

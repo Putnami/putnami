@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/sdk/extension/oci"
 	"go.putnami.dev/typescript/extension/internal/build"
@@ -45,9 +46,9 @@ type DockerParams struct {
 // process, deterministically, and without a docker daemon. The image is
 // written as a self-contained OCI layout; publish pushes it from there.
 func PackageDocker(workspaceRoot, projectName, projectPath string, params DockerParams, versionInfo *git.VersionInfo, wsVersion string) (map[string]any, error) {
-	compileOutput := filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "build", "compile")
+	compileOutput := filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "build"), "compile")
 	if !project.FileExists(compileOutput) {
-		compileOutput = filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "package", "compile")
+		compileOutput = filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "package"), "compile")
 	}
 	if !project.FileExists(compileOutput) {
 		return nil, fmt.Errorf("compile output not found for %s", projectName)
@@ -155,7 +156,7 @@ func PackageDocker(workspaceRoot, projectName, projectPath string, params Docker
 		}, nil
 	}
 
-	dockerOutputDir := filepath.Join(workspaceRoot, ".putnami", "out", projectPath, "package", "docker")
+	dockerOutputDir := filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "package"), "docker")
 	layoutDir := filepath.Join(dockerOutputDir, "oci")
 	baseCacheDir := filepath.Join(workspaceRoot, ".putnami", "cache", "oci-base")
 	digest, err := oci.AssemblePlanToLayout(imagePlan, layoutDir, oci.LayoutOptions{

@@ -419,7 +419,7 @@ func TestBatchMemberTalliesByItsDeclaredBatchKind(t *testing.T) {
 		},
 		Summary: batchWireSummary{Warnings: 2},
 		Artifacts: []batchWireArtifact{{
-			ID: "coverage", Name: "Coverage Profile", Kind: "coverage", Path: ".putnami/out/a/test/coverage.out",
+			ID: "coverage", Name: "Coverage Profile", Kind: "coverage", Path: ".putnami/out/a/~test/coverage.out",
 		}},
 	}
 	for _, test := range []struct {
@@ -478,7 +478,7 @@ func TestBatchMemberTalliesByItsDeclaredBatchKind(t *testing.T) {
 			t.Errorf("kind %q: progress %q, logs %v, summary %q; want %q, %v, %q",
 				test.kind, progress, logs, summary, test.progress, test.logs, test.summary)
 		}
-		if artifactPath != ".putnami/out/a/test/coverage.out" {
+		if artifactPath != ".putnami/out/a/~test/coverage.out" {
 			t.Errorf("kind %q: artifact path = %q", test.kind, artifactPath)
 		}
 	}

@@ -44,12 +44,12 @@ export function workspaceRoot(): string {
 
 /**
  * The provider binary lives in the per-command output directory `build-compile`
- * declares: `<workspace>/.putnami/out/<project>/build/bin/<binary>`. This
+ * declares: `<workspace>/.putnami/out/<project>/~build/bin/<binary>`. This
  * project declares the provider project as a dependency, so the scheduler has
  * already produced it when this test runs.
  */
 function providerBinary(): string {
-  const binary = join(workspaceRoot(), '.putnami', 'out', PROVIDER_PROJECT, 'build', 'bin', PROVIDER_BINARY);
+  const binary = join(workspaceRoot(), '.putnami', 'out', PROVIDER_PROJECT, '~build', 'bin', PROVIDER_BINARY);
   if (!existsSync(binary)) {
     throw new Error(
       `provider binary ${binary} is missing; run \`putnami build --projects go.putnami.dev/examples/service-to-service\``,

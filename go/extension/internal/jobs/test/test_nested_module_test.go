@@ -103,7 +103,7 @@ func (fx nestedModuleFixture) runSolo(t *testing.T, ref pctx.ProjectRef) ([]byte
 
 // runBatch runs the batch path over the selected projects under one coverage
 // scope ("" for the default) and returns each member's result by project ID.
-// Every member's coverage.out lands under <root>/.putnami/out/<path>/test/.
+// Every member's coverage.out lands under <root>/.putnami/out/<path>/~test/.
 func (fx nestedModuleFixture) runBatch(t *testing.T, scope string, selected ...pctx.ProjectRef) map[string]batchProjectResult {
 	t.Helper()
 	if err := os.RemoveAll(filepath.Join(fx.root, ".putnami", "out")); err != nil {
@@ -136,7 +136,7 @@ func (fx nestedModuleFixture) runBatch(t *testing.T, scope string, selected ...p
 // batchProfile reads the coverage.out the batch path wrote for one member.
 func (fx nestedModuleFixture) batchProfile(t *testing.T, ref pctx.ProjectRef) []byte {
 	t.Helper()
-	path := filepath.Join(fx.root, ".putnami", "out", filepath.FromSlash(ref.Path), "test", "coverage.out")
+	path := filepath.Join(fx.root, ".putnami", "out", filepath.FromSlash(ref.Path), "~test", "coverage.out")
 	profile, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("batch wrote no profile for %s: %v", ref.Name, err)

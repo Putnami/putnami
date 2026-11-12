@@ -189,7 +189,7 @@ func formatDiagnostics(diags []diag.Diagnostic) string {
 //   - {workspaceRoot}  → workspace root path
 //   - {projectRoot}    → project root path
 //   - {extensionRoot}  → extension root path
-//   - {outputRoot}     → output path (.putnami/out/<project>/<command>/<step>)
+//   - {outputRoot}     → output path (.putnami/out/<project>/~<command>/<step>)
 //   - {cacheRoot}      → per-workspace mutable scratch path (.putnami/cache)
 //
 // The lifecycle primitives declare three context-specific tokens against the

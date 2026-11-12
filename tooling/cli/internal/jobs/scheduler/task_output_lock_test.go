@@ -89,19 +89,19 @@ func TestTaskOutputLockNames(t *testing.T) {
 		{
 			name: "a task without a declaration locks its command output",
 			job:  outputLockJob("tooling/cli", "test~test", nil),
-			want: []string{"command-output:tooling/cli/test"},
+			want: []string{"command-output:.putnami/out/tooling/cli/~test"},
 		},
 		{
 			name: "the root project locks the root command output",
 			job:  outputLockJob("", "lint~check", nil),
-			want: []string{"command-output:lint"},
+			want: []string{"command-output:.putnami/out/~lint"},
 		},
 		{
 			name: "command-output declarations stay inside the command-output key",
 			job: outputLockJob("proj", "test~exec", map[string]extension.DeclaredOutput{
 				"coverage": fileDeclaration(extension.OutputRootCommandOutput, "coverage.out", true),
 			}),
-			want: []string{"command-output:proj/test"},
+			want: []string{"command-output:.putnami/out/proj/~test"},
 		},
 		{
 			name: "project-rooted literal and pathFrom outputs share one project key",
@@ -110,21 +110,21 @@ func TestTaskOutputLockNames(t *testing.T) {
 				"client": {Kind: extension.OutputKindDirectory, PathFrom: "clientOutput", OptionalEmpty: true},
 				"schema": {Kind: extension.OutputKindFile, Path: "schema/config.json", OptionalEmpty: true},
 			}),
-			want: []string{"command-output:proj/build", "project:proj"},
+			want: []string{"command-output:.putnami/out/proj/~build", "project:proj"},
 		},
 		{
 			name: "a workspace-rooted output adds the workspace key",
 			job: outputLockJob("proj", "build~infra", map[string]extension.DeclaredOutput{
 				"manifest": fileDeclaration(extension.OutputRootWorkspace, "infra.json", true),
 			}),
-			want: []string{"command-output:proj/build", "workspace:"},
+			want: []string{"command-output:.putnami/out/proj/~build", "workspace:"},
 		},
 		{
 			name: "invocation-scoped outputs take no key",
 			job: outputLockJob("proj", "test~env-up", map[string]extension.DeclaredOutput{
 				"lease": {Kind: extension.OutputKindFile, Scope: extensionproto.OutputScopeInvocation, Path: "database/lease.json"},
 			}),
-			want: []string{"command-output:proj/test"},
+			want: []string{"command-output:.putnami/out/proj/~test"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -325,7 +325,7 @@ func TestTaskOutputLockWaitLineNamesTheHolder(t *testing.T) {
 		"/tooling/cli:test~test waits for session 20260925-192012-876307",
 		fmt.Sprintf("pid %d", os.Getpid()),
 		"task /tooling/cli:test~test",
-		".putnami/out/tooling/cli/test",
+		".putnami/out/tooling/cli/~test",
 	} {
 		if !strings.Contains(message, want) {
 			t.Errorf("wait line %q does not contain %q", message, want)
@@ -382,7 +382,7 @@ func TestTaskOutputLockWaitLineWithoutALiveHolderRecord(t *testing.T) {
 				done <- err
 			}()
 			message := waitMessage(t, messages, "no line without a live holder record")
-			if !strings.Contains(message, "waits for another putnami process, which is writing .putnami/out/proj/test") {
+			if !strings.Contains(message, "waits for another putnami process, which is writing .putnami/out/proj/~test") {
 				t.Errorf("wait line = %q", message)
 			}
 			_ = bare.Release()
@@ -477,7 +477,7 @@ func TestTaskOutputLockPreparationKeys(t *testing.T) {
 
 	keys := session.keysFor([]*ScheduledJob{plain}, always, false)
 	project := keyNamed(t, keys, "project:proj")
-	commandOutput := keyNamed(t, keys, "command-output:proj/test")
+	commandOutput := keyNamed(t, keys, "command-output:.putnami/out/proj/~test")
 	if !project.preparation || commandOutput.preparation {
 		t.Fatalf("keys = %+v, want only project:proj as a preparation key", keys)
 	}
@@ -536,7 +536,7 @@ func TestTaskOutputLockServeKeys(t *testing.T) {
 	session.serveSteps = map[string]bool{serving.Key(): true}
 
 	keys := session.keysFor([]*ScheduledJob{serving}, always, true)
-	commandOutput := keyNamed(t, keys, "command-output:proj/serve")
+	commandOutput := keyNamed(t, keys, "command-output:.putnami/out/proj/~serve")
 	project := keyNamed(t, keys, "project:proj")
 	workspace := keyNamed(t, keys, "workspace:")
 	if !commandOutput.serve || project.serve || workspace.serve {
@@ -616,7 +616,7 @@ func TestTaskOutputLockServeKeysKeepADeclaredCommandOutput(t *testing.T) {
 	session.serveSteps = map[string]bool{serving.Key(): true}
 
 	keys := session.keysFor([]*ScheduledJob{serving}, nil, true)
-	commandOutput := keyNamed(t, keys, "command-output:proj/serve")
+	commandOutput := keyNamed(t, keys, "command-output:.putnami/out/proj/~serve")
 	if commandOutput.serve {
 		t.Fatalf("keys = %+v, want the declared command-output key kept until the capture", keys)
 	}
@@ -1021,14 +1021,14 @@ func TestTaskOutputLockReaderKeyModes(t *testing.T) {
 	if len(keys) != 2 {
 		t.Fatalf("keys = %+v, want the command output and the project", keys)
 	}
-	if commandOutput := keyNamed(t, keys, "command-output:proj/build"); !commandOutput.exclusive {
+	if commandOutput := keyNamed(t, keys, "command-output:.putnami/out/proj/~build"); !commandOutput.exclusive {
 		t.Fatal("the command-output key is not exclusive")
 	}
 	project := keyNamed(t, keys, "project:proj")
 	if project.exclusive || project.preparation {
 		t.Fatalf("reader key = %+v, want shared and held until capture", project)
 	}
-	if restore := session.keysFor([]*ScheduledJob{reader}, nil, false); len(restore) != 1 || restore[0].name != "command-output:proj/build" {
+	if restore := session.keysFor([]*ScheduledJob{reader}, nil, false); len(restore) != 1 || restore[0].name != "command-output:.putnami/out/proj/~build" {
 		t.Fatalf("restore keys = %+v, want the command output alone", restore)
 	}
 
