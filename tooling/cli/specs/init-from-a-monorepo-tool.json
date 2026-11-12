@@ -65,7 +65,7 @@
       "id": "init-rerun-shows-a-diff",
       "text": [
         "Rerun in a workspace that already exists, putnami init --from <tool> runs the workspace sync tasks as a dry run with the mode it resolves and the extensions --apply would declare, which each reads as declared, so it prints what --apply would change and the mode change, and writes nothing.",
-        "With --apply it records the mode and runs putnami projects sync."
+        "With --apply it records the mode and runs putnami projects sync, and fails with the sync when a workspace install fails."
       ]
     },
     {
@@ -129,7 +129,7 @@
       "id": "init-from-rush",
       "text": [
         "putnami init --from rush, at the root of a repository that holds rush.json, declares @putnami/rush, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs projects sync, whose Rush sync task writes each Rush project's putnami.json.",
-        "In import mode the TypeScript install writes the root package.json with the projects as workspaces.",
+        "In import mode the TypeScript install runs rush install and writes no root package.json, unless a root package.json declares another packageManager.",
         "Without rush.json it is a usage error that names the file."
       ]
     },

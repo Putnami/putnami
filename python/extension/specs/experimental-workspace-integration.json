@@ -20,7 +20,7 @@
     },
     {
       "id": "workspace-scope",
-      "text": "Python workspace installation and upgrade jobs operate on the Python projects selected from the workspace and report a skipped or failed result instead of inventing a missing project."
+      "text": "Python workspace installation and upgrade jobs operate on the Python projects selected from the workspace and report a skipped or failed result instead of inventing a missing project. A project whose [project] name is no valid project name, such as a template's placeholder, is no uv workspace member."
     },
     {
       "id": "native-tools",
@@ -34,6 +34,10 @@
         "The extension installs no uv: workspace-install runs the resolved uv and, outside a hosted run, declares its release as the [tool.uv] required-version of the root pyproject.toml.",
         "With none, a job fails naming the release and `putnami install`."
       ]
+    },
+    {
+      "id": "the-repository-uv-pin-is-kept",
+      "text": "When the repository pins uv for its own tools in .prototools, mise.toml, .mise.toml, .tool-versions or a moon toolchain file, workspace-install declares no [tool.uv] required-version, which would make uv refuse the repository's own setup."
     },
     {
       "id": "exact-uv-declaration",

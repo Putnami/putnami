@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	extensionproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/exec"
@@ -189,9 +190,9 @@ func TestAnUnknownPackageManagerFailsTheInstall(t *testing.T) {
 	}
 }
 
-// A pnpm workspace installs with the pnpm on PATH, lists its members in
-// pnpm-workspace.yaml, keeps its lockfile, and gets no bun.lock, no
-// packageManager and no root workspaces.
+// A pnpm workspace installs with the pnpm on PATH, adds to the globs of
+// pnpm-workspace.yaml the member they do not name, keeps its lockfile, and
+// gets no bun.lock, no packageManager and no root workspaces.
 func TestAPNPMInstallKeepsItsLockfileAndWritesNoBunLock(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-keeps-the-package-manager", "a-pnpm-install-keeps-its-lockfile-and-writes-no-bun-lock")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-lists-the-members", "a-pnpm-workspace-lists-its-members-in-pnpm-workspace-yaml")
@@ -215,7 +216,7 @@ func TestAPNPMInstallKeepsItsLockfileAndWritesNoBunLock(t *testing.T) {
 	if status, _, err := runWorkspaceInstall(ctx, jsonl.New(), nil); err != nil || status != "OK" {
 		t.Fatalf("runWorkspaceInstall = %q, %v; want OK", status, err)
 	}
-	if want := "packages:\n  - web\n\nonlyBuiltDependencies:\n  - esbuild\n"; seen != want {
+	if want := "packages:\n  - 'apps/*'\n  - web\n\nonlyBuiltDependencies:\n  - esbuild\n"; seen != want {
 		t.Fatalf("pnpm-workspace.yaml when pnpm install started =\n%s\nwant\n%s", seen, want)
 	}
 	if got, _ := os.ReadFile(filepath.Join(dir, "pnpm-lock.yaml")); string(got) != lock {
@@ -493,5 +494,115 @@ func TestWorkspaceMemberDirsOfAnotherManagerReadsThePackageJSON(t *testing.T) {
 	got := workspaceMemberDirs(dir)
 	if len(got) != 1 || got[0] != filepath.Join(dir, "apps", "web") {
 		t.Fatalf("workspaceMemberDirs = %v, want apps/web from package.json", got)
+	}
+}
+
+// An imported pnpm repository whose member keeps every task on the
+// repository's tool and whose globs list it: the install writes no file pnpm
+// reads, so the manifest, pnpm-workspace.yaml and the lockfile stay
+// byte-identical.
+func TestAnImportWhoseTasksNeedNoPackageKeepsTheLockfile(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-adds-what-a-task-needs",
+		"a-workspace-whose-tasks-need-no-package-keeps-its-manifest")
+	lock := "lockfileVersion: '9.0'\n\nimporters:\n\n  .: {}\n\n  apps/web: {}\n"
+	manifest := "{\n    \"name\": \"shop\",\n    \"private\": true,\n    \"packageManager\": \"pnpm@10.26.1\",\n    \"devDependencies\": {\n        \"turbo\": \"^2.5.0\"\n    }\n}\n"
+	workspace := "packages:\n  - 'apps/*'\n  - '!apps/legacy'\n"
+	ctx, dir := managerWorkspace(t, manifest, map[string]string{
+		"pnpm-lock.yaml":         lock,
+		"pnpm-workspace.yaml":    workspace,
+		"apps/web/package.json":  `{"name":"web"}`,
+		"apps/web/putnami.json":  `{"extensions":["@putnami/turbo"]}`,
+		"putnami.extension.json": `{"workspaceDevDependencies":{"typescript":"^6.0.2","@types/bun":"^1.4.0","@biomejs/biome":"2.5.15"}}`,
+	})
+	ctx.WorkspaceProjects = []pctx.ProjectRef{{Name: "shop", Path: "."}, {Name: "web", Path: "apps/web"}}
+	mockLookPath(t, map[string]string{"pnpm": "/usr/local/bin/pnpm"})
+	mockAllExec(t, func(string, []string, ...exec.Option) (*exec.Result, error) {
+		return &exec.Result{Success: true}, nil
+	})
+	if status, _, err := runWorkspaceInstall(ctx, jsonl.New(), nil); err != nil || status != "OK" {
+		t.Fatalf("runWorkspaceInstall = %q, %v; want OK", status, err)
+	}
+	for name, want := range map[string]string{"package.json": manifest, "pnpm-workspace.yaml": workspace, "pnpm-lock.yaml": lock} {
+		if got, _ := os.ReadFile(filepath.Join(dir, name)); string(got) != want {
+			t.Errorf("%s =\n%s\nwant it unchanged:\n%s", name, got, want)
+		}
+	}
+}
+
+// A failed install reports what the manager printed: pnpm prints the error of
+// a lifecycle script on stdout, and Yarn can print a whole bundle on one line.
+func TestAFailedInstallReportsTheManagersError(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-reports-the-managers-error", "a-failed-install-reports-the-managers-error")
+	ctx, _ := managerWorkspace(t, `{"name":"repo","private":true,"packageManager":"pnpm@10.19.0"}`, map[string]string{
+		"pnpm-workspace.yaml": "packages:\n  - web\n",
+	})
+	ctx.WorkspaceProjects = membership()
+	mockLookPath(t, map[string]string{"pnpm": "/usr/bin/pnpm"})
+	bundle := strings.Repeat("x", 48*1024)
+	mockAllExec(t, func(string, []string, ...exec.Option) (*exec.Result, error) {
+		return &exec.Result{ExitCode: 1, Stdout: "Scope: all 2 workspace projects\n" + bundle + "\n. postinstall: ⨯ error devDependencies should be ordered alphabetically\nELIFECYCLE Command failed with exit code 1.\n"}, nil
+	})
+	emit := jsonl.New()
+	var logged []string
+	emit.Observe(func(message string) { logged = append(logged, message) })
+	if status, _, err := runWorkspaceInstall(ctx, emit, nil); status != "FAILED" || err != nil {
+		t.Fatalf("runWorkspaceInstall = %q, %v; want FAILED", status, err)
+	}
+	var failure string
+	for _, message := range logged {
+		if strings.HasPrefix(message, "pnpm install failed: ") {
+			failure = message
+		}
+	}
+	if !strings.Contains(failure, "devDependencies should be ordered alphabetically") || !strings.HasSuffix(failure, "ELIFECYCLE Command failed with exit code 1.") {
+		t.Fatalf("the failure %q does not report pnpm's error", failure)
+	}
+	if len(failure) > managerOutputBudget+len("pnpm install failed: ") {
+		t.Fatalf("the failure reports %d bytes, want at most %d", len(failure), managerOutputBudget)
+	}
+}
+
+// A Rush repository installs with rush install, and gets no root package.json
+// and no lockfile of another manager: Rush installs the projects rush.json
+// lists, and the npm install-run-rush.js runs fails on a root manifest.
+func TestARushRepositoryInstallsWithRushAndGetsNoRootManifest(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-runs-rush-install", "a-rush-repository-installs-with-rush-install")
+	ctx, dir := managerWorkspace(t, "", map[string]string{
+		"rush.json":                         `{"rushVersion": "5.140.0", "pnpmVersion": "9.15.0", "projects": [{"packageName": "web", "projectFolder": "web"}]}`,
+		"common/config/rush/pnpm-lock.yaml": "lockfileVersion: '9.0'\n",
+	})
+	ctx.WorkspaceProjects = membership()
+	mockLookPath(t, map[string]string{"rush": "/usr/local/bin/rush"})
+	calls := recordCalls(t)
+	if status, _, err := runWorkspaceInstall(ctx, jsonl.New(), nil); err != nil || status != "OK" {
+		t.Fatalf("runWorkspaceInstall = %q, %v; want OK", status, err)
+	}
+	if len(*calls) != 1 || (*calls)[0].bin != "/usr/local/bin/rush" || !slices.Equal((*calls)[0].args, []string{"install"}) {
+		t.Fatalf("the install started %v, want only rush install", *calls)
+	}
+	for _, name := range []string{"package.json", "pnpm-workspace.yaml", "bun.lock", "pnpm-lock.yaml"} {
+		if _, err := os.Stat(filepath.Join(dir, name)); !os.IsNotExist(err) {
+			t.Errorf("the Rush install wrote %s", name)
+		}
+	}
+	changes, err := syncTypeScriptWorkspace(dir, ctx.WorkspaceProjects, false)
+	if err != nil || len(changes) != 0 {
+		t.Fatalf("the workspace sync of a Rush repository = %v, %v; want no change", changes, err)
+	}
+}
+
+// A hosted run starts no rush install: it runs the release rush.json pins,
+// which it downloads first, and that is repository code.
+func TestAHostedRushInstallIsRefused(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-runs-rush-install", "a-rush-repository-installs-with-rush-install")
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "1")
+	ctx, _ := managerWorkspace(t, "", map[string]string{"rush.json": `{"rushVersion": "5.140.0", "projects": []}`})
+	mockLookPath(t, map[string]string{"rush": "/usr/local/bin/rush"})
+	calls := recordCalls(t)
+	if status, _, err := runWorkspaceInstall(ctx, jsonl.New(), nil); !errors.Is(err, errHostedRush) || status != "FAILED" {
+		t.Fatalf("runWorkspaceInstall = %q, %v; want the hosted Rush refusal", status, err)
+	}
+	if len(*calls) != 0 {
+		t.Fatalf("the hosted install started %v, want nothing", *calls)
 	}
 }

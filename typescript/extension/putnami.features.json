@@ -376,6 +376,61 @@
           }
         },
         {
+          "id": "workspace-install-keeps-the-member-globs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-repository-globs-and-exclusions-are-kept",
+              "a-pnpm-workspace-without-packages-gains-no-list",
+              "an-adopted-repository-without-a-list-gains-none"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-runs-rush-install",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-rush-repository-installs-with-rush-install"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-reports-the-managers-error",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-install-reports-the-managers-error"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-adds-what-a-task-needs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-workspace-whose-tasks-need-no-package-keeps-its-manifest",
+              "a-devdependency-is-added-for-a-moved-task-only"
+            ]
+          }
+        },
+        {
           "id": "workspace-install-keeps-the-package-manager",
           "stage": "coded",
           "evidenceKinds": [

@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
 )
@@ -487,5 +488,177 @@ func TestSyncTypeScriptWorkspace_KeepsTheScriptsByteForByte(t *testing.T) {
 				t.Errorf("package.json =\n%s\nwant\n%s", got, c.after)
 			}
 		})
+	}
+}
+
+// importedMembers is the membership an import resolves in a repository whose
+// member list uses globs: apps/web and packages/ui are under its globs,
+// examples/vue/2.6 under its exclusion, tools/gen under none of them, and
+// templates/app is a template whose name is a placeholder.
+func importedMembers(t *testing.T, root string) []pctx.ProjectRef {
+	t.Helper()
+	for rel, name := range map[string]string{
+		"apps/web": "web", "packages/ui": "@acme/ui", "examples/vue/2.6": "vue-2.6", "tools/gen": "gen",
+	} {
+		writeProbeFile(t, filepath.Join(root, rel, "package.json"), `{"name":"`+name+`"}`)
+	}
+	writeProbeFile(t, filepath.Join(root, "templates/app/package.json"), `{"name":"{{ packageName }}"}`)
+	var refs []pctx.ProjectRef
+	for _, rel := range []string{"apps/web", "examples/vue/2.6", "packages/ui", "templates/app", "tools/gen"} {
+		refs = append(refs, pctx.ProjectRef{Name: rel, Path: rel})
+	}
+	return refs
+}
+
+// The repository's globs and exclusions stay as written, byte for byte, and a
+// member is added only when no entry names it: tools/gen is added, a member
+// under an exclusion is not, and neither is a template.
+func TestSyncTypeScriptWorkspace_KeepsThePNPMGlobsAndAddsOnlyAnUnlistedMember(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-keeps-the-member-globs",
+		"the-repository-globs-and-exclusions-are-kept")
+	root := t.TempDir()
+	writeProbeFile(t, filepath.Join(root, "package.json"), `{"name":"repo","private":true,"packageManager":"pnpm@10.0.0"}`)
+	original := "packages:\n  - 'apps/*'\n  # the UI kit\n  - packages/*\n  - '!examples/vue/2*'\n\ntrustPolicy: no-downgrade\n"
+	writeProbeFile(t, filepath.Join(root, "pnpm-workspace.yaml"), original)
+
+	if _, err := syncTypeScriptWorkspace(root, importedMembers(t, root), false); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	want := "packages:\n  - 'apps/*'\n  # the UI kit\n  - packages/*\n  - '!examples/vue/2*'\n  - tools/gen\n\ntrustPolicy: no-downgrade\n"
+	if got := readTextFile(t, filepath.Join(root, "pnpm-workspace.yaml")); got != want {
+		t.Fatalf("pnpm-workspace.yaml =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// A pnpm-workspace.yaml without `packages` gains none: pnpm then takes every
+// package under the root, and a list would narrow that.
+func TestSyncTypeScriptWorkspace_AddsNoPackagesListWherePNPMHasNone(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-keeps-the-member-globs",
+		"a-pnpm-workspace-without-packages-gains-no-list")
+	root := t.TempDir()
+	writeProbeFile(t, filepath.Join(root, "package.json"), `{"name":"repo","private":true,"packageManager":"pnpm@10.0.0"}`)
+	original := "onlyBuiltDependencies:\n  - esbuild\n"
+	writeProbeFile(t, filepath.Join(root, "pnpm-workspace.yaml"), original)
+
+	changes, err := syncTypeScriptWorkspace(root, importedMembers(t, root), false)
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if len(changes) != 0 {
+		t.Fatalf("changes = %+v, want none", changes)
+	}
+	if got := readTextFile(t, filepath.Join(root, "pnpm-workspace.yaml")); got != original {
+		t.Fatalf("pnpm-workspace.yaml =\n%s\nwant it unchanged", got)
+	}
+}
+
+// The root package.json workspaces of a Yarn, npm or Bun repository keep their
+// globs: a member no entry names is added after them, the list being unsorted.
+func TestSyncTypeScriptWorkspace_KeepsTheWorkspacesGlobs(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-keeps-the-member-globs",
+		"the-repository-globs-and-exclusions-are-kept")
+	root := t.TempDir()
+	writeProbeFile(t, filepath.Join(root, "package.json"),
+		"{\n  \"name\": \"repo\",\n  \"private\": true,\n  \"workspaces\": [\n    \"packages/*\",\n    \"apps/*\",\n    \"!examples/**\"\n  ]\n}\n")
+	members := importedMembers(t, root)
+
+	if _, err := syncTypeScriptWorkspace(root, members, false); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	var workspaces []string
+	if err := json.Unmarshal(readJSONField(t, filepath.Join(root, "package.json"), "workspaces"), &workspaces); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"packages/*", "apps/*", "!examples/**", "tools/gen"}; !slices.Equal(workspaces, want) {
+		t.Fatalf("workspaces = %v, want %v", workspaces, want)
+	}
+
+	// Every member is listed now, so a second sync writes nothing.
+	changes, err := syncTypeScriptWorkspace(root, members, false)
+	if err != nil || len(changes) != 0 {
+		t.Fatalf("second sync = %+v, %v; want no change", changes, err)
+	}
+}
+
+// An entry matches a member the way the package managers' glob library does,
+// so a member a brace, a negated class or a "**" covers is not listed again,
+// and one in a dot directory, which no wildcard reaches, is.
+func TestMatchMemberPattern_ReadsTheManagersGlobs(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-keeps-the-member-globs",
+		"the-repository-globs-and-exclusions-are-kept")
+	for _, tc := range []struct {
+		pattern, rel string
+		want         bool
+	}{
+		{"packages/{core,cli}", "packages/core", true},
+		{"packages/{core,cli}", "packages/web", false},
+		{"{apps,tooling/{a,b}}/*", "tooling/b/x", true},
+		{"packages/[!_]*", "packages/core", true},
+		{"packages/[!_]*", "packages/_private", false},
+		{"packages/*", "packages/.tpl", false},
+		{"packages/.*", "packages/.tpl", true},
+		{"**", "examples/.hidden/app", false},
+		{"examples/**", "examples/vue/basic", true},
+		{"examples/vue/2*", "examples/vue/2-basic", true},
+	} {
+		if got := matchMemberPattern(tc.pattern, tc.rel); got != tc.want {
+			t.Errorf("matchMemberPattern(%q, %q) = %v, want %v", tc.pattern, tc.rel, got, tc.want)
+		}
+	}
+}
+
+// A listed path stays while its directory holds a manifest pnpm reads,
+// package.yaml included, and goes once it holds none.
+func TestPlanMemberList_DropsOnlyAPathWithNoManifest(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-keeps-the-member-globs",
+		"the-repository-globs-and-exclusions-are-kept")
+	root := t.TempDir()
+	writeProbeFile(t, filepath.Join(root, "tools", "gen", "package.yaml"), "name: gen\n")
+	if err := os.MkdirAll(filepath.Join(root, "old"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	edit := planMemberList(root, []string{"tools/gen", "old", "packages/*"}, nil)
+	if edit.drop("tools/gen") || !edit.drop("old") || edit.drop("packages/*") {
+		t.Fatalf("drop: tools/gen=%v old=%v packages/*=%v; want only old dropped", edit.drop("tools/gen"), edit.drop("old"), edit.drop("packages/*"))
+	}
+}
+
+// An adopted repository whose root package.json has no workspaces, or whose
+// pnpm install has no pnpm-workspace.yaml, gets no member list: it keeps none.
+// A native workspace with the same files gets one.
+func TestSyncTypeScriptWorkspace_AddsNoListAnAdoptedRepositoryKeepsNone(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-keeps-the-member-globs",
+		"an-adopted-repository-without-a-list-gains-none")
+	members := []pctx.ProjectRef{{Name: "web", Path: "web"}}
+	for _, tc := range []struct {
+		name, manifest, lockfile, listFile string
+	}{
+		{"npm", `{"name":"shop","private":true}` + "\n", "package-lock.json", "package.json"},
+		{"pnpm", `{"name":"shop","private":true}` + "\n", "pnpm-lock.yaml", "pnpm-workspace.yaml"},
+	} {
+		for _, adopted := range []bool{true, false} {
+			root := t.TempDir()
+			writeProbeFile(t, filepath.Join(root, "package.json"), tc.manifest)
+			writeProbeFile(t, filepath.Join(root, tc.lockfile), "")
+			writeProbeFile(t, filepath.Join(root, "web", "package.json"), `{"name":"web"}`)
+			config := `{"name":"shop","extensions":["@putnami/nx","@putnami/typescript"]}`
+			if adopted {
+				config = `{"name":"shop","extensions":["@putnami/nx","@putnami/typescript"],"options":{"@putnami/nx":{"mode":"import"}}}`
+			}
+			writeProbeFile(t, filepath.Join(root, "putnami.workspace.json"), config)
+			changes, err := syncTypeScriptWorkspace(root, members, false)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if adopted && (len(changes) != 0 || readTextFile(t, filepath.Join(root, "package.json")) != tc.manifest) {
+				t.Errorf("%s: an adopted repository without a list got %+v", tc.name, changes)
+			}
+			if _, err := os.Stat(filepath.Join(root, "pnpm-workspace.yaml")); adopted && err == nil {
+				t.Errorf("%s: an adopted repository gained pnpm-workspace.yaml", tc.name)
+			}
+			if !adopted && (len(changes) != 1 || changes[0].Path != tc.listFile) {
+				t.Errorf("%s: a native workspace got %+v, want the list in %s", tc.name, changes, tc.listFile)
+			}
+		}
 	}
 }

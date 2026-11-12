@@ -106,8 +106,24 @@
       "text": "Workspace install writes the complete membership in the job context, with the workspace-sync task's code, where the package manager reads it: packages of pnpm-workspace.yaml for pnpm, keeping its other lines, else workspaces of the root package.json. It writes before it seeds the catalog and installs, so a project created after the last projects sync is installed, leaves an unchanged list and a context without the membership untouched, and fails before installing when it cannot read or write the list."
     },
     {
+      "id": "workspace-install-keeps-the-member-globs",
+      "text": "The member list keeps every entry the repository wrote, globs and exclusions included, read as pnpm reads them, and drops only a path whose directory holds no package manifest. It adds, sorted, a member no entry names, never a template, whose package.json name is no valid package name. A pnpm-workspace.yaml without packages gains none, nor does a repository adopted with init --from that keeps no list."
+    },
+    {
+      "id": "workspace-install-adds-what-a-task-needs",
+      "text": "Workspace install adds a devDependency of the extension to the root package.json only when a member runs a job that needs it: Biome for a lint with Biome, as the member's options choose, the TypeScript compiler and Bun's types for a build, package, validate or test. A member that does not run the extension or disables the job needs none; a context without the membership needs all. Each goes where it sorts, so a workspace whose tasks need no new package keeps its manifest and lockfile byte-identical."
+    },
+    {
       "id": "workspace-install-keeps-the-package-manager",
       "text": "Workspace install runs the package manager the root package.json names in packageManager, bun, npm, pnpm or yarn, else the one the root names by its files: bun.lock or bun.lockb, pnpm-lock.yaml or pnpm-workspace.yaml, yarn.lock, then package-lock.json or npm-shrinkwrap.json. With none it runs Bun. It runs npm, pnpm and yarn from PATH and fails naming the manager when PATH has none, fails on any other packageManager name, and writes no lockfile of another manager."
+    },
+    {
+      "id": "workspace-install-runs-rush-install",
+      "text": "In a repository with a root rush.json and no packageManager in a root package.json, workspace install runs rush install from PATH, failing naming rush when PATH has none, and writes no root package.json, member list or catalog. The workspace sync writes no member list, and a hosted fetch or install and a dependency upgrade fail naming Rush."
+    },
+    {
+      "id": "workspace-install-reports-the-managers-error",
+      "text": "A failed install fails the job with the end of what the manager printed on stdout and stderr, at most 4 KiB, each line clipped to 512 bytes."
     },
     {
       "id": "the-lockfile-in-use-keys-the-cache",

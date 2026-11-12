@@ -61,8 +61,12 @@
     "typescript/typescript-project-toolchain#upgrade-table-shows-source-revision",
     "typescript/typescript-project-toolchain#workspace-biome-default",
     "typescript/typescript-project-toolchain#workspace-bun-pin",
+    "typescript/typescript-project-toolchain#workspace-install-adds-what-a-task-needs",
     "typescript/typescript-project-toolchain#workspace-install-creates-the-root-manifest",
+    "typescript/typescript-project-toolchain#workspace-install-keeps-the-member-globs",
     "typescript/typescript-project-toolchain#workspace-install-keeps-the-package-manager",
-    "typescript/typescript-project-toolchain#workspace-install-lists-the-members"
+    "typescript/typescript-project-toolchain#workspace-install-lists-the-members",
+    "typescript/typescript-project-toolchain#workspace-install-reports-the-managers-error",
+    "typescript/typescript-project-toolchain#workspace-install-runs-rush-install"
   ]
 }

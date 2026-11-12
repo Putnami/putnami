@@ -20,7 +20,8 @@ npm, pnpm, Yarn and Bun can do that from the repository's own lockfile.
 ## Decision
 
 Workspace install runs the package manager the repository declares: the
-`packageManager` field of the root `package.json`, else the manager whose
+`packageManager` field of the root `package.json`, else Rush for a root
+`rush.json`, else the manager whose
 lockfile, or for pnpm whose `pnpm-workspace.yaml`, lies at the root, the rule
 the Node-workspace detector of `putnami observe` and the monorepo probes read.
 A workspace that declares none installs with Bun, so a workspace `putnami
@@ -30,6 +31,10 @@ workspace declares and reinstalls with the same manager.
 - npm, pnpm and Yarn run from `PATH`, the way `turbo` does in delegate mode:
   the repository already provides them, through Corepack or a global
   install. The CLI provisions only Bun, the task runtime.
+- A Rush repository installs with `rush install`, from `PATH`. Rush installs
+  the projects `rush.json` lists and reads no root `package.json`, so the
+  install writes none, and no member list or catalog. A hosted run refuses
+  it: `rush install` downloads and runs the release `rush.json` pins.
 - Each manager reads its members and its catalog where it reads them:
   `pnpm-workspace.yaml` for pnpm, the root `package.json` otherwise. A
   manager without catalogs (npm, Yarn) gets no catalog seed.

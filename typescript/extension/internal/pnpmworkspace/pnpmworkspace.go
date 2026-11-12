@@ -379,6 +379,128 @@ func SetPackages(text string, desired []string) (string, error) {
 	return d.String(), nil
 }
 
+// EditPackages returns text with each item of its `packages` list that drop
+// reports removed and each path of added inserted, so every item the
+// repository wrote stays byte for byte: its quoting, its comments and its
+// order. An added path goes ahead of the first item that sorts after it when
+// the items are sorted, else after the last item, with the indentation of the
+// first item. A list in flow form, or one emptied by drop, is written as
+// SetPackages writes it. A file without the key gains it as SetPackages
+// writes it. A `packages` value Packages cannot read is an error.
+func EditPackages(text string, drop func(string) bool, added []string) (string, error) {
+	current, found, err := Packages(text)
+	if err != nil {
+		return "", err
+	}
+	var kept []string
+	for _, item := range current {
+		if !drop(item) {
+			kept = append(kept, item)
+		}
+	}
+	d := parseDocument(text)
+	b, _ := findTop(d, "packages")
+	_, isFlow, _ := flowInner(b.value, '[', ']')
+	if !found || isFlow || len(kept) == 0 {
+		return SetPackages(text, insertSorted(kept, added))
+	}
+
+	type item struct {
+		line  int
+		value string
+	}
+	var items []item
+	itemPrefix := ""
+	for i := b.key + 1; i < b.end; i++ {
+		s := d.lines[i]
+		body := strings.TrimLeft(s, " ")
+		if !strings.HasPrefix(body, "-") {
+			continue
+		}
+		value, _, err := scalar(strings.TrimPrefix(body, "-"))
+		if err != nil {
+			return "", err
+		}
+		if itemPrefix == "" {
+			itemPrefix = s[:indentOf(s)] + "- "
+		}
+		items = append(items, item{line: i, value: value})
+	}
+	sorted := sortedStrings(kept)
+	// before[i] holds the lines inserted ahead of line i; after holds those
+	// appended behind the last item.
+	before := map[int][]string{}
+	var after []string
+	last := items[len(items)-1].line
+	for _, path := range added {
+		line := itemPrefix + renderScalar(path)
+		placed := false
+		if sorted {
+			for _, it := range items {
+				if !drop(it.value) && it.value > path {
+					before[it.line] = append(before[it.line], line)
+					placed = true
+					break
+				}
+			}
+		}
+		if !placed {
+			after = append(after, line)
+		}
+	}
+	dropped := map[int]bool{}
+	for _, it := range items {
+		if drop(it.value) {
+			dropped[it.line] = true
+		}
+	}
+	lines := make([]string, 0, len(d.lines)+len(added))
+	for i, s := range d.lines {
+		lines = append(lines, before[i]...)
+		if !dropped[i] {
+			lines = append(lines, s)
+		}
+		if i == last {
+			lines = append(lines, after...)
+		}
+	}
+	d.lines = lines
+	return d.String(), nil
+}
+
+// insertSorted returns list with each of added inserted ahead of the first
+// item that sorts after it when list is sorted, else appended.
+func insertSorted(list, added []string) []string {
+	out := append([]string(nil), list...)
+	sorted := sortedStrings(list)
+	for _, path := range added {
+		at := len(out)
+		if sorted {
+			for i, item := range out {
+				if item > path {
+					at = i
+					break
+				}
+			}
+		}
+		out = append(out[:at], append([]string{path}, out[at:]...)...)
+	}
+	return out
+}
+
+// InsertSorted is insertSorted for a list kept outside this file, such as the
+// workspaces of the root package.json.
+func InsertSorted(list, added []string) []string { return insertSorted(list, added) }
+
+func sortedStrings(list []string) bool {
+	for i := 1; i < len(list); i++ {
+		if list[i-1] > list[i] {
+			return false
+		}
+	}
+	return true
+}
+
 // SetCatalogEntry returns text with the version of the name entry of the
 // selected catalog, the default one for catalog "", set to version, in place:
 // the key keeps its spelling and the line its indentation and comment. found

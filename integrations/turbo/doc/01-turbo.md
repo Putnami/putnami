@@ -87,12 +87,20 @@ as `mode` does, so a preview reads the list it would record.
 ### What import mode installs
 
 Import mode declares `@putnami/typescript` in the workspace, and its own
-workspace setup then runs: it adds its devDependencies to the root
-`package.json`, lists the members where the repository's package manager reads
-them (`pnpm-workspace.yaml` for pnpm, the root `package.json` `workspaces`
-otherwise), writes a root `tsconfig.json` and `biome.json` when they are
-missing, and installs with that manager, which keeps its lockfile: no
-`bun.lock` is written. Delegate mode declares only `@putnami/turbo` and changes
+workspace setup then runs. It adds to the root `package.json`, in sorted
+order, only the devDependencies a moved task needs: `typescript` and
+`@types/bun`, which every type check reads, for a build, package, validate or
+test, and `@biomejs/biome` for a Biome lint. It adds to
+the member list where the repository's package manager reads it
+(`pnpm-workspace.yaml` for pnpm, the root `package.json` `workspaces`
+otherwise) only a member no glob covers, and keeps every glob and exclusion.
+A repository that keeps no list, a `pnpm-workspace.yaml` without `packages`,
+no `pnpm-workspace.yaml` or a root `package.json` without `workspaces`, gains
+none. It writes a root
+`tsconfig.json` and `biome.json` when they are missing, and installs with that
+manager, which keeps its lockfile: no `bun.lock` is written, and a repository
+whose tasks need no new package keeps its lockfile unchanged. A failed install
+fails `init` with the manager's output. Delegate mode declares only `@putnami/turbo` and changes
 none of them.
 
 An import also adopts Putnami's TypeScript conventions (D-066) on each

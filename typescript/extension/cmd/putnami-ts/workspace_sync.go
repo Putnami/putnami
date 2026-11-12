@@ -73,6 +73,13 @@ func runWorkspaceSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (strin
 // in a deterministic order. Split from the job entry point so tests exercise the
 // tree effects without a job context.
 func syncTypeScriptWorkspace(root string, selected []pctx.ProjectRef, dryRun bool) ([]workspaceSyncChange, error) {
+	// A Rush repository lists its projects and their package names in
+	// rush.json, which rush install checks against each package.json: the sync
+	// renames no package and writes no member list there.
+	manager, _ := detectPackageManager(root)
+	if manager.Name == managerRush {
+		return nil, nil
+	}
 	members := typeScriptMembers(root, selected)
 
 	var changes []workspaceSyncChange
@@ -84,7 +91,6 @@ func syncTypeScriptWorkspace(root string, selected []pctx.ProjectRef, dryRun boo
 
 	// The membership goes where the workspace's package manager reads it. A
 	// declaration the install refuses still has its members in package.json.
-	manager, _ := detectPackageManager(root)
 	workspaceChange, err := syncWorkspaceMembers(root, manager, members, dryRun)
 	if err != nil {
 		return nil, err
@@ -185,8 +191,8 @@ func alignPackageNames(root string, members []typeScriptMember, dryRun bool) ([]
 }
 
 // syncWorkspaceMembers writes the members where manager reads them: the
-// packages of pnpm-workspace.yaml for pnpm, and the root package.json
-// workspaces otherwise.
+// packages of pnpm-workspace.yaml for pnpm, nothing for Rush, whose rush.json
+// the repository writes, and the root package.json workspaces otherwise.
 func syncWorkspaceMembers(root string, manager packageManager, members []typeScriptMember, dryRun bool) (*workspaceSyncChange, error) {
 	if manager.listsMembersInPNPMWorkspace() {
 		return syncPNPMWorkspacePackages(root, members, dryRun)
@@ -194,47 +200,56 @@ func syncWorkspaceMembers(root string, manager packageManager, members []typeScr
 	return syncRootWorkspaces(root, members, dryRun)
 }
 
-// syncPNPMWorkspacePackages rewrites the `packages` list of pnpm-workspace.yaml
-// to exactly the members' paths, keeping every other line of the file. A
-// workspace with no root package.json is left alone, as syncRootWorkspaces
-// leaves it, and so is one with no member and no pnpm-workspace.yaml. An
-// unchanged list is not rewritten.
+// syncPNPMWorkspacePackages lists the members in the `packages` list of
+// pnpm-workspace.yaml, keeping every other line of the file and every entry
+// the repository wrote (planMemberList). A file without `packages` is left
+// alone: pnpm then takes every package under the root, so it lists every
+// member already. An adopted repository without the file is left alone too:
+// it keeps no pnpm workspace. A workspace with no root package.json is left
+// alone, as syncRootWorkspaces leaves it, and so is one with no member and no
+// pnpm-workspace.yaml. An unchanged list is not rewritten.
 func syncPNPMWorkspacePackages(root string, members []typeScriptMember, dryRun bool) (*workspaceSyncChange, error) {
 	if _, err := os.Stat(filepath.Join(root, workspaceMarkerFile)); err != nil {
 		return nil, nil //nolint:nilerr // no root manifest is an ordinary state, not a failure
 	}
 	path := pnpmWorkspaceFile(root)
 	data, err := os.ReadFile(path)
+	exists := err == nil
 	if err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("read %s: %w", pnpmworkspace.File, err)
 	}
-
-	desired := make([]string, 0, len(members))
-	for _, member := range members {
-		desired = append(desired, member.Path)
-	}
-	sort.Strings(desired)
 
 	current, found, err := pnpmworkspace.Packages(string(data))
 	if err != nil {
 		return nil, err
 	}
-	if (found && equalStringSlices(current, desired)) || (!found && len(desired) == 0) {
+	if exists && !found {
 		return nil, nil
+	}
+	if !exists && adoptedRepository(root) {
+		return nil, nil
+	}
+	edit := planMemberList(root, current, members)
+	if !edit.changes(current) {
+		return nil, nil
+	}
+	updated, err := pnpmworkspace.EditPackages(string(data), edit.drop, edit.added)
+	if err != nil {
+		return nil, err
+	}
+	after, _, err := pnpmworkspace.Packages(updated)
+	if err != nil {
+		return nil, err
 	}
 
 	change := &workspaceSyncChange{
 		Path:   pnpmworkspace.File,
 		Field:  "packages",
 		Before: fmt.Sprintf("%d entries", len(current)),
-		After:  fmt.Sprintf("%d entries", len(desired)),
+		After:  fmt.Sprintf("%d entries", len(after)),
 	}
 	if dryRun {
 		return change, nil
-	}
-	updated, err := pnpmworkspace.SetPackages(string(data), desired)
-	if err != nil {
-		return nil, err
 	}
 	if err := os.WriteFile(path, []byte(updated), 0644); err != nil {
 		return nil, fmt.Errorf("write %s: %w", pnpmworkspace.File, err)
@@ -242,8 +257,8 @@ func syncPNPMWorkspacePackages(root string, members []typeScriptMember, dryRun b
 	return change, nil
 }
 
-// syncRootWorkspaces rewrites the root package.json `workspaces` membership to
-// exactly the members' paths.
+// syncRootWorkspaces lists the members in the root package.json
+// `workspaces`, keeping every entry the repository wrote (planMemberList).
 //
 // Both npm wire forms round-trip: the object form is written back AS an object
 // with only its `packages` member replaced, so a workspace that configured
@@ -252,7 +267,9 @@ func syncPNPMWorkspacePackages(root string, members []typeScriptMember, dryRun b
 // changing how bun and yarn hoist as a side effect of adding a project.
 //
 // A workspace with no root package.json is left alone: creating one would give
-// a Go-only or Python-only workspace an npm identity nobody asked for. An
+// a Go-only or Python-only workspace an npm identity nobody asked for. So is
+// the root package.json of an adopted repository that has no workspaces: the
+// repository installs no member there. An
 // unchanged membership is not rewritten, so a no-op sync does not touch the
 // file.
 func syncRootWorkspaces(root string, members []typeScriptMember, dryRun bool) (*workspaceSyncChange, error) {
@@ -266,19 +283,24 @@ func syncRootWorkspaces(root string, members []typeScriptMember, dryRun bool) (*
 		return nil, err
 	}
 
-	desired := make([]string, 0, len(members))
-	for _, member := range members {
-		desired = append(desired, member.Path)
+	if _, listed := pkg["workspaces"]; !listed && adoptedRepository(root) {
+		return nil, nil
 	}
-	sort.Strings(desired)
-
 	workspaces, err := readRootWorkspaces(pkg["workspaces"])
 	if err != nil {
 		return nil, err
 	}
-	if equalStringSlices(workspaces.packages, desired) {
+	edit := planMemberList(root, workspaces.packages, members)
+	if !edit.changes(workspaces.packages) {
 		return nil, nil
 	}
+	var kept []string
+	for _, entry := range workspaces.packages {
+		if !edit.drop(entry) {
+			kept = append(kept, entry)
+		}
+	}
+	desired := pnpmworkspace.InsertSorted(kept, edit.added)
 
 	change := &workspaceSyncChange{
 		Path:   workspaceMarkerFile,
@@ -370,16 +392,4 @@ func (w rootWorkspaces) encode(desired []string) (json.RawMessage, error) {
 		return nil, fmt.Errorf("encode workspaces object: %w", err)
 	}
 	return encoded, nil
-}
-
-func equalStringSlices(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
 }

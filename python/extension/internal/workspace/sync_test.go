@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // ---- helpers ----
@@ -710,4 +712,49 @@ func mustCompile(t *testing.T, pattern string) *regexp.Regexp {
 		t.Fatalf("regexp.Compile(%q): %v", pattern, err)
 	}
 	return re
+}
+
+func TestRepositoryUVPin(t *testing.T) {
+	for _, tc := range []struct {
+		file, content, want string
+	}{
+		{".prototools", "moon = \"1.30.4\"\nuv = \"0.8.17\"\n", ".prototools"},
+		{".tool-versions", "python 3.12.4\nuv 0.8.17\n", ".tool-versions"},
+		{"mise.toml", "[tools]\nuv = \"0.8.17\"\n", "mise.toml"},
+		{".moon/toolchain.yml", "python:\n  uv:\n    version: '0.8.17'\n", ".moon/toolchain.yml"},
+		// moon installs uv with no version of its own: nothing is pinned.
+		{".moon/toolchains.yml", "python:\n  packageManager: 'uv'\n  uv:\n    syncProjectWorkspaceDependencies: true\n", ""},
+		{".tool-versions", "python 3.12.4\n", ""},
+		{".moon/toolchains.yml", "uv: { version: '0.8.17' }\n", ".moon/toolchains.yml"},
+		{".config/mise.toml", "[tools]\n\"aqua:astral-sh/uv\" = \"0.8.17\"\n", ".config/mise.toml"},
+		// A key outside the table that holds the tools is no pin.
+		{".prototools", "moon = \"1.30.4\"\n[plugins]\nuv = \"github://moonrepo/uv-plugin\"\n", ""},
+		{"mise.toml", "[tasks]\nuv = \"uv sync\"\n", ""},
+	} {
+		dir := t.TempDir()
+		writeFile(t, filepath.Join(dir, tc.file), tc.content)
+		if got := RepositoryUVPin(dir); got != tc.want {
+			t.Errorf("RepositoryUVPin with %s %q = %q, want %q", tc.file, tc.content, got, tc.want)
+		}
+	}
+}
+
+// A [project] name that is no TOML string or no valid project name marks a
+// template; a quoted name with a comment, in either quote, is a member's.
+func TestTemplateProject(t *testing.T) {
+	spectest.Proves(t, "python/experimental-workspace-integration", "workspace-scope", "a-template-is-no-uv-workspace-member")
+	for _, tc := range []struct {
+		content string
+		want    bool
+	}{
+		{"[project]\nname = \"{{ package_name | kebab_case }}\"\n", true},
+		{"[project]\nname = {{ package_name }}\n", true},
+		{"[project]\nname = \"shop-api\" # the service\n", false},
+		{"[project]\nname = 'shop_api'\n", false},
+		{"[project]\ndynamic = [\"version\"]\n[tool.x]\nname = {{ x }}\n", false},
+	} {
+		if got := templateProject(tc.content); got != tc.want {
+			t.Errorf("templateProject(%q) = %v, want %v", tc.content, got, tc.want)
+		}
+	}
 }

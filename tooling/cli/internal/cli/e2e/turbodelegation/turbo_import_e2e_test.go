@@ -70,7 +70,10 @@ func TestADelegatedTurborepoImportsPricingAndPassesLintTestBuild(t *testing.T) {
 	if err != nil || json.Unmarshal(data, &pkg) != nil {
 		t.Fatalf("read the root package.json: %v", err)
 	}
+	// Bun installs, and an empty workspaces list, which the install fills in:
+	// an adopted repository that keeps no list gains none.
 	pkg["packageManager"] = json.RawMessage(`"bun@1.4.0"`)
+	pkg["workspaces"] = json.RawMessage(`[]`)
 	data, _ = json.MarshalIndent(pkg, "", "  ")
 	clitest.WriteFile(t, filepath.Join(root, "package.json"), string(data)+"\n")
 	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
