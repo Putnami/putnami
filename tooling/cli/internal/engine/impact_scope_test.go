@@ -89,7 +89,7 @@ func TestNarrowToTaskScopes_KeepsTheScopedExtensionsJobsAndTheirPredecessors(t *
 	}
 	scopes := map[string][]string{"/lib": {"/go/extension"}, "/app": {"/typescript/extension"}}
 
-	narrowed := narrowToTaskScopes(ws, planned, scopes)
+	narrowed := narrowToTaskScopes(ws, planned, scopes, nil)
 
 	want := []string{
 		"/lib:generate", "/lib:build", "/lib:test",
@@ -124,21 +124,21 @@ func TestNarrowToTaskScopes_KeepsTheScopedExtensionsJobsAndTheirPredecessors(t *
 	}
 
 	// No scope: the plan is returned as is, the same slice.
-	if same := narrowToTaskScopes(ws, planned, nil); len(same) != len(planned) || &same[0] != &planned[0] {
+	if same := narrowToTaskScopes(ws, planned, nil, nil); len(same) != len(planned) || &same[0] != &planned[0] {
 		t.Error("an unscoped selection must return the plan untouched")
 	}
 	// A registry extension shares the project's name and has no RelPath: it
 	// is not the workspace project the scope names.
 	foreign := scopedJob(lib, "", "build")
 	foreign.Extension.Name = "@putnami/go"
-	if got := narrowToTaskScopes(ws, []*scheduler.ScheduledJob{foreign}, scopes); len(got) != 0 {
+	if got := narrowToTaskScopes(ws, []*scheduler.ScheduledJob{foreign}, scopes, nil); len(got) != 0 {
 		t.Errorf("a registry extension named like the scoped project was kept: %v", got)
 	}
 	// A registry build pinned over that project replaces it: the scope that
 	// names the project keeps the pinned build's jobs.
 	pinned := scopedJob(lib, "", "build")
 	pinned.Extension.Name, pinned.Extension.PinnedOver = "@putnami/go", "go/extension"
-	if got := narrowToTaskScopes(ws, []*scheduler.ScheduledJob{pinned}, scopes); len(got) != 1 {
+	if got := narrowToTaskScopes(ws, []*scheduler.ScheduledJob{pinned}, scopes, nil); len(got) != 1 {
 		t.Errorf("a registry build pinned over the scoped project was dropped: %v", got)
 	}
 }
@@ -176,7 +176,7 @@ func TestNarrowToTaskScopes_MatchesTheJobsCommandAndStep(t *testing.T) {
 	}
 
 	var got []string
-	for _, job := range narrowToTaskScopes(ws, planned, scopes) {
+	for _, job := range narrowToTaskScopes(ws, planned, scopes, nil) {
 		got = append(got, job.Key())
 	}
 	want := []string{"/lib:build~generate", "/lib:test~test", "/tool:build~generate"}
@@ -295,15 +295,16 @@ func projectIDs(projects []*workspace.Project) []string {
 	return ids
 }
 
-// A task-scoped project keeps the jobs of every command of the criteria kind,
-// whatever the command is called. Their steps read the verification reports
-// the session recorded rather than files, so no changed file ever names them
-// and narrowing would retire the spec gate for exactly the projects task-level
-// selection newly creates. The name alone keeps nothing: a `validate` command
-// without the kind is narrowed like any other.
-func TestNarrowToTaskScopes_NeverNarrowsACriteriaKindCommand(t *testing.T) {
+// A task-scoped project whose scope names a task of a command with a kind
+// keeps the jobs of every command of the criteria kind, whatever the command
+// is called. Their steps read the verification reports the session recorded
+// rather than files, so no changed file ever names them and narrowing would
+// retire the spec gate for exactly the projects task-level selection newly
+// creates. The name alone keeps nothing: a `validate` command without the kind
+// is narrowed like any other.
+func TestNarrowToTaskScopes_KeepsACriteriaKindCommandWhenTheScopeNamesATaskOfAKind(t *testing.T) {
 	t.Parallel()
-	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-criteria-kind-command-is-never-narrowed")
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-criteria-job-is-kept-when-the-scope-names-a-task-of-a-kind")
 	criteria := extensionproto.CommandKindCriteria
 	project := &workspace.Project{ID: "/libs/http", Name: "http", Path: "libs/http"}
 	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{project})
@@ -315,16 +316,85 @@ func TestNarrowToTaskScopes_NeverNarrowsACriteriaKindCommand(t *testing.T) {
 		ofKind(criteria, namespacedJob(project, "acme/extension", "audit", "rules")),
 		namespacedJob(project, "legacy/extension", "validate", "lint"),
 	}
-	scopes := map[string][]string{"/libs/http": {"build~compile"}}
+	kinded := map[string]bool{"build": true, "test": true, "validate": true, "audit": true}
+	keptUnder := func(scope ...string) []string {
+		var names []string
+		for _, job := range narrowToTaskScopes(ws, planned, map[string][]string{"/libs/http": scope}, kinded) {
+			names = append(names, jobTaskScope(job))
+		}
+		return names
+	}
+	criteriaJobs := []string{"validate~features", "validate~specs", "audit~rules"}
 
-	kept := narrowToTaskScopes(ws, planned, scopes)
-
+	if got, want := keptUnder("build~compile"), append([]string{"build~compile"}, criteriaJobs...); !slices.Equal(got, want) {
+		t.Errorf("narrowed plan = %v, want %v: the scope names build~compile, a task of a command with a kind", got, want)
+	}
+	// The scope names a task no planned job runs: a `validate --impacted`
+	// session after a `test --impacted` one still judges what the tests recorded.
+	for _, scope := range [][]string{
+		{"/go/extension#test~test"},
+		{"closure:test~test-env"},
+		{"/go/extension"},
+	} {
+		if got := keptUnder(scope...); !slices.Equal(got, criteriaJobs) {
+			t.Errorf("narrowed plan under %v = %v, want %v: the scope reaches a result a criteria job judges", scope, got, criteriaJobs)
+		}
+	}
+	// A caller that resolved no command kinds keeps every criteria job.
 	var names []string
-	for _, job := range kept {
+	for _, job := range narrowToTaskScopes(ws, planned, map[string][]string{"/libs/http": {"package~archives"}}, nil) {
 		names = append(names, jobTaskScope(job))
 	}
-	if want := []string{"build~compile", "validate~features", "validate~specs", "audit~rules"}; !slices.Equal(names, want) {
-		t.Errorf("narrowed plan = %v, want %v: the scope names build~compile, and the criteria commands are never narrowed", names, want)
+	if !slices.Equal(names, criteriaJobs) {
+		t.Errorf("narrowed plan with no known kinds = %v, want %v", names, criteriaJobs)
+	}
+}
+
+// A scope that names only tasks of commands with no kind keeps no criteria job:
+// `package~archives` records no result a criteria command judges, and the gate
+// plans no `package`. This is the plan a change confined to the declaration of
+// a `package` or `publish` task gives every consumer of the extension. A job
+// that declares side effects stays, and so does the criteria job the scope
+// names itself.
+func TestNarrowToTaskScopes_AScopeOfTasksWithoutAKindKeepsNoCriteriaJob(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-scope-of-tasks-without-a-kind-keeps-no-criteria-job")
+	criteria := extensionproto.CommandKindCriteria
+	project := &workspace.Project{ID: "/libs/http", Name: "http", Path: "libs/http"}
+	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{project})
+	planned := []*scheduler.ScheduledJob{
+		namespacedJob(project, "go/extension", "build", "compile"),
+		ofKind(extensionproto.CommandKindVerification, namespacedJob(project, "go/extension", "test", "test")),
+		ofKind(criteria, namespacedJob(project, "tooling/sdd-extension", "validate", "features")),
+		ofKind(criteria, namespacedJob(project, "tooling/sdd-extension", "validate", "specs")),
+		withSideEffects(namespacedJob(project, "go/extension", "publish", "go"), extensionproto.SideEffectsRegistry),
+	}
+	kinded := commandsWithAKind([]*extension.ExtensionDescription{
+		{Jobs: map[string]*extension.JobDefinition{
+			"build":   {Traits: extensionproto.CommandTraits{Kind: extensionproto.CommandKindFiles}},
+			"test":    {Traits: extensionproto.CommandTraits{Kind: extensionproto.CommandKindVerification}},
+			"package": {},
+			"publish": {},
+		}},
+		{Jobs: map[string]*extension.JobDefinition{
+			"sdd:validate": {CommandName: "validate", Traits: extensionproto.CommandTraits{Kind: criteria}},
+		}},
+		nil,
+	})
+	keptUnder := func(scope ...string) []string {
+		var names []string
+		for _, job := range narrowToTaskScopes(ws, planned, map[string][]string{"/libs/http": scope}, kinded) {
+			names = append(names, jobTaskScope(job))
+		}
+		return names
+	}
+
+	scope := []string{"/go/extension#package~archives", "/go/extension#publish~docker", "/go/extension#publish~go", "closure:package~docker"}
+	if got, want := keptUnder(scope...), []string{"publish~go"}; !slices.Equal(got, want) {
+		t.Errorf("narrowed plan under %v = %v, want %v: no entry names a task of a command with a kind", scope, got, want)
+	}
+	if got, want := keptUnder("package~archives", "validate~specs"), []string{"validate~features", "validate~specs", "publish~go"}; !slices.Equal(got, want) {
+		t.Errorf("narrowed plan = %v, want %v: the scope names a criteria task, so every criteria job stays", got, want)
 	}
 }
 
@@ -379,7 +449,7 @@ func TestNarrowToTaskScopes_AKeptSpecGateKeepsNoUnscopedTest(t *testing.T) {
 	}
 	narrow := func(scopes map[string][]string) []string {
 		var got []string
-		for _, job := range narrowToTaskScopes(ws, append(plan(http, true), plan(core, false)...), scopes) {
+		for _, job := range narrowToTaskScopes(ws, append(plan(http, true), plan(core, false)...), scopes, nil) {
 			got = append(got, job.Key())
 		}
 		return got
@@ -500,7 +570,7 @@ func TestNarrowToTaskScopes_AKeptJobKeepsNoJobItIsOnlySerializedAfter(t *testing
 		t.Fatalf("lint~fix is serialized after %v, want the compile and the test that read the sources", got)
 	}
 
-	narrowed := narrowToTaskScopes(ws, plan(), map[string][]string{"/lib": {"lint~fix", "lint~check"}})
+	narrowed := narrowToTaskScopes(ws, plan(), map[string][]string{"/lib": {"lint~fix", "lint~check"}}, nil)
 	if got, want := sortedJobKeys(narrowed), []string{"/lib:lint~check", "/lib:lint~fix"}; !slices.Equal(got, want) {
 		t.Fatalf("narrowed = %v, want %v: lint is only serialized after the compile and the test", got, want)
 	}
@@ -511,7 +581,7 @@ func TestNarrowToTaskScopes_AKeptJobKeepsNoJobItIsOnlySerializedAfter(t *testing
 		t.Errorf("the narrowed plan does not validate: %v", err)
 	}
 
-	narrowed = narrowToTaskScopes(ws, plan(), map[string][]string{"/lib": {"lint~fix", "build~compile"}})
+	narrowed = narrowToTaskScopes(ws, plan(), map[string][]string{"/lib": {"lint~fix", "build~compile"}}, nil)
 	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:lint~fix"}; !slices.Equal(got, want) {
 		t.Fatalf("narrowed = %v, want %v", got, want)
 	}
@@ -559,7 +629,7 @@ func TestNarrowToTaskScopes_KeepsTheOrderOfEveryPairOfKeptJobs(t *testing.T) {
 			}
 		}
 		input := plan()
-		narrowed := narrowToTaskScopes(ws, input, map[string][]string{"/lib": scope})
+		narrowed := narrowToTaskScopes(ws, input, map[string][]string{"/lib": scope}, nil)
 		if got := edges(input); got != fullEdges {
 			t.Errorf("scope %v: the narrowing changed the planned jobs:\n%s\nwant\n%s", scope, got, fullEdges)
 		}
@@ -621,7 +691,7 @@ func TestNarrowToTaskScopes_KeepsAnOrderThatRestsOnADroppedJob(t *testing.T) {
 		"/client": {"build~generate", "build~compile", "lint~check"},
 	}
 
-	narrowed := narrowToTaskScopes(ws, planned, scopes)
+	narrowed := narrowToTaskScopes(ws, planned, scopes, nil)
 	if got, want := sortedJobKeys(narrowed), []string{
 		"/api:build~generate", "/api:lint~fix", "/client:build~compile", "/client:build~generate", "/client:lint~check",
 	}; !slices.Equal(got, want) {
@@ -767,15 +837,17 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 		t.Fatalf("planned = %v, want %v", got, want)
 	}
 
-	narrowed := narrowToTaskScopes(ws, planned, map[string][]string{"/lib": {"build~compile"}})
+	narrowed := narrowToTaskScopes(ws, planned, map[string][]string{"/lib": {"build~compile"}}, nil)
 
 	if got, want := sortedJobKeys(narrowed), []string{"/lib:build~compile", "/lib:ship~upload"}; !slices.Equal(got, want) {
 		t.Errorf("narrowed = %v, want %v: ship declares registry side effects, publish, deploy and docs declare none", got, want)
 	}
 }
 
-// Every first-party command keeps, under a task scope, the jobs of `publish`,
-// `deploy`, `validate` and `validate-workspace`, and no other. Every
+// Every first-party command keeps, under a task scope that names a `test`
+// task, the jobs of `publish`, `deploy`, `validate` and `validate-workspace`,
+// and no other. Under a scope that names a `package` task only, it keeps the
+// jobs of `publish` and `deploy`, and no other. Every
 // first-party `publish` resolves to `registry`, by default or by declaration,
 // and no other first-party command declares side effects. Every first-party
 // `validate` and `validate-workspace` resolves to the criteria kind, by its
@@ -786,12 +858,16 @@ func TestNarrowToTaskScopes_FollowsTheDeclaredSideEffectsNotTheCommandName(t *te
 func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-task-scope-keeps-every-job-that-declares-side-effects")
-	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-criteria-kind-command-is-never-narrowed")
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-criteria-job-is-kept-when-the-scope-names-a-task-of-a-kind")
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "a-scope-of-tasks-without-a-kind-keeps-no-criteria-job")
 	keptByName := map[string]bool{"publish": true, "deploy": true, "validate": true, "validate-workspace": true}
+	keptWithoutAKind := map[string]bool{"publish": true, "deploy": true}
 	repoRoot := filepath.Join(engineModuleRoot(t), "..", "..")
 	project := &workspace.Project{ID: "/app", Name: "app", Path: "app"}
 	ws := workspace.NewWorkspace("/ws", nil, []*workspace.Project{project})
-	scopes := map[string][]string{"/app": {"none~none"}}
+	// Neither scope names a planned job: no first-party command has a `none` step.
+	scopes := map[string][]string{"/app": {"test~none"}}
+	scopesWithoutAKind := map[string][]string{"/app": {"package~none"}}
 	var dirs []string
 	err := filepath.WalkDir(repoRoot, func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
@@ -832,16 +908,24 @@ func TestNarrowToTaskScopes_KeepsWhatEveryFirstPartyCommandKept(t *testing.T) {
 	if warnings := extension.ApplyVocabularyTraits(loaded); len(warnings) > 0 {
 		t.Fatalf("the first-party vocabularies merge with warnings: %v", warnings)
 	}
+	kinded := commandsWithAKind(loaded)
+	if !kinded["test"] || kinded["package"] {
+		t.Fatalf("first-party kinds = %v, want `test` with a kind and `package` without one", kinded)
+	}
 	kept := make(map[string]int)
 	for i, ext := range loaded {
 		dir := dirs[i]
 		for _, def := range ext.Jobs {
 			job := &scheduler.ScheduledJob{Project: project, Extension: ext, JobDef: def}
 			command := modeljobs.JobCommandName(job)
-			got := len(narrowToTaskScopes(ws, []*scheduler.ScheduledJob{job}, scopes)) == 1
+			got := len(narrowToTaskScopes(ws, []*scheduler.ScheduledJob{job}, scopes, kinded)) == 1
 			if got != keptByName[command] {
 				t.Errorf("%s %s: kept under a scope that does not name it = %t, want %t (traits %+v)",
 					dir, command, got, keptByName[command], def.Traits)
+			}
+			if without := len(narrowToTaskScopes(ws, []*scheduler.ScheduledJob{job}, scopesWithoutAKind, kinded)) == 1; without != keptWithoutAKind[command] {
+				t.Errorf("%s %s: kept under a scope of a command with no kind = %t, want %t (traits %+v)",
+					dir, command, without, keptWithoutAKind[command], def.Traits)
 			}
 			if got {
 				kept[command]++

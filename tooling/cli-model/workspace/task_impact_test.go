@@ -21,6 +21,9 @@ type fakeTaskIndex struct {
 	everyReached []string
 	// extensionTasks maps an extension project id to the tasks it declares.
 	extensionTasks map[string][]string
+	// plannedIn maps a project id to the extension tasks the planner may run
+	// in it. A project absent from the map may run every task.
+	plannedIn map[string][]string
 	// runtime holds the "<projectID>|<path>" pairs an extension's runtime reads.
 	runtime map[string]bool
 	// manifest maps "<projectID>|<path>" to the tasks a change of that
@@ -55,6 +58,22 @@ func (f fakeTaskIndex) TasksReachedFrom(tasks []string) []string {
 
 func (f fakeTaskIndex) TasksOfExtension(extensionProjectID string) []string {
 	return f.extensionTasks[extensionProjectID]
+}
+
+// TasksPlannedIn keeps every task, unless the fake names the tasks a project
+// may plan.
+func (f fakeTaskIndex) TasksPlannedIn(projectID string, tasks []string) []string {
+	may, restricted := f.plannedIn[projectID]
+	if !restricted {
+		return tasks
+	}
+	var out []string
+	for _, task := range tasks {
+		if slices.Contains(may, task) {
+			out = append(out, task)
+		}
+	}
+	return out
 }
 
 func (f fakeTaskIndex) TasksOfManifestChange(extensionProjectID, path string) ([]string, bool) {
@@ -268,6 +287,50 @@ func TestTraceChangeImpact_ExtensionConsumerEdgeFiresOnlyWhenTheBinaryMoved(t *t
 		if got := r.Trace.ScopeOf("/apps/web"); !slices.Equal(got, tc.wantScope) {
 			t.Errorf("%s scoped /apps/web to %v, want %v", tc.file, got, tc.wantScope)
 		}
+	}
+}
+
+// The workspace lists an extension for every project, and the extension plans
+// tasks in some of them only. Its rebuilt runtime reaches a consumer for the
+// tasks it may plan there, and a consumer it may plan none in is not selected:
+// no action of that project executes the tool that moved.
+func TestTraceChangeImpact_AnExtensionReachesOnlyTheConsumersItMayPlanIn(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-model", "change-impact", "an-extension-reaches-only-the-consumers-it-may-plan-in")
+	ws := NewWorkspace("/workspace", nil, []*Project{
+		{ID: "/go/extension", Name: "@putnami/go", Path: "go/extension"},
+		{ID: "/apps/api", Name: "api", Path: "apps/api", Extensions: []string{"/go/extension"}},
+		{ID: "/apps/lib", Name: "lib", Path: "apps/lib", Extensions: []string{"/go/extension"}},
+		{ID: "/apps/docs", Name: "docs", Path: "apps/docs", Extensions: []string{"/go/extension"}},
+	})
+	every := []string{"/go/extension#build~describe", "/go/extension#test~test"}
+	index := fakeTaskIndex{
+		reading:        map[string][]string{"/go/extension|go/extension/run.go": {"build~describe", "test~test"}},
+		reached:        map[string][]string{"build~describe": {"build~describe"}},
+		everyReached:   []string{"build~describe"},
+		extensionTasks: map[string][]string{"/go/extension": every},
+		plannedIn: map[string][]string{
+			"/apps/lib":  {"/go/extension#build~describe"},
+			"/apps/docs": {},
+		},
+	}
+
+	r := TraceChangeImpact(ws, []string{"go/extension/run.go"}, ChangeImpactOptions{Tasks: index})
+	selected := ownerProjectIDs(r.Projects)
+	slices.Sort(selected)
+	if want := []string{"/apps/api", "/apps/lib", "/go/extension"}; !slices.Equal(selected, want) {
+		t.Fatalf("selected %v, want %v: a consumer the extension plans no task in is not reached", selected, want)
+	}
+	if got := r.Trace.ScopeOf("/apps/api"); !slices.Equal(got, every) {
+		t.Errorf("/apps/api is scoped to %v, want every task %v", got, every)
+	}
+	if got, want := r.Trace.ScopeOf("/apps/lib"), []string{"/go/extension#build~describe"}; !slices.Equal(got, want) {
+		t.Errorf("/apps/lib is scoped to %v, want the one task the extension plans there %v", got, want)
+	}
+	if _, reached := r.Trace.Edges["/apps/docs"]; reached {
+		t.Errorf("the trace records an edge into /apps/docs: %+v", r.Trace.Edges["/apps/docs"])
+	}
+	if path := impactPathWithTasks(ws, "/go/extension", "/apps/docs", index); path != nil {
+		t.Errorf("the impact path to /apps/docs is %+v, want none", path)
 	}
 }
 

@@ -29,7 +29,7 @@
         "A changed file claims its nearest directory owner (symlinks, grouped paths canonicalized), asset, declared-input and scope-config readers, then the tasks of each that read it;",
         "a file no task reads claims nothing.",
         "Dependency edges, and contract edges whose committed contract changed, carry the tasks whose `^` reference names a source task; ordering-only edges carry none.",
-        "A rebuilt extension reaches consumers for its own tasks; an unattributable claim or workspace-wide input keeps a project whole."
+        "A rebuilt extension reaches consumers for tasks it may plan there; an unattributable claim or workspace-wide input keeps a project whole."
       ]
     },
     {

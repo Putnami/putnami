@@ -8,6 +8,8 @@
   when its runtime moved and names the runtime input; a change confined to
   the task and step declarations of the extension's own manifest carries the
   steps it moved and names the manifest.
+- **Amended**: 2026-11-12, §3: the edge reaches a consumer only for the tasks
+  the extension may plan in it, and reaches no consumer it may plan none in.
 
 ## Context
 
@@ -80,6 +82,19 @@ it, not the packages next to them.
   replaces the manifest. When a runtime change and a confined manifest change
   of one extension reach the same consumer, the consumer runs every task and
   the trace names the runtime input.
+- The edge reaches a consumer for the tasks the extension may plan in it
+  (`MayPlanJob`): the project uses the extension, or the command has the
+  workspace activation, and the command's activation files, when it names
+  any, match a file of the project. A consumer the extension may plan none
+  of the carried tasks in is not selected: no action of that project
+  executes the tool that moved. A command the workspace-once activation
+  plans runs once for the workspace on every impacted run, so its tasks
+  select no project. A carried task no command of the loaded manifest
+  declares, such as a step the change removed, stays in every consumer's
+  scope. Before this amendment the workspace `extensions` list made every
+  project a consumer of every extension: one line of
+  `integrations/bazel/reports.go` selected 152 of the 154 projects of this
+  repository, and now selects 4.
 - The edge selects each consumer for the tasks it carries, of that extension
   only. The scope entry is qualified by the extension project's id, because
   two extensions routinely declare the same `<command>~<step>` (ADR 0044 owns
@@ -121,7 +136,8 @@ identity, so it reaches the live JSONL stream and the session's
 ## Consequences
 
 - A change to an in-workspace extension's runtime runs, on every project
-  under it, that extension's jobs and their predecessors, and nothing else. A
+  the extension may plan a task in, that extension's jobs and their
+  predecessors, and nothing else. A
   change confined to its task and step declarations runs the jobs of the
   steps it moved and their predecessors. Consumer cache keys still include
   the extension's implementation digest and each task's contract digest, so

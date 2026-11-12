@@ -48,7 +48,5 @@
       ]
     }
   ],
-  "decisions": [
-    "typescript/framework/database/doc/adr/0003-shared-physical-pool-per-database.md"
-  ]
+  "decisions": ["typescript/framework/database/doc/adr/0003-shared-physical-pool-per-database.md"]
 }

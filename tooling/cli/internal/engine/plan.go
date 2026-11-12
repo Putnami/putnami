@@ -110,7 +110,7 @@ func buildPlan(
 	// An --impacted selection can hold a project for the tasks of a changed
 	// extension only; the planner plans the project whole, and the narrowing
 	// happens here, on the plan, where the predecessor closure is visible.
-	planned = narrowToTaskScopes(ws, planned, req.selectionEvidence.taskScopes)
+	planned = narrowToTaskScopes(ws, planned, req.selectionEvidence.taskScopes, commandsWithAKind(extensions))
 	if len(planned) == 0 {
 		// A lifecycle run reports its own, job-specific no-op ("No jobs matched for
 		// deps install.") and tells "no extension provides this job" from "the job
