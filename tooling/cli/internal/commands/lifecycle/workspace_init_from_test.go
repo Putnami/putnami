@@ -136,6 +136,9 @@ type initFromCalls struct {
 	imports [][]string
 	// removed are the extensions --apply removed from the lock and the disk.
 	removed []string
+	// moves makes the stubbed sync move a target: it declares
+	// @putnami/typescript, as the import sync of Nx, Turborepo and Rush does.
+	moves bool
 }
 
 func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
@@ -157,8 +160,11 @@ func stubInitFrom(t *testing.T, terminal bool, answer string) *initFromCalls {
 		calls.removed = append(calls.removed, name)
 		return nil
 	}
-	syncInitProjects = func(_ context.Context, _ string, cfg *wsproto.Config, _ LifecycleEnv) error {
+	syncInitProjects = func(_ context.Context, root string, cfg *wsproto.Config, _ LifecycleEnv) error {
 		calls.synced = cfg
+		if calls.moves {
+			declareTypeScript(t, root)
+		}
 		return nil
 	}
 	previewInitSync = func(_ context.Context, _ string, _ *wsproto.Config, mode string, declares, imports []string, _ LifecycleEnv) error {
@@ -198,12 +204,15 @@ func readInitConfig(t *testing.T, dir string) initConfig {
 func TestInitFromNxDeclaresTheNxExtensionRecordsTheModeAndSyncs(t *testing.T) {
 	spectest.Proves(t, initFromFeature, "init-from-nx", "init-from-nx-declares-the-nx-extension-records-the-mode-and-syncs")
 	for mode, want := range map[string][]string{
+		// The import sync declares @putnami/typescript once a target moves
+		// to it, and init installs it after the sync.
 		"import":   {"@putnami/nx", "@putnami/typescript"},
 		"delegate": {"@putnami/nx"},
 	} {
 		t.Run(mode, func(t *testing.T) {
 			dir := nxRepository(t)
 			calls := stubInitFrom(t, false, "")
+			calls.moves = mode == "import"
 			out, err := captureStdout(t, func() error {
 				return WorkspaceInit(context.Background(), "", []string{"--from", "nx", "--mode", mode, "--workspace", "shop"}, LifecycleEnv{})
 			})
@@ -220,7 +229,29 @@ func TestInitFromNxDeclaresTheNxExtensionRecordsTheModeAndSyncs(t *testing.T) {
 			if calls.synced == nil || !slices.Contains(calls.synced.Extensions.Names(), "@putnami/nx") {
 				t.Errorf("projects sync ran on %+v", calls.synced)
 			}
+			if strings.Contains(out, "No task moves") {
+				t.Errorf("a sync that moved a target notes that none moves:\n%s", out)
+			}
 		})
+	}
+
+	// An import that moves no target declares and installs the Nx extension
+	// alone, and says that delegate mode gives the same result.
+	dir := nxRepository(t)
+	calls := stubInitFrom(t, false, "")
+	out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), "", []string{"--from", "nx", "--mode", "import", "--workspace", "shop"}, LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v\n%s", err, out)
+	}
+	if cfg := readInitConfig(t, dir); !slices.Equal(cfg.Extensions, []string{"@putnami/nx"}) || !slices.Equal(calls.installed, []string{"@putnami/nx"}) {
+		t.Errorf("extensions %v, installed %v, want the Nx extension alone", cfg.Extensions, calls.installed)
+	}
+	for _, want := range []string{"No task moves to a Putnami extension: every task keeps running through nx, and no language extension was installed.", "putnami init --from nx --mode delegate gives the same result."} {
+		if !strings.Contains(out, want) {
+			t.Errorf("init prints %q:\n%s", want, out)
+		}
 	}
 
 	// Without nx.json, init refuses.
@@ -367,12 +398,13 @@ func TestInitFromRerunPreviewsAndWritesOnlyWithApply(t *testing.T) {
 		t.Errorf("workspace config = %+v, removed %v", cfg, calls.removed)
 	}
 
-	// Back to import from a delegate-only workspace: --apply declares and
-	// installs the TypeScript extension.
+	// Back to import from a delegate-only workspace: the sync declares the
+	// TypeScript extension once a target moves, and --apply installs it.
 	if err := os.WriteFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename), []byte(`{"name": "shop", "extensions": ["@putnami/nx"], "options": {"@putnami/nx": {"mode": "delegate"}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	calls = stubInitFrom(t, false, "")
+	calls.moves = true
 	out, err = captureStdout(t, func() error {
 		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--mode", "import", "--apply"}, LifecycleEnv{})
 	})
@@ -384,7 +416,7 @@ func TestInitFromRerunPreviewsAndWritesOnlyWithApply(t *testing.T) {
 	}
 }
 
-func TestInitFromPreviewReadsTheExtensionsApplyDeclaresAsDeclared(t *testing.T) {
+func TestInitFromPreviewDeclaresNoLanguageExtensionBeforeTheSync(t *testing.T) {
 	spectest.Proves(t, initFromFeature, "init-rerun-shows-a-diff", "init-from-rerun-previews-and-writes-only-with-apply")
 	dir := nxRepository(t)
 	delegateOnly := `{"name": "shop", "extensions": ["@putnami/nx"], "options": {"@putnami/nx": {"mode": "delegate"}}}`
@@ -392,40 +424,44 @@ func TestInitFromPreviewReadsTheExtensionsApplyDeclaresAsDeclared(t *testing.T) 
 		t.Fatal(err)
 	}
 
-	// A switch to import previews the sync with @putnami/typescript, which
-	// --apply declares before it syncs, and writes nothing.
+	// A switch to import previews the sync with no extension declared
+	// beforehand: the sync itself declares @putnami/typescript once a target
+	// moves, and its preview shows it. Nothing is written.
 	calls := stubInitFrom(t, false, "")
 	out, err := captureStdout(t, func() error {
 		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--mode", "import"}, LifecycleEnv{})
 	})
-	if err != nil || !slices.Equal(calls.previewed, []string{"import"}) || len(calls.declares) != 1 || !slices.Equal(calls.declares[0], []string{"@putnami/typescript"}) {
+	if err != nil || !slices.Equal(calls.previewed, []string{"import"}) || len(calls.declares) != 1 || len(calls.declares[0]) != 0 {
 		t.Fatalf("err %v, previewed %v with %v\n%s", err, calls.previewed, calls.declares, out)
 	}
-	if !strings.Contains(out, "extensions + @putnami/typescript") {
-		t.Errorf("the preview names the extension --apply declares:\n%s", out)
+	if strings.Contains(out, "extensions + @putnami/typescript") {
+		t.Errorf("init declares @putnami/typescript before the sync:\n%s", out)
 	}
 	if data, _ := os.ReadFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename)); string(data) != delegateOnly {
 		t.Errorf("a preview wrote %s", data)
 	}
 
-	// The preview's sync tasks receive them as a parameter beside the mode.
-	want := map[string]any{"dryRun": true, "mode": "import", "declaredExtensions": []string{"@putnami/typescript"}}
-	if got := initPreviewParams("import", calls.declares[0], nil); !reflect.DeepEqual(got, want) {
+	// The preview's sync tasks receive the extensions --apply declares as a
+	// parameter beside the mode.
+	want := map[string]any{"dryRun": true, "mode": "import", "declaredExtensions": []string{"@putnami/nx"}}
+	if got := initPreviewParams("import", []string{"@putnami/nx"}, nil); !reflect.DeepEqual(got, want) {
 		t.Errorf("preview params = %v, want %v", got, want)
 	}
 	if got := initPreviewParams("delegate", nil, nil); !reflect.DeepEqual(got, map[string]any{"dryRun": true, "mode": "delegate"}) {
 		t.Errorf("a preview that declares nothing passes no extension: %v", got)
 	}
 
-	// --apply declares the extension the preview read as declared.
+	// --apply records the mode, and the sync declares the extension a moved
+	// target runs.
 	calls = stubInitFrom(t, false, "")
+	calls.moves = true
 	if out, err := captureStdout(t, func() error {
 		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--mode", "import", "--apply"}, LifecycleEnv{})
 	}); err != nil || calls.synced == nil || !slices.Contains(calls.synced.Extensions.Names(), "@putnami/typescript") {
 		t.Fatalf("err %v, synced %+v\n%s", err, calls.synced, out)
 	}
 
-	// Once the workspace declares it, the preview passes no extension.
+	// A rerun previews with no extension to declare either.
 	calls = stubInitFrom(t, false, "")
 	if out, err := captureStdout(t, func() error {
 		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx"}, LifecycleEnv{})
@@ -444,7 +480,7 @@ func TestInitFromApplyKeepsTheObjectFormOfExtensions(t *testing.T) {
 	out, err := captureStdout(t, func() error {
 		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--mode", "import", "--apply"}, LifecycleEnv{})
 	})
-	if err != nil || !slices.Equal(calls.installed, []string{"@putnami/typescript"}) {
+	if err != nil || len(calls.installed) != 0 {
 		t.Fatalf("err %v, installed %v\n%s", err, calls.installed, out)
 	}
 	data, _ := os.ReadFile(filepath.Join(dir, wsproto.WorkspaceConfigFilename))
@@ -454,13 +490,13 @@ func TestInitFromApplyKeepsTheObjectFormOfExtensions(t *testing.T) {
 	if err := json.Unmarshal(data, &doc); err != nil {
 		t.Fatalf("extensions lost their object form: %v\n%s", err, data)
 	}
-	if want := map[string]string{"@putnami/nx": "^0.4.0", "@putnami/go": "", "@putnami/typescript": ""}; !maps.Equal(doc.Extensions, want) {
+	if want := map[string]string{"@putnami/nx": "^0.4.0", "@putnami/go": ""}; !maps.Equal(doc.Extensions, want) {
 		t.Errorf("extensions = %v, want %v", doc.Extensions, want)
 	}
 }
 
-// declareTypeScript stands for moon's import sync: it declares the language
-// extension it maps a project to, keeping the config's order.
+// declareTypeScript stands for an import sync that moves a target to
+// @putnami/typescript: it declares the extension, keeping the config's order.
 func declareTypeScript(t *testing.T, root string) {
 	t.Helper()
 	file := filepath.Join(root, wsproto.WorkspaceConfigFilename)
@@ -535,6 +571,8 @@ func TestInitFromMoonDeclaresTheMoonExtensionAndSyncsTheProjects(t *testing.T) {
 func TestInitFromTurboDeclaresTheTurboExtensionAndRecordsTheMode(t *testing.T) {
 	spectest.Proves(t, initFromFeature, "init-from-turbo", "init-from-turbo-declares-the-turbo-extension-and-records-the-mode")
 	for mode, want := range map[string][]string{
+		// The import sync declares @putnami/typescript once a target moves
+		// to it, and init installs it after the sync.
 		"import":   {"@putnami/turbo", "@putnami/typescript"},
 		"delegate": {"@putnami/turbo"},
 	} {
@@ -545,6 +583,7 @@ func TestInitFromTurboDeclaresTheTurboExtensionAndRecordsTheMode(t *testing.T) {
 				t.Fatal(err)
 			}
 			calls := stubInitFrom(t, false, "")
+			calls.moves = mode == "import"
 			out, err := captureStdout(t, func() error {
 				return WorkspaceInit(context.Background(), "", []string{"--from", "turbo", "--mode", mode, "--workspace", "shop"}, LifecycleEnv{})
 			})
@@ -574,6 +613,8 @@ func TestInitFromTurboDeclaresTheTurboExtensionAndRecordsTheMode(t *testing.T) {
 func TestInitFromRushDeclaresTheExtensionsOfTheModeAndSyncsTheProjects(t *testing.T) {
 	spectest.Proves(t, initFromFeature, "init-from-rush", "init-from-rush-declares-the-extensions-of-the-mode-and-syncs-the-projects")
 	for mode, want := range map[string][]string{
+		// The import sync declares @putnami/typescript once a target moves
+		// to it, and init installs it after the sync.
 		"import":   {"@putnami/rush", "@putnami/typescript"},
 		"delegate": {"@putnami/rush"},
 	} {
@@ -584,6 +625,7 @@ func TestInitFromRushDeclaresTheExtensionsOfTheModeAndSyncsTheProjects(t *testin
 				t.Fatal(err)
 			}
 			calls := stubInitFrom(t, false, "")
+			calls.moves = mode == "import"
 			out, err := captureStdout(t, func() error {
 				return WorkspaceInit(context.Background(), "", []string{"--from", "rush", "--mode", mode, "--workspace", "shop"}, LifecycleEnv{})
 			})
@@ -667,7 +709,7 @@ func TestInitFromImportAddsProjectsToTheListAndPreviewsWithoutApply(t *testing.T
 	}
 
 	// Without --apply, the run previews the sync with the list it would
-	// record and the extension it would declare, and writes nothing.
+	// record, and writes nothing.
 	calls := stubInitFrom(t, false, "")
 	out, err := captureStdout(t, func() error {
 		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--import", "/packages/pricing"}, LifecycleEnv{})
@@ -675,12 +717,11 @@ func TestInitFromImportAddsProjectsToTheListAndPreviewsWithoutApply(t *testing.T
 	if err != nil || !slices.Equal(calls.previewed, []string{"delegate"}) || calls.synced != nil || len(calls.installed) != 0 {
 		t.Fatalf("err %v, calls %+v\n%s", err, calls, out)
 	}
-	if !slices.Equal(calls.imports[0], []string{"/packages/pricing"}) || !slices.Equal(calls.declares[0], []string{"@putnami/typescript"}) {
+	if !slices.Equal(calls.imports[0], []string{"/packages/pricing"}) || len(calls.declares[0]) != 0 {
 		t.Errorf("the preview read imports %v and declares %v", calls.imports, calls.declares)
 	}
 	for _, want := range []string{
 		`options["@putnami/nx"].import + /packages/pricing`,
-		"extensions + @putnami/typescript",
 		"putnami init --from nx --mode delegate --import /packages/pricing --apply",
 	} {
 		if !strings.Contains(out, want) {
@@ -698,9 +739,10 @@ func TestInitFromImportAddsProjectsToTheListAndPreviewsWithoutApply(t *testing.T
 		t.Errorf("preview params = %v, want the mode and the list", got)
 	}
 
-	// --apply records the list, declares and installs @putnami/typescript,
-	// and synchronizes.
+	// --apply records the list and synchronizes; the sync declares
+	// @putnami/typescript for the target that moves, and init installs it.
 	calls = stubInitFrom(t, false, "")
+	calls.moves = true
 	out, err = captureStdout(t, func() error {
 		return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--import", "/packages/pricing", "--apply"}, LifecycleEnv{})
 	})
@@ -749,13 +791,14 @@ func TestInitFromImportAddsProjectsToTheListAndPreviewsWithoutApply(t *testing.T
 	}
 
 	// A new workspace from Turborepo: --import alone adopts in delegate
-	// mode, records the list and declares @putnami/typescript.
+	// mode and records the list; the sync declares @putnami/typescript.
 	turbo := t.TempDir()
 	t.Chdir(turbo)
 	if err := os.WriteFile(filepath.Join(turbo, "turbo.json"), []byte(`{"tasks": {"build": {}}}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	calls = stubInitFrom(t, true, "")
+	calls.moves = true
 	out, err = captureStdout(t, func() error {
 		return WorkspaceInit(context.Background(), "", []string{"--from", "turbo", "--import", "/packages/pricing", "--workspace", "shop"}, LifecycleEnv{})
 	})

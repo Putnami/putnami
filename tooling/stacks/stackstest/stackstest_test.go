@@ -223,3 +223,22 @@ func TestWriteFileCreatesTheDirectories(t *testing.T) {
 		t.Errorf("%q %v", got, err)
 	}
 }
+
+func TestChangedListsEachFileAddedRemovedOrRewritten(t *testing.T) {
+	root := t.TempDir()
+	WriteFile(t, root, "kept.txt", "same")
+	WriteFile(t, root, "rewritten.txt", "old")
+	WriteFile(t, root, "removed.txt", "gone")
+	before := Snapshot(t, root)
+	if got := Changed(t, root, before); len(got) != 0 {
+		t.Fatalf("changed = %v before any write", got)
+	}
+	WriteFile(t, root, "rewritten.txt", "new")
+	WriteFile(t, root, "sub/added.txt", "added")
+	if err := os.Remove(filepath.Join(root, "removed.txt")); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.Join(Changed(t, root, before), ","), "removed.txt,rewritten.txt,sub/added.txt"; got != want {
+		t.Errorf("changed = %s, want %s", got, want)
+	}
+}

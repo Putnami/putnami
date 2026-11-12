@@ -4,7 +4,9 @@
 - **Date**: 2026-11-11
 - **Amended**: 2026-11-12, rules 6 and 9: a moved task does what its script
   did, and a Bun build moves only when it writes the entries its
-  `package.json` names.
+  `package.json` names. 2026-11-12, rule 1: a project names its language
+  extension only when one of its targets moves, and an import that moves
+  no target declares and installs nothing.
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), the import mode of
   `@putnami/nx`, `@putnami/turbo`, `@putnami/rush` and `@putnami/moon`;
   `putnami init --from`
@@ -36,13 +38,20 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
 
 ## Decision
 
-1. **One rule for every tool.** In import mode, a project whose language has
-   a Putnami extension moves to that extension. Its `build`, `test` or `lint`
-   target moves to Putnami only when the extension runs the same tool as the
-   target. A target that runs another tool, or that no Putnami task takes
-   over, keeps running as the repository defines it, through the tool, and
-   the sync lists it as not mapped, with its reason. A project whose language
-   has no extension stays on the tool. D-065 and D-066 apply to every import.
+1. **One rule for every tool.** In import mode, a project's `build`, `test`
+   or `lint` target moves to the Putnami extension of its language only when
+   that extension runs the same tool as the target. A target that runs
+   another tool, or that no Putnami task takes over, keeps running as the
+   repository defines it, through the tool, and the sync lists it as not
+   mapped, with its reason. A project names its language extension only when
+   one of its targets moves: a project none of whose targets moves, or whose
+   language has no extension, stays on the tool alone. The sync declares a
+   language extension in the workspace only when a project names it, and
+   `putnami init --from` installs only what the sync declared. An import
+   that moves no target declares no language extension and installs
+   nothing, so the repository's lockfile and configuration stay as they
+   were; `init` says that no task moves and that `--mode delegate` gives the
+   same result. D-065 and D-066 apply to every project that moves a target.
 2. **The TypeScript rule is stated once.** `tooling/stacks` holds the rule
    that decides whether `@putnami/typescript` runs what a TypeScript script
    runs: `bun build` or a `tsc` alone for `build` (the `tscscript` package of

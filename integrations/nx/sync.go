@@ -137,8 +137,8 @@ type SyncResult struct {
 	// Imported are the workspace-relative directories of the TypeScript
 	// projects a delegated workspace's import list moved to
 	// @putnami/typescript, sorted. A selected project that is no TypeScript
-	// project, or whose workspace does not declare the extension, stays on
-	// Nx and is listed among Unmapped.
+	// project, or none of whose targets moves, stays on Nx and is listed
+	// among Unmapped.
 	Imported []string
 	// Unmatched are the entries of the import list that select no project.
 	Unmatched []string
@@ -203,16 +203,26 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	if err != nil {
 		return SyncResult{}, err
 	}
-	typeScript := slices.Contains(opts.Declared, TypeScriptExtension) || declaresExtension(root, TypeScriptExtension)
+	// An imported project names @putnami/typescript only when one of its
+	// targets moves, and the sync declares the extension in the workspace
+	// only then (ADR 0017 of tooling/stacks). A declared extension claims
+	// every project with a package.json, so the projects plan again once a
+	// move declares it.
+	declared := slices.Contains(opts.Declared, TypeScriptExtension) || declaresExtension(root, TypeScriptExtension)
+	plans := planProjects(root, detection.Projects, mode, imports, declared)
+	if !declared && slices.ContainsFunc(plans, func(plan projectPlan) bool { return plan.typeScript }) {
+		declared = true
+		plans = planProjects(root, detection.Projects, mode, imports, declared)
+	}
 	var conventions []stacks.ConventionProject
 	lintMoved := false
-	for _, p := range detection.Projects {
+	for i, p := range detection.Projects {
 		projectMode := mode
 		if imports.Selects(p.Path) {
 			projectMode = ModeImport
 		}
-		plan := planProject(root, p, projectMode, typeScript)
-		if mode == ModeDelegate && plan.typeScript {
+		plan := plans[i]
+		if mode == ModeDelegate && projectMode == ModeImport && plan.typeScript {
 			result.Imported = append(result.Imported, p.Path)
 		}
 		if plan.typeScript {
@@ -264,6 +274,18 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	result.Conventions = append(append(result.Conventions, notes...), warnings...)
 	if lintMoved {
 		result.Notes = append(result.Notes, stacks.LintDependentsNote)
+	}
+	if slices.ContainsFunc(plans, func(plan projectPlan) bool { return plan.typeScript }) {
+		changed, change, err := stacks.DeclareExtensions(root, []string{TypeScriptExtension}, opts.DryRun)
+		if err != nil {
+			return SyncResult{}, fmt.Errorf("%s: %w", wsproto.WorkspaceConfigFilename, err)
+		}
+		if changed {
+			result.Written = append(result.Written, wsproto.WorkspaceConfigFilename)
+		}
+		if change != nil {
+			result.Changes = append(result.Changes, Change{File: change.File, Before: change.Before, After: change.After})
+		}
 	}
 	return result, nil
 }
@@ -384,9 +406,10 @@ func declaresExtension(root, name string) bool {
 
 // projectPlan is what the sync writes for one project.
 type projectPlan struct {
-	// typeScript reports an imported TypeScript project, whose putnami.json
-	// names @putnami/typescript beside the extension: a putnami.json that
-	// names extensions is claimed by those alone.
+	// typeScript reports an imported TypeScript project one of whose
+	// targets moves, whose putnami.json names @putnami/typescript beside the
+	// extension: a putnami.json that names extensions is claimed by those
+	// alone.
 	typeScript bool
 	deps       []string
 	disabled   []string
@@ -412,8 +435,27 @@ type projectPlan struct {
 	lintMoved, testMoved bool
 }
 
-// planProject maps the targets of one project in the mode.
-func planProject(root string, p detect.Project, mode string, typeScript bool) projectPlan {
+// planProjects maps the targets of each project, in the order of projects:
+// a project the import list selects in the import mode. declared reports
+// that the workspace declares @putnami/typescript, or that the sync declares
+// it because a target moves: the extension then claims every project with a
+// package.json.
+func planProjects(root string, projects []detect.Project, mode string, imports *stacks.ImportList, declared bool) []projectPlan {
+	plans := make([]projectPlan, len(projects))
+	for i, p := range projects {
+		projectMode := mode
+		if imports.Selects(p.Path) {
+			projectMode = ModeImport
+		}
+		plans[i] = planProject(root, p, projectMode, declared)
+	}
+	return plans
+}
+
+// planProject maps the targets of one project in the mode. An imported
+// TypeScript project names @putnami/typescript only when one of its targets
+// moves to it.
+func planProject(root string, p detect.Project, mode string, declared bool) projectPlan {
 	var plan projectPlan
 	for _, d := range p.Dependencies {
 		plan.deps = append(plan.deps, wsproto.ProjectIDFromPath(d))
@@ -425,9 +467,7 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: t.Name, Reason: unrunReason(p.Name, t.Name)})
 		}
 	}
-	isTS := mode == ModeImport && typeScript && isTypeScriptProject(root, p.Path)
-	plan.typeScript = isTS
-	plan.nodeRuntime = isTS && (targets["serve"].Executor == nodeExecutor || startScriptRunsNode(filepath.Join(root, filepath.FromSlash(p.Path))))
+	isTS := mode == ModeImport && isTypeScriptProject(root, p.Path)
 	for _, task := range lifecycleTasks {
 		target, ok := targets[task]
 		covered := ok && isTS && coveredByTypeScript(root, p.Path, task, target)
@@ -448,12 +488,13 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 			plan.compiler = covered && compiler
 		}
 		if reason == "" && ok {
-			reason = importReason(root, p.Path, typeScript, isTS, task, target)
+			reason = importReason(root, p.Path, isTS, task, target)
 		}
 		switch {
 		case !ok:
 			plan.disabled = append(plan.disabled, task)
 		case covered:
+			plan.typeScript = true
 			plan.disabled = append(plan.disabled, ExtensionName+":"+task)
 			if task == "test" {
 				plan.runner = testRunner(target)
@@ -463,7 +504,7 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 				plan.eslint = lintsWithESLint(root, p.Path, target)
 				plan.lintMoved = true
 			}
-		case typeScript && hasManifest(root, p.Path):
+		case declared && hasManifest(root, p.Path):
 			// The TypeScript extension claims the project too: the target
 			// runs through Nx alone.
 			plan.disabled = append(plan.disabled, TypeScriptExtension+":"+task)
@@ -481,17 +522,15 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 				Reason: "its test configuration names no JUnit or coverage report: the result is the exit code alone"})
 		}
 	}
+	plan.nodeRuntime = plan.typeScript && (targets["serve"].Executor == nodeExecutor || startScriptRunsNode(filepath.Join(root, filepath.FromSlash(p.Path))))
 	slices.Sort(plan.disabled)
 	return plan
 }
 
-func importReason(root, dir string, declared, isTS bool, task string, target detect.Target) string {
+func importReason(root, dir string, isTS bool, task string, target detect.Target) string {
 	runs := target.Executor
 	if target.Command != "" && (runs == "" || runs == "nx:run-script" || runs == "nx:run-commands") {
 		runs = target.Command
-	}
-	if !declared {
-		return fmt.Sprintf("the workspace does not declare %s: %s keeps running through nx run", TypeScriptExtension, task)
 	}
 	if !isTS {
 		return fmt.Sprintf("the project is no TypeScript project (package.json, and a tsconfig*.json or a .ts source): %s keeps running through nx run", task)

@@ -504,44 +504,6 @@ func TestTheMoonManifestConformsToTheStackCore(t *testing.T) {
 	stackstest.CheckManifest(t, "putnami.extension.json", s)
 }
 
-func TestTheSyncKeepsTheWorkspaceConfigOrder(t *testing.T) {
-	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
-	root := t.TempDir()
-	file := filepath.Join(root, wsproto.WorkspaceConfigFilename)
-	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, "{\n  \"name\": \"demo\",\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}},\n  \"extensions\": [\"@putnami/moon\"]\n}\n")
-	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || !changed {
-		t.Fatalf("declare: %v %v", changed, err)
-	}
-	data, _ := os.ReadFile(file)
-	want := "{\n  \"name\": \"demo\",\n  \"options\": {\n    \"@putnami/moon\": {\n      \"mode\": \"import\"\n    }\n  },\n  \"extensions\": [\n    \"@putnami/moon\",\n    \"@putnami/go\"\n  ]\n}\n"
-	if string(data) != want {
-		t.Errorf("config:\n%s\nwant\n%s", data, want)
-	}
-	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
-		t.Errorf("a declared extension changes nothing: %v %v", changed, err)
-	}
-	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, "[]")
-	if _, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err == nil {
-		t.Error("a config that is no object fails")
-	}
-	if changed, _, err := declareExtensions(t.TempDir(), []string{"@putnami/go"}, false); err != nil || changed {
-		t.Errorf("no workspace config: %v %v", changed, err)
-	}
-}
-
-func TestAnExtensionLoadedFromTheWorkspaceIsDeclared(t *testing.T) {
-	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
-	root := t.TempDir()
-	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": ["/moon-extension", "./tools/go", "/missing"]}`)
-	stackstest.WriteFile(t, root, "tools/go/putnami.extension.json", `{"name": "@putnami/go"}`)
-	if changed, _, err := declareExtensions(root, []string{"@putnami/go"}, false); err != nil || changed {
-		t.Errorf("an extension the workspace loads by path is declared: %v %v", changed, err)
-	}
-	if changed, _, err := declareExtensions(root, []string{"@putnami/rust"}, true); err != nil || !changed {
-		t.Errorf("a dry run reports an undeclared extension: %v %v", changed, err)
-	}
-}
-
 func TestADryRunOfTheSyncJobPrintsEachDiffAndWritesNothing(t *testing.T) {
 	spectest.Proves(t, feature, "sync-writes-each-project", "the-sync-writes-each-moon-project-putnami-json")
 	d := readDemo(t)
@@ -891,5 +853,48 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 	}
 	if again, err := Stale(context.Background(), root); err != nil || len(again.Written) != 0 || len(again.Changes) != 0 {
 		t.Errorf("a second import changes %v %v, %v", again.Written, again.Changes, err)
+	}
+}
+
+func TestAnImportThatMovesNoTaskDeclaresNothing(t *testing.T) {
+	spectest.Proves(t, feature, "an-import-declares-only-what-moves", "an-import-that-moves-no-task-declares-nothing")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, false)
+	// api runs webpack, Mocha and an ESLint chained to Prettier, which
+	// @putnami/typescript does not run; pricing builds a release, which
+	// @putnami/rust does not build, and cargo test stays on moon.
+	stackstest.WriteFile(t, root, ".moon/tasks/node.yml", "tasks:\n  lint:\n    command: 'eslint . && prettier --check .'\n")
+	stackstest.WriteFile(t, root, "apps/api/moon.yml", "language: 'typescript'\ndependsOn: ['pricing']\ntasks:\n  build:\n    command: 'webpack'\n  test:\n    command: 'mocha'\n")
+	stackstest.WriteFile(t, root, "packages/pricing/moon.yml", "language: 'rust'\ntasks:\n  build:\n    command: 'cargo build --release'\n  unit:\n    command: 'cargo test'\n    tags: ['test']\n")
+	before := stackstest.Snapshot(t, root)
+	result, err := Sync(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Each project runs on moon alone, and only the putnami.json files
+	// change: the workspace config, the manifests and the lockfile keep their
+	// bytes.
+	for _, dir := range []string{"apps/api", "packages/pricing", "apps/web"} {
+		if got, want := readProjectFile(t, root, dir)["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s extensions = %v, want %v", dir, got, want)
+		}
+	}
+	for _, rel := range stackstest.Changed(t, root, before) {
+		if filepath.Base(rel) != wsproto.ConfigFilename {
+			t.Errorf("the sync changed %s", rel)
+		}
+	}
+	if len(result.Extensions) != 0 || slices.Contains(result.Written, wsproto.WorkspaceConfigFilename) {
+		t.Errorf("extensions = %v, written = %v, want none declared", result.Extensions, result.Written)
+	}
+
+	// Once a test moves, the sync declares the extension that runs it.
+	stackstest.WriteFile(t, root, "apps/api/moon.yml", "language: 'typescript'\ndependsOn: ['pricing']\ntasks:\n  build:\n    command: 'webpack'\n  test:\n    command: 'vitest run'\n")
+	result, err = Sync(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := result.Extensions, []string{"@putnami/typescript"}; !slices.Equal(got, want) {
+		t.Errorf("declared extensions = %v, want %v", got, want)
 	}
 }

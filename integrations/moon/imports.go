@@ -194,8 +194,8 @@ func packageScripts(dir string) map[string]string {
 // extension.
 type importPlan struct {
 	// extension and also are the extensions the project runs: its
-	// language's alone, or the moon extension beside it when a task stays on
-	// moon.
+	// language's alone, the moon extension beside it when a task stays on
+	// moon, or the moon extension alone when none moves.
 	extension string
 	also      []string
 	// disabled are the commands the project runs none of, bare for a
@@ -262,7 +262,13 @@ func planImport(root string, p detect.Project, mapped map[string]string) importP
 			plan.bunBuild = stacks.TypeScriptBuildsWithBun(line)
 		}
 	}
-	if len(plan.kept) == 0 {
+	switch {
+	case len(moved) == 0:
+		// A project none of whose tasks moves runs on moon alone (ADR 0017
+		// of tooling/stacks): it names no language extension.
+		plan.extension = ExtensionName
+		return plan
+	case len(plan.kept) == 0:
 		return plan
 	}
 	plan.extension, plan.also = ExtensionName, []string{extension}

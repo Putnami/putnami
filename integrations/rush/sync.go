@@ -98,7 +98,7 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 	packages := make([]stacks.GraphPackage, 0, len(detection.Projects))
 	var kept []string
 	var conventions []stacks.ConventionProject
-	lintMoved := false
+	lintMoved, declare := false, false
 	for _, p := range detection.Projects {
 		pkg := stacks.GraphPackage{DependsOn: p.DependsOn, Dir: p.Folder}
 		if mode == ModeDelegate {
@@ -122,9 +122,13 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 		pkg.Edit = plan.edit
 		kept = append(kept, plan.notes...)
 		lintMoved = lintMoved || plan.lintMoved
+		packages = append(packages, pkg)
+		if plan.extension == ExtensionName && len(plan.also) == 0 {
+			continue
+		}
+		declare = true
 		convention.BunBuild = plan.bunBuild
 		conventions = append(conventions, convention)
-		packages = append(packages, pkg)
 	}
 	result, err := sync.Apply(root, packages, dry)
 	if err != nil {
@@ -149,6 +153,20 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 		if lintMoved {
 			result.Warnings = append(result.Warnings, stacks.LintDependentsNote)
 		}
+		// The workspace declares @putnami/typescript only when a script
+		// moves to it, so an import that moves none installs nothing.
+		if declare {
+			changed, change, err := stacks.DeclareExtensions(root, []string{TypeScriptExtension}, dry)
+			if err != nil {
+				return SyncResult{}, fmt.Errorf("%s: %w", wsproto.WorkspaceConfigFilename, err)
+			}
+			if changed {
+				result.Written = append(result.Written, wsproto.WorkspaceConfigFilename)
+			}
+			if change != nil {
+				result.Changes = append(result.Changes, *change)
+			}
+		}
 		return result, nil
 	}
 	if _, ok := commands[stacks.TaskTest]; ok {
@@ -166,8 +184,8 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 // tooling/stacks).
 type importPlan struct {
 	// extension and also are the extensions the project runs: the
-	// TypeScript extension alone, or the Rush extension beside it when a
-	// target stays on Rush.
+	// TypeScript extension alone, the Rush extension beside it when a
+	// target stays on Rush, or the Rush extension alone when none moves.
 	extension string
 	also      []string
 	// disabled are the jobs the project runs none of, bare for a task it has
@@ -230,7 +248,13 @@ func planImport(root string, p detect.Project, scripts map[string]string, publis
 			plan.notes = append(plan.notes, fmt.Sprintf("not mapped: the %s script of %s: %s", task, p.Name, reason))
 		}
 	}
-	if len(plan.kept) == 0 {
+	switch {
+	case len(moved) == 0:
+		// A project none of whose scripts moves runs on Rush alone (ADR 0017
+		// of tooling/stacks): it names no TypeScript extension.
+		plan.extension = ExtensionName
+		return plan
+	case len(plan.kept) == 0:
 		return plan
 	}
 	plan.extension, plan.also = ExtensionName, []string{TypeScriptExtension}

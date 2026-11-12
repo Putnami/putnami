@@ -2,6 +2,9 @@
 
 - **Status**: accepted; amended by
   [ADR 0002](0002-a-delegated-workspace-imports-the-projects-a-list-names.md)
+  and by
+  [ADR 0017 of `tooling/stacks`](../../../../tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md):
+  the sync declares `@putnami/typescript`, only when a target moves to it
 - **Date**: 2026-11-09
 - **Scope**: `integrations/nx` (`@putnami/nx`) and `tooling/cli`
   (`putnami init --from`); builds on
@@ -28,7 +31,8 @@ every later `putnami projects sync` rewrites the projects' `putnami.json`.
   project has no target for.
 - In import mode, `init` also declares `@putnami/typescript`, whose probe
   claims each project with a `package.json` (corrected by ADR 0002: the
-  sync names it in each TypeScript project's `putnami.json`). For a
+  sync names it in each TypeScript project's `putnami.json`; and by ADR 0017
+  of `tooling/stacks`: the sync declares it, only when a target moves). For a
   TypeScript project, one with `package.json` and a `tsconfig*.json` or a
   `.ts` source, the sync
   disables the qualified job of the extension that does not run a target:

@@ -196,6 +196,19 @@
               "an-imported-task-does-what-its-script-did"
             ]
           }
+        },
+        {
+          "id": "an-import-declares-only-what-moves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-that-moves-no-task-declares-nothing"
+            ]
+          }
         }
       ]
     }

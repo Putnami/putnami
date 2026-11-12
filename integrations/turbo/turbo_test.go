@@ -404,9 +404,10 @@ func TestAChainedLintScriptStaysOnTurborepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jobs, _ := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"].([]any)
-	if !slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
-		t.Errorf("jobs = %v, want the TypeScript lint disabled", jobs)
+	// No task of pricing moves: it runs on Turborepo alone.
+	pricing := readProjectFile(t, root, "packages/pricing")
+	if got, want := pricing["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+		t.Errorf("extensions = %v, want %v", got, want)
 	}
 	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool {
 		return u.Task == "@demo/pricing#lint" && strings.Contains(u.Reason, "prettier")
@@ -425,9 +426,10 @@ func TestESLintWithOtherArgumentsStaysOnTurborepo(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	jobs, _ := readProjectFile(t, root, "packages/pricing")["disable"].(map[string]any)["jobs"].([]any)
-	if !slices.Contains(jobs, any(TypeScriptExtension+":lint")) {
-		t.Errorf("jobs = %v, want the TypeScript lint disabled", jobs)
+	// No task of pricing moves: it runs on Turborepo alone.
+	pricing := readProjectFile(t, root, "packages/pricing")
+	if got, want := pricing["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+		t.Errorf("extensions = %v, want %v", got, want)
 	}
 	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool {
 		return u.Task == "@demo/pricing#lint" && strings.Contains(u.Reason, "would drop")
@@ -887,5 +889,52 @@ func TestAnImportedTaskDoesWhatItsScriptDid(t *testing.T) {
 	}
 	if options := readProjectFile(t, root, "packages/pricing")["options"]; options != nil {
 		t.Errorf("delegated pricing options = %v", options)
+	}
+}
+
+func TestAnImportThatMovesNoTaskDeclaresNothing(t *testing.T) {
+	spectest.Proves(t, feature, "an-import-declares-only-what-moves", "an-import-that-moves-no-task-declares-nothing")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "demo", "extensions": ["@putnami/turbo"]}`+"\n")
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "main": "dist/index.js", "scripts": {"build": "webpack", "test": "mocha"}}`)
+	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "main": "dist/server.js", "scripts": {"build": "webpack", "test": "mocha"}, "dependencies": {"@demo/pricing": "workspace:*"}}`)
+	before := stackstest.Snapshot(t, root)
+	result, err := Sync(root, Options{Mode: ModeImport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Each package runs on Turborepo alone, and only the putnami.json files
+	// change: the workspace config, the manifests and the lockfile keep their
+	// bytes.
+	for _, dir := range []string{"packages/pricing", "apps/api"} {
+		if got, want := readProjectFile(t, root, dir)["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s extensions = %v, want %v", dir, got, want)
+		}
+	}
+	for _, rel := range stackstest.Changed(t, root, before) {
+		if filepath.Base(rel) != wsproto.ConfigFilename {
+			t.Errorf("the sync changed %s", rel)
+		}
+	}
+	if slices.Contains(result.Written, wsproto.WorkspaceConfigFilename) {
+		t.Errorf("written = %v, want no workspace config", result.Written)
+	}
+
+	// Once a test moves, the sync declares the extension that runs it.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "main": "dist/index.js", "scripts": {"build": "webpack", "test": "vitest run"}}`)
+	if _, err := Sync(root, Options{Mode: ModeImport}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workspace struct{ Extensions []string }
+	if err := json.Unmarshal(data, &workspace); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := workspace.Extensions, []string{ExtensionName, TypeScriptExtension}; !slices.Equal(got, want) {
+		t.Errorf("declared extensions = %v, want %v", got, want)
 	}
 }

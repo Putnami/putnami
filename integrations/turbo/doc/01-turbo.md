@@ -25,10 +25,13 @@ terminal, in CI or from an agent, it imports. `--mode import` or
 putnami init --from turbo --mode delegate
 ```
 
-`init` writes a workspace that declares `@putnami/turbo`, and
-`@putnami/typescript` in import mode, records the mode in
+`init` writes a workspace that declares `@putnami/turbo`, records the mode in
 `options["@putnami/turbo"].mode` of `putnami.workspace.json`, installs the
-extensions, and runs `putnami projects sync`.
+extension, and runs `putnami projects sync`. In import mode, the sync
+declares `@putnami/typescript` only when a task moves to it, and `init` then
+installs it. When no task moves, `init` installs nothing more, leaves the
+lockfile as it was, and says that `--mode delegate` gives the same result
+(ADR 0017 of `tooling/stacks`).
 
 Run `init` again with `--mode` to change the mode; without it, a rerun keeps the recorded mode. It prints the change to the workspace
 config and the diff of each `putnami.json`, and writes nothing. Add `--apply`
@@ -80,14 +83,14 @@ other package as delegate mode writes it. Import mode reads no list.
 putnami init --from turbo --import /packages/pricing --apply
 ```
 
-adds the entry, declares `@putnami/typescript`, and synchronizes; without
-`--apply` it previews. The sync job's `import` parameter outranks the option,
+adds the entry and synchronizes; the sync declares `@putnami/typescript` when
+a task of an imported package moves to it. Without `--apply` it previews. The sync job's `import` parameter outranks the option,
 as `mode` does, so a preview reads the list it would record.
 
 ### What import mode installs
 
-Import mode declares `@putnami/typescript` in the workspace, and its own
-workspace setup then runs. It adds to the root `package.json`, in sorted
+Once a task moves, the sync declares `@putnami/typescript` in the workspace,
+and its own workspace setup then runs. It adds to the root `package.json`, in sorted
 order, only the devDependencies a moved task needs: `typescript` and
 `@types/bun`, which every type check reads, for a build, package, validate or
 test, and `@biomejs/biome` for a Biome lint. It adds to

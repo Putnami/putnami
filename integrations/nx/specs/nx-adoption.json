@@ -141,6 +141,13 @@
         "A bun build target moves only when Putnami's Bun build writes the entries the package.json names: none outside src/, or entries D-066 rewrites; otherwise it stays on Nx and the sync says why.",
         "When a lint moves, the sync says that putnami lint --impacted lints the projects a change touches, not their dependents."
       ]
+    },
+    {
+      "id": "an-import-declares-only-what-moves",
+      "text": [
+        "In import mode, a project names @putnami/typescript only when one of its targets moves to it; a project none of whose targets moves runs on Nx alone.",
+        "The sync declares a language extension in putnami.workspace.json only when a project names it: an import that moves no target leaves the workspace config, every manifest and the lockfile as they were."
+      ]
     }
   ],
   "decisions": [

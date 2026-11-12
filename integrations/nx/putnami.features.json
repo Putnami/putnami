@@ -242,6 +242,19 @@
               "an-imported-target-does-what-its-target-did"
             ]
           }
+        },
+        {
+          "id": "an-import-declares-only-what-moves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-that-moves-no-target-declares-nothing"
+            ]
+          }
         }
       ]
     }
