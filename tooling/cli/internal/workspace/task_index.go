@@ -2,6 +2,7 @@ package workspace
 
 import (
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -97,6 +98,13 @@ type taskIndex struct {
 	// extensionProjects maps an in-workspace extension project's ID to the task
 	// scopes that extension declares.
 	extensionProjects map[string][]string
+	// declaring maps an extension's name and its workspace-relative path to
+	// the commands that declare each of its task scopes.
+	declaring map[string]map[string][]*extension.JobDefinition
+	// extensionCommands maps a task scope qualified by an in-workspace
+	// extension project's ID, as extensionProjects spells it, to the commands
+	// of that extension that declare it (TasksPlannedIn).
+	extensionCommands map[string][]*extension.JobDefinition
 	// assets maps a project ID to its cross-project generate asset sources,
 	// workspace-relative and slash-separated.
 	assets map[string][]string
@@ -203,6 +211,8 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 		byCommand:         make(map[string][]string),
 		byExtension:       make(map[string][]string),
 		extensionProjects: make(map[string][]string),
+		declaring:         make(map[string]map[string][]*extension.JobDefinition),
+		extensionCommands: make(map[string][]*extension.JobDefinition),
 		runtimeInputs:     make(map[string][]string),
 		ownManifests:      make(map[string]bool),
 		planned:           &plannedMemo{answers: make(map[plannedKey]bool), hasFiles: make(map[string]bool)},
@@ -274,6 +284,8 @@ func (idx *taskIndex) addExtension(
 			register(idx.byCommand, command, scope)
 			register(idx.byExtension, ext.Name, scope)
 			register(idx.byExtension, wsproto.CleanWorkspacePath(ext.RelPath), scope)
+			idx.registerDeclaring(ext.Name, scope, job)
+			idx.registerDeclaring(wsproto.CleanWorkspacePath(ext.RelPath), scope, job)
 		}
 		// A session barrier ("!cmd") orders two commands across the session
 		// and carries no data, so it is not an impact edge. A dependency on
@@ -556,7 +568,13 @@ func (idx *taskIndex) bindExtensionProjects(extensions []*extension.ExtensionDes
 		}
 		scopes := append([]string(nil), idx.extensionProjects[id]...)
 		for _, scope := range idx.byExtension[declared] {
-			scopes = append(scopes, id+extensionScopeSeparator+scope)
+			qualified := id + extensionScopeSeparator + scope
+			scopes = append(scopes, qualified)
+			for _, job := range idx.declaring[declared][scope] {
+				if !slices.Contains(idx.extensionCommands[qualified], job) {
+					idx.extensionCommands[qualified] = append(idx.extensionCommands[qualified], job)
+				}
+			}
 		}
 		idx.extensionProjects[id] = dedupeSortedStrings(scopes)
 		if ext.Runtime != nil && ext.Runtime.Prepare != nil && len(ext.Runtime.Prepare.Inputs) > 0 {
@@ -846,6 +864,48 @@ func (idx *taskIndex) TasksReachedFrom(tasks []string) []string {
 // manifest declares.
 func (idx *taskIndex) TasksOfExtension(extensionProjectID string) []string {
 	return idx.extensionProjects[extensionProjectID]
+}
+
+// registerDeclaring records that job, a command of the extension key names,
+// declares scope.
+func (idx *taskIndex) registerDeclaring(key, scope string, job *extension.JobDefinition) {
+	if idx.declaring[key] == nil {
+		idx.declaring[key] = make(map[string][]*extension.JobDefinition)
+	}
+	if !slices.Contains(idx.declaring[key][scope], job) {
+		idx.declaring[key][scope] = append(idx.declaring[key][scope], job)
+	}
+}
+
+// TasksPlannedIn returns the entries of tasks that the planner may run in the
+// project: a qualified task scope stays when one of the extension's commands
+// that declare it may be planned there (MayPlanJob). A command the
+// workspace-once activation plans answers for no project (answersForProjects):
+// the engine plans it once on every impacted run, whatever the selection.
+//
+// It errs wide. An entry the index attributes to no command stays: a task a
+// confined manifest change removed, or a scope the index did not qualify. So
+// does every entry when the project is unknown.
+func (idx *taskIndex) TasksPlannedIn(projectID string, tasks []string) []string {
+	project := idx.ws.ProjectByID(projectID)
+	if project == nil {
+		return tasks
+	}
+	planned := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		commands, attributed := idx.extensionCommands[task]
+		if !attributed {
+			planned = append(planned, task)
+			continue
+		}
+		for _, job := range commands {
+			if answersForProjects(job) && idx.mayPlan(job, project) {
+				planned = append(planned, task)
+				break
+			}
+		}
+	}
+	return planned
 }
 
 // layerTasks attributes one option layer to task scopes, by the same rule the

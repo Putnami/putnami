@@ -264,6 +264,49 @@ func TestTaskIndex_TasksOfExtensionAreQualifiedByTheExtensionProject(t *testing.
 	}
 }
 
+// The extension-consumer edge reaches a project for the tasks the extension may
+// plan in it. A project that does not use the extension runs none of them. A
+// command the workspace-once activation plans runs once for the workspace, in no
+// project. A task the index attributes to no command stays, so a scope it cannot
+// answer for is never narrowed away.
+func TestTaskIndex_TasksPlannedInKeepsTheTasksTheExtensionMayPlanInTheProject(t *testing.T) {
+	ext := taskIndexExtension()
+	ext.Jobs["workspace-sync"] = &extension.JobDefinition{CommandName: "workspace-sync", Activation: workspaceOnceActivation}
+	ws := NewWorkspace("/workspace", nil, []*Project{
+		{ID: "/go/extension", Name: "@fixture/go", Path: "go/extension"},
+		{ID: "/libs/http", Name: "http", Path: "libs/http", Extensions: []string{"/go/extension"}},
+		{ID: "/docs/site", Name: "site", Path: "docs/site"},
+	})
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{ext}, nil)
+	if idx == nil {
+		t.Fatal("NewTaskIndex returned nil for a workspace with one manifest")
+	}
+	every := idx.TasksOfExtension("/go/extension")
+	if !slices.Contains(every, "/go/extension#workspace-sync") {
+		t.Fatalf("the extension declares %v, want the workspace-once command among them", every)
+	}
+	var perProject []string
+	for _, task := range every {
+		if task != "/go/extension#workspace-sync" {
+			perProject = append(perProject, task)
+		}
+	}
+
+	if got := idx.TasksPlannedIn("/libs/http", every); !slices.Equal(got, perProject) {
+		t.Errorf("a project that uses the extension plans %v, want %v", got, perProject)
+	}
+	if got := idx.TasksPlannedIn("/docs/site", every); len(got) != 0 {
+		t.Errorf("a project that does not use the extension plans %v, want none", got)
+	}
+	removed := []string{"/go/extension#package~docker"}
+	if got := idx.TasksPlannedIn("/docs/site", removed); !slices.Equal(got, removed) {
+		t.Errorf("a task no command of the index declares answered %v, want it kept %v", got, removed)
+	}
+	if got := idx.TasksPlannedIn("/no/such/project", every); !slices.Equal(got, every) {
+		t.Errorf("an unknown project answered %v, want every task %v", got, every)
+	}
+}
+
 // A published build pinned by the name of a workspace project carries no
 // RelPath: its tasks are still named with the id of the project it replaces,
 // so a consumer that names that project by path keeps the pinned build's jobs.

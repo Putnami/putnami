@@ -178,6 +178,7 @@ type scopedIndex struct{}
 func (scopedIndex) TasksReadingPath(string, string) []string              { return nil }
 func (scopedIndex) TasksReachedFrom([]string) []string                    { return []string{"build"} }
 func (scopedIndex) TasksOfExtension(string) []string                      { return nil }
+func (scopedIndex) TasksPlannedIn(_ string, tasks []string) []string      { return tasks }
 func (scopedIndex) TasksOfManifestChange(string, string) ([]string, bool) { return nil, false }
 func (scopedIndex) ReadsAsExtensionRuntime(string, string) bool           { return false }
 

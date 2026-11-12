@@ -68,6 +68,15 @@ type TaskImpactIndex interface {
 	// vocabulary above.
 	TasksOfExtension(extensionProjectID string) []string
 
+	// TasksPlannedIn returns the entries of tasks, qualified as
+	// TasksOfExtension qualifies them, that the planner may run in the
+	// project: the ones a command of the extension declares and may plan
+	// there. A command the workspace-once activation plans runs once for the
+	// workspace whatever the selection, so its tasks are planned in no
+	// project. An entry the index attributes to no command stays in the
+	// answer. Empty means the extension runs none of the tasks in the project.
+	TasksPlannedIn(projectID string, tasks []string) []string
+
 	// TasksOfManifestChange answers a change to an in-workspace extension
 	// project's own manifest at path. confined reports whether the change
 	// stays inside task and step declarations. When it does, tasks lists the
@@ -813,7 +822,9 @@ func isExtensionManifestOf(p *Project, file string) bool {
 //
 // The extension-consumer edge carries what the change moved in the tool a
 // consumer runs. An extension whose runtime the change moved hands every
-// consumer every task it declares. Whether the runtime moved is the question
+// consumer every task it declares and may run in that consumer
+// (TaskImpactIndex.TasksPlannedIn); a consumer it may run none in is not
+// reached. Whether the runtime moved is the question
 // `^` already answers: the extension is full, or the tasks a claim or an edge
 // gave it reach a dependent's task at all. A `_test.go` inside an extension
 // therefore re-runs that extension's tests and nothing else in the workspace,
@@ -927,7 +938,17 @@ func (w *impactWalk) run() {
 			continue
 		}
 		for _, next := range consumers {
-			w.reachConsumer(next, edge, tasks)
+			carried := tasks
+			if w.index != nil {
+				// The edge reaches a consumer for the tasks the extension may
+				// run there. A consumer it runs none of them in executes
+				// nothing of the tool that moved, and is not selected.
+				carried = w.index.TasksPlannedIn(next, tasks)
+				if len(carried) == 0 {
+					continue
+				}
+			}
+			w.reachConsumer(next, edge, carried)
 		}
 	}
 }
@@ -1074,7 +1095,8 @@ func movedContracts(ws *Workspace, changedFiles []string) contractMoves {
 }
 
 // reachConsumer applies an extension-consumer edge (consumerEdgeFrom): the
-// consumer runs the tasks it carries and stays where it is. Nothing is enqueued
+// consumer runs the tasks it carries, the ones the extension may run in it
+// (TaskImpactIndex.TasksPlannedIn), and stays where it is. Nothing is enqueued
 // — those tasks propagate nothing. The edge is recorded on the first reach, and
 // a runtime edge replaces the declaration edge of the same extension, so a
 // consumer that runs every task of it names the reason it does.
@@ -1107,7 +1129,9 @@ func (w *impactWalk) scopeOf(id string) *impactScope {
 }
 
 // extensionConsumerIndex maps each in-workspace extension project's ID to the
-// IDs of the projects that effectively run under it. These are IMPACT-ONLY
+// IDs of the projects that may run under it. It is the widest set: with a task
+// index, the walk reaches a consumer only for the tasks the extension may run
+// in it (TaskImpactIndex.TasksPlannedIn). These are IMPACT-ONLY
 // edges: every consuming project's jobs run the tasks the
 // extension declares, so a change to the extension must select its consumers'
 // tasks of it even though no project declares a build dependency on the

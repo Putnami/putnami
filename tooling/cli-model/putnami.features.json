@@ -73,6 +73,7 @@
               "implicit-scope-edges-order-without-propagating-impact",
               "a-scope-config-selects-every-project-that-inherits-it",
               "extension-consumers-run-the-changed-extension-tasks",
+              "an-extension-reaches-only-the-consumers-it-may-plan-in",
               "a-change-selects-only-the-tasks-that-read-it",
               "workspace-input-patterns-widen-to-every-project"
             ]
