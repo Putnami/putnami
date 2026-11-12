@@ -505,7 +505,7 @@ func writeImpactFile(t *testing.T, root, rel, content string) {
 // A run writes its own state into the tree: the build stamp
 // <project>/.gen/version.json and the session files under .putnami/. Neither is
 // a change the operator made, so the next --impacted run must not select the
-// projects they sit in — whether or not .gitignore lists them (#1075).
+// projects they sit in — whether or not .gitignore lists them.
 func TestImpactedSelection_IgnoresThePathsPutnamiWrites(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-ignores-own-writes", "the-diff-leaves-out-what-putnami-and-the-run-wrote")
 	tmp := t.TempDir()
@@ -541,7 +541,7 @@ func TestImpactedSelection_IgnoresThePathsPutnamiWrites(t *testing.T) {
 // The selection measures the tree the operator left — what was uncommitted
 // when the run started — so that file selects nothing, while an edit the
 // operator made before the run, and a path a commit since the base changed,
-// still count (#1075).
+// still count.
 func TestImpactedSelection_LeavesOutTheFilesTheRunWrote(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-ignores-own-writes", "the-diff-leaves-out-what-putnami-and-the-run-wrote")
 	tmp := t.TempDir()
@@ -598,7 +598,7 @@ func TestImpactedSelection_LeavesOutTheFilesTheRunWrote(t *testing.T) {
 
 // Every --impacted run names its base and where it came from, whatever the
 // tier: the same change selects a handful of projects against HEAD~1 and the
-// whole workspace against the trunk (#1075).
+// whole workspace against the trunk.
 func TestImpactedSelection_BaselineExplanationNamesTheBaseAndItsOrigin(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "safe-baseline", "every-run-states-its-base-and-its-origin")
 	tmp := t.TempDir()

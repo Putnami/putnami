@@ -525,7 +525,7 @@ func TestWorkspaceInitCreatesGitignore(t *testing.T) {
 // An adopted repository keeps its own .gitignore, and init adds the two
 // directories every run writes to it: without them Git reports each run's
 // .gen/version.json and .putnami/ files, and the next --impacted run selects
-// every project they sit in (#1075). A line that already covers one is kept,
+// every project they sit in. A line that already covers one is kept,
 // and the rest of the file is the team's.
 func TestWorkspaceInitAddsPutnamiDirectoriesToAnExistingGitignore(t *testing.T) {
 	dir := t.TempDir()
