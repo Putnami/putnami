@@ -17,6 +17,7 @@ import (
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/dockertest"
 	"go.putnami.dev/sdk/extension/jsonl"
 	observeswift "go.putnami.dev/tooling/observe/detect/swift"
 	"go.putnami.dev/tooling/stacks"
@@ -41,7 +42,12 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
-	os.Exit(m.Run())
+	// The default keychain would run the credential helper the developer's
+	// Docker configuration names, which can block until the job timeout.
+	restore := dockertest.IsolateConfig()
+	code := m.Run()
+	restore()
+	os.Exit(code)
 }
 
 var txtarFile = regexp.MustCompile(`(?m)^-- (.+?) --\n`)
