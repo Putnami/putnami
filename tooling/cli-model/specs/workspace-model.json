@@ -21,7 +21,11 @@
     },
     {
       "id": "dependency-graph",
-      "text": "The dependency graph answers transitive dependents, transitive dependencies, and a topological order deterministically, reports a declared cycle instead of looping, and keeps external path dependencies out of the ordering."
+      "text": [
+        "The dependency graph answers transitive dependents, transitive dependencies, and a topological order deterministically, and keeps external path dependencies out of the ordering.",
+        "It groups the projects that all reach each other into one component, and a task waits only for the components its project's component depends on.",
+        "A cycle loads when every extension each of its projects names declares workspace.buildGraphEdges; any other cycle is reported instead of looping."
+      ]
     },
     {
       "id": "change-impact",

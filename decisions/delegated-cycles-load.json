@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "delegated-cycles-load",
+  "statement": "a dependency cycle loads only when every project of its strongly connected component names extensions that all declare workspace.buildGraphEdges; selection follows every edge, the scheduler orders components, and the build tool orders targets inside one",
+  "settled": "2026-11-13",
+  "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0088-a-cycle-among-delegated-projects-loads.md",
+  "reviewOnly": true
+}
