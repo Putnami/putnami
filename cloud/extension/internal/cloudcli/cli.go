@@ -384,6 +384,8 @@ func RunCommand(command string, ioctx IO, args []string) error {
 		return distributioncli.PackageSiteContent(params, args, workspaceRoot, ioctx)
 	case "validate-site-content":
 		return distributioncli.ValidateSiteContentSources(params, args, workspaceRoot, ioctx)
+	case "generate-site-content":
+		return distributioncli.GenerateSiteContent(params, args, workspaceRoot, ioctx)
 	case "publish-site-content":
 		return publishSiteContent(params, args, workspaceRoot, env, ioctx)
 	case "publish-deployment":

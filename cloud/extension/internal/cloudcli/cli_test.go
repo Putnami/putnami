@@ -1471,8 +1471,11 @@ func TestExtensionManifestBuildsImageLayersBeforePackaging(t *testing.T) {
 	}
 
 	assertImageLayersContribution("cloud-image-layers", "cloud-image-layers", []any{"image-layers.json"}, true)
-	assertImageLayersContribution("build", "cloud-image-layers", []any{"image-layers.json"}, true)
-	assertImageLayersContribution("package", "cloud-image-layers-check", []any{"*/index.md", ".gen/config-schema.json", "image-layers.json", "schema/config.json"}, false)
+	// build also activates on putnami.json for the site-content generate
+	// step; its image-layer step keeps image-layers.json as its own gate
+	// (TestSiteContentGenerateRunsBeforeTheStepsThatReadIt).
+	assertImageLayersContribution("build", "cloud-image-layers", []any{"image-layers.json", "putnami.json"}, true)
+	assertImageLayersContribution("package", "cloud-image-layers-check", []any{"*/index.md", ".gen/config-schema.json", "image-layers.json", "schema/config.json", "site-content.json"}, false)
 
 	tasks := manifest["tasks"].(map[string]any)
 	producer := tasks["cloud-image-layers"].(map[string]any)

@@ -473,7 +473,10 @@ section is the first directory of a candidate path. Outside a work tree it
 walks the selected site's section trees on disk and refuses an empty section.
 Packaging, publishing and the workspace probe that declares the sections read
 the same tree, so a project that passes this step packages the sections and
-files the step checked.
+files the step checked. A generated section the project declares is read from
+`.gen/site-content/<section>` on disk instead (see
+[Generated site-content sections](#generated-site-content-sections)); for a
+site project, `validate` plans `build` first so that directory exists.
 Only a project that declares
 `site-content` launches the site checker. The cached Config step still
 launches for every project with a `putnami.json`, then skips those without a
@@ -487,7 +490,13 @@ input it reads changes:
   that Git tracks, or that is untracked and matches no ignore rule. A regular
   file counts by its bytes and its executable bit, a symbolic link by its
   target text. A `putnami.verdict-policy.json` file does not count: the CI
-  plane reads it, and no build does.
+  plane reads it, and no build does. A file under `.gen/site-content` does
+  not count either, even where Git does not ignore `.gen`: the key of the
+  build step below fixes those files.
+- the key of the build step `cloud-site-content-generate`, which the step
+  waits for. That key fixes the declared generated sections the build step
+  writes under `.gen/site-content/`, so this key does not read those files:
+  the build step can rewrite them after the run computes its keys.
 - the `--app` parameter
 - the workspace's projects: their names, paths, `putnami.json` files and
   dependencies. The CLI keys them for every task that reads the Git candidate
@@ -520,14 +529,15 @@ extension is stamped at the highest contract its manifest requires, contract 18
 for the step dependencies of `publish`, and an older CLI refuses it.
 
 Every other task of this extension is uncached, except the image-layer check
-described below. Tasks that call Putnami Cloud, such as login, token, publish,
+described below and the site-content generate step. Tasks that call Putnami Cloud, such as login, token, publish,
 deploy and install, have effects that a cache hit cannot reproduce. The
 remaining pipeline tasks state their reason in the task description of
 [`putnami.extension.json`](putnami.extension.json).
 
-These source checks do not assemble even an in-memory bundle. No build,
-package, publish, copy, generation, archive or compression, install or network
-operation is required. Packaging retains payload reads, digests, provenance,
+These source checks do not assemble even an in-memory bundle. No package,
+publish, copy, archive or compression, install or network operation is
+required, and the check itself generates nothing. A site project still plans
+`build` before it, which runs the project's declared generators. Packaging retains payload reads, digests, provenance,
 manifest and archive verification. Generated migration bundles, produced image
 layers, npm loadability and publication or runtime checks remain at their
 existing stages; ordinary validation does not prove those artifacts or SDD
@@ -575,8 +585,9 @@ stamped at CLI contract 18, which this form requires.
 A docs project (a `putnami.json` declaring `publish: ["site-content"]`) gets
 one `put` release-set member per section, `cloud/doc-contents-<section>`, in
 the Cloud workspace's own Put namespace. Its `package~cloud-site-content` step
-assembles and verifies the bundles with no network and keys on the project
-tree, so a docs edit republishes the sections. Its
+assembles and verifies the bundles with no network. It keys on the project
+tree and on the key of `build~cloud-site-content-generate`, which it waits
+for, so a docs edit or a generator input edit republishes the sections. Its
 `publish~cloud-publish-site-content` step publishes exactly the planned
 members at the planned version and moves the plan's first channel (`canary` on
 main) in the same atomic Put publish. To leave docs out of a run, do not
@@ -585,6 +596,80 @@ select the docs project. Without a release-set plan the step publishes nothing;
 the direct operator path. Both resolve the Put credential the way archive
 publication does: a stored machine credential for the Put host, else a minted
 user token.
+
+### Generated site-content sections
+
+A site project may declare a section that a command generates during `build`,
+instead of a committed section directory. The declaration lives in a
+`site-content.json` file at the project root:
+
+```json
+{
+  "generated": {
+    "reference": {"command": ["go", "run", "../../tools/reference-gen", "--out", "{output}"]}
+  }
+}
+```
+
+The generator's inputs stay in the project's `putnami.json`, under
+`options["@putnami/cloud:build"].filePatterns`. That key belongs to the
+engine: it adds the files it lists to the key of every task of the
+extension's `build` command.
+
+```json
+{
+  "name": "docs/example.dev",
+  "publish": ["site-content"],
+  "options": {
+    "@putnami/cloud:build": {"filePatterns": ["../../tools/reference-gen/**"]}
+  }
+}
+```
+
+- `site-content.json` holds one object whose only member is `generated`, a
+  map of section name to `{"command": [...]}`. Every unknown member, at any
+  level, is refused. A section name is one lowercase URL-safe directory name.
+  `putnami.json` does not carry the declaration: one written there declares
+  nothing.
+- The `build~cloud-site-content-generate` step runs each command in the
+  project directory, in section-name order. Each `{output}` in an argument
+  becomes the absolute path of `.gen/site-content/<section>`, and a command
+  must pass it at least once. The step first removes `.gen/site-content`, so
+  the directory holds only the declared sections.
+- The step fails when a command fails, cannot start, or writes no regular
+  file. A site project that declares no generated section runs a step that
+  does nothing.
+- The step is cached and deterministic. Its key holds `site-content.json`,
+  where the commands live, `putnami.json`, and the files that
+  `options["@putnami/cloud:build"].filePatterns` lists. List every file the
+  command reads. The patterns are relative to the project directory and may
+  name files outside it. A change to a file the list leaves out does not run
+  the step again, and the published section keeps its old content.
+- The command is project code: it runs at the trust level of the project's
+  own tests, with the job's environment. Its program must be on the job's
+  `PATH`, as `go` is on a runner whose `PATH` holds the workspace's locked Go
+  toolchain. The extension sends no network request itself; a generator that
+  reads the network is no longer deterministic.
+- `validate` and `package` plan `build` first for a site project, so the
+  section exists when they read it. The workspace probe lists a generated
+  section from `site-content.json` alone, before any build, and lists it
+  again when that file changes.
+- Validation, packaging and publication read a generated section from
+  `.gen/site-content/<section>`. They refuse one whose directory is absent,
+  and one whose name is also a committed section directory. A directory under
+  `.gen/site-content` that the project does not declare is no section.
+- The section's member is `cloud/doc-contents-<section>`, like a committed
+  section's. Its selection fingerprint moves when the generate step's key
+  moves: a listed generator input or a command changes it, and the generated
+  files themselves do not.
+- `package` activates on a committed section landing page, `<section>/index.md`,
+  or on `site-content.json`, as it activates on `image-layers.json` for an
+  image. A site project whose only sections are generated still packages and
+  publishes them.
+- A site project may also be a Go or TypeScript project. The language
+  extension's `build-generate` owns the project's `.gen` directory and cedes
+  `.gen/site-content` to this step, as it cedes `.gen/layers` to
+  `cloud-image-layers`.
 
 A project that declares `publish: ["archives"]` and owns a scoped extension
 package, or declares `options.publish.binary-name`, gets an `archive`
@@ -652,7 +737,12 @@ green gate for an unexercised entrypoint.
 
 `build~cloud-image-layers` produces the layers. It is uncached, because it
 downloads upstream artifacts, and it declares `.gen/layers` as its output, so
-no other task of a plan may write there. For an image project, `package`
+no other task of a plan may write there. The `build` command activates for
+every project with a `putnami.json`, as `validate` does, so that a docs
+project plans its site-content step. The layer step therefore runs for every
+project that holds an `image-layers.json`, whether or not the project names
+`@putnami/cloud`: a step condition cannot test which extensions a project
+names. For an image project, `package`
 runs `build` first in the same session, then
 `package~cloud-image-layers-check` verifies the layers. The check is cached.
 It runs again when any file it reads changes:
@@ -1527,7 +1617,7 @@ and exposes them.
 | [`internal/deliverycli`](internal/deliverycli) | `cache`, `cache-provider` (and the remote build-cache client), the `credential-provider` RPC server and its Delivery capability calls, `ci report` (run conclusions and tee'd JSONL test, coverage and build report batches), `ci init/validate/fmt/explain`, `channels follow` |
 | [`internal/sourcecli`](internal/sourcecli) | `source connect/status/disconnect` self-service GitHub onboarding |
 | [`internal/configcli`](internal/configcli) | `config`, `secrets`, `config publish` |
-| [`internal/distributioncli`](internal/distributioncli) | `registries`, `registry-token`, `channels set/status`, the developer-machine read credential of `credential-provider`, `packages`, `db migrations publish`, and the site-content packaging and publishing that the operator CLI's `publish-doc` calls |
+| [`internal/distributioncli`](internal/distributioncli) | `registries`, `registry-token`, `channels set/status`, the developer-machine read credential of `credential-provider`, `packages`, `db migrations publish`, and the site-content generation, validation, packaging and publishing; the operator CLI's `publish-doc` calls the packaging and publishing |
 | [`internal/datacli`](internal/datacli) | `db` (`status`, `list`, `info`, `grant`, `connect`) and the Data side of migration publication |
 | [`internal/runtimecli`](internal/runtimecli) | `env`, `deploy` |
 | [`internal/identitycli`](internal/identitycli) | `login` (OAuth device flow), `whoami` |

@@ -560,6 +560,7 @@ var cededGenSubpaths = []string{
 	".gen/migrations.json",
 	".gen/requirements.json",
 	".gen/schema",
+	".gen/site-content",
 }
 
 // cededClaim names one declared output of one manifest task that claims a
@@ -629,6 +630,10 @@ var cededGenOwner = map[string][]cededClaim{
 	// nothing over an earlier manifest, leaving it in place.
 	".gen/requirements.json": {{task: "build-infra", output: "requirements", required: true}},
 	".gen/schema":            {{task: "build-describe", output: "schema"}},
+	// The generated sections of a site project, which
+	// cloud-site-content-generate of @putnami/cloud declares as its project
+	// directory output.
+	".gen/site-content": nil,
 }
 
 // cededSubpathContains reports whether a literal declared path is the ceded
@@ -672,11 +677,15 @@ func TestGenCedesEverySubpathDescribeProducesAfterGenerate(t *testing.T) {
 	if !slices.Equal(gen.Excludes, cededGenSubpaths) {
 		t.Errorf("build-generate gen excludes = %v, want %v", gen.Excludes, cededGenSubpaths)
 	}
-	// cloud-image-layers of @putnami/cloud declares the project directory
-	// .gen/layers, and the ownership check accepts it beside this output.
-	layers := proto.DeclaredOutput{Kind: proto.OutputKindDirectory, Root: proto.OutputRootProject, Path: ".gen/layers"}
-	if proto.OutputsOverlap(gen.Ref(), layers.Ref()) {
-		t.Errorf("build-generate gen output %+v overlaps the .gen/layers directory cloud-image-layers declares", gen.Ref())
+	// cloud-image-layers and cloud-site-content-generate of @putnami/cloud
+	// declare the project directories .gen/layers and .gen/site-content, and
+	// the ownership check accepts each beside this output, so a Go project may
+	// build image layers or publish a generated site-content section.
+	for path, task := range map[string]string{".gen/layers": "cloud-image-layers", ".gen/site-content": "cloud-site-content-generate"} {
+		cloud := proto.DeclaredOutput{Kind: proto.OutputKindDirectory, Root: proto.OutputRootProject, Path: path}
+		if proto.OutputsOverlap(gen.Ref(), cloud.Ref()) {
+			t.Errorf("build-generate gen output %+v overlaps the %s directory %s declares", gen.Ref(), path, task)
+		}
 	}
 
 	for _, ceded := range cededGenSubpaths {

@@ -31,6 +31,11 @@ type siteContentSource struct {
 	// candidates holds, sorted, the candidate files and the unkeyable
 	// candidates of tree.
 	candidates []string
+	// generated holds, sorted, the generated sections site-content.json
+	// declares (readSiteContentGenerators). Each one is read from the disk
+	// under .gen/site-content/<section>, inside a Git work tree too: the
+	// build step writes it, and no Git candidate holds it.
+	generated []string
 }
 
 func openSiteContentSource(siteDir string) (*siteContentSource, error) {
@@ -43,15 +48,38 @@ func openSiteContentSource(siteDir string) (*siteContentSource, error) {
 		source.candidates = slices.Concat(tree.Paths(), tree.Unkeyable())
 		slices.Sort(source.candidates)
 	}
+	generators, err := readSiteContentGenerators(siteDir)
+	if err != nil {
+		return nil, err
+	}
+	for _, generator := range generators {
+		source.generated = append(source.generated, generator.section)
+	}
 	return source, nil
 }
 
-// sectionNames returns the sorted names of the site's section directories.
-// On disk a section is an immediate subdirectory. In the cut it is the first
+// generatedSection reports the declared generated section whose directory is
+// sourceDir.
+func (s *siteContentSource) generatedSection(sourceDir string) (string, bool) {
+	for _, section := range s.generated {
+		if filepath.Clean(sourceDir) == siteContentGeneratedSectionDir(s.dir, section) {
+			return section, true
+		}
+	}
+	return "", false
+}
+
+// sectionNames returns the sorted names of the site's sections: its section
+// directories and its declared generated sections. On disk a section
+// directory is an immediate subdirectory. In the cut it is the first
 // directory of a candidate path, or a submodule directly under the site
 // directory, so a section always holds a candidate. A dot-directory is
 // tooling state, never a section: once a site directory is a project, putnami
-// writes .gen/ into it.
+// writes .gen/ into it, and a directory under .gen/site-content is a section
+// only when the project declares its name. A declared generated section that
+// is also a section directory is refused: a section has one source. The names
+// never depend on whether .gen/site-content exists, so the workspace probe,
+// which runs before build, lists the same sections packaging reads.
 func (s *siteContentSource) sectionNames() ([]string, error) {
 	var names []string
 	if s.tree == nil {
@@ -77,7 +105,17 @@ func (s *siteContentSource) sectionNames() ([]string, error) {
 		slices.Sort(names)
 		names = slices.Compact(names)
 	}
-	return slices.DeleteFunc(names, func(name string) bool { return strings.HasPrefix(name, ".") }), nil
+	names = slices.DeleteFunc(names, func(name string) bool { return strings.HasPrefix(name, ".") })
+	for _, section := range s.generated {
+		if slices.Contains(names, section) {
+			return nil, clicore.NewError(fmt.Sprintf(
+				"section %q of %s is declared generated and is also a section directory; a section has one source: remove the directory or the declaration",
+				section, s.dir), clicore.ExitUsage)
+		}
+	}
+	names = append(names, s.generated...)
+	slices.Sort(names)
+	return names, nil
 }
 
 // walkSection visits the files of the section directory sourceDir, served
@@ -86,7 +124,18 @@ func (s *siteContentSource) sectionNames() ([]string, error) {
 // bytes, and validation only counts them. In the cut, a submodule, a nested
 // repository or any other candidate Git lists that is not a regular file or a
 // symbolic link is refused like a symbolic link, since no `git:` key holds it.
+//
+// A declared generated section is read from the disk, and its directory must
+// exist: an absent one means the build step that writes it has not run.
 func (s *siteContentSource) walkSection(sourceDir, mount string, visit func(siteContentFile)) error {
+	if section, generated := s.generatedSection(sourceDir); generated {
+		if _, err := os.Lstat(sourceDir); os.IsNotExist(err) {
+			return clicore.NewError(fmt.Sprintf(
+				"generated section %q of %s has no directory %s; run `putnami build` for the project, whose cloud-site-content-generate step writes it",
+				section, s.dir, sourceDir), clicore.ExitUsage)
+		}
+		return walkSiteContentFiles(sourceDir, mount, visit)
+	}
 	if s.tree == nil {
 		return walkSiteContentFiles(sourceDir, mount, visit)
 	}

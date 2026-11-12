@@ -109,7 +109,7 @@
   },
   "workspace": {
     "markers": ["putnami.json"],
-    "inputs": ["putnami.extension.json", "putnami.json"]
+    "inputs": ["putnami.extension.json", "putnami.json", "site-content.json"]
   },
   "commandGroups": {
     "cloud": {
@@ -1517,17 +1517,26 @@
       ]
     },
     "build": {
+      "activation": "workspace",
       "activationFiles": [
-        "image-layers.json"
+        "image-layers.json",
+        "putnami.json"
       ],
-      "description": "Materialize an image project's declared generated layers as ordinary build outputs. This keeps a cold monorepo CI run self-bootstrapping: build --impacted produces the runner bytes before the trusted post-gate stage packages and publishes the runner-backed worker from the same checkout. The package contribution still re-verifies the exact bytes and current pins immediately before assembly.",
+      "traits": {"injectPublishChannels": true, "kind": "files"},
+      "description": "Materialize an image project's declared generated layers, and a site project's declared generated site-content sections, as ordinary build outputs. This keeps a cold monorepo CI run self-bootstrapping: build --impacted produces the runner bytes before the trusted post-gate stage packages and publishes the runner-backed worker from the same checkout. The package contribution still re-verifies the exact bytes and current pins immediately before assembly. The command activates on putnami.json, as validate does, because a site project names no extension and its declaration file is optional; each step keeps its own condition, so a project with neither image-layers.json nor the site-content publish entry plans no step. The image-layer step therefore runs for every project that holds image-layers.json, whether or not it names @putnami/cloud: a step condition cannot test which extensions a project names.",
       "run": [
         {
           "id": "cloud-image-layers",
           "task": "cloud-image-layers",
+          "activation": {"files": ["image-layers.json"]},
           "dependsOn": ["^compile"],
           "heavy": true,
           "cpuWeight": 2
+        },
+        {
+          "id": "cloud-site-content-generate",
+          "if": "params.site-content",
+          "task": "cloud-site-content-generate"
         }
       ]
     },
@@ -1535,7 +1544,13 @@
       "activation": "workspace",
       "activationFiles": ["putnami.json"],
       "traits": {"injectPublishChannels": true, "kind": "criteria"},
-      "description": "Validate existing authored production Config inputs and declared site-content source metadata without packaging.",
+      "sessionPrerequisites": [
+        {
+          "command": "build",
+          "if": "params.site-content"
+        }
+      ],
+      "description": "Validate existing authored production Config inputs and declared site-content source metadata without packaging. A site project plans build first, so its declared generated sections exist when validation reads them.",
       "run": [
         {
           "id": "cloud-config-member",
@@ -1555,15 +1570,20 @@
         {
           "command": "build",
           "if": "params.image"
+        },
+        {
+          "command": "build",
+          "if": "params.site-content"
         }
       ],
       "activationFiles": [
         "*/index.md",
         ".gen/config-schema.json",
         "image-layers.json",
-        "schema/config.json"
+        "schema/config.json",
+        "site-content.json"
       ],
-      "description": "Verify declared image layers when present, build a canonical secret-free Config member for schema-bearing projects, and assemble the site-content bundles of a docs site project (activated by a section landing page, <section>/index.md). Every package step is local and produces immutable inputs for the selected release-set publication.",
+      "description": "Verify declared image layers when present, build a canonical secret-free Config member for schema-bearing projects, and assemble the site-content bundles of a docs site project (activated by a section landing page, <section>/index.md, or by site-content.json, which declares the project's generated sections). Every package step is local and produces immutable inputs for the selected release-set publication.",
       "flags": {
         "env": {
           "type": "string",
@@ -2624,14 +2644,41 @@
       "cwd": "{projectRoot}",
       "cache": {"enabled": true, "noOutput": true},
       "declares": {},
+      "reads": ["gen"],
       "inputs": {
         "manifest": {"from": "project", "files": ["putnami.jso[n]"]},
-        "sections": {"from": "project", "files": ["git:**", "!../**"]},
+        "sections": {"from": "project", "files": ["git:**", "!../**", "!.gen/site-content/**"]},
         "app": {"from": "params"},
         "appName": {"from": "params"}
       },
-      "description": "Inspect declared site sections, mounts, regular-file policy and paths; never read payloads, generate artifacts or assemble archives. Cached on the files and parameters the extension README lists: it reads the sections through the project's Git candidate files, so an ignored file and an empty directory are absent for it, and a symbolic link is refused. Refuses any project other than the one in its working directory.",
+      "description": "Inspect declared site sections, mounts, regular-file policy and paths; never read payloads, generate artifacts or assemble archives. Cached on the files and parameters the extension README lists: it reads the committed sections through the project's Git candidate files, so an ignored file and an empty directory are absent for it, and a symbolic link is refused. It reads a declared generated section from .gen/site-content/<section>, which the build step cloud-site-content-generate writes, and refuses one that is absent; its key folds that step's key, which fixes those bytes, and does not read them: the git:** input excludes .gen/site-content, so the key holds none of those files even where Git does not ignore .gen. Refuses any project other than the one in its working directory.",
       "timeoutMs": 60000
+    },
+    "cloud-site-content-generate": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": ["generate-site-content"],
+      "cwd": "{projectRoot}",
+      "cache": {"enabled": true, "deterministic": true},
+      "writes": ["gen"],
+      "declares": {
+        "outputs": {
+          "site-content": {
+            "kind": "directory",
+            "root": "project",
+            "path": ".gen/site-content",
+            "optionalEmpty": true,
+            "emptied": true,
+            "description": "One directory per generated section the project declares, .gen/site-content/<section>. Absent when the project declares none. Only this task writes the path, so the engine empties it before this task runs."
+          }
+        }
+      },
+      "inputs": {
+        "manifest": {"from": "project", "files": ["putnami.jso[n]"]},
+        "declaration": {"from": "project", "files": ["site-content.jso[n]"]}
+      },
+      "description": "Run the generator command of each generated section the project's site-content.json declares, with {output} replaced by the absolute path of .gen/site-content/<section>. Fails when a command fails or writes no file. Succeeds with nothing to do when the project declares no generated section. Cached and deterministic: the key holds site-content.json, where the commands live, putnami.json, and the files the project lists in options[\"@putnami/cloud:build\"].filePatterns, which are the generator's inputs. The extension sends no network request; the command runs with the job's environment and must find its program on PATH.",
+      "timeoutMs": 600000
     },
     "cloud-validate-config-project": {
       "kind": "command",
@@ -2738,7 +2785,8 @@
       ],
       "cwd": "{projectRoot}",
       "cache": false,
-      "description": "Assemble and contract-verify every section bundle of a site project, with no network. Its task identity keys on the project tree and is the selection fingerprint of the project's site-content members. Uncached: bundle.json embeds the short HEAD commit and the task identity is the release selection fingerprint.",
+      "reads": ["gen"],
+      "description": "Assemble and contract-verify every section bundle of a site project, with no network. Its task identity keys on the project tree and on the key of the build step that generates the project's declared sections, and is the selection fingerprint of the project's site-content members. Uncached: bundle.json embeds the short HEAD commit and the task identity is the release selection fingerprint.",
       "timeoutMs": 120000
     },
     "cloud-publish-site-content-project": {
@@ -2759,7 +2807,8 @@
           "site-content"
         ]
       },
-      "description": "Publish exactly the site-content members the release-set plan selected for this site project, at the planned version, moving the plan's first channel in the same atomic Put publish.",
+      "reads": ["gen"],
+      "description": "Publish exactly the site-content members the release-set plan selected for this site project, at the planned version, moving the plan's first channel in the same atomic Put publish. A declared generated section is read from .gen/site-content/<section>.",
       "timeoutMs": 600000
     },
     "cloud-publish-deployment-project": {

@@ -34,8 +34,10 @@ func SiteContentCoordinate(section string) string {
 
 // SiteContentSections returns the sorted section slugs of one site project
 // directory, as DeriveSiteContentSections reads them: files directly under the
-// site directory (putnami.json, README.md) are meta. A section slug that
-// cannot be a mount is an error.
+// site directory (putnami.json, site-content.json, README.md) are meta, and a
+// generated section site-content.json declares is listed whether or not build
+// has written it yet. A section slug
+// that cannot be a mount is an error.
 func SiteContentSections(siteDir string) ([]string, error) {
 	sections, err := DeriveSiteContentSections(siteDir, filepath.Base(siteDir), "", map[string]string{})
 	if err != nil {
@@ -114,6 +116,11 @@ func declaresSiteContent(projectDir string) (bool, error) {
 }
 
 func emptySectionError(sec SiteContentSection) error {
+	if sec.generated {
+		return clicore.NewError(fmt.Sprintf(
+			"generated section %q of docs/%s has no files in %s — a site-content member must ship content; check its generator command",
+			sec.Section, sec.Site, sec.Dir), clicore.ExitUsage)
+	}
 	return clicore.NewError(fmt.Sprintf(
 		"section %q under docs/%s has no files — a site-content member must ship content; add a page or remove the directory",
 		sec.Section, sec.Site), clicore.ExitUsage)
@@ -216,7 +223,7 @@ func PublishSiteContentMembers(params map[string]any, args []string, workspaceRo
 	for _, member := range members {
 		sec, ok := byCoordinate[member.Coordinate]
 		if !ok {
-			return nil, clicore.NewError(fmt.Sprintf("release-set plan selects %s, but %s has no matching section directory", member.Coordinate, project.id), clicore.ExitUsage)
+			return nil, clicore.NewError(fmt.Sprintf("release-set plan selects %s, but %s has no matching section", member.Coordinate, project.id), clicore.ExitUsage)
 		}
 		bundle, shipped, err := assembleSection(sec, member.SourceRevision)
 		if err != nil {
