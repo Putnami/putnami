@@ -11,7 +11,7 @@ import (
 // TestExtensionsInstallChannelPinsTheNamedExtension checks that `extensions
 // install --channel <channel> <name>` installs <name>@<channel>, as init
 // installs its extensions, and that a channel with nothing to apply it to is a
-// usage error rather than ignored (#1087).
+// usage error rather than ignored.
 func TestExtensionsInstallChannelPinsTheNamedExtension(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -87,7 +87,7 @@ func TestAnUnreadablePackageAttributesNothing(t *testing.T) {
 // import statement does not spell: require.resolve and import.meta.resolve, a
 // type import, a triple-slash types reference, a config file that imports a
 // shared configuration, and a tsconfig `extends`. Each one reads the package,
-// so none of them may leave its edge reported as a declaration (#1087).
+// so none of them may leave its edge reported as a declaration.
 func TestThePackageScanReadsResolvesTypesAndConfigExtends(t *testing.T) {
 	dir := t.TempDir()
 	writePackageFile(t, dir, "src/mcp/apps.ts", "const root = path.dirname(require.resolve(\"@acme/mcp-apps/package.json\"));\n")

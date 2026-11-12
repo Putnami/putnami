@@ -743,7 +743,7 @@ func TestStructuredCommandRefusesAJobFlagItDoesNotRead(t *testing.T) {
 }
 
 // TestParseArgs_ExtensionsInstallAcceptsChannel checks that `extensions
-// install` accepts --channel, as init does (#1087).
+// install` accepts --channel, as init does.
 func TestParseArgs_ExtensionsInstallAcceptsChannel(t *testing.T) {
 	t.Parallel()
 	for _, args := range [][]string{

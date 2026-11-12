@@ -814,7 +814,7 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 // TestTheProbeAttributesEachEdgeToTurborepo checks that every edge the probe
 // answers is Turborepo's own (build-graph), in delegate mode and for a package
 // an import keeps on Turborepo, so the declared-edge check and `putnami deps
-// prune` leave alone an edge the sync writes and would write back (#1087).
+// prune` leave alone an edge the sync writes and would write back.
 func TestTheProbeAttributesEachEdgeToTurborepo(t *testing.T) {
 	d := readDemo(t)
 	root := repository(t, d)

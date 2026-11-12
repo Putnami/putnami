@@ -71,7 +71,7 @@ func TestTypeScriptUnmappedReasonSaysWhy(t *testing.T) {
 
 // TestTheESLintReasonNamesWhatItDrops checks that the ESLint reason quotes the
 // arguments the TypeScript lint drops, not the whole script, and gives no
-// advice to move an argument no ESLint configuration can hold (#1087).
+// advice to move an argument no ESLint configuration can hold.
 func TestTheESLintReasonNamesWhatItDrops(t *testing.T) {
 	keeps := "it keeps running through the tool"
 	got := TypeScriptUnmappedReason(TaskLint, "eslint --max-warnings 0 src", keeps)

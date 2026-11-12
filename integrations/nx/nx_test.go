@@ -544,7 +544,7 @@ func TestESLintWithOtherArgumentsStaysOnNx(t *testing.T) {
 
 // TestTheESLintReasonNamesTheOptionItDrops checks that a lint target kept on
 // Nx names what the TypeScript lint would drop: the executor's options, not the
-// executor, and a script's arguments, not the whole script (#1087).
+// executor, and a script's arguments, not the whole script.
 func TestTheESLintReasonNamesTheOptionItDrops(t *testing.T) {
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, TypeScriptExtension)
@@ -1328,7 +1328,7 @@ func changeFiles(r SyncResult) []string {
 
 // TestTheProbeAttributesEachEdgeToNx checks that every edge the probe answers
 // is Nx's own (build-graph): the declared-edge check then judges the edges Nx
-// states instead of naming each project as unattributed (#1087).
+// states instead of naming each project as unattributed.
 func TestTheProbeAttributesEachEdgeToNx(t *testing.T) {
 	d := readDemo(t)
 	root := repository(t, d, ModeDelegate)
