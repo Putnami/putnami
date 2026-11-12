@@ -37,7 +37,7 @@ func printHelpMarkdown(w io.Writer, scope *helpScope) {
 			if f.ValueName != "" {
 				flag += " " + f.ValueName
 			}
-			iox.Fprintf(w, "| %s | %s |\n", flag, f.Description)
+			markdownRow(w, flag, f.Description)
 		}
 		iox.Fprintln(w)
 	}
@@ -92,9 +92,24 @@ func printHelpMarkdown(w io.Writer, scope *helpScope) {
 	iox.Fprintf(w, "| `NO_COLOR` | Standard no-color convention |\n")
 }
 
+// markdownRow writes one table row. A pipe inside a cell, even inside a code
+// span, splits a GitHub-flavored Markdown row, so each cell escapes it.
+func markdownRow(w io.Writer, cells ...string) {
+	escaped := make([]string, len(cells))
+	for i, cell := range cells {
+		escaped[i] = markdownCell(cell)
+	}
+	iox.Fprintf(w, "| %s |\n", strings.Join(escaped, " | "))
+}
+
+// markdownCell escapes the pipes of one table cell.
+func markdownCell(cell string) string {
+	return strings.ReplaceAll(cell, "|", `\|`)
+}
+
 func printMarkdownGroup(w io.Writer, entries []CommandInfo) {
 	for _, c := range entries {
-		iox.Fprintf(w, "| `putnami %s` | %s |\n", c.Name, c.Description)
+		markdownRow(w, "`putnami "+c.Name+"`", c.Description)
 	}
 	iox.Fprintln(w)
 }
@@ -116,7 +131,7 @@ func printCommandReferenceMarkdown(w io.Writer, command commandmeta.Command) {
 			if flag.ValueName != "" {
 				label += " " + flag.ValueName
 			}
-			iox.Fprintf(w, "| %s | %s |\n", label, flag.Description)
+			markdownRow(w, label, flag.Description)
 		}
 		iox.Fprintln(w)
 	}
