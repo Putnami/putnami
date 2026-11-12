@@ -5,7 +5,7 @@
 - **Scope**: `@putnami/cli-model` (`workspace.ProjectMetadataDigest`,
   `GeneratedClientBinding`), `@putnami/cli` (`internal/workspace` bindings, the
   first-run pass, `install` host hooks, version line pathspecs)
-- **Issue**: [#1055](https://github.com/Putnami/putnami/issues/1055)
+- **Date**: 2026-11-11
 
 ## Context
 

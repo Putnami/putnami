@@ -7,7 +7,7 @@
   `generatedFrom` member of `putnami.json` (`protocols/workspace`), the client
   generators of `go.putnami.dev/api` and `@putnami/client`, the `@putnami/go`
   and `@putnami/typescript` lifecycle commands
-- **Issue**: [#1055](https://github.com/Putnami/putnami/issues/1055)
+- **Date**: 2026-11-11
 
 ## Context
 
