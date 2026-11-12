@@ -229,6 +229,33 @@ func TestTheProjectsOfANxWorkspaceBecomeProjects(t *testing.T) {
 	}
 }
 
+func TestTheTypeScriptExtensionNamesANxProjectWithANamedPackage(t *testing.T) {
+	spectest.Proves(t, feature, "projects-become-projects", "the-projects-of-a-nx-workspace-become-projects-with-their-edges")
+	// project.json names pricing "pricing" and its package.json
+	// "@demo/pricing". Once the workspace declares @putnami/typescript, whose
+	// probe names it by its package.json, the Nx probe reports no name and nx
+	// run still receives the Nx name. Without it, the Nx name stays.
+	for _, tc := range []struct {
+		extensions []string
+		name       string
+	}{
+		{[]string{stacks.TypeScriptExtension}, ""},
+		{nil, "pricing"},
+	} {
+		root := repository(t, readDemo(t), ModeImport, tc.extensions...)
+		writeFile(t, root, "packages/pricing/project.json", `{"name": "pricing"}`)
+		for _, p := range probe(t, root).Projects {
+			if p.Path != "packages/pricing" {
+				continue
+			}
+			var meta stacks.Metadata
+			if err := json.Unmarshal(p.Metadata, &meta); err != nil || p.SourceName != tc.name || meta.Component != "pricing" {
+				t.Errorf("extensions %v: source name %q, component %q (%v), want %q and pricing", tc.extensions, p.SourceName, meta.Component, err, tc.name)
+			}
+		}
+	}
+}
+
 func TestTheSyncWritesEachProjectPutnamiJSONInBothModes(t *testing.T) {
 	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-in-both-modes")
 	d := readDemo(t)

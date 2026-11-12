@@ -38,23 +38,32 @@ func Stack() (stacks.Stack, error) {
 
 // Detect names the Nx projects among the candidate paths with the Nx
 // detector: each is named by its Nx project name, which nx run receives, with
-// the workspace root for stack root and the projects it depends on. Any other
-// candidate is no member of the extension.
+// the workspace root for stack root and the projects it depends on. A project
+// the TypeScript extension names carries no name of its own: the package name
+// wins, and nx run still receives the Nx name. Any other candidate is no
+// member of the extension.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	detection := detect.Detect(root, detect.Options{})
 	projects := make(map[string]detect.Project, len(detection.Projects))
 	for _, p := range detection.Projects {
 		projects[p.Path] = p
 	}
+	typeScript := stacks.DeclaresExtension(root, TypeScriptExtension)
 	var out []stacks.Component
 	for _, path := range request.Paths {
 		p, ok := projects[path]
 		if !ok {
 			continue
 		}
+		// The TypeScript extension names a project with a named package.json;
+		// nx run still receives the Nx name.
+		name := p.Name
+		if typeScript && stacks.NamedByTypeScript(root, p.Path) {
+			name = ""
+		}
 		out = append(out, stacks.Component{
 			Path:         p.Path,
-			Name:         p.Name,
+			Name:         name,
 			Ref:          p.Name,
 			SourceFile:   p.SourceFile,
 			Root:         wsproto.ProbeRootPath,

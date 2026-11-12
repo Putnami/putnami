@@ -155,3 +155,29 @@ func TestADelegatedNxWorkspaceImportsPricingAndPassesLintTestBuild(t *testing.T)
 		t.Errorf("a delegated api task came from Putnami's cache:\n%s", out)
 	}
 }
+
+// An Nx project whose project.json names it differently from its
+// package.json loads in import mode: the TypeScript extension's name wins, so
+// the probe merges without a conflict.
+func TestAnImportedNxProjectTakesItsPackageName(t *testing.T) {
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	demo := readDemo(t)
+	root := nxWorkspace(t, demo, buildRuntime(t))
+	stubNx(t, demo)
+	clitest.LinkSourceExtensions(t, repoRoot, root)
+	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"),
+		`{"name": "shop", "extensions": ["/nx-extension", "/.ext/typescript", "/.ext/dev"], "includes": [], "options": {"@putnami/nx": {"mode": "import"}}}`)
+	clitest.WriteFile(t, filepath.Join(root, "packages/pricing/project.json"), `{"name": "pricing"}`)
+
+	for _, args := range [][]string{{"projects", "sync"}, {"projects", "list"}} {
+		code, out := clitest.RunGateArgs(t, root, args...)
+		if code != 0 || strings.Contains(out, "merge-conflict") || strings.Contains(out, "probe failed") {
+			t.Fatalf("%s exit %d:\n%s", strings.Join(args, " "), code, out)
+		}
+		if args[1] == "list" && !strings.Contains(out, "@demo/pricing") {
+			t.Errorf("projects list names no @demo/pricing:\n%s", out)
+		}
+	}
+}

@@ -203,7 +203,7 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	if err != nil {
 		return SyncResult{}, err
 	}
-	typeScript := slices.Contains(opts.Declared, TypeScriptExtension) || declaresExtension(root, TypeScriptExtension)
+	typeScript := slices.Contains(opts.Declared, TypeScriptExtension) || stacks.DeclaresExtension(root, TypeScriptExtension)
 	var conventions []stacks.ConventionProject
 	lintMoved := false
 	for _, p := range detection.Projects {
@@ -352,34 +352,6 @@ func readWorkspace(root string) (*workspaceDoc, error) {
 		return nil, fmt.Errorf("%s: %w", wsproto.WorkspaceConfigFilename, err)
 	}
 	return &doc, nil
-}
-
-// declaresExtension reports whether the workspace at root declares the
-// extension: by name, or by a path whose manifest states that name.
-func declaresExtension(root, name string) bool {
-	doc, err := readWorkspace(root)
-	if err != nil || doc == nil {
-		return false
-	}
-	for _, e := range doc.Extensions {
-		if e == name {
-			return true
-		}
-		if !strings.HasPrefix(e, "/") && !strings.HasPrefix(e, ".") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(strings.TrimPrefix(e, "/")), "putnami.extension.json")) //nolint:gosec // a manifest the workspace declares
-		if err != nil {
-			continue
-		}
-		var manifest struct {
-			Name string `json:"name"`
-		}
-		if json.Unmarshal(data, &manifest) == nil && manifest.Name == name {
-			return true
-		}
-	}
-	return false
 }
 
 // projectPlan is what the sync writes for one project.
