@@ -97,7 +97,8 @@
         "verification": {
           "kind": "acceptance",
           "checks": [
-            "init-from-rerun-previews-and-writes-only-with-apply"
+            "init-from-rerun-previews-and-writes-only-with-apply",
+            "init-from-apply-fails-when-the-workspace-install-fails"
           ]
         }
       },

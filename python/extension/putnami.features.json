@@ -35,7 +35,8 @@
             "checks": [
               "cached-python-tasks-are-keyed-on-the-uv-workspace-files",
               "a-workspace-with-no-python-members-reports-skipped",
-              "a-missing-workspace-config-is-reported-not-invented"
+              "a-missing-workspace-config-is-reported-not-invented",
+              "a-template-is-no-uv-workspace-member"
             ]
           }
         },
@@ -73,6 +74,19 @@
               "workspace-install-runs-the-resolved-uv-and-declares-it",
               "a-job-without-a-uv-fails-naming-putnami-install-and-requests-nothing",
               "a-hosted-run-declares-nothing"
+            ]
+          }
+        },
+        {
+          "id": "the-repository-uv-pin-is-kept",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-repository-that-pins-uv-gets-no-required-version"
             ]
           }
         },

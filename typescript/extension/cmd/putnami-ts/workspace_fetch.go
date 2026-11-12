@@ -30,6 +30,11 @@ import (
 // Tests replace it.
 var readJobCredential = registrycred.ReadJobCredential
 
+// errHostedRush refuses a hosted install of a Rush repository: rush install
+// runs the Rush and the manager rush.json pins, downloading them first, which
+// is repository code a hosted run never starts.
+var errHostedRush = fmt.Errorf("a hosted run does not install a Rush repository: rush install runs the release %s pins", rushConfig)
+
 // committedLockFile is the lock workspace-fetch downloads for and a hosted
 // install reads unchanged in a Bun workspace: the text lock, whose members the
 // fetch reads.
@@ -117,6 +122,11 @@ func runWorkspaceFetch(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (stri
 	manager, err := detectPackageManager(ctx.WorkspaceRoot)
 	if err != nil {
 		return "FAILED", nil, err
+	}
+	// rush install runs the Rush and the manager rush.json pins, downloading
+	// them first: repository code, which this job never starts.
+	if manager.Name == managerRush {
+		return "FAILED", nil, errHostedRush
 	}
 	// The job installs no package manager: it runs the bun the CLI resolved,
 	// or the npm, pnpm or yarn on PATH, outside the workspace. A manager the

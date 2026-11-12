@@ -137,11 +137,10 @@ project's directory: `rush` must be on `PATH` at the `rushVersion` of
 `rush.json`, and the result records `delegatedTo: rush`. The probe answers a
 project only when its `putnami.json` names `@putnami/rush`, that is when one
 of its scripts stays on Rush. The TypeScript
-extension's install writes the root `package.json` with the projects as
-`workspaces` and installs them with Bun, since a Rush root declares no package
-manager of its own: its lockfile lies under `common/config/rush`. Rush's
-lockfile and `rush install` are no longer used. A root `package.json` that
-declares `packageManager`, or a root lockfile, selects that manager instead.
+extension's install runs `rush install`, which keeps Rush's lockfile under
+`common/config/rush` and links each project's dependencies; it writes no root
+`package.json`. A root `package.json` that declares `packageManager` selects
+that manager instead. A hosted run does not install a Rush repository.
 
 An import also adopts Putnami's TypeScript conventions (D-066), so each
 project builds and resolves its neighbours from their sources:

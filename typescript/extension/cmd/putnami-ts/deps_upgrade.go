@@ -68,6 +68,9 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 	if err != nil {
 		return "FAILED", nil, err
 	}
+	if manager.Name == managerRush {
+		return "FAILED", nil, errors.New("a Rush repository upgrades its dependencies with rush update, which @putnami/typescript does not run")
+	}
 	managerBin, err := resolveManagerBin(manager)
 	if err != nil {
 		return "FAILED", nil, err
@@ -154,7 +157,7 @@ func runDepsUpgrade(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (stri
 	if !result.Success {
 		emit.PhaseEnd("install", "failed")
 		reportRegistryRefusal(emit, result.Stderr)
-		emit.Log("error", label+" failed: "+result.Stderr)
+		emit.Log("error", label+" failed: "+managerFailureOutput(result))
 		if rollbackErr := rollbackNPMUpgrade(transaction, nil); rollbackErr != nil {
 			return "FAILED", nil, rollbackErr
 		}

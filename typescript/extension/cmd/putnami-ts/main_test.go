@@ -614,8 +614,10 @@ func TestEnsureWorkspaceDevDeps_AddsMissingDeps(t *testing.T) {
 }
 
 // Adding the extension's devDependencies keeps the order of the root
-// manifest's top-level keys and of its existing devDependencies: an adopted
-// repository's package.json changes by the added entries alone.
+// manifest's top-level keys and of its existing devDependencies, and puts each
+// added entry where it sorts among sorted ones: an adopted repository's
+// package.json changes by the added entries alone, and a check that the
+// entries are sorted, such as sherif, still passes.
 func TestEnsureWorkspaceDevDeps_KeepsTheManifestKeyOrder(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "catalog-seeding", "the-root-manifest-top-level-key-order-is-preserved")
 	wsDir := t.TempDir()
@@ -628,7 +630,7 @@ func TestEnsureWorkspaceDevDeps_KeepsTheManifestKeyOrder(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ := os.ReadFile(filepath.Join(wsDir, "package.json"))
-	want := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"packageManager\": \"pnpm@10.26.1\",\n  \"scripts\": {\n    \"test\": \"turbo run test\"\n  },\n  \"devDependencies\": {\n    \"turbo\": \"^2.5.0\",\n    \"typescript\": \"^5.6.0\",\n    \"@biomejs/biome\": \"2.5.15\",\n    \"@types/bun\": \"^1.4.0\"\n  }\n}\n"
+	want := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"packageManager\": \"pnpm@10.26.1\",\n  \"scripts\": {\n    \"test\": \"turbo run test\"\n  },\n  \"devDependencies\": {\n    \"@biomejs/biome\": \"2.5.15\",\n    \"@types/bun\": \"^1.4.0\",\n    \"turbo\": \"^2.5.0\",\n    \"typescript\": \"^5.6.0\"\n  }\n}\n"
 	if string(got) != want {
 		t.Fatalf("package.json =\n%s\nwant\n%s", got, want)
 	}
@@ -2726,5 +2728,95 @@ func TestRunBuildCompile_NoEntrypoint(t *testing.T) {
 	// TestRunBuildCompile_Success.
 	if findEvent(events, func(e map[string]any) bool { return e["type"] == "phase" && e["name"] == "compile" }) != nil {
 		t.Errorf("a project with no entrypoint emitted a compile phase; events = %v", events)
+	}
+}
+
+// devDepsWorkspace is a root manifest with sorted devDependencies, the
+// extension's three workspace devDependencies, and the member web whose
+// putnami.json is config, "" for none.
+func devDepsWorkspace(t *testing.T, config string) (*pctx.Context, string) {
+	t.Helper()
+	wsDir := t.TempDir()
+	extDir := t.TempDir()
+	writeProbeFile(t, filepath.Join(extDir, "putnami.extension.json"),
+		`{"workspaceDevDependencies":{"typescript":"^6.0.2","@types/bun":"^1.4.0","@biomejs/biome":"2.5.15"}}`)
+	original := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"devDependencies\": {\n    \"eslint\": \"^9.0.0\",\n    \"zod\": \"^3.0.0\"\n  }\n}\n"
+	writeProbeFile(t, filepath.Join(wsDir, "package.json"), original)
+	writeProbeFile(t, filepath.Join(wsDir, "web", "package.json"), `{"name":"web","scripts":{"lint":"eslint ."}}`)
+	if config != "" {
+		writeProbeFile(t, filepath.Join(wsDir, "web", "putnami.json"), config)
+	}
+	ctx := &pctx.Context{
+		WorkspaceRoot:     wsDir,
+		Extension:         pctx.Extension{Root: extDir},
+		WorkspaceProjects: []pctx.ProjectRef{{Name: "shop", Path: "."}, {Name: "web", Path: "web"}},
+	}
+	return ctx, original
+}
+
+// An imported member whose every task stays on the repository's tool needs
+// no devDependency, so the root manifest, and with it the lockfile, stays
+// byte-identical.
+func TestEnsureWorkspaceDevDeps_AddsNothingNoMovedTaskNeeds(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-adds-what-a-task-needs",
+		"a-workspace-whose-tasks-need-no-package-keeps-its-manifest")
+	ctx, original := devDepsWorkspace(t, `{"extensions":["@putnami/turbo"]}`)
+	if err := ensureWorkspaceDevDeps(ctx, jsonl.New()); err != nil {
+		t.Fatal(err)
+	}
+	if got := readTextFile(t, filepath.Join(ctx.WorkspaceRoot, "package.json")); got != original {
+		t.Fatalf("package.json =\n%s\nwant it unchanged", got)
+	}
+}
+
+// A member that moved its build to this extension and kept its test on the
+// repository's tool, and lints with ESLint, needs the TypeScript compiler and
+// Bun's types its type check reads, and no Biome.
+func TestEnsureWorkspaceDevDeps_AddsOnlyWhatAMovedTaskNeeds(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-adds-what-a-task-needs",
+		"a-devdependency-is-added-for-a-moved-task-only")
+	ctx, _ := devDepsWorkspace(t, `{"extensions":["@putnami/turbo","@putnami/typescript"],"disable":{"jobs":["@putnami/turbo:build","@putnami/typescript:test"]}}`)
+	if err := ensureWorkspaceDevDeps(ctx, jsonl.New()); err != nil {
+		t.Fatal(err)
+	}
+	want := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"devDependencies\": {\n    \"@types/bun\": \"^1.4.0\",\n    \"eslint\": \"^9.0.0\",\n    \"typescript\": \"^6.0.2\",\n    \"zod\": \"^3.0.0\"\n  }\n}\n"
+	if got := readTextFile(t, filepath.Join(ctx.WorkspaceRoot, "package.json")); got != want {
+		t.Fatalf("package.json =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// A member with no putnami.json runs every job of the extension, so it needs
+// every devDependency, Biome excepted while it lints with ESLint.
+func TestEnsureWorkspaceDevDeps_AMemberWithoutConfigNeedsItsJobsTools(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-adds-what-a-task-needs",
+		"a-devdependency-is-added-for-a-moved-task-only")
+	ctx, _ := devDepsWorkspace(t, "")
+	if err := ensureWorkspaceDevDeps(ctx, jsonl.New()); err != nil {
+		t.Fatal(err)
+	}
+	var pkg struct {
+		DevDependencies map[string]string `json:"devDependencies"`
+	}
+	if err := json.Unmarshal([]byte(readTextFile(t, filepath.Join(ctx.WorkspaceRoot, "package.json"))), &pkg); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := pkg.DevDependencies["@biomejs/biome"]; ok || pkg.DevDependencies["@types/bun"] == "" || pkg.DevDependencies["typescript"] == "" {
+		t.Fatalf("devDependencies = %v, want @types/bun and typescript, no Biome", pkg.DevDependencies)
+	}
+}
+
+// The validate and package jobs run the TypeScript compiler too, so a member
+// that keeps its build and test elsewhere still needs it and Bun's types. The linter is the
+// one the member's own putnami.json chooses, over what its lint script runs.
+func TestEnsureWorkspaceDevDeps_ReadsTheMembersJobsAndLinter(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-adds-what-a-task-needs",
+		"a-devdependency-is-added-for-a-moved-task-only")
+	ctx, _ := devDepsWorkspace(t, `{"disable":{"jobs":["build","test"]},"options":{"@putnami/typescript":{"lint":{"linter":"biome"}}}}`)
+	if err := ensureWorkspaceDevDeps(ctx, jsonl.New()); err != nil {
+		t.Fatal(err)
+	}
+	want := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"devDependencies\": {\n    \"@biomejs/biome\": \"2.5.15\",\n    \"@types/bun\": \"^1.4.0\",\n    \"eslint\": \"^9.0.0\",\n    \"typescript\": \"^6.0.2\",\n    \"zod\": \"^3.0.0\"\n  }\n}\n"
+	if got := readTextFile(t, filepath.Join(ctx.WorkspaceRoot, "package.json")); got != want {
+		t.Fatalf("package.json =\n%s\nwant\n%s", got, want)
 	}
 }

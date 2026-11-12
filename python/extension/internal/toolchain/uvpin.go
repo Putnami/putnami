@@ -61,7 +61,8 @@ const uvLockOrigin = "toolchains.uv in " + WorkspaceLockFile
 //     digests its checksum file lists, which an offline request does not
 //     read.
 //   - With neither a declaration nor a committed pin, DefaultUVRelease is
-//     pinned: the release workspace-install declares for such a workspace.
+//     pinned: the release workspace-install declares for such a workspace,
+//     unless the repository pins uv in a file of its own.
 //
 // Every pin records an archive and a SHA-256 for request.Platform; a pin that
 // cannot serve that platform is answered as a problem. The error reports a

@@ -462,3 +462,44 @@ func TestDepsUpgrade_RunsTheResolvedUV(t *testing.T) {
 		t.Fatalf("uv commands = %+v, want %+v", stub.calls, want)
 	}
 }
+
+// An adopted repository that pins uv for its own tools, as moon's toolchain
+// does, keeps that pin alone: the install declares no required-version, which
+// would make uv refuse the repository's setup, and lists no template, whose
+// placeholder name is no valid TOML key in the sources.
+func TestWorkspaceInstall_KeepsTheRepositoryUVPinAndListsNoTemplate(t *testing.T) {
+	spectest.Proves(t, "python/experimental-workspace-integration", "the-repository-uv-pin-is-kept", "a-repository-that-pins-uv-gets-no-required-version")
+	spectest.Proves(t, "python/experimental-workspace-integration", "workspace-scope", "a-template-is-no-uv-workspace-member")
+	t.Setenv(extensionproto.OfflineDependenciesEnv, "")
+	stub := stubUVResolution(t)
+	tmp := pythonWorkspace(t, "")
+	os.WriteFile(filepath.Join(tmp, ".putnamirc.json"), []byte(`{"projects": ["pkg", "templates/fastapi-ai"]}`), 0644)
+	os.MkdirAll(filepath.Join(tmp, "templates/fastapi-ai"), 0755)
+	os.WriteFile(filepath.Join(tmp, "templates/fastapi-ai/pyproject.toml"), []byte("[project]\nname = \"{{ package_name | kebab_case }}\"\nversion = \"0.1.0\"\n"), 0644)
+	os.MkdirAll(filepath.Join(tmp, ".moon"), 0755)
+	os.WriteFile(filepath.Join(tmp, ".moon/toolchains.yml"), []byte("python:\n  version: '3.12'\n  packageManager: 'uv'\n  uv:\n    # the release CI installs\n    version: '0.8.17'\n"), 0644)
+
+	captureEvents(t, func(emit *jsonl.Emitter) {
+		status, _, err := WorkspaceInstall(&pctx.Context{WorkspaceRoot: tmp}, emit, nil)
+		if err != nil || status != "OK" {
+			t.Fatalf("WorkspaceInstall = %s, %v; want OK", status, err)
+		}
+	})
+
+	if len(stub.calls) != 1 {
+		t.Fatalf("uv commands = %+v, want one uv lock", stub.calls)
+	}
+	data, err := os.ReadFile(filepath.Join(tmp, "pyproject.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "required-version") {
+		t.Errorf("pyproject.toml declares a uv release against .moon/toolchains.yml:\n%s", data)
+	}
+	if strings.Contains(string(data), "templates/fastapi-ai") || strings.Contains(string(data), "{{") {
+		t.Errorf("pyproject.toml lists the template:\n%s", data)
+	}
+	if !strings.Contains(string(data), `members = ["pkg"]`) {
+		t.Errorf("pyproject.toml does not list pkg:\n%s", data)
+	}
+}

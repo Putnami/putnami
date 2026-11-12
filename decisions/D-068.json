@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "D-068",
-  "statement": "a TypeScript workspace installs with the package manager its repository declares, in packageManager, else by its root lockfile or pnpm-workspace.yaml, and Bun is the default only when it declares none; Bun still runs the TypeScript tasks",
+  "statement": "a TypeScript workspace installs with the manager its repository declares: packageManager, else rush install for a rush.json, else its root lockfile or pnpm-workspace.yaml; Bun is the default only when it declares none and still runs the TypeScript tasks",
   "settled": "2026-11-10",
   "settledBy": "fdumay",
   "adr": "typescript/extension/doc/adr/0007-the-repository-chooses-its-package-manager.md",

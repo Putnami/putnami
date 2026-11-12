@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"go.putnami.dev/sdk/extension/exec"
 	"go.putnami.dev/typescript/extension/internal/pnpmworkspace"
 )
 
@@ -21,7 +22,13 @@ const (
 	managerNPM  = "npm"
 	managerPNPM = "pnpm"
 	managerYarn = "yarn"
+	managerRush = "rush"
 )
+
+// rushConfig is the file at the root of a Rush repository. Rush installs the
+// projects it lists, each with the dependencies of its own package.json, and
+// reads no root package.json.
+const rushConfig = "rush.json"
 
 // rootLockfiles are the root files that name a workspace's package manager
 // when its root package.json declares none, in the order they are looked for:
@@ -47,8 +54,8 @@ const yarnBerryConfig = ".yarnrc.yml"
 
 // packageManager is the package manager a workspace installs with.
 type packageManager struct {
-	// Name is bun, npm, pnpm or yarn; for a declaration the extension does not
-	// install with, the declared name.
+	// Name is bun, npm, pnpm, yarn or rush; for a declaration the extension
+	// does not install with, the declared name.
 	Name string
 	// Version is the version packageManager declares, "" when the manager comes
 	// from a lockfile or is the default.
@@ -91,6 +98,8 @@ func (m packageManager) lockfiles() []string {
 		return []string{"yarn.lock"}
 	case managerNPM:
 		return []string{"package-lock.json", "npm-shrinkwrap.json"}
+	case managerRush:
+		return []string{"common/config/rush/pnpm-lock.yaml", "common/config/rush/yarn.lock", "common/config/rush/npm-shrinkwrap.json"}
 	}
 	return nil
 }
@@ -100,8 +109,8 @@ func (m packageManager) lockfiles() []string {
 var errUnknownPackageManager = errors.New("@putnami/typescript installs with bun, npm, pnpm or yarn")
 
 // detectPackageManager returns the package manager the workspace at root
-// declares: the packageManager field of its root package.json, else the
-// manager a root file names (rootLockfiles), else Bun. A
+// declares: the packageManager field of its root package.json, else Rush for a
+// root rush.json, else the manager a root file names (rootLockfiles), else Bun. A
 // declaration of another manager returns that name and an error wrapping
 // errUnknownPackageManager; a root package.json it cannot read is an error.
 func detectPackageManager(root string) (packageManager, error) {
@@ -121,6 +130,9 @@ func detectPackageManager(root string) (packageManager, error) {
 			return m, fmt.Errorf("package.json#packageManager declares %q: %w; declare one of them, or remove the field to install with the manager whose lockfile lies at the root", declared, errUnknownPackageManager)
 		}
 		return m, nil
+	}
+	if isRegularFile(filepath.Join(root, rushConfig)) {
+		return packageManager{Name: managerRush, Source: rushConfig}, nil
 	}
 	for _, lock := range rootLockfiles {
 		if !isRegularFile(filepath.Join(root, lock.file)) {
@@ -202,14 +214,17 @@ func yarnMajor(m packageManager) int {
 var lookPath = stdexec.LookPath
 
 // resolveManagerBin returns the executable the workspace installs with: the
-// bun the CLI resolved for Bun, and the npm, pnpm or yarn on PATH otherwise.
-// The CLI provisions only Bun; the repository brings its other manager, through
-// Corepack or a global install.
+// bun the CLI resolved for Bun, and the npm, pnpm, yarn or rush on PATH
+// otherwise. The CLI provisions only Bun; the repository brings its other
+// manager, through Corepack or a global install.
 func resolveManagerBin(m packageManager) (string, error) {
 	if m.Name == managerBun {
 		return resolveBunBin()
 	}
 	bin, err := lookPath(m.Name)
+	if err != nil && m.Name == managerRush {
+		return "", fmt.Errorf("the workspace installs with %s, and no rush is on PATH: install @microsoft/rush, then run `putnami install` again", m.label())
+	}
 	if err != nil {
 		return "", fmt.Errorf("the workspace installs with %s, and no %s is on PATH: install %s, or run `corepack enable`, then run `putnami install` again",
 			m.label(), m.Name, m.Name)
@@ -224,7 +239,8 @@ type installInvocation struct {
 	env  map[string]string
 }
 
-// workspaceInstallInvocation returns the install the workspace runs with m. A
+// workspaceInstallInvocation returns the install the workspace runs with m:
+// rush install for Rush, which installs the version its rush.json pins. A
 // hosted run installs frozen from the cache workspace-fetch filled, offline
 // where the manager can: bun install --frozen-lockfile, npm ci --offline,
 // pnpm install --frozen-lockfile --offline, yarn install --frozen-lockfile
@@ -266,6 +282,12 @@ func workspaceInstallInvocation(m packageManager, force, hosted bool) installInv
 			args = append(args, "--force")
 		}
 		return installInvocation{args: args}
+	case managerRush:
+		args := []string{"install"}
+		if force {
+			args = append(args, "--purge")
+		}
+		return installInvocation{args: args}
 	}
 	return installInvocation{args: workspaceInstallArgs(force, hosted)}
 }
@@ -273,4 +295,33 @@ func workspaceInstallInvocation(m packageManager, force, hosted bool) installInv
 // pnpmWorkspaceFile is the path of pnpm-workspace.yaml under root.
 func pnpmWorkspaceFile(root string) string {
 	return filepath.Join(root, pnpmworkspace.File)
+}
+
+// managerOutputBudget bounds the manager output a failed install reports, and
+// managerLineBudget each of its lines: a manager can print a whole minified
+// bundle on one line.
+const (
+	managerOutputBudget = 4096
+	managerLineBudget   = 512
+)
+
+// managerFailureOutput returns what a failed package manager printed, for the
+// error its job reports: the end of its stdout, then of its stderr. pnpm and
+// Yarn print their errors, and those of the lifecycle scripts they run, on
+// stdout; Bun prints them on stderr.
+func managerFailureOutput(result *exec.Result) string {
+	var streams []string
+	for _, stream := range []string{result.Stdout, result.Stderr} {
+		if trimmed := strings.TrimSpace(stream); trimmed != "" {
+			streams = append(streams, trimmed)
+		}
+	}
+	if len(streams) == 0 {
+		return fmt.Sprintf("exit status %d, and no output", result.ExitCode)
+	}
+	lines := strings.Split(strings.Join(streams, "\n"), "\n")
+	for i, line := range lines {
+		lines[i] = truncateUTF8Head(line, managerLineBudget)
+	}
+	return utf8Tail(strings.Join(lines, "\n"), managerOutputBudget)
 }

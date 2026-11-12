@@ -29,6 +29,9 @@ func runWorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) 
 	if err != nil {
 		return "FAILED", nil, err
 	}
+	if hosted && manager.Name == managerRush {
+		return "FAILED", nil, errHostedRush
+	}
 
 	// The job installs no package manager: it runs the bun the CLI resolved,
 	// which the CLI provisions under the Putnami home when the host holds
@@ -74,7 +77,7 @@ func runWorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) 
 	if !result.Success {
 		emit.PhaseEnd("install", "failed")
 		reportRegistryRefusal(emit, result.Stderr)
-		emit.Log("error", label+" failed: "+result.Stderr)
+		emit.Log("error", label+" failed: "+managerFailureOutput(result))
 		return "FAILED", nil, nil
 	}
 
@@ -107,10 +110,44 @@ func workspaceInstallArgs(force, hosted bool) []string {
 // member list, the catalog entries, the packageManager declaration of a Bun
 // workspace, tsconfig.json, biome.json and the .npmrc scope lines. Each step
 // writes only what is missing or stale, so a second call rewrites nothing. A
+// Rush repository gets no root package.json, and only the files the tasks
+// read. A
 // failure to create the root package.json, to list the members or to
 // materialize biome.json is returned; the other steps log a warning and
 // continue. managerBin is the executable of manager.
 func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, manager packageManager, managerBin string) error {
+	// Rush reads no root package.json: it installs the projects rush.json
+	// lists, and a root manifest would be one more package for the npm that
+	// install-run-rush.js runs. Only the files the tasks read are shaped.
+	if manager.Name != managerRush {
+		if err := shapeRootPackageManifest(ctx, emit, manager, managerBin); err != nil {
+			return err
+		}
+	}
+
+	// Ensure workspace tsconfig.json exists.
+	if err := ensureWorkspaceTsConfig(ctx, emit); err != nil {
+		emit.Log("warn", "failed to ensure workspace tsconfig.json: "+err.Error())
+	}
+
+	// Materialize the formatter rules owned by this resolved extension with the
+	// workspace-root role, so every project observes one stable configuration.
+	if err := ensureWorkspaceBiomeConfig(ctx, emit); err != nil {
+		return err
+	}
+
+	// Ensure workspace .npmrc maps every declared scope to its registry.
+	if err := ensureWorkspaceNpmrc(ctx, emit); err != nil {
+		emit.Log("warn", "failed to ensure workspace .npmrc: "+err.Error())
+	}
+	return nil
+}
+
+// shapeRootPackageManifest brings the root package.json, and the
+// pnpm-workspace.yaml of pnpm, to the state an install uses: the extension's
+// devDependencies, the member list, the catalog entries and the packageManager
+// declaration of a Bun workspace.
+func shapeRootPackageManifest(ctx *pctx.Context, emit *jsonl.Emitter, manager packageManager, managerBin string) error {
 	// Create the root package.json when it is missing, so every step below
 	// finds the file it shapes. A workspace with a TypeScript install has
 	// asked for it.
@@ -148,22 +185,6 @@ func shapeWorkspaceManifests(ctx *pctx.Context, emit *jsonl.Emitter, manager pac
 		if err := ensureWorkspacePackageManager(ctx, emit, managerBin); err != nil {
 			emit.Log("warn", "failed to declare the workspace packageManager: "+err.Error())
 		}
-	}
-
-	// Ensure workspace tsconfig.json exists.
-	if err := ensureWorkspaceTsConfig(ctx, emit); err != nil {
-		emit.Log("warn", "failed to ensure workspace tsconfig.json: "+err.Error())
-	}
-
-	// Materialize the formatter rules owned by this resolved extension with the
-	// workspace-root role, so every project observes one stable configuration.
-	if err := ensureWorkspaceBiomeConfig(ctx, emit); err != nil {
-		return err
-	}
-
-	// Ensure workspace .npmrc maps every declared scope to its registry.
-	if err := ensureWorkspaceNpmrc(ctx, emit); err != nil {
-		emit.Log("warn", "failed to ensure workspace .npmrc: "+err.Error())
 	}
 	return nil
 }
@@ -283,7 +304,9 @@ func isPlainReleaseVersion(version string) bool {
 }
 
 // ensureWorkspaceDevDeps reads workspaceDevDependencies from the extension
-// manifest and adds any missing entries to the workspace root package.json.
+// manifest and adds to the workspace root package.json each missing entry a
+// member needs (devDependencyNeeds), in sorted order when the existing
+// entries are sorted.
 func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 	// Read extension manifest.
 	manifestPath := filepath.Join(ctx.Extension.Root, "putnami.extension.json")
@@ -326,10 +349,12 @@ func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 		}
 	}
 
-	// Add missing dependencies, after the existing ones, in name order.
+	// Add each missing dependency a member needs: where it sorts among the
+	// existing ones when they are sorted, else after them, in name order.
+	need := devDependencyNeeds(ctx)
 	var added []string
 	for name := range manifest.WorkspaceDevDeps {
-		if _, exists := devDeps[name]; !exists {
+		if _, exists := devDeps[name]; !exists && need.needs(name) {
 			added = append(added, name)
 		}
 	}
@@ -337,15 +362,16 @@ func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 		return nil
 	}
 	sort.Strings(added)
+	devOrder = manifestKeyOrder(devDeps, devOrder)
 	for _, name := range added {
 		version, err := marshalManifestValue(manifest.WorkspaceDevDeps[name])
 		if err != nil {
 			return fmt.Errorf("marshal devDependency %s: %w", name, err)
 		}
 		devDeps[name] = version
-		devOrder = append(devOrder, name)
 		emit.Log("info", "adding workspace devDependency: "+name+"@"+manifest.WorkspaceDevDeps[name])
 	}
+	devOrder = pnpmworkspace.InsertSorted(devOrder, added)
 
 	// Write back devDependencies; the root manifest and the devDependencies
 	// keep the key order they were read in.

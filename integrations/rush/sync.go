@@ -220,8 +220,8 @@ const rushxStep = "rushx"
 
 // rushSteps writes, in an imported project's putnami.json, the steps of each
 // task whose script stays on Rush: rushx <task> in the project's directory,
-// since an import installs with the repository's package manager (D-065)
-// rather than through rush install.
+// where rush install, which the import's workspace install runs (D-068),
+// linked the project's dependencies.
 type rushSteps struct{ stacks.StepsOverride }
 
 var rushxSteps = rushSteps{stacks.StepsOverride{

@@ -18,6 +18,10 @@ import (
 
 var nameRe = regexp.MustCompile(`^name\s*=\s*"([^"]+)"\s*$`)
 
+// distributionName is a valid Python project name (PEP 508). A template's
+// placeholder, such as {{ package_name | kebab_case }}, is none.
+var distributionName = regexp.MustCompile(`^([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9._-]*[A-Za-z0-9])$`)
+
 var skipDirs = map[string]bool{
 	".git":          true,
 	".putnami":      true,
@@ -131,7 +135,9 @@ func readPutnamiConfig(path string) putnamiRCConfig {
 	return config
 }
 
-// DiscoverPythonProjects finds Python projects by filtering workspace config entries.
+// DiscoverPythonProjects finds Python projects by filtering workspace config
+// entries. A project whose [project] name is no valid project name is a
+// template, not a member: its placeholder would break the uv workspace.
 func DiscoverPythonProjects(workspaceRoot string) []string {
 	rels := parseWorkspaceConfigProjects(workspaceRoot)
 	members := make([]string, 0, len(rels))
@@ -148,6 +154,9 @@ func DiscoverPythonProjects(workspaceRoot string) []string {
 		if !strings.Contains(string(data), "[project]") {
 			continue
 		}
+		if templateProject(string(data)) {
+			continue
+		}
 		// uv reads members as slash-separated globs, and a backslash in the
 		// TOML basic string they are written to is an escape: on Windows
 		// "packages\mypkg" would not even parse.
@@ -155,6 +164,41 @@ func DiscoverPythonProjects(workspaceRoot string) []string {
 	}
 	sort.Strings(members)
 	return dedupe(members)
+}
+
+// projectNameKey is the name key of a [project] table, with its raw value.
+var projectNameKey = regexp.MustCompile(`^name\s*=\s*(.*?)\s*$`)
+
+// projectNameValue is a TOML string, in double or single quotes, and an
+// optional comment.
+var projectNameValue = regexp.MustCompile(`^(?:"([^"\\]*)"|'([^']*)')\s*(?:#.*)?$`)
+
+// templateProject reports whether pyproject content is a template's: the name
+// of its [project] table is no TOML string, as an unquoted {{ placeholder }}
+// is, or no valid project name. A project whose name is not written there,
+// such as a dynamic one, is a member.
+func templateProject(content string) bool {
+	inProject := false
+	for _, raw := range strings.Split(content, "\n") {
+		line := strings.TrimSpace(raw)
+		if strings.HasPrefix(line, "[") {
+			inProject = line == "[project]"
+			continue
+		}
+		if !inProject {
+			continue
+		}
+		m := projectNameKey.FindStringSubmatch(line)
+		if m == nil {
+			continue
+		}
+		value := projectNameValue.FindStringSubmatch(m[1])
+		if value == nil {
+			return true
+		}
+		return !distributionName.MatchString(value[1] + value[2])
+	}
+	return false
 }
 
 // SyncUVWorkspace updates the root pyproject.toml with [tool.uv.workspace]

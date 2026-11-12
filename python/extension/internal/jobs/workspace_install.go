@@ -66,7 +66,13 @@ func WorkspaceInstall(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (st
 		emit.Diagnostic("error", err.Error(), "", 0)
 		return "FAILED", nil, nil
 	}
-	if !hosted {
+	// A repository that pins uv for its own tools keeps that pin alone: a
+	// required-version of another release would make uv refuse its setup.
+	pin := workspace.RepositoryUVPin(wsRoot)
+	if !hosted && pin != "" {
+		emit.Log("info", fmt.Sprintf("%s pins the uv of the repository: pyproject.toml declares no required-version", pin))
+	}
+	if !hosted && pin == "" {
 		version, err := uvVersion(uv)
 		if err != nil {
 			emit.Diagnostic("error", fmt.Sprintf("Cannot read the release of %s: %v", uv, err), "", 0)
