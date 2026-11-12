@@ -109,12 +109,18 @@ in-process equivalent. Do not delete them as recursion.
 
 ## Consequences
 
-- The surface goldens (`internal/cli/surface_golden_test.go` and
-  `internal/commands/completion/surface_golden_test.go`, with their
-  `testdata/surface/`) and the
-  parse-acceptance table pin help, man, Markdown, structured help, completion
-  and valid invocations. They run in-process only: one subprocess re-exec
-  per golden would add its start-up cost to every golden.
+- The catalog has one committed rendering: `command-surface.json`, which
+  `TestGoldenCommandSurfaceDocument` pins and `PUTNAMI_UPDATE_SURFACE_GOLDENS=1`
+  regenerates. A change to the commands touches that one file beside the
+  catalog, so two pull requests that change commands conflict at most there.
+- Each renderer (text, command, man and Markdown help, structured help, and
+  bash, zsh and fish completion) is proven on a small catalog its test builds
+  with `commandmeta.ReplaceForTest` (`internal/cli/help_render_test.go`,
+  `internal/commands/completion/completion_render_test.go`), and a test over
+  the CLI's catalog proves every renderer reaches each of its commands. The
+  parse-acceptance table pins valid invocations. Every one of these runs
+  in-process: a subprocess re-exec per case would add its start-up cost to
+  every case.
 - Invalid input is a usage error (exit 2): an unknown flag for the command, a
   value flag without a value, a bad `--retry`, an unknown `--max-parallel`
-  mode. Validation tests pin it, not the goldens.
+  mode. Validation tests pin it, not the renderer tests.

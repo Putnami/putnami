@@ -49,7 +49,7 @@ func printHelpMarkdown(w io.Writer, scope *helpScope) {
 	iox.Fprintf(w, "| Argument | Description |\n|----------|-------------|\n")
 	iox.Fprintf(w, "| `.` | Current directory scope (project or subtree) |\n\n")
 
-	for _, cat := range structuredCommandCategories {
+	for _, cat := range structuredCommandCategoriesFromCatalog() {
 		iox.Fprintf(w, "## %s\n\n", cat.Name)
 		iox.Fprintf(w, "| Command | Description |\n|---------|-------------|\n")
 		printMarkdownGroup(w, cat.Commands)

@@ -68,7 +68,7 @@ Current directory scope (project or subtree).
 `)
 
 	iox.Fprint(w, ".SH STRUCTURED COMMANDS\n")
-	for _, cat := range structuredCommandCategories {
+	for _, cat := range structuredCommandCategoriesFromCatalog() {
 		iox.Fprintf(w, ".SS %s\n", cat.Name)
 		for _, c := range cat.Commands {
 			iox.Fprintf(w, ".TP\n.B %s\n%s.\n", c.Name, c.Description)

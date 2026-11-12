@@ -19,7 +19,8 @@
         "verification": {
           "kind": "acceptance",
           "checks": [
-            "the-rendered-help-surface-is-pinned",
+            "each-help-renderer-is-proven-on-a-small-catalog",
+            "every-help-surface-covers-every-catalog-command",
             "command-help-includes-structured-and-extension-flags"
           ]
         }

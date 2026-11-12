@@ -48,7 +48,7 @@ func TestFrameworkParserConsumesReservedGlobals(t *testing.T) {
 func TestHelpCatalogCoversReservedGlobals(t *testing.T) {
 	t.Parallel()
 	inCatalog := map[string]bool{}
-	for _, cat := range allFlagCategories {
+	for _, cat := range flagCategoriesFromCatalog() {
 		for _, fi := range cat.Flags {
 			inCatalog[strings.TrimPrefix(fi.Long, "--")] = true
 		}
