@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -505,9 +506,24 @@ func resolveScalar(projectPath, field, explicitValue string, claims map[string][
 		sort.Strings(providers)
 		claimants = append(claimants, fmt.Sprintf("%q (%s)", value, strings.Join(providers, ", ")))
 	}
-	return "", []diag.Diagnostic{diag.Errorf("probe-conflict", projectPath+"."+field,
-		"providers disagree on %s: %s — set it explicitly in putnami.json to resolve",
-		field, strings.Join(claimants, " vs "))}
+	return "", []diag.Diagnostic{diag.Errorf("probe-conflict", projectPath,
+		"providers disagree on %s: %s — %s",
+		field, strings.Join(claimants, " vs "), conflictRemedy(projectPath, field))}
+}
+
+// explicitKeys names the putnami.json key that decides each scalar a provider
+// reports. A field with no key, such as version, has no explicit value.
+var explicitKeys = map[string]string{"sourceName": "name", "type": "type"}
+
+// conflictRemedy names the edit that resolves a conflict on field: the key of
+// the project's putnami.json, which for the workspace root is the putnami.json
+// beside putnami.workspace.json.
+func conflictRemedy(projectPath, field string) string {
+	key, ok := explicitKeys[field]
+	if !ok {
+		return "make the manifests agree"
+	}
+	return fmt.Sprintf("set %q in %s to resolve", key, path.Join(projectPath, ConfigFilename))
 }
 
 // ResolveProjectName applies the v1 identity precedence for a project's name:

@@ -135,6 +135,7 @@
               "an-edge-carries-the-manifest-family-it-came-from",
               "an-import-inside-one-scope-is-allowed",
               "a-cross-scope-import-of-a-scope-private-project-is-reported",
+              "a-project-nested-in-the-project-it-imports-crosses-no-boundary",
               "a-public-project-a-generated-client-and-a-contract-edge-are-allowed"
             ]
           }

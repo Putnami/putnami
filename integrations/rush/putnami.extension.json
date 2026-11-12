@@ -157,7 +157,7 @@
       ]
     },
     "validate": {
-      "description": "In delegate mode, fail when a Rush project's putnami.json no longer matches rush.json and the project manifests, such as after a change that alters the edges between projects.",
+      "description": "Fail when a Rush project's putnami.json no longer matches rush.json and the project manifests, such as after a change that alters the edges between projects, in import mode as in delegate mode.",
       "activation": "workspace-once",
       "run": [
         {
@@ -373,7 +373,7 @@
       }
     },
     "rush-graph-check-exec": {
-      "description": "In delegate mode, compare each Rush project's putnami.json with rush.json and the project manifests, and fail with rush.sync_stale when a sync would change one. Writes nothing; passes in import mode.",
+      "description": "Compare each Rush project's putnami.json with rush.json and the project manifests, and fail with rush.sync_stale when a sync would change one, in import mode as in delegate mode. Writes nothing.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

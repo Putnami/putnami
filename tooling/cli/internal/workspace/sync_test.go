@@ -365,6 +365,53 @@ func TestSynchronize_MergeConflictIsTyped(t *testing.T) {
 	}
 }
 
+// The workspace root is a probe candidate and no project. When a go.mod and a
+// package.json at the root name it differently, the conflict names the root as
+// "." and the putnami.json beside putnami.workspace.json, whose name resolves
+// it.
+func TestSynchronize_TheRootPutnamiJSONResolvesARootNameConflict(t *testing.T) {
+	root := t.TempDir()
+	writeFileAt(t, filepath.Join(root, "putnami.workspace.json"), `{"name":"myorg"}`)
+	writeFileAt(t, filepath.Join(root, "package.json"), `{"name":"myorg"}`)
+	writeFileAt(t, filepath.Join(root, "go.mod"), "module github.com/acme/monorepo\n\ngo 1.25\n")
+	InvalidateLoadCache(root)
+	t.Cleanup(func() { InvalidateLoadCache(root) })
+	rootClaim := func(name, sourceName string) ProviderBinding {
+		provider := &countingProvider{name: name, answer: func(wsproto.ProbeRequest) wsproto.ProbeResult {
+			return wsproto.ProbeResult{Version: wsproto.ProbeProtocolVersion, Extension: name,
+				Projects: []wsproto.ProbeProject{{Path: wsproto.ProbeRootPath, SourceName: sourceName}}}
+		}}
+		return ProviderBinding{Scope: scopeFor(t, name, []string{"package.json", "go.mod"}, []string{"package.json", "go.mod"}), Provider: provider}
+	}
+	providers := []ProviderBinding{rootClaim("@putnami/go", "github.com/acme/monorepo"), rootClaim("@putnami/typescript", "myorg")}
+	load := func() *Workspace {
+		InvalidateLoadCache(root)
+		ws, err := Load(root)
+		if err != nil {
+			t.Fatalf("load workspace: %v", err)
+		}
+		return ws
+	}
+
+	_, err := Synchronize(SyncRequest{Workspace: load(), Providers: providers})
+	var failure *wsproto.ProbeFailure
+	if !errors.As(err, &failure) || failure.Kind != wsproto.ProbeFailureConflict || len(failure.Diagnostics) != 1 {
+		t.Fatalf("Synchronize error = %v, want one merge conflict", err)
+	}
+	if got := failure.Diagnostics[0]; got.Field != "." || !strings.Contains(got.Message, `set "name" in putnami.json to resolve`) {
+		t.Fatalf("conflict = %q: %q, want the root as \".\" and the root putnami.json as the remedy", got.Field, got.Message)
+	}
+
+	writeFileAt(t, filepath.Join(root, "putnami.json"), `{"name":"myorg"}`)
+	outcome, err := Synchronize(SyncRequest{Workspace: load(), Providers: providers})
+	if err != nil {
+		t.Fatalf("Synchronize with a root name: %v", err)
+	}
+	if got := outcome.Merged[wsproto.ProbeRootPath].SourceName; got != "myorg" {
+		t.Fatalf("root source name = %q, want the root putnami.json name", got)
+	}
+}
+
 // A workspace with no adapter-declaring extension still gets an index: the
 // snapshot is core's own record, not only the providers'.
 func TestSynchronize_NoProvidersStillWritesTheIndex(t *testing.T) {
