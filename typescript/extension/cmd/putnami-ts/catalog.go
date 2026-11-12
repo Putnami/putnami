@@ -95,16 +95,37 @@ func topLevelKeyOrder(data []byte) ([]string, error) {
 // alphabetically so output stays deterministic. This is what keeps unmanaged
 // top-level keys (overrides, scripts, packageManager, ...) untouched across a
 // rewrite instead of being reordered alphabetically by Go's map marshaling.
+//
+// HTML escaping is off: json.MarshalIndent would write "&", "<" and ">" in
+// every member, a script's "&&" included, as "\u0026", "\u003c" and "\u003e".
 func writeRootManifest(path string, pkg map[string]json.RawMessage, order []string) error {
-	out, err := json.MarshalIndent(orderedRawObject{keys: manifestKeyOrder(pkg, order), values: pkg}, "", "  ")
-	if err != nil {
+	var out bytes.Buffer
+	enc := json.NewEncoder(&out)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	// Encode ends the document with the newline Bun and npm write.
+	if err := enc.Encode(orderedRawObject{keys: manifestKeyOrder(pkg, order), values: pkg}); err != nil {
 		return fmt.Errorf("marshal package.json: %w", err)
 	}
-	out = append(out, '\n')
-	if err := os.WriteFile(path, out, 0644); err != nil {
+	if err := os.WriteFile(path, out.Bytes(), 0644); err != nil {
 		return fmt.Errorf("write package.json: %w", err)
 	}
 	return nil
+}
+
+// marshalManifestValue is json.Marshal without HTML escaping, for every value
+// written into a manifest. writeRootManifest compacts the members it writes
+// without escaping, but it keeps an escape a member already holds: a value
+// json.Marshal encoded would keep "\u003e=1.0.0" where the manifest said
+// ">=1.0.0".
+func marshalManifestValue(v any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte{'\n'}), nil
 }
 
 // manifestKeyOrder returns the top-level keys of pkg to emit: every key in
@@ -150,7 +171,7 @@ func (o orderedRawObject) MarshalJSON() ([]byte, error) {
 		if i > 0 {
 			buf.WriteByte(',')
 		}
-		kb, err := json.Marshal(k)
+		kb, err := marshalManifestValue(k)
 		if err != nil {
 			return nil, fmt.Errorf("marshal key %q: %w", k, err)
 		}
@@ -322,7 +343,7 @@ func (m *catalogModel) newCatalogsAtTop() bool {
 // each catalog's original placement.
 func (m *catalogModel) writeBack(pkg map[string]json.RawMessage) error {
 	if m.defaultCat != nil {
-		raw, err := json.Marshal(m.defaultCat)
+		raw, err := marshalManifestValue(m.defaultCat)
 		if err != nil {
 			return fmt.Errorf("marshal catalog: %w", err)
 		}
@@ -333,7 +354,7 @@ func (m *catalogModel) writeBack(pkg map[string]json.RawMessage) error {
 		}
 	}
 	if m.named != nil {
-		raw, err := json.Marshal(m.named)
+		raw, err := marshalManifestValue(m.named)
 		if err != nil {
 			return fmt.Errorf("marshal catalogs: %w", err)
 		}
@@ -344,7 +365,7 @@ func (m *catalogModel) writeBack(pkg map[string]json.RawMessage) error {
 		}
 	}
 	if m.wsObj != nil {
-		raw, err := json.Marshal(m.wsObj)
+		raw, err := marshalManifestValue(m.wsObj)
 		if err != nil {
 			return fmt.Errorf("marshal workspaces: %w", err)
 		}
@@ -397,7 +418,7 @@ func stripPutnamiEntries(pkg map[string]json.RawMessage, key string, dryRun bool
 		delete(pkg, key)
 		return true, nil
 	}
-	out, err := json.Marshal(entries)
+	out, err := marshalManifestValue(entries)
 	if err != nil {
 		return false, fmt.Errorf("marshal %s: %w", key, err)
 	}

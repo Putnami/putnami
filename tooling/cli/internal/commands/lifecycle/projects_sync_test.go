@@ -492,3 +492,26 @@ func workspaceWithMembers(t *testing.T, members ...string) string {
 	t.Cleanup(func() { workspace.InvalidateLoadCache(ws) })
 	return ws
 }
+
+// The sync rewrites a putnami.json without HTML escaping: a command holding
+// "&&", "<" and ">" keeps those bytes, where json.MarshalIndent would write
+// "&", "<" and ">".
+func TestProjectsSync_RewritesAConfigWithoutEscapingHTML(t *testing.T) {
+	const command = `"run": "a && b < in > out"`
+	ws := t.TempDir()
+	scopeCfg := filepath.Join(ws, "scope1", "putnami.json")
+	writeProjectFile(t, scopeCfg, `{"includes":["a"],"options":{`+command+`}}`)
+	if err := updateScopeProjects(ws, "scope1", []string{"b"}, nil); err != nil {
+		t.Fatalf("updateScopeProjects: %v", err)
+	}
+	member := filepath.Join(ws, "libs", "foo", "putnami.json")
+	writeProjectFile(t, member, `{"options":{`+command+`}}`)
+	if _, err := nameMember(ws, "libs/foo", "libs/foo", false); err != nil {
+		t.Fatalf("nameMember: %v", err)
+	}
+	for _, file := range []string{scopeCfg, member} {
+		if got := readText(t, file); !strings.Contains(got, command) {
+			t.Errorf("%s =\n%s\nwant it to hold %s", file, got, command)
+		}
+	}
+}

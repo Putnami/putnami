@@ -59,7 +59,15 @@ func writeAgentEntrypoints(wsRoot string, force bool) (guidanceWriteReport, erro
 		{agentEntrypointPath, planAgentsEntrypoint},
 		{ClaudeEntrypointPath, planClaudeEntrypoint},
 	} {
-		current, exists, err := readOptionalGuidance(filepath.Join(wsRoot, entrypoint.path))
+		file := filepath.Join(wsRoot, entrypoint.path)
+		// An entrypoint that is a symbolic link is the team's, like a
+		// CLAUDE.md that links to AGENTS.md: it shows the file it links to,
+		// which receives the block. Reading through the link and writing the
+		// result would replace the link with a copy of that file.
+		if info, err := os.Lstat(file); err == nil && info.Mode()&os.ModeSymlink != 0 {
+			continue
+		}
+		current, exists, err := readOptionalGuidance(file)
 		if err != nil {
 			return report, err
 		}

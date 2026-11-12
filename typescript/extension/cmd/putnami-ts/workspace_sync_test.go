@@ -454,3 +454,38 @@ func TestSyncTypeScriptWorkspace_PreservesManifestKeyOrder(t *testing.T) {
 		t.Fatalf("key order = %v, want the authored order preserved", order)
 	}
 }
+
+// An import rewrites the root package.json membership and nothing else: a
+// script holding "&&", "<" and ">" keeps those bytes, where json.MarshalIndent
+// would write them as "\u0026", "\u003c" and "\u003e". So do a key holding one
+// of them and a version range in the catalog of the object workspaces form,
+// which the sync re-encodes.
+func TestSyncTypeScriptWorkspace_KeepsTheScriptsByteForByte(t *testing.T) {
+	scripts := "{\n  \"name\": \"repo\",\n  \"private\": true,\n  \"scripts\": {\n" +
+		"    \"release\": \"turbo clean && npm run build:packages && changeset publish\",\n" +
+		"    \"log\": \"node a.js < in.txt > out.txt 2>&1\",\n" +
+		"    \"a&b\": \"echo '<b>'\"\n" +
+		"  },\n  \"workspaces\": "
+	for name, c := range map[string]struct{ before, after string }{
+		"array": {
+			before: scripts + "[\n    \"stale/path\"\n  ]\n}\n",
+			after:  scripts + "[\n    \"libs/core\"\n  ]\n}\n",
+		},
+		"object with a catalog": {
+			before: scripts + "{\n    \"packages\": [\n      \"stale/path\"\n    ],\n    \"catalog\": {\n      \"react\": \">=18 <19\"\n    }\n  }\n}\n",
+			after:  scripts + "{\n    \"packages\": [\n      \"libs/core\"\n    ],\n    \"catalog\": {\n      \"react\": \">=18 <19\"\n    }\n  }\n}\n",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := t.TempDir()
+			writeProbeFile(t, filepath.Join(root, "package.json"), c.before)
+			writeProbeFile(t, filepath.Join(root, "libs", "core", "package.json"), `{"name":"@acme/core"}`)
+			if _, err := syncTypeScriptWorkspace(root, []pctx.ProjectRef{{Name: "@acme/core", SourceName: "@acme/core", Path: "libs/core"}}, false); err != nil {
+				t.Fatalf("sync: %v", err)
+			}
+			if got := readTextFile(t, filepath.Join(root, "package.json")); got != c.after {
+				t.Errorf("package.json =\n%s\nwant\n%s", got, c.after)
+			}
+		})
+	}
+}

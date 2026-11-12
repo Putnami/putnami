@@ -513,9 +513,12 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
-	// Create .gitignore if it doesn't exist
+	// Create .gitignore if it doesn't exist. Here and for README.md and
+	// .gitattributes below, a symbolic link is an existing file, even one whose
+	// target does not resolve: Lstat, unlike Stat, sees the link itself, so a
+	// write never goes through it to create the target.
 	gitignorePath := filepath.Join(cwd, ".gitignore")
-	if _, err := os.Stat(gitignorePath); os.IsNotExist(err) {
+	if _, err := os.Lstat(gitignorePath); os.IsNotExist(err) {
 		if err := os.WriteFile(gitignorePath, []byte(defaultGitignore), 0o644); err == nil {
 			iox.Fprintln(os.Stdout, "  ✓ .gitignore created")
 		}
@@ -525,7 +528,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	// is and how to check a change from its first commit. An existing file is
 	// the team's and stays untouched.
 	readmePath := filepath.Join(cwd, "README.md")
-	if _, err := os.Stat(readmePath); os.IsNotExist(err) {
+	if _, err := os.Lstat(readmePath); os.IsNotExist(err) {
 		if err := os.WriteFile(readmePath, []byte(workspaceReadme(workspaceName(flags, cwd))), 0o644); err == nil {
 			iox.Fprintln(os.Stdout, "  ✓ README.md created")
 		}
@@ -536,7 +539,7 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	// file is the team's and stays untouched; `putnami doctor` reports a
 	// checkout that converts line endings without the policy.
 	gitattributesPath := filepath.Join(cwd, ".gitattributes")
-	if _, err := os.Stat(gitattributesPath); os.IsNotExist(err) {
+	if _, err := os.Lstat(gitattributesPath); os.IsNotExist(err) {
 		if err := os.WriteFile(gitattributesPath, []byte(git.LFPolicyAttributes+"\n"), 0o644); err == nil {
 			iox.Fprintln(os.Stdout, "  ✓ .gitattributes created (LF line endings)")
 		}

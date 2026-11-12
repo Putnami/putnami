@@ -1,6 +1,7 @@
 package lifecycle
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -318,11 +319,11 @@ func nameMember(wsRoot, member, name string, replace bool) (bool, error) {
 		return false, nil
 	}
 	doc["name"] = name
-	out, err := json.MarshalIndent(doc, "", "  ")
+	out, err := encodeConfigFile(doc)
 	if err != nil {
 		return false, fmt.Errorf("write %s: %w", file, err)
 	}
-	if err := os.WriteFile(file, append(out, '\n'), 0o644); err != nil { //nolint:gosec // a tracked project file
+	if err := os.WriteFile(file, out, 0o644); err != nil { //nolint:gosec // a tracked project file
 		return false, fmt.Errorf("write %s: %w", file, err)
 	}
 	return true, nil
@@ -911,11 +912,25 @@ func updateScopeProjects(wsRoot, scopePath string, added, removed []string) erro
 	sort.Strings(filtered)
 
 	raw["includes"] = filtered
-	out, err := json.MarshalIndent(raw, "", "  ")
+	out, err := encodeConfigFile(raw)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(cfgPath, append(out, '\n'), 0o644)
+	return os.WriteFile(cfgPath, out, 0o644)
+}
+
+// encodeConfigFile renders a configuration file the sync rewrites: two-space
+// indented, with a final newline, and without HTML escaping. json.MarshalIndent
+// would write the "&&" of a command the file holds as "\u0026\u0026".
+func encodeConfigFile(doc any) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(doc); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 func updateConfigMembership(wsRoot string, scopes, projects []string) error {

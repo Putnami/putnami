@@ -172,7 +172,7 @@ func alignPackageNames(root string, members []typeScriptMember, dryRun bool) ([]
 		if dryRun {
 			continue
 		}
-		encoded, err := json.Marshal(member.Name)
+		encoded, err := marshalManifestValue(member.Name)
 		if err != nil {
 			return nil, fmt.Errorf("%s: encode name: %w", member.Path, err)
 		}
@@ -349,7 +349,7 @@ func readRootWorkspaces(raw json.RawMessage) (rootWorkspaces, error) {
 // `nohoist`, and the `catalog`/`catalogs` bun accepts here too — survives in its
 // authored position, or a bare array when that is what the manifest had.
 func (w rootWorkspaces) encode(desired []string) (json.RawMessage, error) {
-	packages, err := json.Marshal(desired)
+	packages, err := marshalManifestValue(desired)
 	if err != nil {
 		return nil, fmt.Errorf("encode workspaces: %w", err)
 	}
@@ -365,7 +365,7 @@ func (w rootWorkspaces) encode(desired []string) (json.RawMessage, error) {
 	}
 	object["packages"] = packages
 
-	encoded, err := json.Marshal(orderedRawObject{keys: manifestKeyOrder(object, w.order), values: object})
+	encoded, err := marshalManifestValue(orderedRawObject{keys: manifestKeyOrder(object, w.order), values: object})
 	if err != nil {
 		return nil, fmt.Errorf("encode workspaces object: %w", err)
 	}
