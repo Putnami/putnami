@@ -193,6 +193,8 @@ var spawnSites = map[string]spawnSite{
 		why: "read verbs only: rev-parse, through gitread.ResolveCommit, and diff"},
 	"git/git.go:DiffWorkingTree": {spawns: 5, verdict: noRepositoryCode,
 		why: "read verbs only: rev-parse, through gitread.ResolveCommit, diff and ls-files"},
+	"git/git.go:UncommittedPaths": {spawns: 2, verdict: noRepositoryCode,
+		why: "read verbs only: diff and ls-files"},
 	"git/git.go:(*Head).LineVersion": {spawns: 2, verdict: noRepositoryCode,
 		why: "read verbs only, through linetag.LastRelease and gitread.CommitsSince: rev-parse, for-each-ref, cat-file, log"},
 	"git/git.go:HeadTree": {spawns: 1, verdict: noRepositoryCode,

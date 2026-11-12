@@ -278,6 +278,72 @@ coverage
 .env.prod.yaml
 `
 
+// putnamiGitignoreEntries are the directories every Putnami run writes: the
+// generated tree and build stamp of each project (.gen/), and the sessions,
+// caches and command output of the workspace (.putnami/). Neither is ever
+// committed, and Git reports both as changes until .gitignore lists them.
+var putnamiGitignoreEntries = []struct {
+	entry string
+	// covering are the spellings of an existing line that already ignore the
+	// directory everywhere it appears.
+	covering []string
+}{
+	{".putnami/", []string{".putnami", ".putnami/", "/.putnami", "/.putnami/", "**/.putnami", "**/.putnami/"}},
+	{".gen/", []string{".gen", ".gen/", "**/.gen", "**/.gen/"}},
+}
+
+// writeInitGitignore creates the workspace .gitignore, or appends to the
+// repository's own the putnamiGitignoreEntries it does not list yet. Every
+// other line of an existing file is the team's and stays untouched.
+func writeInitGitignore(root string) {
+	path := filepath.Join(root, ".gitignore")
+	info, err := os.Lstat(path)
+	if os.IsNotExist(err) {
+		if err := os.WriteFile(path, []byte(defaultGitignore), 0o644); err == nil {
+			iox.Fprintln(os.Stdout, "  ✓ .gitignore created")
+		}
+		return
+	}
+	if err != nil || !info.Mode().IsRegular() {
+		return
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return
+	}
+	missing := missingGitignoreEntries(string(data))
+	if len(missing) == 0 {
+		return
+	}
+	text := string(data)
+	if text != "" && !strings.HasSuffix(text, "\n") {
+		text += "\n"
+	}
+	if text != "" {
+		text += "\n"
+	}
+	text += "# Putnami\n" + strings.Join(missing, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(text), 0o644); err == nil {
+		iox.Fprintf(os.Stdout, "  ✓ .gitignore lists %s\n", strings.Join(missing, " and "))
+	}
+}
+
+// missingGitignoreEntries returns the putnamiGitignoreEntries no line of a
+// .gitignore covers, in their order.
+func missingGitignoreEntries(gitignore string) []string {
+	lines := make(map[string]bool)
+	for _, line := range strings.Split(gitignore, "\n") {
+		lines[strings.TrimSpace(line)] = true
+	}
+	var missing []string
+	for _, e := range putnamiGitignoreEntries {
+		if !slices.ContainsFunc(e.covering, func(spelling string) bool { return lines[spelling] }) {
+			missing = append(missing, e.entry)
+		}
+	}
+	return missing
+}
+
 // workspaceName is the --workspace name, or the directory's name.
 func workspaceName(flags initFlags, cwd string) string {
 	if flags.workspace != "" {
@@ -513,16 +579,11 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
-	// Create .gitignore if it doesn't exist. Here and for README.md and
-	// .gitattributes below, a symbolic link is an existing file, even one whose
-	// target does not resolve: Lstat, unlike Stat, sees the link itself, so a
-	// write never goes through it to create the target.
-	gitignorePath := filepath.Join(cwd, ".gitignore")
-	if _, err := os.Lstat(gitignorePath); os.IsNotExist(err) {
-		if err := os.WriteFile(gitignorePath, []byte(defaultGitignore), 0o644); err == nil {
-			iox.Fprintln(os.Stdout, "  ✓ .gitignore created")
-		}
-	}
+	// Create .gitignore, or add the directories Putnami writes to the one the
+	// repository has. Here and for README.md and .gitattributes below, a
+	// symbolic link is an existing file, even one whose target does not
+	// resolve, and a write never goes through it.
+	writeInitGitignore(cwd)
 
 	// Create README.md if it doesn't exist, so the workspace documents what it
 	// is and how to check a change from its first commit. An existing file is

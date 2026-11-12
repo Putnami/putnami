@@ -522,6 +522,37 @@ func TestWorkspaceInitCreatesGitignore(t *testing.T) {
 	}
 }
 
+// An adopted repository keeps its own .gitignore, and init adds the two
+// directories every run writes to it: without them Git reports each run's
+// .gen/version.json and .putnami/ files, and the next --impacted run selects
+// every project they sit in (#1075). A line that already covers one is kept,
+// and the rest of the file is the team's.
+func TestWorkspaceInitAddsPutnamiDirectoriesToAnExistingGitignore(t *testing.T) {
+	dir := t.TempDir()
+	stubExtensionInstall(t)
+	gitignorePath := filepath.Join(dir, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("node_modules\n/.putnami\n*.log"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	origDir, _ := os.Getwd()
+	os.Chdir(dir)
+	defer os.Chdir(origDir)
+	_ = WorkspaceInit(context.Background(), "", []string{"--extension", "go"}, LifecycleEnv{})
+
+	data, err := os.ReadFile(gitignorePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := "node_modules\n/.putnami\n*.log\n\n# Putnami\n.gen/\n"
+	if string(data) != want {
+		t.Errorf(".gitignore = %q, want %q", data, want)
+	}
+	if missing := missingGitignoreEntries(string(data)); len(missing) != 0 {
+		t.Errorf("after init, .gitignore still misses %v", missing)
+	}
+}
+
 // TestWorkspaceInitWritesAReadme: a new workspace documents itself from its
 // first commit, and init --force keeps a README the team already has.
 func TestWorkspaceInitWritesAReadme(t *testing.T) {

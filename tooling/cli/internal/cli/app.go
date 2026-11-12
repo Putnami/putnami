@@ -310,6 +310,9 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// a local run; a hosted run stops here when the install fails.
 	bootstrapGlobal := parsed.Global
 	engine.ApplyEnvOverrides(&bootstrapGlobal, cfg)
+	// An --impacted selection counts the changes the operator made, not the
+	// lockfile the implicit install below writes: record the tree first.
+	ctx = workspace.CaptureRunStart(ctx, wsRoot, bootstrapGlobal.Impacted)
 	// A hosted job command reads the remote cache through one provider, and
 	// hands its reporters the run credential, which the bootstrap starts
 	// before the implicit install's first repository code.

@@ -327,10 +327,14 @@ func dirtyHash(repoRoot string) string {
 type BaselineSource string
 
 const (
-	// BaselineSourceExplicit is a ref the caller (flag or workspace config)
+	// BaselineSourceExplicit is a ref the caller (the --baseline flag)
 	// provided; it is returned unchanged so typos or intentionally unusual refs
 	// surface from the later git diff.
 	BaselineSourceExplicit BaselineSource = "explicit"
+	// BaselineSourceConfig is the workspace config baseline, which
+	// ResolveBaselineDetailed receives as an explicit ref; the workspace caller
+	// that read it from the config names it.
+	BaselineSourceConfig BaselineSource = "config"
 	// BaselineSourceEpic is a configured long-lived integration branch that sits
 	// nearer to HEAD than the trunk.
 	BaselineSourceEpic BaselineSource = "epic"
@@ -575,6 +579,22 @@ func DiffWorkingTree(repoRoot, baseline string) (WorkingTreeDiff, error) {
 		}
 	}
 	return WorkingTreeDiff{Base: base, Files: files, Uncommitted: uncommitted}, nil
+}
+
+// UncommittedPaths returns the paths no commit records: those that differ
+// from HEAD in the index or the working tree, and the untracked files git does
+// not ignore. It is the local part of a DiffWorkingTree, read on its own so a
+// caller can record it before anything in the process writes to the tree.
+func UncommittedPaths(repoRoot string) ([]string, error) {
+	dirty, err := gitread.Run(repoRoot, "diff", "--no-ext-diff", "--no-renames", "--name-only", "-z", "HEAD")
+	if err != nil {
+		return nil, fmt.Errorf("git diff HEAD: %w", err)
+	}
+	untracked, err := gitread.Run(repoRoot, "ls-files", "-z", "--others", "--exclude-standard")
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files --others: %w", err)
+	}
+	return dedupStrings(append(gitread.SplitNUL(dirty), gitread.SplitNUL(untracked)...)), nil
 }
 
 func diffBase(repoRoot, baseline string) (string, error) {

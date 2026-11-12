@@ -83,6 +83,19 @@
         }
       },
       {
+        "id": "impacted-ignores-own-writes",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-diff-leaves-out-what-putnami-and-the-run-wrote"
+          ]
+        }
+      },
+      {
         "id": "safe-baseline",
         "stage": "coded",
         "evidenceKinds": [
@@ -93,7 +106,8 @@
           "checks": [
             "a-feature-branch-compares-with-the-trunk",
             "trunk-builds-use-the-last-build-or-all",
-            "the-workspace-configured-baseline-wins"
+            "the-workspace-configured-baseline-wins",
+            "every-run-states-its-base-and-its-origin"
           ]
         }
       },

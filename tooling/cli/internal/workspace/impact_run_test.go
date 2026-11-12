@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -498,5 +499,152 @@ func writeImpactFile(t *testing.T, root, rel, content string) {
 	}
 	if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// A run writes its own state into the tree: the build stamp
+// <project>/.gen/version.json and the session files under .putnami/. Neither is
+// a change the operator made, so the next --impacted run must not select the
+// projects they sit in — whether or not .gitignore lists them (#1075).
+func TestImpactedSelection_IgnoresThePathsPutnamiWrites(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-ignores-own-writes", "the-diff-leaves-out-what-putnami-and-the-run-wrote")
+	tmp := t.TempDir()
+	gitInitWithBaseline(t, tmp)
+
+	projects := []*Project{
+		{ID: "/packages/app", Name: "app", Path: "packages/app"},
+		{ID: "/packages/lib", Name: "lib", Path: "packages/lib"},
+	}
+	ws := &Workspace{Root: tmp, Projects: projects, Graph: BuildGraph(projects)}
+
+	writeImpactFile(t, tmp, filepath.Join("packages", "lib", "lib.go"), "package lib\n")
+	writeImpactFile(t, tmp, filepath.Join("packages", "app", ".gen", "version.json"), "{\"buildTime\":\"now\"}\n")
+	writeImpactFile(t, tmp, filepath.Join(".putnami", "sessions", "last.json"), "{}\n")
+
+	selection, err := ImpactedSelectionForBaseline(ws, "main")
+	if err != nil {
+		t.Fatalf("ImpactedSelectionForBaseline: %v", err)
+	}
+	if names := impactNameSet(selection.Projects); len(names) != 1 || !names["lib"] {
+		t.Fatalf("selected %v, want only lib — app's untracked .gen/version.json is Putnami's own output", names)
+	}
+	if !slices.Equal(selection.ChangedFiles, []string{"packages/lib/lib.go"}) {
+		t.Errorf("changed files = %v, want only the source edit", selection.ChangedFiles)
+	}
+	if len(selection.UnownedRootFiles) != 0 {
+		t.Errorf("unowned root files = %v, want none — .putnami/ is not an operator change", selection.UnownedRootFiles)
+	}
+}
+
+// A run's first-use install can write a file before the selection reads the
+// tree: on an adopted repository, a lockfile the repository does not commit.
+// The selection measures the tree the operator left — what was uncommitted
+// when the run started — so that file selects nothing, while an edit the
+// operator made before the run, and a path a commit since the base changed,
+// still count (#1075).
+func TestImpactedSelection_LeavesOutTheFilesTheRunWrote(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-ignores-own-writes", "the-diff-leaves-out-what-putnami-and-the-run-wrote")
+	tmp := t.TempDir()
+	gitInitWithBaseline(t, tmp)
+	writeImpactFile(t, tmp, filepath.Join("packages", "web", "pnpm-lock.yaml"), "lockfileVersion: 9\n")
+	runGitForImpact(t, tmp, "add", "-A")
+	runGitForImpact(t, tmp, "commit", "-m", "web lock")
+
+	projects := []*Project{
+		{ID: "/packages/app", Name: "app", Path: "packages/app"},
+		{ID: "/packages/lib", Name: "lib", Path: "packages/lib"},
+		{ID: "/packages/web", Name: "web", Path: "packages/web"},
+	}
+	ws := &Workspace{Root: tmp, Projects: projects, Graph: BuildGraph(projects)}
+
+	// The operator's edit, before the run.
+	writeImpactFile(t, tmp, filepath.Join("packages", "lib", "lib.go"), "package lib\n")
+	runStart, err := git.UncommittedPaths(tmp)
+	if err != nil {
+		t.Fatalf("UncommittedPaths: %v", err)
+	}
+	// The run's install, after: a new lockfile in app, and a rewrite of the
+	// lockfile the base..HEAD commit changed in web.
+	writeImpactFile(t, tmp, filepath.Join("packages", "app", "bun.lock"), "{}\n")
+	writeImpactFile(t, tmp, filepath.Join("packages", "web", "pnpm-lock.yaml"), "lockfileVersion: 9.1\n")
+
+	selection, err := ImpactedSelectionWithOptions(ws, "HEAD~1", ImpactedSelectionOptions{RunStart: runStart})
+	if err != nil {
+		t.Fatalf("ImpactedSelectionWithOptions: %v", err)
+	}
+	if names := impactNameSet(selection.Projects); len(names) != 2 || !names["lib"] || !names["web"] {
+		t.Fatalf("selected %v, want lib (the operator's edit) and web (the commit) — not app (the run's lockfile)", names)
+	}
+	if !slices.Equal(selection.RunWrittenFiles, []string{"packages/app/bun.lock"}) {
+		t.Errorf("run-written files = %v, want [packages/app/bun.lock]", selection.RunWrittenFiles)
+	}
+	if slices.Contains(selection.ChangedFiles, "packages/app/bun.lock") ||
+		slices.Contains(selection.UncommittedFiles, "packages/app/bun.lock") {
+		t.Errorf("changed %v / uncommitted %v still hold the run's lockfile", selection.ChangedFiles, selection.UncommittedFiles)
+	}
+	if note := selection.RunWrittenFilesExplanation(); note == "" {
+		t.Error("the selection does not say it left the run's lockfile out")
+	}
+
+	// Without a recorded start, every uncommitted path counts.
+	all, err := ImpactedSelectionWithOptions(ws, "HEAD~1", ImpactedSelectionOptions{})
+	if err != nil {
+		t.Fatalf("ImpactedSelectionWithOptions: %v", err)
+	}
+	if names := impactNameSet(all.Projects); !names["app"] {
+		t.Errorf("with no recorded start, selected %v, want app too", names)
+	}
+}
+
+// Every --impacted run names its base and where it came from, whatever the
+// tier: the same change selects a handful of projects against HEAD~1 and the
+// whole workspace against the trunk (#1075).
+func TestImpactedSelection_BaselineExplanationNamesTheBaseAndItsOrigin(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "safe-baseline", "every-run-states-its-base-and-its-origin")
+	tmp := t.TempDir()
+	gitInitWithBaseline(t, tmp)
+	head, err := gitread.ResolveCommit(tmp, "HEAD")
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeImpactFile(t, tmp, "next.txt", "next\n")
+	runGitForImpact(t, tmp, "add", "-A")
+	runGitForImpact(t, tmp, "commit", "-m", "next")
+
+	projects := []*Project{{ID: "/packages/lib", Name: "lib", Path: "packages/lib"}}
+	ws := &Workspace{Root: tmp, Projects: projects, Graph: BuildGraph(projects)}
+
+	explicit, err := ImpactedSelectionForBaseline(ws, "HEAD~1")
+	if err != nil {
+		t.Fatalf("ImpactedSelectionForBaseline: %v", err)
+	}
+	want := "  --impacted: diffs against HEAD~1 at " + head[:7] + " (from --baseline)."
+	if got := explicit.BaselineExplanation(); got != want {
+		t.Errorf("explicit baseline line = %q, want %q", got, want)
+	}
+
+	ws.Config = &wsproto.Config{Baseline: "HEAD~1"}
+	configured, err := ImpactedSelectionForBaseline(ws, "")
+	if err != nil {
+		t.Fatalf("ImpactedSelectionForBaseline: %v", err)
+	}
+	if configured.BaselineSource != git.BaselineSourceConfig {
+		t.Errorf("source = %q, want %q", configured.BaselineSource, git.BaselineSourceConfig)
+	}
+	if got := configured.BaselineExplanation(); !strings.Contains(got, "from the workspace config baseline") {
+		t.Errorf("configured baseline line = %q, want it to name the workspace config", got)
+	}
+
+	ws.Config = nil
+	runGitForImpact(t, tmp, "update-ref", "refs/remotes/origin/main", head)
+	trunk, err := ImpactedSelectionForBaseline(ws, "")
+	if err != nil {
+		t.Fatalf("ImpactedSelectionForBaseline: %v", err)
+	}
+	if got := trunk.BaselineExplanation(); !strings.Contains(got, "origin/main") || !strings.Contains(got, "remote trunk") {
+		t.Errorf("trunk baseline line = %q, want it to name origin/main and the trunk tier", got)
+	}
+	if trunk.BaselineIsFallback() {
+		t.Error("the remote trunk is not a fallback tier")
 	}
 }

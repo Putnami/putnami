@@ -42,8 +42,12 @@
       ]
     },
     {
+      "id": "impacted-ignores-own-writes",
+      "text": "The impacted diff leaves out every path under a .gen/ or .putnami/ directory, whether or not .gitignore lists it, and every uncommitted file the run wrote before it selected: one that was not uncommitted when the run started and that no commit since the base changes."
+    },
+    {
       "id": "safe-baseline",
-      "text": "An implicit impacted baseline resolves from reviewed workspace and trunk candidates and never compares a branch with its own published counterpart."
+      "text": "An implicit impacted baseline resolves from reviewed workspace and trunk candidates and never compares a branch with its own published counterpart. Every impacted run, a dry run included, states the base it diffs against and the tier that chose it."
     },
     {
       "id": "explicit-baseline",

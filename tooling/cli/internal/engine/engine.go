@@ -416,6 +416,10 @@ type Request struct {
 	// tree mutation. Nil makes the engine capture it itself at the start
 	// of Run, before hooks — which is what the terminal path did.
 	VersionSnapshot *git.VersionInfo
+	// runStart is the tree state workspace.CaptureRunStart recorded for this run: the
+	// uncommitted paths before the process wrote anything. Nil when none was
+	// recorded.
+	runStart []string
 	// versions is resolved during serial planning and then read by execution
 	// and evidence recovery. Each run, including a watch iteration, owns it.
 	versions cachekey.RunVersions
@@ -633,6 +637,12 @@ func (e *Engine) Run(ctx context.Context, request Request, sink EventSink) (Sess
 	// start for the same workspace, before its bootstrap or install ran any
 	// repository code, is that read (runAncestry).
 	req.ancestry = runAncestry(ctx, req)
+
+	// An --impacted selection leaves out the files this run writes before it
+	// selects. The adapter recorded the tree before its first-use bootstrap;
+	// a caller that did not is recorded here, before the first hook.
+	ctx = workspace.CaptureRunStart(ctx, req.WorkspaceRoot, req.Global.Impacted)
+	req.runStart = workspace.RunStartFrom(ctx)
 
 	// Hook verbosity is resolved once, here, from the flags as parsed. The run
 	// stages layer env/config overrides onto Global later (applyEnvOverrides);
