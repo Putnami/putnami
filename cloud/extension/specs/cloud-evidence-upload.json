@@ -58,7 +58,7 @@
       "id": "signs-a-person-in",
       "text": [
         "With --sign-in and no PUTNAMI_CLOUD_TOKEN, the command uses the session putnami cloud login stored, refreshed when it expired, and runs the same device sign-in when none exists, then uploads as that person: the run names the repository and no workspace, and Putnami Cloud opens the observed workspace in the person's organization.",
-        "A token in PUTNAMI_CLOUD_TOKEN uploads with that token, and the run and every batch name the repository too: an organization's ingest token reaches the repository's observed workspace, and a workspace token keeps its workspace.",
+        "With a token in PUTNAMI_CLOUD_TOKEN, the upload names the repository too: an organization's ingest token needs it.",
         "Without --sign-in and without a token, it refuses as before."
       ]
     },
