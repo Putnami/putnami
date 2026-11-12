@@ -132,7 +132,7 @@ func TypeScriptUnmappedReason(task, script, keeps string) string {
 	case strings.ContainsAny(script, "&|;"):
 		return fmt.Sprintf("its script chains another command (%q), which %s does not run: %s", script, TypeScriptExtension, keeps)
 	case task == TaskLint && strings.Contains(script, "eslint"):
-		return fmt.Sprintf("its ESLint takes arguments (%q) that %s would drop: move them to the ESLint configuration; %s", script, TypeScriptExtension, keeps)
+		return ESLintArgumentsReason(script, keeps)
 	case task == TaskTest && TestArgumentsDropped(script) != "":
 		return fmt.Sprintf("its test runner takes arguments (%q) that %s would drop: move them to the runner's configuration; %s", TestArgumentsDropped(script), TypeScriptExtension, keeps)
 	}
@@ -141,6 +141,56 @@ func TypeScriptUnmappedReason(task, script, keeps string) string {
 		runs = append(slices.Clone(runs), "tsc alone")
 	}
 	return fmt.Sprintf("%s runs %s, not %q: %s", TypeScriptExtension, strings.Join(runs, " or "), script, keeps)
+}
+
+// eslintCommandLineOnly are the ESLint options no configuration file holds:
+// --flag enables an ESLint feature flag, which only the command line and the
+// ESLINT_FLAGS variable set. Advice to move one to the ESLint configuration
+// could not be followed.
+var eslintCommandLineOnly = []string{"--flag"}
+
+// ESLintDroppedArguments splits the arguments a lint script passes ESLint, and
+// that the TypeScript lint drops, into the ones an ESLint configuration can
+// hold and the ones it cannot (eslintCommandLineOnly), each with its value.
+// The "." the TypeScript lint lints anyway is no dropped argument. A script
+// that does not start ESLint as a word answers its whole text as holdable.
+func ESLintDroppedArguments(script string) (holdable, commandLineOnly []string) {
+	fields := strings.Fields(script)
+	start := slices.Index(fields, "eslint")
+	if start < 0 {
+		return []string{strings.TrimSpace(script)}, nil
+	}
+	fields = fields[start+1:]
+	for i := 0; i < len(fields); i++ {
+		field := fields[i]
+		name, _, inline := strings.Cut(field, "=")
+		switch {
+		case field == ".":
+		case slices.Contains(eslintCommandLineOnly, name):
+			if !inline && i+1 < len(fields) && !strings.HasPrefix(fields[i+1], "-") {
+				field += " " + fields[i+1]
+				i++
+			}
+			commandLineOnly = append(commandLineOnly, field)
+		default:
+			holdable = append(holdable, field)
+		}
+	}
+	return holdable, commandLineOnly
+}
+
+// ESLintArgumentsReason says why an ESLint lint script keeps running through
+// the tool, ending with keeps: it names the arguments the TypeScript lint
+// would drop, and advises moving them to the ESLint configuration only when
+// that configuration can hold every one of them.
+func ESLintArgumentsReason(script, keeps string) string {
+	holdable, commandLineOnly := ESLintDroppedArguments(script)
+	if len(commandLineOnly) > 0 {
+		return fmt.Sprintf("its ESLint takes %q, which %s would drop and no ESLint configuration can hold: %s",
+			strings.Join(commandLineOnly, " "), TypeScriptExtension, keeps)
+	}
+	return fmt.Sprintf("its ESLint takes arguments (%q) that %s would drop: move them to the ESLint configuration; %s",
+		strings.Join(holdable, " "), TypeScriptExtension, keeps)
 }
 
 // runsProgram reports whether command is one of programs, or one of them

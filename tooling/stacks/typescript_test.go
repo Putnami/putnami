@@ -69,6 +69,28 @@ func TestTypeScriptUnmappedReasonSaysWhy(t *testing.T) {
 	}
 }
 
+// TestTheESLintReasonNamesWhatItDrops checks that the ESLint reason quotes the
+// arguments the TypeScript lint drops, not the whole script, and gives no
+// advice to move an argument no ESLint configuration can hold (#1087).
+func TestTheESLintReasonNamesWhatItDrops(t *testing.T) {
+	keeps := "it keeps running through the tool"
+	got := TypeScriptUnmappedReason(TaskLint, "eslint --max-warnings 0 src", keeps)
+	if want := `its ESLint takes arguments ("--max-warnings 0 src") that @putnami/typescript would drop: move them to the ESLint configuration; ` + keeps; got != want {
+		t.Errorf("reason = %q, want %q", got, want)
+	}
+	for _, script := range []string{
+		"eslint --flag unstable_native_nodejs_ts_config",
+		"pnpm exec eslint --flag=unstable_native_nodejs_ts_config .",
+		"eslint --flag unstable_native_nodejs_ts_config --max-warnings 0",
+	} {
+		got := TypeScriptUnmappedReason(TaskLint, script, keeps)
+		if strings.Contains(got, "move") || !strings.Contains(got, "unstable_native_nodejs_ts_config") ||
+			!strings.Contains(got, "no ESLint configuration can hold") || !strings.HasSuffix(got, keeps) {
+			t.Errorf("reason for %q = %q: want the flag named, no ESLint configuration able to hold it, and no advice to move it", script, got)
+		}
+	}
+}
+
 func TestTheRunnerAndTheLinterOptions(t *testing.T) {
 	doc := map[string]any{}
 	SetTypeScriptRunner(doc, "vitest")

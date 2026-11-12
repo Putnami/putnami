@@ -792,7 +792,7 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 	for _, want := range []string{
 		`not mapped: the build script of @demo/api: @putnami/typescript runs bun build or tsc alone, not "webpack": it keeps running through Rush, with rushx build`,
 		`not mapped: the test script of @demo/api: @putnami/typescript runs bun test or vitest or jest or npx vitest or npx jest, not "mocha": it keeps running through Rush, with rushx test`,
-		`not mapped: the lint script of @demo/pricing: its ESLint takes arguments ("eslint --max-warnings 0 src") that @putnami/typescript would drop: move them to the ESLint configuration; it keeps running through Rush, with rushx lint`,
+		`not mapped: the lint script of @demo/pricing: its ESLint takes arguments ("--max-warnings 0 src") that @putnami/typescript would drop: move them to the ESLint configuration; it keeps running through Rush, with rushx lint`,
 	} {
 		if !slices.Contains(result.Warnings, want) {
 			t.Errorf("warnings = %v, want %q", result.Warnings, want)

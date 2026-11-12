@@ -829,7 +829,13 @@ tidy`'s own walk rule (test files count, build tags do not except `ignore`,
 a directory the `go.mod` `ignore` directive names unless the module imports a
 package in it), and the
 TypeScript provider reads the package's committed sources and skips
-`node_modules`, `dist`, `build`, `coverage` and dot-directories. Neither runs a
+`node_modules`, `dist`, `build`, `coverage` and dot-directories. It counts an
+import, a type import, a re-export, `require`, `require.resolve`,
+`import.meta.resolve`, a `/// <reference types>` directive, a configuration
+file that imports a shared configuration, and the `extends` of a tsconfig
+file. An edge the probe of a monorepo tool's extension attributes to the
+tool's own graph (`build-graph`), such as an edge the Turborepo or Nx sync
+writes, is real without an import. Neither provider runs a
 toolchain, and
 neither reads a tree a build wrote, so a cold clone and a warm checkout answer
 the same thing. A scan that cannot read a file attributes nothing: the manifest

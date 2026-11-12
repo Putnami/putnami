@@ -810,3 +810,36 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 		t.Errorf("delegate mode: %v %v", result.Conventions, err)
 	}
 }
+
+// TestTheProbeAttributesEachEdgeToTurborepo checks that every edge the probe
+// answers is Turborepo's own (build-graph), in delegate mode and for a package
+// an import keeps on Turborepo, so the declared-edge check and `putnami deps
+// prune` leave alone an edge the sync writes and would write back (#1087).
+func TestTheProbeAttributesEachEdgeToTurborepo(t *testing.T) {
+	d := readDemo(t)
+	root := repository(t, d)
+	s := stack(t)
+	check := func(mode string) {
+		t.Helper()
+		result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension,
+			DependencySources: true, Paths: []string{".", "apps/api", "packages/pricing"}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		edges := 0
+		for _, p := range result.Projects {
+			for _, dep := range p.Dependencies {
+				edges++
+				if p.DependencySources[dep] != wsproto.DependencySourceBuildGraph {
+					t.Errorf("%s: %s edge %s source = %q, want %q", mode, p.Path, dep, p.DependencySources[dep], wsproto.DependencySourceBuildGraph)
+				}
+			}
+		}
+		if edges == 0 {
+			t.Fatalf("%s: projects = %+v, want the api's edge to pricing", mode, result.Projects)
+		}
+	}
+	check("delegate")
+	writeFile(t, root, "apps/api/putnami.json", `{"extensions": ["@putnami/turbo", "@putnami/typescript"]}`)
+	check("import")
+}

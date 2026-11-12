@@ -443,8 +443,9 @@ var catalog = []Command{
 		Category:    "Extensions & Templates",
 		Summary:     "Install extensions from config",
 		Description: "Install extensions from workspace configuration and run extension install hooks",
-		Usage:       "putnami extensions install [name] [--latest] [--user] [--platform <os/arch>] [--dest <dir>] [--output <format>]",
+		Usage:       "putnami extensions install [name] [--channel <channel>] [--latest] [--user] [--platform <os/arch>] [--dest <dir>] [--output <format>]",
 		Flags: []Flag{
+			{Long: "--channel", Type: FlagValue, ValueName: "<channel>", Description: "Install the named extension from one release channel, as <name>@<channel> does and as init resolves on --channel"},
 			{Long: "--latest", Description: "Ignore the lock file and resolve the latest versions"},
 			userScopeFlag("Pin one registry extension in the user scope (~/.putnami/user) so its commands run outside any workspace"),
 			{
@@ -465,6 +466,7 @@ var catalog = []Command{
 			"putnami extensions install --output=jsonl",
 			"putnami extensions install --platform linux/amd64 --dest ./.gen/warm-artifacts",
 			"putnami extensions install --user @acme/audit",
+			"putnami extensions install @putnami/observe --channel canary",
 		},
 		Related:          []string{"extensions list", "extensions update", "deps install"},
 		StructuredOutput: true,

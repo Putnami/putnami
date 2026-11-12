@@ -423,7 +423,7 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 			plan.compiler = covered && compiler
 		}
 		if reason == "" && ok {
-			reason = importReason(typeScript, isTS, task, target)
+			reason = importReason(root, p.Path, typeScript, isTS, task, target)
 		}
 		switch {
 		case !ok:
@@ -458,7 +458,7 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 	return plan
 }
 
-func importReason(declared, isTS bool, task string, target detect.Target) string {
+func importReason(root, dir string, declared, isTS bool, task string, target detect.Target) string {
 	runs := target.Executor
 	if target.Command != "" && (runs == "" || runs == "nx:run-script" || runs == "nx:run-commands") {
 		runs = target.Command
@@ -475,8 +475,12 @@ func importReason(declared, isTS bool, task string, target detect.Target) string
 	if task == "test" && stacks.TestArgumentsDropped(runs) != "" {
 		return fmt.Sprintf("its test runner takes arguments (%q) that @putnami/typescript would drop: move them to the runner's configuration; %s keeps running through nx run", stacks.TestArgumentsDropped(runs), task)
 	}
-	if task == "lint" && (target.Executor == eslintExecutor || strings.Contains(runs, "eslint")) {
-		return fmt.Sprintf("its ESLint takes arguments or options (%q) that @putnami/typescript would drop: move them to the ESLint configuration; %s keeps running through nx run", runs, task)
+	keeps := task + " keeps running through nx run"
+	if task == "lint" && target.Executor == eslintExecutor {
+		return eslintExecutorReason(root, dir, keeps)
+	}
+	if task == "lint" && strings.Contains(runs, "eslint") {
+		return stacks.ESLintArgumentsReason(runs, keeps)
 	}
 	return fmt.Sprintf("@putnami/typescript runs %s, not %q: %s keeps running through nx run", strings.Join(typeScriptCommands[task], " or "), runs, task)
 }
@@ -601,52 +605,71 @@ func coveredByTypeScript(root, dir, task string, target detect.Target) bool {
 func lintsWithESLint(root, dir string, target detect.Target) bool {
 	switch target.Executor {
 	case eslintExecutor:
-		return eslintExecutorOptionsCarried(root, dir)
+		dropped, read := eslintExecutorDropped(root, dir)
+		return read && len(dropped) == 0
 	case "", "nx:run-script", "nx:run-commands":
 		return slices.Contains(stacks.ESLintScripts, strings.Join(strings.Fields(target.Command), " "))
 	}
 	return false
 }
 
-// eslintExecutorOptionsCarried reports whether the lint target of the project
-// at dir sets no option the TypeScript lint would drop: none, or only
-// lintFilePatterns that name the project root. It reads the target in the
+// eslintExecutorDropped names, sorted, the options of the lint target of the
+// project at dir that the TypeScript lint would drop: every option but
+// lintFilePatterns that name the project root, and configurations, whose
+// options a default configuration may set. It reads the target in the
 // project's project.json, else the nx member of its package.json, under the
-// targetDefaults of nx.json for lint and for the ESLint executor. It fails
-// closed: a target it cannot find or read, or one with configurations, whose
-// options a default configuration may set, is not carried.
-func eslintExecutorOptionsCarried(root, dir string) bool {
+// targetDefaults of nx.json for lint and for the ESLint executor. read is
+// false when it cannot find or read the target: the caller fails closed.
+func eslintExecutorDropped(root, dir string) (dropped []string, read bool) {
 	target, ok := lintTarget(root, dir)
-	if !ok || len(target.Configurations) > 0 {
-		return false
+	if !ok {
+		return nil, false
 	}
-	options := map[string]any{}
 	defaults, ok := lintTargetDefaults(root)
 	if !ok {
-		return false
+		return nil, false
 	}
+	options := map[string]any{}
 	for _, layer := range append(defaults, target) {
-		if len(layer.Configurations) > 0 {
-			return false
+		if len(layer.Configurations) > 0 && !slices.Contains(dropped, "configurations") {
+			dropped = append(dropped, "configurations")
 		}
 		for name, value := range layer.Options {
 			options[name] = value
 		}
 	}
 	for name, value := range options {
-		if name != "lintFilePatterns" {
-			return false
+		if name != "lintFilePatterns" || !patternsNameTheProject(value, dir) {
+			dropped = append(dropped, name)
 		}
-		patterns, _ := value.([]any)
-		for _, pattern := range patterns {
-			switch pattern {
-			case "{projectRoot}", ".", "./", dir, "./" + dir:
-			default:
-				return false
-			}
+	}
+	slices.Sort(dropped)
+	return dropped, true
+}
+
+// patternsNameTheProject reports whether lintFilePatterns name the project
+// root alone, which the TypeScript lint lints anyway.
+func patternsNameTheProject(value any, dir string) bool {
+	patterns, _ := value.([]any)
+	for _, pattern := range patterns {
+		switch pattern {
+		case "{projectRoot}", ".", "./", dir, "./" + dir:
+		default:
+			return false
 		}
 	}
 	return true
+}
+
+// eslintExecutorReason says why an ESLint executor target stays on Nx, ending
+// with keeps: it names the options the TypeScript lint would drop.
+func eslintExecutorReason(root, dir, keeps string) string {
+	dropped, read := eslintExecutorDropped(root, dir)
+	if !read {
+		return fmt.Sprintf("its ESLint executor's options cannot be read, and @putnami/typescript would drop any: %s", keeps)
+	}
+	return fmt.Sprintf("its ESLint executor sets options (%s) that @putnami/typescript would drop: move them to the ESLint configuration; %s",
+		strings.Join(dropped, ", "), keeps)
 }
 
 // nxTargetConfig is the part of an Nx target configuration the ESLint

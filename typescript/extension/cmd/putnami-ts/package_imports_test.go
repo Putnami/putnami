@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"testing"
 )
 
@@ -79,5 +80,39 @@ func TestAnUnreadablePackageAttributesNothing(t *testing.T) {
 	}
 	if !scan.importsPackage("@acme/never") {
 		t.Errorf("an incomplete scan reported a phantom edge")
+	}
+}
+
+// TestThePackageScanReadsResolvesTypesAndConfigExtends checks the reads an
+// import statement does not spell: require.resolve and import.meta.resolve, a
+// type import, a triple-slash types reference, a config file that imports a
+// shared configuration, and a tsconfig `extends`. Each one reads the package,
+// so none of them may leave its edge reported as a declaration (#1087).
+func TestThePackageScanReadsResolvesTypesAndConfigExtends(t *testing.T) {
+	dir := t.TempDir()
+	writePackageFile(t, dir, "src/mcp/apps.ts", "const root = path.dirname(require.resolve(\"@acme/mcp-apps/package.json\"));\n")
+	writePackageFile(t, dir, "src/meta.ts", "const url = import.meta.resolve('@acme/meta-resolved');\n")
+	writePackageFile(t, dir, "src/lastRunView.ts", "import type { RunReport } from '@acme/types';\n")
+	writePackageFile(t, dir, "src/ambient.d.ts", "/// <reference types=\"@acme/ambient\" />\n")
+	writePackageFile(t, dir, "eslint.config.mts", "import baseConfig from \"@acme/eslint-config/base\";\nexport default [...baseConfig];\n")
+	writePackageFile(t, dir, "tsconfig.json", "{\n  \"extends\": \"@acme/tsconfig/base.json\",\n  \"include\": [\"src\"]\n}\n")
+	writePackageFile(t, dir, "tsconfig.build.json", `{"extends": ["./tsconfig.json", "@acme/tsconfig-strict/strict.json"]}`)
+	writePackageFile(t, dir, "src/data.json", `{"extends": "@acme/not-a-config"}`)
+
+	read := []string{
+		"@acme/mcp-apps", "@acme/meta-resolved", "@acme/types", "@acme/ambient",
+		"@acme/eslint-config", "@acme/tsconfig", "@acme/tsconfig-strict",
+	}
+	scan := scanPackageImports(dir, append(slices.Clone(read), "@acme/not-a-config"))
+	if !scan.complete {
+		t.Fatalf("scan did not complete over a readable package")
+	}
+	for _, name := range read {
+		if !scan.importsPackage(name) {
+			t.Errorf("%s reads as unimported", name)
+		}
+	}
+	if scan.importsPackage("@acme/not-a-config") {
+		t.Errorf("an `extends` in a JSON file that is no tsconfig reads as an import")
 	}
 }
