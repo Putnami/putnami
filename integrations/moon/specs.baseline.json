@@ -5,11 +5,13 @@
     "monorepo/moon-adoption#import-adopts-typescript-conventions",
     "monorepo/moon-adoption#import-keeps-the-tool-that-checks-the-code",
     "monorepo/moon-adoption#import-maps-to-language-extensions",
+    "monorepo/moon-adoption#inferred-tasks-are-read",
     "monorepo/moon-adoption#manifest-follows-the-profile",
     "monorepo/moon-adoption#projects-and-tasks-are-read",
     "monorepo/moon-adoption#reports-from-options",
     "monorepo/moon-adoption#sync-writes-each-project",
     "monorepo/moon-adoption#tasks-delegate-to-moon",
+    "monorepo/moon-adoption#the-root-project-is-named",
     "monorepo/moon-adoption#validate-fails-on-a-stale-graph"
   ]
 }

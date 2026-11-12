@@ -38,6 +38,21 @@
           }
         },
         {
+          "id": "sync-reads-the-graph-nx-resolves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-reads-the-graph-nx-resolves",
+              "without-nx-the-sync-says-what-the-static-read-misses",
+              "a-failing-nx-graph-fails-the-sync"
+            ]
+          }
+        },
+        {
           "id": "import-maps-typescript-targets",
           "stage": "coded",
           "evidenceKinds": [
@@ -103,7 +118,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "an-unmapped-target-is-listed-with-its-reason"
+              "an-unmapped-target-is-listed-with-its-reason",
+              "an-unmapped-target-name-is-one-line"
             ]
           }
         },

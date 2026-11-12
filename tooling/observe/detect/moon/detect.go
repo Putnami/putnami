@@ -72,6 +72,31 @@ type Detection struct {
 	Diagnostics []diag.Diagnostic
 }
 
+// toolchainFiles are the files where a moon workspace configures its
+// toolchains: moon 2.x's, then moon 1.x's.
+var toolchainFiles = []string{".moon/toolchains.yml", ".moon/toolchain.yml"}
+
+// InfersTasks names the setting by which the moon workspace at root infers
+// tasks from package.json scripts, inferTasksFromScripts under javascript
+// (moon 2.x) or node (moon 1.x), as file: key; empty when it infers none.
+// Only moon itself lists those tasks: neither moon.yml nor the task files
+// state them.
+func InfersTasks(root string) string {
+	for _, file := range toolchainFiles {
+		data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(file)))
+		if err != nil {
+			continue
+		}
+		for _, toolchain := range []string{"javascript", "node"} {
+			settings, _, err := topLevel(string(data), toolchain)
+			if m, ok := settings.(map[string]any); err == nil && ok && m["inferTasksFromScripts"] == "true" {
+				return file + ": " + toolchain + ".inferTasksFromScripts"
+			}
+		}
+	}
+	return ""
+}
+
 // IsWorkspace reports whether root holds a moon workspace: its
 // .moon/workspace.yml.
 func IsWorkspace(root string) bool {

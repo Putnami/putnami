@@ -13,6 +13,7 @@
     "monorepo/nx-adoption#manifest-follows-the-profile",
     "monorepo/nx-adoption#projects-become-projects",
     "monorepo/nx-adoption#reports-from-project-options",
+    "monorepo/nx-adoption#sync-reads-the-graph-nx-resolves",
     "monorepo/nx-adoption#sync-writes-the-project-graph",
     "monorepo/nx-adoption#tasks-delegate-to-nx",
     "monorepo/nx-adoption#unmapped-targets-are-listed",

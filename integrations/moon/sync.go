@@ -66,6 +66,24 @@ type SyncResult struct {
 	// Unreported are the moon ids of the delegated projects whose test task
 	// reads no report: its result is moon's exit code alone.
 	Unreported []string
+	// Unresolved says, as a moon.tasks_inferred warning, which tasks the sync
+	// could not read: those a workspace infers from package.json scripts when
+	// neither the export nor moon lists them. Empty otherwise.
+	Unresolved string
+}
+
+// rootProjectNote names a moon project at the workspace root, which the sync
+// writes no putnami.json for, and the tasks that keep running through moon.
+func rootProjectNote(p detect.Project) string {
+	tasks := "it has no task"
+	if len(p.Tasks) > 0 {
+		names := make([]string, 0, len(p.Tasks))
+		for _, t := range p.Tasks {
+			names = append(names, t.Name)
+		}
+		tasks = fmt.Sprintf("its tasks %s keep running through moon run %s:<task>", strings.Join(names, ", "), p.ID)
+	}
+	return fmt.Sprintf("moon project %s at the workspace root is no Putnami project: a project there would own every file no deeper project claims; %s", p.ID, tasks)
 }
 
 // Sync writes the moon project graph of the workspace at root into each
@@ -87,12 +105,24 @@ func Stale(ctx context.Context, root string) (SyncResult, error) {
 
 // synchronize runs the sync in the mode given, else the workspace's; with dry
 // set it writes nothing, and its result holds the content of each change.
-func synchronize(_ context.Context, root string, dry bool, given string) (SyncResult, error) {
+func synchronize(ctx context.Context, root string, dry bool, given string) (SyncResult, error) {
 	fromExport := fileExists(root, detect.DefaultGraphFile)
 	if !detect.IsWorkspace(root) && !fromExport {
 		return SyncResult{}, nil
 	}
-	detection := detect.Detect(root, detect.Options{})
+	resolved, err := resolveGraph(ctx, root)
+	if err != nil {
+		return SyncResult{}, err
+	}
+	defer resolved.cleanup()
+	detection := detect.Detect(root, resolved.options)
+	if resolved.options.GraphFile != "" && !detection.FromExport {
+		var reasons []string
+		for _, d := range detection.Diagnostics {
+			reasons = append(reasons, d.Message)
+		}
+		return SyncResult{}, fmt.Errorf("%s printed no moon project graph, so no edge is written: %s", exportSource, strings.Join(reasons, "; "))
+	}
 	mode, err := Mode(root)
 	if given != "" {
 		mode, err = stacks.CheckAdoptionMode(given)
@@ -100,12 +130,14 @@ func synchronize(_ context.Context, root string, dry bool, given string) (SyncRe
 	if err != nil {
 		return SyncResult{}, err
 	}
-	result := SyncResult{Mode: mode}
+	result := SyncResult{Mode: mode, Unresolved: resolved.unresolved}
+	var notes []string
 	extensions := map[string]bool{}
 	var packages []stacks.GraphPackage
 	var conventions []stacks.ConventionProject
 	for _, p := range detection.Projects {
 		if p.Dir == wsproto.ProbeRootPath {
+			notes = append(notes, rootProjectNote(p))
 			continue
 		}
 		extension := ExtensionFor(mode, p)
@@ -160,8 +192,12 @@ func synchronize(_ context.Context, root string, dry bool, given string) (SyncRe
 		return SyncResult{}, err
 	}
 	result.GraphResult = graph
+	result.Warnings = append(notes, result.Warnings...)
 	result.Export = detect.WorkspaceFile
-	if detection.FromExport {
+	switch {
+	case resolved.options.GraphFile != "":
+		result.Export = exportSource
+	case detection.FromExport:
 		result.Export = detect.DefaultGraphFile
 	}
 	result.Extensions = slices.Sorted(maps.Keys(extensions))
@@ -489,6 +525,7 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 	for _, u := range result.Unmapped {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("moon task %s:%s: %s", u.Project, u.Task, u.Reason), "", 0, 0, CodeTaskUnmapped)
 	}
+	reportUnresolved(emit, result)
 	for _, warning := range result.Warnings {
 		emit.Diagnostic("warning", warning, "", 0)
 	}
@@ -542,6 +579,7 @@ func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		emit.DiagnosticWithCode("warning", "the project graph cannot be checked: "+summary(result), "", 0, 0, CodeSyncNoExport)
 		return "OK", nil, nil
 	}
+	reportUnresolved(emit, result)
 	stale := append(slices.Clone(result.Written), result.Retracted...)
 	if len(stale) == 0 {
 		return "OK", nil, nil
@@ -550,6 +588,13 @@ func RunCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[s
 		emit.DiagnosticWithCode("error", fmt.Sprintf("%s no longer matches the moon project graph of %s: run putnami projects sync and commit the result", file, result.Export), file, 0, 0, CodeSyncStale)
 	}
 	return "FAILED", nil, errors.New(CodeSyncStale)
+}
+
+// reportUnresolved warns of the tasks the sync could not read.
+func reportUnresolved(emit *jsonl.Emitter, result SyncResult) {
+	if result.Unresolved != "" {
+		emit.DiagnosticWithCode("warning", result.Unresolved, "", 0, 0, CodeTasksInferred)
+	}
 }
 
 // sortUnmapped orders the unmapped tasks by project, then task.

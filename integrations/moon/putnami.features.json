@@ -25,6 +25,21 @@
           }
         },
         {
+          "id": "inferred-tasks-are-read",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-reads-the-tasks-moon-infers",
+              "without-moon-the-sync-says-it-cannot-read-the-inferred-tasks",
+              "a-failing-moon-project-graph-fails-the-sync"
+            ]
+          }
+        },
+        {
           "id": "sync-writes-each-project",
           "stage": "coded",
           "evidenceKinds": [
@@ -34,6 +49,19 @@
             "kind": "acceptance",
             "checks": [
               "the-sync-writes-each-moon-project-putnami-json"
+            ]
+          }
+        },
+        {
+          "id": "the-root-project-is-named",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sync-names-the-root-project-it-does-not-adopt"
             ]
           }
         },
