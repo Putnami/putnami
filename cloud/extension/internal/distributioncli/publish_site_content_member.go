@@ -34,8 +34,9 @@ func SiteContentCoordinate(section string) string {
 
 // SiteContentSections returns the sorted section slugs of one site project
 // directory, as DeriveSiteContentSections reads them: files directly under the
-// site directory (putnami.json, README.md) are meta, and a declared generated
-// section is listed whether or not build has written it yet. A section slug
+// site directory (putnami.json, site-content.json, README.md) are meta, and a
+// generated section site-content.json declares is listed whether or not build
+// has written it yet. A section slug
 // that cannot be a mount is an error.
 func SiteContentSections(siteDir string) ([]string, error) {
 	sections, err := DeriveSiteContentSections(siteDir, filepath.Base(siteDir), "", map[string]string{})

@@ -26,7 +26,7 @@ func TestExtensionManifestActivatesAndOwnsNativeArchivePublishing(t *testing.T) 
 		t.Fatalf("extension contract diagnostics = %+v", diagnostics)
 	}
 	if manifest.Workspace == nil || !slices.Equal(manifest.Workspace.Markers, []string{"putnami.json"}) ||
-		!slices.Equal(manifest.Workspace.Inputs, []string{"putnami.extension.json", "putnami.json"}) || manifest.Workspace.SyncTask != "" {
+		!slices.Equal(manifest.Workspace.Inputs, []string{"putnami.extension.json", "putnami.json", "site-content.json"}) || manifest.Workspace.SyncTask != "" {
 		t.Fatalf("Cloud workspace adapter = %+v", manifest.Workspace)
 	}
 	requireDeclaredMemberProfile(t, "archive", "putnami/cloud", "0.2.0-main")

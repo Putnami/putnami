@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
+	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
 )
 
 func TestOrdinaryValidateSiteContentPlanHasOnlySourceChecks(t *testing.T) {
@@ -175,15 +177,14 @@ func TestExtensionManifestWiresSiteContentWithoutPublishDoc(t *testing.T) {
 	requireStep("package", cloudSiteContentPackageStep, "cloud-package-site-content", "params.site-content")
 	// Without a package job the planner cannot compute the members' selection
 	// fingerprint, so the package command must activate for a site project:
-	// its section landing page is the activation file.
-	activated := false
-	for _, pattern := range commands["package"].(map[string]any)["activationFiles"].([]any) {
-		if pattern == "*/index.md" {
-			activated = true
+	// a committed section's landing page and the generated-section declaration
+	// are the activation files, so a project whose only sections are
+	// generated packages them too.
+	activationFiles := commands["package"].(map[string]any)["activationFiles"].([]any)
+	for _, want := range []string{"*/index.md", distributioncli.SiteContentDeclarationFile} {
+		if !slices.Contains(activationFiles, any(want)) {
+			t.Fatalf("package activationFiles = %v, want %s so a docs site project plans its package step", activationFiles, want)
 		}
-	}
-	if !activated {
-		t.Fatalf("package activationFiles = %v, want */index.md so a docs site project plans its package step", commands["package"].(map[string]any)["activationFiles"])
 	}
 	requireStep("publish", cloudSiteContentPublishStep, "cloud-publish-site-content-project", "params.site-content")
 

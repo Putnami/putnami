@@ -598,25 +598,37 @@ user token.
 ### Generated site-content sections
 
 A site project may declare a section that a command generates during `build`,
-instead of a committed section directory:
+instead of a committed section directory. The declaration lives in a
+`site-content.json` file at the project root:
+
+```json
+{
+  "generated": {
+    "reference": {"command": ["go", "run", "../../tools/reference-gen", "--out", "{output}"]}
+  }
+}
+```
+
+The generator's inputs stay in the project's `putnami.json`, under
+`options["@putnami/cloud:build"].filePatterns`. That key belongs to the
+engine: it adds the files it lists to the key of every task of the
+extension's `build` command.
 
 ```json
 {
   "name": "docs/example.dev",
   "publish": ["site-content"],
   "options": {
-    "@putnami/cloud": {
-      "site-content": {
-        "generated": {
-          "reference": {"command": ["go", "run", "../../tools/reference-gen", "--out", "{output}"]}
-        }
-      }
-    },
     "@putnami/cloud:build": {"filePatterns": ["../../tools/reference-gen/**"]}
   }
 }
 ```
 
+- `site-content.json` holds one object whose only member is `generated`, a
+  map of section name to `{"command": [...]}`. Every unknown member, at any
+  level, is refused. A section name is one lowercase URL-safe directory name.
+  `putnami.json` does not carry the declaration: one written there declares
+  nothing.
 - The `build~cloud-site-content-generate` step runs each command in the
   project directory, in section-name order. Each `{output}` in an argument
   becomes the absolute path of `.gen/site-content/<section>`, and a command
@@ -625,8 +637,8 @@ instead of a committed section directory:
 - The step fails when a command fails, cannot start, or writes no regular
   file. A site project that declares no generated section runs a step that
   does nothing.
-- The step is cached and deterministic. Its key holds `putnami.json`, where
-  the commands live, and the files that
+- The step is cached and deterministic. Its key holds `site-content.json`,
+  where the commands live, `putnami.json`, and the files that
   `options["@putnami/cloud:build"].filePatterns` lists. List every file the
   command reads. The patterns are relative to the project directory and may
   name files outside it. A change to a file the list leaves out does not run
@@ -638,7 +650,8 @@ instead of a committed section directory:
   reads the network is no longer deterministic.
 - `validate` and `package` plan `build` first for a site project, so the
   section exists when they read it. The workspace probe lists a generated
-  section from `putnami.json` alone, before any build.
+  section from `site-content.json` alone, before any build, and lists it
+  again when that file changes.
 - Validation, packaging and publication read a generated section from
   `.gen/site-content/<section>`. They refuse one whose directory is absent,
   and one whose name is also a committed section directory. A directory under
@@ -648,7 +661,9 @@ instead of a committed section directory:
   moves: a listed generator input or a command changes it, and the generated
   files themselves do not.
 - `package` activates on a committed section landing page, `<section>/index.md`,
-  so a site project keeps at least one committed section.
+  or on `site-content.json`, as it activates on `image-layers.json` for an
+  image. A site project whose only sections are generated still packages and
+  publishes them.
 - A site project that is also a Go or TypeScript project cannot declare a
   generated section: the language extension's `build` owns the project's
   `.gen` directory and does not cede `.gen/site-content`.

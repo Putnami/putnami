@@ -81,10 +81,14 @@ func TestSiteContentGenerateTaskContract(t *testing.T) {
 	if want := map[string]bool{"enabled": true, "deterministic": true}; !reflect.DeepEqual(task.Cache, want) {
 		t.Fatalf("cache = %v, want %v", task.Cache, want)
 	}
-	// The commands live in putnami.json. The generator's own inputs reach the
-	// key through options["@putnami/cloud:build"].filePatterns, which the
-	// engine adds to every key of the extension's build command.
-	if want := map[string]manifestInputPort{"manifest": {From: "project", Files: []string{"putnami.jso[n]"}}}; !reflect.DeepEqual(task.Inputs, want) {
+	// The commands live in site-content.json. The generator's own inputs
+	// reach the key through options["@putnami/cloud:build"].filePatterns in
+	// putnami.json, which the engine adds to every key of the extension's
+	// build command.
+	if want := map[string]manifestInputPort{
+		"manifest":    {From: "project", Files: []string{"putnami.jso[n]"}},
+		"declaration": {From: "project", Files: []string{"site-content.jso[n]"}},
+	}; !reflect.DeepEqual(task.Inputs, want) {
 		t.Fatalf("inputs = %v, want %v", task.Inputs, want)
 	}
 	if !slices.Equal(task.Writes, []string{"gen"}) {

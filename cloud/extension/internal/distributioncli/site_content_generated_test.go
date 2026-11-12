@@ -11,24 +11,30 @@ import (
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 )
 
-// writeGeneratedSiteProject writes a site project whose putnami.json carries
-// siteContent as options["@putnami/cloud"]["site-content"], or no option when
-// siteContent is nil, and returns the project directory.
+// writeGeneratedSiteProject writes a site project with siteContent as its
+// site-content.json, or no such file when siteContent is nil, and returns the
+// project directory.
 func writeGeneratedSiteProject(t *testing.T, siteContent any) string {
 	t.Helper()
 	project := t.TempDir()
-	document := map[string]any{"name": "docs/example.dev", "publish": []string{"site-content"}}
+	if err := os.WriteFile(filepath.Join(project, "putnami.json"), []byte(`{"name":"docs/example.dev","publish":["site-content"]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
 	if siteContent != nil {
-		document["options"] = map[string]any{"@putnami/cloud": map[string]any{"site-content": siteContent}}
-	}
-	data, err := json.Marshal(document)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(project, "putnami.json"), data, 0o600); err != nil {
-		t.Fatal(err)
+		data, err := json.Marshal(siteContent)
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeSiteContentDeclaration(t, project, string(data))
 	}
 	return project
+}
+
+func writeSiteContentDeclaration(t *testing.T, project, document string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(project, SiteContentDeclarationFile), []byte(document), 0o600); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func generatedSections(commands map[string][]string) map[string]any {
@@ -147,9 +153,9 @@ func TestGenerateSiteContentWithNoDeclaration(t *testing.T) {
 		name        string
 		siteContent any
 	}{
-		{name: "no option"},
+		{name: "no declaration file"},
 		{name: "no generated section", siteContent: map[string]any{"generated": map[string]any{}}},
-		{name: "an empty site-content", siteContent: map[string]any{}},
+		{name: "an empty declaration", siteContent: map[string]any{}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			project := writeGeneratedSiteProject(t, tc.siteContent)
@@ -170,7 +176,7 @@ func TestGenerateSiteContentWithNoDeclaration(t *testing.T) {
 		})
 	}
 
-	t.Run("no project document", func(t *testing.T) {
+	t.Run("no project file", func(t *testing.T) {
 		result, _, err := generateIn(t, t.TempDir())
 		if err != nil || result["status"] != "skipped" {
 			t.Fatalf("generate-site-content = (%v, %v), want skipped", err, result)
@@ -188,7 +194,10 @@ func TestGenerateSiteContentRefusesAnInvalidDeclaration(t *testing.T) {
 	}{
 		{name: "a misspelled field", siteContent: map[string]any{"generate": map[string]any{}}, want: `unknown field "generate"`},
 		{name: "a misspelled command field", siteContent: map[string]any{"generated": map[string]any{"api": map[string]any{"cmd": output}}}, want: `unknown field "cmd"`},
-		{name: "a value that is not an object", siteContent: true, want: "it must be an object"},
+		{name: "a value that is not an object", siteContent: true, want: "it must be one object whose only member is generated"},
+		{name: "a list", siteContent: []any{}, want: "it must be one object whose only member is generated"},
+		{name: "generated that is not an object", siteContent: map[string]any{"generated": []any{}}, want: "cannot unmarshal array"},
+		{name: "a section that is not an object", siteContent: map[string]any{"generated": map[string]any{"api": output}}, want: "cannot unmarshal array"},
 		{name: "an empty command", siteContent: generatedSections(map[string][]string{"api": {}}), want: "command must be a non-empty list"},
 		{name: "an unnamed program", siteContent: generatedSections(map[string][]string{"api": {" ", "{output}"}}), want: "command must be a non-empty list"},
 		{name: "no output placeholder", siteContent: generatedSections(map[string][]string{"api": {"sh", "-c", "true"}}), want: "command must pass {output}"},
@@ -216,24 +225,33 @@ func TestGenerateSiteContentRefusesAnInvalidDeclaration(t *testing.T) {
 		}
 	})
 
-	t.Run("a project document that is not JSON", func(t *testing.T) {
-		project := t.TempDir()
-		if err := os.WriteFile(filepath.Join(project, "putnami.json"), []byte("{"), 0o600); err != nil {
-			t.Fatal(err)
-		}
-		if _, _, err := generateIn(t, project); err == nil || !strings.Contains(err.Error(), "decode") {
-			t.Fatalf("generate-site-content = %v, want a decode error", err)
-		}
-	})
+	for _, tc := range []struct{ name, document, want string }{
+		{name: "a file that is not JSON", document: "{", want: "unexpected EOF"},
+		{name: "an empty file", document: "", want: "it must be one object"},
+		{name: "null", document: "null", want: "it must be one object"},
+		{name: "a second value after the object", document: `{"generated":{}} {}`, want: "data follows the object"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			project := writeGeneratedSiteProject(t, nil)
+			writeSiteContentDeclaration(t, project, tc.document)
+			_, _, err := generateIn(t, project)
+			if err == nil || clicore.ExitCode(err) != clicore.ExitUsage || !strings.Contains(err.Error(), "site-content.json") || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("generate-site-content = %v, want a usage error on site-content.json with %q", err, tc.want)
+			}
+		})
+	}
 
-	t.Run("a cloud option layer that is not an object", func(t *testing.T) {
+	// putnami.json declares no generated section: the declaration has one
+	// source, site-content.json.
+	t.Run("a declaration in putnami.json", func(t *testing.T) {
 		project := t.TempDir()
-		document := `{"name":"docs/example.dev","options":{"@putnami/cloud":true}}`
+		document := `{"name":"docs/example.dev","publish":["site-content"],"options":{"@putnami/cloud":{"site-content":{"generated":{"api":{"command":["sh","-c","printf x > \"$1/index.md\"","sh","{output}"]}}}}}}`
 		if err := os.WriteFile(filepath.Join(project, "putnami.json"), []byte(document), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		if _, _, err := generateIn(t, project); err == nil || !strings.Contains(err.Error(), `decode options["@putnami/cloud"]`) {
-			t.Fatalf("generate-site-content = %v, want a decode error", err)
+		result, _, err := generateIn(t, project)
+		if err != nil || result["status"] != "skipped" {
+			t.Fatalf("generate-site-content = (%v, %v), want skipped: putnami.json declares no generated section", err, result)
 		}
 	})
 }

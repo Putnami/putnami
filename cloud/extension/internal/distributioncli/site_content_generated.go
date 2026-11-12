@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"os"
 	"os/exec"
@@ -26,9 +27,11 @@ const siteContentGeneratedDir = ".gen/site-content"
 // the command receives the absolute path of its section directory.
 const siteContentOutputPlaceholder = "{output}"
 
-// siteContentOptionsKey is the project option layer the declaration lives
-// under: options["@putnami/cloud"]["site-content"].generated.
-const siteContentOptionsKey = "@putnami/cloud"
+// SiteContentDeclarationFile is the project-root file that declares a site
+// project's generated sections. Its presence activates the package command,
+// as image-layers.json does for an image project, so a site project whose
+// only sections are generated still packages and publishes them.
+const SiteContentDeclarationFile = "site-content.json"
 
 // siteContentGeneratorTailLines caps the output lines a failing generator's
 // error restates. Every line also streams as the command runs.
@@ -41,10 +44,10 @@ type siteContentGenerator struct {
 	command []string
 }
 
-// siteContentGeneratedDeclaration is the shape of
-// options["@putnami/cloud"]["site-content"]. Unknown fields are refused, so a
-// misspelled key fails instead of declaring nothing.
-type siteContentGeneratedDeclaration struct {
+// siteContentDeclaration is the shape of site-content.json. Unknown members
+// are refused at every level, so a misspelled key fails instead of declaring
+// nothing.
+type siteContentDeclaration struct {
 	Generated map[string]siteContentGeneratorDeclaration `json:"generated"`
 }
 
@@ -53,49 +56,37 @@ type siteContentGeneratorDeclaration struct {
 }
 
 // readSiteContentGenerators returns, sorted by section, the generated sections
-// the project document in projectDir declares under
-// options["@putnami/cloud"]["site-content"].generated. An absent project
-// document, or one that declares no generated section, returns none. A
-// section name must be a section slug, and each command must be a non-empty
-// argument list whose program is named and that passes {output} to the
-// command at least once.
+// that site-content.json in projectDir declares. An absent file, or one that
+// declares no generated section, returns none. The file must hold one JSON
+// object whose only member is generated, and each section one object whose
+// only member is command. A section name must be a section slug, and each
+// command must be a non-empty argument list whose program is named and that
+// passes {output} to the command at least once.
 func readSiteContentGenerators(projectDir string) ([]siteContentGenerator, error) {
-	file := filepath.Join(projectDir, "putnami.json")
-	data, err := os.ReadFile(file) //nolint:gosec // G304: the project's own putnami.json
+	file := filepath.Join(projectDir, SiteContentDeclarationFile)
+	data, err := os.ReadFile(file) //nolint:gosec // G304: the project's own declaration file
 	if err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil
 		}
 		return nil, clicore.NewError("read "+file+": "+err.Error(), clicore.ExitUsage)
 	}
-	var document struct {
-		Options map[string]json.RawMessage `json:"options"`
+	shape := "it must be one object whose only member is generated, a map of section name to {\"command\": [...]}"
+	if trimmed := bytes.TrimSpace(data); len(trimmed) == 0 || trimmed[0] != '{' {
+		return nil, clicore.NewError("decode "+file+": "+shape, clicore.ExitUsage)
 	}
-	if err := json.Unmarshal(data, &document); err != nil {
-		return nil, clicore.NewError("decode "+file+": "+err.Error(), clicore.ExitUsage)
-	}
-	layer, present := document.Options[siteContentOptionsKey]
-	if !present {
-		return nil, nil
-	}
-	var cloudOptions map[string]json.RawMessage
-	if err := json.Unmarshal(layer, &cloudOptions); err != nil {
-		return nil, clicore.NewError(fmt.Sprintf("decode options[%q] of %s: %s", siteContentOptionsKey, file, err), clicore.ExitUsage)
-	}
-	raw, declared := cloudOptions[SiteContentPublishEntry]
-	if !declared {
-		return nil, nil
-	}
-	field := fmt.Sprintf("options[%q][%q]", siteContentOptionsKey, SiteContentPublishEntry)
-	var declaration siteContentGeneratedDeclaration
-	decoder := json.NewDecoder(bytes.NewReader(raw))
+	var declaration siteContentDeclaration
+	decoder := json.NewDecoder(bytes.NewReader(data))
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&declaration); err != nil {
-		return nil, clicore.NewError(fmt.Sprintf("decode %s of %s: it must be an object whose only field is generated: %s", field, file, err), clicore.ExitUsage)
+		return nil, clicore.NewError("decode "+file+": "+shape+": "+err.Error(), clicore.ExitUsage)
+	}
+	if _, err := decoder.Token(); !errors.Is(err, io.EOF) {
+		return nil, clicore.NewError("decode "+file+": "+shape+": data follows the object", clicore.ExitUsage)
 	}
 	generators := make([]siteContentGenerator, 0, len(declaration.Generated))
 	for section, generator := range declaration.Generated {
-		where := fmt.Sprintf("%s.generated[%q] of %s", field, section, file)
+		where := fmt.Sprintf("generated[%q] of %s", section, file)
 		if err := validGeneratedSectionName(section); err != nil {
 			return nil, clicore.NewError(where+": "+err.Error(), clicore.ExitUsage)
 		}
@@ -139,10 +130,10 @@ func siteContentGeneratedSectionDir(siteDir, section string) string {
 //
 // It fails when a command fails or writes no regular file. It succeeds with
 // nothing to do when the project declares no generated section. It reads only
-// putnami.json, which the task's key holds, and sends no network request: it
-// does not check whether a generated name collides with a committed section,
-// because that reads the Git candidate files the key does not hold.
-// Validation, which keys on them, refuses the collision.
+// site-content.json, which the task's key holds, and sends no network
+// request. It does not check whether a generated name collides with a
+// committed section, because that reads the Git candidate files the key does
+// not hold. Validation, which keys on them, refuses the collision.
 func GenerateSiteContent(params map[string]any, args []string, _ string, ioctx clicore.IO) error {
 	if positional := clicore.Positionals(args); len(positional) > 0 {
 		return clicore.NewError("generate-site-content takes no argument: it generates the sections of the project in its working directory", clicore.ExitUsage)

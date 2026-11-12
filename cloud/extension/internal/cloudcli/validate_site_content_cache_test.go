@@ -238,7 +238,7 @@ func TestValidateSiteContentVerdictMovesOnlyWithItsKey(t *testing.T) {
 	}
 }
 
-// declareGeneratedSiteContent rewrites the fixture's putnami.json so it
+// declareGeneratedSiteContent writes the fixture's site-content.json so it
 // declares each named section as generated.
 func declareGeneratedSiteContent(t *testing.T, project string, sections ...string) {
 	t.Helper()
@@ -246,10 +246,7 @@ func declareGeneratedSiteContent(t *testing.T, project string, sections ...strin
 	for _, section := range sections {
 		generated[section] = map[string]any{"command": []string{"generate", "--out", "{output}"}}
 	}
-	writeFixtureJSON(t, filepath.Join(project, "putnami.json"), map[string]any{
-		"name": "docs/example.test", "publish": []string{"site-content"},
-		"options": map[string]any{"@putnami/cloud": map[string]any{"site-content": map[string]any{"generated": generated}}},
-	})
+	writeFixtureJSON(t, filepath.Join(project, distributioncli.SiteContentDeclarationFile), map[string]any{"generated": generated})
 }
 
 // TestSiteContentPackagingReadsTheTreeValidationChecks changes the project in
@@ -286,6 +283,13 @@ func TestSiteContentPackagingReadsTheTreeValidationChecks(t *testing.T) {
 			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "api", "index.md"), "# API\n")
 			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "api", "types", "user.md"), "# User\n")
 		}, sections: []string{"api", "guide", "reference"}, files: 5},
+		{name: "a project whose only section is generated", change: func(t *testing.T, project string) {
+			gitCommand(t, project, "rm", "-rq", "guide", "reference")
+			gitCommand(t, project, "commit", "-qm", "only generated")
+			declareGeneratedSiteContent(t, project, "api")
+			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "api", "index.md"), "# API\n")
+			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "api", "types", "user.md"), "# User\n")
+		}, sections: []string{"api"}, files: 2},
 		{name: "an undeclared generated directory", change: func(t *testing.T, project string) {
 			writeFixtureFile(t, filepath.Join(project, ".gen", "site-content", "x", "index.md"), "# X\n")
 		}},

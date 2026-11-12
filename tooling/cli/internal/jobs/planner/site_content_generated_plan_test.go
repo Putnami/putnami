@@ -2,9 +2,11 @@ package planner
 
 import (
 	"encoding/json"
+	"fmt"
 	"maps"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
@@ -33,32 +35,42 @@ const (
 	siteContentMemberKey = "put\x00cloud/doc-contents-api"
 )
 
-// siteContentMembers is the release-set metadata the Cloud workspace probe
-// announces for the fixture: one member per section.
-const siteContentMembers = `{"releaseSet":{"ecosystems":[
-  {"ecosystem":"put","coordinate":"cloud/doc-contents-api","packageStep":"cloud-site-content","publishStep":"cloud-publish-site-content"},
-  {"ecosystem":"put","coordinate":"cloud/doc-contents-guide","packageStep":"cloud-site-content","publishStep":"cloud-publish-site-content"}
-]}}`
+// siteContentMember is the release-set member the Cloud workspace probe
+// announces for one section of the fixture.
+const siteContentMember = `{"ecosystem":"put","coordinate":"cloud/doc-contents-%s","packageStep":"cloud-site-content","publishStep":"cloud-publish-site-content"}`
 
-// siteContentGeneratorDocument is the project document of the fixture: one
-// committed section, one generated section, and the generator's inputs listed
-// for the key of the extension's build command.
-const siteContentGeneratorDocument = `{
+// siteContentFixtures are the two fixture shapes: a generated section beside
+// a committed one, and a generated section alone.
+var siteContentFixtures = []struct {
+	name      string
+	committed bool
+}{
+	{name: "beside a committed section", committed: true},
+	{name: "as the only section", committed: false},
+}
+
+// siteContentProjectDocument is the project document of the fixture: a site
+// project that lists the generator's inputs for the key of the extension's
+// build command.
+const siteContentProjectDocument = `{
   "name": "docs/example.test",
   "publish": ["site-content"],
-  "options": {
-    "@putnami/cloud": {"site-content": {"generated": {"api": {"command": ["go", "run", "../../tools/gen", "{output}"]}}}},
-    "@putnami/cloud:build": {"filePatterns": ["../../tools/gen/**"]}
-  }
+  "options": {"@putnami/cloud:build": {"filePatterns": ["../../tools/gen/**"]}}
 }
+`
+
+// siteContentDeclaration is the fixture's site-content.json: one generated
+// section.
+const siteContentDeclaration = `{"generated": {"api": {"command": ["go", "run", "../../tools/gen", "{output}"]}}}
 `
 
 // siteContentWorkspace writes a Git work tree that ignores .gen, as this
 // repository does, with the site project and a generator outside it, and
 // returns the workspace, the project and the real Cloud extension. The
-// validation step keys the project's Git candidate files, so the workspace is
-// a work tree.
-func siteContentWorkspace(t *testing.T) (*workspace.Workspace, *workspace.Project, *extension.ExtensionDescription) {
+// project has a committed guide section beside its generated api section, or
+// only the generated section when committed is false. The validation step
+// keys the project's Git candidate files, so the workspace is a work tree.
+func siteContentWorkspace(t *testing.T, committed bool) (*workspace.Workspace, *workspace.Project, *extension.ExtensionDescription) {
 	t.Helper()
 	cloud := loadShippedExtension(t, "cloud/extension", "@putnami/cloud")
 
@@ -69,18 +81,25 @@ func siteContentWorkspace(t *testing.T) (*workspace.Workspace, *workspace.Projec
 	}
 	treeKeyedGit(t, root, "init", "-q", "-b", "main")
 	writeTestFile(t, filepath.Join(root, ".gitignore"), ".gen/\n.putnami/\n")
-	writeProjectFile(t, root, siteContentProjectPath, "putnami.json", siteContentGeneratorDocument)
-	writeProjectFile(t, root, siteContentProjectPath, "guide/index.md", "# Guide\n")
+	writeProjectFile(t, root, siteContentProjectPath, "putnami.json", siteContentProjectDocument)
+	writeProjectFile(t, root, siteContentProjectPath, "site-content.json", siteContentDeclaration)
+	if committed {
+		writeProjectFile(t, root, siteContentProjectPath, "guide/index.md", "# Guide\n")
+	}
 	writeProjectFile(t, root, "tools/gen", "main.go", "package main\n")
+	members := []string{fmt.Sprintf(siteContentMember, "api")}
+	if committed {
+		members = append(members, fmt.Sprintf(siteContentMember, "guide"))
+	}
 	var document wsproto.ProjectConfig
-	if err := json.Unmarshal([]byte(siteContentGeneratorDocument), &document); err != nil {
+	if err := json.Unmarshal([]byte(siteContentProjectDocument), &document); err != nil {
 		t.Fatal(err)
 	}
 	site := &workspace.Project{
 		ID: "/" + siteContentProjectPath, Name: siteContentProjectPath, Path: siteContentProjectPath,
 		Publish: document.Publish, Config: &document,
 		// The Cloud workspace probe announces the members under its own name.
-		Metadata: map[string]json.RawMessage{cloud.Name: json.RawMessage(siteContentMembers)},
+		Metadata: map[string]json.RawMessage{cloud.Name: json.RawMessage(`{"releaseSet":{"ecosystems":[` + strings.Join(members, ",") + `]}}`)},
 	}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, []*workspace.Project{site})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
@@ -144,28 +163,37 @@ func putEcosystemProfiles(t *testing.T) *extensionproto.ProfileRegistry {
 }
 
 // Validate, package and publish each plan the generate step, and the step of
-// each that reads the generated section waits for it.
+// each that reads the generated section waits for it. A project whose only
+// section is generated has no section landing page to activate package:
+// site-content.json activates it, so its site-content step is planned.
 func TestTheStepsThatReadAGeneratedSiteContentSectionWaitForItsGenerateStep(t *testing.T) {
-	ws, site, cloud := siteContentWorkspace(t)
-	for command, readers := range map[string][]string{
-		"validate": {"validate~cloud-site-content"},
-		"package":  {"package~cloud-site-content"},
-		"publish":  {"package~cloud-site-content"},
-	} {
-		t.Run(command, func(t *testing.T) {
-			planned := planSiteContent(t, ws, site, cloud, command)
-			generate := planned[siteContentGenerateStep]
-			if generate == nil || generate.Step == nil || generate.Step.Task != "cloud-site-content-generate" {
-				t.Fatalf("plan of %s holds no %s: %v", command, siteContentGenerateStep, slices.Sorted(maps.Keys(planned)))
-			}
-			for _, reader := range readers {
-				job := planned[site.ID+":"+reader]
-				if job == nil || !slices.Contains(job.DependsOn, siteContentGenerateStep) {
-					t.Fatalf("%s:%s = %+v, want it to depend on %s", site.ID, reader, job, siteContentGenerateStep)
-				}
+	for _, fixture := range siteContentFixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			ws, site, cloud := siteContentWorkspace(t, fixture.committed)
+			for command, readers := range map[string][]string{
+				"validate": {"validate~cloud-site-content"},
+				"package":  {"package~cloud-site-content"},
+				"publish":  {"package~cloud-site-content"},
+			} {
+				t.Run(command, func(t *testing.T) {
+					planned := planSiteContent(t, ws, site, cloud, command)
+					generate := planned[siteContentGenerateStep]
+					if generate == nil || generate.Step == nil || generate.Step.Task != "cloud-site-content-generate" {
+						t.Fatalf("plan of %s holds no %s: %v", command, siteContentGenerateStep, slices.Sorted(maps.Keys(planned)))
+					}
+					for _, reader := range readers {
+						job := planned[site.ID+":"+reader]
+						if job == nil || !slices.Contains(job.DependsOn, siteContentGenerateStep) {
+							t.Fatalf("%s:%s = %+v, want it planned and depending on %s; planned %v",
+								site.ID, reader, job, siteContentGenerateStep, slices.Sorted(maps.Keys(planned)))
+						}
+					}
+				})
 			}
 		})
 	}
+
+	cloud := loadShippedExtension(t, "cloud/extension", "@putnami/cloud")
 
 	// The release-set member's package command is package, not build, though
 	// build now carries injectPublishChannels: no build step is the package
@@ -180,7 +208,7 @@ func TestTheStepsThatReadAGeneratedSiteContentSectionWaitForItsGenerateStep(t *t
 // the generated output, which the generate step can rewrite between the run's
 // key pass and the validation step's start.
 func TestTheGeneratedSiteContentValidationKeyFoldsTheGenerateKey(t *testing.T) {
-	ws, site, cloud := siteContentWorkspace(t)
+	ws, site, cloud := siteContentWorkspace(t, true)
 	planned := slices.Collect(maps.Values(planSiteContent(t, ws, site, cloud, "validate")))
 	validate := site.ID + ":validate~cloud-site-content"
 	key := func() string {
@@ -206,9 +234,19 @@ func TestTheGeneratedSiteContentValidationKeyFoldsTheGenerateKey(t *testing.T) {
 // The selection fingerprint of a generated section's member is the key of its
 // package step, which waits for the generate step: it moves when a file the
 // project lists as a generator input or the generator command moves, and not
-// when an unlisted file or the generated output itself moves.
+// when an unlisted file or the generated output itself moves. It holds for a
+// project whose only section is generated too.
 func TestTheGeneratedSiteContentSelectionFingerprintFollowsTheGeneratorInputs(t *testing.T) {
-	ws, site, cloud := siteContentWorkspace(t)
+	for _, fixture := range siteContentFixtures {
+		t.Run(fixture.name, func(t *testing.T) {
+			assertSiteContentFingerprintFollowsTheGeneratorInputs(t, fixture.committed)
+		})
+	}
+}
+
+func assertSiteContentFingerprintFollowsTheGeneratorInputs(t *testing.T, committed bool) {
+	t.Helper()
+	ws, site, cloud := siteContentWorkspace(t, committed)
 	planned := slices.Collect(maps.Values(planSiteContent(t, ws, site, cloud, "package")))
 	memberKey := siteContentMemberKey
 	members := map[string]*workspace.Project{memberKey: site}
@@ -250,8 +288,8 @@ func TestTheGeneratedSiteContentSelectionFingerprintFollowsTheGeneratorInputs(t 
 		t.Fatal("a change to a listed generator input left the fingerprint unmoved; the member would keep the old section")
 	}
 
-	writeProjectFile(t, ws.Root, siteContentProjectPath, "putnami.json",
-		`{"name":"docs/example.test","publish":["site-content"],"options":{"@putnami/cloud":{"site-content":{"generated":{"api":{"command":["go","run","../../tools/gen","--all","{output}"]}}}},"@putnami/cloud:build":{"filePatterns":["../../tools/gen/**"]}}}`)
+	writeProjectFile(t, ws.Root, siteContentProjectPath, "site-content.json",
+		`{"generated": {"api": {"command": ["go", "run", "../../tools/gen", "--all", "{output}"]}}}`)
 	if got := fingerprint(); got == input {
 		t.Error("a change to the generator command left the fingerprint unmoved")
 	}

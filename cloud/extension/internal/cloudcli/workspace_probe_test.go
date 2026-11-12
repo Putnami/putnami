@@ -524,43 +524,88 @@ func TestCloudWorkspaceProbeDeclaresOneSiteContentMemberPerSection(t *testing.T)
 }
 
 // The probe runs before build, so it lists a declared generated section from
-// putnami.json alone: the member exists whether or not .gen/site-content
-// holds it, and an undeclared directory there is no member.
+// site-content.json alone: the member exists whether or not .gen/site-content
+// holds it, and an undeclared directory there is no member. A project whose
+// only section is generated declares that member alone, and the probe watches
+// the declaration file.
 func TestCloudWorkspaceProbeDeclaresAMemberForAGeneratedSection(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		pages []string
+		want  []string
+	}{
+		{name: "beside a committed section", pages: []string{"guides/index.md", ".gen/site-content/undeclared/index.md"},
+			want: []string{"cloud/doc-contents-api", "cloud/doc-contents-guides"}},
+		{name: "as the only section", pages: []string{".gen/site-content/undeclared/index.md"},
+			want: []string{"cloud/doc-contents-api"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			projectPath := "docs/example.test"
+			projectRoot := filepath.Join(root, filepath.FromSlash(projectPath))
+			files := map[string]string{
+				cloudProjectMarker:                         `{"name":"docs/example.test","publish":["site-content"]}`,
+				distributioncli.SiteContentDeclarationFile: `{"generated":{"api":{"command":["generate","{output}"]}}}`,
+			}
+			for _, page := range tc.pages {
+				files[page] = "# page\n"
+			}
+			for rel, content := range files {
+				path := filepath.Join(projectRoot, filepath.FromSlash(rel))
+				if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			result, err := probeCloudWorkspace(root, workspaceproto.ProbeRequest{Paths: []string{projectPath}})
+			if err != nil || len(result.Projects) != 1 {
+				t.Fatalf("result = %+v, %v; want one project", result, err)
+			}
+			if want := []string{projectPath + "/" + cloudProjectMarker, projectPath + "/" + distributioncli.SiteContentDeclarationFile}; !slices.Equal(result.Projects[0].WatchedFiles, want) {
+				t.Fatalf("watched files = %v, want %v", result.Projects[0].WatchedFiles, want)
+			}
+			metadata, found, err := releaseset.ProjectReleaseMetadata(map[string]json.RawMessage{cloudRuntimeIdentity: result.Projects[0].Metadata})
+			if err != nil || !found {
+				t.Fatalf("metadata = %+v, %v, %v", metadata, found, err)
+			}
+			var coordinates []string
+			for _, member := range metadata.Ecosystems {
+				coordinates = append(coordinates, member.Coordinate)
+			}
+			if !slices.Equal(coordinates, tc.want) {
+				t.Fatalf("members = %v, want %v", coordinates, tc.want)
+			}
+			if step, ok := metadata.PackageStepFor(cloudSiteContentEcosystem, "cloud/doc-contents-api"); !ok || step != cloudSiteContentPackageStep {
+				t.Fatalf("generated member package step = %q/%v", step, ok)
+			}
+		})
+	}
+}
+
+// A declaration file whose shape is wrong fails the probe rather than
+// declaring a member list without its generated sections.
+func TestCloudWorkspaceProbeRefusesAnInvalidSiteContentDeclaration(t *testing.T) {
 	root := t.TempDir()
 	projectPath := "docs/example.test"
 	projectRoot := filepath.Join(root, filepath.FromSlash(projectPath))
-	for _, rel := range []string{"guides/index.md", ".gen/site-content/undeclared/index.md"} {
+	for rel, content := range map[string]string{
+		cloudProjectMarker:                         `{"name":"docs/example.test","publish":["site-content"]}`,
+		distributioncli.SiteContentDeclarationFile: `{"generated":{"api":{"cmd":["generate","{output}"]}}}`,
+		"guides/index.md":                          "# page\n",
+	} {
 		path := filepath.Join(projectRoot, filepath.FromSlash(rel))
 		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte("# page\n"), 0o600); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	document := `{"name":"docs/example.test","publish":["site-content"],` +
-		`"options":{"@putnami/cloud":{"site-content":{"generated":{"api":{"command":["generate","{output}"]}}}}}}`
-	if err := os.WriteFile(filepath.Join(projectRoot, cloudProjectMarker), []byte(document), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	result, err := probeCloudWorkspace(root, workspaceproto.ProbeRequest{Paths: []string{projectPath}})
-	if err != nil || len(result.Projects) != 1 {
-		t.Fatalf("result = %+v, %v; want one project", result, err)
-	}
-	metadata, found, err := releaseset.ProjectReleaseMetadata(map[string]json.RawMessage{cloudRuntimeIdentity: result.Projects[0].Metadata})
-	if err != nil || !found {
-		t.Fatalf("metadata = %+v, %v, %v", metadata, found, err)
-	}
-	var coordinates []string
-	for _, member := range metadata.Ecosystems {
-		coordinates = append(coordinates, member.Coordinate)
-	}
-	if want := []string{"cloud/doc-contents-api", "cloud/doc-contents-guides"}; !slices.Equal(coordinates, want) {
-		t.Fatalf("members = %v, want %v", coordinates, want)
-	}
-	if step, ok := metadata.PackageStepFor(cloudSiteContentEcosystem, "cloud/doc-contents-api"); !ok || step != cloudSiteContentPackageStep {
-		t.Fatalf("generated member package step = %q/%v", step, ok)
+	if _, err := probeCloudWorkspace(root, workspaceproto.ProbeRequest{Paths: []string{projectPath}}); err == nil ||
+		!strings.Contains(err.Error(), `unknown field "cmd"`) {
+		t.Fatalf("probe = %v, want it to refuse the misspelled command member", err)
 	}
 }
 

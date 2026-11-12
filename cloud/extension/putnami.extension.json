@@ -109,7 +109,7 @@
   },
   "workspace": {
     "markers": ["putnami.json"],
-    "inputs": ["putnami.extension.json", "putnami.json"]
+    "inputs": ["putnami.extension.json", "putnami.json", "site-content.json"]
   },
   "commandGroups": {
     "cloud": {
@@ -1523,7 +1523,7 @@
         "putnami.json"
       ],
       "traits": {"injectPublishChannels": true, "kind": "files"},
-      "description": "Materialize an image project's declared generated layers, and a site project's declared generated site-content sections, as ordinary build outputs. This keeps a cold monorepo CI run self-bootstrapping: build --impacted produces the runner bytes before the trusted post-gate stage packages and publishes the runner-backed worker from the same checkout. The package contribution still re-verifies the exact bytes and current pins immediately before assembly. The command activates for every project, like validate and package, because a site project names no extension; each step keeps its own condition, so a project with neither image-layers.json nor the site-content publish entry plans no step.",
+      "description": "Materialize an image project's declared generated layers, and a site project's declared generated site-content sections, as ordinary build outputs. This keeps a cold monorepo CI run self-bootstrapping: build --impacted produces the runner bytes before the trusted post-gate stage packages and publishes the runner-backed worker from the same checkout. The package contribution still re-verifies the exact bytes and current pins immediately before assembly. The command activates on putnami.json, as validate does, because a site project names no extension and its declaration file is optional; each step keeps its own condition, so a project with neither image-layers.json nor the site-content publish entry plans no step.",
       "run": [
         {
           "id": "cloud-image-layers",
@@ -1580,9 +1580,10 @@
         "*/index.md",
         ".gen/config-schema.json",
         "image-layers.json",
-        "schema/config.json"
+        "schema/config.json",
+        "site-content.json"
       ],
-      "description": "Verify declared image layers when present, build a canonical secret-free Config member for schema-bearing projects, and assemble the site-content bundles of a docs site project (activated by a section landing page, <section>/index.md). Every package step is local and produces immutable inputs for the selected release-set publication.",
+      "description": "Verify declared image layers when present, build a canonical secret-free Config member for schema-bearing projects, and assemble the site-content bundles of a docs site project (activated by a section landing page, <section>/index.md, or by site-content.json, which declares the project's generated sections). Every package step is local and produces immutable inputs for the selected release-set publication.",
       "flags": {
         "env": {
           "type": "string",
@@ -2673,9 +2674,10 @@
         }
       },
       "inputs": {
-        "manifest": {"from": "project", "files": ["putnami.jso[n]"]}
+        "manifest": {"from": "project", "files": ["putnami.jso[n]"]},
+        "declaration": {"from": "project", "files": ["site-content.jso[n]"]}
       },
-      "description": "Run the generator command of each site-content section the project declares under options[\"@putnami/cloud\"][\"site-content\"].generated, with {output} replaced by the absolute path of .gen/site-content/<section>. Fails when a command fails or writes no file. Succeeds with nothing to do when the project declares no generated section. Cached and deterministic: the key holds putnami.json, where the commands live, and the files the project lists in options[\"@putnami/cloud:build\"].filePatterns, which are the generator's inputs. The extension sends no network request; the command runs with the job's environment and must find its program on PATH.",
+      "description": "Run the generator command of each generated section the project's site-content.json declares, with {output} replaced by the absolute path of .gen/site-content/<section>. Fails when a command fails or writes no file. Succeeds with nothing to do when the project declares no generated section. Cached and deterministic: the key holds site-content.json, where the commands live, putnami.json, and the files the project lists in options[\"@putnami/cloud:build\"].filePatterns, which are the generator's inputs. The extension sends no network request; the command runs with the job's environment and must find its program on PATH.",
       "timeoutMs": 600000
     },
     "cloud-validate-config-project": {

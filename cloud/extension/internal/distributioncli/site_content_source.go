@@ -31,7 +31,7 @@ type siteContentSource struct {
 	// candidates holds, sorted, the candidate files and the unkeyable
 	// candidates of tree.
 	candidates []string
-	// generated holds, sorted, the generated sections the project document
+	// generated holds, sorted, the generated sections site-content.json
 	// declares (readSiteContentGenerators). Each one is read from the disk
 	// under .gen/site-content/<section>, inside a Git work tree too: the
 	// build step writes it, and no Git candidate holds it.
