@@ -221,6 +221,13 @@ func cmdPin(env *CommandEnv) error {
 }
 
 func cmdExtensions(env *CommandEnv) error {
+	if env.Sub == "install" || env.Sub == "" {
+		args, err := lifecycle.ExtensionsInstallChannel(env.Args)
+		if err != nil {
+			return err
+		}
+		env.Args = args
+	}
 	if extensions.HasUserScopeFlag(env.Args) {
 		return cmdExtensionsUserScope(env)
 	}

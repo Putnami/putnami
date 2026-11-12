@@ -992,7 +992,8 @@ them hold nothing else; strict validation refuses any other key. See
   satisfies every constraint; otherwise it resolves again and the move is
   reported (`↑ @acme/dev: 1.0.0 → 2.3.0 (required by @acme/app)`). A
   constraint resolves as written, and an empty one resolves on `latest`. An
-  explicit channel, such as `putnami extensions install @acme/app@canary` or
+  explicit channel, such as `putnami extensions install @acme/app@canary`,
+  `putnami extensions install @acme/app --channel canary` or
   `putnami init --channel canary`, resolves every dependency below that
   extension on the channel, at every hop. A version or a range is not a
   channel.

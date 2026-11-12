@@ -741,3 +741,17 @@ func TestStructuredCommandRefusesAJobFlagItDoesNotRead(t *testing.T) {
 		t.Errorf("projects list --dry-run --help: err = %v, help = %v, want help with no error", helped.Err, helped.Global.Help)
 	}
 }
+
+// TestParseArgs_ExtensionsInstallAcceptsChannel checks that `extensions
+// install` accepts --channel, as init does.
+func TestParseArgs_ExtensionsInstallAcceptsChannel(t *testing.T) {
+	t.Parallel()
+	for _, args := range [][]string{
+		{"extensions", "install", "--channel", "canary", "@putnami/observe"},
+		{"extensions", "install", "@putnami/observe", "--channel=canary"},
+	} {
+		if parsed := ParseArgs(args, nil, nil); parsed.Err != nil {
+			t.Errorf("ParseArgs(%v) = %v, want --channel accepted", args, parsed.Err)
+		}
+	}
+}

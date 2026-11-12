@@ -1068,6 +1068,10 @@ func TestProbeSourceWitnessCoversTheImportScan(t *testing.T) {
 			missing = append(missing, extension)
 		}
 	}
+	// The scan reads every tsconfig file for its `extends`.
+	if !declared["**/tsconfig*.json"] {
+		missing = append(missing, "**/tsconfig*.json")
+	}
 	sort.Strings(missing)
 	if len(missing) > 0 {
 		t.Fatalf("scanned source extensions with no workspace input witness: %v", missing)

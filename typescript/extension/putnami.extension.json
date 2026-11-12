@@ -80,7 +80,8 @@
       "**/*.js",
       "**/*.jsx",
       "**/*.mjs",
-      "**/*.cjs"
+      "**/*.cjs",
+      "**/tsconfig*.json"
     ],
     "excludes": [
       "dist",

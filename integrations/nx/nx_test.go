@@ -542,6 +542,32 @@ func TestESLintWithOtherArgumentsStaysOnNx(t *testing.T) {
 	}
 }
 
+// TestTheESLintReasonNamesTheOptionItDrops checks that a lint target kept on
+// Nx names what the TypeScript lint would drop: the executor's options, not the
+// executor, and a script's arguments, not the whole script.
+func TestTheESLintReasonNamesTheOptionItDrops(t *testing.T) {
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "eslint . --max-warnings 0"}}`)
+	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"lint": {"executor": "@nx/eslint:lint", "options": {"lintFilePatterns": ["apps/api/*/**/*.ts"]}}}}`)
+	result := sync(t, root, SyncOptions{})
+	reasons := map[string]string{}
+	for _, u := range result.Unmapped {
+		if u.Target == "lint" {
+			reasons[u.Project] = u.Reason
+		}
+	}
+	want := map[string]string{
+		"@demo/api": `its ESLint executor sets options (lintFilePatterns) that @putnami/typescript would drop: ` +
+			`move them to the ESLint configuration; lint keeps running through nx run`,
+		"@demo/pricing": `its ESLint takes arguments ("--max-warnings 0") that @putnami/typescript would drop: ` +
+			`move them to the ESLint configuration; lint keeps running through nx run`,
+	}
+	if !reflect.DeepEqual(reasons, want) {
+		t.Errorf("lint reasons = %v, want %v", reasons, want)
+	}
+}
+
 func TestALinterTheProjectChoseIsKept(t *testing.T) {
 	spectest.Proves(t, feature, "import-keeps-eslint", "a-linter-the-project-chose-is-kept")
 	d := readDemo(t)
@@ -1298,4 +1324,33 @@ func changeFiles(r SyncResult) []string {
 		out = append(out, c.File)
 	}
 	return out
+}
+
+// TestTheProbeAttributesEachEdgeToNx checks that every edge the probe answers
+// is Nx's own (build-graph): the declared-edge check then judges the edges Nx
+// states instead of naming each project as unattributed.
+func TestTheProbeAttributesEachEdgeToNx(t *testing.T) {
+	d := readDemo(t)
+	root := repository(t, d, ModeDelegate)
+	s := stack(t)
+	result, err := s.Probe(root, wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension,
+		DependencySources: true, Paths: []string{".", "apps/api", "packages/pricing"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	edges := 0
+	for _, p := range result.Projects {
+		if p.DependencySources == nil {
+			t.Errorf("%s answers no provenance", p.Path)
+		}
+		for _, dep := range p.Dependencies {
+			edges++
+			if p.DependencySources[dep] != wsproto.DependencySourceBuildGraph {
+				t.Errorf("%s edge %s source = %q, want %q", p.Path, dep, p.DependencySources[dep], wsproto.DependencySourceBuildGraph)
+			}
+		}
+	}
+	if edges == 0 {
+		t.Fatalf("projects = %+v, want the api's edge to pricing", result.Projects)
+	}
 }

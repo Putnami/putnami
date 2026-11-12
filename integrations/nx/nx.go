@@ -59,6 +59,8 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			SourceFile:   p.SourceFile,
 			Root:         wsproto.ProbeRootPath,
 			Dependencies: p.Dependencies,
+			// Nx's project graph states each edge, and the sync writes it.
+			EdgeSource: wsproto.DependencySourceBuildGraph,
 		})
 	}
 	return out, detection.Diagnostics

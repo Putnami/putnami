@@ -137,6 +137,11 @@ It then lists, with the reason, each `turbo.json` task other than `build`,
 keeps running through Turborepo. It also lists each delegated package whose
 test task names no JUnit report.
 
+Each edge the sync writes is Turborepo's package graph's (`build-graph`), in
+both modes: the probe attributes it so, and `workspace.declared_edge` does not
+warn about it and `putnami deps prune` does not remove it, even when no source
+file imports the package, such as a shared `tsconfig` or ESLint configuration.
+
 Run the sync again after any change to the dependencies between packages, and
 commit the result. `putnami validate` compares each `putnami.json` with what
 the sync would write and fails with `turbo.sync_stale` when a sync would change

@@ -74,7 +74,11 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			SourceFile:   p.SourceFile,
 			Root:         wsproto.ProbeRootPath,
 			Dependencies: slices.DeleteFunc(slices.Clone(p.Dependencies), func(d string) bool { return d == wsproto.ProbeRootPath }),
-			Watched:      append([]string{Marker, path.Join(p.Path, Marker), path.Join(p.Path, wsproto.ConfigFilename)}, result.WatchedFiles...),
+			// Turborepo's package graph states each edge, and the sync writes
+			// it: an edge a source never imports, such as one to a shared
+			// tsconfig or ESLint configuration, is Turborepo's, not a phantom.
+			EdgeSource: wsproto.DependencySourceBuildGraph,
+			Watched:    append([]string{Marker, path.Join(p.Path, Marker), path.Join(p.Path, wsproto.ConfigFilename)}, result.WatchedFiles...),
 		})
 	}
 	return out, result.Diagnostics

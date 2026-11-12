@@ -18,7 +18,8 @@ import (
 //
 // The scan reads the package's own committed sources — `src/**` and `test/**`
 // are where they live, and the walk covers the whole package directory so a
-// root-level entry point is never missed. What it skips is everything a build
+// root-level entry point and a configuration file are never missed — and the
+// `extends` of its tsconfig files, which read a shared configuration package. What it skips is everything a build
 // or an install WRITES: `node_modules`, `dist`, `build`, `coverage`, and every
 // directory whose name starts with "." (`.gen`, `.putnami`). A generated tree
 // must not change the answer, or a cold clone and a warm checkout would
@@ -29,14 +30,26 @@ import (
 // The scan is read-only and needs no bundler, no type checker and no install.
 
 // importSpecifier matches the module specifier of every form that reads another
-// package: `from "x"`, `import "x"`, `import("x")`, `require("x")`.
+// package: `from "x"` (a type import included), `import "x"`, `import("x")`,
+// `require("x")`, `require.resolve("x")`, `import.meta.resolve("x")` and a
+// `/// <reference types="x" />` directive.
 //
 // Over-matching is the safe direction: a specifier found inside a comment or a
 // string keeps an edge the manifest already states, while a missed one would
 // report a real import as a phantom.
-var importSpecifier = regexp.MustCompile(`(?:\bfrom|\bimport|\brequire)\s*\(?\s*["']([^"']+)["']`)
+var importSpecifier = regexp.MustCompile(`(?:\bfrom|\bimport(?:\.meta\.resolve)?|\brequire(?:\.resolve)?|\breference\s+types\s*=)\s*\(?\s*["']([^"']+)["']`)
 
-// packageSourceExtensions are the files the scan reads.
+// tsconfigExtends matches the `extends` of a tsconfig file: one specifier, or
+// the array TypeScript 5 accepts. A package-name specifier reads the shared
+// configuration package it names; a relative one names no package and matches
+// none of the names asked about.
+var tsconfigExtends = regexp.MustCompile(`"extends"\s*:\s*(\[[^\]]*\]|"[^"]*")`)
+
+// quotedString matches one double-quoted JSON string.
+var quotedString = regexp.MustCompile(`"([^"]+)"`)
+
+// packageSourceExtensions are the source files the scan reads. It also reads
+// every tsconfig file (isTSConfigFile) for its `extends`.
 var packageSourceExtensions = map[string]bool{
 	".ts": true, ".tsx": true, ".mts": true, ".cts": true,
 	".js": true, ".jsx": true, ".mjs": true, ".cjs": true,
@@ -83,15 +96,16 @@ func scanPackageImports(packageDir string, wanted []string) packageImportScan {
 		if entry.IsDir() {
 			return skipPackageDirectory(current, packageDir, entry.Name())
 		}
-		if !packageSourceExtensions[strings.ToLower(filepath.Ext(entry.Name()))] {
+		tsconfig := isTSConfigFile(entry.Name())
+		if !tsconfig && !packageSourceExtensions[strings.ToLower(filepath.Ext(entry.Name()))] {
 			return nil
 		}
 		data, err := os.ReadFile(current) //nolint:gosec // a source file under the probed package
 		if err != nil {
 			return err
 		}
-		for _, match := range importSpecifier.FindAllSubmatch(data, -1) {
-			if name := longestPackageMatch(string(match[1]), wanted); name != "" {
+		for _, specifier := range fileSpecifiers(data, tsconfig) {
+			if name := longestPackageMatch(specifier, wanted); name != "" {
 				scan.imported[name] = true
 			}
 		}
@@ -101,6 +115,30 @@ func scanPackageImports(packageDir string, wanted []string) packageImportScan {
 		scan.complete = false
 	}
 	return scan
+}
+
+// isTSConfigFile reports whether a file name is a tsconfig file:
+// tsconfig.json, or a variant such as tsconfig.build.json.
+func isTSConfigFile(name string) bool {
+	return strings.HasPrefix(name, "tsconfig") && strings.HasSuffix(name, ".json")
+}
+
+// fileSpecifiers returns the module specifiers one file reads: the `extends`
+// of a tsconfig file, or the imports of a source file.
+func fileSpecifiers(data []byte, tsconfig bool) []string {
+	var specifiers []string
+	if tsconfig {
+		for _, match := range tsconfigExtends.FindAllSubmatch(data, -1) {
+			for _, quoted := range quotedString.FindAllSubmatch(match[1], -1) {
+				specifiers = append(specifiers, string(quoted[1]))
+			}
+		}
+		return specifiers
+	}
+	for _, match := range importSpecifier.FindAllSubmatch(data, -1) {
+		specifiers = append(specifiers, string(match[1]))
+	}
+	return specifiers
 }
 
 // skipPackageDirectory keeps the walk on committed sources: the package root is
