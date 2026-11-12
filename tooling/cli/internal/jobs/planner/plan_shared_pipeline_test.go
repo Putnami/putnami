@@ -843,3 +843,25 @@ func TestSharedExecutions_RealGoManifestLeavesNoConflictUnordered(t *testing.T) 
 		}
 	}
 }
+
+// TestSharedExecutions_AnOrderingStepPassesItsProducersThrough pins that a step
+// one command skips does not split a group. In CI the build's tidy flag is off
+// (ciDefault), so the client's build generate waits for client-generate
+// directly, while its test generate waits for it through test config-merge, an
+// ordering producer. Both name the same producer, so they stay one execution.
+func TestSharedExecutions_AnOrderingStepPassesItsProducersThrough(t *testing.T) {
+	t.Setenv("CI", "true")
+	ws, selected := dependentsWorkspace(t)
+	planned, err := Plan(ws, []string{"lint", "test", "build"}, selected,
+		[]*extension.ExtensionDescription{goWithoutClosureDependencies(loadGoPlannerExtension(t)), loadClientgenExtension(t)},
+		nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	byKey := JobsByPlanKey(planned)
+	build := requirePlanKey(t, byKey, dependentsClient+":build~generate")
+	if slices.Contains(build.DependsOn, dependentsClient+":build~tidy") {
+		t.Fatalf("control: build~generate still waits for build~tidy under CI: %v", build.DependsOn)
+	}
+	requireShared(t, byKey, dependentsClient+":build~generate", dependentsClient+":test~generate")
+}
