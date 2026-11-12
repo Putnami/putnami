@@ -6,6 +6,9 @@ import (
 	"strings"
 
 	ciproto "go.putnami.dev/protocol/ci"
+	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
+	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
 // gateTasksForWorkspace derives the verification gate the generated guidance
@@ -23,15 +26,50 @@ import (
 //
 // A workspace without a usable document (missing, unparseable, or with no
 // blocking command) gets the blocking commands of ciproto.DefaultDocument, the
-// protocol's default CI document. The protocol owns those names; the core
-// names no command. The fallback reads no extension, so the guidance is a
-// function of the committed tree alone: it does not change with the
-// extensions installed on a machine or with the host a regeneration runs on.
+// protocol's default CI document, that a loaded extension declares, in the
+// default order. The protocol owns those names; the core names no command. A
+// workspace whose extensions declare test and build, as Bazel's does, is not
+// told to run lint, which the engine would refuse as undeclared. No verb
+// outside the default document joins the fallback. When no extension loads,
+// or none declares a default verb, the whole default stays. The guidance
+// follows the committed lock: context generation materializes the
+// lock-pinned extensions before it writes.
 func gateTasksForWorkspace(wsRoot string) string {
 	if tasks := gateCommandNames(readCIDocument(wsRoot)); len(tasks) > 0 {
 		return strings.Join(tasks, ",")
 	}
-	return strings.Join(gateCommandNames(ciproto.DefaultDocument()), ",")
+	defaults := gateCommandNames(ciproto.DefaultDocument())
+	declared := declaredJobs(wsRoot)
+	kept := make([]string, 0, len(defaults))
+	for _, name := range defaults {
+		if declared[name] {
+			kept = append(kept, name)
+		}
+	}
+	if len(kept) == 0 {
+		return strings.Join(defaults, ",")
+	}
+	return strings.Join(kept, ",")
+}
+
+// declaredJobs returns the job names the workspace's loaded extensions
+// declare, discovered as a job run discovers them: from the workspace
+// projects and the workspace extensions list. A workspace that does not load
+// declares nothing.
+func declaredJobs(wsRoot string) map[string]bool {
+	var projectPaths []string
+	if ws, err := workspace.Load(wsRoot); err == nil && ws != nil {
+		projectPaths = ws.ProjectPaths()
+	}
+	extensions, err := extension.DiscoverExtensions(wsRoot, wsproto.Load(wsRoot), projectPaths)
+	if err != nil {
+		return nil
+	}
+	declared := make(map[string]bool)
+	for name := range extension.BuildJobMap(extensions) {
+		declared[name] = true
+	}
+	return declared
 }
 
 // readCIDocument returns the workspace's CI document, or the zero document

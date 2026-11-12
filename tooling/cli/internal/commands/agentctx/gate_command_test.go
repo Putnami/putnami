@@ -119,25 +119,31 @@ func writeWorkspaceExtensions(t *testing.T, dir string, extensions ...string) {
 }
 
 // A workspace without a usable CI document is told the default document's
-// blocking commands, whatever its extensions declare: the gate reads no extension, so it does not
-// change with what a machine installed or with the host a regeneration runs
-// on. A workspace whose gate runs more says so in its CI document.
-func TestGateTasksWithoutCIDocumentIsTheGenericGate(t *testing.T) {
+// blocking commands that a loaded extension declares, in the default order: a
+// Bazel workspace, whose extension declares test and build, is never told to
+// run lint. No verb outside the default document joins the gate, and a
+// workspace whose extensions declare none of them keeps the whole default. A
+// workspace whose gate runs more says so in its CI document.
+func TestGateTasksWithoutCIDocumentKeepsTheDeclaredDefaultVerbs(t *testing.T) {
 	spectest.Proves(t, "cli/ci-document", "commands-not-gate", "an-unusable-document-falls-back-to-the-default-documents-commands")
 	t.Parallel()
 	validate := extensionManifest(t, "@example/checks", "validate")
+	bazel := extensionManifest(t, "@example/bazel", "test", "build")
 	cases := []struct {
 		name       string
 		extensions []string
 		manifests  map[string][]byte
+		want       string
 	}{
-		{"no workspace file", nil, nil},
-		{"no extension", []string{}, nil},
+		{"no workspace file", nil, nil, defaultGate()},
+		{"no extension", []string{}, nil, defaultGate()},
+		{"an extension declares test and build", []string{"/bazel"}, map[string][]byte{"/bazel": bazel}, "test,build"},
 		{"a declared local extension declares validate", []string{"/lang", "/checks"}, map[string][]byte{
-			"/lang":   extensionManifest(t, "@example/lang", "lint", "test", "build"),
+			"/lang":   extensionManifest(t, "@example/lang", "build", "test", "lint"),
 			"/checks": validate,
-		}},
-		{"an extension declared by name", []string{"@putnami/sdd"}, nil},
+		}, defaultGate()},
+		{"no extension declares a default verb", []string{"/checks"}, map[string][]byte{"/checks": validate}, defaultGate()},
+		{"an extension declared by name and not installed", []string{"@putnami/sdd"}, nil, defaultGate()},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -149,29 +155,29 @@ func TestGateTasksWithoutCIDocumentIsTheGenericGate(t *testing.T) {
 			for path, manifest := range tc.manifests {
 				writeExtension(t, dir, path, manifest)
 			}
-			if got := gateTasksForWorkspace(dir); got != defaultGate() {
-				t.Fatalf("gate = %q, want %q", got, defaultGate())
+			if got := gateTasksForWorkspace(dir); got != tc.want {
+				t.Fatalf("gate = %q, want %q", got, tc.want)
 			}
-			if got := GateTasks(dir); got != defaultGate() {
-				t.Fatalf("GateTasks = %q, want the same derivation %q", got, defaultGate())
+			if got := GateTasks(dir); got != tc.want {
+				t.Fatalf("GateTasks = %q, want the same derivation %q", got, tc.want)
 			}
 		})
 	}
 
-	// A workspace project that holds an extension manifest declaring validate
-	// leaves the gate generic too.
-	t.Run("a project manifest declares validate", func(t *testing.T) {
+	// A workspace project that holds an extension manifest is a loaded
+	// extension too.
+	t.Run("a project manifest declares test and build", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		if err := os.WriteFile(filepath.Join(dir, "putnami.workspace.json"), []byte(`{"name":"fixture","includes":["checks"]}`), 0o644); err != nil {
+		if err := os.WriteFile(filepath.Join(dir, "putnami.workspace.json"), []byte(`{"name":"fixture","includes":["bazel"]}`), 0o644); err != nil {
 			t.Fatalf("write workspace config: %v", err)
 		}
-		writeExtension(t, dir, "/checks", validate)
-		if err := os.WriteFile(filepath.Join(dir, "checks", "putnami.json"), []byte(`{"name":"checks"}`), 0o644); err != nil {
+		writeExtension(t, dir, "/bazel", bazel)
+		if err := os.WriteFile(filepath.Join(dir, "bazel", "putnami.json"), []byte(`{"name":"bazel"}`), 0o644); err != nil {
 			t.Fatalf("write project config: %v", err)
 		}
-		if got := gateTasksForWorkspace(dir); got != defaultGate() {
-			t.Fatalf("gate = %q, want %q", got, defaultGate())
+		if got := gateTasksForWorkspace(dir); got != "test,build" {
+			t.Fatalf("gate = %q, want test,build", got)
 		}
 	})
 
@@ -185,26 +191,25 @@ func TestGateTasksWithoutCIDocumentIsTheGenericGate(t *testing.T) {
 			t.Fatalf("gate = %q, want the document's build,lint,test,validate", got)
 		}
 		trio := t.TempDir()
-		writeWorkspaceExtensions(t, trio, "/checks")
-		writeExtension(t, trio, "/checks", validate)
+		writeWorkspaceExtensions(t, trio, "/bazel")
+		writeExtension(t, trio, "/bazel", bazel)
 		writeCIDocument(t, trio, "build", "lint", "test")
 		if got := gateTasksForWorkspace(trio); got != "build,lint,test" {
 			t.Fatalf("gate = %q, want the document's build,lint,test", got)
 		}
 	})
 
-	// An unusable document falls back to the generic gate, whatever the
-	// extensions declare.
-	t.Run("an unusable document falls back to the generic gate", func(t *testing.T) {
+	// An unusable document falls back to the declared default verbs.
+	t.Run("an unusable document falls back to the declared default verbs", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
-		writeWorkspaceExtensions(t, dir, "/checks")
-		writeExtension(t, dir, "/checks", validate)
+		writeWorkspaceExtensions(t, dir, "/bazel")
+		writeExtension(t, dir, "/bazel", bazel)
 		if err := os.WriteFile(filepath.Join(dir, ciproto.Filename), []byte(`{"version":3,"commands":[]}`), 0o644); err != nil {
 			t.Fatalf("write document: %v", err)
 		}
-		if got := gateTasksForWorkspace(dir); got != defaultGate() {
-			t.Fatalf("gate = %q, want %q", got, defaultGate())
+		if got := gateTasksForWorkspace(dir); got != "test,build" {
+			t.Fatalf("gate = %q, want test,build", got)
 		}
 	})
 }
