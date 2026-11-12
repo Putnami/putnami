@@ -47,7 +47,7 @@ func developerConfig(t *testing.T) (string, string) {
 	}
 	// A link starts faster than a copy: macOS checks a new executable on its
 	// first run.
-	if os.Link(self, helper) != nil && os.Symlink(self, helper) != nil {
+	if os.Symlink(self, helper) != nil && os.Link(self, helper) != nil {
 		copyFile(t, self, helper)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"credsStore":"putnami-test"}`), 0o600); err != nil {
@@ -104,14 +104,14 @@ func TestIsolateConfigKeepsTheDefaultKeychainFromTheCredentialHelper(t *testing.
 	if err := os.Remove(calls); err != nil {
 		t.Fatal(err)
 	}
-	if ConfigIsolated() {
+	if configIsolated() {
 		t.Fatal("the configuration reads as isolated before IsolateConfig")
 	}
 
 	restore := IsolateConfig()
 	dir := os.Getenv(configEnv)
-	if dir == developer || !ConfigIsolated() {
-		t.Fatalf("DOCKER_CONFIG = %s, isolated = %t", dir, ConfigIsolated())
+	if dir == developer || !configIsolated() {
+		t.Fatalf("DOCKER_CONFIG = %s, isolated = %t", dir, configIsolated())
 	}
 	if content, err := os.ReadFile(filepath.Join(dir, "config.json")); err != nil || string(content) != "{}\n" {
 		t.Fatalf("config.json = %q, %v", content, err)
@@ -126,14 +126,14 @@ func TestIsolateConfigKeepsTheDefaultKeychainFromTheCredentialHelper(t *testing.
 	// A test that changes DOCKER_CONFIG leaves the isolation.
 	t.Run("another configuration", func(t *testing.T) {
 		t.Setenv(configEnv, developer)
-		if ConfigIsolated() {
+		if configIsolated() {
 			t.Error("another DOCKER_CONFIG reads as isolated")
 		}
 	})
 
 	restore()
-	if got := os.Getenv(configEnv); got != developer || ConfigIsolated() {
-		t.Errorf("DOCKER_CONFIG = %s after restore, isolated = %t", got, ConfigIsolated())
+	if got := os.Getenv(configEnv); got != developer || configIsolated() {
+		t.Errorf("DOCKER_CONFIG = %s after restore, isolated = %t", got, configIsolated())
 	}
 	if _, err := os.Stat(dir); !os.IsNotExist(err) {
 		t.Errorf("the isolated directory outlives restore: %v", err)
@@ -148,7 +148,7 @@ func TestIsolateConfigRestoresAnUnsetVariable(t *testing.T) {
 		t.Fatal(err)
 	}
 	restore := IsolateConfig()
-	if !ConfigIsolated() {
+	if !configIsolated() {
 		t.Fatal("the configuration is not isolated")
 	}
 	restore()

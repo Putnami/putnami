@@ -7,9 +7,10 @@
 // which hangs the test until the job timeout.
 //
 // A test binary that resolves registry credentials through the default
-// keychain calls IsolateConfig in its TestMain, and its registry fixture calls
-// RequireIsolated. Only tests and the helper packages that only tests import
-// use this package; no product package imports it.
+// keychain calls IsolateConfig in its TestMain. RequireIsolated, called from a
+// registry fixture, fails a binary that does not. Only tests and the helper
+// packages that only tests import use this package; no product package imports
+// it.
 package dockertest
 
 import (
@@ -60,17 +61,17 @@ func IsolateConfig() (restore func()) {
 	}
 }
 
-// ConfigIsolated reports whether DOCKER_CONFIG names the directory
+// configIsolated reports whether DOCKER_CONFIG names the directory
 // IsolateConfig created.
-func ConfigIsolated() bool {
+func configIsolated() bool {
 	return isolated != nil && os.Getenv(configEnv) == isolated.Path()
 }
 
 // RequireIsolated fails the test when its binary reads the developer's Docker
-// configuration. A fixture that serves a registry calls it first.
+// configuration. A fixture that serves a registry can call it first.
 func RequireIsolated(t testing.TB) {
 	t.Helper()
-	if !ConfigIsolated() {
+	if !configIsolated() {
 		t.Fatal("this test binary reads the developer's Docker configuration: call dockertest.IsolateConfig (go.putnami.dev/sdk/extension/dockertest) in TestMain, and leave DOCKER_CONFIG as it sets it")
 	}
 }
