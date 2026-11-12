@@ -432,7 +432,7 @@ func TestValidateContributesTheWorkspaceGuard(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "native-validation-gate", "validate-contributes-exactly-one-workspace-guard-for-any-selection")
 	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-reads-the-git-candidate-cut-and-keys-on-it")
 	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-guard-task-is-reachable-only-from-validate-and-the-explicit-check-command")
-	spectest.Proves(t, clientgenFeature, "native-validation-gate", "validate-plans-no-generation")
+	spectest.Proves(t, clientgenFeature, "native-validation-gate", "the-validate-command-declares-no-dependency")
 	manifest := loadExtensionManifest(t)
 
 	command, ok := manifest.Commands["validate"]
