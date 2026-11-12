@@ -74,7 +74,7 @@ do
   eval "value=\${$name-<unset>}"
   printf '%s=%s\n' "$name" "$value"
 done > "$PREPARE_CAPTURE"
-printf '%s\n' "$*" > "$PREPARE_CAPTURE.args"
+printf '%s\n' "$*" >> "$PREPARE_CAPTURE.args"
 `
 	if err := os.WriteFile(fakeGo, []byte(fakeSource), 0o755); err != nil {
 		t.Fatal(err)
@@ -141,9 +141,21 @@ printf '%s\n' "$*" > "$PREPARE_CAPTURE.args"
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "build -o " + filepath.Join(output, filepath.FromSlash(compiledRuntime)) + " ./cmd/putnami-cloud"
-	if got := strings.TrimSpace(string(args)); got != want {
-		t.Errorf("go received %q, want %q", got, want)
+	calls := strings.Split(strings.TrimSpace(string(args)), "\n")
+	if len(calls) != 2 {
+		t.Fatalf("go ran %d times, want 2 (generate the clients, then build): %q", len(calls), calls)
+	}
+	clients, found := strings.CutPrefix(calls[0], "run ./internal/cmd/runtime-clients --output ")
+	if !found || clients == "" {
+		t.Fatalf("first go call = %q, want the client generation into a temporary directory", calls[0])
+	}
+	want := "build -overlay " + filepath.Join(clients, "overlay.json") +
+		" -o " + filepath.Join(output, filepath.FromSlash(compiledRuntime)) + " ./cmd/putnami-cloud"
+	if calls[1] != want {
+		t.Errorf("second go call = %q, want %q", calls[1], want)
+	}
+	if _, err := os.Stat(clients); !os.IsNotExist(err) {
+		t.Errorf("prepare-runtime left its generated clients at %s (stat: %v)", clients, err)
 	}
 }
 

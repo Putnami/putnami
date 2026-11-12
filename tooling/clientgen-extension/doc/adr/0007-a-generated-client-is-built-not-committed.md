@@ -83,6 +83,13 @@ nothing to update, and `clientgen-adopt` has no manifest pair to prove a move.
 - A fresh worktree has no client until a Putnami command plans it. The core
   restores clients on the first-run pass and from a SessionStart hook
   ([CLI ADR 0087](../../../cli/doc/adr/0087-a-fresh-worktree-restores-its-generated-clients.md)).
+- A program the CLI builds before it plans any job cannot wait for
+  `client-generate`. The `@putnami/cloud` runtime is one: the workspace probe
+  needs it first. Its `prepare-runtime` emits the clients of its replaced
+  modules from their committed contracts into a temporary directory and builds
+  through `go build -overlay`. It writes nothing into the source tree, and its
+  runtime digest already covers each replaced module's `clientgen.json` and
+  contract.
 - A published client holds generated code: packaging runs after
   `client-generate`, and both publishers package the worktree. An external Go
   consumer resolves through the module proxy; `GOPROXY=direct` reads Git, which

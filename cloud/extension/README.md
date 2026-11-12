@@ -63,6 +63,14 @@ platform, and ignores the caller's `GOFLAGS`, `GOOS`, `GOARCH`, `GOEXPERIMENT`
 and the other Go controls that change the compiled bytes. Two prepares of one
 runtime digest build the same binary.
 
+The CLI prepares this runtime before any job runs, so no `client-generate` job
+has written the service clients yet. `bin/prepare-runtime` therefore generates
+them itself: [`internal/cmd/runtime-clients`](internal/cmd/runtime-clients)
+emits each replaced module's client, declared in its `clientgen.json`, from its
+committed `schema/openapi.json` into a temporary directory. The build reads
+them through `go build -overlay`, and the source tree is never written. A
+fresh clone, with no generated file, prepares the runtime.
+
 Every manifest task runs `{extensionRuntime}`, including the
 remote build-cache provider. The Putnami CLI resolves `{extensionRuntime}` to the
 archive's `compiled/putnami-cloud`, or to `compiled/putnami-cloud.exe` on
@@ -1558,8 +1566,9 @@ The extension calls Putnami Cloud services through 14 generated Go clients.
 Each one lives under `../clients/<service>/go` and is its own Putnami project,
 `go.putnami.dev/cloud/clients/<service>`. `./putnamiw client-generate`
 generates it from `../clients/<service>/schema/openapi.json`, and the
-extension's build runs it first. Git ignores `client.gen.go`: never edit or
-commit it.
+extension's build runs it first. The CLI's runtime preparation generates the
+same clients into an overlay of its own (see above). Git ignores
+`client.gen.go`: never edit or commit it.
 
 The services are auth-server, cache-server, config-api, control-api, data-api,
 db-gateway, delivery-api, distribution-api, identity-api, observability-api,

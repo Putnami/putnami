@@ -6,8 +6,10 @@ that the extension binary calls. Each one is its own Putnami project,
 `<service>/go`. `./putnamiw client-generate` generates
 `<service>/go/client.gen.go` from `<service>/schema/openapi.json`, with the
 package and client names in `<service>/clientgen.json`. The extension's build
-runs it first, so you rarely run it yourself. Git ignores `client.gen.go`:
-never edit or commit it.
+runs it first, so you rarely run it yourself. The extension's
+`bin/prepare-runtime` generates the same clients from the same files into a
+temporary overlay, because the CLI builds that runtime before any job runs. Git
+ignores `client.gen.go`: never edit or commit it.
 
 `clientgen.json` declares a client that lives inside its provider's own Go
 module. Its `go.output` names the package directory, here `go`.
