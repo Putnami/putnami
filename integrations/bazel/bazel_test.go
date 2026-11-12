@@ -681,8 +681,7 @@ func TestTheQueryWaitsForTheTasksOfTheStackRoot(t *testing.T) {
 }
 
 // bazel test //<pkg>:all selects no test tagged manual, and exits 4 when it
-// selects none: a package whose tests are all manual has its test disabled
-// (#1081).
+// selects none: a package whose tests are all manual has its test disabled.
 func TestTheSyncDisablesTheTestOfAPackageWhoseTestsAreAllManual(t *testing.T) {
 	d := readDemo(t)
 	t.Setenv("PATH", t.TempDir())
@@ -713,7 +712,7 @@ func optIntoCoverage(t *testing.T, root, dir string) {
 // bazel coverage can fail where bazel test passes, as on a C++ test whose
 // coverage tree holds a dangling link: test runs bazel test, coverage is
 // opted into, and a coverage file that is not LCOV, such as a raw LLVM
-// profile, is skipped with a warning (#1081).
+// profile, is skipped with a warning.
 func TestTheTestTaskRunsBazelTestAndReadsOnlyAnLCOVCoverage(t *testing.T) {
 	d := readDemo(t)
 	testlogs := stubBazel(t, d)

@@ -616,7 +616,7 @@ func TestTheSyncJobWritesNothingInADryRun(t *testing.T) {
 
 // A file name may hold an @, as a systemd unit template does: the address of
 // the target generated for it names its BUILD file's directory, and only
-// @key=value parameters follow an address (#1081).
+// @key=value parameters follow an address.
 func TestTheSyncTakesAProjectDirectoryFromTheBuildFileNotATargetName(t *testing.T) {
 	t.Setenv("PATH", t.TempDir())
 	root := t.TempDir()
