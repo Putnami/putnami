@@ -22,10 +22,10 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/dockertest"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/registrycred"
-	"go.putnami.dev/sdk/extension/scratch"
 )
 
 // TestMain clears the registry routing the host process may carry. Under
@@ -35,31 +35,16 @@ import (
 // need either value pin it with t.Setenv, which restores this cleared state.
 // A publication outbox inherited from an enclosing publication would turn
 // every managed publication under test into a pack, so it is cleared too.
-// It also points DOCKER_CONFIG at a directory holding an empty config.json,
-// so the default keychain never runs the developer's credential helper.
+// It also keeps the tests from the developer's Docker configuration.
 func TestMain(m *testing.M) {
 	for _, key := range []string{privateOCIRegistryURLEnv, "DOCKER_REGISTRY", extproto.PublicationOutboxEnv} {
 		if err := os.Unsetenv(key); err != nil {
 			panic(err)
 		}
 	}
-	// The default keychain loads the docker config and runs the credential
-	// helper it names. A developer's helper can block on its desktop app,
-	// which hangs these tests until the job timeout. An empty config.json in
-	// DOCKER_CONFIG names no helper, and its presence keeps the keychain from
-	// falling back to Podman's auth files.
-	config, err := scratch.New("putnami-docker-config-")
-	if err != nil {
-		panic(err)
-	}
-	if err := os.WriteFile(filepath.Join(config.Path(), "config.json"), []byte("{}\n"), 0o600); err != nil {
-		panic(err)
-	}
-	if err := os.Setenv("DOCKER_CONFIG", config.Path()); err != nil {
-		panic(err)
-	}
+	restore := dockertest.IsolateConfig()
 	code := m.Run()
-	_ = config.Remove()
+	restore()
 	os.Exit(code)
 }
 

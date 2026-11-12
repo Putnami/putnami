@@ -34,6 +34,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/dockertest"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 	"go.putnami.dev/sdk/extension/putnamihome"
@@ -478,6 +479,7 @@ func TestPackageArchivesFailsWithoutACompiledBinaryOrAVersion(t *testing.T) {
 // digest-pinned reference.
 func baseImage(t *testing.T) (string, string) {
 	t.Helper()
+	dockertest.RequireIsolated(t)
 	server := httptest.NewServer(registry.New())
 	t.Cleanup(server.Close)
 	host := strings.TrimPrefix(server.URL, "http://")

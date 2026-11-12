@@ -1,5 +1,7 @@
 // Package imagetest serves the image fixtures of the stack extensions' tests:
 // an in-memory OCI registry with a base image to package onto.
+//
+// A test binary that uses it calls dockertest.IsolateConfig in its TestMain.
 package imagetest
 
 import (
@@ -14,14 +16,19 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/mutate"
 	"github.com/google/go-containerregistry/pkg/v1/random"
 	"github.com/google/go-containerregistry/pkg/v1/remote"
+
+	"go.putnami.dev/sdk/extension/dockertest"
 )
 
 // Registry serves an in-memory OCI registry for the test and pushes a
 // base image index to it with a linux/amd64 and a linux/arm64 image, each
 // naming its platform in its config, as a distroless base does. It answers
 // the registry host and the base's digest reference.
+//
+// It fails a test whose binary reads the developer's Docker configuration.
 func Registry(t testing.TB) (string, string) {
 	t.Helper()
+	dockertest.RequireIsolated(t)
 	server := httptest.NewServer(registry.New())
 	t.Cleanup(server.Close)
 	host := strings.TrimPrefix(server.URL, "http://")

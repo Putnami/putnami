@@ -25,6 +25,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 	"go.putnami.dev/protocol/features/spectest"
 	pctx "go.putnami.dev/sdk/extension/context"
+	"go.putnami.dev/sdk/extension/dockertest"
 	"go.putnami.dev/sdk/extension/jsonl"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 )
@@ -178,6 +179,7 @@ func runImageJob(t *testing.T, ctx *pctx.Context, job func(*pctx.Context, *jsonl
 // answers its host and the digest reference of the base.
 func imageRegistry(t *testing.T) (string, string) {
 	t.Helper()
+	dockertest.RequireIsolated(t)
 	server := httptest.NewServer(registry.New())
 	t.Cleanup(server.Close)
 	host := strings.TrimPrefix(server.URL, "http://")

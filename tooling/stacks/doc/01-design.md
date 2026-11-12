@@ -464,7 +464,9 @@ holds a language stack's manifest to the command surface the stacks share
 ([ADR 0015](adr/0015-the-stack-extensions-share-one-command-surface.md)), with
 a named exemption for each stated reason, and `WriteFile`, and
 its `imagetest` package `Registry`, an in-memory registry that serves a
-two-platform base image.
+two-platform base image. A test binary that calls `Registry` first calls
+`dockertest.IsolateConfig` of the extension SDK in its `TestMain`; `Registry`
+fails the test otherwise.
 
 A file may state a range instead, in Composer's constraint syntax: the PHP
 profile reads `require.php` of `composer.json`, such as `>=8.4` or `^8.2`
