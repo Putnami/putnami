@@ -175,6 +175,33 @@ func TestWithoutAnExportTheBuildFilesGiveThePackages(t *testing.T) {
 	}
 }
 
+func TestADirectoryRepoBazelIgnoresHoldsNoPackage(t *testing.T) {
+	spectest.Proves(t, feature, "bazel-without-export", "a-directory-repo-bazel-ignores-holds-no-package")
+	root := writeTree(t, shop(map[string]string{
+		"REPO.bazel": "repo(default_visibility = [\"//visibility:public\"])\n" +
+			"ignore_directories([\n    \"**/testdata\",\n    'tools/fixtures',\n])\n",
+		"api/testdata/fixture/BUILD.bazel": "",
+		"tools/fixtures/BUILD":             "",
+		"tools/fixtures/deep/BUILD":        "",
+		"tools/gen/BUILD.bazel":            "",
+	}))
+	var got []string
+	for _, p := range Detect(root, "").Packages {
+		got = append(got, p.Dir)
+	}
+	if want := []string{"api", "pricing", "tools/gen", "web"}; !reflect.DeepEqual(got, want) {
+		t.Errorf("packages %v, want %v", got, want)
+	}
+	for dir, want := range map[string]bool{
+		"api": false, "tools/gen": false, ".": false, "api/testdata/fixture": true,
+		"tools/fixtures/deep": true, "third_party/old": true, ".cache": true, "bazel-out/k8": true,
+	} {
+		if got := Ignored(root, dir); got != want {
+			t.Errorf("Ignored(%s) = %v, want %v", dir, got, want)
+		}
+	}
+}
+
 func TestAMalformedExportIsAWarning(t *testing.T) {
 	spectest.Proves(t, feature, "bazel-without-export", "a-malformed-export-is-a-warning")
 	for name, files := range map[string]map[string]string{

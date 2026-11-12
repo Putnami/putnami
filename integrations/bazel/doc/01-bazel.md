@@ -29,7 +29,10 @@ files: a package is a directory whose `putnami.json` the sync wrote from
 `bazel query`. Every other directory with a `BUILD` file, and the root
 package, is a bare member: a project named by its directory, with no
 extension, that runs no task. Directories under `bazel-*` links, hidden
-directories and `node_modules` are never read.
+directories, `node_modules`, the directories `.bazelignore` names and those an
+`ignore_directories` glob of `REPO.bazel` matches are never read: Bazel loads
+no package there, so a `BUILD` file under them, such as a test fixture's, is
+no project.
 
 Add `.putnami/`, `.gen/` and `/bazel-*` to the repository's `.gitignore`:
 `init` writes one only when the repository has none.

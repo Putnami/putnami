@@ -171,14 +171,25 @@ func TestTheRushProjectsBecomeProjectsWithTheirEdges(t *testing.T) {
 			t.Errorf("%s metadata names no package %s: %s", dir, want.name, p.Metadata)
 		}
 	}
-	if p, ok := got["common/autoinstallers/lint"]; !ok || len(p.Extensions) != 0 {
-		t.Errorf("an autoinstaller is bare: %+v", p)
+	// A directory rush.json does not list, such as an autoinstaller, is no
+	// project.
+	if p, ok := got["common/autoinstallers/lint"]; ok {
+		t.Errorf("an autoinstaller rush.json does not list is a project: %+v", p)
 	}
 
-	// In import mode the TypeScript extension runs the projects.
+	// In import mode the TypeScript extension runs the projects: each one is
+	// a bare member, which names no extension.
 	root = repository(t, d, ModeImport, false)
-	if result := probe(t, root); len(result.Projects) != 0 {
-		t.Errorf("import mode answers %+v, want no project", result.Projects)
+	stackstest.WriteFile(t, root, "common/autoinstallers/lint/package.json", `{"name": "lint"}`)
+	var members []string
+	for _, p := range probe(t, root).Projects {
+		if len(p.Extensions) != 0 || p.SourceName != "" {
+			t.Errorf("import mode answers %+v, want a bare member", p)
+		}
+		members = append(members, p.Path)
+	}
+	if want := []string{"apps/api", "apps/web", "libs/pricing"}; !slices.Equal(members, want) {
+		t.Errorf("import mode answers the members %v, want the ones rush.json lists %v", members, want)
 	}
 	// A repository without rush.json answers nothing.
 	if result := probe(t, t.TempDir()); len(result.Projects) != 0 {
@@ -792,10 +803,13 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 		t.Errorf("the import rewrote api's scripts: %s", data)
 	}
 
-	// The probe claims api, which keeps targets on Rush, and not web.
+	// The probe claims api, which keeps targets on Rush, and not web, which
+	// stays a bare member.
 	var claimed []string
 	for _, p := range probe(t, root).Projects {
-		claimed = append(claimed, p.Path)
+		if slices.Contains(p.Extensions, ExtensionName) {
+			claimed = append(claimed, p.Path)
+		}
 	}
 	if !slices.Contains(claimed, "apps/api") || slices.Contains(claimed, "apps/web") {
 		t.Errorf("an import claims %v, want apps/api and not apps/web", claimed)

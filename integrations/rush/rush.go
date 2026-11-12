@@ -61,14 +61,15 @@ func Mode(root string) (string, error) {
 	return stacks.AdoptionMode(root, ExtensionName)
 }
 
-// Detect names the Rush projects among the candidate paths. In delegate mode
-// each project of rush.json is a component named by its package name, which
-// rush receives, with the workspace root for stack root and an edge to each
-// Rush project its package.json depends on; any other candidate that holds a
-// package.json, such as an autoinstaller, is bare and runs no task. In import
-// mode it names only the projects whose putnami.json names the extension,
-// which keep a target on Rush (ADR 0017 of tooling/stacks): the TypeScript
-// extension runs every other target.
+// Detect names the Rush projects among the candidate paths, and only them:
+// a candidate rush.json does not list, such as a test fixture that holds a
+// package.json, is no project. In delegate mode each project of rush.json is
+// a component named by its package name, which rush receives, with the
+// workspace root for stack root and an edge to each Rush project its
+// package.json depends on. In import mode a project whose putnami.json names
+// the extension keeps a target on Rush (ADR 0017 of tooling/stacks) and is a
+// component; every other one is bare, a member whose targets the TypeScript
+// extension runs.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	detection := detect.Detect(root)
 	if len(detection.Projects) == 0 && len(detection.Diagnostics) == 0 {
@@ -88,11 +89,11 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			continue
 		}
 		p, ok := projects[dir]
-		if mode == ModeImport && (!ok || !keepsTargets(root, dir)) {
+		if !ok {
 			continue
 		}
-		if !ok {
-			out = append(out, stacks.Component{Path: dir, Name: dir, SourceFile: path.Join(dir, "package.json"), Bare: true})
+		if mode == ModeImport && !keepsTargets(root, dir) {
+			out = append(out, stacks.Component{Path: dir, Bare: true})
 			continue
 		}
 		out = append(out, stacks.Component{

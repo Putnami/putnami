@@ -4992,6 +4992,19 @@
           }
         },
         {
+          "id": "only-listed-members-become-projects",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-directory-the-tool-does-not-list-becomes-no-project"
+            ]
+          }
+        },
+        {
           "id": "init-import-adds-projects",
           "stage": "coded",
           "evidenceKinds": [

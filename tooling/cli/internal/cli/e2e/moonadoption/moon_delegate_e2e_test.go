@@ -281,3 +281,33 @@ func TestAChangeToOneMoonProjectRunsItAndItsDependentsThroughMoon(t *testing.T) 
 		t.Errorf("validate exit %d after the sync:\n%s", code, out)
 	}
 }
+
+// TestTheWorkspaceAdoptsOnlyTheProjectsMoonLists pins that a directory that holds a package.json or a moon.yml and that .moon/workspace.yml does
+// not list, such as a test fixture, becomes no project: neither init --from
+// moon nor projects sync adds it.
+func TestTheWorkspaceAdoptsOnlyTheProjectsMoonLists(t *testing.T) {
+	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "only-listed-members-become-projects", "a-directory-the-tool-does-not-list-becomes-no-project")
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	demo := readDemo(t)
+	root := moonWorkspace(t, demo, buildRuntime(t), "")
+	stubMoon(t)
+	clitest.WriteFile(t, filepath.Join(root, "apps/api/test/fixture/package.json"), `{"name": "fixture", "version": "1.0.0"}`)
+	if code, out := clitest.RunGateArgs(t, root, "init", "--from", "moon", "--mode", "delegate", "--apply"); code != 0 {
+		t.Fatalf("init --from moon --apply exit %d:\n%s", code, out)
+	}
+	listed := []string{"apps/api", "apps/web", "packages/pricing"}
+	if got := clitest.ProjectPaths(t, root); !slices.Equal(got, listed) {
+		t.Errorf("init --from moon made the projects %v, want the ones .moon/workspace.yml lists %v", got, listed)
+	}
+
+	clitest.WriteFile(t, filepath.Join(root, "packages/pricing/tests/fixture/moon.yml"), `language: 'rust'
+`)
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if got := clitest.ProjectPaths(t, root); !slices.Equal(got, listed) {
+		t.Errorf("projects sync made the projects %v, want the ones .moon/workspace.yml lists %v", got, listed)
+	}
+}

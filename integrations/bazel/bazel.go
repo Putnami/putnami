@@ -51,7 +51,8 @@ func Stack() (stacks.Stack, error) {
 // rules from bazel query, tells a package from a directory with no rule.
 // Every other candidate that holds a BUILD file, the root package included,
 // is bare: it is named by its directory, the root by the workspace, and runs
-// no task.
+// no task. A directory Bazel loads no package from, such as one an
+// ignore_directories glob of REPO.bazel or .bazelignore names, is none.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	if !detect.IsWorkspace(root) {
 		return nil, nil
@@ -71,7 +72,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		}
 		if !ok || dir == wsproto.ProbeRootPath {
 			file := detect.BuildFile(root, dir)
-			if file == "" {
+			if file == "" || detect.Ignored(root, dir) {
 				continue
 			}
 			name := dir

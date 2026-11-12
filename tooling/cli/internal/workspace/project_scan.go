@@ -240,6 +240,14 @@ func ExcludedByProviderScopes(scopes []ProviderScope, rel string) bool {
 	return false
 }
 
+// MarkedByConfig reports whether the directory rel of the workspace at root
+// carries core's own marker: a putnami.json that is more than a scope
+// declaration. Such a directory is a project whatever an adapter says.
+func MarkedByConfig(root, rel string) bool {
+	dir := filepath.Join(root, filepath.FromSlash(rel))
+	return fileExists(filepath.Join(dir, wsproto.ConfigFilename)) && !isScopeOnlyConfig(dir)
+}
+
 func isScopeOnlyConfig(dir string) bool {
 	sc := wsproto.ReadScopeConfig(dir)
 	if sc == nil {

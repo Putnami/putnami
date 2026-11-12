@@ -17,7 +17,7 @@
   "requirements": [
     {
       "id": "packages-become-projects",
-      "text": "The probe answers, for each package of bazel-graph.json, or without it each directory the sync marked for @putnami/bazel: its directory as source name, the export's edges and its putnami.json edges on a BUILD directory, each attributed build-graph, the extension @putnami/bazel, the tag bazel, and metadata: package, root as stack root, .bazelversion version. Any other candidate holding a BUILD or BUILD.bazel file, the root included, is bare: named by its directory, no extension, no task."
+      "text": "The probe answers each package of bazel-graph.json, or without it each directory the sync marked for @putnami/bazel: its directory as source name, the export's and its putnami.json edges, attributed build-graph, extension @putnami/bazel, tag bazel, metadata: package, root as stack root, .bazelversion version. Any other candidate with a BUILD or BUILD.bazel file, the root included, is bare: named by its directory, no extension. A directory .bazelignore or REPO.bazel ignore_directories names is no project."
     },
     {
       "id": "sync-writes-the-package-graph",

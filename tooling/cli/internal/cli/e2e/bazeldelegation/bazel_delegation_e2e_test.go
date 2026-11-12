@@ -351,3 +351,36 @@ func TestAChangeToOneBazelPackageRunsItAndItsDependentsThroughBazel(t *testing.T
 		t.Errorf("validate exit %d after the sync:\n%s", code, out)
 	}
 }
+
+// TestTheWorkspaceAdoptsOnlyThePackagesBazelLoads pins that a directory that holds a BUILD file and that Bazel does
+// not list, such as a test fixture, becomes no project: neither init --from
+// bazel nor projects sync adds it.
+func TestTheWorkspaceAdoptsOnlyThePackagesBazelLoads(t *testing.T) {
+	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "only-listed-members-become-projects", "a-directory-the-tool-does-not-list-becomes-no-project")
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	demo := readDemo(t)
+	root := bazelWorkspace(t, demo, buildRuntime(t))
+	stubBazel(t, demo)
+	clitest.WriteFile(t, filepath.Join(root, "REPO.bazel"), `ignore_directories(["**/testdata"])
+`)
+	clitest.WriteFile(t, filepath.Join(root, "api/testdata/fixture/BUILD.bazel"), ``)
+	if code, out := clitest.RunGateArgs(t, root, "init", "--from", "bazel", "--mode", "delegate", "--apply"); code != 0 {
+		t.Fatalf("init --from bazel --apply exit %d:\n%s", code, out)
+	}
+	// tools holds a BUILD file outside the ignored directories: Bazel loads
+	// it, so it stays a bare member.
+	listed := []string{"api", "pricing", "tools", "web"}
+	if got := clitest.ProjectPaths(t, root); !slices.Equal(got, listed) {
+		t.Errorf("init --from bazel made the projects %v, want the ones Bazel lists %v", got, listed)
+	}
+
+	clitest.WriteFile(t, filepath.Join(root, "pricing/testdata/BUILD"), ``)
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if got := clitest.ProjectPaths(t, root); !slices.Equal(got, listed) {
+		t.Errorf("projects sync made the projects %v, want the ones Bazel lists %v", got, listed)
+	}
+}

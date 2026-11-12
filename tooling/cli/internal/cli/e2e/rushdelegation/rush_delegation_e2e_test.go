@@ -274,3 +274,33 @@ func TestAChangeToOneRushProjectRunsRushBuildOnItAndItsDependents(t *testing.T) 
 		t.Errorf("validate exit %d after the sync:\n%s", code, out)
 	}
 }
+
+// TestTheWorkspaceAdoptsOnlyTheProjectsRushLists pins that a directory that
+// holds a package.json and that rush.json does not list, such as a test
+// fixture, becomes no project: neither init --from rush nor projects sync
+// adds it.
+func TestTheWorkspaceAdoptsOnlyTheProjectsRushLists(t *testing.T) {
+	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "only-listed-members-become-projects", "a-directory-the-tool-does-not-list-becomes-no-project")
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	root := rushWorkspace(t, readDemo(t), buildRuntime(t))
+	stubRush(t)
+	clitest.WriteFile(t, filepath.Join(root, "apps/api/test/fixture/package.json"), `{"name": "fixture", "version": "1.0.0"}`)
+
+	if code, out := clitest.RunGateArgs(t, root, "init", "--from", "rush", "--apply"); code != 0 {
+		t.Fatalf("init --from rush --apply exit %d:\n%s", code, out)
+	}
+	listed := []string{"apps/api", "apps/web", "libs/pricing"}
+	if got := clitest.ProjectPaths(t, root); !slices.Equal(got, listed) {
+		t.Errorf("init --from rush made the projects %v, want the ones rush.json lists %v", got, listed)
+	}
+
+	clitest.WriteFile(t, filepath.Join(root, "tools/scripts/package.json"), `{"name": "scripts", "version": "1.0.0"}`)
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if got := clitest.ProjectPaths(t, root); !slices.Equal(got, listed) {
+		t.Errorf("projects sync made the projects %v, want the ones rush.json lists %v", got, listed)
+	}
+}

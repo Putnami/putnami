@@ -23,7 +23,7 @@
     },
     {
       "id": "import-maps-to-language-extensions",
-      "text": "With mode import in the workspace options of @putnami/moon, or no mode, a project whose moon language is typescript, go, python, php, ruby or rust runs that language's Putnami extension, which the sync declares in the workspace's extensions; any other project runs the delegated @putnami/moon tasks, so no Putnami cache sits over moon's. With mode delegate every project runs @putnami/moon; another value fails the sync and the probe with stacks.adoption_mode_invalid."
+      "text": "With mode import in the workspace options of @putnami/moon, or no mode, a project whose moon language is typescript, go, python, php, ruby or rust runs that language's Putnami extension, which the sync declares; the probe answers it bare unless it keeps a task on moon. Any other project runs the delegated @putnami/moon tasks. With mode delegate every project runs @putnami/moon; another value fails the sync and the probe with stacks.adoption_mode_invalid. A directory moon does not list is no project."
     },
     {
       "id": "import-keeps-the-tool-that-checks-the-code",

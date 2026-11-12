@@ -78,6 +78,10 @@
       "text": "On the same fixture, in import mode, the sync keeps the edges putnami observe reads, gives a TypeScript package @putnami/typescript for a task whose script already runs bun test and disables @putnami/turbo for it, and lists each tsc or vitest task it leaves on Turborepo."
     },
     {
+      "id": "only-listed-members-become-projects",
+      "text": "With a monorepo tool's extension declared, putnami init --from <tool> and putnami projects sync make a project only of a directory the tool lists or that holds its own putnami.json: a workspace member for Turborepo, a project of rush.json, moon or the Nx graph, a Bazel package outside .bazelignore and REPO.bazel ignore_directories, a Pants BUILD directory. The sync counts the directories it left out. When the tool cannot list them, it warns, keeps only putnami.json directories and does not prune."
+    },
+    {
       "id": "init-import-adds-projects",
       "text": "putnami init --from nx|turbo --import <path>,<path> in delegate mode adds each path not listed yet to options[\"@putnami/<tool>\"].import and declares @putnami/typescript. In a workspace that exists, it previews the change and the sync's dry run with that list, and writes only with --apply, which records it, installs the extensions and runs projects sync. A new workspace records it with the mode. --import with another tool, no path, or import mode is a usage error."
     },

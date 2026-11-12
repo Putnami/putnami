@@ -24,6 +24,8 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"testing"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -244,4 +246,41 @@ fi
 		WriteFile(t, filepath.Join(root, "app", "fail"), "")
 	}
 	return root
+}
+
+// ProjectPaths runs `putnami projects list --output=json` in the workspace and
+// returns the path of each project it lists, sorted.
+func ProjectPaths(t *testing.T, wsRoot string) []string {
+	t.Helper()
+	code, out := RunGateArgs(t, wsRoot, "projects", "list", "--output=json")
+	if code != 0 {
+		t.Fatalf("projects list exit %d:\n%s", code, out)
+	}
+	start := strings.Index(out, "{")
+	if start < 0 {
+		t.Fatalf("projects list printed no JSON document:\n%s", out)
+	}
+	var document struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(strings.NewReader(out[start:])).Decode(&document); err != nil {
+		t.Fatalf("projects list printed no JSON document (%v):\n%s", err, out)
+	}
+	type row struct {
+		Path string `json:"path"`
+	}
+	var rows []row
+	if err := json.Unmarshal(document.Data, &rows); err != nil {
+		var one row
+		if err := json.Unmarshal(document.Data, &one); err != nil {
+			t.Fatalf("projects list data is no project row (%v):\n%s", err, out)
+		}
+		rows = []row{one}
+	}
+	paths := make([]string, 0, len(rows))
+	for _, r := range rows {
+		paths = append(paths, r.Path)
+	}
+	sort.Strings(paths)
+	return paths
 }
