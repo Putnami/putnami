@@ -145,12 +145,14 @@ claims. The sync names it and the tasks that keep running through
   `options["@putnami/moon"].tasks.<command>.steps`;
 - for a TypeScript project, the runner of a test that moved, `bun`, `vitest`
   or `jest`,
-  under `options["@putnami/typescript:test"].runner`, and `eslint` under
+  under `options["@putnami/typescript:test"].runner`, with `types: false`
+  there, since the task type-checked nothing, and `eslint` under
   `options["@putnami/typescript"].lint.linter` for an ESLint lint that moved;
 - for a TypeScript project, the conventions of D-066: a `tsconfig.json` that
   extends the root's when it holds no `tsconfig*.json`, and
   `"exports": { ".": "./src/index.ts" }` when its build moves to the Bun
   build, its `package.json` is private and its `main` names a build output.
+  A `bun build` task whose entry the sync does not rewrite stays on moon.
 
 It keeps every other member, the project's own steps included: it writes a
 step only where none is set or where it wrote the one there. It retracts a

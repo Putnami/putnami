@@ -152,11 +152,11 @@ project builds and resolves its neighbours from their sources:
   after that member. Every other byte stays. A project `rush.json` publishes,
   with `shouldPublish` or a `versionPolicyName`, keeps its entry, since
   `rush publish` ships it to consumers that read the build output. Putnami's
-  TypeScript build does not write that output, so the projects that depend on
-  it cannot resolve it, and the sync warns. Add the `exports` by hand when no
-  consumer outside the repository needs the build-output entry, or adopt the
-  repository in delegate mode, where Rush builds it. So does a manifest it cannot edit line by line, such as one with CRLF
-  line ends: add the `exports` by hand.
+  Bun build does not write that output, so the project's `bun build` stays on
+  Rush, run with `rushx build`, and the sync lists it with its reason. So does
+  the build of a manifest the sync cannot edit line by line, such as one with
+  CRLF line ends, one whose `exports` name a build output, and one with no
+  `src/index.ts`.
 - A `tsc` build, or a build that stays on Rush, writes the output its `main`
   names, so its entry stays.
 - A project with no `tsconfig*.json` gets a `tsconfig.json` that extends the

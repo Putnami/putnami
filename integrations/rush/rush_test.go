@@ -696,7 +696,7 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 }
 
 func TestAnImportKeepsTheEntryOfAProjectRushPublishes(t *testing.T) {
-	spectest.Proves(t, feature, "import-adopts-typescript-conventions", "an-import-adds-source-exports-and-a-tsconfig")
+	spectest.Proves(t, feature, "a-moved-task-does-what-its-script-did", "an-imported-task-does-what-its-script-did")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, false)
 	stackstest.WriteFile(t, root, "rush.json", strings.Replace(d["base"]["rush.json"], `"shouldPublish": false`, `"shouldPublish": true`, 1))
@@ -712,8 +712,14 @@ func TestAnImportKeepsTheEntryOfAProjectRushPublishes(t *testing.T) {
 	if data, _ := os.ReadFile(filepath.Join(root, "libs/pricing/package.json")); string(data) != manifest {
 		t.Errorf("a published project's package.json changed:\n%s", data)
 	}
-	if !slices.ContainsFunc(result.Warnings, func(w string) bool { return strings.Contains(w, "rush.json publishes @demo/pricing") }) {
-		t.Errorf("warnings = %v, want the published project named", result.Warnings)
+	// Putnami's Bun build would not write the lib/index.js its consumers
+	// read: the build stays on Rush.
+	want := `not mapped: the build script of @demo/pricing: its package.json names "lib/index.js", which the Bun build of @putnami/typescript does not write, and rush.json publishes it, so that entry stays: it keeps running through Rush, with rushx build`
+	if !slices.Contains(result.Warnings, want) {
+		t.Errorf("warnings = %v, want the build kept on Rush", result.Warnings)
+	}
+	if jobs := readProjectFile(t, root, "libs/pricing")["disable"].(map[string]any)["jobs"]; !slices.Contains(jobs.([]any), any("@putnami/typescript:build")) {
+		t.Errorf("libs/pricing jobs = %v, want the build on Rush", jobs)
 	}
 }
 
@@ -777,12 +783,22 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 		"extensions":   []any{ExtensionName, TypeScriptExtension},
 		"dependencies": []any{"/libs/pricing"},
 		"disable":      map[string]any{"jobs": []any{"@putnami/rush:lint", "@putnami/typescript:test", "@putnami/typescript:build"}},
-		"options":      map[string]any{ExtensionName: map[string]any{"tasks": map[string]any{"build": keptSteps("build"), "test": keptSteps("test")}}},
+		"options": map[string]any{
+			ExtensionName: map[string]any{"tasks": map[string]any{"build": keptSteps("build"), "test": keptSteps("test")}},
+		},
 	}) {
 		t.Errorf("apps/api = %v", api)
 	}
-	if pricing := readProjectFile(t, root, "libs/pricing"); !reflect.DeepEqual(pricing["disable"], map[string]any{"jobs": []any{"@putnami/rush:test", "@putnami/rush:build", "@putnami/typescript:lint"}}) {
+	pricing := readProjectFile(t, root, "libs/pricing")
+	if !reflect.DeepEqual(pricing["disable"], map[string]any{"jobs": []any{"@putnami/rush:test", "@putnami/rush:build", "@putnami/typescript:lint"}}) {
 		t.Errorf("libs/pricing disable = %v", pricing["disable"])
+	}
+	// Its jest test moved, and Jest type-checked nothing.
+	if options := pricing["options"].(map[string]any)[stacks.TypeScriptRunnerLayer]; !reflect.DeepEqual(options, map[string]any{"types": false}) {
+		t.Errorf("libs/pricing options = %v, want a test with no type check", options)
+	}
+	if !slices.Contains(result.Warnings, stacks.LintDependentsNote) {
+		t.Errorf("warnings = %v, want the lint selection note", result.Warnings)
 	}
 	// web declares no script: the TypeScript extension alone, every task
 	// disabled.

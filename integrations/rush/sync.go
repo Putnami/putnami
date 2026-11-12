@@ -98,6 +98,7 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 	packages := make([]stacks.GraphPackage, 0, len(detection.Projects))
 	var kept []string
 	var conventions []stacks.ConventionProject
+	lintMoved := false
 	for _, p := range detection.Projects {
 		pkg := stacks.GraphPackage{DependsOn: p.DependsOn, Dir: p.Folder}
 		if mode == ModeDelegate {
@@ -108,18 +109,20 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 					pkg.Disabled = append(pkg.Disabled, job)
 				}
 			}
-			pkg.Edit = rushxSteps.edit(nil)
+			pkg.Edit = retractEdit
 			packages = append(packages, pkg)
 			continue
 		}
-		plan := planImport(p, scripts(root, p.Folder))
-		pkg.Extension, pkg.Also, pkg.Disabled = plan.extension, plan.also, plan.disabled
-		pkg.Edit = rushxSteps.edit(plan.kept)
-		kept = append(kept, plan.notes...)
-		convention := stacks.ConventionProject{Dir: p.Folder, Name: p.Name, BunBuild: plan.bunBuild}
+		convention := stacks.ConventionProject{Dir: p.Folder, Name: p.Name}
 		if published[p.Folder] {
 			convention.PublishedBy = detect.Config
 		}
+		plan := planImport(root, p, scripts(root, p.Folder), convention.PublishedBy)
+		pkg.Extension, pkg.Also, pkg.Disabled = plan.extension, plan.also, plan.disabled
+		pkg.Edit = plan.edit
+		kept = append(kept, plan.notes...)
+		lintMoved = lintMoved || plan.lintMoved
+		convention.BunBuild = plan.bunBuild
 		conventions = append(conventions, convention)
 		packages = append(packages, pkg)
 	}
@@ -143,6 +146,9 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 		result.Warnings = append(result.Warnings, warnings...)
 		result.Warnings = append(result.Warnings, kept...)
 		result.Warnings = append(result.Warnings, unmappedScripts(root, detection.Projects)...)
+		if lintMoved {
+			result.Warnings = append(result.Warnings, stacks.LintDependentsNote)
+		}
 		return result, nil
 	}
 	if _, ok := commands[stacks.TaskTest]; ok {
@@ -174,26 +180,54 @@ type importPlan struct {
 	// bunBuild reports a build script the TypeScript extension builds with
 	// Bun.
 	bunBuild bool
+	// lintMoved reports a lint script that moved; testMoved a test script
+	// that moved, which type-checked nothing.
+	lintMoved, testMoved bool
+}
+
+// edit writes the steps of the tasks that stay on Rush and the options of
+// the TypeScript tasks that moved.
+func (plan importPlan) edit(doc map[string]any) {
+	rushxSteps.edit(plan.kept)(doc)
+	stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
+}
+
+// retractEdit removes from a delegated or former project what an import
+// wrote: the rushx steps and the options of the tasks that moved.
+func retractEdit(doc map[string]any) {
+	importPlan{}.edit(doc)
 }
 
 // planImport maps the build, test and lint scripts of a project: a script
 // whose tool the TypeScript extension runs moves to it, any other keeps
-// running with rushx, and a task with no script is disabled.
-func planImport(p detect.Project, scripts map[string]string) importPlan {
+// running with rushx, and a task with no script is disabled. A Bun build
+// moves only when it writes the entries the project's package.json names;
+// publishedBy names what publishes the project, or is empty.
+func planImport(root string, p detect.Project, scripts map[string]string, publishedBy string) importPlan {
 	plan := importPlan{extension: TypeScriptExtension}
 	var moved []string
 	for _, task := range graphJobs {
 		script, ok := scripts[task]
+		keeps := fmt.Sprintf("it keeps running through Rush, with rushx %s", task)
+		reason := ""
+		switch {
+		case !ok:
+		case !stacks.TypeScriptRuns(task, script):
+			reason = stacks.TypeScriptUnmappedReason(task, script, keeps)
+		case task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script):
+			reason = stacks.BunBuildKeptReason(root, p.Folder, publishedBy, keeps)
+		}
 		switch {
 		case !ok:
 			plan.disabled = append(plan.disabled, task)
-		case stacks.TypeScriptRuns(task, script):
+		case reason == "":
 			moved = append(moved, task)
 			plan.bunBuild = plan.bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
+			plan.lintMoved = plan.lintMoved || task == stacks.TaskLint
+			plan.testMoved = plan.testMoved || task == stacks.TaskTest
 		default:
 			plan.kept = append(plan.kept, task)
-			plan.notes = append(plan.notes, fmt.Sprintf("not mapped: the %s script of %s: %s", task, p.Name,
-				stacks.TypeScriptUnmappedReason(task, script, fmt.Sprintf("it keeps running through Rush, with rushx %s", task))))
+			plan.notes = append(plan.notes, fmt.Sprintf("not mapped: the %s script of %s: %s", task, p.Name, reason))
 		}
 	}
 	if len(plan.kept) == 0 {
@@ -279,7 +313,7 @@ func graphSync(detection detect.Detection) stacks.GraphSync {
 		// run it, each task that stays on Rush or moves to the TypeScript
 		// extension.
 		Jobs:    graphJobs,
-		Retract: rushxSteps.edit(nil),
+		Retract: retractEdit,
 	}
 }
 

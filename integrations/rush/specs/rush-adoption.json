@@ -80,6 +80,14 @@
         "In import mode, the sync adds exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json whose build script runs bun build, that declares no exports, names a file outside src/ there, holds src/index.ts and that rush.json does not publish, and writes a tsconfig.json extending the root's where a project holds no tsconfig*.json.",
         "It keeps every other byte, warns about each file it writes and each manifest it cannot edit, and a dry sync shows each diff."
       ]
+    },
+    {
+      "id": "a-moved-task-does-what-its-script-did",
+      "text": [
+        "In import mode, a script that moves to @putnami/typescript does what it did: a test script moves with options[\"@putnami/typescript:test\"].types false, since the script type-checked nothing.",
+        "A bun build script moves only when Putnami's Bun build writes the entries the package.json names: none outside src/, or entries D-066 rewrites; otherwise it stays on Rush and the sync says why.",
+        "When a lint moves, the sync says that putnami lint --impacted lints the projects a change touches, not their dependents."
+      ]
     }
   ],
   "decisions": [
