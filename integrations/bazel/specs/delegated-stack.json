@@ -40,7 +40,8 @@
     {
       "id": "tasks-delegate-to-bazel",
       "text": [
-        "Each task compares bazel --version with .bazelversion, then runs at the workspace root bazel test --build_event_json_file=<output>/build-events.json //<package>:all, or bazel build //<package>:all, where :all names the rules of one package.",
+        "Each task compares bazel --version with .bazelversion, then runs at the workspace root bazel test or bazel build on //<package>:all, the rules of one package; test writes a build-event file into its output.",
+        "Both pass --instrumentation_filter=^//, so Bazel keeps its analysis cache.",
         "Each task depends only on its package's graph step, which runs no bazel.",
         "Putnami's cache is off for every task, and the result records delegatedTo bazel.",
         "A failing step fails with stacks.step_failed."
@@ -49,7 +50,7 @@
     {
       "id": "reports-become-the-summary",
       "text": [
-        "After its steps, whatever their outcome, the test task copies the test.xml and LCOV coverage.dat of each test run the build-event file lists and reads them into the test and coverage summary, merging a source file across runs; a coverage.dat that is no LCOV tracefile is skipped with a warning.",
+        "After its steps, whatever their outcome, the test task copies the test.xml and LCOV coverage.dat of each test run the build-event file lists, the coverage of the package's sources alone, and reads them into the test and coverage summary, merging a source across runs; a non-LCOV coverage.dat is skipped with a warning.",
         "It never removes a Bazel output.",
         "A failed case fails the task with stacks.test_failed, a run with no JUnit report with stacks.report_missing, and a missing coverage report fails nothing."
       ]

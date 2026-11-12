@@ -184,7 +184,7 @@
       }
     },
     "test-run": {
-      "description": "Run bazel test //<package>:all in the workspace root for one package, after the Bazel version check, with a build-event file in the command output; then copy the test.xml and the LCOV coverage.dat of each test run the build-event file lists into the command output and read them. A coverage.dat that is no LCOV tracefile is skipped with a warning. A failed case, a step that exits non-zero, or a missing JUnit report fails the task. Putnami's cache is off: Bazel's cache decides what reruns, and Bazel's outputs are never removed.",
+      "description": "Run bazel test --instrumentation_filter=^// //<package>:all in the workspace root for one package, after the Bazel version check, with a build-event file in the command output; then copy the test.xml and the LCOV coverage.dat of each test run the build-event file lists into the command output, keeping the coverage of the package's own sources, and read them. A coverage.dat that is no LCOV tracefile is skipped with a warning. A failed case, a step that exits non-zero, or a missing JUnit report fails the task. Putnami's cache is off: Bazel's cache decides what reruns, and Bazel's outputs are never removed.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -236,7 +236,7 @@
       }
     },
     "build-run": {
-      "description": "Run bazel build //<package>:all in the workspace root for one package, after the Bazel version check. Putnami's cache is off: Bazel's cache decides what reruns.",
+      "description": "Run bazel build --instrumentation_filter=^// //<package>:all in the workspace root for one package, after the Bazel version check, with the filter of the test command so that Bazel keeps its analysis cache between them. Putnami's cache is off: Bazel's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

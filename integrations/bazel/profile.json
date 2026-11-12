@@ -15,10 +15,10 @@
   "tasks": {
     "test": {
       "steps": [
-        ["bazel", "test", "--build_event_json_file={output}/build-events.json", "//{component}:all"]
+        ["bazel", "test", "--instrumentation_filter=^//", "--build_event_json_file={output}/build-events.json", "//{component}:all"]
       ],
       "reportSteps": [
-        ["{runtime}", "collect-reports", "--events", "{output}/build-events.json", "--root", "{root}", "--into", "{output}/reports"]
+        ["{runtime}", "collect-reports", "--events", "{output}/build-events.json", "--root", "{root}", "--package", "{component}", "--into", "{output}/reports"]
       ],
       "inputs": ["sources"],
       "dir": "root",
@@ -29,7 +29,7 @@
     },
     "build": {
       "steps": [
-        ["bazel", "build", "//{component}:all"]
+        ["bazel", "build", "--instrumentation_filter=^//", "//{component}:all"]
       ],
       "inputs": ["sources"],
       "dir": "root"

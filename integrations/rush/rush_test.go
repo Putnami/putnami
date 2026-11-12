@@ -449,18 +449,23 @@ func TestATaskRunsRushOnItsProjectAndRecordsTheDelegation(t *testing.T) {
 	root := repository(t, d, ModeDelegate, true)
 	rootReal, _ := filepath.EvalSymlinks(root)
 
-	for task, want := range map[string]string{
-		stacks.TaskBuild: "rush build --to @demo/pricing",
-		stacks.TaskTest:  "rush test --to @demo/pricing",
-		stacks.TaskLint:  "rush lint --to @demo/pricing",
-	} {
-		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
-		status, data, events := runJob(t, root, "libs/pricing", task)
-		if status != "OK" || data["delegatedTo"] != "rush" {
-			t.Errorf("%s: status %s, data %v, events %s", task, status, data, events)
-		}
-		if log := stubLog(t); len(log) != 1 || log[0] != rootReal+" "+want {
-			t.Errorf("%s ran %q, want %q in %s", task, log, want, rootReal)
+	// A build selects its project and the projects upstream of it, which it
+	// needs built; a lint or a test selects its project alone, so @demo/api
+	// never lints or tests @demo/pricing, which it depends on.
+	for _, project := range []struct{ dir, name string }{{"libs/pricing", "@demo/pricing"}, {"apps/api", "@demo/api"}} {
+		for task, want := range map[string]string{
+			stacks.TaskBuild: "rush build --to " + project.name,
+			stacks.TaskTest:  "rush test --only " + project.name,
+			stacks.TaskLint:  "rush lint --only " + project.name,
+		} {
+			t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
+			status, data, events := runJob(t, root, project.dir, task)
+			if status != "OK" || data["delegatedTo"] != "rush" {
+				t.Errorf("%s %s: status %s, data %v, events %s", project.name, task, status, data, events)
+			}
+			if log := stubLog(t); len(log) != 1 || log[0] != rootReal+" "+want {
+				t.Errorf("%s %s ran %q, want %q in %s", project.name, task, log, want, rootReal)
+			}
 		}
 	}
 
