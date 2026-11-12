@@ -209,8 +209,10 @@ func collectPipelineStepClosure(
 // auto-plans build and package for each project that has publish jobs,
 // then wires up the dependency so all publish steps wait for the prerequisite
 // command's leaf steps to complete. A dependency on one step ("build~describe")
-// plans the whole command too. Session-scoped dependencies ("!build") are
-// handled separately by emitSessionCommandDeps.
+// plans the whole command too. A dependency on the dependency closure
+// ("^client-generate") plans the command in every project the dependent's
+// project depends on, directly or transitively. Session-scoped dependencies
+// ("!build") are handled separately by emitSessionCommandDeps.
 func emitCommandDeps(
 	allJobs *[]*jobmodel.ScheduledJob,
 	ws *workspace.Workspace,
@@ -232,6 +234,14 @@ func emitCommandDeps(
 		existing[j.Key()] = true
 	}
 
+	queued := make(map[string]bool)
+	queue := func(proj *workspace.Project, depCmd string) {
+		if proj == nil || queued[depCmd+"\x00"+proj.ID] {
+			return
+		}
+		queued[depCmd+"\x00"+proj.ID] = true
+		needed[depCmd] = append(needed[depCmd], projCmd{proj: proj, cmdName: depCmd})
+	}
 	for _, job := range *allJobs {
 		if len(job.JobDef.CommandDependsOn) == 0 {
 			continue
@@ -242,16 +252,12 @@ func emitCommandDeps(
 			if dep.Session || depCmd == "" {
 				continue
 			}
-			// Check if we already queued this
-			alreadyQueued := false
-			for _, pc := range needed[depCmd] {
-				if pc.proj.ID == job.Project.ID {
-					alreadyQueued = true
-					break
-				}
+			if !dep.Dependencies {
+				queue(job.Project, depCmd)
+				continue
 			}
-			if !alreadyQueued {
-				needed[depCmd] = append(needed[depCmd], projCmd{proj: job.Project, cmdName: depCmd})
+			for _, id := range dependencyClosureOf(ws, job.Project.ID) {
+				queue(ws.ProjectByID(id), depCmd)
 			}
 		}
 	}
@@ -1162,7 +1168,7 @@ func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace)
 	// Resolve command-level dependencies: each root step of a command
 	// (step with no intra-pipeline deps) gets dependencies on the leaf
 	// steps of each prerequisite command in the same project.
-	resolveCommandDeps(jobs, commandLeaves)
+	resolveCommandDeps(jobs, commandLeaves, ws)
 	resolveSessionCommandDeps(jobs, commandLeaves)
 
 	for _, job := range jobs {
@@ -1396,10 +1402,23 @@ func computeCommandLeaves(jobs []*jobmodel.ScheduledJob) map[string][]string {
 	return result
 }
 
+// dependencyClosureOf returns every project the project depends on, directly
+// or transitively, without the project itself, sorted: the projects a
+// `^command` dependency plans its command in.
+func dependencyClosureOf(ws *workspace.Workspace, projectID string) []string {
+	if ws == nil || ws.Graph == nil {
+		return nil
+	}
+	closure := ws.Graph.TransitiveDependenciesOf(ws.Graph.DependenciesOf(projectID))
+	return slices.DeleteFunc(closure, func(id string) bool { return id == projectID })
+}
+
 // resolveCommandDeps wires command-level dependsOn into job-level deps.
 // For each job whose command has CommandDependsOn, its root steps (steps
 // with no intra-pipeline deps) get dependencies on the leaf steps of
-// each prerequisite command in the same project.
+// each prerequisite command in the same project, or, for a dependency on the
+// dependency closure ("^client-generate"), in every project dependencyClosureOf
+// returns.
 //
 // A dependency on one step ("build~describe") depends instead on the planned
 // jobs of the project that are that step of that command, whichever extension
@@ -1408,7 +1427,7 @@ func computeCommandLeaves(jobs []*jobmodel.ScheduledJob) map[string][]string {
 // does not depend on, by an order-only edge (SerializeAfter), so it runs where
 // a dependency on the whole command runs it. That edge keeps a leaf's files
 // only when the dependent's key reads a file the leaf writes (CLI ADR 0082).
-func resolveCommandDeps(jobs []*jobmodel.ScheduledJob, leaves map[string][]string) {
+func resolveCommandDeps(jobs []*jobmodel.ScheduledJob, leaves map[string][]string, ws *workspace.Workspace) {
 	var stepJobs func(projectID, command, step string) []string
 	for _, job := range jobs {
 		if len(job.JobDef.CommandDependsOn) == 0 {
@@ -1431,6 +1450,12 @@ func resolveCommandDeps(jobs []*jobmodel.ScheduledJob, leaves map[string][]strin
 		for _, rawDep := range job.JobDef.CommandDependsOn {
 			dep := extension.ParseCommandDependency(rawDep)
 			if dep.Session || dep.Command == "" {
+				continue
+			}
+			if dep.Dependencies {
+				for _, id := range dependencyClosureOf(ws, job.Project.ID) {
+					job.DependsOn = append(job.DependsOn, leaves[id+":"+dep.Command]...)
+				}
 				continue
 			}
 			commandLeaves := leaves[job.Project.ID+":"+dep.Command]

@@ -99,8 +99,9 @@ func (c AgentContentContribution) Packaged() bool {
 }
 
 // RequiredCLIContract returns the lowest CLI contract whose vocabulary covers
-// the manifest: BuildGraphEdgesContract for a workspace adapter that declares
-// buildGraphEdges, UserScopeSkillsContract for agent content that names
+// the manifest: DependencyClosureContract for a command that depends on a
+// command across its project's dependency closure, BuildGraphEdgesContract for
+// a workspace adapter that declares buildGraphEdges, UserScopeSkillsContract for agent content that names
 // user-scope skills, ProviderContract for a providers section, StepDependencyContract
 // for a command that depends on one step of another command,
 // HostHooksContract for a hostHooks member, ChangedFilesContract
@@ -198,6 +199,12 @@ func RequiredLoadContract(m *Manifest) int {
 	// the step form, whatever origin the manifest loads from.
 	if DeclaresStepDependency(m) {
 		required = max(required, protocolcli.StepDependencyContract)
+	}
+	// A dependency across the dependency closure plans its command only in a
+	// reader that reads the closure form, whatever origin the manifest loads
+	// from.
+	if DeclaresDependencyClosure(m) {
+		required = max(required, protocolcli.DependencyClosureContract)
 	}
 	// A user-scope skill reaches the user's home only through a reader that
 	// writes it, whatever origin the manifest loads from.

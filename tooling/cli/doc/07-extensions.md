@@ -373,7 +373,8 @@ tasks receive job-context `invocation.artifactRoot` and the matching
 Command-level `dependsOn` auto-plans prerequisite commands. Bare command names
 are scoped to the same project; `command~step` is scoped to the same project
 and waits for that one step of the command; `!command` is a session barrier
-across the current project selection:
+across the current project selection; `^command` runs the command in every
+project the dependent's project depends on, directly or transitively:
 
 ```json
 {
@@ -388,6 +389,11 @@ files, and runs after the other `build` leaf steps through order-only edges. A
 step the plan does not hold adds no dependency, and the order-only edges
 remain. A manifest that uses the form requires `cliContract: 18`, and
 `!command~step` is invalid.
+
+`^client-generate` plans `client-generate` in each project of the dependency
+closure that runs it, and every root step of the dependent command waits for
+those leaf steps. A manifest that uses the form requires `cliContract: 22`, and
+`^command~step` is invalid.
 
 `!build` plans `build` across the selected projects, then every root step of
 the dependent command waits for every `build` leaf job in the final plan. These

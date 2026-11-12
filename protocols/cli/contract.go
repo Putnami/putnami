@@ -320,7 +320,16 @@ const UserScopeSkillsContract = 20
 // every answer that names it, refuses the stamp instead.
 const BuildGraphEdgesContract = 21
 
+// DependencyClosureContract is required by a manifest whose command depends on
+// a command across its project's dependency closure (`^<command>` in a
+// command's dependsOn). A reader at this contract plans the prerequisite
+// command in every project the dependent's project depends on, directly or
+// transitively, and makes the dependent's root steps depend on each one's
+// leaf steps, so an older reader, which would read the entry as a pipeline
+// step reference and plan nothing, refuses the stamp instead.
+const DependencyClosureContract = 22
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = BuildGraphEdgesContract
+const LatestContract = DependencyClosureContract

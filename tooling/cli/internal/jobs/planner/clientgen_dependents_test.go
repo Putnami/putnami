@@ -99,6 +99,23 @@ func planReaches(edges map[string][]string, from, to string) bool {
 	return false
 }
 
+// goWithoutClosureDependencies is the Go extension with no `^command`
+// dependency. Its lint and validate then reach the client's generator through
+// nothing but the dependents rule, so the fixture keeps the race the rule
+// closes.
+func goWithoutClosureDependencies(goExtension *extension.ExtensionDescription) *extension.ExtensionDescription {
+	stripped := *goExtension
+	stripped.Jobs = make(map[string]*extension.JobDefinition, len(goExtension.Jobs))
+	for name, job := range goExtension.Jobs {
+		copied := *job
+		copied.CommandDependsOn = slices.DeleteFunc(slices.Clone(job.CommandDependsOn), func(dependency string) bool {
+			return extension.ParseCommandDependency(dependency).Dependencies
+		})
+		stripped.Jobs[name] = &copied
+	}
+	return &stripped
+}
+
 // TestPlan_DependentsWaitForTheGeneratedClientWriter is the acceptance of the
 // dependents rule against the REAL Go and clientgen manifests. Every job of a
 // project that depends on the client runs after the client's generators, the
@@ -108,11 +125,13 @@ func planReaches(edges map[string][]string, from, to string) bool {
 // rule closes. A plan of client-generate and build alone shows no race: the
 // consumer's build waits for the client's build, which depends on
 // client-generate, so each command set here plans a consumer job that reaches
-// the client through no build.
+// the client through no build. The Go extension's lint and validate also run
+// client-generate across the dependency closure, which orders them too, so the
+// fixture strips that dependency to keep the race.
 func TestPlan_DependentsWaitForTheGeneratedClientWriter(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "dependents-wait-for-an-output-they-read",
 		"every-dependent-job-waits-for-the-generated-client-writer")
-	goExtension := loadGoPlannerExtension(t)
+	goExtension := goWithoutClosureDependencies(loadGoPlannerExtension(t))
 	for _, commands := range [][]string{{"client-generate", "lint"}, {"lint", "test", "build", "validate"}} {
 		t.Run(commands[0]+"-"+commands[len(commands)-1], func(t *testing.T) {
 			ws, selected := dependentsWorkspace(t)

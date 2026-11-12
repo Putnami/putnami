@@ -83,7 +83,8 @@ type taskIndex struct {
 	// that depends on it, transitively and sorted.
 	closure map[string][]string
 	// reachedBy maps a task scope to the task scopes of a DEPENDENT project
-	// that name it through a `^` step reference, sorted.
+	// that name it through a `^` step reference or a `^command` dependency,
+	// sorted.
 	reachedBy map[string][]string
 	// reachedByAny is the union of reachedBy's values: what a project that runs
 	// every task carries across an edge.
@@ -277,10 +278,20 @@ func (idx *taskIndex) addExtension(
 		// A session barrier ("!cmd") orders two commands across the session
 		// and carries no data, so it is not an impact edge. A dependency on
 		// one step ("cmd~step") links the whole command, which widens the
-		// closure and never narrows it.
+		// closure and never narrows it. A dependency on the dependency
+		// closure ("^cmd") reads the command in other projects, so it is
+		// linked across projects (linkCommandDeps).
 		for _, rawPrerequisite := range job.CommandDependsOn {
 			prerequisite := extension.ParseCommandDependency(rawPrerequisite)
 			if prerequisite.Session || prerequisite.Command == "" {
+				continue
+			}
+			if prerequisite.Dependencies {
+				dependent := dependencyClosureKey + command
+				if commandDeps[dependent] == nil {
+					commandDeps[dependent] = make(map[string]bool)
+				}
+				commandDeps[dependent][prerequisite.Command] = true
 				continue
 			}
 			if commandDeps[command] == nil {
@@ -312,13 +323,34 @@ func withDeclaringExtension(job *extension.JobDefinition, ext *extension.Extensi
 	return &named
 }
 
+// dependencyClosureKey prefixes a command in commandDeps whose prerequisites
+// run across its project's dependency closure (`^command`).
+const dependencyClosureKey = "^"
+
 // linkCommandDeps turns each command-level prerequisite into intra-project task
 // edges. The planner makes a command's root steps depend on the prerequisite
 // command's leaf steps in the same project; every pair is linked here rather
 // than the exact roots and leaves, which widens the closure and never narrows
 // it.
+//
+// A prerequisite across the dependency closure (`^command`) runs in the
+// projects the dependent's project depends on, transitively. Each of its task
+// scopes reaches the dependent command's scopes in a dependent project, and
+// reaches itself, so the change travels on to every project further up the
+// closure, as a closure port does.
 func (idx *taskIndex) linkCommandDeps(successors map[string]map[string]bool, commandDeps map[string]map[string]bool) {
 	for command, prerequisites := range commandDeps {
+		if dependent, closure := strings.CutPrefix(command, dependencyClosureKey); closure {
+			for prerequisite := range prerequisites {
+				for _, before := range idx.byCommand[prerequisite] {
+					register(idx.reachedBy, before, before)
+					for _, after := range idx.byCommand[dependent] {
+						register(idx.reachedBy, before, after)
+					}
+				}
+			}
+			continue
+		}
 		for prerequisite := range prerequisites {
 			for _, before := range idx.byCommand[prerequisite] {
 				for _, after := range idx.byCommand[command] {

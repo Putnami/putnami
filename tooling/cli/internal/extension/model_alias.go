@@ -274,7 +274,8 @@ var IsExternalRef = model.IsExternalRef
 // CommandDependency is one entry of a command's dependsOn, parsed.
 type CommandDependency = model.CommandDependency
 
-// ParseCommandDependency reads `command`, `command~step` or `!command`.
+// ParseCommandDependency reads `command`, `command~step`, `!command` or
+// `^command`.
 var ParseCommandDependency = model.ParseCommandDependency
 
 // ExpandedStep is the result of expanding a pipeline step into a job definition.

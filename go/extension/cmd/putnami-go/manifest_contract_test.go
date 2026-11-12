@@ -2867,8 +2867,9 @@ func TestRaceStepIsGatedBoundAndKeyedOnTheChangedFiles(t *testing.T) {
 	if task.Declares == nil || len(task.Declares.Outputs) > 0 || task.Batchable != nil {
 		t.Errorf("test-race-exec declares %+v, batchable %+v; want no output and no batch", task.Declares, task.Batchable)
 	}
-	if m.CLIContract != proto.RequiredCLIContract(m) || m.CLIContract != protocolcli.ChangedFilesContract {
-		t.Errorf("cliContract = %d, want %d, the rung of the changed-files gate", m.CLIContract, protocolcli.ChangedFilesContract)
+	if m.CLIContract != proto.RequiredCLIContract(m) || m.CLIContract < protocolcli.ChangedFilesContract {
+		t.Errorf("cliContract = %d, want the manifest's required rung, at least %d, the rung of the changed-files gate",
+			m.CLIContract, protocolcli.ChangedFilesContract)
 	}
 }
 

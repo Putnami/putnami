@@ -231,7 +231,8 @@
             "write-serialization-stays-separate-from-functional-deps",
             "a-missing-selected-command-is-rejected",
             "runner-publication-functional-gates",
-            "a-step-dependency-reads-one-step-and-runs-after-the-command"
+            "a-step-dependency-reads-one-step-and-runs-after-the-command",
+            "a-closure-dependency-plans-the-command-across-the-dependency-closure"
           ]
         }
       },

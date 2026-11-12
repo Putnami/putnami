@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/go",
-  "cliContract": 16,
+  "cliContract": 22,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -223,7 +223,7 @@
       ]
     },
     "lint": {
-      "dependsOn": ["client-generate"],
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Lint Go code with golangci-lint and staticcheck.",
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
@@ -279,6 +279,7 @@
       ]
     },
     "validate": {
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Hold the breaking-change marker: for a Go project the root putnami.support.json lists as stable, or every Go project when the workspace has no catalog, compare the exported API, and the command-surface document a project that ships a CLI declares, with the last tag of the project's version line. An incompatible change fails unless a commit since that tag declares a breaking change with \"!\" or a BREAKING CHANGE: footer.",
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {

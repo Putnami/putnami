@@ -34,6 +34,9 @@ func TestParseCommandDependency(t *testing.T) {
 		"!publish":              {Command: "publish", Session: true},
 		"!build~describe":       {Command: "build", Step: "describe", Session: true},
 		"build~describe~schema": {Command: "build", Step: "describe~schema"},
+		"^client-generate":      {Command: "client-generate", Dependencies: true},
+		"^build~describe":       {Command: "build", Step: "describe", Dependencies: true},
+		"!^build":               {Command: "^build", Session: true},
 		"":                      {},
 	}
 	for entry, want := range cases {
@@ -121,18 +124,55 @@ func TestMalformedStepDependencyAtItsContractIsRefused(t *testing.T) {
 // at any stamp, with the entry's field.
 func TestValidateManifest_StepDependencyForms(t *testing.T) {
 	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "each-counter-example-reports-its-exact-codes")
-	m := stepDependencyManifest(protocolcli.StepDependencyContract, "build", "build~describe", "!lint")
+	m := stepDependencyManifest(protocolcli.DependencyClosureContract, "build", "build~describe", "!lint", "^client-generate")
 	if diags := ValidateManifest(m); diag.HasErrors(diags) {
-		t.Fatalf("command, command~step and !command must validate: %v", diags)
+		t.Fatalf("command, command~step, !command and ^command must validate: %v", diags)
 	}
-	invalid := []string{"~describe", "build~", "build~describe~schema", "!build~describe", "build~^describe", "^build~describe", "/build~describe"}
-	errors := diag.Errors(ValidateManifest(stepDependencyManifest(protocolcli.StepDependencyContract, invalid...)))
+	invalid := []string{"~describe", "build~", "build~describe~schema", "!build~describe", "build~^describe", "^build~describe", "/build~describe",
+		"^", "^!build", "!^build", "^^build"}
+	errors := diag.Errors(ValidateManifest(stepDependencyManifest(protocolcli.DependencyClosureContract, invalid...)))
 	if len(errors) != len(invalid) {
 		t.Fatalf("errors = %v, want one per invalid entry %v", errors, invalid)
 	}
 	for i, d := range errors {
 		if d.Code != "invalid-command-dependency" || d.Field != fmt.Sprintf("commands.clientgen.dependsOn[%d]", i) {
 			t.Errorf("error %d = %s %s, want invalid-command-dependency at dependsOn[%d]", i, d.Code, d.Field, i)
+		}
+	}
+}
+
+// A dependency on the dependency closure requires rung 22 from every origin,
+// a manifest stamped 22 loads it intact, and one stamped below is refused for
+// it with the remedy that moves it: an older reader would read the entry as a
+// pipeline-step reference and plan nothing.
+func TestDependencyClosureRequiresItsContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
+	m := stepDependencyManifest(protocolcli.DependencyClosureContract, "client-generate", "^client-generate")
+	if !DeclaresDependencyClosure(m) {
+		t.Fatal("DeclaresDependencyClosure = false for a command that depends on ^client-generate")
+	}
+	if got := RequiredCLIContract(m); got != protocolcli.DependencyClosureContract {
+		t.Errorf("RequiredCLIContract = %d, want %d", got, protocolcli.DependencyClosureContract)
+	}
+	loaded, err := NegotiateManifest("x.json", marshalManifest(t, m))
+	if err != nil {
+		t.Fatalf("a manifest stamped 22 must load: %v", err)
+	}
+	if got := loaded.Commands["clientgen"].DependsOn; len(got) != 2 || got[1] != "^client-generate" {
+		t.Errorf("loaded dependsOn = %v, want [client-generate ^client-generate]", got)
+	}
+	if DeclaresDependencyClosure(stepDependencyManifest(protocolcli.CurrentContract, "build", "!lint", "build~describe")) || DeclaresDependencyClosure(nil) {
+		t.Error("DeclaresDependencyClosure = true for a manifest with no ^ entry")
+	}
+	for _, stamp := range []int{protocolcli.CurrentContract, protocolcli.DependencyClosureContract - 1} {
+		_, err := NegotiateManifest("x.json", marshalManifest(t, stepDependencyManifest(stamp, "^client-generate")))
+		if err == nil {
+			t.Fatalf("stamp %d loaded a manifest that depends on ^client-generate", stamp)
+		}
+		for _, want := range []string{"requires 22 for a dependency on a command across the dependency closure", "putnami extensions update"} {
+			if !strings.Contains(err.Error(), want) {
+				t.Errorf("stamp %d: error %q does not say %q", stamp, err, want)
+			}
 		}
 	}
 }

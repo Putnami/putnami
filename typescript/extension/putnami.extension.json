@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/typescript",
-  "cliContract": 13,
+  "cliContract": 22,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-ts",
@@ -711,12 +711,13 @@
       ]
     },
     "validate": {
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Hold the breaking-change marker: for a TypeScript package the root putnami.support.json lists as stable, or every TypeScript package when the workspace has no catalog, compare what the entry points of its package.json export with the last release of the project's version line. An incompatible change fails unless a commit since that release declares a breaking change with \"!\" or a BREAKING CHANGE: footer.",
       "activationFiles": ["package.json"],
       "run": [{ "id": "api", "task": "validate-api" }]
     },
     "lint": {
-      "dependsOn": ["client-generate"],
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Lint and format project code.",
       "activationFiles": [
         "**/*.ts",

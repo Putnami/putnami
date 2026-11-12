@@ -306,6 +306,16 @@ the source of the build tool a delegated stack runs. A reader below 21
 strict-validates each probe answer and would reject one that names the
 source, so it refuses the stamp. The floor binds a manifest wherever it loads
 from. Only a manifest that declares the member is stamped 21.
+Contract `22` (`DependencyClosureContract`) is additive for a command's
+dependency on a command across its project's dependency closure:
+`dependsOn: ["^client-generate"]`. From 22 on, the planner plans the
+prerequisite command in every project the dependent's project depends on,
+directly or transitively, and every root step of the dependent command depends
+on each one's leaf steps. A project that does not run the command adds no
+dependency. A reader below 22 would read the entry as a pipeline-step
+reference, plan nothing and run the dependent before what it reads, so it
+refuses the stamp. The floor binds a manifest wherever it loads from. Only a
+manifest with such an entry is stamped 22.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

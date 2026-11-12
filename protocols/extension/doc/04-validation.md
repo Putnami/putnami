@@ -52,10 +52,11 @@ Pipeline step dependencies must form a directed acyclic graph:
 ```
 
 ### Command Dependencies
-A command's `dependsOn` entry is `command`, `command~step` or `!command`.
-Validation refuses every other spelling with `invalid-command-dependency`: a
-`^`, `/` or `*` prefix, an empty command or step, a second `~`, and a session
-barrier on one step:
+A command's `dependsOn` entry is `command`, `command~step`, `!command` or
+`^command`. Validation refuses every other spelling with
+`invalid-command-dependency`: a second prefix, a `/` or `*` prefix, an empty
+command or step, a second `~`, and a session barrier or a dependency closure on
+one step:
 
 ```json
 // INVALID: a session barrier names a whole command
@@ -296,8 +297,11 @@ changed files (`activation.changedFiles`) or binds them (`from: context`,
 that names one step of another command (`build~describe`),
 `protocols/cli.ProviderContract` (19) for a `providers` section,
 `protocols/cli.UserScopeSkillsContract` (20) for a non-empty
-`agentContent.userScope`, or `protocols/cli.BuildGraphEdgesContract` (21) for
-a workspace adapter that declares `buildGraphEdges`. Rung 6 named the
+`agentContent.userScope`, `protocols/cli.BuildGraphEdgesContract` (21) for
+a workspace adapter that declares `buildGraphEdges`, or
+`protocols/cli.DependencyClosureContract` (22) for a command `dependsOn` entry
+that names a command across the project's dependency closure
+(`^client-generate`). Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose
@@ -455,7 +459,9 @@ package job.
 | current | contract-16 manifest with an input binding the planner does not resolve: `from: command`, or a context path other than `selection.changedFiles` | Rejected for that binding. Strict validation refuses it at any stamp; a manifest stamped 15 or lower loads, and the binding binds nothing. |
 | current | contract-18 manifest whose command depends on `build~describe` | Loads; the planner plans all of `build` and the dependent's root steps wait for `describe` alone. A step the plan does not hold adds no edge. |
 | current | manifest whose command `dependsOn` holds `~`, stamped 17 or lower, or unstamped | Rejected for a dependency on one step of another command, with `putnami extensions update` as the remedy. |
-| current | contract-18 manifest with a command dependency that is not `command`, `command~step` or `!command` | Rejected for that entry. Strict validation refuses it at any stamp. |
+| current | contract-18 manifest with a command dependency that is not `command`, `command~step`, `!command` or `^command` | Rejected for that entry. Strict validation refuses it at any stamp. |
+| current | contract-22 manifest whose command depends on `^client-generate` | Loads; the planner plans `client-generate` in every project the dependent's project depends on, directly or transitively, and the dependent's root steps wait for each one's leaf steps. |
+| current | manifest whose command `dependsOn` starts with `^`, stamped 21 or lower, or unstamped | Rejected for a dependency on a command across the dependency closure, with `putnami extensions update` as the remedy. |
 | current | agent-content manifest stamped 4, or unstamped | Rejected: the stamp does not cover the contribution. |
 | current | manifest naming a registry dependency, stamped 7 or lower or unstamped, from the artifact store or a declared path | Rejected: the stamp does not cover the dependencies the CLI would install and load. |
 | current | contract-3 or lower manifest with a surface | Skipped, with the re-package/`putnami extensions update` remediation on the skip record; a contract-3 reader cannot represent `sessionPrerequisites`, so loading it would permit an ungated dependent command. |

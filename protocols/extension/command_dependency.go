@@ -15,6 +15,11 @@ const StepSeparator = "~"
 // prerequisite command runs across the run's project selection.
 const SessionBarrierPrefix = "!"
 
+// DependencyClosurePrefix marks a command dependency on the dependency
+// closure: the prerequisite command runs in every project the dependent's
+// project depends on, directly or transitively.
+const DependencyClosurePrefix = "^"
+
 // CommandDependency is one entry of a command's dependsOn, read by
 // ParseCommandDependency.
 type CommandDependency struct {
@@ -26,17 +31,25 @@ type CommandDependency struct {
 	// Session is true for a session barrier (`!command`): the prerequisite
 	// runs across the run's selection instead of the dependent's project.
 	Session bool
+	// Dependencies is true for a dependency on the dependency closure
+	// (`^command`): the prerequisite runs in every project the dependent's
+	// project depends on, directly or transitively, instead of the dependent's
+	// project.
+	Dependencies bool
 }
 
 // ParseCommandDependency reads one entry of a command's dependsOn: `command`,
-// `command~step` or `!command`. It splits at the first StepSeparator and
-// never fails; strict validation (validateCommandDependency) refuses the
-// entries that are not one of the three forms. Every reader of a command's
-// dependsOn uses it, so each one names the same command for an entry.
+// `command~step`, `!command` or `^command`. It reads one prefix, splits at the
+// first StepSeparator and never fails; strict validation
+// (validateCommandDependency) refuses the entries that are not one of the four
+// forms. Every reader of a command's dependsOn uses it, so each one names the
+// same command for an entry.
 func ParseCommandDependency(dependency string) CommandDependency {
 	parsed := CommandDependency{Command: dependency}
 	if rest, ok := strings.CutPrefix(dependency, SessionBarrierPrefix); ok {
 		parsed.Command, parsed.Session = rest, true
+	} else if rest, ok := strings.CutPrefix(dependency, DependencyClosurePrefix); ok {
+		parsed.Command, parsed.Dependencies = rest, true
 	}
 	if command, step, ok := strings.Cut(parsed.Command, StepSeparator); ok {
 		parsed.Command, parsed.Step = command, step
@@ -64,6 +77,25 @@ func DeclaresStepDependency(m *Manifest) bool {
 	return false
 }
 
+// DeclaresDependencyClosure reports whether a command of the manifest depends
+// on a command across its project's dependency closure: a dependsOn entry that
+// starts with DependencyClosurePrefix. It is the vocabulary of
+// protocolcli.DependencyClosureContract. A malformed entry with the prefix
+// counts too, so a manifest stamped below the contract never loads it.
+func DeclaresDependencyClosure(m *Manifest) bool {
+	if m == nil {
+		return false
+	}
+	for _, command := range m.Commands {
+		for _, dependency := range command.DependsOn {
+			if strings.HasPrefix(dependency, DependencyClosurePrefix) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 // validateManifestCommandDependencies runs validateCommandDependency over the
 // dependsOn of every command.
 func validateManifestCommandDependencies(m *Manifest) []diag.Diagnostic {
@@ -77,17 +109,22 @@ func validateManifestCommandDependencies(m *Manifest) []diag.Diagnostic {
 }
 
 // validateCommandDependency refuses a command dependency that is not
-// `command`, `command~step` or `!command`: a pipeline-step reference (a `^`,
-// `/` or `*` prefix), an empty command or step, a second separator, and a
-// session barrier on one step.
+// `command`, `command~step`, `!command` or `^command`: a second prefix or a
+// pipeline-step reference (a `/` or `*` prefix), an empty command or step, a
+// second separator, and a session barrier or a dependency closure on one
+// step.
 func validateCommandDependency(field, dependency string) []diag.Diagnostic {
 	parsed := ParseCommandDependency(dependency)
 	refuse := func(format string, args ...any) []diag.Diagnostic {
 		return []diag.Diagnostic{diag.Errorf("invalid-command-dependency", field, format, args...)}
 	}
 	switch {
-	case isExternalRef(parsed.Command):
-		return refuse("dependency %q uses pipeline-step syntax; command-level dependsOn accepts command, command~step or !command", dependency)
+	case isExternalRef(parsed.Command) || strings.HasPrefix(parsed.Command, SessionBarrierPrefix):
+		return refuse("dependency %q uses pipeline-step syntax; command-level dependsOn accepts command, command~step, !command or ^command", dependency)
+	case parsed.Dependencies && parsed.Command == "":
+		return refuse("dependency %q names no command; the form is ^command", dependency)
+	case parsed.Dependencies && strings.Contains(dependency, StepSeparator):
+		return refuse("dependency %q names a step across the dependency closure; ^command names a whole command", dependency)
 	case !strings.Contains(dependency, StepSeparator):
 		return nil
 	case parsed.Session:

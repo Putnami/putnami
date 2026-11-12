@@ -402,3 +402,31 @@ func TestTaskIndex_AVerdictPolicyIsReadOnlyByATaskThatNamesIt(t *testing.T) {
 		t.Error("a verdict policy is read as the extension runtime by a pattern that does not name it")
 	}
 }
+
+// A command that depends on another across the dependency closure
+// (`^client-generate`) runs in a dependent because the prerequisite moved in
+// a project it depends on, and the prerequisite travels on, so a project
+// further up the closure runs it too.
+func TestTaskIndex_AClosureDependencyReachesTheDependentCommandAndTravelsOn(t *testing.T) {
+	lint := taskIndexExtension()
+	lint.Jobs["lint"].CommandDependsOn = []string{"^client-generate"}
+	clientgen := &extension.ExtensionDescription{
+		Name: "@fixture/clientgen",
+		Tasks: map[string]extproto.TaskDefinition{"client-go": {Inputs: map[string]extproto.TaskInputPort{
+			"contract": {From: extproto.TaskInputFromProject, Files: []string{"clientgen.json"}},
+		}}},
+		Jobs: map[string]*extension.JobDefinition{
+			"client-generate": {CommandName: "client-generate", PipelineSteps: []extproto.PipelineStep{{ID: "go", Task: "client-go"}}},
+		},
+	}
+	idx := NewTaskIndex(taskIndexWorkspace(t, nil), []*extension.ExtensionDescription{lint, clientgen}, nil)
+	if idx == nil {
+		t.Fatal("NewTaskIndex returned nil")
+	}
+	if got, want := idx.TasksReachedFrom([]string{"client-generate~go"}), []string{"client-generate~go", "lint~lint"}; !slices.Equal(got, want) {
+		t.Errorf("client-generate~go reaches %v, want %v", got, want)
+	}
+	if got := idx.TasksReachedFrom([]string{"lint~lint"}); len(got) != 0 {
+		t.Errorf("lint~lint reaches %v, want nothing: the dependency points from client-generate to lint", got)
+	}
+}
