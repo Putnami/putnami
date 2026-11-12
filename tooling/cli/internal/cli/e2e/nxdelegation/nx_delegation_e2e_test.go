@@ -131,9 +131,10 @@ func nxWorkspace(t *testing.T, demo map[string]map[string]string, runtime string
 	return root
 }
 
-// stubNx puts first on PATH an npx that answers npx --no nx --version with
-// the demo's Nx version and, for npx --no nx run <project>:test, writes the
-// demo's reports of that project. It logs each call with its working
+// stubNx puts first on PATH an npx that answers npx --no -- nx --version with
+// the demo's Nx version, and npx --no nx --version with npm's version, as
+// npm's npx does. For npx --no nx run <project>:test, it writes the demo's
+// reports of that project. It logs each call with its working
 // directory and returns the log.
 func stubNx(t *testing.T, demo map[string]map[string]string) string {
 	t.Helper()
@@ -145,10 +146,27 @@ func stubNx(t *testing.T, demo map[string]map[string]string) string {
 	clitest.WriteFile(t, filepath.Join(bin, "npx"), `#!/bin/sh
 set -e
 echo "$(pwd) npx $*" >> '`+log+`'
-case "$3" in
+# npm's npx (7 and later) reads its own options until "--" or until a second
+# argument that is no option: "--no nx --version" asks npm for its version.
+own=yes
+words=0
+for arg do
+  [ "$own" = yes ] || break
+  case "$arg" in
+    --) own=no;;
+    --version) echo 10.9.9; exit 0;;
+    -*) ;;
+    *) words=$((words + 1)); [ "$words" -lt 2 ] || own=no;;
+  esac
+done
+[ "$1" = "--no" ] && shift
+[ "$1" = "--" ] && shift
+[ "$1" = "nx" ] || { echo "unexpected npx $*" >&2; exit 2; }
+shift
+case "$1" in
   --version) printf 'Nx Version:\n- Local: v21.0.0\n'; exit 0;;
   run)
-    case "$4" in
+    case "$2" in
       @demo/api:test) dir=apps/api;;
       @demo/pricing:test) dir=packages/pricing;;
       *) exit 0;;

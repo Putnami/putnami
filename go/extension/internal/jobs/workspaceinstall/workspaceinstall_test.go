@@ -926,10 +926,14 @@ func goLessJob(t *testing.T, workspace string) *installJob {
 // any Go project exists. On a host without Go, nothing pins a Go release for
 // the CLI to provision yet, and nothing needs one: the job succeeds without
 // Go, and the first Go project pins the release. A workspace that declares Go
-// and offers no go command fails, naming `putnami install` as the remedy.
+// and offers no go command fails, naming a step that provisions one:
+// `putnami install` when go.work declares the release, which the install pins
+// and provisions. A go.mod alone gives the lock no Go to pin, so the install
+// provisions none: the remedy names a go on PATH or a go.work declaration.
 func TestWorkspaceInstall_WithoutGoOrAGoDeclarationSkipsGo(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "install-without-go", "workspace-install-skips-go-when-nothing-declares-it")
 	spectest.Proves(t, "go/go-project-toolchain", "install-without-go", "a-declared-go-with-no-go-command-fails-naming-putnami-install")
+	spectest.Proves(t, "go/go-project-toolchain", "install-without-go", "an-unpinned-go-fails-naming-a-go-work-declaration")
 	t.Parallel()
 	workspace := jobtest.RealTempDir(t)
 	jobtest.WriteFile(t, workspace, "putnami.workspace.json", `{"name":"fresh","includes":[]}`+"\n")
@@ -953,11 +957,20 @@ func TestWorkspaceInstall_WithoutGoOrAGoDeclarationSkipsGo(t *testing.T) {
 		}
 	}
 
-	for name, declare := range map[string]func(ws string){
-		"go.work":     func(ws string) { jobtest.WriteFile(t, ws, "go.work", "go 1.22\n") },
-		"root go.mod": func(ws string) { jobtest.WriteFile(t, ws, "go.mod", "module example.com/root\n\ngo 1.22\n") },
-		"Go member":   func(ws string) { jobtest.WriteFile(t, ws, "web/go.mod", "module example.com/web\n\ngo 1.22\n") },
+	installRemedy := "the Go extension installs no Go; run `putnami install`, " +
+		"which provisions the Go the workspace lock pins under the Putnami home"
+	declarationRemedy := "the Go extension installs no Go, and the workspace lock pins none to provision; " +
+		"put a go that runs the Go release the workspace needs on PATH, or declare the Go release the workspace needs " +
+		"in go.work at the workspace root, which `putnami install` then pins and provisions under the Putnami home"
+	for name, tc := range map[string]struct {
+		declare func(ws string)
+		remedy  string
+	}{
+		"go.work":     {func(ws string) { jobtest.WriteFile(t, ws, "go.work", "go 1.22\n") }, installRemedy},
+		"root go.mod": {func(ws string) { jobtest.WriteFile(t, ws, "go.mod", "module example.com/root\n\ngo 1.22\n") }, declarationRemedy},
+		"Go member":   {func(ws string) { jobtest.WriteFile(t, ws, "web/go.mod", "module example.com/web\n\ngo 1.22\n") }, declarationRemedy},
 	} {
+		declare := tc.declare
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			workspace := jobtest.RealTempDir(t)
@@ -969,9 +982,8 @@ func TestWorkspaceInstall_WithoutGoOrAGoDeclarationSkipsGo(t *testing.T) {
 			if status := i.run(t, false); status != statusFailed {
 				t.Fatalf("workspace-install = %s, want FAILED:\n%s", status, i.rec.Transcript())
 			}
-			if !i.rec.Contains("the Go extension installs no Go; run `putnami install`, " +
-				"which provisions the Go the workspace lock pins under the Putnami home") {
-				t.Errorf("no diagnostic names `putnami install`:\n%s", i.rec.Transcript())
+			if !i.rec.Contains(tc.remedy) {
+				t.Errorf("no diagnostic names %q:\n%s", tc.remedy, i.rec.Transcript())
 			}
 			if got := i.rec.PhaseStatus("go"); got != "failed" {
 				t.Errorf("go phase = %q, want failed", got)

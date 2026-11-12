@@ -94,9 +94,10 @@ func repository(t *testing.T, d demo, mode string, extensions ...string) string 
 	return root
 }
 
-// stubNx puts first on PATH an npx that answers npx --no nx --version with
+// stubNx puts first on PATH an npx that answers npx --no -- nx --version with
 // the demo's Nx version and, for npx --no nx run <project>:test, writes the
-// demo's reports of that project. It logs each call, with its working
+// demo's reports of that project. Like npm's npx, it answers
+// npx --no nx --version with npm's version. It logs each call, with its working
 // directory, to $STUB_LOG.
 func stubNx(t *testing.T, d demo) {
 	t.Helper()
@@ -107,11 +108,27 @@ func stubNx(t *testing.T, d demo) {
 	script := `#!/bin/sh
 set -e
 echo "$(pwd) npx $*" >> "$STUB_LOG"
-[ "$1" = "--no" ] && [ "$2" = "nx" ] || { echo "unexpected npx $*" >&2; exit 2; }
-case "$3" in
+# npm's npx (7 and later) reads its own options until "--" or until a second
+# argument that is no option: "--no nx --version" asks npm for its version.
+own=yes
+words=0
+for arg do
+  [ "$own" = yes ] || break
+  case "$arg" in
+    --) own=no;;
+    --version) echo 10.9.9; exit 0;;
+    -*) ;;
+    *) words=$((words + 1)); [ "$words" -lt 2 ] || own=no;;
+  esac
+done
+[ "$1" = "--no" ] && shift
+[ "$1" = "--" ] && shift
+[ "$1" = "nx" ] || { echo "unexpected npx $*" >&2; exit 2; }
+shift
+case "$1" in
   --version) printf 'Nx Version:\n- Local: v%s\n- Global: Not found\n' "${STUB_VERSION:-21.0.0}"; exit 0;;
   run)
-    case "$4" in
+    case "$2" in
       @demo/api:test) dir=apps/api;;
       @demo/pricing:test) dir=packages/pricing;;
       *) exit "${STUB_EXIT:-0}";;
@@ -714,7 +731,7 @@ func TestATaskRunsNxRunOnItsProjectAndRecordsTheDelegation(t *testing.T) {
 			t.Errorf("%s: status %s, data %v, events %s", task, status, data, events)
 		}
 		log := stubLog(t)
-		if len(log) != 2 || !strings.HasSuffix(log[0], " npx --no nx --version") || log[1] != rootReal+" "+want {
+		if len(log) != 2 || !strings.HasSuffix(log[0], " npx --no -- nx --version") || log[1] != rootReal+" "+want {
 			t.Errorf("%s ran %q, want the version check then %q in %s", task, log, want, rootReal)
 		}
 	}

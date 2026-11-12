@@ -236,15 +236,20 @@ func execute(j *workspacejob.Job, force bool, contextOrigin string, members []st
 // selectGo records the go command the run uses (FindGoBinary): the Go the CLI
 // provisioned under the Putnami home and put first on PATH, or another go
 // that qualifies. The job installs none, and fails naming the remedy when no
-// go command qualifies. workspace-fetch runs no program from the workspace
-// tree, so it selects a go command outside the workspace.
+// go command qualifies: `putnami install` when it provisions a Go that
+// qualifies, else a go on PATH or the go.work declaration it would pin.
+// workspace-fetch runs no program from the workspace tree, so it selects a go
+// command outside the workspace.
 func (w *install) selectGo() bool {
 	if w.FindGoBinary() {
 		return true
 	}
+	requested := w.RequestedGoVersion()
 	missing := "No installed go command qualifies"
-	if requested := w.RequestedGoVersion(); requested != "" {
+	release := "the Go release the workspace needs"
+	if requested != "" {
 		missing = "No installed go command qualifies for Go " + requested
+		release = "Go " + requested
 	}
 	switch w.mode {
 	case modeFetch:
@@ -254,8 +259,16 @@ func (w *install) selectGo() bool {
 		w.Emit.Diagnostic("error", missing+", and module downloads are off on this run: "+
 			"the job installs no Go, so put the pinned Go on the runner's PATH, in GOROOT, or in the Putnami home", "", 0)
 	default:
-		w.Emit.Diagnostic("error", missing+": the Go extension installs no Go; "+
-			"run `putnami install`, which provisions the Go the workspace lock pins under the Putnami home", "", 0)
+		if w.InstallProvisionsGo(requested) {
+			w.Emit.Diagnostic("error", missing+": the Go extension installs no Go; "+
+				"run `putnami install`, which provisions the Go the workspace lock pins under the Putnami home", "", 0)
+			break
+		}
+		// The lock pins no Go and go.work declares none, so `putnami install`
+		// provisions none: naming it would send the user around in a circle.
+		w.Emit.Diagnostic("error", missing+": the Go extension installs no Go, and the workspace lock pins none to provision; "+
+			"put a go that runs "+release+" on PATH, or declare "+release+" in go.work at the workspace root, "+
+			"which `putnami install` then pins and provisions under the Putnami home", "", 0)
 	}
 	return false
 }

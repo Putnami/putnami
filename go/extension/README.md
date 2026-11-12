@@ -75,6 +75,8 @@ Go is auto-managed. If no `go` on the machine reports the release `putnami.lock.
 1. `go.work` directive at workspace root
 2. `go.mod` in the project directory
 
+The first `go` on `PATH` that meets the version runs, wherever it sits on `PATH`: an older `go` earlier on `PATH` does not hide it. Only a `go.work` declaration gives `putnami install` a release to pin and provision; with a `go.mod` alone and no qualifying `go` on `PATH`, declare the release in `go.work`.
+
 Lint tools are pinned in [`tools/versions.json`](./tools/versions.json), which is
 the machine-readable contract for CI images and setup scripts. `putnami install`
 warms one copy per machine under
