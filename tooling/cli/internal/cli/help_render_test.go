@@ -557,13 +557,24 @@ func TestEveryHelpSurfaceCoversEveryCatalogCommand(t *testing.T) {
 			if !strings.Contains(man, "\n.B "+name+"\n") {
 				t.Errorf("the man page does not list %q", name)
 			}
-			if !strings.Contains(markdown, "| `putnami "+name+"` |") {
+			if !strings.Contains(markdown, "| "+markdownCell("`putnami "+name+"`")+" |") {
 				t.Errorf("the Markdown reference does not list %q", name)
 			}
 		}
 	}
 	if rows == 0 {
 		t.Fatal("the catalog lists no command: the walk is wrong")
+	}
+
+	// Every table of the reference has two columns, so a row holds exactly
+	// three unescaped pipes; a pipe a cell leaves unescaped adds a column.
+	for _, line := range strings.Split(markdown, "\n") {
+		if !strings.HasPrefix(line, "|") {
+			continue
+		}
+		if separators := strings.Count(strings.ReplaceAll(line, `\|`, ""), "|"); separators != 3 {
+			t.Errorf("the Markdown reference row %q has %d cells, want 2", line, separators-1)
+		}
 	}
 
 	for _, command := range commandmeta.ReferenceCommands() {
