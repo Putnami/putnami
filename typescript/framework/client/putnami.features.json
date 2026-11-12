@@ -79,14 +79,14 @@
           }
         },
         {
-          "id": "canonical-generated-manifest",
+          "id": "canonical-generated-sources",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "manifest-hashes-the-canonical-biome-output",
-              "the-provider-local-biome-package-wins-over-the-client-fallback"
+              "the-emitted-sources-are-the-canonical-biome-output",
+              "the-format-projects-biome-package-wins-over-the-emitters-fallback"
             ]
           }
         },
@@ -191,7 +191,7 @@
             "kind": "acceptance",
             "checks": [
               "canonicalizes-project-generation-with-effective-biome-config",
-              "the-committed-typescript-client-is-in-sync-with-the-provider-spec"
+              "a-formatter-failure-preserves-the-existing-client"
             ]
           }
         },
@@ -423,7 +423,7 @@
               "entries-never-cross-a-forwarded-identity-or-outlive-the-registry",
               "the-cache-key-matches-the-shared-vectors",
               "the-runtime-implements-exactly-the-published-capabilities",
-              "the-emitted-ts-client-pins-the-response-cache-capability-and-its-manifest-declares-the-policy"
+              "the-emitted-ts-client-pins-the-response-cache-capability"
             ]
           }
         },
@@ -560,18 +560,6 @@
               "stream-headers-use-each-transports-declared-carrier",
               "binding-headers-match-the-shared-corpus",
               "the-emitted-typescript-client-carries-binding-headers-beside-forwarded-users"
-            ]
-          }
-        },
-        {
-          "id": "client-project-document",
-          "stage": "coded",
-          "evidenceKinds": ["attestation"],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "a-new-client-gets-a-putnami-json-naming-its-provider",
-              "an-existing-putnami-json-is-kept-byte-for-byte"
             ]
           }
         }

@@ -6,6 +6,7 @@ import (
 
 	perrors "go.putnami.dev/errors"
 	phttp "go.putnami.dev/http"
+	clientcontract "go.putnami.dev/protocol/clientcontract"
 )
 
 // ResponseMeta describes a single response entry: status code, optional description, and
@@ -115,6 +116,11 @@ type DiscoveredRoute struct {
 	// transport-specific surface (gRPC bridge, proto Connect RPC) skip these
 	// entries.
 	DocumentOnly bool
+	// Producer names the project and feature that produce the operation. The
+	// api.Clients declaration sets it on every route of an api plugin whose
+	// owning module declares a feature; the OpenAPI projection writes it into
+	// the operation's x-putnami-client. Nil when nothing attributes the route.
+	Producer *clientcontract.OperationProducer
 }
 
 // CanonicalOperationID is the single synthesis of an operation's canonical

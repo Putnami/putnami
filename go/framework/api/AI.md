@@ -77,10 +77,17 @@ body-carrying status declares the same schema (nil on a bodyless status), or
 `Body<status>` per status otherwise (ADR 0008). Connect dispatch and a raw octet
 response are refused beside several success statuses.
 
-`api.GoClientOptions.OmitOperations` leaves the named operations out of the Go
-target instead of failing the provider; the generated doc comment, the build
-output and `omittedOperations` in `client.putnami.json` name each one, and an
-unknown name fails.
+`omitOperations` in a client's `generatedFrom` (the `--omit` flag of
+`putnami-client-generate-go`) leaves the named operations out of the Go client
+instead of failing it; the generated doc comment and the emitter output name
+each one, and an unknown name fails.
+
+`api.Clients(api.ClientsOptions{})` names no client target, output or package.
+It attributes each operation to the project and feature that own its api
+plugin: the published contract carries that `producer` in each operation's
+`x-putnami-client`, and the generated client's design descriptor repeats it.
+A client project builds itself from the provider's committed
+`schema/openapi.json`; the provider writes no client.
 
 A generated Go method takes its authored operationId, or else the route's REST
 idiom (`GET /users/{id}` → `GetUsers`), which drops path parameters. When routes
@@ -313,10 +320,9 @@ api.Endpoint("GET", "/accounts/{id}").
     Handle(getAccount)
 ```
 
-The emitted Go client pins `client.RequireRuntimeCapabilities("response-cache")`
-and its `client.putnami.json` lists `runtimeCapabilities: ["response-cache"]`, so
-a runtime that predates the cache fails to build the client instead of running
-uncached.
+The emitted Go client pins `client.RequireRuntimeCapabilities("response-cache")`,
+so a runtime that predates the cache fails to build the client instead of
+running uncached.
 
 `api.StreamResumeFrom(ctx)` is how a handler avoids re-sending what the consumer
 already read. A handler that ignores it produces the whole stream, and the

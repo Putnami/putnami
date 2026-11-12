@@ -1556,9 +1556,10 @@ Google Cloud IAM credentials, so it is an emergency operator path;
 
 The extension calls Putnami Cloud services through 14 generated Go clients.
 Each one lives under `../clients/<service>/go` and is its own Putnami project,
-`go.putnami.dev/cloud/clients/<service>`. `./putnamiw clientgen`
-generates it from `../clients/<service>/schema/openapi.json`. Never edit
-`client.gen.go` by hand; regenerate it.
+`go.putnami.dev/cloud/clients/<service>`. `./putnamiw client-generate`
+generates it from `../clients/<service>/schema/openapi.json`, and the
+extension's build runs it first. Git ignores `client.gen.go`: never edit or
+commit it.
 
 The services are auth-server, cache-server, config-api, control-api, data-api,
 db-gateway, delivery-api, distribution-api, identity-api, observability-api,
@@ -1574,8 +1575,8 @@ file is copied byte for byte. `delivery-api` comes from a later source, which
 1. Fetch a newer version of `cloud/doc-contents-cloud-cli-schema`.
 2. Copy each `services/<service>/openapi.json` over
    `../clients/<service>/schema/openapi.json`.
-3. Run `./putnamiw clientgen --projects <the client projects>`, for example
-   `--projects go.putnami.dev/cloud/clients/put-server`.
+3. Run `./putnamiw client-generate --projects <the client projects>`, for
+   example `--projects go.putnami.dev/cloud/clients/put-server`.
 4. Adapt the call sites to the regenerated clients.
 
 A call with no declared contract stays hand-written. Two inventories list

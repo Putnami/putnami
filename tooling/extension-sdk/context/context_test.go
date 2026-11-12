@@ -600,3 +600,26 @@ func TestResolvePath_UnsetLeavesTheArgumentForTheProcessDirectory(t *testing.T) 
 		}
 	}
 }
+
+// TestParse_ProjectGeneratedFrom reads a generated client's binding through the
+// SDK entry point a task uses.
+func TestParse_ProjectGeneratedFrom(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "context.json")
+	data := `{"protocolVersion":2,"workspaceRoot":"/ws","outputPath":"/o","cacheRoot":"/c",
+"workspace":{"name":"w"},"extension":{"name":"@putnami/clientgen","root":"/e"},"job":{"name":"client-generate"},
+"project":{"name":"@example/items-client","path":"clients/ts","fullPath":"/ws/clients/ts",
+"generatedFrom":{"service":"items","language":"ts","contractPath":"services/items/schema/openapi.json"}},
+"params":{}}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ctx, err := Parse(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	from := ctx.Project.GeneratedFrom
+	if from == nil || from.Service != "items" || from.Language != GeneratedLanguageTypeScript ||
+		from.ContractPath != "services/items/schema/openapi.json" {
+		t.Fatalf("project.generatedFrom = %+v, want the ts binding the context carries", from)
+	}
+}

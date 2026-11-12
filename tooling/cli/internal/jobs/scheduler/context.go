@@ -145,6 +145,11 @@ type JobContextProject struct {
 	// that resolves to no tags emits `[]`, which a consumer reads as an answer
 	// and tells apart from an absent member.
 	Tags []string `json:"tags,omitzero"`
+	// GeneratedFrom is the project's resolved generation binding: its
+	// putnami.json `generatedFrom` and the provider's committed contract the
+	// workspace load resolved the service to (projectContextGeneratedFrom).
+	// Omitted for a project that is not a generated client.
+	GeneratedFrom *protocoljob.GeneratedFrom `json:"generatedFrom,omitempty"`
 }
 
 // JobContextSelectedProject is one project in the resolved command selection.
@@ -292,6 +297,7 @@ func BuildJobContext(
 		Type:              job.Project.Type,
 		DependencyClosure: dependencyClosureContext(ws, versions, job.Project),
 		Tags:              projectContextTags(job.Project),
+		GeneratedFrom:     projectContextGeneratedFrom(job.Project),
 	}
 	ctx.SelectedProjects = selectedProjectsContext(ws, versions, job.SelectedProjects, cmdName)
 	// The complete membership travels on EVERY document, not only the
@@ -425,6 +431,26 @@ func projectContextTags(project *workspace.Project) []string {
 		return []string{}
 	}
 	return tags
+}
+
+// projectContextGeneratedFrom returns a generated client's binding as the
+// workspace load resolved it: the options its putnami.json declares and the
+// contract of the one provider that declares its service. The contract path is
+// empty when none or several do; the client's key then folds the unresolved
+// marker, and its generation fails naming the service.
+func projectContextGeneratedFrom(project *workspace.Project) *protocoljob.GeneratedFrom {
+	if project == nil || project.GeneratedClient == nil || project.Config == nil || project.Config.GeneratedFrom == nil {
+		return nil
+	}
+	declared := project.Config.GeneratedFrom
+	return &protocoljob.GeneratedFrom{
+		Service:        declared.Service,
+		Language:       declared.Language,
+		PackageName:    declared.PackageName,
+		ClientName:     declared.ClientName,
+		OmitOperations: append([]string(nil), declared.OmitOperations...),
+		ContractPath:   project.GeneratedClient.ContractPath,
+	}
 }
 
 func projectContextOptions(project *workspace.Project) map[string]map[string]any {

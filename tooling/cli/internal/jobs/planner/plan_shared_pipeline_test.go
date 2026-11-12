@@ -514,16 +514,15 @@ func cutPlanKey(key string) (project, step string, ok bool) {
 // TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator pins, on the
 // real Go and clientgen manifests, that a group shares beside a writer of
 // another command and that the group's dependents still wait for that writer.
-// The clientgen generators read the client's gen after the build and rewrite
-// the client a consumer compiles. The client's test generate adopts its build
-// generate and takes that earlier place, so the consumer no longer waits for
-// the generators through it: it waits because the generators declare their
-// client readByDependents. Without that flag the same shared plan leaves a
-// consumer job unordered with a generator.
+// The client-generate generator rewrites the client a consumer compiles. The
+// client's test generate adopts its build generate, and the consumer waits for
+// the generator because the generator declares its client readByDependents.
+// Without that flag the same shared plan leaves a consumer job unordered with
+// the generator.
 func TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator(t *testing.T) {
 	t.Parallel()
 	goExtension := loadGoPlannerExtension(t)
-	for _, commands := range [][]string{{"clientgen", "test", "build"}, {"lint", "test", "build", "validate"}} {
+	for _, commands := range [][]string{{"client-generate", "lint", "test", "build"}, {"lint", "test", "build", "validate"}} {
 		ws, selected := dependentsWorkspace(t)
 		plan := func(clientgen *extension.ExtensionDescription) []*jobmodel.ScheduledJob {
 			planned, err := Plan(ws, commands, selected, []*extension.ExtensionDescription{goExtension, clientgen}, nil, nil, nil, nil)
@@ -538,12 +537,12 @@ func TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator(t *testing.T
 		clientTest := requirePlanKey(t, byKey, dependentsClient+":test~test")
 		var generators []*jobmodel.ScheduledJob
 		for _, job := range planned {
-			if job.Project.ID == dependentsClient && job.CommandName() == "clientgen" {
+			if job.Project.ID == dependentsClient && job.CommandName() == "client-generate" {
 				generators = append(generators, job)
 			}
 		}
 		if len(generators) == 0 {
-			t.Fatalf("plan %v: control: no clientgen generator planned for %s", commands, dependentsClient)
+			t.Fatalf("plan %v: control: no client-generate job planned for %s", commands, dependentsClient)
 		}
 
 		edges, unflagged := planEdges(planned), planEdges(plan(clientgenWithoutReadByDependents(t)))

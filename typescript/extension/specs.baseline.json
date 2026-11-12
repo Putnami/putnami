@@ -9,7 +9,6 @@
     "typescript/typescript-project-toolchain#bun-answers-its-toolchain-pin",
     "typescript/typescript-project-toolchain#bun-under-the-putnami-home",
     "typescript/typescript-project-toolchain#catalog-seeding",
-    "typescript/typescript-project-toolchain#committed-client-drift",
     "typescript/typescript-project-toolchain#committed-openapi-drift",
     "typescript/typescript-project-toolchain#committed-route-inventory",
     "typescript/typescript-project-toolchain#declared-assets-must-exist",

@@ -243,7 +243,6 @@ func (r ownerRow) String() string {
 //     because the finalizer's whole job is to read a record that cannot carry
 //     one.
 func TestDeclaredOutputOwnerTable(t *testing.T) {
-	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-client-drift", "the-generate-client-output-declares-fail-on-drift")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-openapi-drift", "the-generate-openapi-output-declares-fail-on-drift")
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "committed-route-inventory", "the-generate-http-routes-output-declares-fail-on-drift")
 	m := loadExtensionManifest(t)
@@ -251,7 +250,6 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 	want := []ownerRow{
 		{task: "build-compile", id: "compile", kind: "directory", root: "command-output", path: "compile", optionalEmpty: true},
 		{task: "build-generate", id: "capabilities", kind: "file", root: "project", path: "schema/capabilities.json", optionalEmpty: true},
-		{task: "build-generate", id: "client", kind: "directory", root: "project", path: "clientOutput", optionalEmpty: true, drift: "fail"},
 		{task: "build-generate", id: "gen", kind: "directory", root: "project", path: ".gen"},
 		{task: "build-generate", id: "httpRoutes", kind: "file", root: "project", path: "schema/http-routes.json", optionalEmpty: true, drift: "fail"},
 		{task: "build-generate", id: "openapi", kind: "file", root: "project", path: "schema/openapi.json", optionalEmpty: true, drift: "fail"},
@@ -554,43 +552,6 @@ func commandsByTask(m *proto.Manifest) map[string][]string {
 		out[task] = names
 	}
 	return out
-}
-
-// TestGenerateDeclaresTheClientOutputPort pins the runtime↔manifest link the
-// clients half of the ownership decision rests on: the generated client's
-// directory is chosen by the project's clientgen config, so it is declarable
-// only through a data output port, and the consumer reads it back by name. A
-// rename on either side would silently stop the client from being captured.
-func TestGenerateDeclaresTheClientOutputPort(t *testing.T) {
-	m := loadExtensionManifest(t)
-	generate, ok := m.Tasks["build-generate"]
-	if !ok {
-		t.Fatal("manifest task \"build-generate\" is missing")
-	}
-	if _, ok := generate.Outputs[GeneratedClientOutputPort]; !ok {
-		t.Fatalf("build-generate does not declare the %q output port the runtime reports the generated client directory on",
-			GeneratedClientOutputPort)
-	}
-	// The .gen + clients declarations landed together with the plan-time
-	// same-manifest-task exemption (one task scheduled by several commands is
-	// one owner, not several — plan_contract.go, found by this slice). Pin the
-	// whole ownership decision: .gen owned whole, client via the port.
-	if generate.Declares == nil {
-		t.Fatal("build-generate lost its v3 declaration")
-	}
-	gen, ok := generate.Declares.Outputs["gen"]
-	if !ok || gen.Kind != proto.OutputKindDirectory || gen.Path != ".gen" || gen.EffectiveRoot() != proto.OutputRootProject {
-		t.Fatalf("gen ownership = %+v, want the whole project-rooted .gen directory", gen)
-	}
-	client, ok := generate.Declares.Outputs["client"]
-	if !ok || client.PathFrom != GeneratedClientOutputPort || !client.OptionalEmpty {
-		t.Fatalf("client ownership = %+v, want optional-empty pathFrom %q", client, GeneratedClientOutputPort)
-	}
-	// The client project's own .gen, its dependency install and its project
-	// document belong to the workspace (protocol ADR 0005).
-	if got, want := proto.DecidablePreserves(client), []string{".gen", "node_modules", "putnami.json"}; !slices.Equal(got, want) {
-		t.Errorf("client preserves %v, want %v", got, want)
-	}
 }
 
 // typeScriptFeatureEvidencePath is where the @putnami/application pre-build
@@ -1214,6 +1175,24 @@ func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
 			t.Errorf("command %q declares no traits, so it depends on the core's verb table; declare %+v", name, want)
 		case *cmd.Traits != want:
 			t.Errorf("command %q declares traits %+v, want %+v", name, *cmd.Traits, want)
+		}
+	}
+}
+
+// TestLifecycleCommandsWaitForClientGenerate pins that every command that
+// reads a project's sources runs after that project's client-generate, so a
+// generated client's src/ exists before anything builds, tests, lints, serves
+// or packages it (tooling/clientgen-extension ADR 0007). A project without the
+// command plans nothing more.
+func TestLifecycleCommandsWaitForClientGenerate(t *testing.T) {
+	m := loadExtensionManifest(t)
+	for _, name := range []string{"build", "test", "lint", "serve", "package"} {
+		command, ok := m.Commands[name]
+		if !ok {
+			t.Fatalf("manifest command %q is missing", name)
+		}
+		if !slices.Contains(command.DependsOn, "client-generate") {
+			t.Errorf("command %q dependsOn = %v, want it to hold client-generate", name, command.DependsOn)
 		}
 	}
 }

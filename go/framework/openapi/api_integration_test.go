@@ -527,6 +527,7 @@ type canonicalResponse struct {
 
 func TestOpenAPI_CanonicalProviderBytesKeepClientHashThroughUnchangedPublication(t *testing.T) {
 	spectest.Proves(t, "go/api-contracts", "generated-from-contract", "canonical-provider-bytes-keep-client-hash-through-unchanged-publication")
+	spectest.Proves(t, "tooling/cross-language-rest-clients", "contract-carries-attribution", "the-contract-carries-each-operations-producer-attribution")
 
 	server := &fakeServer{}
 	apiPlugin := api.New(server,
@@ -540,9 +541,7 @@ func TestOpenAPI_CanonicalProviderBytesKeepClientHashThroughUnchangedPublication
 		Returns(api.Type[canonicalResponse]()).
 		Handle(func(_ *phttp.EndpointContext) *phttp.Response { return phttp.JSON(nil) }))
 	openapiPlugin := NewPlugin(PluginOptions{Title: "Canonical API", Version: "1.0.0"}).From(apiPlugin)
-	clientsPlugin := api.Clients(api.ClientsOptions{
-		Go: api.GoClientOptions{PackageName: "widgetsclient", ClientName: "WidgetsClient"},
-	}).From(apiPlugin)
+	clientsPlugin := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 
 	application := app.New("canonical-provider")
 	application.Module.Feature(app.Feature{
@@ -597,6 +596,15 @@ func TestOpenAPI_CanonicalProviderBytesKeepClientHashThroughUnchangedPublication
 	if required := document.Components.Schemas["canonicalResponse"].Required; !reflect.DeepEqual(required, []string{"alpha", "zeta"}) {
 		t.Fatalf("required order = %v, want [alpha zeta]", required)
 	}
+	// The api.Clients declaration attributes the operation to the project and
+	// feature that own its api plugin, inside the contract itself.
+	wantProducer := &clientcontract.OperationProducer{Project: "canonical-provider", Feature: "canonical/widgets"}
+	if operation.ClientContract == nil || !reflect.DeepEqual(operation.ClientContract.Producer, wantProducer) {
+		t.Fatalf("operation x-putnami-client = %+v, want producer %+v", operation.ClientContract, wantProducer)
+	}
+	if !bytes.Contains(described, []byte(`"producer": {`)) {
+		t.Fatalf("described contract carries no producer:\n%s", described)
+	}
 
 	// The Go extension's publication boundary decodes into an untyped object
 	// before encoding it. GenerateSpec already normalized the structural arrays
@@ -607,42 +615,15 @@ func TestOpenAPI_CanonicalProviderBytesKeepClientHashThroughUnchangedPublication
 		t.Fatalf("publication would rewrite provider bytes\nprovider:\n%s\npublished:\n%s", described, published)
 	}
 
+	// A client project generates from the published contract. The client it
+	// emits pins the hash of those bytes.
 	expectedHash := fmt.Sprintf("%x", sha256.Sum256(published))[:16]
-	stagedClient, err := os.ReadFile(filepath.Join(genDir, api.ClientStageDir, "go", "client.gen.go"))
+	client, err := emitGoClient(t, published, "widgetsclient", "WidgetsClient")
 	if err != nil {
-		t.Fatalf("read staged client: %v", err)
+		t.Fatalf("emit client: %v", err)
 	}
-	if !strings.Contains(string(stagedClient), `SpecHash: "`+expectedHash+`"`) {
-		t.Fatalf("staged client does not carry published spec hash %s", expectedHash)
-	}
-
-	// Publish the unchanged provider document and drive the workspace clientgen
-	// entry point. Its output must remain byte-identical to the client staged
-	// inside Describe. A publication that merges an additional static route is a
-	// different contract and is deliberately outside this invariant.
-	schemaPath := filepath.Join(projectRoot, DefaultDescribePath)
-	if err := os.MkdirAll(filepath.Dir(schemaPath), 0o750); err != nil {
-		t.Fatalf("prepare published schema: %v", err)
-	}
-	// The workspace generator emits the client as a package inside the provider's
-	// own Go module, so the ownership manifest names <module>/clients/go. A Go
-	// provider project always carries that go.mod; the fixture states it rather
-	// than letting the manifest be written without an import path.
-	if err := os.WriteFile(filepath.Join(projectRoot, "go.mod"), []byte("module example.dev/canonical\n\ngo 1.25\n"), 0o600); err != nil {
-		t.Fatalf("write provider go.mod: %v", err)
-	}
-	if err := os.WriteFile(schemaPath, published, 0o600); err != nil {
-		t.Fatalf("publish schema: %v", err)
-	}
-	if _, err := api.GenerateProjectClients(projectRoot); err != nil {
-		t.Fatalf("GenerateProjectClients: %v", err)
-	}
-	workspaceClient, err := os.ReadFile(filepath.Join(projectRoot, "clients", "go", "client.gen.go"))
-	if err != nil {
-		t.Fatalf("read workspace client: %v", err)
-	}
-	if !bytes.Equal(workspaceClient, stagedClient) {
-		t.Fatalf("workspace client differs after publication\nstaged:\n%s\nworkspace:\n%s", stagedClient, workspaceClient)
+	if !strings.Contains(string(client), `SpecHash: "`+expectedHash+`"`) {
+		t.Fatalf("client does not carry published spec hash %s:\n%s", expectedHash, client)
 	}
 }
 
@@ -1137,9 +1118,7 @@ func TestOpenAPI_AutoDiscovery_PublishesPrimaryCreatedStatusAndGeneratesTypedCli
 		ReturnsStatus(http.StatusCreated, "Created", api.Type[CreatedUser]()).
 		Document())
 	openapiPlugin := NewPlugin(PluginOptions{Title: "Returns", Version: "1.0.0"}).From(apiPlugin)
-	clientsPlugin := api.Clients(api.ClientsOptions{
-		Go: api.GoClientOptions{PackageName: "createdusers", ClientName: "CreatedUsersClient"},
-	}).From(apiPlugin)
+	clientsPlugin := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 	application := app.New("returns-status")
 	application.Use(apiPlugin).Use(openapiPlugin).Use(clientsPlugin)
 
@@ -1157,7 +1136,7 @@ func TestOpenAPI_AutoDiscovery_PublishesPrimaryCreatedStatusAndGeneratesTypedCli
 		t.Fatalf("created response = %#v", created)
 	}
 
-	clientSource, err := os.ReadFile(filepath.Join(out, api.ClientStageDir, "go", "client.gen.go"))
+	clientSource, err := emitDescribedGoClient(t, out, "createdusers", "CreatedUsersClient")
 	if err != nil {
 		t.Fatalf("read generated client: %v", err)
 	}
@@ -1479,10 +1458,9 @@ type retiredWidget struct {
 }
 
 // describeWidgetProvider runs a real first-party provider through Describe and
-// returns the published OpenAPI bytes and the staged Go client. retired adds a
-// second route so the caller can compare a provider that has it against one
-// that never did.
-func describeWidgetProvider(t *testing.T, projectRoot string, retired bool) (spec, clientSource []byte) {
+// returns the described OpenAPI bytes. retired adds a second route so the
+// caller can compare a provider that has it against one that never did.
+func describeWidgetProvider(t *testing.T, projectRoot string, retired bool) []byte {
 	t.Helper()
 	apiPlugin := api.New(&fakeServer{},
 		api.WithClientService(api.ClientServiceOptions{
@@ -1498,9 +1476,7 @@ func describeWidgetProvider(t *testing.T, projectRoot string, retired bool) (spe
 			Handle(func(_ *phttp.EndpointContext) *phttp.Response { return phttp.JSON(nil) }))
 	}
 	openapiPlugin := NewPlugin(PluginOptions{Title: "Widgets", Version: "1.0.0"}).From(apiPlugin)
-	clientsPlugin := api.Clients(api.ClientsOptions{
-		Go: api.GoClientOptions{PackageName: "widgetsclient", ClientName: "WidgetsClient"},
-	}).From(apiPlugin)
+	clientsPlugin := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 	application := app.New("widget-provider")
 	application.Use(apiPlugin).Use(openapiPlugin).Use(clientsPlugin)
 
@@ -1512,75 +1488,57 @@ func describeWidgetProvider(t *testing.T, projectRoot string, retired bool) (spe
 	if err != nil {
 		t.Fatalf("read described spec: %v", err)
 	}
-	clientSource, err = os.ReadFile(filepath.Join(genDir, api.ClientStageDir, "go", "client.gen.go"))
-	if err != nil {
-		t.Fatalf("read staged client: %v", err)
+	return spec
+}
+
+// emitWidgetsClient generates the widgets client into output, over whatever
+// an earlier run left there, and returns its source.
+func emitWidgetsClient(t *testing.T, contract []byte, output string) []byte {
+	t.Helper()
+	if _, err := api.EmitGoClient(contract, output, api.EmitGoClientOptions{PackageName: "widgetsclient", ClientName: "WidgetsClient"}); err != nil {
+		t.Fatalf("emit client: %v", err)
 	}
-	return spec, clientSource
+	source, err := os.ReadFile(filepath.Join(output, api.GoClientFile)) //nolint:gosec // G304: test-owned temporary directory
+	if err != nil {
+		t.Fatalf("read generated client: %v", err)
+	}
+	return source
 }
 
 // A route the provider stops registering must vanish from every surface the
-// build produces, byte for byte: the described document, the staged client, and
-// the client the workspace generator rewrites over the previous one. The
-// publication half of the same invariant lives in the Go extension's
-// openapiutil tests, which own the merge.
+// build produces, byte for byte: the described document and the client a
+// client project regenerates over the previous one. The publication half of
+// the same invariant lives in the Go extension's openapiutil tests, which own
+// the merge.
 func TestOpenAPI_RemovedRouteDoesNotSurviveDescribeOrClientGeneration(t *testing.T) {
 	spectest.Proves(t, "go/api-contracts", "generated-from-contract", "a-route-the-provider-removed-leaves-no-residue-in-the-generated-client")
 
 	// A provider that never declared the route: the reference bytes.
-	freshSpec, freshClient := describeWidgetProvider(t, t.TempDir(), false)
+	freshSpec := describeWidgetProvider(t, t.TempDir(), false)
+	freshClient := emitWidgetsClient(t, freshSpec, t.TempDir())
 
-	// A provider that declared it, published, generated — then removed it.
+	// A provider that declared it, generated a client, then removed it.
 	projectRoot := t.TempDir()
-	if err := os.WriteFile(filepath.Join(projectRoot, "go.mod"), []byte("module example.dev/widgets\n\ngo 1.25\n"), 0o600); err != nil {
-		t.Fatalf("write provider go.mod: %v", err)
-	}
-	retiredSpec, _ := describeWidgetProvider(t, projectRoot, true)
+	output := filepath.Join(projectRoot, "client")
+	retiredSpec := describeWidgetProvider(t, projectRoot, true)
 	if !bytes.Contains(retiredSpec, []byte("/widgets/retired")) {
 		t.Fatalf("fixture did not declare the retired route:\n%s", retiredSpec)
 	}
-	if err := os.MkdirAll(filepath.Dir(filepath.Join(projectRoot, DefaultDescribePath)), 0o750); err != nil {
-		t.Fatalf("prepare published schema: %v", err)
-	}
-	if err := os.WriteFile(filepath.Join(projectRoot, DefaultDescribePath), retiredSpec, 0o600); err != nil {
-		t.Fatalf("publish schema: %v", err)
-	}
-	if _, err := api.GenerateProjectClients(projectRoot); err != nil {
-		t.Fatalf("GenerateProjectClients (with retired route): %v", err)
-	}
-	generatedPath := filepath.Join(projectRoot, "clients", "go", "client.gen.go")
-	withRetired, err := os.ReadFile(generatedPath)
-	if err != nil {
-		t.Fatalf("read generated client: %v", err)
-	}
-	if !bytes.Contains(withRetired, []byte("ListWidgetsRetired")) {
+	if withRetired := emitWidgetsClient(t, retiredSpec, output); !bytes.Contains(withRetired, []byte("ListWidgetsRetired")) {
 		t.Fatalf("fixture client has no method for the retired route:\n%s", withRetired)
 	}
 
-	// Re-describe without the route, publish, and regenerate over the existing
-	// client and its ownership manifest.
-	trimmedSpec, trimmedStaged := describeWidgetProvider(t, projectRoot, false)
+	// Re-describe without the route and regenerate over the existing client.
+	trimmedSpec := describeWidgetProvider(t, projectRoot, false)
 	if !bytes.Equal(trimmedSpec, freshSpec) {
 		t.Fatalf("describe after removal differs from a provider that never declared the route\nafter removal:\n%s\nnever declared:\n%s", trimmedSpec, freshSpec)
 	}
-	if !bytes.Equal(trimmedStaged, freshClient) {
-		t.Fatalf("staged client after removal differs from a provider that never declared the route\nafter removal:\n%s\nnever declared:\n%s", trimmedStaged, freshClient)
-	}
-	if err := os.WriteFile(filepath.Join(projectRoot, DefaultDescribePath), trimmedSpec, 0o600); err != nil {
-		t.Fatalf("publish trimmed schema: %v", err)
-	}
-	if _, err := api.GenerateProjectClients(projectRoot); err != nil {
-		t.Fatalf("GenerateProjectClients (after removal): %v", err)
-	}
-	regenerated, err := os.ReadFile(generatedPath)
-	if err != nil {
-		t.Fatalf("read regenerated client: %v", err)
-	}
+	regenerated := emitWidgetsClient(t, trimmedSpec, output)
 	if bytes.Contains(regenerated, []byte("ListWidgetsRetired")) || bytes.Contains(regenerated, []byte("/widgets/retired")) {
 		t.Fatalf("removed route survived client regeneration:\n%s", regenerated)
 	}
-	if !bytes.Equal(regenerated, trimmedStaged) {
-		t.Fatalf("workspace client differs from the staged client after removal\nworkspace:\n%s\nstaged:\n%s", regenerated, trimmedStaged)
+	if !bytes.Equal(regenerated, freshClient) {
+		t.Fatalf("client after removal differs from a provider that never declared the route\nafter removal:\n%s\nnever declared:\n%s", regenerated, freshClient)
 	}
 }
 

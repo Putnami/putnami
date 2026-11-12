@@ -1312,7 +1312,7 @@
       "result": "pass"
     },
     {
-      "id": "ts-ts.contract.generation.the-emitted-surface-matches-the-committed-one",
+      "id": "ts-ts.contract.generation.the-committed-contract-renders-reproducibly",
       "provider": "ts",
       "target": "ts",
       "cell": "contract",
@@ -1321,20 +1321,7 @@
       "family": "generation",
       "auth": "n/a",
       "policy": "n/a",
-      "test": "test/generation.test.ts:renders the same file set and the same operations as what is committed",
-      "result": "pass"
-    },
-    {
-      "id": "ts-ts.contract.generation.the-manifest-owns-the-current-contract-and-bytes",
-      "provider": "ts",
-      "target": "ts",
-      "cell": "contract",
-      "transport": "n/a",
-      "encoding": "n/a",
-      "family": "generation",
-      "auth": "n/a",
-      "policy": "n/a",
-      "test": "test/generation.test.ts:binds the committed bytes to the contract they came from",
+      "test": "test/generation.test.ts:renders every declared operation, and the same files on every run",
       "result": "pass"
     },
     {
@@ -1406,7 +1393,7 @@
       "cell": "rest-json",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "ts",
@@ -1445,7 +1432,7 @@
       "cell": "rest-binary",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "ts",
@@ -1521,7 +1508,7 @@
       "cell": "connect-unary-proto",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "ts",
@@ -1559,7 +1546,7 @@
       "cell": "connect-stream",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "ts",
@@ -1601,7 +1588,7 @@
       "cell": "sse",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "ts",
@@ -1636,7 +1623,7 @@
       "cell": "ws-server",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "ts",
@@ -1677,7 +1664,7 @@
       "cell": "ws-client",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "ts",
@@ -1712,7 +1699,7 @@
       "cell": "ws-bidi",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "go",
@@ -1760,7 +1747,7 @@
       "cell": "rest-json",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "go",
@@ -1795,7 +1782,7 @@
       "cell": "rest-binary",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "go",
@@ -1833,7 +1820,7 @@
       "cell": "connect-unary-json",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "go",
@@ -1874,7 +1861,7 @@
       "cell": "connect-unary-proto",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "go",
@@ -1909,7 +1896,7 @@
       "cell": "connect-stream",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "go",
@@ -1985,7 +1972,7 @@
       "cell": "ws-server",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "go",
@@ -2020,7 +2007,7 @@
       "cell": "ws-client",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     },
     {
       "target": "go",
@@ -2055,7 +2042,7 @@
       "cell": "ws-bidi",
       "family": "generation",
       "status": "n/a",
-      "rule": "Generation is a property of the contract, not of a cell: one committed artifact covers every operation, and the contract-level rows carry it."
+      "rule": "Generation is a property of the contract, not of a cell: one render of the contract covers every operation, and the contract-level rows carry it."
     }
   ]
 }

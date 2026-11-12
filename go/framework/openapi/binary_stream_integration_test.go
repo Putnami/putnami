@@ -70,9 +70,7 @@ func TestTheEmittedGoClientStreamsCallerLabelledOctetsThroughTheRealProvider(t *
 		}
 	})
 	openapiPlugin := NewPlugin(PluginOptions{Title: "Stream blobs", Version: "1.0.0"}).From(provider)
-	clientsPlugin := api.Clients(api.ClientsOptions{
-		Go: api.GoClientOptions{PackageName: "blobsclient", ClientName: "BlobsClient"},
-	}).From(provider)
+	clientsPlugin := api.Clients(api.ClientsOptions{}).From(provider)
 	application := app.New("stream-blobs")
 	application.Use(provider).Use(openapiPlugin).Use(clientsPlugin)
 	out := t.TempDir()
@@ -112,7 +110,7 @@ func TestTheEmittedGoClientStreamsCallerLabelledOctetsThroughTheRealProvider(t *
 			}
 		}
 	}
-	source, err := os.ReadFile(filepath.Join(out, api.ClientStageDir, "go", "client.gen.go"))
+	source, err := emitDescribedGoClient(t, out, "blobsclient", "BlobsClient")
 	if err != nil {
 		t.Fatal(err)
 	}

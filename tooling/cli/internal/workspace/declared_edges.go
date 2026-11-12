@@ -60,8 +60,8 @@ import (
 //     naming a workspace package no source file of the project imports.
 //     devDependencies are NOT in scope: a `workspace:` devDependency is how a
 //     project requests an EXTENSION, and the build reads it by running it.
-//  4. An orphan client.putnami.json: a committed generated-client manifest
-//     whose `service.id` no provider of this workspace declares any more.
+//  4. An orphan generatedFrom: a putnami.json `generatedFrom` whose service no
+//     single provider of this workspace declares.
 //
 // The check reports; `putnami deps prune` repairs what it has a writer for and
 // names the edit to make for the rest, and the check's advice says exactly

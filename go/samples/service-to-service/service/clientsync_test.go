@@ -1,9 +1,7 @@
 package service
 
 import (
-	"context"
-	"crypto/sha256"
-	"fmt"
+	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,9 +10,7 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 
 	"go.putnami.dev/api"
-	"go.putnami.dev/http"
 	"go.putnami.dev/openapi"
-	clientcontract "go.putnami.dev/protocol/clientcontract"
 )
 
 // matrixFeature is the feature this sample owns in putnami.features.json. The
@@ -22,127 +18,105 @@ import (
 // the verification wire rather than through this file.
 const matrixFeature = "samples/go-first-party-client-matrix"
 
-// renderedClient is the Go client the generator renders from the provider's
-// routes, with the inputs a check of the render needs.
-type renderedClient struct {
-	spec      []byte
-	ir        api.SpecIR
-	producers []api.ClientOperationProducer
-	src       string
-}
-
-// renderClient regenerates the Go client from the provider's routes through the
-// same pipeline `putnami build` uses: the api.Clients describer reads the
-// OpenAPI spec and runs GenerateClientFromIR.
-func renderClient(t *testing.T) renderedClient {
+// describedContract runs the provider's describe step, the one `putnami build`
+// runs, and returns the OpenAPI contract it writes. The client project builds
+// its client from that contract once the provider commits it.
+func describedContract(t *testing.T) []byte {
 	t.Helper()
-	server := http.NewServerPlugin(http.ServerConfig{})
-	apiPlugin := api.New(server, ClientContract())
-	Register(apiPlugin)
-	protoPlugin, bridge := ConnectPlugins(apiPlugin, server)
-	if err := apiPlugin.Configure(context.Background(), nil); err != nil {
-		t.Fatalf("configure api: %v", err)
+	out := t.TempDir()
+	if err := NewApp().Describe(out, []string{"openapi", "clients"}); err != nil {
+		t.Fatalf("describe: %v", err)
 	}
-	// The same lifecycle order NewApp runs: the descriptor first, then the
-	// bridge that serves it, so the rendered spec advertises Connect exactly as
-	// the running provider does.
-	if err := protoPlugin.Configure(context.Background(), nil); err != nil {
-		t.Fatalf("configure proto: %v", err)
-	}
-	if err := bridge.Configure(context.Background(), nil); err != nil {
-		t.Fatalf("configure connect bridge: %v", err)
-	}
-	openapiPlugin := openapi.NewPlugin(openapi.PluginOptions{Title: "Items API", Version: "1.0.0"}).From(apiPlugin)
-	if err := openapiPlugin.Configure(context.Background(), nil); err != nil {
-		t.Fatalf("configure openapi: %v", err)
-	}
-
-	spec, err := openapiPlugin.OpenAPISpecJSON()
+	contract, err := os.ReadFile(filepath.Join(out, openapi.DefaultDescribePath)) //nolint:gosec // G304: test-owned temporary directory
 	if err != nil {
-		t.Fatalf("render spec: %v", err)
+		t.Fatalf("read described contract: %v", err)
 	}
-	ir, err := api.ReadOpenAPISpec(spec)
-	if err != nil {
-		t.Fatalf("read spec: %v", err)
-	}
-	// Producer attribution is per operation. This provider declares one feature
-	// on its root module, so every route it owns resolves to that feature — the
-	// describer derives the same table from the module tree at build time.
-	producers := make([]api.ClientOperationProducer, 0, len(apiPlugin.DiscoveredRoutes()))
-	for _, route := range apiPlugin.DiscoveredRoutes() {
-		producers = append(producers, api.ClientOperationProducer{
-			Method:          route.Method,
-			Path:            route.Path,
-			ProducerProject: ProjectName,
-			ProducerFeature: FeatureID,
-		})
-	}
-	src, err := api.GenerateClientFromIR(ir, api.ClientGenOptions{
-		PackageName: ClientPackage,
-		ClientName:  ClientName,
-		Design:      &api.ClientDesignOptions{Operations: producers},
-	})
-	if err != nil {
-		t.Fatalf("generate client: %v", err)
-	}
-	return renderedClient{spec: spec, ir: ir, producers: producers, src: src}
+	return contract
 }
 
-// TestGeneratedClientInSync asserts the render matches the committed
-// clients/go/client.gen.go and that the committed manifest owns it. Drift here
-// means a build would rewrite the committed client. Regenerate intentional
-// changes through the workspace `putnami clientgen` command so source and
-// ownership manifest stay atomic.
-func TestGeneratedClientInSync(t *testing.T) {
-	spectest.Proves(t, matrixFeature, "generation-is-deterministic-and-a-break-is-detected", "the-committed-client-is-what-the-generator-renders")
-	rendered := renderClient(t)
-
-	path := filepath.Join("..", "clients", "go", "client.gen.go")
-	want, err := os.ReadFile(path)
+// emitClient runs the emitter putnami-client-generate-go runs, with this
+// sample's package and client names, and returns the files it wrote.
+func emitClient(t *testing.T, contract []byte) map[string][]byte {
+	t.Helper()
+	out := t.TempDir()
+	if _, err := api.EmitGoClient(contract, out, api.EmitGoClientOptions{PackageName: ClientPackage, ClientName: ClientName}); err != nil {
+		t.Fatalf("emit client: %v", err)
+	}
+	entries, err := os.ReadDir(out)
 	if err != nil {
-		t.Fatalf("read committed client (run `putnami clientgen --projects %s` to create): %v", ProjectName, err)
+		t.Fatal(err)
 	}
-	if string(want) != rendered.src {
-		t.Errorf("committed clients/go/client.gen.go is out of sync with the generator;\nrun: putnami clientgen --projects %s", ProjectName)
+	files := map[string][]byte{}
+	for _, entry := range entries {
+		body, err := os.ReadFile(filepath.Join(out, entry.Name())) //nolint:gosec // G304: test-owned temporary directory
+		if err != nil {
+			t.Fatal(err)
+		}
+		files[entry.Name()] = body
 	}
+	return files
+}
 
-	manifestBytes, err := os.ReadFile(filepath.Join("..", "clients", "go", clientcontract.GeneratedManifestFile))
+// The emitter renders the client from the contract the provider describes:
+// the same bytes on every run, one file, and each operation attributed to the
+// project and feature the contract names.
+func TestTheClientIsWhatTheEmitterRendersFromTheDescribedContract(t *testing.T) {
+	spectest.Proves(t, matrixFeature, "generation-is-deterministic-and-a-break-is-detected", "the-client-is-what-the-emitter-renders-from-the-described-contract")
+	contract := describedContract(t)
+
+	spec, err := api.ReadOpenAPISpec(contract)
 	if err != nil {
-		t.Fatalf("read committed generated manifest: %v", err)
+		t.Fatalf("read contract: %v", err)
 	}
-	manifest, diagnostics := clientcontract.ParseAndValidateGeneratedManifest(manifestBytes)
-	if len(diagnostics) != 0 {
-		t.Fatalf("generated manifest diagnostics = %v", diagnostics)
-	}
-	contractHash := sha256.Sum256(rendered.spec)
-	sourceHash := sha256.Sum256(want)
-	if manifest.ContractSHA256 != fmt.Sprintf("%x", contractHash) || len(manifest.Files) != 1 ||
-		manifest.Files[0].Path != "client.gen.go" || manifest.Files[0].SHA256 != fmt.Sprintf("%x", sourceHash) {
-		t.Fatalf("generated manifest does not own the current provider contract/client: %#v", manifest)
-	}
-
-	foundStream := false
-	for _, operation := range manifest.Operations {
-		for _, transport := range operation.Transports {
-			foundStream = foundStream || operation.OperationID == "getItems_Id_Watch" && transport.Protocol == clientcontract.TransportSSE
+	operations := 0
+	for _, service := range spec.Services {
+		for _, method := range service.Methods {
+			operations++
+			if method.Client == nil {
+				t.Errorf("%s %s carries no x-putnami-client", method.HTTPMethod, method.Path)
+				continue
+			}
+			producer := method.Client.Producer
+			if producer == nil || producer.Project != ProjectName || producer.Feature != FeatureID {
+				t.Errorf("%s %s producer = %+v, want %s / %s", method.HTTPMethod, method.Path, producer, ProjectName, FeatureID)
+			}
 		}
 	}
-	if !foundStream {
-		t.Fatalf("generated manifest omits provider SSE operation: %#v", manifest.Operations)
+	if operations == 0 {
+		t.Fatal("the described contract declares no operation")
+	}
+
+	first := emitClient(t, contract)
+	second := emitClient(t, describedContract(t))
+	if len(first) != 1 || first[api.GoClientFile] == nil {
+		t.Fatalf("the emitter wrote %d file(s), want only %s", len(first), api.GoClientFile)
+	}
+	if !bytes.Equal(first[api.GoClientFile], second[api.GoClientFile]) {
+		t.Fatal("two describes and emissions of the same provider rendered different clients")
+	}
+	source := string(first[api.GoClientFile])
+	const watchAttribution = `{OperationID: "getItems_Id_Watch", Method: "GET", Path: "/items/{id}/watch", ProducerProject: "` + ProjectName + `", ProducerFeature: "` + FeatureID + `"}`
+	if !strings.Contains(source, watchAttribution) {
+		t.Errorf("the client does not attribute the SSE operation from the contract; want %s", watchAttribution)
 	}
 }
 
 // TestARemovedOperationIsDetected renders the contract without one operation. A
 // removed operation is the contract break a consumer must not discover at run
-// time: the render moves the bytes and leaves the committed manifest owning an
-// operation the render no longer has, which is the pair the workspace
-// clientgen guard compares.
+// time: the render moves the bytes and the method is gone, so the consumer that
+// still calls it stops compiling.
 func TestARemovedOperationIsDetected(t *testing.T) {
 	spectest.Proves(t, matrixFeature, "generation-is-deterministic-and-a-break-is-detected", "a-removed-operation-is-detected-rather-than-rendered-through")
-	rendered := renderClient(t)
-	amputated := rendered.ir
+	contract := describedContract(t)
+	rendered := string(emitClient(t, contract)[api.GoClientFile])
+
+	ir, err := api.ReadOpenAPISpec(contract)
+	if err != nil {
+		t.Fatalf("read contract: %v", err)
+	}
+	amputated := ir
 	amputated.Services = nil
-	for _, service := range rendered.ir.Services {
+	for _, service := range ir.Services {
 		kept := make([]api.MethodIR, 0, len(service.Methods))
 		for _, method := range service.Methods {
 			if method.Path != "/whoami" {
@@ -157,12 +131,12 @@ func TestARemovedOperationIsDetected(t *testing.T) {
 	broken, err := api.GenerateClientFromIR(amputated, api.ClientGenOptions{
 		PackageName: ClientPackage,
 		ClientName:  ClientName,
-		Design:      &api.ClientDesignOptions{Operations: rendered.producers},
+		Design:      &api.ClientDesignOptions{},
 	})
 	if err != nil {
 		t.Fatalf("generate client from the amputated contract: %v", err)
 	}
-	if broken == rendered.src {
+	if broken == rendered {
 		t.Fatal("removing a declared operation rendered the same client")
 	}
 	// The method itself, not the embedded descriptor: a client generated from a
@@ -171,7 +145,7 @@ func TestARemovedOperationIsDetected(t *testing.T) {
 	if strings.Contains(broken, whoamiMethod) {
 		t.Fatal("the render kept a method for an operation the contract no longer declares")
 	}
-	if !strings.Contains(rendered.src, whoamiMethod) {
-		t.Fatal("the committed contract no longer declares the operation this check removes")
+	if !strings.Contains(rendered, whoamiMethod) {
+		t.Fatal("the described contract no longer declares the operation this check removes")
 	}
 }

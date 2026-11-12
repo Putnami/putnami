@@ -153,10 +153,8 @@ func BuildRunVersions(ws *workspace.Workspace, snapshot *putnamigit.VersionInfo)
 	head, headErr := putnamigit.ReadHead(ws.Root, snapshot)
 	for _, line := range runVersionLines(ws) {
 		pattern := cachekey.LineTagPattern(ws, line)
-		spec := putnamigit.LineSpec{ScopePath: line, TagPattern: pattern, Stable: stable}
-		if line != "" {
-			spec.Pathspecs = []string{line}
-		}
+		spec := putnamigit.LineSpec{ScopePath: line, TagPattern: pattern, Stable: stable,
+			Pathspecs: workspace.LinePathspecs(ws, line)}
 		info, err := (*putnamigit.VersionInfo)(nil), headErr
 		if headErr == nil {
 			info, err = head.LineVersion(spec)

@@ -324,7 +324,8 @@ describe('generateTypeScriptClient', () => {
     const files = generateTypeScriptClient(makeSpec(), { packageName: '@test/users-client' });
     const paths = files.map((f) => f.path).sort((left, right) => left.localeCompare(right));
 
-    expect(paths).toEqual(['package.json', 'src/index.ts', 'src/types.ts', 'src/users-client.ts', 'tsconfig.json']);
+    // The closure is `src/` alone: the client project authors its package.json and tsconfig.json.
+    expect(paths).toEqual(['src/index.ts', 'src/types.ts', 'src/users-client.ts']);
   });
 
   test('generates types.ts with interfaces', () => {
@@ -358,94 +359,6 @@ describe('generateTypeScriptClient', () => {
     expect(client).toContain('export class UsersClient extends BaseClient');
     expect(client).toContain("readonly serviceName = 'users'");
     expect(client).toContain('constructor(config: ClientConfig)');
-  });
-
-  test('embeds exact producer feature and operation descriptors when declared', () => {
-    const files = generateTypeScriptClient(makeSpec({ specHash: 'spec-123' }), {
-      packageName: '@test/users-client',
-      design: {
-        operations: [
-          { method: 'GET', path: '/users/{id}', producerProject: '@test/users', producerFeature: 'users/manage' },
-        ],
-      },
-    });
-    const client = files.find((file) => file.path === 'src/users-client.ts')?.content;
-
-    expect(client).toContain('type GeneratedClientDesign');
-    expect(client).toContain(
-      '"operationId":"getUser","method":"GET","path":"/users/{id}","producerProject":"@test/users","producerFeature":"users/manage"',
-    );
-    expect(client).toContain('super({ ...config, design: UsersClient.design })');
-    // The canonical operation id travels with the call so the runtime resolves
-    // the trace from the invoked operation, not by reverse-matching the URL.
-    expect(client).toContain("operationId: 'getUser',");
-  });
-
-  // The regression fixture the per-operation contract exists for: one generated
-  // client whose operations belong to two producer features plus one that
-  // belongs to none.
-  test('attributes each operation to its own producer and leaves the rest unattributed', () => {
-    const files = generateTypeScriptClient(makeSpec({ specHash: 'spec-123' }), {
-      packageName: '@test/users-client',
-      design: {
-        operations: [
-          { method: 'GET', path: '/users/{id}', producerProject: '@test/users', producerFeature: 'users/read' },
-          { method: 'POST', path: '/users', producerProject: '@test/users', producerFeature: 'users/manage' },
-        ],
-      },
-    });
-    const client = files.find((file) => file.path === 'src/users-client.ts')?.content ?? '';
-
-    expect(client).toContain('"operationId":"getUser","method":"GET","path":"/users/{id}"');
-    expect(client).toContain('"producerFeature":"users/read"');
-    expect(client).toContain('"producerFeature":"users/manage"');
-    // listUsers (GET /users) is in neither table entry: it must stay bare.
-    expect(client).toContain('{"operationId":"listUsers","method":"GET","path":"/users"}');
-  });
-
-  // Cloud's case: the TypeScript symbol normalizer rewrites the punctuation the
-  // canonical operation id keeps, so the descriptor and the call must carry the
-  // canonical id, never the symbol.
-  test('preserves a canonical operation id the TypeScript symbol cannot keep', () => {
-    const spec: SpecIR = {
-      irVersion: 1,
-      transport: 'http',
-      specHash: 'spec-123',
-      services: [
-        {
-          name: 'OperatorService',
-          className: 'OperatorClient',
-          methods: [
-            {
-              name: 'getV1_Operator_Cli_usage',
-              operationId: 'getV1_Operator_Cli-usage',
-              httpMethod: 'GET',
-              path: '/v1/operator/cli-usage',
-              response: [{ name: 'total', tsType: 'number', optional: false, array: false }],
-            },
-          ],
-        },
-      ],
-    };
-    const files = generateTypeScriptClient(spec, {
-      packageName: '@test/operator-client',
-      design: {
-        operations: [
-          {
-            method: 'GET',
-            path: '/v1/operator/cli-usage',
-            producerProject: 'acme-platform',
-            producerFeature: 'platform/operator-cli-usage',
-          },
-        ],
-      },
-    });
-    const client = files.find((file) => file.path === 'src/operator-client.ts')?.content ?? '';
-
-    expect(client).toContain('async getV1_Operator_Cli_usage(');
-    expect(client).toContain('"operationId":"getV1_Operator_Cli-usage"');
-    expect(client).toContain("operationId: 'getV1_Operator_Cli-usage',");
-    expect(client).toContain('"producerFeature":"platform/operator-cli-usage"');
   });
 
   test('generates HTTP methods with correct arguments', () => {
@@ -498,28 +411,6 @@ describe('generateTypeScriptClient', () => {
 
     expect(index).toContain("export * from './types'");
     expect(index).toContain("export { UsersClient } from './users-client'");
-  });
-
-  test('generates package.json', () => {
-    const files = generateTypeScriptClient(makeSpec(), {
-      packageName: '@test/users-client',
-      version: '1.2.3',
-    });
-    const pkg = JSON.parse(files.find((f) => f.path === 'package.json')?.content ?? '');
-
-    expect(pkg.name).toBe('@test/users-client');
-    expect(pkg.version).toBe('1.2.3');
-    expect(pkg.main).toBe('src/index.ts');
-    expect(pkg.dependencies['@putnami/client']).toBe('workspace:*');
-  });
-
-  test('pins @putnami/client with the caller-resolved specifier', () => {
-    const files = generateTypeScriptClient(makeSpec(), {
-      packageName: '@test/users-client',
-      clientDependency: 'catalog:',
-    });
-    const pkg = JSON.parse(files.find((f) => f.path === 'package.json')?.content ?? '');
-    expect(pkg.dependencies['@putnami/client']).toBe('catalog:');
   });
 
   test('generates auto-generated header', () => {

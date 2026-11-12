@@ -454,6 +454,12 @@ export interface ClientContractOperation {
   readonly errors: readonly ClientDeclaredError[];
   readonly idempotency: ClientIdempotencyPolicy;
   readonly resilience?: ClientResiliencePolicy;
+  /**
+   * The project and feature that produce this operation. A generated client
+   * carries it into its design declaration. It is absent when the provider
+   * declares no feature for the operation.
+   */
+  readonly producer?: { readonly project: string; readonly feature: string };
 }
 
 /** Logical stream message schemas; websocket upgrades do not invent HTTP response bodies. */

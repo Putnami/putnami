@@ -281,6 +281,14 @@ func ValidateOperation(operation *OperationV1, document *DocumentV1) []diag.Diag
 		return []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, "", "operation metadata is nil")}
 	}
 	var diags []diag.Diagnostic
+	if producer := operation.Producer; producer != nil {
+		if strings.TrimSpace(producer.Project) == "" {
+			diags = append(diags, diag.Errorf(ErrorCodeRequired, "producer.project", "an operation producer names its project"))
+		}
+		if strings.TrimSpace(producer.Feature) == "" {
+			diags = append(diags, diag.Errorf(ErrorCodeRequired, "producer.feature", "an operation producer names its feature"))
+		}
+	}
 	if !validStream(operation.Stream) {
 		diags = append(diags, diag.Errorf(ErrorCodeInvalidEnum, "stream",
 			"stream mode %q is unsupported", operation.Stream))

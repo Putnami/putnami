@@ -136,6 +136,7 @@
   ],
   "commands": {
     "build": {
+      "dependsOn": ["client-generate"],
       "description": "Build project: generate code, transpile library and/or compile bundled output.",
       "flags": {
         "transpile": {
@@ -333,6 +334,7 @@
       ]
     },
     "test": {
+      "dependsOn": ["client-generate"],
       "description": "Run tests.",
       "activationFiles": [
         "**/*.test.ts",
@@ -522,6 +524,7 @@
       ]
     },
     "serve": {
+      "dependsOn": ["client-generate"],
       "description": "Serve an application with hot-reload.",
       "traits": {
         "requiresRunnable": true,
@@ -713,6 +716,7 @@
       "run": [{ "id": "api", "task": "validate-api" }]
     },
     "lint": {
+      "dependsOn": ["client-generate"],
       "description": "Lint and format project code.",
       "activationFiles": [
         "**/*.ts",
@@ -791,6 +795,7 @@
       ]
     },
     "package": {
+      "dependsOn": ["client-generate"],
       "description": "Create distribution packages (npm, docker).",
       "traits": {
         "injectPublishChannels": true
@@ -1297,14 +1302,10 @@
       "outputs": {
         "data": {
           "description": "Generated code metadata and exports map"
-        },
-        "clientOutput": {
-          "description": "Project-relative directory of the generated TypeScript client, reported only when the client generator emitted one. This is the pathFrom anchor for the clients half of the ownership decision above: the directory is chosen by the project's clientgen config, so it is declarable only through this port. The consumer reads it under this exact name."
         }
       },
       "writes": [
-        "gen",
-        "clients"
+        "gen"
       ],
       "reads": [
         "sources"
@@ -1335,14 +1336,6 @@
             ],
             "description": "Generated sources: the whole project-rooted .gen subtree, owned exclusively by this task, minus .gen/deployment.json, which it cedes to package-deployment, .gen/requirements.json and .gen/infra/runtime.json, which it cedes to build-infra (those tasks write the files after this task's snapshot and declare them), .gen/layers and .gen/site-content, which it cedes to cloud-image-layers and cloud-site-content-generate of @putnami/cloud, which declare them, and .gen/config-schema.json with its .gen/config-schema.jsonschema.json companion, the config-extract fallback that only config-extract-exec writes and nobody claims, so an execution or a restore of this task leaves them in place."
           },
-          "client": {
-            "kind": "directory",
-            "pathFrom": "clientOutput",
-            "optionalEmpty": true,
-            "preserves": [".gen", "node_modules", "putnami.json"],
-            "drift": "fail",
-            "description": "Generated TypeScript client at the config-chosen directory the clientOutput port reports; absent when the project generates no client. The client is committed, and this task is the FIRST writer of that directory in a session, so the engine compares what it writes (or a cache hit restores) with the bytes present before and fails the task on a difference — the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document a workspace commits inside the directory, and the dependency install the workspace materializes there when the client is a package of its own, are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
-          },
           "capabilities": {
             "kind": "file",
             "root": "project",
@@ -1356,7 +1349,7 @@
             "path": "schema/openapi.json",
             "optionalEmpty": true,
             "drift": "fail",
-            "description": "The project's committed OpenAPI contract, written by the application's openapi() document at slot 0 during this task's pre-build hook — the one document clientGenerator(), workspace client discovery and compose read. It is committed, and this task is its first writer in a session, so the engine compares what it writes (or a cache hit restores) with the bytes present before and fails the task with generated-output-drift on a difference — the worktree then holds the regenerated contract to commit (protocols/extension ADR 0004). Absent for a project without openapi(), or whose document sets output to false or to another path."
+            "description": "The project's committed OpenAPI contract, written by the application's openapi() document at slot 0 during this task's pre-build hook — the one document every client project of this provider generates from, and that workspace client discovery and compose read. It is committed, and this task is its first writer in a session, so the engine compares what it writes (or a cache hit restores) with the bytes present before and fails the task with generated-output-drift on a difference — the worktree then holds the regenerated contract to commit (protocols/extension ADR 0004). Absent for a project without openapi(), or whose document sets output to false or to another path."
           },
           "httpRoutes": {
             "kind": "file",
@@ -2532,11 +2525,7 @@
           "description": "Test execution result with pass/fail counts"
         }
       },
-      "reads": [
-        "gen",
-        "sources",
-        { "id": "workspace-clients", "scope": "workspace" }
-      ],
+      "reads": ["gen", "sources"],
       "batchable": {
         "tool": "bun",
         "kind": "verification",

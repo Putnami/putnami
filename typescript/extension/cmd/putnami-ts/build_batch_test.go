@@ -349,11 +349,9 @@ func TestRunBuildGenerateBatch_EqualsSolo(t *testing.T) {
 	if !reflect.DeepEqual(got["assets"], soloData["assets"]) {
 		t.Fatalf("batch assets %v != solo assets %v", got["assets"], soloData["assets"])
 	}
-	// clientOutput presence must match (both absent here — no client generator).
-	_, soloHasClient := soloData["clientOutput"]
-	_, batchHasClient := got["clientOutput"]
-	if soloHasClient != batchHasClient {
-		t.Fatalf("clientOutput presence mismatch: solo=%v batch=%v", soloHasClient, batchHasClient)
+	// Both payloads carry the same members, and nothing else.
+	if len(got) != len(soloData) {
+		t.Fatalf("batch data members %v != solo data members %v", got, soloData)
 	}
 }
 

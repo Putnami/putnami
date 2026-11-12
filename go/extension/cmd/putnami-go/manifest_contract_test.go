@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"go.putnami.dev/go/extension/internal/codegen"
 	"go.putnami.dev/go/extension/internal/jobs/configmerge"
 	"go.putnami.dev/go/extension/internal/toolchain"
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -349,16 +348,15 @@ type ownerRow struct {
 	// it.
 	excludes string
 	// drift is the declaration's drift policy (protocols/extension ADR 0004).
-	// The committed generated client is the ONE output that carries it: this
-	// task is the first writer of that directory in a session, so it is the
-	// only place the pre-write bytes can be compared with.
+	// No output of this manifest carries one: the extension writes no
+	// committed file it is the first writer of in a session.
 	drift string
 	// emptied asks the engine to empty an optional directory output before its
 	// task executes and on a restore of an entry that records it empty
-	// (protocols/extension ADR 0009, CLI ADR 0068). Only the two describe trees
-	// a later key leaves out carry it: .gen/schema and .gen/clientgen hold no
-	// byte describe's key does not fix, so the clientgen keys fold that key
-	// instead of hashing the bytes describe writes during the run.
+	// (protocols/extension ADR 0009, CLI ADR 0068). Only the describe tree a
+	// later key leaves out carries it: .gen/schema holds no byte describe's key
+	// does not fix, so the clientgen keys fold that key instead of hashing the
+	// bytes describe writes during the run.
 	emptied bool
 }
 
@@ -414,13 +412,11 @@ func (r ownerRow) String() string {
 //     directory, because other frameworks' evidence files may share the
 //     directory. A hit then restores the evidence of the binding its store
 //     key binds (cache.sourceBound, CLI ADR 0069).
-//   - build-describe's `.gen/schema` and `.gen/clientgen` are the only
-//     optional project outputs that declare `emptied`. No committed file lives
-//     in either: a provider slice commits its generation contract as
-//     clientgen.json at its root. The engine empties both before describe
-//     executes and on a restore of an entry that records them empty, so a
-//     describe that skips or writes nothing leaves no earlier run's bytes for
-//     the clientgen tasks to read.
+//   - build-describe's `.gen/schema` is the only optional project output that
+//     declares `emptied`. No committed file lives in it. The engine empties it
+//     before describe executes and on a restore of an entry that records it
+//     empty, so a describe that skips or writes nothing leaves no earlier run's
+//     contract for the clientgen tasks to read.
 //   - test-env-up's two rows are the only INVOCATION-scoped outputs here (an
 //     earlier migration). They collide with nothing by construction: they live in
 //     the orchestrator's private per-invocation tree, not in the project or the
@@ -435,14 +431,11 @@ func (r ownerRow) String() string {
 // TestTheArchivePackagerOwnsTheArchivePublicationManifest pins the one that
 // stopped being one.
 func TestDeclaredOutputOwnerTable(t *testing.T) {
-	spectest.Proves(t, "go/go-project-toolchain", "committed-client-drift", "the-describe-client-output-declares-fail-on-drift")
 	m := loadExtensionManifest(t)
 
 	want := []ownerRow{
 		{task: "build-compile", id: "bin", kind: "directory", root: "command-output", path: "bin", optionalEmpty: true},
 		{task: "build-cross-compile", id: "bin", kind: "directory", root: "command-output", path: "bin", optionalEmpty: true},
-		{task: "build-describe", id: "client", kind: "directory", root: "project", path: "clientOutputs", optionalEmpty: true, drift: "fail"},
-		{task: "build-describe", id: "clientgen", kind: "directory", root: "project", path: ".gen/clientgen", optionalEmpty: true, emptied: true},
 		{task: "build-describe", id: "design", kind: "directory", root: "project", path: ".gen/design", optionalEmpty: true},
 		// The committed feature evidence. It names the project's source
 		// binding, and a describe hit must restore the evidence its store
@@ -549,7 +542,6 @@ func rowsString(rows []ownerRow) string {
 // cededGenOwner records that second statement for every row.
 var cededGenSubpaths = []string{
 	".gen/.describe.lock",
-	".gen/clientgen",
 	".gen/conf",
 	".gen/config-deps.json",
 	".gen/deployment.json",
@@ -591,7 +583,6 @@ var cededGenOwner = map[string][]cededClaim{
 	// invocation must serialize on the SAME mutex, and a per-command output
 	// directory would give them two.
 	".gen/.describe.lock": nil,
-	".gen/clientgen":      {{task: "build-describe", output: "clientgen"}},
 	// The merged config file, claimed by BOTH config-merge tasks: the
 	// test variant at the literal .gen/conf/.env.test.yaml, the build variant
 	// at the environment-suffixed path its mergedConfig port reports. The two
@@ -1451,35 +1442,6 @@ func TestConfigMergeKeysOnTheClosureConfigFiles(t *testing.T) {
 		if !slices.Equal(key.ClosureFiles, []string{"conf/.env.*.yaml", "conf/.env.yaml"}) {
 			t.Errorf("%s derived closureFiles = %v, want the two config patterns", name, key.ClosureFiles)
 		}
-	}
-}
-
-// TestDescribeDeclaresTheClientOutputPort pins the runtime↔manifest link the
-// client half of the ownership decision rests on: the generated client's
-// directory is chosen by the project's clientgen config, so it is declarable
-// only through a data output port, and the consumer reads it back by name. A
-// rename on either side would silently stop the client from being captured.
-func TestDescribeDeclaresTheClientOutputPort(t *testing.T) {
-	m := loadExtensionManifest(t)
-	describe, ok := m.Tasks["build-describe"]
-	if !ok {
-		t.Fatal("manifest task \"build-describe\" is missing")
-	}
-	if _, ok := describe.Outputs[codegen.GeneratedClientOutputPort]; !ok {
-		t.Fatalf("build-describe does not declare the %q output port the runtime reports the generated client directory on",
-			codegen.GeneratedClientOutputPort)
-	}
-	if describe.Declares == nil {
-		t.Fatal("build-describe lost its v3 declaration")
-	}
-	client, ok := describe.Declares.Outputs["client"]
-	if !ok || client.PathFrom != codegen.GeneratedClientOutputPort || !client.OptionalEmpty {
-		t.Fatalf("client ownership = %+v, want optional-empty pathFrom %q", client, codegen.GeneratedClientOutputPort)
-	}
-	// The module files, the project document and the client project's own .gen
-	// belong to the workspace (protocol ADR 0005).
-	if got, want := proto.DecidablePreserves(client), []string{".gen", "go.mod", "go.sum", "putnami.json"}; !slices.Equal(got, want) {
-		t.Errorf("client preserves %v, want %v", got, want)
 	}
 }
 
@@ -2970,5 +2932,24 @@ func TestWithCISetLintAndBuildScheduleNoStepThatWritesSources(t *testing.T) {
 	}
 	if len(check.Writes) != 0 || (check.Declares != nil && check.Declares.MutatesSources) {
 		t.Errorf("build-tidy-check declares writes %v; a check writes nothing", check.Writes)
+	}
+}
+
+// TestLifecycleCommandsWaitForClientGeneration pins that every command that
+// compiles, checks, serves or packages a project first runs that project's
+// client-generate: a generated client project builds its client from the
+// provider's contract before anything reads it. A project without the command
+// plans nothing more.
+func TestLifecycleCommandsWaitForClientGeneration(t *testing.T) {
+	m := loadExtensionManifest(t)
+	for _, name := range []string{"build", "test", "lint", "serve", "package"} {
+		command, ok := m.Commands[name]
+		if !ok {
+			t.Errorf("command %q is missing", name)
+			continue
+		}
+		if !slices.Contains(command.DependsOn, "client-generate") {
+			t.Errorf("command %q dependsOn = %v, want it to include client-generate", name, command.DependsOn)
+		}
 	}
 }

@@ -179,3 +179,17 @@ func TestTheCommittedCensusIsValidAndOnlyCoversHandwrittenTransports(t *testing.
 	}
 	t.Logf("committed census: %d entries covering %d callsites", len(census.Entries), total)
 }
+
+// repositoryRootForTest is the root of this repository, four levels above
+// this package.
+func repositoryRootForTest(t *testing.T) string {
+	t.Helper()
+	root, err := filepath.Abs(filepath.Join("..", "..", "..", ".."))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "putnami.workspace.json")); err != nil {
+		t.Fatalf("resolve repository root from %s: %v", root, err)
+	}
+	return root
+}

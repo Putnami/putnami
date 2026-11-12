@@ -4,11 +4,9 @@ import (
 	"testing"
 
 	clientcontract "go.putnami.dev/protocol/clientcontract"
-	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestConsumerEdgesUseActualManifestBindingSymbols(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "consumer-lineage", "each-imported-binding-reports-provider-operation-artifact-consumer-auth-and-transport")
 	root := t.TempDir()
 	writeSourceIndex(t, root, "consumers/go", "consumers/ts")
 	writeWorkspaceFile(t, root, "consumers/go/putnami.json", `{"name":"go-consumer"}`)

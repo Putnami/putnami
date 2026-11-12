@@ -290,10 +290,10 @@ func declaredOutputPath(output extension.DeclaredOutput, data map[string]any) (s
 }
 
 // declaredPortPathValue reads a task output port's reported path from the
-// executed result data. Both wire shapes the extensions use are accepted: a
-// single string (typescript's clientOutput) and a list (go's clientOutputs), of
+// executed result data. Two wire shapes are accepted: a single string, such as
+// the moduleClientOutput the clientgen in-module target reports, and a list, of
 // which the first usable entry wins, keeping the recorded path deterministic
-// when a task reports more than one client directory.
+// when a task reports more than one path.
 func declaredPortPathValue(data map[string]any, port string) (string, bool) {
 	if data == nil || port == "" {
 		return "", false

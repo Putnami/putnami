@@ -20,9 +20,11 @@ Four steps, in this order. Nothing else is consumer-owned.
 1. **Declare.** `src/main.ts` declares the client contract on `api({ client: … })`;
    the endpoints under `src/api/` declare their query string, request headers,
    body, response and the errors they may throw.
-2. **Generate.** `putnami clientgen --projects @example/10-service-to-service`
-   emits `clients/ts` and `clients/go` from the provider's own OpenAPI document,
-   each with an ownership manifest. Both trees are committed.
+2. **Generate.** `clients/ts` and `clients/go` each name the provider's
+   service, `catalog.items`, in the `generatedFrom` member of their
+   `putnami.json`. `putnami client-generate` builds each one from the
+   provider's committed `schema/openapi.json`, and every build, test and serve
+   command runs it first. Git holds no generated file.
 3. **Register the binding.** `registerItemsClient(instance)` in `src/main.ts`
    (TypeScript) or `RegisterItemsClient(module)` (Go). The `clients` block of the
    configuration carries the base URL and the credential values — nothing else.
@@ -138,7 +140,7 @@ Inspect the functional and technical path with:
 
 ```bash
 ./putnamiw build --projects @example/10-service-to-service
-./putnamiw clientgen --projects @example/10-service-to-service
+./putnamiw client-generate --projects @example/items-client,go.putnami.dev/examples/ts-items-client
 ./putnamiw features inspect items/manage
 ```
 
@@ -164,11 +166,12 @@ what `src/api/proxy/get.ts` calls. The test drives the generated typed client
 rather than raw `fetch`, so a provider change that was not regenerated fails the
 suite instead of failing at runtime.
 
-`clients/go/` is the committed cross-language client for the same contract. It
-is generated, not written, and it is committed the way a `.pb.go` is — so
-reviewing an API change means reviewing what it did to every consumer. Its
-`client.gen.go` carries the operation set the document declares; regenerating it
-after a provider change is part of changing the provider.
+`clients/go/` is the cross-language client for the same contract. It is
+generated, not written, and it is built, not committed: its `putnami.json`
+names the provider in `generatedFrom`, and `client-generate` writes its
+`client.gen.go` from the provider's committed `schema/openapi.json`. Reviewing
+an API change means reviewing the contract diff. A contract change moves the
+client's cache key, so the next build regenerates it.
 
 ## The cross-language matrix
 

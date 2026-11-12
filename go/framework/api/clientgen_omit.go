@@ -10,9 +10,8 @@ import (
 // omitOperations returns spec without the operations named in names, and the
 // operations it left out, in contract order. The input spec is not modified.
 //
-// It is the only place a Go target leaves an operation out, and the emitter,
-// the ownership manifest and the design graph all call it, so the three can
-// never disagree about which operations the target has.
+// It is the only place a Go client leaves an operation out, so the emitter and
+// its callers never disagree about which operations the client has.
 //
 // A name the contract does not declare fails. An entry that matches nothing
 // would read as a decision while changing nothing, and a mistyped one would
@@ -44,7 +43,7 @@ func omitOperations(spec SpecIR, names []string) (SpecIR, []MethodIR, error) {
 	for _, name := range names {
 		if !found[name] {
 			return SpecIR{}, nil, errors.Newf(CodeClientGenConfig,
-				"api: go.omitOperations names operation %q, which the contract does not declare", name)
+				"api: omitOperations names operation %q, which the contract does not declare", name)
 		}
 	}
 	spec.Services = services
@@ -65,14 +64,14 @@ func omittedOperationIDs(omitted []MethodIR) []string {
 }
 
 // emitOmittedOperations continues a client's doc comment with every operation
-// go.omitOperations left out, so the generated source names each one whichever
-// emitter wrote it. It writes nothing when none was left out.
+// omitOperations left out, so the generated source names each one. It writes
+// nothing when none was left out.
 func emitOmittedOperations(source *strings.Builder, omitted []MethodIR) {
 	if len(omitted) == 0 {
 		return
 	}
-	source.WriteString("//\n// The client configuration leaves these operations out of the Go target\n")
-	source.WriteString("// (go.omitOperations), so they have no method here:\n//\n")
+	source.WriteString("//\n// The client's generatedFrom leaves these operations out (omitOperations),\n")
+	source.WriteString("// so they have no method here:\n//\n")
 	for _, method := range omitted {
 		fmt.Fprintf(source, "//   - %s (%s %s)\n", method.OperationID, strings.ToUpper(method.HTTPMethod), method.Path)
 	}

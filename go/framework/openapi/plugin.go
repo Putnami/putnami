@@ -374,6 +374,7 @@ func fromAPIRoute(r api.DiscoveredRoute) DiscoveredRoute {
 		Throws:             throws,
 		Security:           security,
 		ClientOptions:      r.Meta.ClientOptions,
+		Producer:           r.Producer,
 	}
 }
 

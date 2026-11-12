@@ -22,13 +22,6 @@ type artifactReader interface {
 	List(prefix string) ([]string, error)
 }
 
-// Inspect discovers provider contracts from the built tree and verifies the
-// generated target closure of the worktree against itself: manifests parse,
-// hashes match bytes, operations cover the contract. It renders nothing.
-func Inspect(workspaceRoot string, mode Mode) Report {
-	return inspect(indexedView(workspaceRoot), discover, "", mode)
-}
-
 // InspectCommitted is the guard's inspection (`clientgen-check`, and the
 // `validate` contribution). members are the workspace-relative directories of
 // the projects the orchestrator resolved as workspace members. Inside a Git
@@ -60,27 +53,14 @@ func InspectCommitted(workspaceRoot string, members []string) Report {
 		canonicalizeReport(&report)
 		return report
 	}
-	return inspect(view, discoverCommitted, "", ModeCheck)
+	return inspect(view)
 }
 
-// InspectRendered compares a fresh ephemeral generator render with the worktree
-// bytes. expectedRoot must mirror provider paths below workspaceRoot. It is the
-// sync and adopt commands' verification: they regenerated in place, so the
-// worktree and the render are expected to agree byte for byte.
-func InspectRendered(workspaceRoot, expectedRoot string, mode Mode) Report {
-	return inspect(indexedView(workspaceRoot), discover, expectedRoot, mode)
-}
-
-func inspect(view workspaceView, discovery func(workspaceView) ([]provider, []Finding), expectedRoot string, mode Mode) (report Report) {
+func inspect(view workspaceView) (report Report) {
 	inspectStarted := time.Now()
 	workspaceRoot := view.root
-	providers, findings := discovery(view)
-	var committed artifactReader = view.workspaceFiles
-	expected := committed
-	if expectedRoot != "" {
-		expected = workspaceFiles{root: expectedRoot}
-	}
-	report = inspectWithReader(workspaceRoot, mode, providers, findings, committed, expected)
+	providers, findings := discoverCommitted(view)
+	report = inspectWithReader(providers, findings, view.workspaceFiles, view.workspaceFiles)
 	report.ExternalContracts, findings = loadAndValidateExternalInventory(view, providers)
 	report.Findings = append(report.Findings, findings...)
 	report.FrameworkTransports, findings = loadAndValidateFrameworkInventory(view)
@@ -124,17 +104,16 @@ func inspect(view workspaceView, discovery func(workspaceView) ([]provider, []Fi
 }
 
 // inspectWithReader judges every first-party provider's configured targets:
-// committed is the tree under judgment (the worktree), expected is the render
-// it must equal — the same reader when nothing was rendered.
+// committed is the tree under judgment (the worktree), expected is the tree
+// that names what it must hold. The guard passes one reader for both; a test
+// passes two to judge one tree against another.
 func inspectWithReader(
-	workspaceRoot string,
-	mode Mode,
 	providers []provider,
 	findings []Finding,
 	committed artifactReader,
 	expected artifactReader,
 ) Report {
-	report := Report{ProtocolVersion: 1, Mode: mode, Findings: append([]Finding(nil), findings...)}
+	report := Report{ProtocolVersion: 1, Mode: ModeCheck, Findings: append([]Finding(nil), findings...)}
 	for _, item := range providers {
 		providerReport := ProviderReport{
 			Project: item.rel, Classification: item.classification, ContractSHA256: item.contractHash,
@@ -182,8 +161,6 @@ func inspectWithReader(
 	} else {
 		report.Coverage.Percent = report.Coverage.Covered * 100 / report.Coverage.Required
 	}
-	_ = workspaceRoot
-	_ = mode
 	return report
 }
 
@@ -455,9 +432,6 @@ func canonicalizeReport(report *Report) {
 			return report.Providers[i].Targets[a].Language < report.Providers[i].Targets[b].Language
 		})
 	}
-	sort.Slice(report.AppliedAdaptations, func(i, j int) bool {
-		return adaptationSortKey(report.AppliedAdaptations[i]) < adaptationSortKey(report.AppliedAdaptations[j])
-	})
 	sort.Slice(report.AdaptationQueue, func(i, j int) bool {
 		return adaptationSortKey(report.AdaptationQueue[i]) < adaptationSortKey(report.AdaptationQueue[j])
 	})

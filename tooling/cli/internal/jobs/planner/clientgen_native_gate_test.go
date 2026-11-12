@@ -4,11 +4,11 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
@@ -17,8 +17,7 @@ import (
 
 // The native validation gate: `putnami validate` must reject new handwritten
 // first-party transports and inconsistent committed clients for the WHOLE
-// workspace, from any selection, and must judge a selected provider's client
-// drift in the same session.
+// workspace, from any selection.
 //
 // Three properties make that true, and none is visible from the extension's
 // own tests:
@@ -28,13 +27,10 @@ import (
 //     project's extension list, so no project can opt out of the guard by not
 //     depending on @putnami/clientgen — and it plans exactly one node however
 //     many projects the selection resolves to.
-//  2. GENERATION BEFORE THE GUARD. The guard's command depends on the
-//     `!clientgen` session barrier: the planner plans `clientgen` for every
-//     selected project that declares the extension (a provider), and orders
-//     the guard after those leaves. A selected provider therefore regenerates
-//     every target in place, with the engine judging drift on the generators'
-//     declared outputs (task_drift.go), before the guard reads the tree. A
-//     consumer-only selection plans no generation at all.
+//  2. NO GENERATION. The guard's command depends on nothing, so validate
+//     plans no generation for any selection: the guard reads the committed
+//     tree, and a generated client is built, not committed (clientgen ADR
+//     0007).
 //  3. NO NESTED SESSION. The guard reads committed inputs and spawns no
 //     Putnami. The pre-session artifact baseline it used to earn through a
 //     workspace-scoped, uncacheable declaration is gone with the render it
@@ -43,7 +39,7 @@ import (
 //     candidate cut the guard reads and nothing else (clientgen ADR 0006).
 //
 // These assertions read the REAL manifest. A guard that stops being planned,
-// loses its barrier, or loses its key would keep passing its own unit tests
+// gains a dependency, or loses its key would keep passing its own unit tests
 // while silently verifying the wrong tree or re-running on every invocation.
 
 const clientgenExtensionName = "@putnami/clientgen"
@@ -131,19 +127,19 @@ func TestNativeValidatePlansOneClientgenGuardForAnySelection(t *testing.T) {
 	}
 }
 
-// TestNativeValidateGuardWaitsForTheSelectedProvidersGeneration pins the
-// barrier and the declaration pair: a selected provider's clientgen tasks are
-// planned and the guard depends on their leaves; a consumer-only selection plans
-// none and the guard depends on nothing.
-func TestNativeValidateGuardWaitsForTheSelectedProvidersGeneration(t *testing.T) {
+// TestNativeValidatePlansNoGeneration pins that validate plans the guard and
+// nothing else: not for a consumer-only selection, and not for a selection
+// that holds a provider with an in-module target and a client project that
+// names its provider in generatedFrom.
+func TestNativeValidatePlansNoGeneration(t *testing.T) {
+	spectest.Proves(t, "tooling/cross-language-rest-clients", "native-validation-gate", "validate-plans-no-generation")
 	description := loadClientgenExtension(t)
 	command := description.Jobs["validate"]
-	if command == nil || !slices.Contains(command.CommandDependsOn, "!clientgen") {
-		t.Fatalf("validate dependsOn = %v, want the !clientgen session barrier: without it a selected provider's "+
-			"clients are never regenerated before the guard reads them", command.CommandDependsOn)
+	if command == nil || len(command.CommandDependsOn) != 0 {
+		t.Fatalf("validate = %+v, want a command that depends on nothing", command)
 	}
 
-	// Consumer-only selection: one guard, no generation, no dependency.
+	// Consumer-only selection: one guard, no dependency.
 	guard := clientgenNodes(planValidate(t, 3))[0]
 	if len(guard.DependsOn) != 0 {
 		t.Fatalf("a consumer-only validate gave the guard dependencies %v; nothing should have been planned for it", guard.DependsOn)
@@ -161,50 +157,38 @@ func TestNativeValidateGuardWaitsForTheSelectedProvidersGeneration(t *testing.T)
 		t.Fatal("the guard is not cacheable; it reads the Git candidate cut its git:** key hashes (clientgen ADR 0006)")
 	}
 
-	// A selected provider: its clientgen tasks are planned and the guard waits
-	// for them.
+	// A provider with an in-module target and a client project: still the
+	// guard alone.
 	root := t.TempDir()
+	writeProjectFile(t, root, "provider", "go.mod", "module example.com/provider\n\ngo 1.25\n")
+	writeProjectFile(t, root, "provider", "clientgen.json", `{"targets":["go"],"go":{"output":"client"}}`)
+	writeProjectFile(t, root, "client", "go.mod", "module example.com/client\n\ngo 1.25\n")
+	writeProjectFile(t, root, "client", wsproto.ConfigFilename, `{"name":"client","generatedFrom":{"service":"items","language":"go"}}`)
 	provider := &workspace.Project{
 		ID: "/provider", Name: "provider", Path: "provider", Type: "library",
 		Extensions: []string{clientgenExtensionName},
 	}
-	consumer := &workspace.Project{
-		ID: "/consumer", Name: "consumer", Path: "consumer", Type: "library",
+	client := &workspace.Project{
+		ID: "/client", Name: "client", Path: "client", Type: "library",
 		Extensions: []string{"@putnami/go"},
+		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "client")),
 	}
-	ws := &workspace.Workspace{Root: root, Name: "mixed", Projects: []*workspace.Project{provider, consumer}}
-	planned, err := Plan(ws, []string{"validate"}, []*workspace.Project{provider, consumer},
+	ws := &workspace.Workspace{Root: root, Name: "mixed", Projects: []*workspace.Project{provider, client}}
+	planned, err := Plan(ws, []string{"validate"}, []*workspace.Project{provider, client},
 		[]*extension.ExtensionDescription{description}, nil, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("plan validate with a provider: %v", err)
+		t.Fatalf("plan validate with a provider and a client: %v", err)
 	}
-	var generators []string
-	guard = nil
-	for _, node := range clientgenNodes(planned) {
-		switch {
-		case node.Step != nil && node.Step.Task == "clientgen-workspace-check":
-			guard = node
-		case node.CommandName() == "clientgen":
-			generators = append(generators, node.Key())
+	nodes := clientgenNodes(planned)
+	if len(nodes) != 1 || nodes[0].Step == nil || nodes[0].Step.Task != "clientgen-workspace-check" {
+		keys := make([]string, 0, len(nodes))
+		for _, node := range nodes {
+			keys = append(keys, node.Key())
 		}
+		t.Fatalf("validate planned %v, want the guard alone", keys)
 	}
-	sort.Strings(generators)
-	if guard == nil {
-		t.Fatal("no guard planned beside the provider's generation")
-	}
-	want := []string{"/provider:clientgen~generate-go", "/provider:clientgen~generate-ts"}
-	if !slices.Equal(generators, want) {
-		t.Fatalf("clientgen tasks planned for the selected provider = %v, want %v", generators, want)
-	}
-	for _, key := range want {
-		if !slices.Contains(guard.DependsOn, key) {
-			t.Fatalf("the guard %v does not wait for %s; it would read the client before it is regenerated", guard.DependsOn, key)
-		}
-	}
-	for _, node := range clientgenNodes(planned) {
-		if node.Project.ID == "/consumer" && node.CommandName() == "clientgen" {
-			t.Fatalf("clientgen was planned for the consumer %s, which declares no provider", node.Key())
-		}
+	if len(nodes[0].DependsOn) != 0 {
+		t.Fatalf("the guard depends on %v; validate plans no generation", nodes[0].DependsOn)
 	}
 }
 
@@ -242,110 +226,27 @@ func TestNativeValidateGuardIsDisableable(t *testing.T) {
 	}
 }
 
-// TestProviderGenerationNeverOverlapsAGeneratedTreeRewrite pins the ordering
-// guarantee against the two REAL manifests. `package` rewrites the
-// provider's .gen through its own generate step, which no functional edge
-// orders against `clientgen`. The generators read .gen/clientgen/config.json,
-// so each one declares a read of the project `gen` resource, and the planner
-// must then sequence it against every writer of that resource: a generator
-// that ran while .gen was rewritten read no contract, reported no target, and
-// the engine emptied the committed client under a successful task.
-func TestProviderGenerationNeverOverlapsAGeneratedTreeRewrite(t *testing.T) {
-	root := t.TempDir()
-	writeProjectFile(t, root, "provider", "go.mod",
-		"module example.com/provider\n\ngo 1.25\n\nrequire go.putnami.dev/app v0.0.0\n")
-	writeProjectFile(t, root, "provider", "provider.go", "package main\n\nfunc main() {}\n")
-	writeProjectFile(t, root, "provider", wsproto.ConfigFilename, `{"options":{"package":{"archives":true}}}`)
-	provider := &workspace.Project{
-		ID: "/provider", Name: "provider", Path: "provider", Type: "application",
-		Extensions: []string{"@putnami/go", clientgenExtensionName},
-		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "provider")),
-	}
-	planned, err := Plan(testWorkspace(root, provider), []string{"package", "clientgen", "validate"},
-		[]*workspace.Project{provider},
-		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil, nil)
-	if err != nil {
-		t.Fatalf("plan package,clientgen,validate: %v", err)
-	}
-
-	edges := make(map[string][]string, len(planned))
-	var writers, generators []string
-	for _, job := range planned {
-		edges[job.Key()] = append(append([]string(nil), job.DependsOn...), job.SerializeAfter...)
-		if job.Project == nil || job.Project.ID != "/provider" {
-			continue
-		}
-		// describe declares only a read of gen, yet it writes the very file the
-		// generators read, .gen/clientgen/config.json. It is ordered through the
-		// generate step it depends on, so it must be ordered here too.
-		if cachekey.WritesProjectGen(job) || (job.Step != nil && job.Step.Task == "build-describe") {
-			writers = append(writers, job.Key())
-		}
-		if job.CommandName() == "clientgen" {
-			generators = append(generators, job.Key())
-		}
-	}
-	sort.Strings(writers)
-	sort.Strings(generators)
-	for _, want := range []string{"/provider:build~generate", "/provider:package~generate",
-		"/provider:build~describe", "/provider:package~describe"} {
-		if !slices.Contains(writers, want) {
-			t.Fatalf(".gen writers planned = %v, want %s among them; the plan no longer reproduces the race "+
-				"this test guards", writers, want)
-		}
-	}
-	if want := []string{"/provider:clientgen~generate-go", "/provider:clientgen~generate-ts"}; !slices.Equal(generators, want) {
-		t.Fatalf("clientgen tasks = %v, want %v", generators, want)
-	}
-
-	reaches := func(from, to string) bool {
-		seen := map[string]bool{}
-		stack := []string{from}
-		for len(stack) > 0 {
-			key := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			if key == to {
-				return true
-			}
-			if seen[key] {
-				continue
-			}
-			seen[key] = true
-			stack = append(stack, edges[key]...)
-		}
-		return false
-	}
-	for _, generator := range generators {
-		for _, writer := range writers {
-			if !reaches(generator, writer) && !reaches(writer, generator) {
-				t.Errorf("%s and %s are unordered: the generator can read .gen/clientgen/config.json while the "+
-					"writer rewrites .gen", generator, writer)
-			}
-		}
-	}
-}
-
-// TestProviderGenerationNeverOverlapsATestOfItsClient pins the order between a
-// generator and the test steps that compile its committed client: the
-// provider's own and a consumer's. The generator rewrites the client inside the
-// provider's tree, after the build, and reads the provider's .gen. The
-// provider's test generate adopts its build generate and takes that earlier
-// place in the write order. The build's infra step declares the project's gen
-// write, so it waits for the provider's test steps that read .gen, and the
-// generator follows the build. The consumer waits for the generator because the
-// generator declares its client readByDependents.
+// TestProviderGenerationNeverOverlapsATestOfItsClient pins the order between an
+// in-module generator and the test steps that compile its client: the
+// provider's own and a consumer's. The generator writes the client inside the
+// provider's tree. The provider's test waits for it because the Go test
+// command depends on client-generate. The consumer waits for it because the
+// generator declares its client readByDependents. The provider's test generate
+// adopts its build generate, and the build's infra step, which declares the
+// project's gen write, waits for the provider's test steps that read .gen.
 func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
 	root := t.TempDir()
 	writeProjectFile(t, root, "provider", "go.mod",
 		"module example.com/provider\n\ngo 1.25\n\nrequire go.putnami.dev/app v0.0.0\n")
 	writeProjectFile(t, root, "provider", "provider.go", "package main\n\nfunc main() {}\n")
 	writeProjectFile(t, root, "provider", wsproto.ConfigFilename, `{}`)
+	writeProjectFile(t, root, "provider", "clientgen.json", `{"targets":["go"],"go":{"output":"client"}}`)
 	writeProjectFile(t, root, "consumer", "go.mod", "module example.com/consumer\n\ngo 1.25\n")
 	writeProjectFile(t, root, "consumer", "consumer.go", "package consumer\n")
 	writeProjectFile(t, root, "consumer", wsproto.ConfigFilename, `{}`)
 	provider := &workspace.Project{
 		ID: "/provider", Name: "provider", Path: "provider", Type: "application",
-		Extensions: []string{"@putnami/go", clientgenExtensionName},
+		Extensions: []string{"@putnami/go"},
 		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "provider")),
 	}
 	consumer := &workspace.Project{
@@ -354,11 +255,11 @@ func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
 		Dependencies: []string{"provider"},
 		Config:       wsproto.LoadProjectConfig(filepath.Join(root, "consumer")),
 	}
-	planned, err := Plan(testWorkspace(root, provider, consumer), []string{"lint", "test", "build", "clientgen"},
+	planned, err := Plan(testWorkspace(root, provider, consumer), []string{"lint", "test", "build"},
 		[]*workspace.Project{provider, consumer},
 		[]*extension.ExtensionDescription{loadGoPlannerExtension(t), loadClientgenExtension(t)}, nil, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("plan lint,test,build,clientgen: %v", err)
+		t.Fatalf("plan lint,test,build: %v", err)
 	}
 	byKey := JobsByPlanKey(planned)
 	requireShared(t, byKey, "/provider:build~generate", "/provider:test~generate")
@@ -377,7 +278,7 @@ func TestProviderGenerationNeverOverlapsATestOfItsClient(t *testing.T) {
 		t.Fatal("control: no test step of /provider reads .gen")
 	}
 	consumerTest := requirePlanKey(t, byKey, "/consumer:test~test")
-	for _, key := range []string{"/provider:clientgen~generate-go", "/provider:clientgen~generate-ts"} {
+	for _, key := range []string{"/provider:client-generate~module"} {
 		generator := requirePlanKey(t, byKey, key)
 		for _, reader := range append(append([]*jobmodel.ScheduledJob(nil), providerReaders...), consumerTest) {
 			if !ordered(generator, reader) {

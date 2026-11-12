@@ -194,6 +194,18 @@ type OperationV1 struct {
 	Idempotency Idempotency `json:"idempotency"`
 	// Resilience overrides document defaults for this operation.
 	Resilience *ResiliencePolicy `json:"resilience,omitempty"`
+	// Producer attributes the operation to the project and feature that
+	// produce it. A generated client carries it into its design declaration.
+	// It is absent when the provider declares no feature for the operation.
+	Producer *OperationProducer `json:"producer,omitempty"`
+}
+
+// OperationProducer names the project and feature that produce an operation.
+type OperationProducer struct {
+	// Project is the producing project's id or name.
+	Project string `json:"project"`
+	// Feature is the producing feature's id.
+	Feature string `json:"feature"`
 }
 
 // MessageShapes preserves logical stream messages when HTTP upgrade responses

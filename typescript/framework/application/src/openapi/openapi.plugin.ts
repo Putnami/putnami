@@ -1,6 +1,13 @@
 import { file, Glob, gzipSync } from 'bun';
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { fileExists, getDirectoryName, getProjectRoot, joinPath, readPackageJson } from '@putnami/utils';
+import {
+  fileExists,
+  getCurrentProject,
+  getDirectoryName,
+  getProjectRoot,
+  joinPath,
+  readPackageJson,
+} from '@putnami/utils';
 import {
   ApiPlugin,
   applyPrefix,
@@ -29,6 +36,17 @@ const FILE_METHOD_MAP: Record<string, HttpMethod | 'ws' | 'multi'> = {
   'route.ts': 'multi',
   'routes.ts': 'multi',
 };
+
+/**
+ * A plugin that asks every `openapi()` document of its application to name, in
+ * each client operation's `x-putnami-client`, the project and the feature that
+ * produce it. `clientGenerator()` of `@putnami/client/generator` is one. The
+ * feature is the one the module that registers the documented `api()` plugins
+ * declares; an operation of a module that declares none stays unattributed.
+ */
+export interface ClientOperationAttribution {
+  readonly attributesClientOperations: true;
+}
 
 export interface OpenApiConfig {
   title: string;
@@ -227,7 +245,7 @@ export class OpenApiPlugin implements Plugin {
     mkdirSync(getDirectoryName(openapiPath), { recursive: true });
     mkdirSync(getDirectoryName(openapiGzPath), { recursive: true });
 
-    const spec = generateOpenApiSpec(routes, this.buildOptions(app, client));
+    const spec = attributeOperations(app, owner, generateOpenApiSpec(routes, this.buildOptions(app, client)));
     const specJson = `${JSON.stringify(spec, null, 2).trimEnd()}\n`;
 
     // Write the human-readable spec (committed by default). End it with a
@@ -254,16 +272,20 @@ export class OpenApiPlugin implements Plugin {
    * Runtime: generate spec from registered routes and optionally expose via HTTP route.
    */
   async warmup(app: Module): Promise<void> {
-    const { plugins: apiPlugins } = this.findApiPlugins(app);
+    const { owner, plugins: apiPlugins } = this.findApiPlugins(app);
     if (apiPlugins.length === 0) {
       return;
     }
 
     // Generate spec at runtime for the spec() method, from the same plugins
     // and under the same contract the build-time document used.
-    this._spec = generateOpenApiSpec(
-      apiPlugins.flatMap((apiPlugin) => [...apiPlugin.routes]),
-      this.buildOptions(app, documentClientContract(apiPlugins)),
+    this._spec = attributeOperations(
+      app,
+      owner,
+      generateOpenApiSpec(
+        apiPlugins.flatMap((apiPlugin) => [...apiPlugin.routes]),
+        this.buildOptions(app, documentClientContract(apiPlugins)),
+      ),
     );
 
     // If exposeRoute is enabled, register HTTP route to serve the compressed spec
@@ -426,6 +448,39 @@ function documentClientContract(apiPlugins: readonly ApiPlugin[]): ClientService
     }
   }
   return first?.clientContract;
+}
+
+/**
+ * Name the producer of every client operation in `spec` when a plugin of the
+ * application asks for it ({@link ClientOperationAttribution}). The producer is
+ * the current project and the feature of `owner`, the module that registers the
+ * documented api() plugins. `producer` is the last member of the operation's
+ * `x-putnami-client`, the place the Go describer writes it, so both languages
+ * emit the same bytes.
+ */
+function attributeOperations(app: Module, owner: Module, spec: OpenApiDocument): OpenApiDocument {
+  if (!requestsAttribution(app)) return spec;
+  const feature = typeof owner.getEffectiveFeature === 'function' ? owner.getEffectiveFeature() : undefined;
+  if (!feature) return spec;
+  const producer = { project: getCurrentProject().name, feature: feature.id };
+  for (const item of Object.values(spec.paths)) {
+    for (const [method, operation] of Object.entries(item)) {
+      const client = operation['x-putnami-client'];
+      if (client) item[method] = { ...operation, 'x-putnami-client': { ...client, producer } };
+    }
+  }
+  return spec;
+}
+
+/** Whether a plugin of the application implements {@link ClientOperationAttribution}. */
+function requestsAttribution(app: Module): boolean {
+  const root = typeof app?.getRoot === 'function' ? app.getRoot() : app;
+  if (typeof root?.collectPlugins !== 'function') return false;
+  return root
+    .collectPlugins()
+    .some(
+      ({ plugin }) => (plugin as Partial<ClientOperationAttribution> | undefined)?.attributesClientOperations === true,
+    );
 }
 
 /** Key-order-independent identity of a client contract; `undefined` for none. */

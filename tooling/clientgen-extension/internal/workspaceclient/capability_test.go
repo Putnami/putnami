@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	clientcontract "go.putnami.dev/protocol/clientcontract"
-	"go.putnami.dev/protocol/features/spectest"
 )
 
 // cachedAnalyzerFixture is a provider whose one operation declares a response
@@ -64,23 +63,21 @@ func cachedAnalyzerFixture(t *testing.T, mutate func(*clientcontract.GeneratedCl
 }
 
 func TestACommittedManifestThatDeclaresACachePolicyItsRuntimeDoesNotImplementFailsTheCheck(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "runtime-capability-gate",
-		"a-committed-manifest-that-declares-a-cache-policy-its-runtime-does-not-implement-fails-the-check")
 	item, committed := cachedAnalyzerFixture(t, nil)
-	if report := inspectWithReader("/workspace", ModeCheck, []provider{item}, nil, committed, committed); len(report.Findings) != 0 {
+	if report := inspectWithReader([]provider{item}, nil, committed, committed); len(report.Findings) != 0 {
 		t.Fatalf("a consistent cached target produced findings: %+v", report.Findings)
 	}
 
 	item, committed = cachedAnalyzerFixture(t, func(manifest *clientcontract.GeneratedClientManifestV1) {
 		manifest.RuntimeCapabilities = nil
 	})
-	report := inspectWithReader("/workspace", ModeCheck, []provider{item}, nil, committed, committed)
+	report := inspectWithReader([]provider{item}, nil, committed, committed)
 	assertFindingCodes(t, report, "clientgen.unsupported-runtime-capability")
 
 	item, committed = cachedAnalyzerFixture(t, func(manifest *clientcontract.GeneratedClientManifestV1) {
 		manifest.RuntimeCapabilities = []clientcontract.RuntimeCapability{"response-cache-v2"}
 	})
-	report = inspectWithReader("/workspace", ModeCheck, []provider{item}, nil, committed, committed)
+	report = inspectWithReader([]provider{item}, nil, committed, committed)
 	found := false
 	for _, finding := range report.Findings {
 		found = found || finding.Code == "clientgen.unsupported-runtime-capability"
@@ -91,13 +88,11 @@ func TestACommittedManifestThatDeclaresACachePolicyItsRuntimeDoesNotImplementFai
 }
 
 func TestACommittedCachePolicyThatDriftsFromTheProviderContractFailsTheCheck(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "runtime-capability-gate",
-		"a-committed-cache-policy-that-drifts-from-the-provider-contract-fails-the-check")
 	item, committed := cachedAnalyzerFixture(t, func(manifest *clientcontract.GeneratedClientManifestV1) {
 		policy := *manifest.Operations[0].Cache
 		policy.FreshMs = 60000
 		manifest.Operations[0].Cache = &policy
 	})
-	report := inspectWithReader("/workspace", ModeCheck, []provider{item}, nil, committed, committed)
+	report := inspectWithReader([]provider{item}, nil, committed, committed)
 	assertFindingCodes(t, report, "clientgen.operation-coverage-drift")
 }

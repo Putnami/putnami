@@ -725,8 +725,6 @@
           "kind": "acceptance",
           "checks": [
             "clientgen-key-ignores-the-describe-owned-trees",
-            "clientgen-key-reads-a-contract-the-project-commits-under-gen",
-            "clientgen-key-folds-describes-key-in-a-real-plan",
             "clientgen-start-key-equals-the-precomputed-key-when-describe-writes"
           ]
         }

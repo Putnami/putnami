@@ -424,6 +424,10 @@
           "idempotency": {
             "kind": "non-idempotent"
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -604,6 +608,10 @@
           "idempotency": {
             "kind": "non-idempotent"
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -754,6 +762,10 @@
           "idempotency": {
             "kind": "safe"
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -875,6 +887,10 @@
           ],
           "idempotency": {
             "kind": "non-idempotent"
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "security": {
             "alternatives": [
@@ -999,6 +1015,10 @@
           ],
           "idempotency": {
             "kind": "non-idempotent"
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "security": {
             "alternatives": [
@@ -1125,6 +1145,10 @@
           ],
           "idempotency": {
             "kind": "non-idempotent"
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "security": {
             "alternatives": [
@@ -1261,6 +1285,10 @@
           ],
           "idempotency": {
             "kind": "non-idempotent"
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "security": {
             "alternatives": [
@@ -1412,6 +1440,10 @@
           "idempotency": {
             "kind": "safe"
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -1551,6 +1583,10 @@
           "idempotency": {
             "kind": "safe"
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -1673,6 +1709,10 @@
           "idempotency": {
             "keyHeader": "X-Idempotency-Key",
             "kind": "idempotent"
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "resilience": {
             "attemptTimeoutMs": 250,
@@ -1867,6 +1907,10 @@
               "$ref": "#/components/schemas/ItemChange"
             }
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "resilience": {
             "stream": {
               "maxBufferedMessages": 4,
@@ -2037,6 +2081,10 @@
           "idempotency": {
             "kind": "safe"
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -2197,6 +2245,10 @@
             "output": {
               "$ref": "#/components/schemas/StockTotal"
             }
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "resilience": {
             "stream": {
@@ -2378,6 +2430,10 @@
               "$ref": "#/components/schemas/ItemRevision"
             }
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "resilience": {
             "stream": {
               "handshakeTimeoutMs": 2000,
@@ -2556,6 +2612,10 @@
             "output": {
               "$ref": "#/components/schemas/StockTotal"
             }
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "resilience": {
             "stream": {
@@ -2745,6 +2805,10 @@
               "$ref": "#/components/schemas/Item"
             }
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -2925,6 +2989,10 @@
           "idempotency": {
             "kind": "safe"
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -3083,6 +3151,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "security": {
             "alternatives": [
@@ -3251,6 +3323,10 @@
               "$ref": "#/components/schemas/QuoteTick"
             }
           },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
+          },
           "security": {
             "alternatives": [
               {
@@ -3399,6 +3475,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "security": {
             "alternatives": [
@@ -3556,6 +3636,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "feature": "items/manage",
+            "project": "go.putnami.dev/examples/service-to-service"
           },
           "security": {
             "alternatives": [

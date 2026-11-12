@@ -156,3 +156,67 @@ func TestBuildJobContext_ConformsToProtocol(t *testing.T) {
 		}
 	}
 }
+
+// TestBuildJobContext_CarriesTheResolvedGenerationBinding pins the producer
+// side of project.generatedFrom: a generated client's context carries what its
+// putnami.json declares and the contract path the workspace load resolved, and
+// passes the strict reader. An unresolved service carries no contract path, and
+// a project that is not a client carries no member at all.
+func TestBuildJobContext_CarriesTheResolvedGenerationBinding(t *testing.T) {
+	spectest.Proves(t, "job/execution-context", "the-cli-produces-a-conforming-context", "the-cli-context-passes-the-strict-reader-as-version-2")
+	t.Parallel()
+	ws := &workspace.Workspace{Name: "w", Root: "/workspace"}
+	client := func(binding *workspace.GeneratedClientBinding) *ScheduledJob {
+		return &ScheduledJob{
+			Project: &workspace.Project{
+				ID: "/clients/items", Name: "items-client", Path: "clients/items",
+				Config: &wsproto.ProjectConfig{GeneratedFrom: &wsproto.GeneratedFrom{
+					Service: "items", Language: wsproto.GeneratedLanguageGo,
+					PackageName: "itemsclient", ClientName: "ItemsClient", OmitOperations: []string{"deleteItem"},
+				}},
+				GeneratedClient: binding,
+			},
+			Extension: &extension.ExtensionDescription{Name: "@putnami/clientgen", Path: "/workspace/tooling/clientgen-extension"},
+			JobDef:    &extension.JobDefinition{Name: "client-generate~go", ExtensionName: "@putnami/clientgen"},
+		}
+	}
+	parse := func(t *testing.T, job *ScheduledJob) *protocoljob.Context {
+		t.Helper()
+		data, err := json.Marshal(BuildJobContext(ws, job, nil, nil, nil))
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed, diags := protocoljob.ParseAndValidate(data)
+		if diag.HasErrors(diags) {
+			t.Fatalf("produced context violates the job context protocol: %v\n%s", diags, data)
+		}
+		return parsed
+	}
+
+	resolved := parse(t, client(&workspace.GeneratedClientBinding{
+		ServiceID: "items", Language: "go", ProviderID: "/services/items",
+		ContractPath: "services/items/schema/openapi.json", ContractSHA256: "abc",
+	}))
+	want := protocoljob.GeneratedFrom{
+		Service: "items", Language: "go", PackageName: "itemsclient", ClientName: "ItemsClient",
+		OmitOperations: []string{"deleteItem"}, ContractPath: "services/items/schema/openapi.json",
+	}
+	if got := resolved.Project.GeneratedFrom; got == nil || got.Service != want.Service || got.Language != want.Language ||
+		got.PackageName != want.PackageName || got.ClientName != want.ClientName || got.ContractPath != want.ContractPath ||
+		len(got.OmitOperations) != 1 || got.OmitOperations[0] != "deleteItem" {
+		t.Fatalf("project.generatedFrom = %+v, want %+v", got, want)
+	}
+
+	unresolved := parse(t, client(&workspace.GeneratedClientBinding{
+		ServiceID: "items", Language: "go", ContractSHA256: workspace.UnresolvedContractDigest,
+	}))
+	if got := unresolved.Project.GeneratedFrom; got == nil || got.ContractPath != "" || got.Service != "items" {
+		t.Fatalf("unresolved project.generatedFrom = %+v, want the service with no contract path", got)
+	}
+
+	plain := client(nil)
+	plain.Project.Config = &wsproto.ProjectConfig{}
+	if got := parse(t, plain).Project.GeneratedFrom; got != nil {
+		t.Fatalf("a project that is not a client carries project.generatedFrom = %+v", got)
+	}
+}

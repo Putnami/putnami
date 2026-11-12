@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 
@@ -29,6 +30,13 @@ type clientGenConfig struct {
 	} `json:"ts"`
 	Go struct {
 		Output string `json:"output"`
+		// ModulePath, PackageName, ClientName and OmitOperations are the
+		// in-module Go target's options (ReadModuleTarget). The guard reads
+		// none of them.
+		ModulePath     string   `json:"modulePath,omitempty"`
+		PackageName    string   `json:"packageName,omitempty"`
+		ClientName     string   `json:"clientName,omitempty"`
+		OmitOperations []string `json:"omitOperations,omitempty"`
 	} `json:"go"`
 }
 
@@ -111,14 +119,6 @@ var httpMethods = map[string]bool{
 	"patch": true, "post": true, "put": true, "trace": true,
 }
 
-// discover reads the BUILT tree: the generation contract the provider's build
-// wrote (.gen/clientgen/config.json), else the one it commits (clientgen.json),
-// and the OpenAPI document of the same origin (see builtSpecPath). It is the
-// sync, adopt and generation view — a fresh build precedes each of them.
-func discover(view workspaceView) ([]provider, []Finding) {
-	return discoverWith(view, builtSpecPath, false)
-}
-
 // discoverCommitted reads the COMMITTED tree, which is the only tree the guard
 // may trust: on a cold clone nothing under .gen exists, and on a warm one the
 // bytes there describe whatever build last ran — possibly another commit's.
@@ -129,7 +129,7 @@ func discover(view workspaceView) ([]provider, []Finding) {
 // the candidate cut a .gen file exists only when the project commits it, and
 // each such file under .gen/clientgen or .gen/schema is a finding.
 func discoverCommitted(view workspaceView) ([]provider, []Finding) {
-	providers, findings := discoverWith(view, committedSpecPath, true)
+	providers, findings := discoverWith(view)
 	return providers, append(findings, committedGeneratedContracts(view)...)
 }
 
@@ -271,12 +271,7 @@ func ignoredByRules(root string, rels []string) (map[string]bool, error) {
 	return ignored, nil
 }
 
-// specPathResolver names the OpenAPI document a view reads for the provider at
-// projectRel. committedContract is true when the generation contract the view
-// read is the committed clientgen.json.
-type specPathResolver func(files workspaceFiles, projectRel string, committedContract bool) string
-
-func discoverWith(view workspaceView, specPathFor specPathResolver, targetsFromManifests bool) ([]provider, []Finding) {
+func discoverWith(view workspaceView) ([]provider, []Finding) {
 	var findings []Finding
 	workspaceRoot := view.root
 	projectPaths, err := view.members()
@@ -298,11 +293,10 @@ func discoverWith(view workspaceView, specPathFor specPathResolver, targetsFromM
 		} else if !errors.Is(configErr, fs.ErrNotExist) {
 			findings = append(findings, Finding{Code: "clientgen.invalid-config", Path: configRel, Message: configErr.Error()})
 		}
-		committedContract := configErr == nil && configRel == joinRel(projectRel, committedConfigFile)
-		item.specPath = specPathFor(view.workspaceFiles, projectRel, committedContract)
-		if item.config == nil && targetsFromManifests {
-			// No build wrote a contract here, but the tree may commit generated
-			// targets: each committed manifest names its own language and
+		item.specPath = committedSpecPath(view.workspaceFiles, projectRel, configErr == nil)
+		if item.config == nil {
+			// The project commits no generation contract, but the tree may commit
+			// generated targets: each committed manifest names its own language and
 			// directory, which is exactly what the contract would have said. A
 			// project that commits none is not a provider, exactly as a project
 			// with no generation contract never was. One that commits targets
@@ -422,7 +416,7 @@ func discoverWith(view workspaceView, specPathFor specPathResolver, targetsFromM
 		// clone that absence is the only thing there is to read.
 		if item.config == nil && !item.emptyFirstPartyContract() {
 			findings = append(findings, Finding{Code: "clientgen.missing-config", Path: item.rel,
-				ServiceID: metadata.Service.ID, Message: "first-party provider has no " + builtConfigFile + " and no " + committedConfigFile})
+				ServiceID: metadata.Service.ID, Message: "first-party provider has no " + committedConfigFile})
 		}
 		providers = append(providers, *item)
 	}
@@ -430,28 +424,20 @@ func discoverWith(view workspaceView, specPathFor specPathResolver, targetsFromM
 }
 
 // builtConfigFile is the project-relative path of the generation contract a
-// build writes: build-describe for a Go app, build-generate for a TypeScript
-// one. committedConfigFile is the path of the contract a project commits
-// instead, such as a provider slice with no app. It lives outside .gen
-// because build-describe empties .gen/clientgen before it executes.
+// build once wrote. No build writes it now, and a file there is a
+// clientgen.committed-generated-contract finding, never a contract.
+// committedConfigFile is the generation contract a provider commits at its
+// root.
 const (
 	builtConfigFile     = ".gen/clientgen/config.json"
 	committedConfigFile = "clientgen.json"
 )
 
-// readGenerationConfig reads the project's generation contract: the one a build
-// wrote, and the committed one when no build wrote one. Both views read the same
-// order. In the candidate cut a .gen file exists only when the project commits
-// it, so the guard reads the committed clientgen.json. It returns the
-// workspace-relative path it read, or the committed path when neither exists.
+// readGenerationConfig reads the project's committed generation contract,
+// clientgen.json. It returns the workspace-relative path it read.
 func readGenerationConfig(view workspaceView, projectRel string) ([]byte, string, error) {
-	built := joinRel(projectRel, builtConfigFile)
-	data, err := view.Read(built)
-	if err == nil || !errors.Is(err, fs.ErrNotExist) {
-		return data, built, err
-	}
 	committed := joinRel(projectRel, committedConfigFile)
-	data, err = view.Read(committed)
+	data, err := view.Read(committed)
 	return data, committed, err
 }
 
@@ -482,29 +468,17 @@ func indexedProjectPaths(workspaceRoot string) ([]string, error) {
 	return paths, nil
 }
 
-// builtSpecPath pairs the OpenAPI document with the generation contract's
-// origin, exactly as both language emitters do. With a contract a build wrote,
-// or none, it prefers the document the provider's build wrote over the
-// committed sidecar: after a build the built one is the authority. With the
-// committed clientgen.json it reads the committed sidecar only: no build wrote
-// the contract then, so a .gen/schema file is whatever an earlier build left,
-// and no cache key covers it.
-func builtSpecPath(files workspaceFiles, projectRel string, committedContract bool) string {
+// committedSpecPath prefers the committed sidecar: it is what the checkout
+// holds, whether or not anything under .gen exists or is current. A project
+// that commits clientgen.json reads the committed sidecar only, as the
+// emitters do: a .gen/schema file is whatever an earlier build left, and no
+// cache key covers it. A provider with no generation contract and no sidecar
+// resolves to a contract under .gen only when one is there to read, which in
+// the candidate cut means the project commits it.
+func committedSpecPath(files workspaceFiles, projectRel string, committedContract bool) string {
 	if committedContract {
 		return firstSpecPath(files, projectRel, "schema/openapi.json")
 	}
-	return firstSpecPath(files, projectRel,
-		".gen/schema/openapi.json",
-		".gen/schema/openapi.json.gz",
-		"schema/openapi.json")
-}
-
-// committedSpecPath prefers the committed sidecar: it is what the checkout
-// holds, whether or not anything under .gen exists or is current. A provider
-// with no sidecar resolves to a contract under .gen only when one is there to
-// read, which in the candidate cut means the project commits it. It reads
-// that order whatever contract the guard read.
-func committedSpecPath(files workspaceFiles, projectRel string, _ bool) string {
 	return firstSpecPath(files, projectRel,
 		"schema/openapi.json",
 		".gen/schema/openapi.json",
@@ -526,7 +500,7 @@ func firstSpecPath(files workspaceFiles, projectRel string, candidates ...string
 // one target per manifest language, at the directory that holds it. A tree
 // that commits none yields nil — the project is not a provider; a manifest
 // that cannot be read as a first-party target is a finding, because a closure
-// nobody can read is not an empty one. Directories the snapshot walk skips
+// nobody can read is not an empty one. Directories the project walk skips
 // (dot-directories, installs, vendored trees, testdata) are skipped here for
 // the same reason.
 //
@@ -582,7 +556,7 @@ func configFromCommittedManifests(files workspaceFiles, projectRel string) (*cli
 
 // committedManifestPaths lists, in directory-walk order, the workspace-relative
 // client.putnami.json manifests below the provider projectRel ("." is the
-// root), outside the directories the snapshot walk skips and never at the
+// root), outside the directories the project walk skips and never at the
 // project's own root. A manifest at the project's OWN root is a generated
 // client the project IS — an indexed client package inside its provider's
 // output directory — not a target the project generates; its provider names
@@ -590,7 +564,7 @@ func configFromCommittedManifests(files workspaceFiles, projectRel string) (*cli
 func committedManifestPaths(files workspaceFiles, projectRel string) []string {
 	var manifests []string
 	if files.tree != nil {
-		for _, rel := range files.candidatesBelow(projectRel, excludedSnapshotDir) {
+		for _, rel := range files.candidatesBelow(projectRel, excludedWalkDir) {
 			if path.Base(rel) != clientcontract.GeneratedManifestFile || path.Dir(rel) == projectRel {
 				continue
 			}
@@ -608,7 +582,7 @@ func committedManifestPaths(files workspaceFiles, projectRel string) []string {
 			return nil
 		}
 		if entry.IsDir() {
-			if walked != projectRoot && excludedSnapshotDir(entry.Name()) {
+			if walked != projectRoot && excludedWalkDir(entry.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
@@ -672,3 +646,13 @@ func diagnostics(path, code string, values []diag.Diagnostic) []Finding {
 }
 
 func blank(value string) bool { return strings.TrimSpace(value) == "" }
+
+// excludedWalkDir reports whether a project walk skips a directory: a
+// dot-directory, an install, a vendored tree or test data holds no target.
+func excludedWalkDir(name string) bool {
+	return strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "testdata"
+}
+
+func hasConfiguredTarget(values []string, want string) bool {
+	return slices.Contains(values, want)
+}

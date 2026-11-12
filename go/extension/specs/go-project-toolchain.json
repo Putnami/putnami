@@ -325,14 +325,6 @@
       ]
     },
     {
-      "id": "committed-client-drift",
-      "text": [
-        "The generated Go client build-describe mirrors into the project tree is committed, and build-describe is its first writer in a session;",
-        "its declared client output carries drift: fail, so the engine compares what the task writes (or a cache hit restores) with the bytes present before and fails the task with generated-output-drift when they differ, leaving the regenerated client in the worktree to commit.",
-        "Build-time generation under .gen carries no policy."
-      ]
-    },
-    {
       "id": "locked-go-is-exact",
       "text": [
         "When the workspace lock pins a Go release that meets the workspace's go directive, the extension runs only that release: a go on PATH that reports another release is passed over for the pinned release the CLI provisions under the Putnami home.",

@@ -59,6 +59,12 @@ package job
 // project resolves to no tags, and an absent member says the producer did not
 // resolve them.
 //
+// `project.generatedFrom` is a fourth: a generated client's `generatedFrom`
+// with the provider's committed contract the orchestrator resolved its service
+// to. The client's cache key folds that contract's digest, so a task that
+// reads the path here reads the contract its key holds. An empty
+// `contractPath` says no single provider declares the service.
+//
 // `selection` is the same kind of member for the same reason: the orchestrator
 // has already resolved WHAT THE USER ASKED FOR into a mode, a baseline and a
 // project set, and an extension that re-derived it would need the CLI's flag
@@ -84,7 +90,9 @@ package job
 // path is required when a path IS present, metadata must be a namespaced JSON
 // object, project config must be a non-null JSON object, and project tags must
 // be a non-null, sorted list of distinct, non-empty tags with no surrounding
-// spaces. A producer cannot invent a
+// spaces, and a project generation binding must name a service and a known
+// language, carry Go options only for Go, and give a clean workspace-relative
+// contract path. A producer cannot invent a
 // second meaning later.
 //
 // A document without `protocolVersion` is version 1, exactly as before, and v1

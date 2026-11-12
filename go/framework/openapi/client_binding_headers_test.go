@@ -50,12 +50,12 @@ func TestEmittedGoClientCarriesBindingHeadersAlongsideForwardedUsers(t *testing.
 	application := app.New("revision-provider")
 	application.Use(provider).
 		Use(NewPlugin(PluginOptions{Title: "Revisions", Version: "1.0.0"}).From(provider)).
-		Use(api.Clients(api.ClientsOptions{Go: api.GoClientOptions{PackageName: "widgetsclient", ClientName: "RevisionsClient"}}).From(provider))
+		Use(api.Clients(api.ClientsOptions{}).From(provider))
 	out := t.TempDir()
 	if err := application.Describe(out, []string{"openapi", "clients"}); err != nil {
 		t.Fatal(err)
 	}
-	source, err := os.ReadFile(filepath.Join(out, api.ClientStageDir, "go", "client.gen.go"))
+	source, err := emitDescribedGoClient(t, out, "widgetsclient", "RevisionsClient")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -254,9 +254,8 @@ func watch() { _, _ = http.NewRequest("GET", "/catalog/watch", nil) }
 		}, false, clean},
 		{"the built generation contract is committed", func() {
 			gitIn(t, root, "add", "-f", "services/catalog/.gen/clientgen/config.json")
-		}, true, "services/catalog[go:clients/go,ts:clients/ts] | " +
-			"clientgen.committed-generated-contract@services/catalog/.gen/clientgen/config.json " +
-			"clientgen.missing-manifest@services/catalog/clients/ts/client.putnami.json"},
+		}, true, "services/catalog[go:clients/go] | " +
+			"clientgen.committed-generated-contract@services/catalog/.gen/clientgen/config.json"},
 		{"the built generation contract leaves the index", func() {
 			gitIn(t, root, "rm", "-q", "--cached", "services/catalog/.gen/clientgen/config.json")
 		}, true, clean},

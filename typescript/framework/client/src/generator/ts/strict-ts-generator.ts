@@ -6,7 +6,7 @@ import {
 } from '@putnami/application';
 import type { ContentIR, MethodIR, ParameterIR, ServiceIR, SpecIR, SuccessIR } from '../ir.type';
 import { assertSafeIdentifier, operationTypeBase, pascalCase, toKebabCase } from '../string-utils';
-import type { GeneratedFile, TsGeneratorOptions } from './ts-generator';
+import type { GeneratedFile } from './ts-generator';
 
 /** Closed set of integer widths a contract may declare (D0.2). */
 const INTEGER_FORMATS = new Set(['int32', 'int64', 'uint32', 'uint64']);
@@ -21,7 +21,7 @@ const RESERVED_CLIENT_METHODS = new Set([
 ]);
 
 /** First-party REST/SSE emitter. Unsupported transports fail before any file is returned. */
-export function generateStrictTypeScriptClient(spec: SpecIR, options: TsGeneratorOptions): GeneratedFile[] {
+export function generateStrictTypeScriptClient(spec: SpecIR): GeneratedFile[] {
   if (!spec.contract) throw new Error('clientgen_first_party_required: strict emitter requires a contract');
   validateStrictRestSpec(spec);
   const files: GeneratedFile[] = [
@@ -31,11 +31,6 @@ export function generateStrictTypeScriptClient(spec: SpecIR, options: TsGenerato
       content: generateStrictService(service, spec),
     })),
     { path: 'src/index.ts', content: generateStrictIndex(spec) },
-    { path: 'package.json', content: generateStrictPackage(options) },
-    {
-      path: 'tsconfig.json',
-      content: `${JSON.stringify({ extends: options.tsconfigExtends ?? '../../../../tsconfig.base.json', compilerOptions: {} }, null, 2)}\n`,
-    },
   ];
   return files;
 }
@@ -442,6 +437,7 @@ function generateStrictService(service: ServiceIR, spec: SpecIR): string {
     transport: 'http',
   };
   const capabilities = serviceRuntimeCapabilities(service);
+  const design = serviceDesign(service, spec);
   const typeImports = new Set<string>(['ClientCallOptions']);
   for (const method of service.methods) {
     const base = operationTypeBase(method.operationId);
@@ -469,12 +465,15 @@ function generateStrictService(service: ServiceIR, spec: SpecIR): string {
     '',
     // The canonicalizer prunes what a service does not use, so this line names
     // every symbol the emitter can reach rather than tracking which it did.
-    `import { BaseClient, bindServiceClient, encodeHttpParameter, readBoundedBody, registerServiceClient, type ByteStream, type ClientConfig, type DuplexStream, type FrameStream, type GeneratedServiceDescriptor, type ServiceBinding, type ServiceClientBindingTarget, type StreamObserver } from '@putnami/client';`,
+    `import { BaseClient, bindServiceClient, encodeHttpParameter, readBoundedBody, registerServiceClient, type ByteStream, type ClientConfig, type DuplexStream, type FrameStream, type GeneratedClientDesign, type GeneratedServiceDescriptor, type ServiceBinding, type ServiceClientBindingTarget, type StreamObserver } from '@putnami/client';`,
     ...(capabilities.length ? ["import { requireClientRuntimeCapabilities } from '@putnami/client';"] : []),
     `import type { ${[...typeImports].sort().join(', ')} } from './types';`,
     '',
     `const SERVICE_DESCRIPTOR = ${JSON.stringify(descriptor)} as const satisfies GeneratedServiceDescriptor;`,
     '',
+    ...(design
+      ? [`const SERVICE_DESIGN = ${JSON.stringify(design)} as const satisfies GeneratedClientDesign;`, '']
+      : []),
     ...(capabilities.length
       ? [
           '// The operations below need these client runtime capabilities. A runtime that',
@@ -499,6 +498,7 @@ function generateStrictService(service: ServiceIR, spec: SpecIR): string {
       ? ['      clientDefaults: SERVICE_DESCRIPTOR.contract.defaults?.resilience,']
       : []),
     ...(spec.schemas ? ['      clientSchemas: SERVICE_DESCRIPTOR.schemas,'] : []),
+    ...(design ? ['      design: SERVICE_DESIGN,'] : []),
     '    });',
     '  }',
   ];
@@ -532,6 +532,34 @@ function generateStrictService(service: ServiceIR, spec: SpecIR): string {
     '',
   );
   return lines.join('\n');
+}
+
+/**
+ * The design declaration of one generated service: its exact operations, each
+ * with the producer the contract names in `x-putnami-client.producer`. A call
+ * resolves its feature trace from it by operation id. A service none of whose
+ * operations names a producer declares no design, so a contract without
+ * attribution renders the bytes it always did.
+ */
+function serviceDesign(service: ServiceIR, spec: SpecIR): Record<string, unknown> | undefined {
+  if (!service.methods.some((method) => method.client?.producer)) return undefined;
+  return {
+    language: 'ts',
+    client: service.className,
+    service: service.name,
+    ...(spec.specHash ? { specHash: spec.specHash } : {}),
+    operations: service.methods.map((method) => {
+      const producer = method.client?.producer;
+      return {
+        // The canonical operation id, never `method.name`: that one is the
+        // TypeScript symbol and the normalizer may have rewritten it.
+        operationId: method.operationId,
+        method: method.httpMethod.toUpperCase(),
+        path: method.path,
+        ...(producer ? { producerProject: producer.project, producerFeature: producer.feature } : {}),
+      };
+    }),
+  };
 }
 
 function renderMethod(method: MethodIR, spec: SpecIR): string[] {
@@ -1046,20 +1074,4 @@ function generateStrictIndex(spec: SpecIR): string {
     );
   }
   return `${lines.join('\n')}\n`;
-}
-
-function generateStrictPackage(options: TsGeneratorOptions): string {
-  return `${JSON.stringify(
-    {
-      name: options.packageName,
-      version: options.version ?? '0.0.1',
-      description: options.description ?? `Generated API client for ${options.packageName}`,
-      main: 'src/index.ts',
-      exports: { '.': './src/index.ts' },
-      dependencies: { '@putnami/client': options.clientDependency ?? 'workspace:*' },
-      private: false,
-    },
-    null,
-    2,
-  )}\n`;
 }

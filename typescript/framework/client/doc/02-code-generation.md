@@ -1,12 +1,18 @@
 # Code Generation
 
-`@putnami/client` generates fully-typed API client classes from OpenAPI and Proto specs at build time. Consumers get native TypeScript types, auto-configured transport, and embedded spec metadata — with no manual configuration.
+`@putnami/client` generates fully-typed API client classes from a provider's committed OpenAPI contract. Consumers get native TypeScript types, auto-configured transport, and embedded spec metadata — with no manual configuration.
 
 ## Overview
 
-The generator runs in the `application.postGenerate()` lifecycle — *after* every plugin's `generate()` has resolved, so the OpenAPI spec is fully written before it is read (reading it inside the parallel `generate()` pass would race that write). When you run `putnami build`, it reads the generated spec, passes it through a language-agnostic intermediate representation (IR), and emits a publishable TypeScript client package.
-
-OpenAPI is the authoritative v1 contract. The generator reads the `openapi()` plugin's emitted asset path (`schema/openapi.json` by default, or `.gen/schema/openapi.json` when `output: false`). See [`openapi-ir-mapping.md`](./openapi-ir-mapping.md) for the canonical, fixture-backed OpenAPI→IR mapping rules.
+Generation has two halves. The provider declares itself a client contract with
+`clientGenerator()`: the plugin names, in each operation's `x-putnami-client`,
+the project and feature that produce it, and the provider commits the contract
+as `schema/openapi.json`. A client project then generates itself from that
+committed contract with `putnami client-generate`. The emitter passes the
+contract through a language-agnostic intermediate representation (IR) and
+writes the client's `src` tree. See
+[`openapi-ir-mapping.md`](./openapi-ir-mapping.md) for the canonical,
+fixture-backed OpenAPI→IR mapping rules.
 
 **When to use it:** whenever a Putnami service exposes an HTTP or gRPC API that other services or frontend clients need to consume.
 
@@ -16,7 +22,7 @@ OpenAPI is the authoritative v1 contract. The generator reads the `openapi()` pl
 
 ### Adding the Plugin
 
-Add `clientGenerator()` to your application after the API spec plugins:
+Add `clientGenerator()` to the provider application after the API spec plugins:
 
 ```typescript
 import { application, http, api, endpoint, openapi } from '@putnami/application';
@@ -43,14 +49,32 @@ const app = application()
   .use(http({ port: 3000 }))
   .use(usersApi)
   .use(openapi({ title: 'Users API', version: '1.0.0' })) // OpenAPI spec (authoritative)
-  .use(clientGenerator({ packageName: '@myorg/users-client' }));
+  .use(clientGenerator());
+```
+
+### Declaring the Client Project
+
+The client is a project of its own. Its `putnami.json` names the provider's
+service in `generatedFrom`, and its `package.json` name is the client's npm
+package name:
+
+```json
+{
+  "name": "@myorg/users-client",
+  "type": "library",
+  "generatedFrom": { "service": "users.api", "language": "ts" }
+}
 ```
 
 ### Generating the Client
 
 ```bash
-putnami clientgen-sync --projects @myorg/users-api
+putnami client-generate --projects @myorg/users-client
 ```
+
+The `@putnami/typescript` `build`, `test`, `lint`, `serve` and `package`
+commands run `client-generate` first, so building the client, or a project
+that depends on it, generates it too.
 
 A first-party client covers unary REST/JSON operations and server streams over
 SSE. An operation reachable only over Connect or WebSocket, a WebSocket transport
@@ -61,51 +85,38 @@ the contract did not declare. The low-level `ConnectTransport` and
 `WebSocketTransport` described in [Transports](./03-transports.md) are separate
 hand-written APIs; they are not what a generated first-party client dispatches to.
 
-The generator produces a publishable client package at `clients/ts/` (configurable):
+The client project holds its authored files and the generated `src` tree:
 
 ```
-clients/ts/
-├── package.json          → { name: "@myorg/users-client", ... }
-├── putnami.json          → Written once, when the directory has none
-├── tsconfig.json
-└── src/
+users-client/
+├── package.json          → Authored: { name: "@myorg/users-client", ... }
+├── putnami.json          → Authored: names the provider in generatedFrom
+├── tsconfig.json         → Authored
+└── src/                  → Generated, ignored by Git
     ├── index.ts          → Re-exports all client classes and types
     ├── users-client.ts   → Typed UsersClient class
     └── types.ts          → Request/response interfaces
 ```
 
-`putnami.json` is the client's project document. The generator writes it
-only when the directory has none: it names the package, marks it a
-`library`, tags it `ts` and `generated-client`, selects `@putnami/typescript`,
-and declares `featureAuthority.provider` with the provider's project id, such
-as `/go/samples/task-api`. As a library, the client has no `serve` or `run`
-job. `putnami validate` accepts it without a feature of its own while its
-provider carries a feature, a spec or a `featureAuthority` that resolves.
-Generation fails when no `putnami.workspace.json` sits above the provider,
-since the client then has no provider id to name. After that the file is yours: no later run rewrites it,
-and `client.putnami.json` does not list it. Its `name` is the project's name in
-Putnami, so when you change `ts.packageName`, change `name` too.
+`client-generate` replaces the `src` tree whole and never reads, writes or
+removes the authored files beside it. Git holds no generated file. A contract
+with no operation removes `src`. A contract with no document-level
+`x-putnami-client` fails.
 
-The standalone `generateProjectClients()` path used by `putnami clientgen`
-applies the provider's Biome formatting and lint fixes before writing the
-generated TypeScript package. It uses each
-file's final output path, so path overrides, inherited configuration and
-EditorConfig rules apply as they do during `putnami lint`. Repeated generation
-and lint therefore preserve the same bytes with the same contract and tools.
+The emitter applies the client project's Biome formatting and lint fixes before
+it writes the `src` tree. It uses each file's final output path, so path
+overrides, inherited configuration and EditorConfig rules apply as they do
+during `putnami lint`. Repeated generation and lint therefore preserve the same
+bytes with the same contract and tools.
 
 Run `putnami deps install` before generation. The generator resolves Biome from
-the provider first, then from its own installed dependency; no formatter on
-`PATH` is required. Package lookup only considers installed files. It reads
-`biome.json` from the provider or its Putnami
-workspace. Missing configuration or a formatter failure stops generation before
-any generated client file is replaced. Diagnostics identify the failed phase
-without including generated source or formatter output.
-The normal `putnami lint` gate remains responsible for reporting lint-rule
-violations; Biome's stdin writer applies fixes without reporting every violation.
-
-The in-app `clientGenerator()` plugin still writes the renderer's source during
-the cached build. Applying this formatting there requires the build cache to
-track the full Biome and EditorConfig configuration dependencies first.
+the client project first, then from its own installed dependency; no formatter
+on `PATH` is required. Package lookup only considers installed files. Missing
+configuration or a formatter failure stops generation before any generated
+client file is replaced. Diagnostics identify the failed phase without
+including generated source or formatter output. The normal `putnami lint` gate
+remains responsible for reporting lint-rule violations; Biome's stdin writer
+applies fixes without reporting every violation.
 
 ### Registering and Calling the Generated Client
 
@@ -245,39 +256,42 @@ const PROTO_META = {
 
 ## Spec Priority
 
-**The marked OpenAPI document is the authoritative contract.** When an `openapi.json` exists it always wins — a Proto artifact never silently takes priority over it. For a first-party provider the document carries the `x-putnami-client` contract, and the transports it declares — including Connect, with the protobuf descriptor travelling in the same contract — are what the emitted client dispatches on. A bare Proto artifact is read only as a legacy fallback when no OpenAPI spec was produced.
+**The marked OpenAPI document is the authoritative contract.** `client-generate`
+reads the provider's committed `schema/openapi.json` and nothing else. For a
+first-party provider the document carries the `x-putnami-client` contract, and
+the transports it declares — including Connect, with the protobuf descriptor
+travelling in the same contract — are what the emitted client dispatches on.
+`readProtoSpec()` stays available to a custom pipeline that starts from a Proto
+document.
 
-| Spec present | Transport | Encoding |
+| Contract | Transport | Encoding |
 |---|---|---|
 | Marked OpenAPI | the declared transports, in declared order | JSON, or protobuf on a declared `connect+proto` transport |
-| Unmarked OpenAPI only | HTTP | JSON |
-| Both | the OpenAPI document wins | as declared |
-| Proto only (legacy fallback) | Connect | binary proto |
+| Unmarked OpenAPI | refused: first-party generation requires `x-putnami-client` | — |
 
 ## API Reference
 
-### `clientGenerator(config?): ClientGeneratorPlugin`
+### `clientGenerator(): ClientGeneratorPlugin`
 
-Factory function that creates a `ClientGeneratorPlugin` instance.
+Factory function that creates a `ClientGeneratorPlugin` instance. It takes no
+options and names no target, output or package: the client project names its
+provider in `generatedFrom`. The plugin writes no file. It makes the
+`openapi()` document record each operation's `producer`.
 
-| Parameter | Type | Default | Description |
-|-----------|------|---------|-------------|
-| `config` | `ClientGeneratorConfig` | `{}` | Generator options |
+### `generateClient(options): GenerateClientResult`
 
-### `ClientGeneratorConfig`
+Renders the TypeScript client of a committed contract into a client project.
+`client-generate` runs it through the `putnami-client-generate` binary.
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `targets` | `('ts' \| 'go')[]` | `['ts']` | Code generation targets. `'ts'` emits now; `'go'` is wired up in Phase 2b |
-| `output` | `string` | `'clients/ts'` | TS output directory relative to project root |
-| `packageName` | `string` | Auto-computed | npm package name for the generated TS client. If omitted, appends `-client` to the service's own package name |
-| `go` | `Partial<GoClientGenConfig>` | defaults | Go target options (`output`, `modulePath`, `packageName`, `clientName`, `omitOperations`) consumed by the Go emitter in Phase 2b |
+| Option | Type | Description |
+|--------|------|-------------|
+| `contractPath` | `string` | Absolute path of the provider's committed `openapi.json` |
+| `outputDir` | `string` | Absolute directory of the client project |
+| `packageName` | `string` | npm package name, as the client's `package.json` declares it |
+| `formatProjectRoot` | `string` | Directory whose Biome configuration and EditorConfig format the output. Defaults to `outputDir` |
 
-**Auto-computed package name examples:**
-- `@myorg/users-api` → `@myorg/users-api-client`
-- `users-api` → `users-api-client`
-
-The plugin always writes the resolved generation contract to `.gen/clientgen/config.json` — the single source of truth every per-language emitter reads. A project with no app to build commits the contract as `clientgen.json` at its root instead, and the emitters read it when no build wrote `.gen/clientgen/config.json`. See [`openapi-ir-mapping.md`](./openapi-ir-mapping.md#genclientgenconfigjson) for the schema and defaults.
+It returns `{ generated, files }`: `generated` is false when the contract
+declares no operation.
 
 ### `generateTypeScriptClient(specIR, options): GeneratedFile[]`
 
@@ -291,7 +305,7 @@ Low-level generator function. Exposed for custom generation pipelines.
 **Returns:** Array of `{ path: string; content: string }` objects representing generated files.
 
 This low-level renderer returns unformatted source and does not load a formatter
-or write files. `generateProjectClients()` owns formatting at its file-writing
+or write files. `generateClient()` owns formatting at its file-writing
 boundary.
 
 ### `readOpenApiSpec(doc): SpecIR | undefined`
@@ -346,32 +360,46 @@ interface FieldIR {
 
 ## Cross-language clients (TS ↔ Go)
 
-The IR is shared, so one OpenAPI spec can emit **both** a TypeScript and a Go client. Add the `go` target:
+The IR is shared, so one committed contract can emit **both** a TypeScript and a
+Go client. Each client is its own project that names the provider in
+`generatedFrom`; only the `language` differs:
 
-```typescript
-.use(
-  clientGenerator({
-    packageName: '@myorg/users-client', // the TypeScript client
-    targets: ['ts', 'go'],
-    go: { modulePath: 'github.com/myorg/users-client-go' },
-  }),
-);
+```json
+{
+  "name": "github.com/myorg/users-client-go",
+  "generatedFrom": {
+    "service": "users.api",
+    "language": "go",
+    "packageName": "usersclient",
+    "clientName": "UsersClient"
+  }
+}
 ```
 
-- The **same-language** client (the TypeScript one here) is emitted in-app during `putnami build`.
-- The **cross-language** Go client is emitted by **`putnami clientgen`** — a neutral, scheduler-mediated command that runs the Go emitter (`go.putnami.dev/api`) against the provider's own `.gen/schema/openapi.json`. No extension shells out to the other; the shared spec is the only seam. A provider opts into `clientgen` by listing `/tooling/clientgen-extension` in its `putnami.json` `extensions`; a fresh provider then bootstraps its first client (no committed client required).
+The Go client's import path is its own `go.mod` module. Its `client-generate`
+runs the Go emitter (`go.putnami.dev/api`) against the provider's committed
+`schema/openapi.json`, and writes `client.gen.go` at its root. No extension
+shells out to the other; the committed contract is the only seam. The
+symmetric direction works the same way: a Go provider (`api.Clients(...)`)
+commits its contract, and a TypeScript client project names it in
+`generatedFrom`.
 
-Both land under `clients/` (`clients/ts`, `clients/go`), are committed like a `.pb.go`, and a `clientsync`-style test catches drift from the spec. The symmetric direction works too: a Go provider (`api.Clients(...)`) emits its Go client in-app and a TypeScript `clients/ts` via the same `putnami clientgen` command. `targets` defaults to `['ts']`; `go` accepts `{ output, modulePath, packageName, clientName, omitOperations }`.
-
-`go.omitOperations` names operations, by `operationId`, that the Go target leaves out instead of failing the whole provider — for an operation the Go emitter cannot represent yet, such as one declaring typed response headers. Without it such an operation fails Go generation. Each operation left out is named in the generated Go client's doc comment and in `omittedOperations` of its `client.putnami.json`, and a name the contract does not declare fails. The TypeScript client keeps every operation.
+`omitOperations` in a Go client's `generatedFrom` names operations, by
+`operationId`, that the Go client leaves out instead of failing generation —
+for an operation the Go emitter cannot represent yet, such as one declaring
+typed response headers. Without it such an operation fails Go generation. Each
+operation left out is named in the generated Go client's doc comment, and a
+name the contract does not declare fails. The TypeScript client keeps every
+operation.
 
 ## Producer attribution
 
-`.gen/clientgen/config.json` carries a `design.operations` table attributing each
-endpoint to the feature that produced it. Ownership is the module that owns the
-`ApiPlugin` the endpoint was registered on — never the client generator's module
-— so an endpoint whose owner declares no feature is absent from the table and is
-generated **unattributed** instead of inheriting a neighbouring feature.
+Each operation's `x-putnami-client` carries a `producer` — `{ project, feature }`
+— attributing it to the feature that produced it. Ownership is the module that
+owns the `ApiPlugin` the endpoint was registered on — never the client
+generator's module — so an endpoint whose owner declares no feature carries no
+`producer` and is generated **unattributed** instead of inheriting a
+neighbouring feature.
 
 The generated `static readonly design` therefore records `producerProject` and
 `producerFeature` per operation, keyed by the canonical `operationId`. That id is
@@ -387,5 +415,5 @@ class with a duplicated member.
 
 - **Scope:** Generating typed TypeScript **and Go** clients from the marked Putnami OpenAPI document — unary REST/JSON, raw octets, Connect, SSE and WebSocket streams, in-language and cross-language
 - **Out of scope:** Generating clients from external specs (Swagger 2.0, gRPC reflection) — an external contract is inventoried and adapted by hand, never generated from a contract Putnami does not own
-- **Dependencies:** Requires the `openapi()` plugin; the client generator runs in `postGenerate()`, after the spec is written
-- **Extension points:** Use `generateTypeScriptClient()` / `generateProjectClients()` directly with a custom `SpecIR`; the Go emitter lives in `go.putnami.dev/api`
+- **Dependencies:** The provider requires the `openapi()` plugin and commits its contract as `schema/openapi.json`; the client project requires `generatedFrom`
+- **Extension points:** Use `generateTypeScriptClient()` directly with a custom `SpecIR`, or `generateClient()` with a contract file; the Go emitter lives in `go.putnami.dev/api`

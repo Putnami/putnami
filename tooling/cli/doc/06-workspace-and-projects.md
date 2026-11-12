@@ -535,7 +535,7 @@ Each edge line names the project that pulled another one in, and the edge kind:
 | Edge kind | The project was reached because | Selected |
 |-----------|---------------------------------|----------|
 | `dependency` | it declares, or a provider derived for it, a dependency on a project already in the set | the tasks whose `^` reference names one the other project runs, and what those carry inside it |
-| `contract` | it is a generated client of a provider already in the set — its committed `client.putnami.json` names that provider's service — and the change includes the provider's committed contract; the line names that contract and its sha256 | the same rule, with the provider standing in for a declared dependency |
+| `contract` | it is a generated client of a provider already in the set — the `generatedFrom` member of its `putnami.json` names that provider's service — and the change includes the provider's committed contract; the line names that contract and its sha256 | the same rule, with the provider standing in for a declared dependency |
 | `extension-consumer` | it runs under an in-workspace extension whose runtime the change moved; the line names `runtime input` and the changed file the walk traced that runtime to. Or the extension's manifest change edits task and step declarations alone; the line names `task declaration` and the manifest | every task that extension declares for a runtime input, the steps the manifest change moved for a task declaration; each qualified by the extension project's id |
 
 Each line ends with the project's task scope, and a line with none names a
@@ -548,17 +548,14 @@ first edge that reached it otherwise; a project's scope can still grow through
 another edge, and the scope shown is the union.
 
 A `contract` edge fires only when the change includes the provider's committed
-contract, `schema/openapi.json`. The client's committed manifest states the
-exact contract bytes it was generated at (`contractSha256`), and that digest is
-the one provider-side input in its identity: the contract edge orders the
-client's `generate` after the provider's contract producer and contributes
-nothing to its cache key. So a provider change that leaves the committed
-contract alone cannot change what the client or its consumers compile against,
-and selects none of them — a test file or a handler inside an API workload
-selects the workload and its dependency dependents only. A provider change that
-would move the contract without committing it fails the provider's own
-`clientgen` drift check, and a regenerated client's files select the client
-directly, as its own path owner.
+contract, `schema/openapi.json`. The client's identity folds the digest of
+that contract and the client's generation options, and that digest is the one
+provider-side input in its identity. The contract edge orders no job and
+contributes nothing to a cache key. So a provider change that leaves the
+committed contract alone cannot change what the client or its consumers compile
+against, and selects none of them: a test file or a handler inside an API
+workload selects the workload and its dependency dependents only. A change to
+the client's own files selects the client directly, as its own path owner.
 
 When the edge fires, its line names the contract that changed and the first 12
 hex digits of its sha256 in the tree the selection read; the `selection:impacted`
@@ -569,8 +566,8 @@ it still names the contract hop. See
 
 ### The contract edge
 
-A project whose root commits a `client.putnami.json` is a generated client
-target. The manifest's `service.id` names its provider, and the provider is the
+A project whose `putnami.json` declares `generatedFrom` is a generated client.
+Its `generatedFrom.service` names its provider, and the provider is the
 project whose committed contract (`schema/openapi.json`) declares that same
 service identity in its document-level `x-putnami-client` block. Nearness in
 the tree is not a rule: a client beside its provider and one in another scope
@@ -581,11 +578,12 @@ Both ends are read from committed files only. A contract that exists just under
 clone and a warm checkout two different graphs for one commit. A service
 identity two projects both declare resolves to neither — an edge that depended
 on project order would name a different provider from one run to the next — and
-a workspace that commits no client manifest reads no contract at all.
+a workspace where no project declares `generatedFrom` reads no contract at all.
 
-In a plan, the edge orders jobs and changes no cache key. A client's `^` steps
-wait for the provider's steps of the same name, and every client job waits for
-the provider jobs that can write the client's directory. See
+In a plan, the edge orders no job and changes no cache key
+([ADR 0087](adr/0087-a-fresh-worktree-restores-its-generated-clients.md)). The
+projects that compile a client wait for the client's own `client-generate` job
+through the dependents rule. See
 [Generated-Client Ordering](04-job-execution.md#generated-client-ordering).
 
 The block is capped at 5 seeds and 10 edges. The full record is the
@@ -751,8 +749,9 @@ A service declares nothing. Its committed contract is its public surface, so the
 edge from a generated client to its provider is always allowed, and the
 provider's implementation stays private. A generated client is importable
 from every scope, wherever it sits: it is the service's published way in. That
-holds when its committed `client.putnami.json` names a service a provider in
-the workspace commits, and its `putnami.json` declares no `visibility`; a client
+holds when the `generatedFrom` of its `putnami.json` names a service a
+provider in the workspace commits, and its `putnami.json` declares no
+`visibility`; a client
 that declares `scope` keeps that boundary.
 
 ### Reporting and enforcing

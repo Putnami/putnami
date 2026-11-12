@@ -1,45 +1,27 @@
 import { describe, expect, test } from 'bun:test';
 import { spawnSync } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import {
-  cpSync,
-  existsSync,
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  readdirSync,
-  realpathSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { specTest } from '@putnami/runtime/spectest';
 import { resolveBiomeCli } from '../../src/generator/generated-file-canonicalizer';
-import { generateProjectClients } from '../../src/generator/project-clients';
+import { generateClient } from '../../src/generator/project-clients';
 
-// One-operation OpenAPI document → a single service with one method.
-const MINIMAL_SPEC = JSON.stringify({
-  openapi: '3.0.3',
-  info: { title: 'Items', version: '1.0.0' },
-  paths: {
-    '/items/{id}': {
-      get: {
-        operationId: 'getItem',
-        parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }],
-        responses: { '204': { description: 'No Content' } },
-      },
-    },
-  },
+const GENERATE_BIN = join(import.meta.dir, '../../bin/generate.ts');
+const DEFAULT_BIOME_CONFIG = JSON.stringify({
+  ...JSON.parse(readFileSync(join(import.meta.dir, '../../../../../biome.json'), 'utf8')),
+  vcs: { enabled: false },
 });
+const FORMATTER_TEST_TIMEOUT_MS = 60_000;
 
-const TS_CONFIG = JSON.stringify({
-  thirdParty: true,
-  targets: ['ts'],
-  ts: { output: 'clients/ts', packageName: '@example/items-client' },
-  go: { output: 'clients/go', modulePath: '', packageName: 'client', clientName: 'Client' },
-});
+/** The client project's authored files, which generation never touches. */
+const AUTHORED = {
+  'clients/widgets/package.json': '{"name":"@example/widgets-client","private":true}\n',
+  'clients/widgets/tsconfig.json': '{"extends":"../../tsconfig.base.json"}\n',
+  'clients/widgets/putnami.json': '{"name":"@example/widgets-client","generatedFrom":{"service":"fixtures.widgets"}}\n',
+};
 
+/** One first-party operation from the shared corpus, served over REST only. */
 function firstPartySpec(): string {
   const source = readFileSync(
     join(import.meta.dir, '../../../../../protocols/clientcontract/fixtures/openapi/valid/full.openapi.json'),
@@ -54,11 +36,30 @@ function firstPartySpec(): string {
   return `${preserveWideIntegers(source, JSON.stringify(fixture, null, 2))}\n`;
 }
 
+/** The first-party spec with its operation attributed to a producer. */
+function attributedSpec(): string {
+  const source = firstPartySpec();
+  const fixture = JSON.parse(source);
+  fixture.paths['/widgets/{id}'].get['x-putnami-client'].producer = {
+    project: '@example/widgets',
+    feature: 'widgets/read',
+  };
+  return `${preserveWideIntegers(source, JSON.stringify(fixture, null, 2))}\n`;
+}
+
+/** The first-party spec with every operation removed. */
+function emptySpec(): string {
+  const source = firstPartySpec();
+  const fixture = JSON.parse(source);
+  fixture.paths = {};
+  return `${preserveWideIntegers(source, JSON.stringify(fixture, null, 2))}\n`;
+}
+
 /**
  * JSON.parse/stringify cannot round-trip the corpus's exact uint64 bounds: a token
- * comes back as the nearest double and no longer fits its declared width. Restore
- * every wide integer the source publishes, and fail loudly rather than hand a
- * fixture to the reader that silently lost the contract's precision.
+ * past 2^53 comes back rounded. Restore the source's own digits for every wide
+ * integer the source publishes, and fail loudly rather than hand a fixture to the
+ * reader that silently lost the contract's precision.
  */
 function preserveWideIntegers(source: string, text: string): string {
   let restored = text;
@@ -71,36 +72,60 @@ function preserveWideIntegers(source: string, text: string): string {
   return restored;
 }
 
-const FIRST_PARTY_CONFIG = JSON.stringify({
-  targets: ['ts'],
-  ts: { output: 'clients/ts', packageName: '@example/widgets-client' },
-  go: { output: 'clients/go', modulePath: '', packageName: 'client', clientName: 'Client' },
-});
-const GENERATE_BIN = join(import.meta.dir, '../../bin/generate.ts');
-const DEFAULT_BIOME_CONFIG = JSON.stringify({
-  ...JSON.parse(readFileSync(join(import.meta.dir, '../../../../../biome.json'), 'utf8')),
-  vcs: { enabled: false },
-});
-const FORMATTER_TEST_TIMEOUT_MS = 60_000;
-
-function sha256(content: string | Uint8Array): string {
-  return createHash('sha256').update(content).digest('hex');
+interface Fixture {
+  workspace: string;
+  contract: string;
+  client: string;
 }
 
-// The provider project is `svc` in a fresh workspace, so a client project
-// generation writes names its provider "/svc".
-function setupProject(files: Record<string, string>): string {
+/**
+ * A workspace holding a provider's committed contract and a client project with
+ * its authored files. `files` are workspace-relative and win over the defaults.
+ */
+function setupWorkspace(files: Record<string, string> = {}): Fixture {
   // Keep the config and file-walker identities equal on macOS (/var -> /private/var).
   const workspace = realpathSync(mkdtempSync(join(tmpdir(), 'cg-ts-')));
-  writeFileSync(join(workspace, 'putnami.workspace.json'), '{"name":"w"}\n');
-  const root = join(workspace, 'svc');
-  mkdirSync(root);
-  for (const [rel, content] of Object.entries({ 'biome.json': DEFAULT_BIOME_CONFIG, ...files })) {
-    const p = join(root, rel);
-    mkdirSync(dirname(p), { recursive: true });
-    writeFileSync(p, content);
+  for (const [rel, content] of Object.entries({
+    'putnami.workspace.json': '{"name":"w"}\n',
+    'biome.json': DEFAULT_BIOME_CONFIG,
+    'provider/schema/openapi.json': firstPartySpec(),
+    ...AUTHORED,
+    ...files,
+  })) {
+    const path = join(workspace, rel);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, content);
   }
-  return root;
+  return {
+    workspace,
+    contract: join(workspace, 'provider/schema/openapi.json'),
+    client: join(workspace, 'clients/widgets'),
+  };
+}
+
+function generate(fixture: Fixture) {
+  return generateClient({
+    contractPath: fixture.contract,
+    outputDir: fixture.client,
+    packageName: '@example/widgets-client',
+  });
+}
+
+function runBin(args: string[], env: Record<string, string | undefined> = process.env) {
+  return spawnSync(process.execPath, [GENERATE_BIN, ...args], { encoding: 'utf8', env });
+}
+
+function binArgs(fixture: Fixture): string[] {
+  return ['--contract', fixture.contract, '--output', fixture.client, '--package-name', '@example/widgets-client'];
+}
+
+/** Every file under `dir`, relative and sorted. */
+function listFiles(dir: string, prefix = ''): string[] {
+  return readdirSync(dir, { withFileTypes: true })
+    .flatMap((entry) =>
+      entry.isDirectory() ? listFiles(join(dir, entry.name), `${prefix}${entry.name}/`) : [`${prefix}${entry.name}`],
+    )
+    .sort();
 }
 
 // Inject a process failure only after the earlier file has used the real Biome.
@@ -121,7 +146,7 @@ function installLateBiomeFailure(projectRoot: string, actualBiomeCli: string): v
     `const { spawnSync } = require('node:child_process');
 const { readFileSync } = require('node:fs');
 const args = process.argv.slice(2);
-if (args.some((arg) => arg.endsWith('clients/ts/src/items-client.ts'))) process.exit(23);
+if (args.some((arg) => arg.endsWith('src/widgets-client.ts'))) process.exit(23);
 const result = spawnSync(process.execPath, [${JSON.stringify(actualBiomeCli)}, ...args], {
   encoding: 'utf8',
   env: process.env,
@@ -134,17 +159,53 @@ process.exit(result.status ?? 1);
   );
 }
 
-describe('generateProjectClients (TypeScript)', () => {
+describe('generateClient (TypeScript)', () => {
   specTest(
-    'canonicalizes generated files with workspace overrides and EditorConfig',
+    'writes only the src closure and no manifest, package.json or tsconfig.json',
+    {
+      feature: 'tooling/cross-language-rest-clients',
+      requirement: 'no-committed-client',
+      check: 'the-emitters-write-no-manifest',
+    },
+    () => {
+      const fixture = setupWorkspace();
+      // A file a previous render owned, which this contract no longer emits.
+      mkdirSync(join(fixture.client, 'src'), { recursive: true });
+      writeFileSync(join(fixture.client, 'src/obsolete-client.ts'), '// stale\n');
+
+      const result = generate(fixture);
+
+      expect(result).toEqual({
+        generated: true,
+        files: ['src/types.ts', 'src/widgets-client.ts', 'src/index.ts'],
+      });
+      expect(listFiles(fixture.client)).toEqual([
+        'package.json',
+        'putnami.json',
+        'src/index.ts',
+        'src/types.ts',
+        'src/widgets-client.ts',
+        'tsconfig.json',
+      ]);
+      expect(existsSync(join(fixture.client, 'client.putnami.json'))).toBe(false);
+      for (const [rel, content] of Object.entries(AUTHORED)) {
+        expect(readFileSync(join(fixture.workspace, rel), 'utf8')).toBe(content);
+      }
+      const client = readFileSync(join(fixture.client, 'src/widgets-client.ts'), 'utf8');
+      expect(client).toContain("serviceId: 'fixtures.widgets'");
+    },
+    FORMATTER_TEST_TIMEOUT_MS,
+  );
+
+  specTest(
+    'renders the same bytes as a fresh workspace lint, with overrides and EditorConfig',
     {
       feature: 'typescript/service-clients',
       requirement: 'generated-parity',
       check: 'canonicalizes-project-generation-with-effective-biome-config',
     },
     () => {
-      const workspace = setupProject({
-        'putnami.workspace.json': '{}',
+      const fixture = setupWorkspace({
         '.editorconfig': 'root = true\n[*]\nindent_style = space\nindent_size = 4\ninsert_final_newline = true\n',
         'biome.base.json': JSON.stringify({
           formatter: { enabled: true, useEditorconfig: true },
@@ -160,238 +221,49 @@ describe('generateProjectClients (TypeScript)', () => {
           vcs: { enabled: false },
           overrides: [
             {
-              includes: ['providers/items/clients/ts/src/**/*.ts'],
+              includes: ['clients/widgets/src/**/*.ts'],
               javascript: { formatter: { quoteStyle: 'double' } },
             },
           ],
         }),
-        'providers/items/.gen/clientgen/config.json': TS_CONFIG,
-        'providers/items/schema/openapi.json': MINIMAL_SPEC,
       });
-      const root = join(workspace, 'providers/items');
 
-      const result = generateProjectClients(root);
-      expect(result.generated).toBe(true);
-      expect(result.outputDir).toBe('clients/ts');
-      for (const file of [
-        'clients/ts/package.json',
-        'clients/ts/tsconfig.json',
-        'clients/ts/src/index.ts',
-        'clients/ts/src/types.ts',
-      ]) {
-        expect(existsSync(join(root, file))).toBe(true);
-      }
-
-      const pkg = JSON.parse(readFileSync(join(root, 'clients/ts/package.json'), 'utf8'));
-      expect(pkg.name).toBe('@example/items-client');
-      expect(pkg.dependencies['@putnami/client']).toBeDefined();
-
-      const clientPath = join(root, 'clients/ts/src/items-client.ts');
-      const client = readFileSync(clientPath, 'utf8');
-      expect(client).toContain('ItemsClient');
+      const result = generate(fixture);
+      const client = readFileSync(join(fixture.client, 'src/widgets-client.ts'), 'utf8');
       expect(client).toContain('from "@putnami/client"');
       expect(client).toContain('\n    readonly serviceName');
 
-      const before = Object.fromEntries(result.files.map((file) => [file, readFileSync(join(root, file), 'utf8')]));
-      const biomeCli = resolveBiomeCli(root);
+      const before = Object.fromEntries(
+        result.files.map((file) => [file, readFileSync(join(fixture.client, file), 'utf8')]),
+      );
+      const biomeCli = resolveBiomeCli(fixture.client);
       for (const [phase, args] of [
         ['format', ['--write']],
         ['lint', ['--write', '--unsafe']],
       ] as const) {
         const lintResult = spawnSync(
           process.execPath,
-          [biomeCli, phase, ...args, `--config-path=${join(workspace, 'biome.json')}`, 'providers/items'],
-          { cwd: workspace, encoding: 'utf8' },
+          [biomeCli, phase, ...args, `--config-path=${join(fixture.workspace, 'biome.json')}`, 'clients/widgets/src'],
+          { cwd: fixture.workspace, encoding: 'utf8' },
         );
         if (lintResult.status !== 0) throw new Error(`Biome ${phase} failed for the generated fixture`);
       }
-      expect(Object.fromEntries(result.files.map((file) => [file, readFileSync(join(root, file), 'utf8')]))).toEqual(
-        before,
-      );
+      expect(
+        Object.fromEntries(result.files.map((file) => [file, readFileSync(join(fixture.client, file), 'utf8')])),
+      ).toEqual(before);
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
   specTest(
-    'selects the provider-local Biome package before the client fallback',
+    'renders identical bytes on a second run, already in their canonical form',
     {
       feature: 'typescript/service-clients',
-      requirement: 'canonical-generated-manifest',
-      check: 'the-provider-local-biome-package-wins-over-the-client-fallback',
+      requirement: 'canonical-generated-sources',
+      check: 'the-emitted-sources-are-the-canonical-biome-output',
     },
     () => {
-      const root = setupProject({ 'package.json': JSON.stringify({ private: true }) });
-      const packageRoot = join(root, 'node_modules/@biomejs/biome');
-      const bin = join(packageRoot, 'bin/biome');
-      mkdirSync(dirname(bin), { recursive: true });
-      writeFileSync(
-        join(packageRoot, 'package.json'),
-        JSON.stringify({
-          name: '@biomejs/biome',
-          version: '99.0.0-provider',
-          exports: { './bin/biome': './bin/biome' },
-        }),
-      );
-      writeFileSync(bin, '// provider-local biome shim\n');
-
-      expect(resolveBiomeCli(root)).toBe(bin);
-    },
-  );
-
-  test(
-    'emits a self-contained TS client package for a ts target',
-    () => {
-      const root = setupProject({
-        '.gen/clientgen/config.json': TS_CONFIG,
-        'schema/openapi.json': MINIMAL_SPEC,
-      });
-
-      const res = generateProjectClients(root);
-      expect(res.generated).toBe(true);
-      expect(res.outputDir).toBe('clients/ts');
-      for (const f of [
-        'clients/ts/package.json',
-        'clients/ts/tsconfig.json',
-        'clients/ts/src/index.ts',
-        'clients/ts/src/types.ts',
-      ]) {
-        expect(existsSync(join(root, f))).toBe(true);
-      }
-
-      const pkg = JSON.parse(readFileSync(join(root, 'clients/ts/package.json'), 'utf8'));
-      expect(pkg.name).toBe('@example/items-client');
-      expect(pkg.dependencies['@putnami/client']).toBeDefined();
-
-      const index = readFileSync(join(root, 'clients/ts/src/index.ts'), 'utf8');
-      expect(index).toContain('ItemsClient');
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  test(
-    'no-op when there is no clientgen contract',
-    () => {
-      const res = generateProjectClients(setupProject({ 'schema/openapi.json': MINIMAL_SPEC }));
-      expect(res.generated).toBe(false);
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  // A provider slice with no app commits its generation contract as
-  // clientgen.json at its root: the Go build-describe empties .gen/clientgen, so
-  // a contract committed there is gone before the generator reads it.
-  test(
-    'reads the committed clientgen.json when no build wrote a contract, and a built one wins',
-    () => {
-      const root = setupProject({
-        'clientgen.json': TS_CONFIG,
-        'schema/openapi.json': MINIMAL_SPEC,
-      });
-      const committed = generateProjectClients(root);
-      expect(committed.generated).toBe(true);
-      expect(committed.outputDir).toBe('clients/ts');
-      expect(existsSync(join(root, 'clients/ts/src/index.ts'))).toBe(true);
-
-      const built = join(root, '.gen/clientgen/config.json');
-      mkdirSync(dirname(built), { recursive: true });
-      writeFileSync(
-        built,
-        JSON.stringify({
-          targets: ['go'],
-          ts: { output: 'clients/ts', packageName: '@example/c' },
-          go: { output: 'clients/go', modulePath: '', packageName: 'client', clientName: 'Client' },
-        }),
-      );
-      expect(generateProjectClients(root).generated).toBe(false);
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  test(
-    'no-op when the ts target is disabled',
-    () => {
-      const root = setupProject({
-        '.gen/clientgen/config.json': JSON.stringify({
-          targets: ['go'],
-          ts: { output: 'clients/ts', packageName: '@example/c' },
-          go: { output: 'clients/go', modulePath: '', packageName: 'client', clientName: 'Client' },
-        }),
-        'schema/openapi.json': MINIMAL_SPEC,
-      });
-      const res = generateProjectClients(root);
-      expect(res.generated).toBe(false);
-      expect(existsSync(join(root, 'clients/ts'))).toBe(false);
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  test(
-    'reads the spec from the .gen fallback (openapi output:false / Go provider)',
-    () => {
-      const root = setupProject({
-        '.gen/clientgen/config.json': TS_CONFIG,
-        '.gen/schema/openapi.json': MINIMAL_SPEC,
-      });
-      expect(generateProjectClients(root).generated).toBe(true);
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  test(
-    'prefers the freshly built .gen contract over a stale committed copy',
-    () => {
-      const fresh = MINIMAL_SPEC.replaceAll('/items/{id}', '/fresh/{id}').replace('getItem', 'getFresh');
-      const stale = MINIMAL_SPEC.replaceAll('/items/{id}', '/stale/{id}').replace('getItem', 'getStale');
-      const root = setupProject({
-        '.gen/clientgen/config.json': TS_CONFIG,
-        '.gen/schema/openapi.json': fresh,
-        'schema/openapi.json': stale,
-      });
-
-      generateProjectClients(root);
-      const source = readFileSync(join(root, 'clients/ts/src/fresh-client.ts'), 'utf8');
-      expect(source).toContain("'/fresh/{id}'");
-      expect(existsSync(join(root, 'clients/ts/src/stale-client.ts'))).toBe(false);
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  // The spec pairs with the contract's origin. A committed clientgen.json reads
-  // the committed schema/openapi.json only: no cache key covers a .gen/schema an
-  // earlier build left in a project whose build does not write the contract.
-  test(
-    'a committed clientgen.json reads the committed spec, never a .gen spec',
-    () => {
-      const committed = MINIMAL_SPEC.replaceAll('/items/{id}', '/committed/{id}').replace('getItem', 'getCommitted');
-      const leftover = MINIMAL_SPEC.replaceAll('/items/{id}', '/leftover/{id}').replace('getItem', 'getLeftover');
-      const root = setupProject({
-        'clientgen.json': TS_CONFIG,
-        'schema/openapi.json': committed,
-        '.gen/schema/openapi.json': leftover,
-      });
-
-      generateProjectClients(root);
-      expect(readFileSync(join(root, 'clients/ts/src/committed-client.ts'), 'utf8')).toContain("'/committed/{id}'");
-      expect(existsSync(join(root, 'clients/ts/src/leftover-client.ts'))).toBe(false);
-
-      rmSync(join(root, 'schema/openapi.json'));
-      expect(() => generateProjectClients(root)).toThrow('must commit its OpenAPI spec as schema/openapi.json');
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  specTest(
-    'writes a deterministic first-party inventory with actual generated symbols and hashes',
-    {
-      feature: 'typescript/service-clients',
-      requirement: 'canonical-generated-manifest',
-      check: 'manifest-hashes-the-canonical-biome-output',
-    },
-    () => {
-      const source = firstPartySpec();
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': source,
+      const fixture = setupWorkspace({
         '.editorconfig': 'root = true\n[*]\nindent_style = space\nindent_size = 4\nend_of_line = lf\n',
         'biome.json': JSON.stringify({
           formatter: { enabled: true, useEditorconfig: true },
@@ -406,464 +278,264 @@ describe('generateProjectClients (TypeScript)', () => {
         }),
       });
 
-      const result = generateProjectClients(root);
-      const manifestSource = readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8');
-      const manifest = JSON.parse(manifestSource);
-      expect(result.files).toContain('clients/ts/client.putnami.json');
-      expect(manifest).toMatchObject({
-        protocolVersion: 1,
-        generatedBy: '@putnami/clientgen',
-        language: 'ts',
-        service: { id: 'fixtures.widgets', audience: 'urn:putnami:fixtures:widgets' },
-        binding: {
-          importPath: '@example/widgets-client',
-          clients: [
-            { service: 'WidgetsService', clientSymbol: 'WidgetsClient', bindingSymbol: 'registerWidgetsClient' },
-          ],
-        },
-        contractSha256: sha256(source),
-        operations: [
-          {
-            operationId: 'getWidget',
-            service: 'WidgetsService',
-            methodSymbol: 'getWidget',
-            stream: 'unary',
-            transports: [{ protocol: 'rest-json', path: '/widgets/{id}', encoding: 'json' }],
-          },
-        ],
-      });
-      expect(manifest.files.map((file: { path: string }) => file.path)).toEqual([
-        'package.json',
-        'src/index.ts',
-        'src/types.ts',
-        'src/widgets-client.ts',
-        'tsconfig.json',
-      ]);
-      for (const file of manifest.files) {
-        expect(file.sha256).toBe(sha256(readFileSync(join(root, 'clients/ts', file.path))));
-      }
-      const generatedClient = readFileSync(join(root, 'clients/ts/src/widgets-client.ts'), 'utf8');
-      expect(generatedClient).toContain("serviceId: 'fixtures.widgets'");
-      expect(generatedClient).toContain('\n    contract: {');
-      expect(generatedClient).not.toContain('const SERVICE_DESCRIPTOR = {"contract"');
-      expect(generateProjectClients(root)).toEqual(result);
-      expect(readFileSync(join(root, 'clients/ts/src/widgets-client.ts'), 'utf8')).toBe(generatedClient);
-      expect(readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8')).toBe(manifestSource);
+      const first = generate(fixture);
+      const rendered = Object.fromEntries(
+        first.files.map((file) => [file, readFileSync(join(fixture.client, file), 'utf8')]),
+      );
+      const client = rendered['src/widgets-client.ts'];
+      expect(client).toContain('\n    contract: {');
+      expect(client).not.toContain('const SERVICE_DESCRIPTOR = {"contract"');
+
+      expect(generate(fixture)).toEqual(first);
+      expect(
+        Object.fromEntries(first.files.map((file) => [file, readFileSync(join(fixture.client, file), 'utf8')])),
+      ).toEqual(rendered);
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
   specTest(
-    'pins the response-cache capability in the emitted module and declares the policy in the manifest',
+    "selects the client project's Biome package before the emitter's fallback",
+    {
+      feature: 'typescript/service-clients',
+      requirement: 'canonical-generated-sources',
+      check: 'the-format-projects-biome-package-wins-over-the-emitters-fallback',
+    },
+    () => {
+      const fixture = setupWorkspace();
+      const packageRoot = join(fixture.client, 'node_modules/@biomejs/biome');
+      const bin = join(packageRoot, 'bin/biome');
+      mkdirSync(dirname(bin), { recursive: true });
+      writeFileSync(
+        join(packageRoot, 'package.json'),
+        JSON.stringify({
+          name: '@biomejs/biome',
+          version: '99.0.0-client',
+          exports: { './bin/biome': './bin/biome' },
+        }),
+      );
+      writeFileSync(bin, '// client-local biome shim\n');
+
+      expect(resolveBiomeCli(fixture.client)).toBe(bin);
+    },
+  );
+
+  specTest(
+    'pins the response-cache capability in the emitted module',
     {
       feature: 'typescript/service-clients',
       requirement: 'response-cache',
-      check: 'the-emitted-ts-client-pins-the-response-cache-capability-and-its-manifest-declares-the-policy',
+      check: 'the-emitted-ts-client-pins-the-response-cache-capability',
     },
     () => {
       // The shared corpus declares fresh 5 s / stale 5 min on getWidget.
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': firstPartySpec(),
-      });
-      generateProjectClients(root);
-      const manifestPath = join(root, 'clients/ts/client.putnami.json');
-      const manifestSource = readFileSync(manifestPath, 'utf8');
-      const manifest = JSON.parse(manifestSource);
-      expect(manifest.runtimeCapabilities).toEqual(['response-cache']);
-      // The workspace formats every client.putnami.json expanded, the way the
-      // Go emitter writes it (biome.json `expand: always`); the manifest must
-      // already be in that form or the client project fails lint.
-      expect(manifestSource).toContain('"runtimeCapabilities": [\n    "response-cache"\n  ]');
-      expect(manifestSource).toMatch(/"keyFields": \[\n\s+"path\.id"\n\s+\]/);
-      const formatResult = spawnSync(
-        process.execPath,
-        [resolveBiomeCli(root), 'format', '--write', `--config-path=${join(root, 'biome.json')}`, 'clients/ts'],
-        { cwd: root, encoding: 'utf8' },
-      );
-      expect(formatResult.status).toBe(0);
-      expect(readFileSync(manifestPath, 'utf8')).toBe(manifestSource);
-      expect(manifest.operations[0].cache).toEqual({
-        freshMs: 5000,
-        staleMs: 300_000,
-        maxEntries: 256,
-        keyFields: ['path.id'],
-        invalidationFields: ['id'],
-      });
-      // The policy keeps the Go emitter's field order too.
-      expect(Object.keys(manifest.operations[0].cache)).toEqual([
-        'freshMs',
-        'staleMs',
-        'maxEntries',
-        'keyFields',
-        'invalidationFields',
-      ]);
-      // The manifest keeps the Go emitter's field order: capabilities after the
-      // operations, before the files.
-      expect(Object.keys(manifest)).toEqual([
-        'protocolVersion',
-        'generatedBy',
-        'language',
-        'service',
-        'binding',
-        'contractSha256',
-        'operations',
-        'runtimeCapabilities',
-        'files',
-      ]);
-      const generatedClient = readFileSync(join(root, 'clients/ts/src/widgets-client.ts'), 'utf8');
-      expect(generatedClient).toContain('requireClientRuntimeCapabilities');
-      expect(generatedClient).toContain("requireClientRuntimeCapabilities(['response-cache']);");
-      expect(generatedClient).toContain('freshMs: 5000');
+      const fixture = setupWorkspace();
+      generate(fixture);
+      const client = readFileSync(join(fixture.client, 'src/widgets-client.ts'), 'utf8');
+      expect(client).toContain("requireClientRuntimeCapabilities(['response-cache']);");
+      expect(client).toContain('freshMs: 5000');
       // A cached method forwards the caller's bypass; its call options declare it.
-      expect(generatedClient).toContain('withoutResponseCache: options?.withoutResponseCache,');
-      const generatedTypes = readFileSync(join(root, 'clients/ts/src/types.ts'), 'utf8');
-      expect(generatedTypes).toContain('withoutResponseCache?: boolean;');
+      expect(client).toContain('withoutResponseCache: options?.withoutResponseCache,');
+      expect(readFileSync(join(fixture.client, 'src/types.ts'), 'utf8')).toContain('withoutResponseCache?: boolean;');
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
   test(
-    'removes stale owned files while preserving unrelated output files',
+    "carries the contract's producer attribution into the design declaration",
     () => {
-      const source = firstPartySpec();
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': source,
-      });
-      generateProjectClients(root);
-      const output = join(root, 'clients/ts');
-      const manifestPath = join(output, 'client.putnami.json');
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-      writeFileSync(join(output, 'unrelated.txt'), 'keep me');
-      writeFileSync(join(output, 'src/obsolete.ts'), '// generated old byte\n');
-      manifest.files.push({ path: 'src/obsolete.ts', sha256: sha256('// generated old byte\n') });
-      manifest.files.sort((left: { path: string }, right: { path: string }) => left.path.localeCompare(right.path));
-      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-
-      generateProjectClients(root);
-      expect(existsSync(join(output, 'src/obsolete.ts'))).toBe(false);
-      expect(readFileSync(join(output, 'unrelated.txt'), 'utf8')).toBe('keep me');
+      const fixture = setupWorkspace({ 'provider/schema/openapi.json': attributedSpec() });
+      generate(fixture);
+      const client = readFileSync(join(fixture.client, 'src/widgets-client.ts'), 'utf8');
+      expect(client).toContain("producerProject: '@example/widgets'");
+      expect(client).toContain("producerFeature: 'widgets/read'");
+      expect(client).toContain('design: SERVICE_DESIGN,');
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
   test(
-    'refuses to delete a stale generated path whose bytes no longer match its inventory',
+    'removes src and keeps the authored files when the contract declares no operation',
     () => {
-      const source = firstPartySpec();
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': source,
-      });
-      generateProjectClients(root);
-      const output = join(root, 'clients/ts');
-      const manifestPath = join(output, 'client.putnami.json');
-      const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
-      writeFileSync(join(output, 'src/obsolete.ts'), '// locally edited\n');
-      manifest.files.push({ path: 'src/obsolete.ts', sha256: sha256('// generated old byte\n') });
-      manifest.files.sort((left: { path: string }, right: { path: string }) => left.path.localeCompare(right.path));
-      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+      const fixture = setupWorkspace();
+      generate(fixture);
+      writeFileSync(fixture.contract, emptySpec());
 
-      expect(() => generateProjectClients(root)).toThrow(/refusing to remove modified generated file/);
-      expect(readFileSync(join(output, 'src/obsolete.ts'), 'utf8')).toBe('// locally edited\n');
+      expect(generate(fixture)).toEqual({ generated: false, files: [] });
+      expect(existsSync(join(fixture.client, 'src'))).toBe(false);
+      expect(listFiles(fixture.client)).toEqual(['package.json', 'putnami.json', 'tsconfig.json']);
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
-  test(
-    'removes the previous first-party target when the provider has no operations left',
-    () => {
-      const source = firstPartySpec();
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': source,
-      });
-      generateProjectClients(root);
-      const output = join(root, 'clients/ts');
-      writeFileSync(join(output, 'notes.md'), 'consumer-owned');
-      const empty = JSON.parse(source);
-      empty.paths = {};
-      writeFileSync(join(root, '.gen/schema/openapi.json'), `${preserveWideIntegers(source, JSON.stringify(empty))}\n`);
+  test('refuses a contract without a document-level x-putnami-client', () => {
+    const fixture = setupWorkspace();
+    const unmarked = JSON.parse(readFileSync(fixture.contract, 'utf8'));
+    unmarked['x-putnami-client'] = undefined;
+    for (const operation of Object.values(unmarked.paths as Record<string, Record<string, Record<string, unknown>>>))
+      for (const item of Object.values(operation)) item['x-putnami-client'] = undefined;
+    writeFileSync(fixture.contract, JSON.stringify(unmarked));
 
-      expect(generateProjectClients(root)).toEqual({ generated: false, outputDir: 'clients/ts', files: [] });
-      expect(existsSync(join(output, 'client.putnami.json'))).toBe(false);
-      expect(existsSync(join(output, 'src/widgets-client.ts'))).toBe(false);
-      expect(readFileSync(join(output, 'notes.md'), 'utf8')).toBe('consumer-owned');
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
+    expect(() => generate(fixture)).toThrow(/x-putnami-client/);
+    expect(existsSync(join(fixture.client, 'src'))).toBe(false);
+  });
 
   specTest(
-    'writes a putnami.json that names its provider when the output has none',
+    'preserves the existing client when canonical formatting fails',
     {
       feature: 'typescript/service-clients',
-      requirement: 'client-project-document',
-      check: 'a-new-client-gets-a-putnami-json-naming-its-provider',
+      requirement: 'generated-parity',
+      check: 'a-formatter-failure-preserves-the-existing-client',
     },
     () => {
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': firstPartySpec(),
-        '.editorconfig': 'root = true\n[*]\nindent_style = space\nindent_size = 4\n',
-        'biome.json': JSON.stringify({ formatter: { enabled: true, useEditorconfig: true } }),
+      const existing = {
+        'clients/widgets/src/widgets-client.ts': '// existing client\n',
+        'clients/widgets/src/types.ts': '// existing types\n',
+      };
+      const fixture = setupWorkspace({
+        'biome.json': JSON.stringify({
+          root: true,
+          vcs: { enabled: false },
+          formatter: { enabled: true },
+          linter: { enabled: true, rules: { recommended: false } },
+        }),
+        ...existing,
       });
+      installLateBiomeFailure(fixture.client, resolveBiomeCli(import.meta.dir));
 
-      const result = generateProjectClients(root);
-      const document = readFileSync(join(root, 'clients/ts/putnami.json'), 'utf8');
-      expect(JSON.parse(document)).toEqual({
-        $schema: 'https://putnami.dev/schemas/putnami-project.json',
-        name: '@example/widgets-client',
-        type: 'library',
-        tags: ['ts', 'generated-client'],
-        extensions: ['@putnami/typescript'],
-        featureAuthority: { provider: '/svc' },
-      });
-      // Biome rendered it with the provider's configuration: the EditorConfig
-      // indentation, and the short array on one line.
-      expect(document).toContain('\n    "tags": ["ts", "generated-client"],\n');
-      const manifest = JSON.parse(readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8'));
-      expect(manifest.files.map((file: { path: string }) => file.path)).not.toContain('putnami.json');
-      expect(result.files).not.toContain('clients/ts/putnami.json');
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  test(
-    'names the provider without its transparent group folders, and fails outside a workspace',
-    () => {
-      const grouped = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': firstPartySpec(),
-      });
-      const provider = join(dirname(grouped), '(apps)', 'billing');
-      mkdirSync(dirname(provider), { recursive: true });
-      cpSync(grouped, provider, { recursive: true });
-      generateProjectClients(provider);
-      expect(JSON.parse(readFileSync(join(provider, 'clients/ts/putnami.json'), 'utf8')).featureAuthority).toEqual({
-        provider: '/billing',
-      });
-
-      const outside = realpathSync(mkdtempSync(join(tmpdir(), 'cg-ts-outside-')));
-      cpSync(grouped, outside, { recursive: true });
-      expect(() => generateProjectClients(outside)).toThrow('putnami.workspace.json');
-      expect(existsSync(join(outside, 'clients/ts'))).toBe(false);
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  specTest(
-    'keeps an existing putnami.json byte for byte',
-    {
-      feature: 'typescript/service-clients',
-      requirement: 'client-project-document',
-      check: 'an-existing-putnami-json-is-kept-byte-for-byte',
-    },
-    () => {
-      const existing = '{"name":"@example/widgets-client","tags":["hand-edited"]}\n';
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': firstPartySpec(),
-        'clients/ts/putnami.json': existing,
-      });
-
-      const result = generateProjectClients(root);
-      expect(result.generated).toBe(true);
-      expect(readFileSync(join(root, 'clients/ts/putnami.json'), 'utf8')).toBe(existing);
-      const manifest = JSON.parse(readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8'));
-      expect(manifest.files.map((file: { path: string }) => file.path)).not.toContain('putnami.json');
-      expect(result.files).not.toContain('clients/ts/putnami.json');
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  test(
-    'throws when the ts target is enabled but no spec exists',
-    () => {
-      const root = setupProject({ '.gen/clientgen/config.json': TS_CONFIG });
-      expect(() => generateProjectClients(root)).toThrow();
-    },
-    FORMATTER_TEST_TIMEOUT_MS,
-  );
-
-  test(
-    'does not expose generated input when canonical formatting fails',
-    () => {
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': firstPartySpec(),
-        'biome.json': '{"runtime-only-token":',
-      });
-
-      let failure: unknown;
-      try {
-        generateProjectClients(root);
-      } catch (error) {
-        failure = error;
+      expect(() => generate(fixture)).toThrow(
+        /^clientgen_format_failed: Biome format failed for src\/widgets-client\.ts/,
+      );
+      for (const [file, content] of Object.entries(existing)) {
+        expect(readFileSync(join(fixture.workspace, file), 'utf8')).toBe(content);
       }
-      expect(failure).toBeInstanceOf(Error);
-      expect((failure as Error).message).toMatch(/^clientgen_format_failed: Biome format failed/);
-      expect((failure as Error).message).not.toContain('runtime-only-token');
-      expect(existsSync(join(root, 'clients/ts/src/widgets-client.ts'))).toBe(false);
+      expect(existsSync(join(fixture.client, 'src/index.ts'))).toBe(false);
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
+});
 
+describe('putnami-client-generate', () => {
   test(
-    'uses the same canonical renderer through the standalone shim without a PATH formatter',
+    'formats with --format-project at the same relative paths, with no PATH formatter',
     () => {
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': firstPartySpec(),
-        'putnami.workspace.json': '{}',
-      });
-      const formatWorkspace = setupProject({
+      const fixture = setupWorkspace();
+      // The real client project lives in another workspace whose Biome
+      // configuration quotes the client's sources with single quotes only.
+      const real = setupWorkspace({
         '.editorconfig': 'root = true\n[*]\nindent_style = space\nindent_size = 4\n',
         'biome.json': JSON.stringify({
           formatter: { useEditorconfig: true },
           javascript: { formatter: { quoteStyle: 'double' } },
           overrides: [
             {
-              includes: ['providers/widgets/clients/ts/src/**/*.ts'],
+              includes: ['clients/widgets/src/**/*.ts'],
               javascript: { formatter: { quoteStyle: 'single' } },
             },
           ],
         }),
-        'putnami.workspace.json': '{}',
-      });
-      const formatRoot = join(formatWorkspace, 'providers/widgets');
-      mkdirSync(formatRoot, { recursive: true });
-      const result = spawnSync(process.execPath, [GENERATE_BIN, '--project', root, '--format-project', formatRoot], {
-        encoding: 'utf8',
-        env: { ...process.env, PATH: dirname(process.execPath), PUTNAMI_WORKSPACE_ROOT: root },
       });
 
-      if (result.status !== 0) throw new Error(result.stderr || 'standalone generator failed without a diagnostic');
+      const result = runBin([...binArgs(fixture), '--format-project', real.client], {
+        ...process.env,
+        PATH: dirname(process.execPath),
+      });
+
+      if (result.status !== 0) throw new Error(result.stderr || 'the emitter failed without a diagnostic');
       expect(result.stderr).toBe('');
-      const client = readFileSync(join(root, 'clients/ts/src/widgets-client.ts'), 'utf8');
+      const client = readFileSync(join(fixture.client, 'src/widgets-client.ts'), 'utf8');
       expect(client).toContain("serviceId: 'fixtures.widgets'");
       expect(client).toContain('\n    contract: {');
-      const manifest = JSON.parse(readFileSync(join(root, 'clients/ts/client.putnami.json'), 'utf8'));
-      for (const file of manifest.files) {
-        expect(file.sha256).toBe(sha256(readFileSync(join(root, 'clients/ts', file.path))));
-      }
+      expect(existsSync(join(real.client, 'src'))).toBe(false);
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
   // A provider serving "/.well-known/..." must not fail with exit 1 and no
-  // message: the class name is not an identifier, so the shim must not
-  // swallow the plain Error the emitter throws.
+  // message: the class name is not an identifier, so the emitter must not
+  // swallow the plain Error the generator throws.
   test(
-    'generates a first-party client for a /.well-known path through the standalone shim',
+    'generates a first-party client for a /.well-known path',
     () => {
-      const fixture = JSON.parse(firstPartySpec());
-      fixture.paths = { '/.well-known/widgets/{id}': fixture.paths['/widgets/{id}'] };
+      const spec = JSON.parse(firstPartySpec());
+      spec.paths = { '/.well-known/widgets/{id}': spec.paths['/widgets/{id}'] };
       // The canonical id a Go provider publishes for this path keeps the
       // dot; it must not reach the emitted type names verbatim
       // ("Get.wellKnownWidgets_IdResult"), or Biome refuses the whole client.
-      fixture.paths['/.well-known/widgets/{id}'].get.operationId = 'get.well-known_Widgets_Id';
-      const root = setupProject({
-        '.gen/clientgen/config.json': FIRST_PARTY_CONFIG,
-        '.gen/schema/openapi.json': `${preserveWideIntegers(firstPartySpec(), JSON.stringify(fixture, null, 2))}\n`,
-      });
-      const result = spawnSync(process.execPath, [GENERATE_BIN, '--project', root], {
-        encoding: 'utf8',
-        env: { ...process.env, PUTNAMI_WORKSPACE_ROOT: dirname(root) },
+      spec.paths['/.well-known/widgets/{id}'].get.operationId = 'get.well-known_Widgets_Id';
+      const fixture = setupWorkspace({
+        'provider/schema/openapi.json': `${preserveWideIntegers(firstPartySpec(), JSON.stringify(spec, null, 2))}\n`,
       });
 
-      if (result.status !== 0) throw new Error(result.stderr || 'standalone generator failed without a diagnostic');
-      expect(readFileSync(join(root, 'clients/ts/src/well-known-client.ts'), 'utf8')).toContain(
-        'export class WellKnownClient',
-      );
-      const types = readFileSync(join(root, 'clients/ts/src/types.ts'), 'utf8');
+      const result = runBin(binArgs(fixture));
+
+      if (result.status !== 0) throw new Error(result.stderr || 'the emitter failed without a diagnostic');
+      const client = readFileSync(join(fixture.client, 'src/well-known-client.ts'), 'utf8');
+      expect(client).toContain('export class WellKnownClient');
+      const types = readFileSync(join(fixture.client, 'src/types.ts'), 'utf8');
       expect(types).toContain('GetWellKnownWidgetsId');
       expect(types).not.toContain('Get.well');
       // The canonical id stays the wire identity; only the derived names change.
-      expect(readFileSync(join(root, 'clients/ts/src/well-known-client.ts'), 'utf8')).toContain(
-        "operationId: 'get.well-known_Widgets_Id',",
-      );
+      expect(client).toContain("operationId: 'get.well-known_Widgets_Id',");
     },
     FORMATTER_TEST_TIMEOUT_MS,
   );
 
-  test('the standalone shim prints an unexpected exception instead of exiting silently', () => {
-    const root = setupProject({ '.gen/clientgen/config.json': '{"targets": [' });
+  test('refuses a missing, unknown or repeated flag with the usage line', () => {
+    const fixture = setupWorkspace();
+    for (const [args, message] of [
+      [['--contract', fixture.contract, '--output', fixture.client], '--package-name is required'],
+      [[...binArgs(fixture), '--project', fixture.client], 'unknown argument "--project"'],
+      [[...binArgs(fixture), '--output', fixture.client], '--output is given twice'],
+      [['--contract'], '--contract needs a value'],
+    ] as const) {
+      const result = runBin([...args]);
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain(message);
+      expect(result.stderr).toContain('usage: putnami-client-generate --contract');
+    }
+    expect(existsSync(join(fixture.client, 'src'))).toBe(false);
+  });
 
-    const result = spawnSync(process.execPath, [GENERATE_BIN, '--project', root], { encoding: 'utf8' });
+  test('exits 0 and removes src for a first-party contract with no operation', () => {
+    const fixture = setupWorkspace({
+      'provider/schema/openapi.json': emptySpec(),
+      'clients/widgets/src/widgets-client.ts': '// previous render\n',
+    });
+
+    const result = runBin(binArgs(fixture));
+
+    expect(result.status).toBe(0);
+    expect(result.stderr).toBe('');
+    expect(existsSync(join(fixture.client, 'src'))).toBe(false);
+  });
+
+  test('prints an unexpected exception instead of exiting silently', () => {
+    const fixture = setupWorkspace({ 'provider/schema/openapi.json': '{"openapi": [' });
+
+    const result = runBin(binArgs(fixture));
 
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
-    expect(result.stderr).toMatch(/^SyntaxError: /);
-    expect(result.stderr).toContain('project-clients.ts');
+    expect(result.stderr).not.toBe('');
   });
 
-  test('preserves existing client files when canonicalization fails', () => {
-    const existing = {
-      'clients/ts/package.json': '{"existing":true}\n',
-      'clients/ts/src/items-client.ts': '// existing client\n',
-      'clients/ts/src/types.ts': '// existing types\n',
-    };
-    const root = setupProject({
-      '.gen/clientgen/config.json': TS_CONFIG,
-      'schema/openapi.json': MINIMAL_SPEC,
-      'biome.json': JSON.stringify({
-        root: true,
-        vcs: { enabled: false },
-        formatter: { enabled: true },
-        linter: { enabled: true, rules: { recommended: false } },
-      }),
-      ...existing,
-    });
-    installLateBiomeFailure(root, resolveBiomeCli(import.meta.dir));
-
-    expect(() => generateProjectClients(root)).toThrow(
-      /^clientgen_format_failed: Biome format failed for src\/items-client\.ts/,
-    );
-    for (const [file, content] of Object.entries(existing)) {
-      expect(readFileSync(join(root, file), 'utf8')).toBe(content);
-    }
-  });
-
-  test('prints only the sanitized formatter failure from the standalone CLI', () => {
+  test('prints only the sanitized formatter failure', () => {
     const configSecret = 'configuration-secret-do-not-echo';
-    const sourceSecret = 'sourceSecretDoNotEcho';
-    const root = setupProject({
-      '.gen/clientgen/config.json': TS_CONFIG,
-      'schema/openapi.json': MINIMAL_SPEC.replace('getItem', sourceSecret),
-      'biome.json': `{"${configSecret}":`,
-    });
-    const bunInstallCache = join(root, '.bun-install-cache');
+    const fixture = setupWorkspace({ 'biome.json': `{"${configSecret}":` });
+    const bunInstallCache = join(fixture.workspace, '.bun-install-cache');
     mkdirSync(bunInstallCache);
 
-    const result = spawnSync(process.execPath, [GENERATE_BIN, '--project', root], {
-      encoding: 'utf8',
-      env: { ...process.env, BUN_INSTALL_CACHE_DIR: bunInstallCache },
-    });
+    const result = runBin(binArgs(fixture), { ...process.env, BUN_INSTALL_CACHE_DIR: bunInstallCache });
 
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
     // One sanitized line: Biome's own summary of what it refused, and none of
-    // the code frames that quote the provider's configuration or its source.
-    expect(result.stderr).toBe(
-      'clientgen_format_failed: Biome format failed for src/types.ts (exit 1): ' +
-        'Expected an array, an object, or a literal but instead found the end of the file. ' +
-        'Biome exited because the configuration resulted in errors. Please fix them.\n',
-    );
+    // the code frames that quote the configuration or the generated source.
+    expect(result.stderr).toMatch(/^clientgen_format_failed: Biome format failed for src\/types\.ts \(exit 1\): /);
+    expect(result.stderr.trimEnd().split('\n')).toHaveLength(1);
     expect(result.stderr).not.toContain(configSecret);
-    expect(result.stderr).not.toContain(sourceSecret);
     expect(readdirSync(bunInstallCache)).toEqual([]);
-  });
-
-  test('rejects a ts.output that escapes the project root', () => {
-    const root = setupProject({
-      '.gen/clientgen/config.json': JSON.stringify({
-        targets: ['ts'],
-        ts: { output: '../escape', packageName: '@example/c' },
-        go: { output: 'clients/go', modulePath: '', packageName: 'client', clientName: 'Client' },
-      }),
-      'schema/openapi.json': MINIMAL_SPEC,
-    });
-    expect(() => generateProjectClients(root)).toThrow();
   });
 });

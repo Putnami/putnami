@@ -79,7 +79,10 @@ func (generator *strictClientGen) render() (string, error) {
 				return "", err
 			}
 			operationVars = append(operationVars, lowerFirst(methodName)+"Operation")
-			designMethods = append(designMethods, methodEmit{Name: methodName, OperationID: method.OperationID, HTTPMethod: method.HTTPMethod, Path: method.Path})
+			designMethods = append(designMethods, methodEmit{
+				Name: methodName, OperationID: method.OperationID, HTTPMethod: method.HTTPMethod, Path: method.Path,
+				Producer: operationProducer(method),
+			})
 		}
 	}
 
@@ -158,7 +161,7 @@ func (generator *strictClientGen) render() (string, error) {
 }
 
 // specRuntimeCapabilities derives the runtime capabilities a first-party
-// contract's operations require, exactly as the generated manifest lists them.
+// contract's operations require.
 func specRuntimeCapabilities(spec SpecIR) []clientcontract.RuntimeCapability {
 	var operations []clientcontract.GeneratedOperation
 	for _, service := range spec.Services {
@@ -1528,4 +1531,13 @@ func connectObservableSchemas(method MethodIR) []clientcontract.Schema {
 		schemas = append(schemas, *method.Client.Messages.Output)
 	}
 	return schemas
+}
+
+// operationProducer returns the producer attribution the operation's contract
+// carries, or nil when it names none.
+func operationProducer(method MethodIR) *clientcontract.OperationProducer {
+	if method.Client == nil {
+		return nil
+	}
+	return method.Client.Producer
 }

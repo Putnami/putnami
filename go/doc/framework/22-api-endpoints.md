@@ -151,28 +151,27 @@ canonical `getV1_Operator_Cli-usage`.
 
 ## Generating typed clients
 
-`api.Clients(...)` is a build-time describer that generates a typed client from
-the provider's OpenAPI document — the single contract the Go and TypeScript
-emitters share:
+`api.Clients(...)` declares that the API is a client contract. It names no
+client: no target, output or package. Register it beside the openapi plugin:
 
 ```go
 openapiPlugin := openapi.NewPlugin(openapi.PluginOptions{Title: "Items"}).From(apiPlugin)
-clients := api.Clients(api.ClientsOptions{
-    Go: api.GoClientOptions{PackageName: "itemsclient", ClientName: "ItemsClient"},
-}).From(apiPlugin)
+clients := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 
 app.New("svc").Use(server).Use(apiPlugin).Use(openapiPlugin).Use(clients)
 ```
 
-During `putnami build` the describer reads the document in memory from the
-openapi plugin — an explicit dependency, so there is no describe-ordering race —
-writes the generation contract to `.gen/clientgen/config.json`, and generates the
-client into `clients/go` by default.
+Each operation's `x-putnami-client` records the project and feature that
+produce it as its `producer`, taken from the module owning the api plugin. An
+operation whose owner declares no feature stays **unattributed** rather than
+inheriting a neighbour's lineage. `ClientsOptions.ThirdParty` permits a
+contract with no `x-putnami-client`, for an external API.
 
-Each generated operation records the project and feature that produced it, taken
-from the module owning the api plugin. An operation whose owner declares no
-feature stays **unattributed** rather than inheriting a neighbour's lineage. See
-[Service Clients](/docs/frameworks/go/service-clients) for the runtime side.
+The provider commits the contract as `schema/openapi.json`. A client project
+names the provider's service in the `generatedFrom` member of its own
+`putnami.json`, and `putnami client-generate` builds the client from that
+committed contract. See [Service Clients](/docs/frameworks/go/service-clients)
+for the generation and runtime side.
 
 ## Registration is a wiring-time activity
 

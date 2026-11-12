@@ -141,8 +141,7 @@ no dependency, and the order-only edges remain. A dependency counts as a read
 of the producer's files, and an order-only edge counts only when the waiter's
 key reads a file the leaf writes (ADR 0082), so naming the step lets a
 `minimal` cache session serve the other `build` leaves, such as a compile, from
-their result alone. `clientgen` depends on `build~generate` and
-`build~describe`. The form requires extension contract 18.
+their result alone. The form requires extension contract 18.
 
 The `!` prefix creates a session barrier. `!build` plans `build` across the
 current project selection, then root steps of the dependent command wait for
@@ -225,40 +224,31 @@ sooner.
 
 ### Generated-Client Ordering
 
-A generated client is a project of its own whose provider writes its directory.
-Resources cannot express that relation, because a resource conflicts only
-within one project. After write serialization, `orderContractClients`
-(`internal/jobs/planner/planner_deps.go`) adds serialize edges from each job of a
-contract client to its provider's jobs, and from each job of a dependent to a
-writer of the output it reads, under three rules:
+A generated client is a project of its own. It generates itself with its own
+`client-generate` task, from its provider's committed contract. The contract
+edge between the client and its provider orders no job
+([ADR 0087](adr/0087-a-fresh-worktree-restores-its-generated-clients.md)): no
+job rewrites the committed contract, and the client's identity already folds
+its digest.
 
-- **Step rule.** A client step that references `^<step>` also waits for the
-  provider's step of that name. A client's `build~generate` waits for the
-  provider's `build~generate`.
-- **Tree rule.** Every client job waits for every provider job whose task
-  declares a durable `directory` output with `pathFrom`. That output is how a
-  generator declares a client whose directory the provider's configuration
-  chooses, such as `clientgen~generate-ts` or the TypeScript `build~generate`.
-  A project-rooted output lies inside the provider's directory, so the rule
-  applies only when the client's directory and the provider's directory nest.
-  A workspace-rooted output applies to every client. The command-output and
-  invocation roots apply to none. A file output never applies.
+The projects that compile a generated client still wait for it. Resources
+cannot express that relation, because a resource conflicts only within one
+project. After write serialization, `orderDependentReaders`
+(`internal/jobs/planner/planner_deps.go`) applies one rule:
+
 - **Dependents rule.** Every job of every project that depends on a writer's
   project, directly or transitively, waits for the writer. A writer is a job
   whose task declares a project-rooted output with `readByDependents`, such as
-  `clientgen~generate-go`: the client project commits the generated client,
-  and the projects that depend on it compile it. The rule follows declared
-  dependency edges. The implicit edge from a scope include to its scope reads
-  nothing, so it does not count. A job that already depends on the writer
-  takes no extra edge.
+  `client-generate~go`: the client project generates its
+  client, and the projects that depend on it compile it. The rule follows
+  declared dependency edges. The implicit edge from a scope include to its
+  scope reads nothing, so it does not count. A job that already depends on the
+  writer takes no extra edge.
 
-The three rules add ordering only. They never add a job to the plan, so an
-unplanned provider or writer adds no edge. They skip finalizers, which the
-invocation runtime dispatches. They also skip any edge that would close a
-cycle, for example when a provider imports its own client: the client jobs that
-the provider's writer depends on already run before it, through the writer's
-dependencies, and the other client jobs wait. The check covers functional,
-write-serialization, and contract edges, so the plan stays a DAG.
+The rule adds ordering only. It never adds a job to the plan, so an unplanned
+writer adds no edge. It skips finalizers, which the invocation runtime
+dispatches. It also skips any edge that would close a cycle: the check covers
+functional and write-serialization edges, so the plan stays a DAG.
 
 A skipped edge leaves the order to the path that already exists, and that path
 can pass through a job an `--impacted` task scope drops. A task scope keeps
@@ -345,7 +335,7 @@ A follower takes its leader's earlier place in the write order, so its
 dependents no longer wait, through it, for a later writer of another command.
 A task whose output other projects read declares that output
 `readByDependents`, and those projects wait for the task itself: the
-`clientgen` generators declare it on the client they rewrite.
+`client-generate` tasks declare it on the client they write.
 
 The plan orders the members, but the runtime designates no leader in advance,
 which is what keeps the mechanism correct on partial plans: a member served

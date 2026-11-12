@@ -205,6 +205,10 @@
           ],
           "idempotency": {
             "kind": "non-idempotent"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -385,6 +389,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -540,6 +548,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       },
@@ -693,6 +705,10 @@
               "failureThreshold": 2,
               "resetTimeoutMs": 60000
             }
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -942,6 +958,10 @@
               "maxFrameBytes": 16384,
               "maxBufferedMessages": 4
             }
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -1102,6 +1122,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -1320,6 +1344,10 @@
               "maxFrameBytes": 16384,
               "maxBufferedMessages": 4
             }
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -1548,6 +1576,10 @@
               "maxBufferedMessages": 4,
               "reconnect": true
             }
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -1766,6 +1798,10 @@
               "maxFrameBytes": 16384,
               "maxBufferedMessages": 4
             }
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -1990,6 +2026,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -2123,6 +2163,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -2301,6 +2345,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -2479,6 +2527,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -2697,6 +2749,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -2881,6 +2937,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }
@@ -3058,6 +3118,10 @@
           ],
           "idempotency": {
             "kind": "safe"
+          },
+          "producer": {
+            "project": "@example/10-service-to-service",
+            "feature": "items/manage"
           }
         }
       }

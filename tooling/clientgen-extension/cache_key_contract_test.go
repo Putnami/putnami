@@ -19,7 +19,7 @@ import (
 // The TypeScript emitter runs Biome's format and lint writer phases over every
 // file it emits, so the resolved Biome configuration, its overrides, its
 // `extends` chain and the EditorConfig beside it decide the emitted bytes as
-// directly as the provider contract does. clientgen-ts is cacheable, which
+// directly as the provider contract does. client-generate-ts is cacheable, which
 // makes each of those files a cache-key entry: without them, changing a
 // formatting rule serves bytes formatted by the previous rule as a HIT.
 //
@@ -31,12 +31,12 @@ import (
 func TestClientgenTsCacheKeyCoversEveryResolvedFormatterInput(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "formatter-inputs-are-cache-keyed", "every-resolved-formatter-input-is-a-declared-cache-key-entry")
 	manifest := loadExtensionManifest(t)
-	task := manifest.Tasks["clientgen-ts"]
+	task := manifest.Tasks["client-generate-ts"]
 	if !task.Cache.IsEnabled() {
-		t.Fatal("clientgen-ts is not cacheable; the formatter inputs below are only load-bearing for a cache key")
+		t.Fatal("client-generate-ts is not cacheable; the formatter inputs below are only load-bearing for a cache key")
 	}
 	if task.Cache.Key == nil {
-		t.Fatal("clientgen-ts declares no cache key, so its key falls back to a whole-project hash that skips dot files")
+		t.Fatal("client-generate-ts declares no cache key, so its key falls back to a whole-project hash that skips dot files")
 	}
 	projectGlobs := task.Cache.Key.Files
 	workspaceGlobs := task.Cache.Key.WorkspaceFiles
@@ -49,7 +49,7 @@ func TestClientgenTsCacheKeyCoversEveryResolvedFormatterInput(t *testing.T) {
 		}
 		for _, input := range inputs {
 			if !coveredByKey(input, projectRel, projectGlobs, workspaceGlobs) {
-				t.Errorf("formatter input %q (resolved for project %q) is not covered by the clientgen-ts cache key\n"+
+				t.Errorf("formatter input %q (resolved for project %q) is not covered by the client-generate-ts cache key\n"+
 					"  files: %v\n  workspaceFiles: %v", input, projectRel, projectGlobs, workspaceGlobs)
 			}
 		}
@@ -59,49 +59,45 @@ func TestClientgenTsCacheKeyCoversEveryResolvedFormatterInput(t *testing.T) {
 // TestGenerationTasksKeyOnTheCommittedContractAndFoldTheBuiltOne pins the other
 // half of the same hazard. With no declared key the file hash walks the project
 // tree and skips every dot directory, so each generator names the committed
-// files it reads: the generation contract clientgen.json and the sidecar
-// schema/openapi.json.
+// files it reads.
 //
-// Neither key names a built file under .gen. build-describe (Go) and
-// build-generate (TypeScript) write .gen/clientgen and .gen/schema during the
-// run, so a key that hashed them would differ between the value the run
-// computes before any task starts and the value the job computes when it
-// starts, and the job would miss the entry the run looked up. Those bytes are
-// fixed by the producer's key, which these keys fold: the TypeScript
-// build-generate owns .gen as a required output, and the Go build-describe
-// declares both trees emptied (protocols/extension ADR 0009, CLI ADR 0068). The
-// clientgen command depends on build~generate and build~describe, which
-// TestWorkspaceCommandsOwnTheirBuildAndTheProjectCommandDependsOnBuild pins.
+// The in-module target reads the provider's committed clientgen.json and
+// schema/openapi.json, so its key names both. A client project reads its own
+// putnami.json, whose generatedFrom carries the generation options, and its
+// provider's committed contract, which lies in another project: the core
+// folds that contract's digest and the options into the client's identity,
+// which every key of the client's tasks holds.
 //
-// A project whose describe is not planned can still commit its generation
-// contract at .gen/clientgen/config.json, and every reader takes that file
-// first. No folded key fixes it, so each key reads it as a Git candidate
-// (git:.gen/clientgen/config.json): a committed file is a candidate and its
-// edit moves the key, and a built one that the workspace ignores is not, so a
-// build of the run never moves the key through it. A plain .gen entry fails
-// here.
+// No key names a file under .gen. A build of the run writes there, so a key
+// that hashed it would differ between the value the run computes before any
+// task starts and the value the job computes when it starts, and the job would
+// miss the entry the run looked up.
 func TestGenerationTasksKeyOnTheCommittedContractAndFoldTheBuiltOne(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "formatter-inputs-are-cache-keyed", "a-cacheable-generator-keys-on-the-committed-contract-and-folds-the-built-one")
 	manifest := loadExtensionManifest(t)
-	wantContractInputs := []string{"clientgen.json", "git:.gen/clientgen/config.json", "schema/openapi.json"}
-	for _, name := range []string{"clientgen-go", "clientgen-ts"} {
+	wantInputs := map[string][]string{
+		"client-generate-go":     {"go.mod", "putnami.json"},
+		"client-generate-module": {"clientgen.json", "go.mod", "putnami.json", "schema/openapi.json"},
+		"client-generate-ts":     {"package.json", "putnami.json"},
+	}
+	for name, inputs := range wantInputs {
 		task := manifest.Tasks[name]
-		if !task.Cache.IsEnabled() {
-			t.Errorf("task %q is not cacheable; generation from an unchanged contract must be reusable", name)
+		if !task.Cache.IsEnabled() || !task.Cache.Deterministic {
+			t.Errorf("task %q cache = %+v; generation from an unchanged contract must be reusable and deterministic", name, task.Cache)
 			continue
 		}
 		if task.Cache.Key == nil {
-			t.Errorf("task %q declares no cache key, so its key cannot see the committed contract it reads", name)
+			t.Errorf("task %q declares no cache key, so its key cannot see the committed files it reads", name)
 			continue
 		}
 		declared := map[string]bool{}
 		for _, glob := range task.Cache.Key.Files {
 			declared[glob] = true
-			if glob == ".gen" || strings.HasPrefix(glob, ".gen/") {
-				t.Errorf("task %q cache key names %q, which a build of the run writes: the key would differ between the run's lookup and the job's start; read a committed file there as a Git candidate (git:%s)", name, glob, glob)
+			if strings.Contains(glob, ".gen") {
+				t.Errorf("task %q cache key names %q, which a build of the run writes", name, glob)
 			}
 		}
-		for _, want := range wantContractInputs {
+		for _, want := range inputs {
 			if !declared[want] {
 				t.Errorf("task %q cache key does not include %q", name, want)
 			}
@@ -111,15 +107,15 @@ func TestGenerationTasksKeyOnTheCommittedContractAndFoldTheBuiltOne(t *testing.T
 
 // The TypeScript emitter reads the workspace root package.json to decide how a
 // client depends on @putnami/client (`catalog:`, a pinned version, or
-// `workspace:*`). That choice is an emitted byte, so the file keys clientgen-ts.
+// `workspace:*`). That choice is an emitted byte, so the file keys client-generate-ts.
 func TestClientgenTsCacheKeyCoversTheWorkspaceRootPackageJSON(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "formatter-inputs-are-cache-keyed", "the-workspace-root-package-json-keys-the-typescript-target")
-	task := loadExtensionManifest(t).Tasks["clientgen-ts"]
+	task := loadExtensionManifest(t).Tasks["client-generate-ts"]
 	if task.Cache.Key == nil {
-		t.Fatal("clientgen-ts declares no cache key")
+		t.Fatal("client-generate-ts declares no cache key")
 	}
 	if !coveredByKey("package.json", "services/provider", task.Cache.Key.Files, task.Cache.Key.WorkspaceFiles) {
-		t.Fatalf("the workspace root package.json is not a clientgen-ts cache key entry\n  workspaceFiles: %v", task.Cache.Key.WorkspaceFiles)
+		t.Fatalf("the workspace root package.json is not a client-generate-ts cache key entry\n  workspaceFiles: %v", task.Cache.Key.WorkspaceFiles)
 	}
 }
 

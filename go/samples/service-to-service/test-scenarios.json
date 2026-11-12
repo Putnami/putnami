@@ -1607,20 +1607,7 @@
       "family": "generation",
       "auth": "n/a",
       "policy": "n/a",
-      "test": "service/clientsync_test.go:TestGeneratedClientInSync",
-      "result": "pass"
-    },
-    {
-      "id": "go-go.contract.generation.the-manifest-owns-the-current-contract-and-bytes",
-      "provider": "go",
-      "target": "go",
-      "cell": "contract",
-      "transport": "n/a",
-      "encoding": "n/a",
-      "family": "generation",
-      "auth": "n/a",
-      "policy": "n/a",
-      "test": "service/clientsync_test.go:TestGeneratedClientInSync",
+      "test": "service/clientsync_test.go:TestTheClientIsWhatTheEmitterRendersFromTheDescribedContract",
       "result": "pass"
     },
     {

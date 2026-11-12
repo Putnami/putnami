@@ -7,17 +7,11 @@ import (
 	clientcontract "go.putnami.dev/protocol/clientcontract"
 )
 
-// Mode selects synchronization or committed-byte verification.
+// Mode names what produced a report. The guard is the only producer left.
 type Mode string
 
-const (
-	// ModeSync regenerates configured targets before inspecting worktree bytes.
-	ModeSync Mode = "sync"
-	// ModeAdopt regenerates targets and applies only manifest-proven import moves.
-	ModeAdopt Mode = "adopt"
-	// ModeCheck inspects committed client bytes without trusting build rewrites.
-	ModeCheck Mode = "check"
-)
+// ModeCheck inspects committed client bytes without trusting build rewrites.
+const ModeCheck Mode = "check"
 
 // Classification distinguishes strict Putnami contracts from external inputs.
 type Classification string
@@ -191,7 +185,7 @@ type ProviderReport struct {
 	EmptyContract bool `json:"emptyContract,omitempty"`
 }
 
-// Report is the deterministic workspace client synchronization result.
+// Report is the deterministic workspace client verification result.
 type Report struct {
 	ProtocolVersion     int                  `json:"protocolVersion"`
 	Mode                Mode                 `json:"mode"`
@@ -200,7 +194,6 @@ type Report struct {
 	ConsumerEdges       []ConsumerEdge       `json:"consumerEdges"`
 	ExternalContracts   []ExternalContract   `json:"externalContracts"`
 	FrameworkTransports []FrameworkTransport `json:"frameworkTransports"`
-	AppliedAdaptations  []Adaptation         `json:"appliedAdaptations"`
 	AdaptationQueue     []Adaptation         `json:"adaptationQueue"`
 	Findings            []Finding            `json:"findings"`
 	// PendingTransports are handwritten-transport verdicts the workspace's
@@ -220,17 +213,6 @@ type Report struct {
 // constant is the metric name, prefixed by PhaseMetricPrefix, so a reader of
 // the session's event log and a reader of the report see one vocabulary.
 const (
-	// PhaseSnapshot captures the generated manifests before an adoption
-	// regenerates them (adopt only).
-	PhaseSnapshot = "snapshot"
-	// PhaseMaterialize builds every provider through the spawning CLI (sync and
-	// adopt only).
-	PhaseMaterialize = "materialize"
-	// PhaseSynchronize regenerates targets in place (sync and adopt only).
-	PhaseSynchronize = "synchronize"
-	// PhaseRender renders the expected clients into a temporary mirror (sync
-	// and adopt only).
-	PhaseRender = "render"
 	// PhaseInspect compares manifests, generated files and inventories.
 	PhaseInspect = "inspect"
 	// PhaseScan parses every consumer source for bindings and transports.
@@ -252,15 +234,3 @@ func (r *Report) recordTiming(phase string, elapsed time.Duration) {
 // Censused pending transports are deliberately excluded: they are reported
 // debt, not a failure of the change under test.
 func (r Report) Clean() bool { return len(r.Findings) == 0 }
-
-// WithFindings merges findings observed outside inspection — the pre-build
-// snapshot is the only current source — and restores the report's canonical
-// order so two runs of the same workspace produce the same bytes.
-func (r Report) WithFindings(extra ...Finding) Report {
-	if len(extra) == 0 {
-		return r
-	}
-	r.Findings = append(append([]Finding(nil), r.Findings...), extra...)
-	canonicalizeReport(&r)
-	return r
-}

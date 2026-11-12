@@ -42,9 +42,9 @@ import (
 // lets a task that writes the project `gen` subtree share: no other declared
 // access to the subtree runs between the leader's write and a follower's
 // capture. A follower's dependents then no longer wait, through it, for a
-// later writer of another command, such as a `clientgen` generator. A task
+// later writer of another command, such as a `client-generate` task. A task
 // whose output the dependent projects read declares it readByDependents, and
-// they wait for that task itself (orderContractClients).
+// they wait for that task itself (orderDependentReaders).
 //
 // Deliberately NOT stamped here:
 //
@@ -151,7 +151,7 @@ func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.Sch
 	}
 	leaders := orderSharedExecutions(jobs, groups)
 	serializeWriteResources(jobs, leaders, ordered)
-	orderContractClients(jobs, ws)
+	orderDependentReaders(jobs, ws)
 	if len(groups) == 0 || ValidatePlanDAG(jobs) == nil {
 		return
 	}
@@ -160,7 +160,7 @@ func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.Sch
 		job.SharedExecutionID = ""
 	}
 	serializeWriteResources(jobs, nil, ordered)
-	orderContractClients(jobs, ws)
+	orderDependentReaders(jobs, ws)
 	// A plan that cannot be scheduled without sharing either has a cycle of its
 	// own, which Plan reports as an error, so only a plan that sharing broke
 	// warns.

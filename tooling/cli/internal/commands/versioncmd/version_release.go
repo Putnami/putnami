@@ -81,10 +81,8 @@ func lineSpecs(wsRoot string) ([]git.LineSpec, error) {
 	}
 	specs := make([]git.LineSpec, 0, len(paths))
 	for _, path := range paths {
-		spec := git.LineSpec{ScopePath: path, TagPattern: ws.Lines[path], Stable: stable}
-		if path != "" {
-			spec.Pathspecs = []string{path}
-		}
+		spec := git.LineSpec{ScopePath: path, TagPattern: ws.Lines[path], Stable: stable,
+			Pathspecs: workspace.LinePathspecs(ws, path)}
 		specs = append(specs, spec)
 	}
 	if len(specs) == 0 {

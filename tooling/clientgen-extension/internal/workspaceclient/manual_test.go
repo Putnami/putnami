@@ -82,7 +82,7 @@ func helper() { _, _ = http.NewRequest("GET", "/catalog/items", nil) }
 }
 
 func TestTypeScriptTransportScannerIgnoresCommentsAndStringFixtures(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "handwritten-client-guard", "comments-strings-tests-and-validated-generated-files-do-not-trigger")
+	spectest.Proves(t, clientgenFeature, "handwritten-client-guard", "comments-strings-tests-and-ignored-generated-files-do-not-trigger")
 	content := `
 // fetch("https://catalog.internal/watch")
 const fixture = 'new WebSocket("wss://catalog.internal/watch")';

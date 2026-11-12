@@ -103,16 +103,6 @@ func (w *describeOutputWriter) String() string {
 // describe run fails.
 const frameworkAppPath = "go.putnami.dev/app"
 
-// GeneratedClientOutputPort is the data output port build-describe reports the
-// project-relative generated-client directories on. The manifest declares a port
-// of this exact name (tasks.build-describe.outputs), and both the CLI scheduler
-// and the v3 task declaration read the directory back under it — a generated
-// client's location is chosen by the project's clientgen config, so this port is
-// the only way the v3 task contract can name it (a declared output's pathFrom).
-// Renaming it on either side silently stops the client from being captured, so
-// the name is a constant the manifest-contract test pins.
-const GeneratedClientOutputPort = "clientOutputs"
-
 // RunDescribe is the entry point for the build-describe job. It compiles a
 // host-platform binary of the project, runs it once with PUTNAMI_DESCRIBE
 // set, and copies the artifacts written under .gen/ into the project tree
@@ -134,7 +124,7 @@ func RunDescribe(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, ma
 		return "SKIP", nil, nil
 	}
 	emit.PhaseEnd("describe", "success")
-	// Both values are project-relative. The payload is stored in this task's
+	// The artifacts are project-relative. The payload is stored in this task's
 	// cache entry and digested by `cache verify`, so anything checkout- or
 	// run-specific in it makes a task the manifest declares `deterministic`
 	// disagree with itself between two equivalent runs. That is why the
@@ -142,16 +132,12 @@ func RunDescribe(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, ma
 	// the project's slot under this worktree's scratch root, or a throwaway
 	// temporary file when there is none — so no two checkouts could ever agree
 	// on the name, and nothing reads it.
-	return "OK", map[string]any{
-		"artifacts":               res.Artifacts,
-		GeneratedClientOutputPort: res.ClientOutputs,
-	}, nil
+	return "OK", map[string]any{"artifacts": res.Artifacts}, nil
 }
 
 // describeResult carries the outcome for the manifest.
 type describeResult struct {
-	Artifacts     []string `json:"artifacts"`
-	ClientOutputs []string `json:"clientOutputs,omitempty"`
+	Artifacts []string `json:"artifacts"`
 }
 
 func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error) {
@@ -210,9 +196,6 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	if err := resetCededSchemaToGenerateStaging(genDir); err != nil {
 		return nil, fmt.Errorf("reset staged schema: %w", err)
 	}
-	if err := resetClientContract(genDir); err != nil {
-		return nil, fmt.Errorf("reset client contract: %w", err)
-	}
 
 	// Snapshot what's already under .gen/schema/ (e.g. files the static
 	// codegen runner produced earlier in the same build) so we only count
@@ -254,18 +237,8 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	if err != nil {
 		return nil, fmt.Errorf("collect artifacts: %w", err)
 	}
-	// Mirror any typed clients the describe binary staged under .gen/clientgen
-	// into the project tree (clients/<lang>). The scheduler captures that tree
-	// under the "clients" cache resource so a describe cache hit rematerializes
-	// it without re-running. Independent of the committed-schema opt-out: the
-	// generated client is required for downstream compilation, not a doc artifact.
-	clientArtifacts, clientOutputs, err := mirrorGeneratedClients(projectPath, genDir)
-	if err != nil {
-		return nil, fmt.Errorf("mirror generated clients: %w", err)
-	}
-	artifacts = append(artifacts, clientArtifacts...)
 	// Nothing the describe binary wrote under .gen needs staging here. Every
-	// subtree this task produces there — schema/, clientgen/, design/,
+	// subtree this task produces there — schema/, design/,
 	// migrations.json, migration-bundle/ — is a subpath build-generate cedes and
 	// this task declares, so the scheduler captures and restores each one from
 	// where its producer wrote it, at the contract path consumers read.
@@ -288,7 +261,7 @@ func runDescribe(ctx *pctx.Context, emit *jsonl.Emitter) (*describeResult, error
 	}
 
 	emit.Log("info", fmt.Sprintf("describe: %d artifact(s)", len(artifacts)))
-	return &describeResult{Artifacts: artifacts, ClientOutputs: clientOutputs}, nil
+	return &describeResult{Artifacts: artifacts}, nil
 }
 
 // capabilitiesSchemaRelPath is the canonical project-relative capability
@@ -922,19 +895,6 @@ func resetCededSchemaToGenerateStaging(genDir string) error {
 		}
 		return os.WriteFile(target, body, 0o644)
 	})
-}
-
-// resetClientContract removes .gen/clientgen before the describe binary runs.
-//
-// .gen/clientgen is this task's declared output, and only this task writes it:
-// the binary writes the generation contract (config.json) and the staged client
-// when the app configures a client generator, and nothing when it does not. The
-// tree after the run therefore holds what this run wrote and nothing else, so
-// the clientgen tasks never read a contract the current sources do not produce.
-// A project that commits its generation contract keeps it at clientgen.json in
-// its root, outside this tree.
-func resetClientContract(genDir string) error {
-	return os.RemoveAll(filepath.Join(genDir, "clientgen"))
 }
 
 // schemaSnapshot maps an absolute path under .gen/schema/ to its previous

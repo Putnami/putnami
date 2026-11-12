@@ -1,16 +1,4 @@
-export { type ClientGeneratorConfig, ClientGeneratorPlugin, clientGenerator } from './client-generator.plugin';
-export {
-  CLIENTGEN_DEFAULTS,
-  type ClientGenConfig,
-  type ClientGenConfigContext,
-  type ClientGenConfigInput,
-  type ClientGenConfigOperation,
-  type ClientTarget,
-  type GoClientGenConfig,
-  resolveClientGenConfig,
-  serializeClientGenConfig,
-  type TsClientGenConfig,
-} from './config.type';
+export { ClientGeneratorPlugin, clientGenerator } from './client-generator.plugin';
 export {
   CLIENT_IR_VERSION,
   type ContentIR,
@@ -33,7 +21,7 @@ export {
   readOpenApiSpecWithOptions,
   serializeClientIR,
 } from './openapi-reader';
-export { generateProjectClients, type ProjectClientResult } from './project-clients';
+export { type GenerateClientOptions, type GenerateClientResult, generateClient } from './project-clients';
 export { readProtoSpec } from './proto-reader';
 export {
   pageTransportSchemas,

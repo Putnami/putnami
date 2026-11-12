@@ -15,8 +15,10 @@ user, err := users.GetUsersId(ctx, usersclient.GetUsersIdInput{
 })
 ```
 
-The provider declares the service contract with `api.WithClientService`, runs
-`putnami clientgen`, and the generated registration resolves URL, client
+The provider declares the service contract with `api.WithClientService` and
+commits it as `schema/openapi.json`. A client project names the provider in
+`generatedFrom`, `putnami client-generate` builds it, and the generated
+registration resolves URL, client
 identity and credential sources from framework config. Generated calls apply
 provider-owned retries, deadlines, response caps, circuit policy, typed errors
 and trace propagation automatically.

@@ -570,6 +570,46 @@ describe('response cache bypass option', () => {
   );
 });
 
+describe('design attribution', () => {
+  // One client whose operations belong to two producer features, plus one that
+  // belongs to none. The contract names each producer; nothing else does.
+  test('carries each operation producer the contract names into the design declaration', () => {
+    const files = emit([
+      method({ client: operation({ producer: { project: '@test/items', feature: 'catalog/browse' } }) }),
+      method({
+        name: 'createItem',
+        operationId: 'createItem',
+        httpMethod: 'POST',
+        client: operation({
+          idempotency: { kind: 'idempotent' },
+          producer: { project: '@test/items', feature: 'catalog/manage' },
+        }),
+      }),
+      method({
+        name: 'getV1_Item_usage',
+        operationId: 'getV1_Item-usage',
+        path: '/items/usage',
+        client: operation({ transports: [{ protocol: 'rest-json', path: '/items/usage', encoding: 'json' }] }),
+      }),
+    ]);
+    const client = files.find((file) => file.path === 'src/items-client.ts')?.content ?? '';
+
+    expect(client).toContain(
+      '"operationId":"listItems","method":"GET","path":"/items","producerProject":"@test/items","producerFeature":"catalog/browse"',
+    );
+    expect(client).toContain('"producerFeature":"catalog/manage"');
+    // The unattributed operation keeps its canonical id and borrows no feature.
+    expect(client).toContain('{"operationId":"getV1_Item-usage","method":"GET","path":"/items/usage"}');
+    expect(client).toContain('as const satisfies GeneratedClientDesign;');
+    expect(client).toContain('      design: SERVICE_DESIGN,');
+  });
+
+  test('declares no design when no operation names a producer', () => {
+    const client = emit([method()]).find((file) => file.path === 'src/items-client.ts')?.content ?? '';
+    expect(client).not.toContain('SERVICE_DESIGN');
+  });
+});
+
 describe('emitted sources compile', () => {
   specTest(
     'typechecks the emitted client against the real @putnami/client surface',
@@ -590,8 +630,12 @@ describe('emitted sources compile', () => {
             { name: 'x-region', location: 'header', required: false, schema: { type: 'string' } },
           ],
           // A declared cache: the forwarded bypass has to type-check against
-          // the real request options.
-          client: operation({ resilience: { cache: { freshMs: 5000 } } }),
+          // the real request options. A producer: the design declaration has
+          // to satisfy the real GeneratedClientDesign.
+          client: operation({
+            resilience: { cache: { freshMs: 5000 } },
+            producer: { project: '@test/items', feature: 'catalog/browse' },
+          }),
         }),
         method({
           name: 'createItem',

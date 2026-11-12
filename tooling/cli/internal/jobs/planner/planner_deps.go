@@ -2,7 +2,6 @@ package planner
 
 import (
 	"fmt"
-	"path"
 	"reflect"
 	"slices"
 	"sort"
@@ -1214,62 +1213,43 @@ func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace)
 	}
 }
 
-// orderContractClients orders a generated client's jobs after the provider jobs
-// that produce what those jobs read, as ORDERING edges alone.
+// orderDependentReaders orders every job of a project that depends on a
+// writer's project, directly or transitively, after that writer, as ORDERING
+// edges alone. A writer is a job whose task declares a project-rooted output
+// with readByDependents: a generated client its project builds and its
+// dependents compile. A resource cannot state this, because a resource
+// conflicts only within one project. The rule follows declared dependency
+// edges; the implicit edge from a scope include to its scope reads nothing, so
+// it does not count.
 //
-// The edge carries one input, the contract, and the client's identity already
-// states it: its committed manifest's contractSha256 is folded into its
-// project metadata digest, which every one of its cache keys asks for. The
-// provider's sources are read by no action of the client, so they must not
-// reach its keys — and DependsOn is a cache-key edge, because
-// cachekey.ComputeJobCacheHashWith folds every DependsOn key into the dependent's key.
 // SerializeAfter is the ordering-only family: it sequences execution, never
 // contributes to a key, and a failed predecessor does not cancel the
-// successor. That is exactly the relation here — the client reads a file that
-// is committed whether or not the provider's job succeeds, and it must not
-// read it while the provider's generator is rewriting it.
+// successor. DependsOn would be wrong here, because
+// cachekey.ComputeJobCacheHashWith folds every DependsOn key into the
+// dependent's key, and the dependent already states what it reads.
 //
-// Three rules name the jobs to wait for, and each decides from the plan alone.
+// The contract edge between a generated client and its provider orders no job
+// (CLI ADR 0087): the client reads the provider's committed contract, which no
+// job rewrites, and its identity already folds that contract's digest.
 //
-// The step rule is the `^` rule applied to the contract provider instead of
-// the declared dependencies: a step orders after the provider's step of the
-// same name. A client's `generate` waits for the provider's `generate`, a Go
-// client's `describe` for the provider's `describe`.
+// An unplanned writer contributes no edge, and nothing is emitted into the
+// plan for it, so an ordering relation never widens a selection. A finalizer
+// is on neither end of an edge: the invocation runtime dispatches it, not the
+// DAG.
 //
-// The tree rule orders EVERY job of the client after every provider job that
-// can rewrite the client's directory. Such a job's task declares a durable
-// directory output whose path its run reports (pathFrom): the provider's
-// configuration chooses that directory, so the plan knows the writer and not
-// the path. Every job of the client reads its own directory, and the writer's
-// drift reference snapshots it, so no client job runs while such a writer
-// runs. The rule decides reach from the output's root. A project-rooted output
-// lies strictly inside the provider's directory, so it reaches the client only
-// when one of the two directories contains the other. A workspace-rooted
-// output reaches any client. The command-output and invocation roots lie
-// outside every project and reach none. A client kept outside its provider's
-// directory therefore waits for no project-rooted writer. A file output never
-// qualifies: a generated client is a directory.
+// An edge is added only when the writer does not already run after the
+// waiting job, so a plan stays a DAG. The check is over every edge the plan
+// holds, functional and write-serialization, so the pass runs after
+// serializeWriteResources, and nothing later adds an edge.
 //
-// The dependents rule orders every job of every project that depends on a
-// writer's project, directly or transitively, after that writer. Such a writer's
-// task declares a project-rooted output with readByDependents: a generated
-// client its project commits and its dependents compile. A resource cannot
-// state this, because a resource conflicts only within one project. The rule
-// follows declared dependency edges; the implicit edge from a scope include to
-// its scope reads nothing, so it does not count.
-//
-// An unplanned writer contributes no edge — there is nothing to wait for —
-// and nothing is emitted into the plan for it, so an ordering relation never
-// widens a selection. A finalizer is on neither end of an edge: the invocation
-// runtime dispatches it, not the DAG.
-//
-// An edge is added only when the writer's job does not already run after the
-// waiting job, so a provider that imports its own generated client keeps a plan
-// that is a DAG: the client jobs its writer depends on already run before it,
-// through the writer's dependencies, and the others wait. The check is over every edge the plan holds —
-// functional, write-serialization, and the contract edges already added — so
-// the pass runs after serializeWriteResources, and nothing later adds an edge.
-func orderContractClients(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace) {
+// The writer's ancestors, the jobs that already run before it, are read once
+// per writer. An edge that makes a job outside them wait for the writer leaves
+// them unchanged, so one read decides every edge to that writer.
+func orderDependentReaders(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace) {
+	graph := ws.Graph
+	if graph == nil {
+		return
+	}
 	idx := buildPlannedIndex(jobs)
 	predecessors := make(map[string][]string, len(jobs))
 	inPlan := make(map[string]bool, len(jobs))
@@ -1284,115 +1264,6 @@ func orderContractClients(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace
 			}
 		}
 		predecessors[job.Key()] = edges
-	}
-	// runsBefore reports whether candidate must already run before key, so
-	// ordering key before candidate would close a cycle.
-	runsBefore := func(candidate, key string) bool {
-		seen := map[string]bool{key: true}
-		stack := append([]string(nil), predecessors[key]...)
-		for len(stack) > 0 {
-			current := stack[len(stack)-1]
-			stack = stack[:len(stack)-1]
-			if current == candidate {
-				return true
-			}
-			if seen[current] {
-				continue
-			}
-			seen[current] = true
-			stack = append(stack, predecessors[current]...)
-		}
-		return false
-	}
-	// nested reports whether one of two workspace-relative directories contains
-	// the other, "." being the workspace root.
-	nested := func(a, b string) bool {
-		a, b = path.Clean(a), path.Clean(b)
-		return a == "." || b == "." || a == b ||
-			strings.HasPrefix(a, b+"/") || strings.HasPrefix(b, a+"/")
-	}
-	// writesClientTree applies the tree rule to one provider job.
-	writesClientTree := func(providerJob, client *jobmodel.ScheduledJob) bool {
-		declaration := jobmodel.TaskDeclarationOf(providerJob)
-		if declaration == nil || jobmodel.IsFinalizerJob(providerJob) {
-			return false
-		}
-		for _, output := range declaration.Outputs {
-			if output.PathFrom == "" || output.Kind != extension.OutputKindDirectory {
-				continue
-			}
-			switch output.EffectiveRoot() {
-			case extension.OutputRootWorkspace:
-				return true
-			case extension.OutputRootProject:
-				if nested(cachekey.ProjectRelPath(providerJob), cachekey.ProjectRelPath(client)) {
-					return true
-				}
-			}
-		}
-		return false
-	}
-
-	for _, job := range jobs {
-		if job.JobDef == nil || jobmodel.IsFinalizerJob(job) {
-			continue
-		}
-		providerID := ws.Graph.ContractProviderOf(job.Project.ID)
-		if providerID == "" {
-			continue
-		}
-		cmdName := job.CommandName()
-		var candidates []string
-		for _, dep := range job.JobDef.DependsOn {
-			if strings.HasPrefix(dep, "^") {
-				candidates = append(candidates, idx.matchingKeys(providerID, cmdName, dep[1:])...)
-			}
-		}
-		for _, providerJob := range idx.byProject[providerID] {
-			if writesClientTree(providerJob, job) {
-				candidates = append(candidates, providerJob.Key())
-			}
-		}
-		if len(candidates) == 0 {
-			continue
-		}
-		key := job.Key()
-		functional := make(map[string]bool, len(job.DependsOn))
-		for _, dep := range job.DependsOn {
-			functional[dep] = true
-		}
-		var extra []string
-		for _, providerKey := range jobmodel.DedupeSorted(candidates) {
-			if providerKey == key || functional[providerKey] || runsBefore(key, providerKey) {
-				continue
-			}
-			extra = append(extra, providerKey)
-			predecessors[key] = append(predecessors[key], providerKey)
-		}
-		if len(extra) == 0 {
-			continue
-		}
-		job.SerializeAfter = jobmodel.DedupeSorted(append(job.SerializeAfter, extra...))
-	}
-
-	orderDependentReaders(jobs, ws.Graph, idx, predecessors)
-}
-
-// orderDependentReaders applies the dependents rule of orderContractClients.
-// predecessors holds every edge the plan has, keyed by the waiting job, and
-// takes each edge this pass adds.
-//
-// The writer's ancestors, the jobs that already run before it, are read once
-// per writer. An edge that makes a job outside them wait for the writer leaves
-// them unchanged, so one read decides every edge to that writer.
-func orderDependentReaders(
-	jobs []*jobmodel.ScheduledJob,
-	graph *workspace.DependencyGraph,
-	idx *plannedIndex,
-	predecessors map[string][]string,
-) {
-	if graph == nil {
-		return
 	}
 	// declaresReadByDependents reports whether a planned job's task declares a
 	// project-rooted output that the projects depending on its project read.

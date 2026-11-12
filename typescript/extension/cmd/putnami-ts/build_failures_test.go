@@ -338,7 +338,7 @@ func setupUnmanifestedLoaderProject(t *testing.T) (*pctx.Context, string) {
 
 // setupUninstalledDependencyProject makes a provider whose package.json
 // declares @putnami/application, the dependency that contributes the hook
-// writing .gen/clientgen/config.json and .gen/schema, while no node_modules
+// writing .gen/schema, while no node_modules
 // holds it, as in a checkout that skipped the install.
 func setupUninstalledDependencyProject(t *testing.T) (*pctx.Context, string) {
 	t.Helper()
@@ -359,9 +359,9 @@ func setupUninstalledDependencyProject(t *testing.T) (*pctx.Context, string) {
 // TestRunBuildGenerate_UninstalledDependencyFails pins that generate never
 // reports success without the hooks its dependencies contribute. Hook discovery
 // is not part of the task's cache key, so a successful generate in a checkout
-// without node_modules was a cache entry whose .gen lacked
-// clientgen/config.json under the same key as a complete one; a restore of it
-// left clientgen~generate-go without its contract.
+// without node_modules was a cache entry whose .gen lacked the provider's
+// contract under the same key as a complete one; a restore of it left the
+// project's clients without the contract they generate from.
 func TestRunBuildGenerate_UninstalledDependencyFails(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-discovery-fails-closed", "a-generate-with-an-uninstalled-dependency-fails")
 	ctx, projectPath := setupUninstalledDependencyProject(t)

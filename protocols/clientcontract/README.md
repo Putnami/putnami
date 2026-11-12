@@ -49,6 +49,21 @@ annotations. Unsupported keywords, duplicate keys, ambiguous nulls, invalid
 paths, unknown credential profiles, and incomplete transport or protobuf
 metadata fail with stable diagnostic codes.
 
+An operation may carry a `producer`: the project and feature that produce it.
+
+```json
+{
+  "producer": { "project": "go.putnami.dev/examples/service-to-service", "feature": "items/manage" }
+}
+```
+
+Both members are required and non-empty. The provider writes it from the
+module that owns the operation's api plugin, and a generated client carries it
+into its design declaration. An operation whose owner declares no feature has
+no `producer`. `OperationProducer` in [`contract.go`](contract.go) and
+`$defs.operationProducer` in
+[`x-putnami-client-v1.json`](schemas/x-putnami-client-v1.json) define it.
+
 Connect and protobuf transports reference an exact
 `/package.Service/Method`. The document projection records service methods and
 streaming flags, field numbers and wire kinds, JSON names, presence, oneofs,
@@ -216,21 +231,13 @@ projection for future cross-language reader conformance. Keeping it next to the
 source OpenAPI fixture establishes the expected lowering boundary; it does not
 claim that a Go or TypeScript production reader is already integrated.
 
-Every generated target will write `client.putnami.json`, described by
-[`generated-client-manifest-v1.json`](schemas/generated-client-manifest-v1.json).
-The manifest binds an exact provider contract digest to the generated service,
-registration symbols, operations, ordered transports, and exact file digests.
-A target that leaves operations out by configuration — a Go target's
-`go.omitOperations` — names them in `omittedOperations`, in ascending order, so
-`operations` and `omittedOperations` together account for every contract
-operation and a reader of committed bytes alone can tell an omission from a lost
-operation. The key is absent when the target generates every operation.
-This package validates the manifest shape and rejects unsupported generator
-markers, unsafe paths, operations without a matching binding client, duplicate
-inventory entries, an operation both generated and omitted, and non-canonical
-inventory order. The marker and digests
-are structural declarations; authenticating them against provider and file
-bytes belongs to future workspace integration.
+The package also publishes
+[`generated-client-manifest-v1.json`](schemas/generated-client-manifest-v1.json)
+and its validator. The manifest binds an exact provider contract digest to the
+generated service, registration symbols, operations, ordered transports, and
+exact file digests. No emitter writes it: a generated client is built, not
+committed, and Git holds no generated client file
+([clientgen ADR 0007](../../tooling/clientgen-extension/doc/adr/0007-a-generated-client-is-built-not-committed.md)).
 
 Two inventories carry the exceptions to first-party generation, and this
 package publishes their schemas so the strict parser and the documents a

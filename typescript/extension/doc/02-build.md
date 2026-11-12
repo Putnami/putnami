@@ -85,7 +85,7 @@ Steps:
 1. **Content hash** — computes SHA256 of all `src/` TypeScript files (first 12 chars)
 2. **Prepare `.gen/`** — creates or clears the `.gen/` directory
 3. **Copy assets** — copies files declared in `putnami.json` `options.generate.assets` (or legacy `.putnamirc.json`). A missing source is skipped with a warning; a copy that fails, such as a symlink to a directory inside a directory asset, fails the generate
-4. **Pre-build hooks** — discovers and runs hooks from dependencies that declare `preBuild` in their `putnami.extension.json`. Hooks can register exports and assets. They run in ascending `hooks.preBuild.order`, ties broken by extension name — see [hook order](#pre-build-hook-order). Each `log` event a hook emits joins the task's event stream at its level once the hook returns, a failed hook's included, and under the member project in a batched generate; `trace` becomes `debug`. Run with `--verbose` or `--output jsonl` to see them. A dependency of `package.json` that no `node_modules` holds, from the project up to the workspace root, fails the generate before any hook runs: run `putnami install`. The cache key names the dependencies, not whether they are installed, so a generate that skipped their hooks would cache an incomplete `.gen/`, without `clientgen/config.json` or `schema/`, under the key of a complete one.
+4. **Pre-build hooks** — discovers and runs hooks from dependencies that declare `preBuild` in their `putnami.extension.json`. Hooks can register exports and assets. They run in ascending `hooks.preBuild.order`, ties broken by extension name — see [hook order](#pre-build-hook-order). Each `log` event a hook emits joins the task's event stream at its level once the hook returns, a failed hook's included, and under the member project in a batched generate; `trace` becomes `debug`. Run with `--verbose` or `--output jsonl` to see them. A dependency of `package.json` that no `node_modules` holds, from the project up to the workspace root, fails the generate before any hook runs: run `putnami install`. The cache key names the dependencies, not whether they are installed, so a generate that skipped their hooks would cache an incomplete `.gen/`, without `schema/`, under the key of a complete one.
 5. **HTTP route inventory** — merges application and web framework facts into `.gen/schema/http-routes.json`, which the step after bundled serve commits to `schema/http-routes.json` — see [committed route inventory](#committed-route-inventory)
 6. **Infra requirements sync** — reconciles the committed `<project>/infra/requirements.json` from the `.gen/infra/*.json` scratch fragments the hooks just wrote — see [infra requirements ordering](#infra-requirements-ordering)
 7. **Version info** — writes/updates `.gen/version.json` with the `contentHash` field
@@ -162,8 +162,8 @@ keys and their hits. A project without feature evidence follows the same
 rule. See [Source-Bound Tasks](../../../tooling/cli/doc/10-caching.md#source-bound-tasks).
 
 `build-generate` also rewrites committed files the binding covers:
-`schema/openapi.json`, `schema/http-routes.json`, `infra/requirements.json` and
-a generated client inside the project. An execution that changes one of them moves its own project's
+`schema/openapi.json`, `schema/http-routes.json` and `infra/requirements.json`.
+An execution that changes one of them moves its own project's
 binding after the hook wrote the evidence. ADR
 [0069](../../../tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md)
 states how the CLI settles that entry.
@@ -539,7 +539,7 @@ TSC is called with:
 
 Source files are discovered from `src/` and `bin/` directories (excluding `.d.ts` and test files).
 
-When the project has a tsconfig, tsc runs with a temporary config that extends it and includes only `src/`, `bin/` and `.gen/`, without test files; `putnami test` type-checks those (see [Test](./03-test.md#type-check)). That config lives in the task's cache directory, never in the project, because a project directory can lie inside another task's declared output, such as a generated client inside its provider's `clientgen` output. It resolves as it would from the project directory: its paths are absolute, `${configDir}` in the extends chain means the project directory, and type roots are the chain's own or the `node_modules/@types` directories of the project and its ancestors. A `tsconfig.types.*.json` an earlier release left in the project is removed.
+When the project has a tsconfig, tsc runs with a temporary config that extends it and includes only `src/`, `bin/` and `.gen/`, without test files; `putnami test` type-checks those (see [Test](./03-test.md#type-check)). That config lives in the task's cache directory, never in the project, because a project directory can hold another task's declared output, such as a generated client's `src/`, which the client's own `client-generate` writes. It resolves as it would from the project directory: its paths are absolute, `${configDir}` in the extends chain means the project directory, and type roots are the chain's own or the `node_modules/@types` directories of the project and its ancestors. A `tsconfig.types.*.json` an earlier release left in the project is removed.
 
 Output is written to `output/types/`.
 
@@ -661,7 +661,7 @@ Every output has exactly one owning task:
 
 | Task | Owns | Root |
 |------|------|------|
-| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json`, `.gen/layers/` and `.gen/site-content/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), `schema/http-routes.json` (with `drift: "fail"`: a committed route inventory that differs from the one the hooks regenerate fails the task with `generated-output-drift` — commit the regenerated inventory; see [committed route inventory](#committed-route-inventory)), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
+| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json`, `.gen/layers/` and `.gen/site-content/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), `schema/http-routes.json` (with `drift: "fail"`: a committed route inventory that differs from the one the hooks regenerate fails the task with `generated-output-drift` — commit the regenerated inventory; see [committed route inventory](#committed-route-inventory)) | project dir |
 | `build-transpile` | `lib/` | per-command output dir |
 | `build-types` | `types/` | per-command output dir |
 | `build-compile` | `compile/` | per-command output dir |

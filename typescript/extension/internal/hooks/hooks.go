@@ -381,7 +381,7 @@ func Discover(workspaceRoot, projectPath, hookKind string) (Discovery, error) {
 // reads package.json and bun.lock, which name the dependencies, not whether
 // they are installed. A generate that ran without the hooks of an uninstalled
 // dependency therefore succeeded, in milliseconds, with a .gen that lacked
-// what those hooks write (clientgen/config.json, schema/, the loaders), under
+// what those hooks write (schema/, the loaders), under
 // the key of a complete run, and the shared cache served that tree to every
 // checkout. A dependency is installed where Node resolution finds it:
 // node_modules of the project, then of each parent directory up to the

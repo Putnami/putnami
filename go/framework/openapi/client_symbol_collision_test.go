@@ -1,7 +1,6 @@
 package openapi
 
 import (
-	"encoding/json"
 	"net/http/httptest"
 	"os"
 	"os/exec"
@@ -117,21 +116,17 @@ func TestEachRouteKeepsItsOwnMethod(t *testing.T) {
 `
 
 // End to end: a real Go provider declares two routes that differ
-// only by a path parameter and asks for Go and TypeScript clients. The in-app
-// describer generates the Go client from the contract the provider publishes;
-// the two operations get two methods, the ownership manifest names them as the
-// client does, the renamed one is the exported form of the TypeScript method
-// name, and the emitted package — compiled against this repository's runtime —
-// calls each route over a real socket.
+// only by a path parameter. The Go client is generated from the contract the
+// provider publishes; the two operations get two methods, the renamed one is
+// the exported form of the TypeScript method name, and the emitted package —
+// compiled against this repository's runtime — calls each route over a real
+// socket.
 func TestTheEmittedGoClientCallsEachRouteThatDiffersOnlyByAPathParameter(t *testing.T) {
 	spectest.Proves(t, "go/api-contracts", "stable-operation-identity",
 		"the-emitted-go-client-calls-each-route-that-differs-only-by-a-path-parameter")
 	httpServer, apiPlugin := symbolCollisionProvider()
 	openapiPlugin := NewPlugin(PluginOptions{Title: "Deploys", Version: "1.0.0"}).From(apiPlugin)
-	clientsPlugin := api.Clients(api.ClientsOptions{
-		Targets: []string{"go", "ts"},
-		Go:      api.GoClientOptions{PackageName: "deploysclient", ClientName: "DeploysClient"},
-	}).From(apiPlugin)
+	clientsPlugin := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 	application := app.New("deploys")
 	application.Use(apiPlugin).Use(openapiPlugin).Use(clientsPlugin)
 	out := t.TempDir()
@@ -143,40 +138,18 @@ func TestTheEmittedGoClientCallsEachRouteThatDiffersOnlyByAPathParameter(t *test
 	getID := api.CanonicalOperationID("GET", "/v1/workspaces/{workspace}/deploy/{release}")
 	want := map[string]string{listID: "GetV1WorkspacesDeploy", getID: "GetV1WorkspacesWorkspaceDeployRelease"}
 
-	var config struct {
-		Targets []string `json:"targets"`
-	}
-	configBytes, err := os.ReadFile(filepath.Join(out, api.ClientGenConfigPath))
-	if err != nil {
-		t.Fatalf("read clientgen config: %v", err)
-	}
-	if err := json.Unmarshal(configBytes, &config); err != nil || strings.Join(config.Targets, ",") != "go,ts" {
-		t.Fatalf("clientgen targets = %v (%v), want go and ts", config.Targets, err)
-	}
-
-	source, err := os.ReadFile(filepath.Join(out, api.ClientStageDir, "go", "client.gen.go"))
+	source, err := emitDescribedGoClient(t, out, "deploysclient", "DeploysClient")
 	if err != nil {
 		t.Fatalf("read generated client: %v", err)
 	}
-	manifestBytes, err := os.ReadFile(filepath.Join(out, api.ClientStageDir, "go", clientcontract.GeneratedManifestFile))
-	if err != nil {
-		t.Fatalf("read generated manifest: %v", err)
-	}
-	manifest, diagnostics := clientcontract.ParseAndValidateGeneratedManifest(manifestBytes)
-	if len(diagnostics) > 0 {
-		t.Fatalf("manifest diagnostics = %v", diagnostics)
-	}
-	if len(manifest.Operations) != len(want) {
-		t.Fatalf("manifest operations = %+v, want %v", manifest.Operations, want)
-	}
-	for _, operation := range manifest.Operations {
-		if operation.MethodSymbol != want[operation.OperationID] {
-			t.Errorf("manifest names %s %q, want %q", operation.OperationID, operation.MethodSymbol, want[operation.OperationID])
-		}
-		signature := "func (c *DeploysClient) " + operation.MethodSymbol + "(ctx context.Context, in " + operation.MethodSymbol + "Input) ("
+	for operationID, symbol := range want {
+		signature := "func (c *DeploysClient) " + symbol + "(ctx context.Context, in " + symbol + "Input) ("
 		if !strings.Contains(string(source), signature) {
-			t.Errorf("the client declares no %q for %s:\n%s", signature, operation.OperationID, source)
+			t.Errorf("the client declares no %q for %s:\n%s", signature, operationID, source)
 		}
+	}
+	if methods := strings.Count(string(source), "func (c *DeploysClient) "); methods != len(want) {
+		t.Errorf("the client declares %d methods, want %d:\n%s", methods, len(want), source)
 	}
 
 	// The TypeScript emitter names its method from the same published

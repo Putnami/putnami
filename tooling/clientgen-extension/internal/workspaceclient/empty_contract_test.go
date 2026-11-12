@@ -118,10 +118,9 @@ func TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget(t *testing.T) {
 	} {
 		t.Run(contract.name, func(t *testing.T) {
 			root := emptyContractWorkspace(t, contract.document)
-			// The warm tree: the session's build wrote the generation contract
-			// the provider's papi.Clients(...) call declares, naming both
-			// targets. This is the state the issue reported.
-			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
+			// The provider commits a generation contract that names both
+			// targets.
+			writeWorkspaceFile(t, root, "services/gomod-server/clientgen.json", `{"targets":["go","ts"]}`)
 
 			report := InspectCommitted(root, fixtureMembers(t, root))
 			if !report.Clean() {
@@ -135,15 +134,14 @@ func TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget(t *testing.T) {
 				t.Fatalf("the empty contract stopped being an audited first-party provider: %+v", report.Providers)
 			}
 
-			// The cold clone: nothing under .gen exists, so no generation
-			// contract and no committed manifest name a target. The verdict
-			// must not change.
-			if err := os.RemoveAll(filepath.Join(root, "services", "gomod-server", ".gen")); err != nil {
+			// No generation contract and no committed manifest name a target.
+			// The verdict must not change.
+			if err := os.Remove(filepath.Join(root, "services", "gomod-server", "clientgen.json")); err != nil {
 				t.Fatal(err)
 			}
 			report = InspectCommitted(root, fixtureMembers(t, root))
 			if !report.Clean() {
-				t.Fatalf("the cold-tree verdict differs from the built-tree one: %+v", report.Findings)
+				t.Fatalf("the verdict without a generation contract differs: %+v", report.Findings)
 			}
 			if len(report.Providers) != 1 || report.Providers[0].ServiceID != "gomod-server" {
 				t.Fatalf("the cold tree lost the declared service identity: %+v", report.Providers)
@@ -151,7 +149,7 @@ func TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget(t *testing.T) {
 
 			// A generation contract that configures no target stays satisfied:
 			// there is nothing for clientgen.no-targets to be about.
-			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":[]}`)
+			writeWorkspaceFile(t, root, "services/gomod-server/clientgen.json", `{"targets":[]}`)
 			if report = InspectCommitted(root, fixtureMembers(t, root)); !report.Clean() {
 				t.Fatalf("an empty contract with no configured target produced findings: %+v", report.Findings)
 			}
@@ -167,7 +165,7 @@ func TestAContractWithFirstPartyOperationsStillNeedsItsGeneratedTarget(t *testin
 	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
 		"a-contract-with-first-party-operations-still-needs-its-generated-target")
 	root := emptyContractWorkspace(t, string(catalogContractForFixture(t)))
-	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
+	writeWorkspaceFile(t, root, "services/gomod-server/clientgen.json", `{"targets":["go","ts"]}`)
 
 	report := InspectCommitted(root, fixtureMembers(t, root))
 	assertFindingCodes(t, report, "clientgen.missing-manifest")
@@ -178,9 +176,9 @@ func TestAContractWithFirstPartyOperationsStillNeedsItsGeneratedTarget(t *testin
 		t.Fatalf("coverage = %+v, want the two operations required per target and none covered", report.Coverage)
 	}
 
-	// The cold clone of the same provider names no target, so the guard says
-	// the provider generates clients and configured none.
-	if err := os.RemoveAll(filepath.Join(root, "services", "gomod-server", ".gen")); err != nil {
+	// The same provider without its clientgen.json names no target, so the
+	// guard says the provider generates clients and configured none.
+	if err := os.Remove(filepath.Join(root, "services", "gomod-server", "clientgen.json")); err != nil {
 		t.Fatal(err)
 	}
 	assertFindingCodes(t, InspectCommitted(root, fixtureMembers(t, root)), "clientgen.missing-config")
@@ -205,7 +203,7 @@ func TestAContractDiscoveryCouldNotReadIsNeverEmpty(t *testing.T) {
 	} {
 		t.Run(contract.name, func(t *testing.T) {
 			root := emptyContractWorkspace(t, contract.document)
-			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go"]}`)
+			writeWorkspaceFile(t, root, "services/gomod-server/clientgen.json", `{"targets":["go"]}`)
 			assertFindingCodes(t, InspectCommitted(root, fixtureMembers(t, root)), contract.code, "clientgen.missing-manifest")
 		})
 	}
@@ -284,7 +282,7 @@ func TestAnOperationUnderAMethodTheGuardOnceDroppedStillNeedsItsTarget(t *testin
 	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
 		"a-contract-with-first-party-operations-still-needs-its-generated-target")
 	root := emptyContractWorkspace(t, traceOperationContractDocument)
-	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
+	writeWorkspaceFile(t, root, "services/gomod-server/clientgen.json", `{"targets":["go","ts"]}`)
 
 	report := InspectCommitted(root, fixtureMembers(t, root))
 	if count := findingCount(report, "clientgen.missing-manifest"); count != 2 {
@@ -304,15 +302,13 @@ func TestAnOperationUnderAMethodTheGuardOnceDroppedStillNeedsItsTarget(t *testin
 // behind after the last one moved to an external authority, must fail as drift
 // rather than disappear with the target that no longer has to exist.
 func TestACommittedTargetOfAnEmptyContractIsStillJudgedInFull(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
-		"a-committed-target-of-an-empty-contract-is-still-judged-in-full")
 	item, expected := analyzerFixture(t)
 	// The provider's contract lost every first-party operation; the generated
 	// Go client beside it still claims two.
 	emptied := item
 	emptied.operations = nil
 
-	report := inspectWithReader("/workspace", ModeCheck, []provider{emptied}, nil, expected, expected)
+	report := inspectWithReader([]provider{emptied}, nil, expected, expected)
 	assertFindingCodes(t, report, "clientgen.operation-coverage-drift")
 	if len(report.Providers) != 1 || len(report.Providers[0].Targets) != 1 {
 		t.Fatalf("a committed target of an empty contract vanished from the report: %+v", report.Providers)
@@ -327,13 +323,13 @@ func TestACommittedTargetOfAnEmptyContractIsStillJudgedInFull(t *testing.T) {
 		edited[path] = append([]byte(nil), content...)
 	}
 	edited["services/catalog/clients/go/client.gen.go"] = []byte("// hand edit of a generated file\n")
-	assertFindingCodes(t, inspectWithReader("/workspace", ModeCheck, []provider{emptied}, nil, edited, edited),
+	assertFindingCodes(t, inspectWithReader([]provider{emptied}, nil, edited, edited),
 		"clientgen.forged-generated-hash")
 
 	// And so is the lineage: a manifest cut from another contract still fails.
 	moved := emptied
 	moved.contractHash = "beef" + emptied.contractHash[4:]
-	assertFindingCodes(t, inspectWithReader("/workspace", ModeCheck, []provider{moved}, nil, expected, expected),
+	assertFindingCodes(t, inspectWithReader([]provider{moved}, nil, expected, expected),
 		"clientgen.contract-drift")
 }
 
@@ -388,7 +384,7 @@ func call() { _, _ = http.Get("gomod-server") }
 	// for the advice — or any other consumer of the report — to walk.
 	writeWorkspaceFile(t, root, "services/gomod-server/putnami.json", `{"name":"gomod-server"}`)
 	writeWorkspaceFile(t, root, "services/gomod-server/schema/openapi.json", allExternalContractDocument)
-	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
+	writeWorkspaceFile(t, root, "services/gomod-server/clientgen.json", `{"targets":["go","ts"]}`)
 	writeSourceIndex(t, root, "consumer", "services/gomod-server")
 	inspected := InspectCommitted(root, fixtureMembers(t, root))
 	var found bool

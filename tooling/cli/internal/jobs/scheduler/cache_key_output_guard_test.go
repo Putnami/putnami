@@ -80,18 +80,67 @@ type keyOutputConflict struct {
 	output  string // the output's project-relative path
 }
 
+// generatedClientSourceReason and generatedClientGitReason explain why a key
+// reads the client a client-generate task writes into its own project. The
+// client is that project's source: every source task of the project compiles or
+// reads it, and the language commands depend on client-generate, so the reader
+// runs after the writer.
+const (
+	generatedClientSourceReason = "client-generate writes the client project's own source, which this task compiles or reads after it: " +
+		"the language commands depend on client-generate, and the plan marks this key movable, since the run that precomputes it has not generated the client yet."
+	generatedClientGitReason = "Only a file a project commits is a Git candidate there, and a generated client is built, not committed " +
+		"(clientgen ADR 0007): the workspace ignores it, and the clientgen guard reports a tracked one."
+)
+
 // keyOutputAllowlist holds each conflict the current manifests carry on
 // purpose, with the reason: the run that precomputes the key never writes the
 // bytes, or the reader's key folds no key that fixes them, so it must read
 // them and the plan marks it movable (planKeyMovement). An entry that no
 // longer matches a conflict fails the guard, so the list only shrinks.
 var keyOutputAllowlist = map[keyOutputConflict]string{
-	{"@putnami/clientgen clientgen-go", "git:.gen/clientgen/config.json", "@putnami/go build-describe", ".gen/clientgen"}:                   "Only a contract a project commits is a Git candidate there, since the workspace ignores the one describe writes; committing one is unsupported and the clientgen guard reports it, and the key reads it so an unmigrated provider is not served a client of another contract.",
-	{"@putnami/clientgen clientgen-go", "git:.gen/clientgen/config.json", "@putnami/typescript build-generate", ".gen"}:                     "Only a contract a project commits is a Git candidate there, since the workspace ignores the one build-generate writes; committing one is unsupported and the clientgen guard reports it, and the key reads it so an unmigrated provider is not served a client of another contract.",
-	{"@putnami/clientgen clientgen-ts", "git:.gen/clientgen/config.json", "@putnami/go build-describe", ".gen/clientgen"}:                   "Only a contract a project commits is a Git candidate there, since the workspace ignores the one describe writes; committing one is unsupported and the clientgen guard reports it, and the key reads it so an unmigrated provider is not served a client of another contract.",
-	{"@putnami/clientgen clientgen-ts", "git:.gen/clientgen/config.json", "@putnami/typescript build-generate", ".gen"}:                     "Only a contract a project commits is a Git candidate there, since the workspace ignores the one build-generate writes; committing one is unsupported and the clientgen guard reports it, and the key reads it so an unmigrated provider is not served a client of another contract.",
-	{"@putnami/clientgen clientgen-go", "schema/openapi.json", "@putnami/typescript build-generate", "schema/openapi.json"}:                 "build-generate polices this committed contract with drift fail: a run that succeeds rewrites it unchanged, and a run that changes it fails build-generate.",
-	{"@putnami/clientgen clientgen-ts", "schema/openapi.json", "@putnami/typescript build-generate", "schema/openapi.json"}:                 "build-generate polices this committed contract with drift fail: a run that succeeds rewrites it unchanged, and a run that changes it fails build-generate.",
+	{"@putnami/clientgen clientgen-workspace-check", "git:**", "@putnami/clientgen client-generate-go", "client.gen.go"}:                    generatedClientGitReason,
+	{"@putnami/cloud cloud-validate-site-content", "git:**", "@putnami/clientgen client-generate-go", "client.gen.go"}:                      generatedClientGitReason,
+	{"@putnami/dotnet package-docker", "**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                    generatedClientSourceReason,
+	{"@putnami/dotnet package-docker", "git:**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                generatedClientGitReason,
+	{"@putnami/go build-compile", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                      generatedClientSourceReason,
+	{"@putnami/go build-cross-compile", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                generatedClientSourceReason,
+	{"@putnami/go build-describe", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                     generatedClientSourceReason,
+	{"@putnami/go build-generate", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                     generatedClientSourceReason,
+	{"@putnami/go config-extract-exec", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                generatedClientSourceReason,
+	{"@putnami/go lint-golangci-fix", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                  generatedClientSourceReason,
+	{"@putnami/go lint-golangci-readonly", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                             generatedClientSourceReason,
+	{"@putnami/go lint-staticcheck", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                   generatedClientSourceReason,
+	{"@putnami/go test-exec", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                          generatedClientSourceReason,
+	{"@putnami/go test-race-exec", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                     generatedClientSourceReason,
+	{"@putnami/go validate-api", "**/*.go", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                       generatedClientSourceReason,
+	{"@putnami/java package-docker", "**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                      generatedClientSourceReason,
+	{"@putnami/php package-docker", "**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                       generatedClientSourceReason,
+	{"@putnami/php package-docker", "git:**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                   generatedClientGitReason,
+	{"@putnami/python package-docker", "**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                    generatedClientSourceReason,
+	{"@putnami/python package-docker", "git:**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                generatedClientGitReason,
+	{"@putnami/ruby package-docker", "**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                      generatedClientSourceReason,
+	{"@putnami/ruby package-docker", "git:**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                  generatedClientGitReason,
+	{"@putnami/sdd codeowners-sync", "git:**", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                    generatedClientGitReason,
+	{"@putnami/sdd decisions-validate", "git:**", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                 generatedClientGitReason,
+	{"@putnami/sdd docs-links-validate", "git:**", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                generatedClientGitReason,
+	{"@putnami/sdd feature-coverage-validate", "git:**", "@putnami/clientgen client-generate-go", "client.gen.go"}:                          generatedClientGitReason,
+	{"@putnami/sdd recipes-validate", "git:**", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                   generatedClientGitReason,
+	{"@putnami/typescript build-compile", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                                    generatedClientSourceReason,
+	{"@putnami/typescript build-compile", "src/**/*.tsx", "@putnami/clientgen client-generate-ts", "src"}:                                   generatedClientSourceReason,
+	{"@putnami/typescript build-generate", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                                   generatedClientSourceReason,
+	{"@putnami/typescript build-generate", "src/**/*.tsx", "@putnami/clientgen client-generate-ts", "src"}:                                  generatedClientSourceReason,
+	{"@putnami/typescript build-transpile", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                                  generatedClientSourceReason,
+	{"@putnami/typescript build-transpile", "src/**/*.tsx", "@putnami/clientgen client-generate-ts", "src"}:                                 generatedClientSourceReason,
+	{"@putnami/typescript build-tsc", "git:**/*", "@putnami/clientgen client-generate-go", "client.gen.go"}:                                 generatedClientGitReason,
+	{"@putnami/typescript build-types", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                                      generatedClientSourceReason,
+	{"@putnami/typescript build-types", "src/**/*.tsx", "@putnami/clientgen client-generate-ts", "src"}:                                     generatedClientSourceReason,
+	{"@putnami/typescript config-extract-exec", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                              generatedClientSourceReason,
+	{"@putnami/typescript config-extract-exec", "src/**/*.tsx", "@putnami/clientgen client-generate-ts", "src"}:                             generatedClientSourceReason,
+	{"@putnami/typescript test-run", "src/**/*.ts", "@putnami/clientgen client-generate-ts", "src"}:                                         generatedClientSourceReason,
+	{"@putnami/typescript test-run", "src/**/*.tsx", "@putnami/clientgen client-generate-ts", "src"}:                                        generatedClientSourceReason,
+	{"@putnami/web web-i18n-sync-exec", "src/**/*.messages.ts", "@putnami/clientgen client-generate-ts", "src"}:                             generatedClientSourceReason,
+	{"@putnami/web web-i18n-sync-exec", "src/**/*.messages.tsx", "@putnami/clientgen client-generate-ts", "src"}:                            generatedClientSourceReason,
+	{"@putnami/clientgen client-generate-module", "schema/openapi.json", "@putnami/typescript build-generate", "schema/openapi.json"}:       "build-generate polices this committed contract with drift fail: a run that succeeds rewrites it unchanged, and a run that changes it fails build-generate.",
 	{"@putnami/cloud cloud-validate-config-project", ".gen/conf/.env.prod.yaml", "@putnami/typescript build-generate", ".gen"}:              "No TypeScript task writes .gen/conf: the merged env files come from the Go config-merge, to which the Go build-generate cedes .gen/conf.",
 	{"@putnami/cloud cloud-validate-config-project", ".gen/conf/env.prod.yaml", "@putnami/typescript build-generate", ".gen"}:               "No TypeScript task writes .gen/conf: the merged env files come from the Go config-merge, to which the Go build-generate cedes .gen/conf.",
 	{"@putnami/cloud cloud-validate-config-project", "schema/config.json", "@putnami/go config-extract-exec", "schema/config.json"}:         "Only the config-extract command runs config-extract-exec, and no other command runs it or depends on it.",

@@ -98,8 +98,8 @@ A project is importable only by the projects of its own scope, unless its
 `putnami.json` declares `"visibility": "public"`. The boundary applies to real
 imports (a `go.mod` require, a `package.json` dependency), never to a declared
 `dependencies` entry. A generated client is importable from every scope when
-its `client.putnami.json` names a provider in the workspace and its
-`putnami.json` declares no `visibility` (see
+its `generatedFrom` names a service a provider in the workspace commits and
+its `putnami.json` declares no `visibility` (see
 [Generated Clients](07-generated-clients.md)).
 
 `options.workspace.visibility` in `putnami.workspace.json` decides what an

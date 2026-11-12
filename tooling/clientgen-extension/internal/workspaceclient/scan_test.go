@@ -78,13 +78,9 @@ func TestInspectScansWorkspaceSourcesOnce(t *testing.T) {
 			t.Fatalf("%s is called from %v, want exactly one call from %s", callee, sites, wantEnclosing)
 		}
 	}
-	// The adoption codemod is a separate command with its own run; the check
-	// path reaches the scan only through workspaceSourceRecords, and inspect is
-	// the only place that calls it.
-	sites := callers["discoverSourceRecords"]
-	if len(sites) != 2 {
-		t.Fatalf("discoverSourceRecords is called from %v, want exactly the codemod and workspaceSourceRecords", sites)
-	}
+	// The check reaches the scan only through workspaceSourceRecords, and
+	// inspect is the only place that calls it.
+	assertSingleCaller("discoverSourceRecords", "workspaceSourceRecords")
 	assertSingleCaller("workspaceSourceRecords", "inspect")
 }
 
@@ -338,7 +334,7 @@ func TestSourceScanFailureDoesNotInventDrift(t *testing.T) {
 	}})
 	// The fixture must be clean while the scan works, or the assertion below
 	// would pass on a workspace that was already reporting drift.
-	if findings := Inspect(root, ModeCheck).Findings; len(findings) != 0 {
+	if findings := inspect(indexedView(root)).Findings; len(findings) != 0 {
 		t.Fatalf("fixture reports drift before the scan breaks: %+v", findings)
 	}
 
@@ -350,7 +346,7 @@ func TestSourceScanFailureDoesNotInventDrift(t *testing.T) {
 		t.Skipf("this filesystem cannot express an unreadable source: %v", err)
 	}
 
-	findings := Inspect(root, ModeCheck).Findings
+	findings := inspect(indexedView(root)).Findings
 	codes := map[string]int{}
 	for _, finding := range findings {
 		codes[finding.Code]++

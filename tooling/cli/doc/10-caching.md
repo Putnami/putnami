@@ -437,17 +437,13 @@ A declaration should not reach into the `.gen` tree another task writes during
 the run: the key computed before any task runs then differs from the key the
 task computes when it starts, and the task misses the entry the run looked up
 for it. The Go source inputs leave out `.gen`, where `build-describe` stages a
-generated client that no Go source task compiles. The `clientgen-go` and
-`clientgen-ts` keys leave out `.gen/schema` and `.gen/clientgen`, which the Go
-`build-describe` or the TypeScript `build-generate` writes, and fold the
-producer's key instead. A key may leave out bytes another task writes only when
-a key it folds fixes them: the TypeScript `build-generate` owns `.gen` as a
-required output, and the Go `build-describe` declares both trees `emptied`.
-The keys hash the committed generation contract `clientgen.json` and the
-committed sidecar `schema/openapi.json`, which no task writes. They also read
-`.gen/clientgen/config.json` as a Git candidate, so a project that still
-commits its contract there, which is no longer supported, moves its key when
-it edits it, while the one a build writes is ignored and no candidate.
+generated client that no Go source task compiles. The `client-generate` keys
+of `@putnami/clientgen` read no file under `.gen`: they hash the committed
+generation contract `clientgen.json`, the committed `schema/openapi.json` and
+the client project's own files, which no task writes. A key may leave out bytes
+another task writes only when a key it folds fixes them: the TypeScript
+`build-generate` owns `.gen` as a required output, and the Go `build-describe`
+declares its trees `emptied`.
 
 ### Outputs written earlier in the session
 
@@ -722,8 +718,8 @@ it back.
 A restore of an entry that records such an output empty empties it the same
 way, with the same three things left in place. Of the outputs the scheduler
 empties, only an optional one can be recorded empty, such as the `bin` of a run
-that builds nothing, or the `.gen/clientgen` of a Go `build-describe` whose app
-configures no client generator. The restore then leaves the tree the producing execution left, not a
+that builds nothing, or the `.gen/schema` of a Go `build-describe` whose
+producers emit no contract. The restore then leaves the tree the producing execution left, not a
 binary an earlier run wrote beside a green status. The command-output directory
 is detached from an earlier session's link before the emptying. When the
 restore cannot empty the output, the hit is not served: the run falls back as
@@ -791,9 +787,8 @@ optional output can hold a committed file the task reads when it writes
 nothing there, so neither an execution nor a restore empties it, unless the
 output declares `emptied`. That flag states that only the task writes the path,
 and the engine then treats the output as it treats an optional command-output
-directory. The Go `build-describe` declares its `.gen/schema` and
-`.gen/clientgen` outputs emptied, and a `cloud/clients` provider slice commits
-its generation contract as `clientgen.json` outside them.
+directory. The Go `build-describe` declares its `.gen/schema` output emptied,
+and a provider commits its contract as `schema/openapi.json` outside it.
 
 A file that a task stops writing therefore stays in an optional project or
 workspace directory that does not declare `emptied`, or in a `pathFrom`
@@ -960,9 +955,9 @@ keeps out only the tasks that lock the same project or the workspace
 exclusively, the tasks that declare an output rooted there. The `generate`
 task declares `.gen`, so a build step never reads `.gen` while another
 session's `generate` empties or writes it. A task that writes a resource
-without declaring such an output takes no lock there: the tasks that write
-the workspace-scoped `workspace-clients` declare no output, so a reader of
-`workspace-clients` is not protected from them. The `sources` resource takes
+without declaring such an output takes no lock there: a task that writes a
+workspace-scoped resource and declares no output does not protect that
+resource's readers from it. The `sources` resource takes
 no lock: the tasks that write it change source files, not declared outputs.
 Shared locks coexist: tasks of several sessions read one project at once,
 unless a task of their own session writes there when they start, and a task
@@ -1459,23 +1454,18 @@ Rules:
   marker, or task parameters.
 - `--no-cache` subsumes it. When both are given, the run-wide flag wins.
 
-`@putnami/clientgen`'s `clientgen-sync` is the first caller: it materializes
-its providers' contracts with
-`build --projects <providers> --no-cache-projects <providers>`, so the providers
-are re-derived from source while the 90 %+ of planned tasks that are merely
-their dependencies stay cached.
+A caller names the providers it must re-derive from source with
+`build --projects <providers> --no-cache-projects <providers>`, so the
+providers are rebuilt while the 90 %+ of planned tasks that are merely their
+dependencies stay cached.
 
-The bypass there is whole-project, and stays that way. Narrowing it to only the
-tasks that produce the contract sync reads was measured and rejected:
-the tasks a narrowing would restore are 2.6 s of processor time and 1.0 s of
-that nested run's 2.3 s critical path, while the run's own floor — planning 141
-tasks and restoring the 131 cached ones — is larger than both. A task-scoped
-bypass would also need a second closure rule, over task edges rather than
-project edges, for the same flag. That floor is also why the `validate` guard
-no longer spawns this build at all: whether a committed client is what
-the current contract generates is judged by the scheduler on the generator
-task's declared output (see "Declared-output drift"), and the guard reads
-committed inputs only.
+The bypass is whole-project, and stays that way. Narrowing it to only the
+tasks that produce one output was measured and rejected: the tasks a narrowing
+would restore were 2.6 s of processor time and 1.0 s of a nested run's 2.3 s
+critical path, while the run's own floor, planning 141 tasks and restoring the
+131 cached ones, is larger than both. A task-scoped bypass would also need a
+second closure rule, over task edges rather than project edges, for the same
+flag.
 
 ### Speculative prefetch
 
