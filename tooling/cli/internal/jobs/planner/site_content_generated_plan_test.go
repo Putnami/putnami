@@ -24,7 +24,8 @@ import (
 // step that reads the section waits for the generate step, and the keys that
 // fold the generate step's key, among them the member's selection
 // fingerprint, move with the generator's declared inputs and with nothing
-// else.
+// else. They also pin what the manifest plans for a project that declares no
+// generated section, and that a Go site project plans both extensions' build.
 
 const (
 	siteContentProjectPath  = "docs/example.test"
@@ -39,40 +40,54 @@ const (
 // announces for one section of the fixture.
 const siteContentMember = `{"ecosystem":"put","coordinate":"cloud/doc-contents-%s","packageStep":"cloud-site-content","publishStep":"cloud-publish-site-content"}`
 
-// siteContentFixtures are the two fixture shapes: a generated section beside
-// a committed one, and a generated section alone.
-var siteContentFixtures = []struct {
-	name      string
-	committed bool
-}{
-	{name: "beside a committed section", committed: true},
-	{name: "as the only section", committed: false},
-}
-
-// siteContentProjectDocument is the project document of the fixture: a site
-// project that lists the generator's inputs for the key of the extension's
-// build command.
-const siteContentProjectDocument = `{
-  "name": "docs/example.test",
-  "publish": ["site-content"],
-  "options": {"@putnami/cloud:build": {"filePatterns": ["../../tools/gen/**"]}}
-}
-`
-
 // siteContentDeclaration is the fixture's site-content.json: one generated
-// section.
+// section, api.
 const siteContentDeclaration = `{"generated": {"api": {"command": ["go", "run", "../../tools/gen", "{output}"]}}}
 `
 
-// siteContentWorkspace writes a Git work tree that ignores .gen, as this
-// repository does, with the site project and a generator outside it, and
-// returns the workspace, the project and the real Cloud extension. The
-// project has a committed guide section beside its generated api section, or
-// only the generated section when committed is false. The validation step
-// keys the project's Git candidate files, so the workspace is a work tree.
-func siteContentWorkspace(t *testing.T, committed bool) (*workspace.Workspace, *workspace.Project, *extension.ExtensionDescription) {
+// siteContentFixture is one shape of the fixture's site project.
+type siteContentFixture struct {
+	name string
+	// committed adds a committed section, guide.
+	committed bool
+	// declared writes site-content.json, which declares the generated api
+	// section.
+	declared bool
+	// ignoreGen makes the work tree ignore .gen, as this repository does.
+	// Without it the files a generator writes are untracked Git candidates.
+	ignoreGen bool
+	// goProject makes the site project a Go project that also publishes go.
+	goProject bool
+}
+
+// siteContentGeneratedFixtures are the shapes that declare a generated
+// section: beside a committed section, as the only section, and as the only
+// section of a work tree that does not ignore .gen.
+var siteContentGeneratedFixtures = []siteContentFixture{
+	{name: "beside a committed section", committed: true, declared: true, ignoreGen: true},
+	{name: "as the only section", declared: true, ignoreGen: true},
+	{name: "in a work tree that does not ignore .gen", declared: true},
+}
+
+// siteContentPlan is a planned fixture: the workspace, the site project, the
+// real Cloud extension and every extension the run loads.
+type siteContentPlan struct {
+	ws         *workspace.Workspace
+	site       *workspace.Project
+	cloud      *extension.ExtensionDescription
+	extensions []*extension.ExtensionDescription
+}
+
+// siteContentWorkspace writes a Git work tree with the site project of
+// fixture and a generator outside it, and returns it with the real Cloud
+// extension, and the real Go extension for a Go project. The project lists
+// the generator's inputs for the key of the Cloud build command. The
+// validation step keys the project's Git candidate files, so the workspace
+// is a work tree.
+func siteContentWorkspace(t *testing.T, fixture siteContentFixture) siteContentPlan {
 	t.Helper()
 	cloud := loadShippedExtension(t, "cloud/extension", "@putnami/cloud")
+	extensions := []*extension.ExtensionDescription{cloud}
 
 	isolateTreeKeyedGit(t)
 	root, err := filepath.EvalSymlinks(t.TempDir())
@@ -80,35 +95,59 @@ func siteContentWorkspace(t *testing.T, committed bool) (*workspace.Workspace, *
 		t.Fatal(err)
 	}
 	treeKeyedGit(t, root, "init", "-q", "-b", "main")
-	writeTestFile(t, filepath.Join(root, ".gitignore"), ".gen/\n.putnami/\n")
-	writeProjectFile(t, root, siteContentProjectPath, "putnami.json", siteContentProjectDocument)
-	writeProjectFile(t, root, siteContentProjectPath, "site-content.json", siteContentDeclaration)
-	if committed {
-		writeProjectFile(t, root, siteContentProjectPath, "guide/index.md", "# Guide\n")
+	ignored := ".putnami/\n"
+	if fixture.ignoreGen {
+		ignored = ".gen/\n" + ignored
 	}
-	writeProjectFile(t, root, "tools/gen", "main.go", "package main\n")
-	members := []string{fmt.Sprintf(siteContentMember, "api")}
-	if committed {
-		members = append(members, fmt.Sprintf(siteContentMember, "guide"))
+	writeTestFile(t, filepath.Join(root, ".gitignore"), ignored)
+
+	// The project document lists the generator's inputs for the key of the
+	// Cloud build command.
+	publish, uses := `["site-content"]`, `[]`
+	if fixture.goProject {
+		goExtension := loadShippedExtension(t, "go/extension", "@putnami/go")
+		extensions = append(extensions, goExtension)
+		publish, uses = `["go", "site-content"]`, `["`+goExtension.Name+`"]`
+		writeProjectFile(t, root, siteContentProjectPath, "go.mod", "module example.test/docs\n\ngo 1.26\n")
+		writeProjectFile(t, root, siteContentProjectPath, "main.go", "package main\n\nfunc main() {}\n")
 	}
+	data := fmt.Sprintf(`{
+  "name": %q,
+  "publish": %s,
+  "extensions": %s,
+  "options": {"@putnami/cloud:build": {"filePatterns": ["../../tools/gen/**"]}}
+}
+`, siteContentProjectPath, publish, uses)
+	writeProjectFile(t, root, siteContentProjectPath, "putnami.json", data)
 	var document wsproto.ProjectConfig
-	if err := json.Unmarshal([]byte(siteContentProjectDocument), &document); err != nil {
+	if err := json.Unmarshal([]byte(data), &document); err != nil {
 		t.Fatal(err)
 	}
+	var members []string
+	if fixture.declared {
+		writeProjectFile(t, root, siteContentProjectPath, "site-content.json", siteContentDeclaration)
+		members = append(members, fmt.Sprintf(siteContentMember, "api"))
+	}
+	if fixture.committed {
+		writeProjectFile(t, root, siteContentProjectPath, "guide/index.md", "# Guide\n")
+		members = append(members, fmt.Sprintf(siteContentMember, "guide"))
+	}
+	writeProjectFile(t, root, "tools/gen", "main.go", "package main\n")
+
 	site := &workspace.Project{
 		ID: "/" + siteContentProjectPath, Name: siteContentProjectPath, Path: siteContentProjectPath,
-		Publish: document.Publish, Config: &document,
+		Publish: document.Publish, Extensions: document.Extensions, Config: &document,
 		// The Cloud workspace probe announces the members under its own name.
 		Metadata: map[string]json.RawMessage{cloud.Name: json.RawMessage(`{"releaseSet":{"ecosystems":[` + strings.Join(members, ",") + `]}}`)},
 	}
 	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, []*workspace.Project{site})
 	ws.Graph = workspace.BuildGraph(ws.Projects)
-	return ws, site, cloud
+	return siteContentPlan{ws: ws, site: site, cloud: cloud, extensions: extensions}
 }
 
-func planSiteContent(t *testing.T, ws *workspace.Workspace, site *workspace.Project, cloud *extension.ExtensionDescription, command string) map[string]*jobmodel.ScheduledJob {
+func planSiteContent(t *testing.T, fixture siteContentPlan, command string) map[string]*jobmodel.ScheduledJob {
 	t.Helper()
-	planned, err := Plan(ws, []string{command}, []*workspace.Project{site}, []*extension.ExtensionDescription{cloud}, nil, nil, nil, nil)
+	planned, err := Plan(fixture.ws, []string{command}, []*workspace.Project{fixture.site}, fixture.extensions, nil, nil, nil, nil)
 	if err != nil {
 		t.Fatalf("plan %s: %v", command, err)
 	}
@@ -162,32 +201,54 @@ func putEcosystemProfiles(t *testing.T) *extensionproto.ProfileRegistry {
 	return registry
 }
 
+// plannedTask returns the job of planned that runs task of the extension
+// named extensionName under command, or nil. Its key names the extension
+// only when more than one extension contributes to command, so the job is
+// found by what it runs.
+func plannedTask(planned map[string]*jobmodel.ScheduledJob, extensionName, command, task string) *jobmodel.ScheduledJob {
+	for _, job := range planned {
+		if job.Extension != nil && job.Extension.Name == extensionName && job.Step != nil && job.Step.Task == task &&
+			job.JobDef != nil && job.CommandName() == command {
+			return job
+		}
+	}
+	return nil
+}
+
+// requireSiteContentReaders fails unless the plan of command holds the
+// generate step and the reader of command, and the reader waits for the
+// generate step.
+func requireSiteContentReaders(t *testing.T, fixture siteContentPlan, command string, planned map[string]*jobmodel.ScheduledJob) {
+	t.Helper()
+	generate := plannedTask(planned, fixture.cloud.Name, "build", "cloud-site-content-generate")
+	if generate == nil {
+		t.Fatalf("plan of %s holds no cloud-site-content-generate step: %v", command, slices.Sorted(maps.Keys(planned)))
+	}
+	readers := map[string]struct{ command, task string }{
+		"validate": {"validate", "cloud-validate-site-content"},
+		"package":  {"package", "cloud-package-site-content"},
+		"publish":  {"package", "cloud-package-site-content"},
+	}
+	if reader, reads := readers[command]; reads {
+		job := plannedTask(planned, fixture.cloud.Name, reader.command, reader.task)
+		if job == nil || !slices.Contains(job.DependsOn, generate.Key()) {
+			t.Fatalf("%s %s = %+v, want it planned and depending on %s; planned %v",
+				reader.command, reader.task, job, generate.Key(), slices.Sorted(maps.Keys(planned)))
+		}
+	}
+}
+
 // Validate, package and publish each plan the generate step, and the step of
 // each that reads the generated section waits for it. A project whose only
 // section is generated has no section landing page to activate package:
 // site-content.json activates it, so its site-content step is planned.
 func TestTheStepsThatReadAGeneratedSiteContentSectionWaitForItsGenerateStep(t *testing.T) {
-	for _, fixture := range siteContentFixtures {
-		t.Run(fixture.name, func(t *testing.T) {
-			ws, site, cloud := siteContentWorkspace(t, fixture.committed)
-			for command, readers := range map[string][]string{
-				"validate": {"validate~cloud-site-content"},
-				"package":  {"package~cloud-site-content"},
-				"publish":  {"package~cloud-site-content"},
-			} {
+	for _, shape := range siteContentGeneratedFixtures {
+		t.Run(shape.name, func(t *testing.T) {
+			fixture := siteContentWorkspace(t, shape)
+			for _, command := range []string{"validate", "package", "publish"} {
 				t.Run(command, func(t *testing.T) {
-					planned := planSiteContent(t, ws, site, cloud, command)
-					generate := planned[siteContentGenerateStep]
-					if generate == nil || generate.Step == nil || generate.Step.Task != "cloud-site-content-generate" {
-						t.Fatalf("plan of %s holds no %s: %v", command, siteContentGenerateStep, slices.Sorted(maps.Keys(planned)))
-					}
-					for _, reader := range readers {
-						job := planned[site.ID+":"+reader]
-						if job == nil || !slices.Contains(job.DependsOn, siteContentGenerateStep) {
-							t.Fatalf("%s:%s = %+v, want it planned and depending on %s; planned %v",
-								site.ID, reader, job, siteContentGenerateStep, slices.Sorted(maps.Keys(planned)))
-						}
-					}
+					requireSiteContentReaders(t, fixture, command, planSiteContent(t, fixture, command))
 				})
 			}
 		})
@@ -203,31 +264,107 @@ func TestTheStepsThatReadAGeneratedSiteContentSectionWaitForItsGenerateStep(t *t
 	}
 }
 
+// A docs project with committed sections only and no site-content.json plans
+// validate and package as before: their build prerequisite plans the generate
+// step, which does nothing for it, so the prerequisite is never empty.
+func TestAPlainSiteContentProjectPlansValidateAndPackage(t *testing.T) {
+	fixture := siteContentWorkspace(t, siteContentFixture{committed: true, ignoreGen: true})
+	for _, command := range []string{"validate", "package"} {
+		t.Run(command, func(t *testing.T) {
+			requireSiteContentReaders(t, fixture, command, planSiteContent(t, fixture, command))
+		})
+	}
+}
+
+// A site project that is also a Go project plans the Go build and the Cloud
+// generate step side by side: the Go build-generate cedes .gen/site-content,
+// so the two declared outputs do not overlap, with or without a generated
+// section.
+func TestAGoSiteProjectPlansTheGoBuildBesideTheSiteContentGenerateStep(t *testing.T) {
+	for _, shape := range []siteContentFixture{
+		{name: "without site-content.json", committed: true, ignoreGen: true, goProject: true},
+		{name: "with site-content.json", committed: true, declared: true, ignoreGen: true, goProject: true},
+	} {
+		t.Run(shape.name, func(t *testing.T) {
+			fixture := siteContentWorkspace(t, shape)
+			for _, command := range []string{"build", "validate", "package"} {
+				t.Run(command, func(t *testing.T) {
+					planned := planSiteContent(t, fixture, command)
+					requireSiteContentReaders(t, fixture, command, planned)
+					if plannedTask(planned, "@putnami/go", "build", "build-generate") == nil {
+						t.Fatalf("plan of %s holds no Go build-generate step: %v", command, slices.Sorted(maps.Keys(planned)))
+					}
+				})
+			}
+		})
+	}
+}
+
+// build plans no Cloud job for a project that uses no Cloud feature: a Go
+// project, and a project that is neither a Go nor a site project. The Cloud
+// build command activates on putnami.json, and each of its steps keeps its
+// own condition.
+func TestBuildPlansNoCloudJobForAProjectThatUsesNoCloudFeature(t *testing.T) {
+	cloud := loadShippedExtension(t, "cloud/extension", "@putnami/cloud")
+	goExtension := loadShippedExtension(t, "go/extension", "@putnami/go")
+	root := t.TempDir()
+	writeProjectFile(t, root, "services/api", "putnami.json", "{\"name\": \"services/api\", \"publish\": [\"go\"]}\n")
+	writeProjectFile(t, root, "services/api", "go.mod", "module example.test/api\n\ngo 1.26\n")
+	writeProjectFile(t, root, "services/api", "main.go", "package main\n\nfunc main() {}\n")
+	writeProjectFile(t, root, "notes", "putnami.json", "{\"name\": \"notes\"}\n")
+	goProject := &workspace.Project{
+		ID: "/services/api", Name: "services/api", Path: "services/api", Publish: []string{"go"}, Extensions: []string{goExtension.Name},
+		Config: &wsproto.ProjectConfig{Name: "services/api", Publish: []string{"go"}, Extensions: []string{goExtension.Name}},
+	}
+	plain := &workspace.Project{ID: "/notes", Name: "notes", Path: "notes", Config: &wsproto.ProjectConfig{Name: "notes"}}
+	ws := workspace.NewWorkspace(root, &wsproto.Config{Name: "putnami"}, []*workspace.Project{goProject, plain})
+	ws.Graph = workspace.BuildGraph(ws.Projects)
+
+	for _, project := range []*workspace.Project{goProject, plain} {
+		t.Run(project.Name, func(t *testing.T) {
+			planned, err := Plan(ws, []string{"build"}, []*workspace.Project{project}, []*extension.ExtensionDescription{cloud, goExtension}, nil, nil, nil, nil)
+			if err != nil {
+				t.Fatalf("plan build: %v", err)
+			}
+			for _, job := range planned {
+				if job.Extension != nil && job.Extension.Name == cloud.Name {
+					t.Errorf("build of %s plans the Cloud job %s; the project uses no Cloud feature", project.Name, job.Key())
+				}
+			}
+		})
+	}
+}
+
 // The key of the validation step that reads a generated section folds the
 // generate step's key: it moves with a listed generator input and not with
 // the generated output, which the generate step can rewrite between the run's
-// key pass and the validation step's start.
+// key pass and the validation step's start. That holds in a work tree that
+// does not ignore .gen too, where the generated files are Git candidates.
 func TestTheGeneratedSiteContentValidationKeyFoldsTheGenerateKey(t *testing.T) {
-	ws, site, cloud := siteContentWorkspace(t, true)
-	planned := slices.Collect(maps.Values(planSiteContent(t, ws, site, cloud, "validate")))
-	validate := site.ID + ":validate~cloud-site-content"
-	key := func() string {
-		t.Helper()
-		got := siteContentKeys(t, ws, planned)[validate]
-		if got == "" {
-			t.Fatalf("no key for %s", validate)
-		}
-		return got
-	}
+	for _, shape := range siteContentGeneratedFixtures {
+		t.Run(shape.name, func(t *testing.T) {
+			fixture := siteContentWorkspace(t, shape)
+			planned := slices.Collect(maps.Values(planSiteContent(t, fixture, "validate")))
+			validate := fixture.site.ID + ":validate~cloud-site-content"
+			key := func() string {
+				t.Helper()
+				got := siteContentKeys(t, fixture.ws, planned)[validate]
+				if got == "" {
+					t.Fatalf("no key for %s", validate)
+				}
+				return got
+			}
 
-	base := key()
-	writeProjectFile(t, ws.Root, siteContentProjectPath, ".gen/site-content/api/index.md", "# API\n")
-	if got := key(); got != base {
-		t.Errorf("the generated output moved the validation key; the generate step can rewrite it during the run: %s, want %s", got, base)
-	}
-	writeProjectFile(t, ws.Root, "tools/gen", "main.go", "package main\n\nfunc main() {}\n")
-	if got := key(); got == base {
-		t.Error("a change to a listed generator input left the validation key unmoved; it does not fold the generate key")
+			base := key()
+			writeProjectFile(t, fixture.ws.Root, siteContentProjectPath, ".gen/site-content/api/index.md", "# API\n")
+			if got := key(); got != base {
+				t.Errorf("the generated output moved the validation key; the generate step can rewrite it during the run: %s, want %s", got, base)
+			}
+			writeProjectFile(t, fixture.ws.Root, "tools/gen", "main.go", "package main\n\nfunc main() {}\n")
+			if got := key(); got == base {
+				t.Error("a change to a listed generator input left the validation key unmoved; it does not fold the generate key")
+			}
+		})
 	}
 }
 
@@ -235,21 +372,23 @@ func TestTheGeneratedSiteContentValidationKeyFoldsTheGenerateKey(t *testing.T) {
 // package step, which waits for the generate step: it moves when a file the
 // project lists as a generator input or the generator command moves, and not
 // when an unlisted file or the generated output itself moves. It holds for a
-// project whose only section is generated too.
+// project whose only section is generated, and in a work tree that does not
+// ignore .gen.
 func TestTheGeneratedSiteContentSelectionFingerprintFollowsTheGeneratorInputs(t *testing.T) {
-	for _, fixture := range siteContentFixtures {
-		t.Run(fixture.name, func(t *testing.T) {
-			assertSiteContentFingerprintFollowsTheGeneratorInputs(t, fixture.committed)
+	for _, shape := range siteContentGeneratedFixtures {
+		t.Run(shape.name, func(t *testing.T) {
+			assertSiteContentFingerprintFollowsTheGeneratorInputs(t, shape)
 		})
 	}
 }
 
-func assertSiteContentFingerprintFollowsTheGeneratorInputs(t *testing.T, committed bool) {
+func assertSiteContentFingerprintFollowsTheGeneratorInputs(t *testing.T, shape siteContentFixture) {
 	t.Helper()
-	ws, site, cloud := siteContentWorkspace(t, committed)
-	planned := slices.Collect(maps.Values(planSiteContent(t, ws, site, cloud, "package")))
+	fixture := siteContentWorkspace(t, shape)
+	ws := fixture.ws
+	planned := slices.Collect(maps.Values(planSiteContent(t, fixture, "package")))
 	memberKey := siteContentMemberKey
-	members := map[string]*workspace.Project{memberKey: site}
+	members := map[string]*workspace.Project{memberKey: fixture.site}
 	registry := putEcosystemProfiles(t)
 	fingerprint := func() string {
 		t.Helper()
@@ -257,8 +396,7 @@ func assertSiteContentFingerprintFollowsTheGeneratorInputs(t *testing.T, committ
 		// hide the content change the key is supposed to see.
 		cache := store.NewCacheManager(store.NewLocalStore(t.TempDir()))
 		cache.SetInputResolver(noListedFiles{})
-		got, err := cachekey.SelectionFingerprints(ws, planned, nil, cache, registry,
-			[]*extension.ExtensionDescription{cloud}, members)
+		got, err := cachekey.SelectionFingerprints(ws, planned, nil, cache, registry, fixture.extensions, members)
 		if err != nil {
 			t.Fatalf("SelectionFingerprints: %v", err)
 		}

@@ -30,7 +30,8 @@ import (
 // .gen/site-content/<section>, which the build step
 // cloud-site-content-generate writes. The task's key folds that step's key,
 // which holds site-content.json and fixes those bytes, so it does not read
-// them. The check refuses a declared generated section whose directory is
+// them: its `git:**` input excludes .gen/site-content, which a work tree that
+// does not ignore .gen would otherwise list. The check refuses a declared generated section whose directory is
 // absent, and one whose name is also a section directory.
 func ValidateSiteContentSources(params map[string]any, args []string, workspaceRoot string, ioctx clicore.IO) error {
 	clicore.AdoptPositionalApp(params, args)

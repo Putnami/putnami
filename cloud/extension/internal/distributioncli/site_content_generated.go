@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 )
@@ -187,12 +188,13 @@ func runSiteContentGenerator(ctx context.Context, projectDir string, generator s
 	}
 	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec // G204: the project declares this command; running it is the feature
 	cmd.Dir = projectDir
-	lines := &siteContentGeneratorOutput{emit: ioctx.Stdout}
-	// One writer for both streams: os/exec then calls Write from one goroutine
-	// at a time.
-	cmd.Stdout, cmd.Stderr = lines, lines
+	lines := &siteContentGeneratorOutput{}
+	stdout := &siteContentGeneratorStream{output: lines, emit: ioctx.Stdout}
+	stderr := &siteContentGeneratorStream{output: lines, emit: ioctx.Stderr}
+	cmd.Stdout, cmd.Stderr = stdout, stderr
 	runErr := cmd.Run()
-	lines.flush()
+	stdout.flush()
+	stderr.flush()
 	subject := fmt.Sprintf("generate site-content section %q: %s", generator.section, argv[0])
 	if runErr != nil {
 		var message strings.Builder
@@ -233,16 +235,25 @@ func countSiteContentGeneratedFiles(dir string) (int, error) {
 	return files, err
 }
 
-// siteContentGeneratorOutput forwards a generator's output line by line and
-// keeps its last siteContentGeneratorTailLines lines for the error of a
-// failing run.
+// siteContentGeneratorOutput keeps the last siteContentGeneratorTailLines
+// non-blank lines a generator wrote to either stream, in the order they
+// completed, for the error of a failing run. os/exec copies each stream on
+// its own goroutine, so the lock orders the two streams' lines.
 type siteContentGeneratorOutput struct {
-	emit    func(string)
-	pending []byte
-	tail    []string
+	mu   sync.Mutex
+	tail []string
 }
 
-func (w *siteContentGeneratorOutput) Write(p []byte) (int, error) {
+// siteContentGeneratorStream forwards one stream of a generator line by line
+// to its own emitter: stdout to the job's stdout, stderr to its stderr. os/exec
+// calls Write on one stream from one goroutine.
+type siteContentGeneratorStream struct {
+	output  *siteContentGeneratorOutput
+	emit    func(string)
+	pending []byte
+}
+
+func (w *siteContentGeneratorStream) Write(p []byte) (int, error) {
 	w.pending = append(w.pending, p...)
 	for {
 		index := bytes.IndexByte(w.pending, '\n')
@@ -254,23 +265,25 @@ func (w *siteContentGeneratorOutput) Write(p []byte) (int, error) {
 	}
 }
 
-func (w *siteContentGeneratorOutput) flush() {
+func (w *siteContentGeneratorStream) flush() {
 	if len(w.pending) > 0 {
 		w.line(string(w.pending))
 		w.pending = nil
 	}
 }
 
-func (w *siteContentGeneratorOutput) line(line string) {
+func (w *siteContentGeneratorStream) line(line string) {
 	line = strings.TrimRight(line, "\r")
+	w.output.mu.Lock()
+	defer w.output.mu.Unlock()
 	if w.emit != nil {
 		w.emit(line)
 	}
 	if strings.TrimSpace(line) == "" {
 		return
 	}
-	if len(w.tail) == siteContentGeneratorTailLines {
-		w.tail = w.tail[1:]
+	if len(w.output.tail) == siteContentGeneratorTailLines {
+		w.output.tail = w.output.tail[1:]
 	}
-	w.tail = append(w.tail, line)
+	w.output.tail = append(w.output.tail, line)
 }

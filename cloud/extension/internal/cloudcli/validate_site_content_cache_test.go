@@ -70,12 +70,13 @@ func TestValidateSiteContentCacheContract(t *testing.T) {
 		// A glob keeps every byte of putnami.json, and keys a manifest Git
 		// ignores, which the candidate files do not hold.
 		"manifest": {From: "project", Files: []string{"putnami.jso[n]"}},
-		// "git:**" alone selects the whole repository. The exclusion keeps the
-		// candidate files of the project and nothing above it.
-		"sections": {From: "project", Files: []string{"git:**", "!../**"}},
-		// No port reads .gen/site-content. The generate step can rewrite it
-		// between the run's key pass and this task's start, so reading it
-		// would move the key; the folded generate key fixes those bytes.
+		// "git:**" alone selects the whole repository. The first exclusion
+		// keeps the candidate files of the project and nothing above it.
+		// The second keeps .gen/site-content out where Git does not ignore
+		// .gen: no port reads it. The generate step can rewrite it between
+		// the run's key pass and this task's start, so reading it would move
+		// the key; the folded generate key fixes those bytes.
+		"sections": {From: "project", Files: []string{"git:**", "!../**", "!.gen/site-content/**"}},
 		// `putnami validate --app X` reaches each project's step, and the check
 		// refuses a project other than its own.
 		"app": {From: "params"}, "appName": {From: "params"},

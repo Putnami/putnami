@@ -1523,7 +1523,7 @@
         "putnami.json"
       ],
       "traits": {"injectPublishChannels": true, "kind": "files"},
-      "description": "Materialize an image project's declared generated layers, and a site project's declared generated site-content sections, as ordinary build outputs. This keeps a cold monorepo CI run self-bootstrapping: build --impacted produces the runner bytes before the trusted post-gate stage packages and publishes the runner-backed worker from the same checkout. The package contribution still re-verifies the exact bytes and current pins immediately before assembly. The command activates on putnami.json, as validate does, because a site project names no extension and its declaration file is optional; each step keeps its own condition, so a project with neither image-layers.json nor the site-content publish entry plans no step.",
+      "description": "Materialize an image project's declared generated layers, and a site project's declared generated site-content sections, as ordinary build outputs. This keeps a cold monorepo CI run self-bootstrapping: build --impacted produces the runner bytes before the trusted post-gate stage packages and publishes the runner-backed worker from the same checkout. The package contribution still re-verifies the exact bytes and current pins immediately before assembly. The command activates on putnami.json, as validate does, because a site project names no extension and its declaration file is optional; each step keeps its own condition, so a project with neither image-layers.json nor the site-content publish entry plans no step. The image-layer step therefore runs for every project that holds image-layers.json, whether or not it names @putnami/cloud: a step condition cannot test which extensions a project names.",
       "run": [
         {
           "id": "cloud-image-layers",
@@ -2647,11 +2647,11 @@
       "reads": ["gen"],
       "inputs": {
         "manifest": {"from": "project", "files": ["putnami.jso[n]"]},
-        "sections": {"from": "project", "files": ["git:**", "!../**"]},
+        "sections": {"from": "project", "files": ["git:**", "!../**", "!.gen/site-content/**"]},
         "app": {"from": "params"},
         "appName": {"from": "params"}
       },
-      "description": "Inspect declared site sections, mounts, regular-file policy and paths; never read payloads, generate artifacts or assemble archives. Cached on the files and parameters the extension README lists: it reads the committed sections through the project's Git candidate files, so an ignored file and an empty directory are absent for it, and a symbolic link is refused. It reads a declared generated section from .gen/site-content/<section>, which the build step cloud-site-content-generate writes, and refuses one that is absent; its key folds that step's key, which fixes those bytes, and does not read them. Refuses any project other than the one in its working directory.",
+      "description": "Inspect declared site sections, mounts, regular-file policy and paths; never read payloads, generate artifacts or assemble archives. Cached on the files and parameters the extension README lists: it reads the committed sections through the project's Git candidate files, so an ignored file and an empty directory are absent for it, and a symbolic link is refused. It reads a declared generated section from .gen/site-content/<section>, which the build step cloud-site-content-generate writes, and refuses one that is absent; its key folds that step's key, which fixes those bytes, and does not read them: the git:** input excludes .gen/site-content, so the key holds none of those files even where Git does not ignore .gen. Refuses any project other than the one in its working directory.",
       "timeoutMs": 60000
     },
     "cloud-site-content-generate": {

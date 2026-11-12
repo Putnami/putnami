@@ -490,7 +490,9 @@ input it reads changes:
   that Git tracks, or that is untracked and matches no ignore rule. A regular
   file counts by its bytes and its executable bit, a symbolic link by its
   target text. A `putnami.verdict-policy.json` file does not count: the CI
-  plane reads it, and no build does.
+  plane reads it, and no build does. A file under `.gen/site-content` does
+  not count either, even where Git does not ignore `.gen`: the key of the
+  build step below fixes those files.
 - the key of the build step `cloud-site-content-generate`, which the step
   waits for. That key fixes the declared generated sections the build step
   writes under `.gen/site-content/`, so this key does not read those files:
@@ -664,9 +666,10 @@ extension's `build` command.
   or on `site-content.json`, as it activates on `image-layers.json` for an
   image. A site project whose only sections are generated still packages and
   publishes them.
-- A site project that is also a Go or TypeScript project cannot declare a
-  generated section: the language extension's `build` owns the project's
-  `.gen` directory and does not cede `.gen/site-content`.
+- A site project may also be a Go or TypeScript project. The language
+  extension's `build-generate` owns the project's `.gen` directory and cedes
+  `.gen/site-content` to this step, as it cedes `.gen/layers` to
+  `cloud-image-layers`.
 
 A project that declares `publish: ["archives"]` and owns a scoped extension
 package, or declares `options.publish.binary-name`, gets an `archive`
@@ -734,7 +737,12 @@ green gate for an unexercised entrypoint.
 
 `build~cloud-image-layers` produces the layers. It is uncached, because it
 downloads upstream artifacts, and it declares `.gen/layers` as its output, so
-no other task of a plan may write there. For an image project, `package`
+no other task of a plan may write there. The `build` command activates for
+every project with a `putnami.json`, as `validate` does, so that a docs
+project plans its site-content step. The layer step therefore runs for every
+project that holds an `image-layers.json`, whether or not the project names
+`@putnami/cloud`: a step condition cannot test which extensions a project
+names. For an image project, `package`
 runs `build` first in the same session, then
 `package~cloud-image-layers-check` verifies the layers. The check is cached.
 It runs again when any file it reads changes:

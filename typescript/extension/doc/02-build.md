@@ -661,7 +661,7 @@ Every output has exactly one owning task:
 
 | Task | Owns | Root |
 |------|------|------|
-| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json` and `.gen/layers/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), `schema/http-routes.json` (with `drift: "fail"`: a committed route inventory that differs from the one the hooks regenerate fails the task with `generated-output-drift` — commit the regenerated inventory; see [committed route inventory](#committed-route-inventory)), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
+| `build-generate` | `.gen/` minus `.gen/deployment.json`, `.gen/requirements.json`, `.gen/infra/runtime.json`, `.gen/layers/` and `.gen/site-content/`, `schema/capabilities.json`, `schema/openapi.json` (with `drift: "fail"`: a committed spec that differs from the one `openapi()` regenerates fails the task with `generated-output-drift` — commit the regenerated spec), `schema/http-routes.json` (with `drift: "fail"`: a committed route inventory that differs from the one the hooks regenerate fails the task with `generated-output-drift` — commit the regenerated inventory; see [committed route inventory](#committed-route-inventory)), and the generated client directory (via the `clientOutput` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
 | `build-transpile` | `lib/` | per-command output dir |
 | `build-types` | `types/` | per-command output dir |
 | `build-compile` | `compile/` | per-command output dir |
@@ -688,8 +688,8 @@ exceptions are the files later steps write after generate's snapshot:
 `build-generate` cedes `.gen/deployment.json` to `package-deployment` (see
 [Package → Deployment Channel](./07-package.md#deployment-channel)), and
 `.gen/requirements.json` and `.gen/infra/runtime.json` to `build-infra`. It
-also cedes `.gen/layers/` to `cloud-image-layers` of `@putnami/cloud`, which
-declares it. `build-generate` still deletes `.gen/infra/` fragments at the start of every
+also cedes `.gen/layers/` to `cloud-image-layers` and `.gen/site-content/` to
+`cloud-site-content-generate`, both of `@putnami/cloud`, which declare them. `build-generate` still deletes `.gen/infra/` fragments at the start of every
 run, the runtime defaults file with them, and `build-infra` writes it again
 after generate.
 

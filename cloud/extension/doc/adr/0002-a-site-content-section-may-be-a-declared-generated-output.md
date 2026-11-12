@@ -44,7 +44,10 @@ plan `build` first for a site project, so the step that reads a section waits
 for the step that writes it, and its key, and with it the member's selection
 fingerprint, mixes the generate step's key. No reader's key reads
 `.gen/site-content` itself: the generate step can rewrite it after the run
-computes its keys, and the folded key already fixes those bytes. Validation,
+computes its keys, and the folded key already fixes those bytes. Validation
+keys the project's Git candidate files, so its `git:**` input excludes
+`.gen/site-content/**` by name: the rule holds in a work tree that does not
+ignore `.gen`, too. Validation,
 packaging and publication read a declared generated section from
 `.gen/site-content/<section>` and nowhere else. The probe lists the declared
 names from `site-content.json` alone, so it stays a pure function of the
@@ -81,5 +84,11 @@ committed section directory.
 - Every site project's package step now waits for the generate step, so each
   site-content member's selection fingerprint moves once when this version of
   the extension is installed.
-- A site project that is also a Go or TypeScript project cannot declare a
-  generated section until those extensions cede `.gen/site-content`.
+- A site project may also be a Go or TypeScript project: their
+  `build-generate` cedes `.gen/site-content` to the generate step, as it
+  cedes `.gen/layers` to `cloud-image-layers`.
+- The Cloud `build` command activates for every project with a
+  `putnami.json`, so that a docs project, which names no extension, plans its
+  generate step. Each step keeps its own condition. The image-layer step
+  therefore runs for every project that holds an `image-layers.json`, not only
+  for one that names `@putnami/cloud`.

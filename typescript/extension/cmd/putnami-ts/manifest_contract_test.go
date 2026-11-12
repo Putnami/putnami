@@ -226,8 +226,9 @@ func (r ownerRow) String() string {
 //     and build-infra. Resolved by CEDED SUBPATHS: build-generate excludes
 //     those three files (cededGenSubpaths) and their writers declare them, so
 //     a hit restores them and generate's restore never resurrects an earlier
-//     run's copy. It also excludes `.gen/layers`, which cloud-image-layers of
-//     @putnami/cloud declares.
+//     run's copy. It also excludes `.gen/layers` and `.gen/site-content`,
+//     which cloud-image-layers and cloud-site-content-generate of
+//     @putnami/cloud declare.
 //   - `.gen/config-schema.json` and its `.gen/config-schema.jsonschema.json`
 //     companion are the config-extract fallback that only config-extract-exec
 //     writes. build-generate cedes them too, and nobody declares them, so
@@ -670,13 +671,19 @@ const configSchemaFallbackCompanionPath = ".gen/config-schema.jsonschema.json"
 // in the order the manifest normalizes it to: the config-extract fallback and
 // its JSON Schema companion, which nobody declares, the files
 // package-deployment and build-infra write after generate and declare as their
-// outputs, and the .gen/layers directory cloud-image-layers of @putnami/cloud
-// declares.
-var cededGenSubpaths = []string{configSchemaFallbackPath, configSchemaFallbackCompanionPath, infraagg.DeploymentFile, infraagg.RuntimeDefaultsFile, imageLayersDir, infraagg.AggregatedManifestFile}
+// outputs, and the .gen/layers and .gen/site-content directories
+// cloud-image-layers and cloud-site-content-generate of @putnami/cloud
+// declare.
+var cededGenSubpaths = []string{configSchemaFallbackPath, configSchemaFallbackCompanionPath, infraagg.DeploymentFile, infraagg.RuntimeDefaultsFile, imageLayersDir, infraagg.AggregatedManifestFile, siteContentDir}
 
 // imageLayersDir is the project directory cloud-image-layers of @putnami/cloud
 // declares as its output.
 const imageLayersDir = ".gen/layers"
+
+// siteContentDir is the project directory cloud-site-content-generate of
+// @putnami/cloud declares as its output: the generated sections of a site
+// project.
+const siteContentDir = ".gen/site-content"
 
 // TestInfraAggregationIsWiredIntoBuild pins the properties that make
 // extension-owned infra aggregation correct and cacheable.
@@ -761,11 +768,13 @@ func TestInfraAggregationIsWiredIntoBuild(t *testing.T) {
 	}
 	gen := m.Tasks["build-generate"].Declares.Outputs["gen"]
 	if !slices.Equal(gen.Excludes, cededGenSubpaths) {
-		t.Errorf("build-generate gen excludes = %v, want %v: generate cedes the config-extract fallback and exactly the paths build-infra, package-deployment and cloud-image-layers claim", gen.Excludes, cededGenSubpaths)
+		t.Errorf("build-generate gen excludes = %v, want %v: generate cedes the config-extract fallback and exactly the paths build-infra, package-deployment, cloud-image-layers and cloud-site-content-generate claim", gen.Excludes, cededGenSubpaths)
 	}
-	layers := proto.DeclaredOutput{Kind: proto.OutputKindDirectory, Root: proto.OutputRootProject, Path: imageLayersDir}
-	if proto.OutputsOverlap(gen.Ref(), layers.Ref()) {
-		t.Errorf("build-generate gen output %+v overlaps the %s directory cloud-image-layers declares", gen.Ref(), imageLayersDir)
+	for path, task := range map[string]string{imageLayersDir: "cloud-image-layers", siteContentDir: "cloud-site-content-generate"} {
+		cloud := proto.DeclaredOutput{Kind: proto.OutputKindDirectory, Root: proto.OutputRootProject, Path: path}
+		if proto.OutputsOverlap(gen.Ref(), cloud.Ref()) {
+			t.Errorf("build-generate gen output %+v overlaps the %s directory %s declares", gen.Ref(), path, task)
+		}
 	}
 
 	if cmds := commandsByTask(m)["build-infra"]; len(cmds) != 1 || cmds[0] != "build" {

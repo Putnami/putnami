@@ -45,18 +45,25 @@ func generatedSections(commands map[string][]string) map[string]any {
 	return map[string]any{"generated": generated}
 }
 
+// generatorStreams holds the lines generate-site-content streamed to the
+// job's stdout and to its stderr.
+type generatorStreams struct {
+	stdout, stderr []string
+}
+
 // generateIn runs generate-site-content from project, as the build step does,
 // and returns its JSON result, the lines it streamed and its error.
-func generateIn(t *testing.T, project string, args ...string) (map[string]any, []string, error) {
+func generateIn(t *testing.T, project string, args ...string) (map[string]any, generatorStreams, error) {
 	t.Helper()
 	t.Chdir(project)
 	var result map[string]any
-	var lines []string
+	var streams generatorStreams
 	err := GenerateSiteContent(map[string]any{"json": true}, args, "", clicore.IO{
 		JSON:   func(data any) { result = resultPayloadMap(t, data) },
-		Stdout: func(line string) { lines = append(lines, line) },
+		Stdout: func(line string) { streams.stdout = append(streams.stdout, line) },
+		Stderr: func(line string) { streams.stderr = append(streams.stderr, line) },
 	})
-	return result, lines, err
+	return result, streams, err
 }
 
 func readGeneratedTree(t *testing.T, project string) map[string]string {
@@ -83,12 +90,13 @@ func readGeneratedTree(t *testing.T, project string) map[string]string {
 
 // The command receives the absolute section directory wherever {output}
 // appears in an argument, runs in the project directory, and its output
-// streams line by line. Sections run in name order, into a directory that
-// holds only the declared sections.
+// streams line by line, its stdout to the job's stdout and its stderr to the
+// job's stderr. Sections run in name order, into a directory that holds only
+// the declared sections.
 func TestGenerateSiteContentReplacesTheOutputPlaceholder(t *testing.T) {
 	project := writeGeneratedSiteProject(t, generatedSections(map[string][]string{
 		"api": {"sh", "-c", `mkdir -p "$1/types" && printf '# API\n' > "$1/index.md" && printf '# User\n' > "$1/types/user.md" && echo "wrote api from $(basename "$PWD")"`, "sh", "{output}"},
-		"cli": {"sh", "-c", `printf '# CLI\n' > "${1#--out=}/index.md" && echo wrote cli`, "sh", "--out={output}"},
+		"cli": {"sh", "-c", `printf '# CLI\n' > "${1#--out=}/index.md" && echo wrote cli && echo "cli note" >&2`, "sh", "--out={output}"},
 	}))
 	stale := filepath.Join(project, ".gen", "site-content", "removed", "index.md")
 	if err := os.MkdirAll(filepath.Dir(stale), 0o750); err != nil {
@@ -98,7 +106,7 @@ func TestGenerateSiteContentReplacesTheOutputPlaceholder(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	result, lines, err := generateIn(t, project)
+	result, streams, err := generateIn(t, project)
 	if err != nil {
 		t.Fatalf("generate-site-content: %v", err)
 	}
@@ -106,8 +114,11 @@ func TestGenerateSiteContentReplacesTheOutputPlaceholder(t *testing.T) {
 	if got := readGeneratedTree(t, project); !reflect.DeepEqual(got, want) {
 		t.Fatalf(".gen/site-content = %v, want %v", got, want)
 	}
-	if !reflect.DeepEqual(lines, []string{"wrote api from " + filepath.Base(project), "wrote cli"}) {
-		t.Fatalf("streamed lines = %q, want each generator's output in section order", lines)
+	if !reflect.DeepEqual(streams.stdout, []string{"wrote api from " + filepath.Base(project), "wrote cli"}) {
+		t.Fatalf("stdout lines = %q, want each generator's stdout in section order", streams.stdout)
+	}
+	if !reflect.DeepEqual(streams.stderr, []string{"cli note"}) {
+		t.Fatalf("stderr lines = %q, want the generator's stderr alone", streams.stderr)
 	}
 	if result["status"] != "generated" || result["files"] != 3 {
 		t.Fatalf("result = %v, want generated with 3 files", result)
@@ -122,8 +133,9 @@ func TestGenerateSiteContentRefusesAFailedOrEmptyGenerator(t *testing.T) {
 		command []string
 		want    []string
 	}{
-		{name: "a failing command", command: []string{"sh", "-c", `echo "cannot read the schema" >&2; exit 3`, "sh", "{output}"},
-			want: []string{`generate site-content section "api": sh exited with status 3`, "cannot read the schema"}},
+		// The error restates the last lines of both streams.
+		{name: "a failing command", command: []string{"sh", "-c", `echo "reading the schema"; echo "cannot read the schema" >&2; exit 3`, "sh", "{output}"},
+			want: []string{`generate site-content section "api": sh exited with status 3`, "reading the schema", "cannot read the schema"}},
 		{name: "a program not on PATH", command: []string{"putnami-no-such-generator", "{output}"},
 			want: []string{`section "api": putnami-no-such-generator is not on the job's PATH`}},
 		{name: "a command that writes nothing", command: []string{"sh", "-c", "true", "sh", "{output}"},
