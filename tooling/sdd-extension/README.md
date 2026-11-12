@@ -251,7 +251,7 @@ activation:
 
 | Command | Scope | Steps | Cached? |
 |---|---|---|---|
-| `validate` | one project, activated by `putnami.features.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
+| `validate` | one project, activated by `putnami.features.json`, `features/*.json` or `specs/*.json` | `features-validate` → `specs-validate` | yes: features on the Git candidate cut, specs on its documents |
 | `validate-workspace` | the workspace, once | `architecture-validate`, `specs-ratchet-validate`, `decisions-validate`, `recipes-validate`, `codeowners-sync`, `docs-links-validate`, `breaking-marker-validate`, `agent-attribution-validate`, `feature-coverage-validate`, `feature-coverage-ratchet-validate`, `verdict-policy-validate` | yes: architecture, ratchet and verdict policies on their documents; decisions, recipes, CODEOWNERS, docs links and feature coverage on the Git candidate cut. The breaking marker, the agent attribution and the feature-coverage ratchet are never cached |
 
 Both are in the canonical gate:
@@ -283,7 +283,7 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   identities, because a spec is keyed by a feature id and "one spec per feature"
   is a workspace-wide guarantee. The key follows the read set, not the
   ownership: two project ports name what the task reports on, and a workspace
-  port (`**/putnami.features.json`, `**/specs/*.json`) names the identity tier
+  port (`**/putnami.features.json`, `**/features/*.json`, `**/specs/*.json`) names the identity tier
   it resolves against. A key that stopped at the project would let a sibling's
   manifest change this verdict silently.
 - `architecture-validate` reads the workspace's ARC declarations, capability
@@ -321,7 +321,8 @@ A task may be cacheable only when its declared inputs COVER what it reads.
   no commit and no baseline ref. Two runs on one tree share one entry, whatever
   the commit, the ref or the checkout. The cut is a workspace port, so one
   digest serves every project's key; a project port naming
-  `putnami.features.json` keeps the project side off ignored build output.
+  `putnami.features.json` and `features/*.json` keeps the project side off
+  ignored build output.
 - `breaking-marker-validate` is never cached. It compares the proposed squash
   message in `PUTNAMI_PROPOSAL_MESSAGE` with the commits since the run's
   impacted baseline, and the candidate cut holds neither the variable nor the
@@ -405,7 +406,8 @@ never read.
 
 `feature-coverage-validate` asks every project of the workspace which outcome
 its code serves. A project answers with a feature in its own
-`putnami.features.json`, a spec under its own `specs/`, or a reviewed
+`putnami.features.json` or `features/*.json`, a spec under its own `specs/`,
+or a reviewed
 `featureAuthority` in its `putnami.json`: an `owner` that names an authored
 feature, `none` with the reason it has no feature, `dependents: true` for a
 library whose dependents carry its specs, or `provider` with the project id a
@@ -446,8 +448,9 @@ matching rule, so a project that declares nothing belongs to the nearest
 declaration above it. A workspace with one maintainer declares the catch-all
 only and gets `* @maintainer`. When the workspace commits a `specs.baseline.json`,
 the files the spec gate reads (`**/specs.baseline.json`, `**/specs/*.json`,
-`**/putnami.features.json` and `putnami.workspace.json`) close the file with the
-workspace owners, so they keep that review inside a team's directory.
+`**/putnami.features.json`, `**/features/*.json` and `putnami.workspace.json`)
+close the file with the workspace owners, so they keep that review inside a
+team's directory.
 
 The step rewrites the committed file only when it differs, so the file follows
 the declarations without a command of its own. On CI, the rule that fails a

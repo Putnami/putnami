@@ -69,7 +69,7 @@ export type MeasurementAggregation =
 /**
  * One observed metric aggregate: the bounded semantic metric name, the
  * reduction that produced `value`, and its unit. The authored target lives in
- * `putnami.features.json` only; nothing here can state a verdict.
+ * the authored feature declaration only; nothing here can state a verdict.
  */
 export interface Measurement {
   readonly name: string;

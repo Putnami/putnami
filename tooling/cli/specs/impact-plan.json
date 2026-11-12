@@ -17,15 +17,26 @@
     },
     {
       "id": "pinned-revisions",
-      "text": "impact-plan plans only the checked-out HEAD of a clean worktree, from a --base that is its ancestor, and refuses each other range before it plans. It refuses a plan whose planning changed the checkout. It needs no repository remote."
+      "text": [
+        "impact-plan plans only the checked-out HEAD of a clean worktree, from a --base that is its ancestor, and refuses each other range before it plans.",
+        "It refuses a plan whose planning changed the checkout.",
+        "It needs no repository remote."
+      ]
     },
     {
       "id": "named-commands",
-      "text": "The one positional argument names the commands, comma-separated, resolved through the workspace's aliases and those of the loaded verb vocabulary, and the engine plans exactly that list. A missing or extra list, a command named twice, an alias that expands to several commands, a command no discovered extension declares, and --baseline, --impacted, --projects or --all are usage errors. A declared command that plans no task is a valid empty plan."
+      "text": [
+        "The one positional argument names the commands, comma-separated, resolved through the workspace's aliases and those of the loaded verb vocabulary, and the engine plans exactly that list.",
+        "A missing or extra list, a command named twice, an alias that expands to several commands, a command no discovered extension declares, and --baseline, --impacted, --projects or --all are usage errors.",
+        "A declared command that plans no task is a valid empty plan."
+      ]
     },
     {
       "id": "one-structured-result",
-      "text": "With --output=json, impact-plan writes one result envelope whose command is impact-plan and whose data is the ImpactPlan, which ValidateImpactPlan accepts. The human output is a short summary."
+      "text": [
+        "With --output=json, impact-plan writes one result envelope whose command is impact-plan and whose data is the ImpactPlan, which ValidateImpactPlan accepts.",
+        "The human output is a short summary."
+      ]
     }
   ],
   "decisions": [

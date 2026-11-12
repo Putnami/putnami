@@ -23,10 +23,11 @@ import (
 // Two tiers fall out of that split, and both are load-bearing:
 //
 //   - The IDENTITY tier stays workspace-wide. Durable putnami.features.json
-//     manifests and canonical specs/ documents are the only artifacts that mint
-//     an identity, so reading them at every root is what keeps global duplicate
-//     detection exact under any selection. Each is one bounded JSON document per
-//     root; neither walks a source tree or a generated directory.
+//     manifests, features/*.json documents and canonical specs/ documents are
+//     the only artifacts that mint an identity, so reading them at every root
+//     is what keeps global duplicate detection exact under any selection. Each
+//     is a bounded set of direct JSON children of one root; none walks a source
+//     tree or a generated directory.
 //   - The EVALUATION tier is scoped. Evidence fragments, capability manifests,
 //     and generated design graphs are read for seed roots plus the exact roots a
 //     selected feature reaches, never for the rest of the workspace.

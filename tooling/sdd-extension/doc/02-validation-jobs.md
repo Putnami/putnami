@@ -487,9 +487,9 @@ A task may be cacheable only when its declared inputs cover what it reads.
 
 ```json
 "inputs": {
-  "manifest": { "from": "project",   "files": ["putnami.features.json"] },
+  "manifest": { "from": "project",   "files": ["putnami.features.json", "features/*.json"] },
   "specs":    { "from": "project",   "files": ["specs/*.json"] },
-  "identity": { "from": "workspace", "files": ["**/putnami.features.json", "**/specs/*.json", "**/putnami.json", "putnami.workspace.json", "!**/.gen/**"] },
+  "identity": { "from": "workspace", "files": ["**/putnami.features.json", "**/features/*.json", "**/specs/*.json", "**/putnami.json", "putnami.workspace.json", "!**/.gen/**"] },
   "externalSpecs": { "from": "workspace", "files": ["git:**/*.md", "git:**/*.feature"] }
 }
 ```
@@ -588,7 +588,7 @@ producer recorded what a component was configured with.
 "inputs": {
   "floor": {
     "from": "workspace",
-    "files": ["**/putnami.features.json", "**/specs/*.json", "**/putnami.json", "putnami.workspace.json", "**/specs.baseline.json", "!**/.gen/**"]
+    "files": ["**/putnami.features.json", "**/features/*.json", "**/specs/*.json", "**/putnami.json", "putnami.workspace.json", "**/specs.baseline.json", "!**/.gen/**"]
   },
   "externalSpecs": { "from": "workspace", "files": ["git:**/*.md", "git:**/*.feature"] }
 }
@@ -606,7 +606,7 @@ and re-keys the task.
 ```json
 "inputs": {
   "repository": { "from": "workspace", "files": ["git:**"] },
-  "manifest": { "from": "project", "files": ["putnami.features.json"] }
+  "manifest": { "from": "project", "files": ["putnami.features.json", "features/*.json"] }
 }
 ```
 

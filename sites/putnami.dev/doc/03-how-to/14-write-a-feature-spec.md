@@ -58,6 +58,8 @@ A spec details a feature; it never creates one. If the feature does not exist ye
 }
 ```
 
+A project with many features can hold one file per feature instead: `features/invoice-export.json` carries the same `protocolVersion` and `namespace` and the one feature under `feature`, with `"$schema": "https://putnami.dev/schemas/putnami-feature.json"`. Adding a feature then adds a file instead of editing one that every other feature edits. A root holds one form or the other, never both.
+
 No feature declaration, no spec. That is the intended pressure: product intent has exactly one home.
 
 ## Write the spec
@@ -89,6 +91,8 @@ Specs are direct JSON children of `specs/` at your workspace root or at an exact
 }
 ```
 
+A long requirement `text` may be an array of sentences, `"text": ["An export states its format in the response content type.", "It never guesses the format from the file name."]`, so a diff names the sentence that changed. The statement is the sentences joined by one space, at most 512 bytes.
+
 That is the whole contract. Six fields:
 
 | Field | What it holds |
@@ -96,7 +100,7 @@ That is the whole contract. Six fields:
 | `feature` | the one authored feature ID this spec details |
 | `outcomes` | what the feature intends to deliver, in your order |
 | `nonGoals` | what it deliberately excludes, in your order |
-| `requirements` | stable sentences, each with a spec-local `id` |
+| `requirements` | stable statements, each with a spec-local `id` and a `text` string or array of sentences |
 | `decisions` | workspace-relative links to `doc/adr/*.md` records |
 | `protocolVersion` | always the integer `1` |
 
@@ -126,7 +130,7 @@ Specs are a strict, versioned wire contract, so mistakes fail loudly instead of 
 - a spec that references a feature nobody declared fails, and so does a second spec for a feature that already has one;
 - the file is reformatted to canonical bytes — two-space indentation, one trailing newline — so specs never produce whitespace diffs.
 
-Your editor validates the file as you type if you keep the `$schema` line: both `https://putnami.dev/schemas/putnami-spec.json` and `https://putnami.dev/schemas/putnami-features.json` are published.
+Your editor validates the file as you type if you keep the `$schema` line: `https://putnami.dev/schemas/putnami-spec.json`, `https://putnami.dev/schemas/putnami-features.json` and `https://putnami.dev/schemas/putnami-feature.json` are published.
 
 Run the checks yourself, or let CI do it:
 

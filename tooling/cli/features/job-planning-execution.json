@@ -1,0 +1,1295 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/job-planning-execution",
+    "type": "feature",
+    "name": "Job planning and execution",
+    "outcome": "A user can select public jobs, preview their dependency plan, execute them through one engine, and receive a stable result",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "command-catalog",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-catalog-is-unique-rooted-and-well-formed",
+            "the-registry-and-catalog-agree",
+            "a-root-that-left-the-core-is-refused-unless-an-extension-declares-it"
+          ]
+        }
+      },
+      {
+        "id": "workspace-scoped-help",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "help-lists-what-the-workspace-extensions-provide",
+            "help-outside-a-workspace-says-no-extension-is-loaded"
+          ]
+        }
+      },
+      {
+        "id": "job-flags-follow-job-commands",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "help-and-completion-hide-the-job-flags-where-no-job-command-is-loaded",
+            "the-references-and-completion-list-the-flags-help-lists",
+            "a-core-command-refuses-a-job-flag-it-does-not-read"
+          ]
+        }
+      },
+      {
+        "id": "flags-follow-the-command",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-flag-before-the-command-is-refused",
+            "a-flag-before-a-subcommand-is-refused",
+            "a-flag-before-the-command-help-names-is-refused",
+            "completion-offers-nothing-after-a-leading-flag",
+            "completion-after-help-offers-the-command-it-describes"
+          ]
+        }
+      },
+      {
+        "id": "help-lists-command-groups",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "help-lists-the-command-groups-of-the-loaded-extensions"
+          ]
+        }
+      },
+      {
+        "id": "completion-skips-carried-commands",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "completion-offers-groups-not-the-commands-they-carry"
+          ]
+        }
+      },
+      {
+        "id": "completion-reads-names-literally",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "bash-offers-each-name-as-one-literal-word",
+            "zsh-flag-specs-read-each-name-literally",
+            "zsh-describe-entries-read-each-name-literally",
+            "fish-quotes-each-name-for-both-reads",
+            "a-quoted-command-alias-takes-its-command-flags"
+          ]
+        }
+      },
+      {
+        "id": "completion-keeps-a-colon-in-its-word",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "bash-reads-a-colon-word-as-one-word"
+          ]
+        }
+      },
+      {
+        "id": "completion-offers-a-flag-value-in-its-slot",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "completion-offers-only-the-values-of-the-flag-before-the-cursor"
+          ]
+        }
+      },
+      {
+        "id": "extension-verb-vocabulary",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "help-lists-the-loaded-vocabulary-first",
+            "vocabulary-aliases-resolve-first-and-never-shadow-a-command",
+            "completion-offers-the-loaded-vocabulary",
+            "a-workspace-alias-wins-over-a-vocabulary-alias",
+            "a-provider-process-resolves-no-vocabulary-alias",
+            "impact-plan-resolves-the-vocabulary-aliases",
+            "the-live-view-orders-columns-by-the-loaded-vocabulary"
+          ]
+        }
+      },
+      {
+        "id": "vocabulary-default-traits",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-undeclared-job-takes-its-verbs-default-traits",
+            "a-vocabulary-requires-contract-9",
+            "side-effects-come-only-from-loaded-jobs",
+            "first-party-jobs-keep-their-traits"
+          ]
+        }
+      },
+      {
+        "id": "no-core-development-verb",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-catalog-declares-no-job-command",
+            "a-workspace-without-a-development-extension-shows-no-verb-alias-or-flag",
+            "an-undeclared-job-command-is-refused-once-in-every-entry-point"
+          ]
+        }
+      },
+      {
+        "id": "selection-before-plan",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "one-selection-applies-to-every-command",
+            "a-channel-publish-narrows-itself-alone"
+          ]
+        }
+      },
+      {
+        "id": "recursive-activation-project-ownership",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "recursive-patterns-stay-with-the-selected-project",
+            "own-files-activate-selected-children-and-mixed-parents"
+          ]
+        }
+      },
+      {
+        "id": "dependency-plan",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-dag-is-deterministic",
+            "write-serialization-stays-separate-from-functional-deps",
+            "a-missing-selected-command-is-rejected",
+            "runner-publication-functional-gates",
+            "a-step-dependency-reads-one-step-and-runs-after-the-command"
+          ]
+        }
+      },
+      {
+        "id": "dependents-wait-for-an-output-they-read",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-read-by-dependents-output-outside-the-project-is-refused",
+            "every-dependent-job-waits-for-the-generated-client-writer",
+            "the-dependents-rule-orders-only-dependents-and-keeps-the-plan-a-dag"
+          ]
+        }
+      },
+      {
+        "id": "preview-no-effects",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "plan-only-and-dry-runs-execute-nothing",
+            "only-declared-dry-run-simulations-survive",
+            "machine-previews-are-typed-plans-not-runs"
+          ]
+        }
+      },
+      {
+        "id": "single-engine",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "only-the-engine-runs-jobs",
+            "the-scheduler-seam-is-package-private"
+          ]
+        }
+      },
+      {
+        "id": "canonical-result",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-scheduler-populates-the-canonical-session",
+            "machine-surfaces-reduce-through-the-canonical-model"
+          ]
+        }
+      },
+      {
+        "id": "declared-output-cache-boundary",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "local-docker-candidate-is-task-owned-cache-eligible",
+            "a-restored-package-output-carries-the-channel-it-recorded",
+            "restored-docker-candidate-feeds-selected-publish"
+          ]
+        }
+      },
+      {
+        "id": "git-candidate-inputs",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "candidate-bytes-and-membership-determine-the-key",
+            "candidate-enumeration-failure-never-produces-a-key"
+          ]
+        }
+      },
+      {
+        "id": "release-set-channel-advance",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "every-listed-head-is-resolved-once",
+            "selection-fingerprint-follows-the-package-key",
+            "distinct-package-provider-fingerprint-follows-real-package-key",
+            "an-empty-channel-measures-against-the-named-baseline",
+            "an-advanced-channel-with-a-head-ignores-the-baseline",
+            "a-baseline-channel-that-cannot-be-read-is-refused",
+            "a-first-publish-against-a-baseline-uploads-only-what-changed",
+            "an-inherit-channel-is-the-baseline-whatever-the-channel-holds",
+            "an-inherit-channel-without-a-head-is-refused",
+            "an-inherit-channel-that-cannot-apply-is-refused"
+          ]
+        }
+      },
+      {
+        "id": "release-set-reuse-channel",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-selected-member-is-released-from-the-reuse-channel",
+            "a-member-the-reuse-head-cannot-vouch-for-is-built",
+            "a-reused-member-whose-dependency-is-built-is-built",
+            "a-plan-that-reuses-nothing-keeps-its-bytes",
+            "a-reuse-channel-that-cannot-apply-is-refused",
+            "a-tagged-publication-ignores-the-reuse-channel",
+            "a-main-publish-releases-what-its-pull-request-published"
+          ]
+        }
+      },
+      {
+        "id": "release-set-reuse-source-revision",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-record-the-final-head-built-is-reused",
+            "a-record-inherited-from-an-earlier-push-is-built",
+            "a-reuse-channel-without-its-source-revision-is-refused",
+            "a-reuse-source-revision-without-a-reuse-channel-is-refused",
+            "a-reuse-source-revision-that-is-not-a-full-commit-is-refused"
+          ]
+        }
+      },
+      {
+        "id": "release-set-attribution-opt-in",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "default-plan-and-set-decode-under-a-pre-attribution-strict-reader",
+            "opted-in-plan-records-project-and-kind",
+            "opted-in-plan-attributes-carried-over-members",
+            "inherited-member-keeps-head-attribution"
+          ]
+        }
+      },
+      {
+        "id": "release-set-source-tree-opt-in",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "default-plan-and-set-carry-no-source-tree",
+            "opted-in-plan-records-the-head-tree-on-republished-members",
+            "inherited-member-keeps-head-source-tree",
+            "clean-checkout-records-head-tree-whatever-the-bound-revision",
+            "commit-drops-a-tree-the-checkout-no-longer-holds"
+          ]
+        }
+      },
+      {
+        "id": "release-set-members-by-ecosystem",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "one-project-yields-several-members",
+            "member-plans-its-declaring-publisher",
+            "selected-member-routes-exact-artifact-steps",
+            "mixed-publication-retains-verification-without-extra-writes",
+            "distinct-package-provider-and-publication-owner-survive-final-scope"
+          ]
+        }
+      },
+      {
+        "id": "private-selected-publication-handoff",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "canonical-selected-plan-without-credentials",
+            "private-callback-and-exact-ack",
+            "no-handoff-for-preview-or-dry-run",
+            "member-less-plan-arms-the-head-confirming-release",
+            "callback-without-after-refused"
+          ]
+        }
+      },
+      {
+        "id": "generated-output-drift",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-first-generation-warns-locally-and-fails-in-ci",
+            "a-path-from-output-is-judged-inside-the-project-reference",
+            "a-restored-entry-is-judged-against-the-checkout-it-lands-in",
+            "an-executed-task-fails-on-stale-bytes-and-passes-on-equal-bytes",
+            "the-reference-and-the-verdict-never-reach-the-cache-key-or-the-failure-cache",
+            "warn-reports-without-failing"
+          ]
+        }
+      },
+      {
+        "id": "spec-gate-records-an-empty-evaluation",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "every-answered-selected-project-records-no-group",
+            "an-unanswered-selected-project-records-nothing"
+          ]
+        }
+      },
+      {
+        "id": "spec-gate-evidence-scope",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-unplanned-attester-resolves-from-its-cache-entry",
+            "a-direct-dependent-attester-resolves-from-its-cache-entry",
+            "a-feature-authority-attester-resolves-from-its-cache-entry",
+            "a-feature-authority-of-another-feature-stays-out-of-the-candidate-set",
+            "transitive-dependents-stay-out-of-the-candidate-set",
+            "a-consulted-source-that-did-not-support-the-check-still-blocks",
+            "an-exhausted-evidence-scope-blocks-and-says-so",
+            "unresolvable-evidence-warns-with-the-attesting-projects-named",
+            "a-resolved-session-consults-no-cache"
+          ]
+        }
+      },
+      {
+        "id": "declared-verification-producers",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-verification-kind-command-carries-the-gate",
+            "projection-applicability-plans-the-declaring-commands",
+            "cache-recovery-plans-the-verification-kind-commands",
+            "a-warm-hit-restores-the-declared-artifact-by-kind",
+            "coverage-is-recorded-and-replayed-under-the-command-that-measured-it",
+            "a-cache-hit-reports-the-coverage-its-producing-run-measured",
+            "a-third-party-producer-command-gates-the-run"
+          ]
+        }
+      },
+      {
+        "id": "batch-parity-and-live-cells-follow-declared-kinds",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-batch-member-tallies-by-its-declared-batchable-kind",
+            "a-batch-member-phase-is-its-declared-phase-else-its-step-id",
+            "a-batch-member-meta-names-its-command-as-a-solo-run-does",
+            "the-first-party-batchable-tasks-keep-their-tally-and-phase",
+            "a-live-cell-values-by-the-declared-kind",
+            "the-tasks-line-and-failure-cause-follow-the-kind",
+            "columns-no-vocabulary-names-rank-after-it-alphabetically",
+            "cell-width-and-hide-priority-derive-from-traits"
+          ]
+        }
+      },
+      {
+        "id": "publication-follows-declared-effects",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-side-effecting-job-is-never-shared-by-trait",
+            "a-registry-publisher-of-any-name-joins-the-release-set",
+            "a-registry-command-alone-executes-under-dry-run",
+            "a-member-package-job-is-found-by-its-declared-route"
+          ]
+        }
+      },
+      {
+        "id": "publish-run-checks-declared-channels",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-declared-channel-no-publish-step-serves-fails-the-run",
+            "a-job-serves-only-the-channels-its-task-declares",
+            "a-dependent-job-of-another-project-serves-the-channels-its-task-declares",
+            "cloud-archive-publication-serves-the-declaring-project"
+          ]
+        }
+      },
+      {
+        "id": "scoped-cache-bypass",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "no-cache-projects-is-execution-policy-only",
+            "a-selector-that-matches-nothing-fails-the-run",
+            "only-the-named-projects-and-their-dependents-lose-the-cache",
+            "a-bypassed-task-is-neither-served-nor-published"
+          ]
+        }
+      },
+      {
+        "id": "concurrent-session-output-exclusion",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-second-session-waits-for-the-task-output-holder",
+            "a-restore-waits-for-the-task-output-holder",
+            "locks-are-taken-in-one-global-order",
+            "the-wait-names-the-holder-and-ends-on-cancellation",
+            "a-nested-session-reenters-only-its-ancestors-locks"
+          ]
+        }
+      },
+      {
+        "id": "concurrent-session-read-exclusion",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-reader-and-another-sessions-writer-exclude-each-other",
+            "readers-in-several-sessions-share-their-lock",
+            "a-wait-behind-readers-names-no-holder"
+          ]
+        }
+      },
+      {
+        "id": "a-serve-step-releases-its-command-output-once-it-started",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-finite-step-runs-beside-another-sessions-serve-step",
+            "a-finite-step-still-waits-for-another-sessions-finite-step",
+            "a-serve-step-keeps-every-other-key-until-capture",
+            "a-serve-step-that-declares-a-command-output-keeps-it-until-capture",
+            "a-dependents-serve-run-comes-up-beside-its-dependencys-serve-run"
+          ]
+        }
+      },
+      {
+        "id": "scratch-generation-retention",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "expired-generations-reclaim-arbitrary-orphans",
+            "active-and-nested-consumers-retain-the-generation",
+            "a-detached-child-retains-its-lease",
+            "only-an-active-consumer-skips-reclamation-silently",
+            "reaping-never-follows-symlinks",
+            "failed-reclamation-is-retried"
+          ]
+        }
+      },
+      {
+        "id": "failure-replay-cache",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-unchanged-failure-replays-without-executing",
+            "a-replayed-failure-blocks-its-dependents",
+            "a-replayed-failure-reports-its-provenance-and-original-output",
+            "only-a-failure-the-key-explains-is-recorded",
+            "one-run-counts-one-observation-per-key",
+            "a-recorded-failure-stays-local",
+            "a-success-clears-the-recorded-failure",
+            "a-success-clears-the-recorded-failure-under-a-cache-bypass",
+            "a-task-keys-the-same-under-every-selection",
+            "a-changed-input-runs-again",
+            "retry-failed-forces-re-execution",
+            "retry-failed-is-execution-policy-only"
+          ]
+        }
+      },
+      {
+        "id": "extension-implementation-cache-key",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-digest-replaces-the-version-in-the-key",
+            "an-installed-tree-digest-ignores-version-metadata",
+            "an-installed-tree-digest-follows-the-implementation",
+            "a-version-only-build-keeps-the-key",
+            "a-store-record-is-trusted-only-inside-the-store",
+            "a-toolchain-pin-still-moves-the-key"
+          ]
+        }
+      },
+      {
+        "id": "go-embed-cache-inputs",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-listed-file-edit-moves-the-key-and-its-dependents",
+            "an-old-entry-cannot-restore-after-a-listed-file-edit",
+            "portable-inputs-bind-a-listed-file-and-fail-on-its-deletion",
+            "a-failed-answer-fails-the-key",
+            "a-failed-selector-fails-the-task-before-execution",
+            "go-embed-selector-selects-changed-and-deleted-targets",
+            "a-selector-reads-nothing-in-a-project-its-extension-cannot-plan"
+          ]
+        }
+      },
+      {
+        "id": "clientgen-key-reads-no-run-written-tree",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "clientgen-key-ignores-the-describe-owned-trees",
+            "clientgen-key-reads-a-contract-the-project-commits-under-gen",
+            "clientgen-key-folds-describes-key-in-a-real-plan",
+            "clientgen-start-key-equals-the-precomputed-key-when-describe-writes"
+          ]
+        }
+      },
+      {
+        "id": "result-only-remote-restore",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-hit-no-job-waits-for-moves-no-bytes",
+            "a-hit-a-planned-job-waits-for-keeps-its-files",
+            "an-order-only-waiter-whose-key-reads-nothing-the-task-writes-leaves-it-result-only",
+            "a-run-that-reads-the-files-restores-them-or-executes"
+          ]
+        }
+      },
+      {
+        "id": "tree-keyed-task-cache",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-build-stamp-keys-without-its-commit-fields",
+            "a-generate-asset-keys-by-its-workspace-relative-path",
+            "a-stamp-inside-a-generate-asset-keeps-its-commit",
+            "one-tree-in-two-checkouts-at-two-commits-shares-its-keys",
+            "a-version-aware-task-still-keys-on-the-commit"
+          ]
+        }
+      },
+      {
+        "id": "a-verdict-policy-is-no-build-input",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-pattern-that-does-not-name-a-verdict-policy-leaves-it-out-of-the-key",
+            "only-a-task-that-names-a-verdict-policy-reads-it",
+            "the-workspace-protocol-names-the-ci-verdict-policy-file"
+          ]
+        }
+      },
+      {
+        "id": "release-baseline-cache-key",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-release-baseline-keys-on-the-line-tag-and-the-breaking-marker"
+          ]
+        }
+      },
+      {
+        "id": "executed-directory-output-starts-empty",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-leftover-is-removed-and-never-stored",
+            "ceded-and-preserved-paths-and-the-stamp-stay-untouched",
+            "a-hit-of-a-present-output-and-an-adopted-result-empty-nothing",
+            "a-failure-to-empty-fails-the-task-before-it-runs",
+            "a-retry-starts-from-an-empty-directory",
+            "a-path-from-output-is-left-as-it-stands",
+            "an-optional-project-or-workspace-output-is-left-as-it-stands",
+            "an-optional-command-output-directory-is-emptied",
+            "an-emptied-optional-project-or-workspace-output-is-emptied",
+            "a-restore-of-an-empty-command-output-record-empties-it",
+            "a-failure-to-empty-on-restore-executes-the-task",
+            "an-entry-stored-without-emptying-is-never-served"
+          ]
+        }
+      },
+      {
+        "id": "emptied-output-keeps-tracked-files",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-emptied-output-that-holds-a-tracked-file-is-never-emptied",
+            "a-hit-over-a-tracked-file-in-an-emptied-output-is-not-served",
+            "outside-a-git-work-tree-an-emptied-output-is-emptied",
+            "a-git-work-tree-without-a-git-program-fails-closed"
+          ]
+        }
+      },
+      {
+        "id": "session-written-input-keys",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-earlier-task-output-moves-the-key-of-its-reader",
+            "a-precomputed-key-a-write-may-move-is-never-looked-up-or-shared",
+            "pruning-on-a-movable-consumer-key-is-confirmed-when-the-producer-starts",
+            "a-written-link-target-moves-the-key-of-a-reader-through-the-link"
+          ]
+        }
+      },
+      {
+        "id": "planned-write-reach",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-write-that-reaches-no-selected-file-leaves-a-key-unmoved",
+            "a-bounded-port-output-moves-only-the-keys-that-read-its-bound",
+            "a-write-to-a-link-target-moves-a-key-that-reads-through-the-link"
+          ]
+        }
+      },
+      {
+        "id": "job-context-names-member-types",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "each-workspace-member-names-its-resolved-type",
+            "each-workspace-member-names-its-resolved-runs-with"
+          ]
+        }
+      },
+      {
+        "id": "extension-command-host-rpc",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-launched-process-receives-the-socket-and-token",
+            "the-channel-closes-when-the-process-exits-whatever-its-exit",
+            "a-planned-job-and-a-provider-call-receive-no-channel",
+            "a-hosted-run-opens-no-channel"
+          ]
+        }
+      },
+      {
+        "id": "host-rpc-core-calls",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-request-without-the-token-is-refused",
+            "an-unknown-method-is-method-not-found",
+            "a-frame-over-the-limit-is-refused",
+            "calls-are-served-one-at-a-time",
+            "stopping-cancels-the-call-in-flight",
+            "collaboration-call-returns-the-cli-envelope",
+            "verification-report-returns-what-the-cache-corroborates"
+          ]
+        }
+      },
+      {
+        "id": "host-rpc-workspace-owners",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "workspace-owners-answers-one-entry-per-path-in-request-order",
+            "workspace-owners-are-the-nearest-project-and-every-asset-claimant",
+            "workspace-owners-include-every-project-whose-provider-watches-a-root-file",
+            "workspace-owners-are-sorted-by-id-and-empty-when-none-owns-the-path",
+            "workspace-owners-refuses-an-empty-list-and-a-path-outside-io-fs-form",
+            "workspace-owners-is-unavailable-outside-a-workspace"
+          ]
+        }
+      },
+      {
+        "id": "host-rpc-version-lines",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "version-lines-answers-what-the-core-computes-for-each-line",
+            "version-lines-selects-the-line-its-scope-names",
+            "version-lines-refuses-a-scope-that-names-no-line",
+            "version-lines-names-the-recorded-graph-after-a-failed-refresh",
+            "version-lines-is-unavailable-outside-a-workspace",
+            "version-lines-reports-an-invalid-configuration-with-its-own-code",
+            "version-lines-reports-a-git-failure-as-the-hosts"
+          ]
+        }
+      },
+      {
+        "id": "host-rpc-workspace-probe",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "workspace-probe-answers-the-user-scope-probes-outside-a-workspace",
+            "workspace-probe-writes-nothing-in-the-callers-directory",
+            "workspace-probe-reports-a-failed-probe-as-a-diagnostic",
+            "workspace-probe-answers-the-workspace-view-inside-a-workspace"
+          ]
+        }
+      },
+      {
+        "id": "source-bound-cache",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-entry-is-found-only-at-its-binding",
+            "an-entry-at-the-plain-key-never-serves",
+            "a-binding-error-inside-a-repository-executes-and-stores-nothing",
+            "an-unmanaged-workspace-uses-the-empty-binding",
+            "the-remote-and-status-only-legs-use-the-bound-key",
+            "a-lease-at-one-binding-never-holds-a-waiter-at-another",
+            "a-source-bound-failure-is-never-replayed",
+            "a-source-bound-entry-prunes-no-producer",
+            "a-test-only-edit-stores-beside-the-first-entry-and-keeps-every-key",
+            "an-execution-after-an-in-run-rewrite-reads-the-current-binding"
+          ]
+        }
+      },
+      {
+        "id": "source-bound-settle",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-execution-that-moves-its-binding-settles-at-the-binding-it-leaves",
+            "a-task-that-keeps-moving-its-binding-executes-at-most-once-more",
+            "a-run-without-the-cache-settles-too"
+          ]
+        }
+      },
+      {
+        "id": "command-kinds-and-traits",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-manifest-declaring-a-kind-or-new-trait-requires-contract-11",
+            "an-unknown-kind-workload-or-phase-is-refused",
+            "the-dev-vocabulary-declares-every-first-party-kind"
+          ]
+        }
+      },
+      {
+        "id": "publish-tasks-declare-their-channels",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-manifest-declaring-publish-channels-requires-contract-12",
+            "an-invalid-publish-channel-declaration-is-refused",
+            "a-planned-job-exposes-its-tasks-publish-channels"
+          ]
+        }
+      },
+      {
+        "id": "an-extension-manifest-names-its-extension",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-manifest-without-a-name-is-refused-by-validation",
+            "an-installed-manifest-without-a-name-keeps-loading",
+            "discovery-reads-no-package-json"
+          ]
+        }
+      },
+      {
+        "id": "extension-flags-reach-their-command",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "validation-refuses-a-flag-a-core-global-flag-takes",
+            "validation-accepts-a-flag-the-core-hands-to-the-command",
+            "an-undeclared-dry-run-previews-the-plan"
+          ]
+        }
+      },
+      {
+        "id": "a-short-alias-reaches-the-task-under-its-long-name",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-job-short-alias-binds-the-long-name",
+            "an-extension-subcommand-short-alias-binds-the-long-name",
+            "both-spellings-of-one-flag-are-refused"
+          ]
+        }
+      },
+      {
+        "id": "an-interactive-subcommand-refuses-a-preview-it-cannot-honor",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-undeclared-interactive-preview-is-refused",
+            "a-declaring-interactive-subcommand-gets-dry-run"
+          ]
+        }
+      },
+      {
+        "id": "source-bound-stamp",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-stamp-write-replaces-the-stamp-whole",
+            "a-source-bound-preparation-takes-its-project-key",
+            "the-source-bound-tasks-of-one-project-take-turns",
+            "a-restore-of-paths-the-binding-excludes-keeps-the-binding"
+          ]
+        }
+      },
+      {
+        "id": "workload-lifecycle",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-serve-workload-command-of-any-name-streams-until-interrupted",
+            "a-once-workload-command-forwards-its-exit-code",
+            "a-hosted-run-refuses-a-serve-workload-command",
+            "a-serve-workload-command-owns-no-watch",
+            "a-group-invocation-that-serves-owns-no-watch",
+            "a-composition-member-is-a-serve-workload-step"
+          ]
+        }
+      },
+      {
+        "id": "an-interactive-launch-names-the-directory-it-was-typed-in",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-context-and-environment-carry-the-typed-directory",
+            "the-context-conforms-to-the-job-protocol",
+            "a-planned-job-carries-none",
+            "an-inherited-value-is-stripped",
+            "outside-a-workspace-it-equals-the-caller-directory",
+            "the-context-carries-the-typed-output-globals"
+          ]
+        }
+      },
+      {
+        "id": "a-group-default-takes-positionals",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-word-that-names-no-subcommand-runs-the-positional-default",
+            "a-declared-subcommand-wins-over-a-positional-word",
+            "a-word-without-a-positional-default-stays-an-unknown-subcommand",
+            "the-group-help-prints-the-positional-in-its-usage-line",
+            "completion-offers-project-ids-after-the-group-word",
+            "a-manifest-with-a-positional-default-requires-contract-15"
+          ]
+        }
+      },
+      {
+        "id": "a-flag-takes-its-ci-default-when-ci-is-set",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-ci-default-replaces-the-default-when-ci-is-set",
+            "an-explicit-flag-wins-over-the-ci-default",
+            "a-flag-with-a-ci-default-keys-only-the-tasks-that-declare-it"
+          ]
+        }
+      },
+      {
+        "id": "a-step-reads-the-changed-files",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-change-gated-step-is-planned-only-for-a-project-that-owns-a-matching-changed-file",
+            "a-run-that-measured-no-diff-plans-no-change-gated-step",
+            "the-owned-changed-files-are-bound-into-the-step",
+            "the-owned-changed-files-key-the-step",
+            "a-frozen-request-plans-the-submitters-changed-files",
+            "cleanup-waits-for-the-consumers-the-plan-holds",
+            "a-manifest-with-a-change-gate-requires-contract-16"
+          ]
+        }
+      },
+      {
+        "id": "an-interactive-command-stops-on-its-own-terms",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-cli-waits-for-an-interactive-child-after-a-terminal-signal",
+            "a-second-signal-kills-the-interactive-child-at-once",
+            "the-cli-holds-the-interactive-child-from-before-its-start",
+            "a-child-that-exits-by-itself-after-the-signal-keeps-its-exit-code",
+            "a-child-that-dies-by-the-signal-or-is-killed-is-interrupted"
+          ]
+        }
+      },
+      {
+        "id": "project-setup-runs-in-the-project-extension",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "create-runs-project-setup-with-the-path-and-the-channel",
+            "a-failed-setup-keeps-the-project-and-names-the-create-to-run-again",
+            "create-reads-the-toolchains-the-setup-job-resolves",
+            "create-runs-the-setup-once-when-its-toolchains-resolve",
+            "create-prepares-pins-and-installs-only-a-toolchain-the-extension-locks",
+            "a-bare-host-create-sets-the-project-up-with-no-failed-task"
+          ]
+        }
+      },
+      {
+        "id": "deps-add-refuses-the-version-none",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "deps-add-refuses-the-version-none-before-any-job",
+            "deps-add-splits-a-scoped-spec-at-its-last-at"
+          ]
+        }
+      },
+      {
+        "id": "deps-edit-runs-in-the-project-extension",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-lifecycle-run-prints-an-always-visible-summary",
+            "deps-add-and-remove-forward-dry-run-to-the-deps-edit-job",
+            "deps-add-and-remove-run-the-deps-edit-job-of-the-project",
+            "deps-refuses-a-project-whose-extensions-declare-no-deps-edit"
+          ]
+        }
+      },
+      {
+        "id": "the-cache-provider-owns-its-configuration",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "core-reads-no-cache-configuration",
+            "a-provider-that-is-not-ready-stops-silently",
+            "one-provider-per-run"
+          ]
+        }
+      },
+      {
+        "id": "a-declared-provider-that-cannot-serve-says-so-once",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-provider-that-fails-to-start-or-to-initialize-says-so-once",
+            "a-hosted-run-without-its-path-cache-provider-builds-locally",
+            "a-skipped-extension-adds-no-cache-notice"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -18,87 +18,190 @@
   "requirements": [
     {
       "id": "version-1-and-closed-vocabularies",
-      "text": "Documents are version 1. A code host is github, gitlab or generic; a CI system one the-ci-run-is-identified names; a component source orchestrator, workspace, manifest, fallback, fallback-codeowners, fallback-directories or declared; an impact changed, dependent or unaffected; a file status added, modified, deleted or renamed; a dependency change added, removed, upgraded, downgraded or changed; an SBOM format cyclonedx or spdx. Ecosystems are open lowercase slugs. Every code starts with evidence."
+      "text": [
+        "Documents are version 1.",
+        "A code host is github, gitlab or generic;",
+        "a CI system one the-ci-run-is-identified names;",
+        "a component source orchestrator, workspace, manifest, fallback, fallback-codeowners, fallback-directories or declared;",
+        "an impact changed, dependent or unaffected;",
+        "a file status added, modified, deleted or renamed;",
+        "a dependency change added, removed, upgraded, downgraded or changed;",
+        "an SBOM format cyclonedx or spdx.",
+        "Ecosystems are open lowercase slugs.",
+        "Every code starts with evidence."
+      ]
     },
     {
       "id": "one-member-set",
-      "text": "For every object, schemas/evidence.json declares exactly the members of the Go type, and so does the strict decoder's case-sensitive member walk. The schema's enums are the Go vocabularies and its patterns are the expressions the Go validator applies."
+      "text": [
+        "For every object, schemas/evidence.json declares exactly the members of the Go type, and so does the strict decoder's case-sensitive member walk.",
+        "The schema's enums are the Go vocabularies and its patterns are the expressions the Go validator applies."
+      ]
     },
     {
       "id": "one-fixture-corpus",
-      "text": "fixtures/expectations.json lists exactly the fixtures on disk. The reader validates each valid fixture without an error and gives each invalid fixture exactly its listed distinct codes, all in the closed validation set."
+      "text": [
+        "fixtures/expectations.json lists exactly the fixtures on disk.",
+        "The reader validates each valid fixture without an error and gives each invalid fixture exactly its listed distinct codes, all in the closed validation set."
+      ]
     },
     {
       "id": "parsing-is-strict",
-      "text": "The reader refuses with evidence.parse_error bytes that are not JSON, a second document after the first, a document that is not an object, or a member of the wrong type. A member the schema does not declare, at any depth and compared case-sensitively, is evidence.unknown_field at its dotted path. A required top-level member that is absent or null, and an empty producer name or version, is evidence.required."
+      "text": [
+        "The reader refuses with evidence.parse_error bytes that are not JSON, a second document after the first, a document that is not an object, or a member of the wrong type.",
+        "A member the schema does not declare, at any depth and compared case-sensitively, is evidence.unknown_field at its dotted path.",
+        "A required top-level member that is absent or null, and an empty producer name or version, is evidence.required."
+      ]
     },
     {
       "id": "the-subject-names-the-change",
-      "text": "The subject names its code host and its repository, else evidence.required, and a commit sha of 40 or 64 lowercase hexadecimal characters; a base sha, when present, has the same form, and a document with changed files or changed-line coverage has one. A github or gitlab subject names its host, a lowercase DNS name with an optional port, and its numeric project id, the key that survives a rename. A change request number is positive. Any other defect is evidence.invalid_subject."
+      "text": [
+        "The subject names its code host and its repository, else evidence.required, and a commit sha of 40 or 64 lowercase hexadecimal characters;",
+        "a base sha, when present, has the same form, and a document with changed files or changed-line coverage has one.",
+        "A github or gitlab subject names its host, a lowercase DNS name with an optional port, and its numeric project id, the key that survives a rename.",
+        "A change request number is positive.",
+        "Any other defect is evidence.invalid_subject."
+      ]
     },
     {
       "id": "the-ci-run-is-identified",
-      "text": "The CI system is github-actions, gitlab-ci, jenkins, circleci, buildkite, azure-pipelines, bitbucket-pipelines, teamcity or generic; the run and job ids and the attempt, when present, identify the document among the runs, jobs and re-runs of one commit, and the attempt is positive; the run URL is https and carries no credentials. Any defect is evidence.invalid_ci."
+      "text": [
+        "The CI system is github-actions, gitlab-ci, jenkins, circleci, buildkite, azure-pipelines, bitbucket-pipelines, teamcity or generic;",
+        "the run and job ids and the attempt, when present, identify the document among the runs, jobs and re-runs of one commit, and the attempt is positive;",
+        "the run URL is https and carries no credentials.",
+        "Any defect is evidence.invalid_ci."
+      ]
     },
     {
       "id": "the-ci-system-is-recognized-by-its-marker",
-      "text": "The variable a CI sets in every job names its system: GITHUB_ACTIONS=true github-actions, GITLAB_CI=true gitlab-ci, JENKINS_URL jenkins, CIRCLECI=true circleci, BUILDKITE=true buildkite, TF_BUILD=true azure-pipelines, BITBUCKET_BUILD_NUMBER bitbucket-pipelines, TEAMCITY_VERSION teamcity; the first wins, values compare without case, and a bare variable matches any non-empty value. Else CI=true or CI=1 is a generic CI, and neither is no CI."
+      "text": [
+        "The variable a CI sets in every job names its system: GITHUB_ACTIONS=true github-actions, GITLAB_CI=true gitlab-ci, JENKINS_URL jenkins, CIRCLECI=true circleci, BUILDKITE=true buildkite, TF_BUILD=true azure-pipelines, BITBUCKET_BUILD_NUMBER bitbucket-pipelines, TEAMCITY_VERSION teamcity;",
+        "the first wins, values compare without case, and a bare variable matches any non-empty value.",
+        "Else CI=true or CI=1 is a generic CI, and neither is no CI."
+      ]
     },
     {
       "id": "paths-stay-in-the-repository",
-      "text": "Every path is relative to the repository root, slash-separated, non-empty, with no leading slash, no drive letter, no backslash, no control character and no empty, dot or dot-dot segment; a component id is such a path or the root, written as a single dot. A renamed file names a previous path that differs from its path, and no other status names one. A changed-line coverage file is a changed file that was not deleted. Any defect, or an unknown file status, is evidence.invalid_path."
+      "text": [
+        "Every path is relative to the repository root, slash-separated, non-empty, with no leading slash, no drive letter, no backslash, no control character and no empty, dot or dot-dot segment;",
+        "a component id is such a path or the root, written as a single dot.",
+        "A renamed file names a previous path that differs from its path, and no other status names one.",
+        "A changed-line coverage file is a changed file that was not deleted.",
+        "Any defect, or an unknown file status, is evidence.invalid_path."
+      ]
     },
     {
       "id": "references-resolve",
-      "text": "Component ids, the edges of one component, changed file paths, changed-line coverage files, and the components of tests and coverage entries are unique, else evidence.duplicate. Every component a changed file, a dependency edge, a tests or coverage entry or a dependency change names exists, and an edge is never empty, else evidence.unknown_component."
+      "text": [
+        "Component ids, the edges of one component, changed file paths, changed-line coverage files, and the components of tests and coverage entries are unique, else evidence.duplicate.",
+        "Every component a changed file, a dependency edge, a tests or coverage entry or a dependency change names exists, and an edge is never empty, else evidence.unknown_component."
+      ]
     },
     {
       "id": "components-are-well-formed",
-      "text": "A component's ecosystem is a lowercase slug and its source is known; a component never depends on itself; a changed file lies inside the directory of the component it names. Any defect is evidence.invalid_component."
+      "text": [
+        "A component's ecosystem is a lowercase slug and its source is known; a component never depends on itself; a changed file lies inside the directory of the component it names.",
+        "Any defect is evidence.invalid_component."
+      ]
     },
     {
       "id": "impact-is-consistent",
-      "text": "A component is changed exactly when a changed file belongs to it; it is dependent exactly when it is not changed and reaches a changed component through its dependency edges; every other component is unaffected. Any other impact is evidence.invalid_impact."
+      "text": [
+        "A component is changed exactly when a changed file belongs to it;",
+        "it is dependent exactly when it is not changed and reaches a changed component through its dependency edges;",
+        "every other component is unaffected.",
+        "Any other impact is evidence.invalid_impact."
+      ]
     },
     {
       "id": "counts-add-up",
-      "text": "Counts and durations are non-negative; covered lines never exceed total lines; a tests entry lists no more failing cases than it counts failures; the changed-line coverage totals are the sums of its files; uncovered line numbers are positive, strictly increasing, and no more than the file's uncovered lines. Any defect is evidence.invalid_count."
+      "text": [
+        "Counts and durations are non-negative;",
+        "covered lines never exceed total lines;",
+        "a tests entry lists no more failing cases than it counts failures;",
+        "the changed-line coverage totals are the sums of its files;",
+        "uncovered line numbers are positive, strictly increasing, and no more than the file's uncovered lines.",
+        "Any defect is evidence.invalid_count."
+      ]
     },
     {
       "id": "dependency-changes-are-well-formed",
-      "text": "A dependency change names its ecosystem, a lockfile that is a changed file, and its package. An added package has a to version and no from version, a removed one a from version and no to version, and every other change both versions, which differ. Any defect is evidence.invalid_dependency_change."
+      "text": [
+        "A dependency change names its ecosystem, a lockfile that is a changed file, and its package.",
+        "An added package has a to version and no from version, a removed one a from version and no to version, and every other change both versions, which differ.",
+        "Any defect is evidence.invalid_dependency_change."
+      ]
     },
     {
       "id": "the-document-is-bounded",
-      "text": "A document holds at most 20000 changed files, 5000 components, 100000 dependency edges, 10000 dependency changes, 20000 changed-line coverage files, 1000 decisions and 500 diagnostics; a tests entry at most 50 failing cases, a file at most 200 uncovered line numbers, a decision at most 100 scope patterns and 1000 governed files, and every string at most 4096 bytes. A larger member is evidence.too_large. Checking the impact is linear in the components and the edges."
+      "text": [
+        "A document holds at most 20000 changed files, 5000 components, 100000 dependency edges, 10000 dependency changes, 20000 changed-line coverage files, 1000 decisions and 500 diagnostics;",
+        "a tests entry at most 50 failing cases, a file at most 200 uncovered line numbers, a decision at most 100 scope patterns and 1000 governed files, and every string at most 4096 bytes.",
+        "A larger member is evidence.too_large.",
+        "Checking the impact is linear in the components and the edges."
+      ]
     },
     {
       "id": "timestamps-and-diagnostics-are-well-formed",
-      "text": "generatedAt is a valid RFC 3339 timestamp with a zone, else evidence.invalid_timestamp. A reader diagnostic has a known severity, a dotted lowercase code and a message, else evidence.invalid_diagnostic; whatever its severity, it never makes the document invalid."
+      "text": [
+        "generatedAt is a valid RFC 3339 timestamp with a zone, else evidence.invalid_timestamp.",
+        "A reader diagnostic has a known severity, a dotted lowercase code and a message, else evidence.invalid_diagnostic; whatever its severity, it never makes the document invalid."
+      ]
     },
     {
       "id": "sbom-sources-are-named",
-      "text": "The optional sbom member names the software bills of materials (SBOM) the producer read: a head one and a base one, each optional, each with its format and a dotted spec version, else evidence.invalid_sbom. The sbom member and the dependency states are optional: a document without them validates as before, and a producer that read no SBOM writes none of them."
+      "text": [
+        "The optional sbom member names the software bills of materials (SBOM) the producer read: a head one and a base one, each optional, each with its format and a dotted spec version, else evidence.invalid_sbom.",
+        "The sbom member and the dependency states are optional: a document without them validates as before, and a producer that read no SBOM writes none of them."
+      ]
     },
     {
       "id": "dependency-states-are-well-formed",
-      "text": "A dependency change carries a before state only when the sbom member names a base and the package is not added, and an after state only when it names a head and the package is not removed. A state lists non-empty licences and vulnerabilities, each with an id and a severity of critical, high, medium, low, info, none or unknown, else evidence.invalid_dependency_change. An id twice in a state is evidence.duplicate; over 20 licences or 200 vulnerabilities is evidence.too_large."
+      "text": [
+        "A dependency change carries a before state only when the sbom member names a base and the package is not added, and an after state only when it names a head and the package is not removed.",
+        "A state lists non-empty licences and vulnerabilities, each with an id and a severity of critical, high, medium, low, info, none or unknown, else evidence.invalid_dependency_change.",
+        "An id twice in a state is evidence.duplicate; over 20 licences or 200 vulnerabilities is evidence.too_large."
+      ]
     },
     {
       "id": "decision-records-are-well-formed",
-      "text": "The optional decisions member lists the records the change concerns. A decision names its record's path, a non-empty title and a status of proposed, accepted, rejected, deprecated, superseded or unknown; a date, when present, is a valid YYYY-MM-DD date; a scope pattern is a repository path whose segments may hold *, ** and ?. A path defect is evidence.invalid_path, a path or pattern twice evidence.duplicate, any other defect evidence.invalid_decision. A document without decisions validates as before."
+      "text": [
+        "The optional decisions member lists the records the change concerns.",
+        "A decision names its record's path, a non-empty title and a status of proposed, accepted, rejected, deprecated, superseded or unknown;",
+        "a date, when present, is a valid YYYY-MM-DD date;",
+        "a scope pattern is a repository path whose segments may hold *, ** and ?.",
+        "A path defect is evidence.invalid_path, a path or pattern twice evidence.duplicate, any other defect evidence.invalid_decision.",
+        "A document without decisions validates as before."
+      ]
     },
     {
       "id": "decisions-follow-the-diff",
-      "text": "A decision governs only changed files, each once, else evidence.invalid_decision and evidence.duplicate. Its change, when present, is the file status of its record, which is then a changed file with that status; without a change, its record is not a changed file. A decision that neither governs a changed file nor has a change concerns no change and is refused. Every defect is evidence.invalid_decision."
+      "text": [
+        "A decision governs only changed files, each once, else evidence.invalid_decision and evidence.duplicate.",
+        "Its change, when present, is the file status of its record, which is then a changed file with that status; without a change, its record is not a changed file.",
+        "A decision that neither governs a changed file nor has a change concerns no change and is refused.",
+        "Every defect is evidence.invalid_decision."
+      ]
     },
     {
       "id": "architecture-rules-are-well-formed",
-      "text": "The optional architecture member lists at most 1000 rules an architecture checker evaluated. A rule names its tool, an open lowercase slug such as archunit, deptrac or import-linter, and its rule text, else evidence.required; its status is kept or broken, else evidence.invalid_architecture. A kept rule reports no violation; a broken one a violationCount of at least 1 and of its listed violations, at most 50, else evidence.invalid_count. A tool and rule pair twice is evidence.duplicate."
+      "text": [
+        "The optional architecture member lists at most 1000 rules an architecture checker evaluated.",
+        "A rule names its tool, an open lowercase slug such as archunit, deptrac or import-linter, and its rule text, else evidence.required;",
+        "its status is kept or broken, else evidence.invalid_architecture.",
+        "A kept rule reports no violation; a broken one a violationCount of at least 1 and of its listed violations, at most 50, else evidence.invalid_count.",
+        "A tool and rule pair twice is evidence.duplicate."
+      ]
     },
     {
       "id": "architecture-violations-are-well-formed",
-      "text": "A violation carries a message, else evidence.required. Its file stays in the repository (evidence.invalid_path); a line, from 1, needs a file (evidence.invalid_architecture); its component names a component (evidence.unknown_component) that holds its file (evidence.invalid_component). A document without the architecture member validates as before."
+      "text": [
+        "A violation carries a message, else evidence.required.",
+        "Its file stays in the repository (evidence.invalid_path);",
+        "a line, from 1, needs a file (evidence.invalid_architecture);",
+        "its component names a component (evidence.unknown_component) that holds its file (evidence.invalid_component).",
+        "A document without the architecture member validates as before."
+      ]
     }
   ],
   "decisions": [

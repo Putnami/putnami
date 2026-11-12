@@ -36,7 +36,8 @@ Declaring the extension at the workspace level makes the commands exist. It does
 both are required:
 
 1. the command's `activationFiles` match the project's tree — for `validate`,
-   a `putnami.features.json` or at least one `specs/*.json`; and
+   a `putnami.features.json`, at least one `features/*.json` or at least one
+   `specs/*.json`; and
 2. the project names the extension in its own `putnami.json` `extensions` array.
 
 ```json

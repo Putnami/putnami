@@ -33,17 +33,20 @@ var declarationFilenames = []string{
 }
 
 // declarationDirectories are the directories whose `*.json` files are
-// declarations: one spec per file, and one decision per file.
+// declarations: one spec, one decision or one feature per file.
 var declarationDirectories = []string{
 	features.SpecDirectory,
 	features.DecisionsDirname,
+	features.FeatureDirectory,
 }
 
 // DeclarationDigest digests, by content, the declaration files the declared
 // checks read: in the workspace root, in every project directory and in every
 // directory between the two, the files named by declarationFilenames and every
-// `specs/*.json` and `decisions/*.json`. projectPaths are slash-separated and
-// relative to root.
+// `*.json` file of a directory named by declarationDirectories. A specs/,
+// decisions/ or features/ directory that holds a putnami.json is a project, and
+// none of its files count. projectPaths are slash-separated and relative to
+// root.
 //
 // A missing file is not a declaration; any other read failure returns an
 // error, so a caller records no digest rather than one over a partial set.
@@ -53,15 +56,13 @@ func DeclarationDigest(root string, projectPaths []string) (*cli.SessionDeclarat
 		for _, name := range declarationFilenames {
 			files[path.Join(dir, name)] = struct{}{}
 		}
-		for _, documents := range declarationDirectories {
-			entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(path.Join(dir, documents))))
-			if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
+		for _, directory := range declarationDirectories {
+			documents, err := declarationDocuments(root, path.Join(dir, directory))
+			if err != nil {
 				return nil, err
 			}
-			for _, entry := range entries {
-				if entry.Type().IsRegular() && strings.HasSuffix(entry.Name(), ".json") {
-					files[path.Join(dir, documents, entry.Name())] = struct{}{}
-				}
+			for _, document := range documents {
+				files[document] = struct{}{}
 			}
 		}
 	}
@@ -89,6 +90,27 @@ func DeclarationDigest(root string, projectPaths []string) (*cli.SessionDeclarat
 	}
 	fmt.Fprintf(digest, "%sfiles %d\n%s", declarationDigestHeader, count, entries.String())
 	return &cli.SessionDeclarations{Digest: hex.EncodeToString(digest.Sum(nil)), Files: count}, nil
+}
+
+// declarationDocuments lists the regular `*.json` children of one
+// slash-separated directory, none when it is absent, is not a directory or
+// holds a putnami.json.
+func declarationDocuments(root, dir string) ([]string, error) {
+	entries, err := os.ReadDir(filepath.Join(root, filepath.FromSlash(dir)))
+	if err != nil && !errors.Is(err, fs.ErrNotExist) && !errors.Is(err, syscall.ENOTDIR) {
+		return nil, err
+	}
+	var documents []string
+	for _, entry := range entries {
+		if !entry.Type().IsRegular() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		if entry.Name() == "putnami.json" {
+			return nil, nil
+		}
+		documents = append(documents, path.Join(dir, entry.Name()))
+	}
+	return documents, nil
 }
 
 // declarationDirs returns the workspace root (".") and every project directory

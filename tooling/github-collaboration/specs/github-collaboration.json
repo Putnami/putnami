@@ -18,7 +18,13 @@
   "requirements": [
     {
       "id": "configurable-state-mapping",
-      "text": "States map to configured issue labels. Transitions remove all state labels and apply the target's first label, even when another label or no label supplies the current state. done and canceled close as completed and not planned; empty resulting label lists are encoded as arrays, never null. Unmapped states needing labels are unsupported. Create applies state labels only for states that need one; create and update refuse state labels."
+      "text": [
+        "States map to configured issue labels.",
+        "Transitions remove all state labels and apply the target's first label, even when another label or no label supplies the current state. done and canceled close as completed and not planned;",
+        "empty resulting label lists are encoded as arrays, never null.",
+        "Unmapped states needing labels are unsupported.",
+        "Create applies state labels only for states that need one; create and update refuse state labels."
+      ]
     },
     {
       "id": "exact-proposal-identity",
@@ -26,15 +32,31 @@
     },
     {
       "id": "reported-publication",
-      "text": "Every proposal answer lists its labels and assignees, [] when absent, with revision covering both. Upsert applies assignAuthor and inheritLabelPrefixes and reports unresolved dropped additions. Label inheritance uses deduplicated exact issue references: Closes and non-closing Refs, including configured-host issue URLs for same or cross-repository tasks; foreign-host URLs never trigger reads. Partial delivery preserves related-task labels without closing the parent."
+      "text": [
+        "Every proposal answer lists its labels and assignees, [] when absent, with revision covering both.",
+        "Upsert applies assignAuthor and inheritLabelPrefixes and reports unresolved dropped additions.",
+        "Label inheritance uses deduplicated exact issue references: Closes and non-closing Refs, including configured-host issue URLs for same or cross-repository tasks;",
+        "foreign-host URLs never trigger reads.",
+        "Partial delivery preserves related-task labels without closing the parent."
+      ]
     },
     {
       "id": "proposal-comments",
-      "text": "comments lists, once across pages, every comment of a pull request: each review's body without the provider's idempotency marker, each line comment with its path, line and commit, both naming their review, and each conversation comment. A review with an empty body is no comment, and a line comment whose line no longer exists in the diff keeps its path without a line."
+      "text": [
+        "comments lists, once across pages, every comment of a pull request: each review's body without the provider's idempotency marker, each line comment with its path, line and commit, both naming their review, and each conversation comment.",
+        "A review with an empty body is no comment, and a line comment whose line no longer exists in the diff keeps its path without a line."
+      ]
     },
     {
       "id": "reconciled-writes",
-      "text": "Every write is sent once. After a lost answer or a 5xx, the provider reads the repository back and answers from what it finds, never with a second issue, pull request or review; a keyed repeat finds its issue before GitHub lists it, past deleted, moved and discussion numbers, as GitHub names them; a lookup that cannot finish creates nothing and says whether a retry can succeed; an unestablished outcome is unresolved, never retryable, and names what settles it; a partly applied write names what exists."
+      "text": [
+        "Every write is sent once.",
+        "After a lost answer or a 5xx, the provider reads the repository back and answers from what it finds, never with a second issue, pull request or review;",
+        "a keyed repeat finds its issue before GitHub lists it, past deleted, moved and discussion numbers, as GitHub names them;",
+        "a lookup that cannot finish creates nothing and says whether a retry can succeed;",
+        "an unestablished outcome is unresolved, never retryable, and names what settles it;",
+        "a partly applied write names what exists."
+      ]
     },
     {
       "id": "honest-failures",
@@ -46,7 +68,10 @@
     },
     {
       "id": "truthful-manifest",
-      "text": "The manifest passes the extension protocol's strict validation, declares preconditions checked where GitHub cannot compare and write in one step, and marks every operation as reaching outside the machine. Its link operation states that a task's parent is outside the revision, which link does not move."
+      "text": [
+        "The manifest passes the extension protocol's strict validation, declares preconditions checked where GitHub cannot compare and write in one step, and marks every operation as reaching outside the machine.",
+        "Its link operation states that a task's parent is outside the revision, which link does not move."
+      ]
     }
   ],
   "decisions": [

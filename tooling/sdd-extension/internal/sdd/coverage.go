@@ -18,7 +18,8 @@ import (
 //
 // Every project of the workspace answers one question: which product outcome
 // does its code serve? It answers with a feature authored in its own
-// putnami.features.json, a spec under its own specs/, or a reviewed
+// putnami.features.json or features/*.json, a spec under its own specs/, or a
+// reviewed
 // featureAuthority in its putnami.json: an owner that names an authored
 // feature, none with the reason the project has no feature, dependents when a
 // project that depends on it declares a feature or hosts a spec, or a provider

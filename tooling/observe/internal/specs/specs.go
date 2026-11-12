@@ -209,7 +209,7 @@ func read(root string, c *candidate) (Spec, []diag.Diagnostic, bool) {
 	}
 	spec := Spec{Format: string(c.format), Path: c.dir, File: c.files[0], Requirements: []Requirement{}}
 	for i, requirement := range projection.Spec.Requirements {
-		r := Requirement{ID: requirement.ID, Text: requirement.Text}
+		r := Requirement{ID: requirement.ID, Text: requirement.Text.String()}
 		if i < len(projection.Requirements) {
 			position := projection.Requirements[i].Position
 			r.Line = position.Line

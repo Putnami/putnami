@@ -19,7 +19,10 @@
   "requirements": [
     {
       "id": "a-pre-rendered-page-reports-from-the-browser",
-      "text": "A page served from build output carries the tracker and this request's page-view id, injected into the response the handler produced, so a fully pre-rendered site collects sessions, engagement, and declared actions without double-counting the view the server already recorded; a page the React renderer produced is left untouched."
+      "text": [
+        "A page served from build output carries the tracker and this request's page-view id, injected into the response the handler produced, so a fully pre-rendered site collects sessions, engagement, and declared actions without double-counting the view the server already recorded;",
+        "a page the React renderer produced is left untouched."
+      ]
     },
     {
       "id": "a-retried-event-is-stored-once",
@@ -63,7 +66,10 @@
     },
     {
       "id": "the-tables-follow-the-datasource-schema",
-      "text": "The four tables live in the schema their datasource already has: analytics.schema when set, otherwise the schema another SQL migration source or sql() declares for that datasource, otherwise public. A workload that declares no schema keeps its migration bundle byte for byte, and a schema that contradicts the datasource's fails the build instead of the migration."
+      "text": [
+        "The four tables live in the schema their datasource already has: analytics.schema when set, otherwise the schema another SQL migration source or sql() declares for that datasource, otherwise public.",
+        "A workload that declares no schema keeps its migration bundle byte for byte, and a schema that contradicts the datasource's fails the build instead of the migration."
+      ]
     },
     {
       "id": "undeclared-actions-are-dropped",

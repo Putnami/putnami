@@ -17,11 +17,19 @@
   "requirements": [
     {
       "id": "upload-hands-the-document-to-the-reporter",
-      "text": "With --upload, putnami observe writes the evidence document to the --evidence path, else to a temporary file it removes, then runs the CLI that started it, or putnami on PATH, as <name> evidence-report --file <path> --output=json, where <name> is the name without scope of the extension PUTNAMI_EVIDENCE_REPORTER selects, @putnami/cloud when the variable is unset. The reporter's standard error goes to observe's standard error."
+      "text": [
+        "With --upload, putnami observe writes the evidence document to the --evidence path, else to a temporary file it removes, then runs the CLI that started it, or putnami on PATH, as <name> evidence-report --file <path> --output=json, where <name> is the name without scope of the extension PUTNAMI_EVIDENCE_REPORTER selects, @putnami/cloud when the variable is unset.",
+        "The reporter's standard error goes to observe's standard error."
+      ]
     },
     {
       "id": "upload-answers-the-report-url",
-      "text": "Observe reads the last protocol CLI version 2 result the reporter writes on its standard output, and copies output that holds none to its standard error, so --output=json still prints one document. When the upload succeeded and data.reportUrl is an absolute https URL without credentials, observe prints it on standard error and the summary note links it. A reporter that answers no result or no such URL still uploaded, with no diagnostic. A failure result adds its error message to observe.upload_failed."
+      "text": [
+        "Observe reads the last protocol CLI version 2 result the reporter writes on its standard output, and copies output that holds none to its standard error, so --output=json still prints one document.",
+        "When the upload succeeded and data.reportUrl is an absolute https URL without credentials, observe prints it on standard error and the summary note links it.",
+        "A reporter that answers no result or no such URL still uploaded, with no diagnostic.",
+        "A failure result adds its error message to observe.upload_failed."
+      ]
     },
     {
       "id": "upload-fails-open",
@@ -29,7 +37,11 @@
     },
     {
       "id": "open-signs-in-and-uploads",
-      "text": "--open uploads as --upload does. Outside a CI it passes --sign-in to the reporter, which uses a token or a stored session when one exists and signs the person in otherwise, then observe prints the report URL the reporter answers on standard error and opens it in the browser. In a CI it passes no --sign-in and opens nothing."
+      "text": [
+        "--open uploads as --upload does.",
+        "Outside a CI it passes --sign-in to the reporter, which uses a token or a stored session when one exists and signs the person in otherwise, then observe prints the report URL the reporter answers on standard error and opens it in the browser.",
+        "In a CI it passes no --sign-in and opens nothing."
+      ]
     },
     {
       "id": "nothing-leaves-without-upload-or-open",

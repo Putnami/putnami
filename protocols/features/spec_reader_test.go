@@ -65,7 +65,7 @@ func TestOverLongRequirementNamesASplit(t *testing.T) {
 	spectest.Proves(t, "features/feature-contracts", "spec-reader-contract", "an-over-long-requirement-names-a-split")
 	long := strings.Repeat("a", 513)
 	projection := features.ReadSpecSource(conformance.MinimalSpecReader{}, minimalInput("outcome "+long+"\nrequirement Long | "+long+"\n"))
-	if projection.Spec == nil || len(projection.Findings) != 0 || projection.Spec.Requirements[0].Text != long {
+	if projection.Spec == nil || len(projection.Findings) != 0 || projection.Spec.Requirements[0].Text.String() != long {
 		t.Fatalf("an external text over the bound must be read whole: %v", projection.Findings)
 	}
 	want := features.FindingCodeSpecTextTooLong + "@spec/invoice#outcomes[0]," + features.FindingCodeSpecTextTooLong + "@spec/invoice/spec.txt#L2"

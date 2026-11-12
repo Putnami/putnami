@@ -14,7 +14,10 @@
   "requirements": [
     {
       "id": "what-the-site-records-is-what-the-notice-says",
-      "text": "Every action name the site tracks is declared in one vocabulary, is named on the privacy page, and the retention the page states is the retention the configuration applies; the page is reachable from the footer of every page."
+      "text": [
+        "Every action name the site tracks is declared in one vocabulary, is named on the privacy page, and the retention the page states is the retention the configuration applies;",
+        "the page is reachable from the footer of every page."
+      ]
     }
   ]
 }

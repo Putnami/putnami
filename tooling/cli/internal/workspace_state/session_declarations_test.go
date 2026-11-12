@@ -20,7 +20,8 @@ func declarationWorkspace(t *testing.T) string {
 	for file, content := range map[string]string{
 		"decisions.json":                             `{"decisions":[]}`,
 		"tooling/putnami.features.json":              `{"features":[]}`,
-		"tooling/cli/putnami.features.json":          `{"features":[{"id":"cli/x"}]}`,
+		"tooling/cli/features/x.json":                `{"feature":{"id":"cli/x"}}`,
+		"tooling/features/putnami.json":              `{"name":"features"}`,
 		"tooling/cli/specs/x.json":                   `{"feature":"cli/x"}`,
 		"tooling/cli/decisions/cache-trust.json":     `{"id":"cache-trust"}`,
 		"tooling/cli/specs.baseline.json":            `{"executableRequirements":[]}`,
@@ -55,7 +56,7 @@ func TestDeclarationDigestMovesWithDeclarationsOnly(t *testing.T) {
 	root := declarationWorkspace(t)
 	before, files := declarationDigestOf(t, root)
 	if files != 7 {
-		t.Fatalf("files = %d, want the 7 declaration files and no code or test fixture", files)
+		t.Fatalf("files = %d, want the 7 declaration files and no code, test fixture or nested project", files)
 	}
 
 	for _, code := range []string{"tooling/cli/main.go", "go/lib/lib.go", "tooling/cli/internal/testdata/specs/y.json"} {
@@ -68,7 +69,8 @@ func TestDeclarationDigestMovesWithDeclarationsOnly(t *testing.T) {
 	}
 
 	for _, declaration := range []string{
-		"decisions.json", "tooling/putnami.features.json", "tooling/cli/specs/x.json", "tooling/cli/decisions/cache-trust.json",
+		"decisions.json", "tooling/putnami.features.json", "tooling/cli/features/x.json", "tooling/cli/specs/x.json",
+		"tooling/cli/decisions/cache-trust.json",
 		"tooling/cli/specs.baseline.json", "tooling/cli/putnami.architecture.json",
 	} {
 		previous, _ := declarationDigestOf(t, root)

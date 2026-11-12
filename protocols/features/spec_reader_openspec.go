@@ -281,7 +281,7 @@ func (parser *openSpecParser) closeBody() {
 		if len(lines) == 0 {
 			lines = parser.metadata
 		}
-		parser.spec.Requirements[len(parser.spec.Requirements)-1].Text = strings.Join(strings.Fields(strings.Join(lines, " ")), " ")
+		parser.spec.Requirements[len(parser.spec.Requirements)-1].Text = SpecText{strings.Join(strings.Fields(strings.Join(lines, " ")), " ")}
 	}
 	parser.body, parser.metadata, parser.inBody = nil, nil, false
 }
@@ -345,7 +345,7 @@ func (parser *openSpecParser) reading() SpecReading {
 	}
 	texts := append([]string(nil), outcomes...)
 	for _, requirement := range parser.spec.Requirements {
-		texts = append(texts, requirement.Text)
+		texts = append(texts, requirement.Text.String())
 	}
 	spec := parser.spec
 	spec.Outcomes = outcomes

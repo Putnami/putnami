@@ -306,7 +306,8 @@ getting started, concepts, how-to guides, principles — live in
 listed in [`sites/putnami.dev/README.md`](sites/putnami.dev/README.md).
 
 A user-visible change also carries its product intent: a feature declaration in
-`putnami.features.json`, one spec under `specs/`, and — when the change rests on
+`putnami.features.json` or `features/<feature>.json`, one spec under `specs/`,
+and — when the change rests on
 a durable choice — a decision record under `<project>/doc/adr/`. The workflow is
 [Write a feature spec](https://putnami.dev/docs/how-to/write-a-feature-spec).
 Never hand-write feature evidence; it is emitted by build and test producers.

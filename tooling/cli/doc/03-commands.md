@@ -909,7 +909,8 @@ creates the project on that release channel, as `putnami init` does.
 
 Template archives contain `putnami.template.json` plus the renderable/static
 template content. Source-workspace declarations at the template root
-(`putnami.json`, `putnami.features.json`, `specs/`, and `specs.baseline.json`),
+(`putnami.json`, `putnami.features.json`, `features/`, `specs/`, and
+`specs.baseline.json`),
 root-local state such as `node_modules/`, and root entries whose name starts
 with a dot are excluded so a generated project does not inherit the template
 project's root SDD identity. `projects create` skips the same entries when it

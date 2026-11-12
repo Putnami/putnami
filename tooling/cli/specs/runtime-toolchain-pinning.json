@@ -19,15 +19,30 @@
   "requirements": [
     {
       "id": "exact-lock-resolution",
-      "text": "A candidate qualifies only when its probe output, with the locked version substituted, equals the expectation exactly. Outside workspace-install, a lock that exists but does not pin a required alias, or has no host-platform integrity, fails a run whose plan needs it, naming the extension and the alias; a workspace with no lock bootstraps under an unavailable identity. An optional toolchain no candidate satisfies publishes empty executable bindings. No mismatching ambient binary is ever substituted."
+      "text": [
+        "A candidate qualifies only when its probe output, with the locked version substituted, equals the expectation exactly.",
+        "Outside workspace-install, a lock that exists but does not pin a required alias, or has no host-platform integrity, fails a run whose plan needs it, naming the extension and the alias;",
+        "a workspace with no lock bootstraps under an unavailable identity.",
+        "An optional toolchain no candidate satisfies publishes empty executable bindings.",
+        "No mismatching ambient binary is ever substituted."
+      ]
     },
     {
       "id": "minimal-child-environment",
-      "text": "A subprocess bound to a resolved toolchain receives the resolved executable's directory first on PATH, ahead of the CLI's directory and every inherited one, and keeps each inherited directory once in its original order. A pinned tool's bare name therefore resolves to the locked executable while tools sharing its directory stay reachable. A home-rooted candidate resolves through the platform user home, not $HOME alone."
+      "text": [
+        "A subprocess bound to a resolved toolchain receives the resolved executable's directory first on PATH, ahead of the CLI's directory and every inherited one, and keeps each inherited directory once in its original order.",
+        "A pinned tool's bare name therefore resolves to the locked executable while tools sharing its directory stay reachable.",
+        "A home-rooted candidate resolves through the platform user home, not $HOME alone."
+      ]
     },
     {
       "id": "identity-keys-results",
-      "text": "The resolved toolchain identity \u2014 the declaration, the locked version, the host platform, the platform integrity and availability, and no host path \u2014 is folded into the task cache key and into the prepared runtime's artifact digest. Resolution completes during runtime synchronization, before selection and planning; an alias synchronization leaves unresolved resolves once the plan is final, before any job runs or reaches the cache. A job is therefore keyed under the identity it runs with."
+      "text": [
+        "The resolved toolchain identity \u2014 the declaration, the locked version, the host platform, the platform integrity and availability, and no host path \u2014 is folded into the task cache key and into the prepared runtime's artifact digest.",
+        "Resolution completes during runtime synchronization, before selection and planning;",
+        "an alias synchronization leaves unresolved resolves once the plan is final, before any job runs or reaches the cache.",
+        "A job is therefore keyed under the identity it runs with."
+      ]
     },
     {
       "id": "workspace-installed-candidates",
@@ -35,27 +50,51 @@
     },
     {
       "id": "provisioning-runs-unpinned",
-      "text": "workspace-install and project-setup write the files toolchain pins derive from, and workspace-fetch precedes workspace-install, so an alias only they need resolves as if optional: a missing pin, missing host-platform integrity or no matching candidate yields the unavailable identity and never fails the run. A local extension's prepare toolchains do too, in a run of only those. A planned job of another command resolves an alias it requires strictly, and refuses one resolved unavailable while a lock exists."
+      "text": [
+        "workspace-install and project-setup write the files toolchain pins derive from, and workspace-fetch precedes workspace-install, so an alias only they need resolves as if optional: a missing pin, missing host-platform integrity or no matching candidate yields the unavailable identity and never fails the run.",
+        "A local extension's prepare toolchains do too, in a run of only those.",
+        "A planned job of another command resolves an alias it requires strictly, and refuses one resolved unavailable while a lock exists."
+      ]
     },
     {
       "id": "unplanned-toolchains-do-not-stop-the-run",
-      "text": "Runtime synchronization leaves a command's required alias the lock does not satisfy unresolved. Once the plan is final, before any job runs or is keyed, a planned job requiring it fails the run with the strict resolution's error, and a missing pin names adding a project that declares it or putnami install; a run that plans no such job goes on. Engine-owned provider launches still resolve strictly."
+      "text": [
+        "Runtime synchronization leaves a command's required alias the lock does not satisfy unresolved.",
+        "Once the plan is final, before any job runs or is keyed, a planned job requiring it fails the run with the strict resolution's error, and a missing pin names adding a project that declares it or putnami install;",
+        "a run that plans no such job goes on.",
+        "Engine-owned provider launches still resolve strictly."
+      ]
     },
     {
       "id": "provisioning-reports-the-installed-toolchain",
-      "text": "workspace-install that starts before a required alias's pinned toolchain exists logs no warning then, since installing it can be what the run does. After the run, however it ends and including a run that plans no job, it probes each such alias again: a candidate that now matches the pin is reported at info level, and an alias still unmatched is a warning naming the extension, the alias and each rejected candidate. A run that holds no workspace-install reports nothing."
+      "text": [
+        "workspace-install that starts before a required alias's pinned toolchain exists logs no warning then, since installing it can be what the run does.",
+        "After the run, however it ends and including a run that plans no job, it probes each such alias again: a candidate that now matches the pin is reported at info level, and an alias still unmatched is a warning naming the extension, the alias and each rejected candidate.",
+        "A run that holds no workspace-install reports nothing."
+      ]
     },
     {
       "id": "mismatch-names-the-install",
-      "text": "The error of a required alias whose pinned release no candidate matches names putnami install, the command that installs that release, before the rejected candidates. It names no remedy when a probe timed out, since that toolchain is there and slow, or in a hosted run, which installs no toolchain."
+      "text": [
+        "The error of a required alias whose pinned release no candidate matches names putnami install, the command that installs that release, before the rejected candidates.",
+        "It names no remedy when a probe timed out, since that toolchain is there and slow, or in a hosted run, which installs no toolchain."
+      ]
     },
     {
       "id": "pinned-archives-are-provisioned",
-      "text": "Once the pins are settled, the CLI installs each pinned toolchain no other candidate answers at the pinned version: it verifies the host archive's SHA-256 and unpacks it, tar.gz or zip, into toolchains/<identity>/<identity>-<version> under the Putnami home, keeping the folder's entries. A folder whose probe answers the version is reused without a request. A pin with no host archive is skipped for an optional toolchain and fails for a required one. A hosted or offline run installs nothing."
+      "text": [
+        "Once the pins are settled, the CLI installs each pinned toolchain no other candidate answers at the pinned version: it verifies the host archive's SHA-256 and unpacks it, tar.gz or zip, into toolchains/<identity>/<identity>-<version> under the Putnami home, keeping the folder's entries.",
+        "A folder whose probe answers the version is reused without a request.",
+        "A pin with no host archive is skipped for an optional toolchain and fails for a required one.",
+        "A hosted or offline run installs nothing."
+      ]
     },
     {
       "id": "provisioned-candidate-resolves-the-pin",
-      "text": "A provisioned candidate resolves to the executable the host platform's archive names, inside toolchains/<lock>/<lock>-<version> under the Putnami home, from the workspace lock's pin. A missing folder or a pin below format 5 leaves it unresolved, and a job that needs it fails naming putnami install."
+      "text": [
+        "A provisioned candidate resolves to the executable the host platform's archive names, inside toolchains/<lock>/<lock>-<version> under the Putnami home, from the workspace lock's pin.",
+        "A missing folder or a pin below format 5 leaves it unresolved, and a job that needs it fails naming putnami install."
+      ]
     }
   ],
   "decisions": [

@@ -1,0 +1,241 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/contributor-workflows",
+    "type": "feature",
+    "name": "Contributor workflows",
+    "outcome": "A workspace uses build to carry its requested outcome, issue or epic through delivery planning, bounded experiments, independent artifact challenge and verified delivery on both supported hosts, with native requirement coverage, portable records, canonical entry points and proof-consuming Go publication under its existing mandate and provider policy",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "one-contributor-extension",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "every-skill-and-worker-renders-on-both-hosts",
+            "the-repository-runs-the-content-it-distributes"
+          ]
+        }
+      },
+      {
+        "id": "explicit-only-invocation",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "explicit-only-skills-declare-it-on-both-hosts"
+          ]
+        }
+      },
+      {
+        "id": "canonical-entry-points",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "only-canonical-entry-points-and-active-utilities"
+          ]
+        }
+      },
+      {
+        "id": "provider-neutral-content",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "no-backend-client-label-or-memory-identity",
+            "the-declared-policy-refuses-provider-specific-content"
+          ]
+        }
+      },
+      {
+        "id": "repository-policy",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "instructions-name-worker-profiles-not-models"
+          ]
+        }
+      },
+      {
+        "id": "intent-first-publication",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-build-loop-pushes-declarations-before-code"
+          ]
+        }
+      },
+      {
+        "id": "intent-first-validation",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-build-loop-checks-declarations-before-it-pushes-them"
+          ]
+        }
+      },
+      {
+        "id": "change-finalize-parity",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "change-finalize-matches-the-core-command"
+          ]
+        }
+      },
+      {
+        "id": "canonical-consumer-migration",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "packaged-canonical-consumer-content",
+            "canonical-recipe-materialization"
+          ]
+        }
+      },
+      {
+        "id": "one-contribution-loop",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "build-is-a-short-core-and-one-reference-per-stage"
+          ]
+        }
+      },
+      {
+        "id": "workflow-profiles",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "workflow-profiles-replace-tiers-and-workers"
+          ]
+        }
+      },
+      {
+        "id": "review-cycle",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-review-cycle-blocks-on-p1-and-p2"
+          ]
+        }
+      },
+      {
+        "id": "epic-orchestration",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-epic-skill-launches-children-and-never-codes"
+          ]
+        }
+      },
+      {
+        "id": "external-spec-authoring",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-spec-skill-edits-the-external-spec-it-resolves"
+          ]
+        }
+      },
+      {
+        "id": "user-scope-skills",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-user-scope-list-names-the-workspace-free-skills",
+            "each-user-scope-skill-defers-to-the-workspace-copy",
+            "build-check-and-design-stop-without-a-workspace"
+          ]
+        }
+      },
+      {
+        "id": "context-without-a-workspace",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-context-skill-reads-observe-without-a-workspace"
+          ]
+        }
+      },
+      {
+        "id": "spec-without-a-workspace",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-spec-skill-writes-the-repository-format-without-a-workspace"
+          ]
+        }
+      }
+    ]
+  }
+}

@@ -153,7 +153,7 @@ func TestOpenSpecCommentsAndCodeAreNotSpecText(t *testing.T) {
 	if projection.Spec == nil || requirementIDs(projection.Spec) != "real" {
 		t.Fatalf("got %v, %s", projection.Spec, codes(projection.Findings))
 	}
-	if got := projection.Spec.Requirements[0].Text; got != "The system SHALL act. Second paragraph." {
+	if got := projection.Spec.Requirements[0].Text.String(); got != "The system SHALL act. Second paragraph." {
 		t.Fatalf("text = %q", got)
 	}
 	scenarios := projection.Requirements[0].Scenarios
@@ -161,11 +161,11 @@ func TestOpenSpecCommentsAndCodeAreNotSpecText(t *testing.T) {
 		t.Fatalf("scenarios = %+v", scenarios)
 	}
 	onlyMetadata := readOpenSpec(t, "## Purpose\nO.\n## Requirements\n### Requirement: A\n**Constraint**: MUST hold.\n")
-	if got := onlyMetadata.Spec.Requirements[0].Text; got != "**Constraint**: MUST hold." {
+	if got := onlyMetadata.Spec.Requirements[0].Text.String(); got != "**Constraint**: MUST hold." {
 		t.Fatalf("metadata body = %q", got)
 	}
 	crlf := readOpenSpec(t, "\xef\xbb\xbf## Purpose\r\nO.\r\n## Requirements\r\n### Requirement: A\r\nThe text.\r\n")
-	if crlf.Spec == nil || crlf.Spec.Requirements[0].Text != "The text." || crlf.Requirements[0].Position.Line != 4 {
+	if crlf.Spec == nil || crlf.Spec.Requirements[0].Text.String() != "The text." || crlf.Requirements[0].Position.Line != 4 {
 		t.Fatalf("crlf = %+v", crlf)
 	}
 }

@@ -38,8 +38,15 @@
       "required": ["id", "text"],
       "properties": {
         "id": { "$ref": "#/$defs/segmentID" },
-        "text": { "$ref": "#/$defs/statement" }
+        "text": { "$ref": "#/$defs/requirementText" }
       }
+    },
+    "requirementText": {
+      "$comment": "One statement, or the same statement as an array of sentences so a diff names the sentence that changed. Readers join the sentences with one space, and the joined statement holds at most 512 bytes.",
+      "oneOf": [
+        { "$ref": "#/$defs/statement" },
+        { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/statement" } }
+      ]
     }
   }
 }

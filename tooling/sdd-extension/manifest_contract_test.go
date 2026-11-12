@@ -71,7 +71,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			// The command activates for a project that authors either artifact.
 			// A project with neither has nothing to validate, so it is pruned at
 			// plan time rather than skipped at run time.
-			ActivationFiles: []string{"putnami.features.json", "specs/*.json"},
+			ActivationFiles: []string{"putnami.features.json", "features/*.json", "specs/*.json"},
 			AlsoRuns:        []string{"validate-workspace"},
 			// Both validation commands check their subject against its
 			// criteria, and declare it, so a workspace without @putnami/dev
@@ -129,7 +129,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				"repository": {From: "workspace", Files: []string{"git:**"}},
 				// A project side left empty would key on every file under the
 				// project root, ignored build output included.
-				"manifest": {From: "project", Files: []string{"putnami.features.json"}},
+				"manifest": {From: "project", Files: []string{"putnami.features.json", "features/*.json"}},
 			},
 			// It reads the project's own source tree — the durable manifest and
 			// every evidence fragment beside it — so it is serialized after the
@@ -156,7 +156,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Cwd:       "{projectRoot}",
 			TimeoutMs: 120000,
 			Inputs: map[string]proto.TaskInputPort{
-				"manifest": {From: "project", Files: []string{"putnami.features.json"}},
+				"manifest": {From: "project", Files: []string{"putnami.features.json", "features/*.json"}},
 				"specs":    {From: "project", Files: []string{"specs/*.json"}},
 				// The identity tier, and the reason it is workspace-scoped is
 				// measured rather than assumed: a feature relation resolves
@@ -165,6 +165,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				// read set reported that real relation as dangling.
 				"identity": {From: "workspace", Files: []string{
 					"**/putnami.features.json",
+					"**/features/*.json",
 					"**/specs/*.json",
 					"**/putnami.json",
 					"putnami.workspace.json",
@@ -260,6 +261,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 				// Nothing under a project's generated .gen tree belongs to it.
 				"floor": {From: "workspace", Files: []string{
 					"**/putnami.features.json",
+					"**/features/*.json",
 					"**/specs/*.json",
 					"**/putnami.json",
 					"putnami.workspace.json",
@@ -340,7 +342,7 @@ func authoredManifest(t *testing.T) *proto.Manifest {
 			Declares: sdkmanifest.Declares(),
 		}).
 		Task("feature-coverage-validate", proto.TaskDefinition{
-			Description: "Check that every workspace project carries a feature authored in its own putnami.features.json, a spec under its own specs/, or a reviewed featureAuthority in its putnami.json: an owner that names an authored feature, or none with a reason. " +
+			Description: "Check that every workspace project carries a feature authored in its own putnami.features.json or features/*.json, a spec under its own specs/, or a reviewed featureAuthority in its putnami.json: an owner that names an authored feature, or none with a reason. " +
 				"A project that carries none fails unless options.sdd.featureCoverage.debt in putnami.workspace.json names it. The list is exact: an entry whose project is covered, or that names no project, fails until it is removed. " +
 				"A workspace that declares no options.sdd.featureCoverage has not adopted the gate and passes with a note. " +
 				"The task reads the manifests and specs through the workspace's Git candidate cut and each project's putnami.json from the job context, and its key is the input `git:**`, which holds that cut and the workspace membership with each project's config: " +
@@ -786,7 +788,7 @@ func TestValidationCommandsCarryTheActivationsD1Settles(t *testing.T) {
 	if project.Activation != "" {
 		t.Errorf("validate activation = %q, want the default project scope", project.Activation)
 	}
-	if want := []string{"putnami.features.json", "specs/*.json"}; !reflect.DeepEqual(project.ActivationFiles, want) {
+	if want := []string{"putnami.features.json", "features/*.json", "specs/*.json"}; !reflect.DeepEqual(project.ActivationFiles, want) {
 		t.Errorf("validate activationFiles = %v, want %v", project.ActivationFiles, want)
 	}
 	// No dependsOn orders the two steps: a step's key holds the key of every
@@ -881,7 +883,7 @@ func TestCachePolicyMatchesTheDeclaredReadSet(t *testing.T) {
 	}
 	wantFeatures := map[string]proto.TaskInputPort{
 		"repository": {From: "workspace", Files: []string{"git:**"}},
-		"manifest":   {From: "project", Files: []string{"putnami.features.json"}},
+		"manifest":   {From: "project", Files: []string{"putnami.features.json", "features/*.json"}},
 	}
 	if !reflect.DeepEqual(features.Inputs, wantFeatures) {
 		t.Errorf("task \"features-validate\" inputs = %+v, want %+v", features.Inputs, wantFeatures)

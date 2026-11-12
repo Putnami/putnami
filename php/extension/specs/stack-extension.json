@@ -20,23 +20,40 @@
   "requirements": [
     {
       "id": "components-become-projects",
-      "text": "The probe answers, for each candidate directory the observe Composer detector knows as a component: its package name, the directories of the components it requires through a path repository, the extension @putnami/php, the tag php, and metadata naming the package, its stack root (the workspace root for the root manifest and for a package a path repository of the root composer.json provides, its own directory otherwise) and the expected PHP version. A directory with no composer.json is no project."
+      "text": [
+        "The probe answers, for each candidate directory the observe Composer detector knows as a component: its package name, the directories of the components it requires through a path repository, the extension @putnami/php, the tag php, and metadata naming the package, its stack root (the workspace root for the root manifest and for a package a path repository of the root composer.json provides, its own directory otherwise) and the expected PHP version.",
+        "A directory with no composer.json is no project."
+      ]
     },
     {
       "id": "tasks-run-the-profile",
-      "text": "Each task first compares php --version with the version .php-version states, or else the range require.php of composer.json states, in the component then at its stack root, an exact version winning over a range: a version outside it fails with stacks.toolchain_mismatch unless toolchain.check is warn. lint then runs the stack root's vendor/bin/phpstan analyse on src, and test its vendor/bin/phpunit on tests with coverage of src, in the component's directory with no shell. There is no build task."
+      "text": [
+        "Each task first compares php --version with the version .php-version states, or else the range require.php of composer.json states, in the component then at its stack root, an exact version winning over a range: a version outside it fails with stacks.toolchain_mismatch unless toolchain.check is warn. lint then runs the stack root's vendor/bin/phpstan analyse on src, and test its vendor/bin/phpunit on tests with coverage of src, in the component's directory with no shell.",
+        "There is no build task."
+      ]
     },
     {
       "id": "reports-become-the-summary",
-      "text": "After its steps, even when PHPUnit exits non-zero, the test task reads the JUnit and Clover reports of its output directory through the evidence readers into the test and coverage summary. A failed case fails the task with stacks.test_failed; a JUnit or Clover pattern that matches no report after steps that succeeded fails it with stacks.report_missing."
+      "text": [
+        "After its steps, even when PHPUnit exits non-zero, the test task reads the JUnit and Clover reports of its output directory through the evidence readers into the test and coverage summary.",
+        "A failed case fails the task with stacks.test_failed; a JUnit or Clover pattern that matches no report after steps that succeeded fails it with stacks.report_missing."
+      ]
     },
     {
       "id": "inputs-per-task",
-      "text": "The php:lint selector answers the component's src files, composer.json and composer.lock, its PHPStan configuration and baseline and its PHP-CS-Fixer configuration, and never its tests; php:test adds its tests, its Symfony config, templates, translations, migrations and assets, its PHPUnit configuration and .env files. Each task's stack-root files are the root composer.json and composer.lock, besides the toolchain files."
+      "text": [
+        "The php:lint selector answers the component's src files, composer.json and composer.lock, its PHPStan configuration and baseline and its PHP-CS-Fixer configuration, and never its tests;",
+        "php:test adds its tests, its Symfony config, templates, translations, migrations and assets, its PHPUnit configuration and .env files.",
+        "Each task's stack-root files are the root composer.json and composer.lock, besides the toolchain files."
+      ]
     },
     {
       "id": "overrides-are-honored",
-      "text": "options[\"@putnami/php\"] in a component's own putnami.json overrides the profile: an object merges, any other value replaces the profile's whole. The steps run and the files the php:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task. An unknown member, a change to id or markers, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+      "text": [
+        "options[\"@putnami/php\"] in a component's own putnami.json overrides the profile: an object merges, any other value replaces the profile's whole.",
+        "The steps run and the files the php:<task> selectors answer follow the resolved profile, and putnami.json is an input of every task.",
+        "An unknown member, a change to id or markers, or a stack-root input the manifest does not declare fails the task with stacks.project_config_invalid."
+      ]
     },
     {
       "id": "manifest-follows-the-profile",
@@ -44,43 +61,83 @@
     },
     {
       "id": "pins-a-php-release",
-      "text": "toolchain-resolve answers php with a release the extension ships, an archive and a SHA-256 per platform, when a composer.json exists outside vendor/. It chooses among the releases every component's statement accepts, else those the root accepts. A committed pin of an accepted release is kept, as committed on a platform with no archive; else 8.4.23 when accepted, else the highest accepted. With no composer.json or no accepted release, or a platform with no archive and no such pin, it answers no pin."
+      "text": [
+        "toolchain-resolve answers php with a release the extension ships, an archive and a SHA-256 per platform, when a composer.json exists outside vendor/.",
+        "It chooses among the releases every component's statement accepts, else those the root accepts.",
+        "A committed pin of an accepted release is kept, as committed on a platform with no archive; else 8.4.23 when accepted, else the highest accepted.",
+        "With no composer.json or no accepted release, or a platform with no archive and no such pin, it answers no pin."
+      ]
     },
     {
       "id": "machine-php-comes-first",
-      "text": "Each task runs the php on PATH when its version satisfies the stated version or range. When php is missing, or outside the statement, the task puts the PHP the workspace lock pins first on PATH and repeats the check. A project whose toolchain.check is warn keeps the php on PATH. With no pinned PHP installed, the check fails as it did before."
+      "text": [
+        "Each task runs the php on PATH when its version satisfies the stated version or range.",
+        "When php is missing, or outside the statement, the task puts the PHP the workspace lock pins first on PATH and repeats the check.",
+        "A project whose toolchain.check is warn keeps the php on PATH.",
+        "With no pinned PHP installed, the check fails as it did before."
+      ]
     },
     {
       "id": "installs-its-dependencies",
-      "text": "Before lint and test, the install step of a component runs the Composer release the extension pins by SHA-256 with composer install at its stack root, one run per root at a time. A root whose last successful install, recorded under vendor/, used its current composer.json and composer.lock is left alone. On Windows the step writes the php.ini of the pinned PHP, which loads openssl, mbstring, curl, zip and fileinfo. A run with offline dependencies installs nothing."
+      "text": [
+        "Before lint and test, the install step of a component runs the Composer release the extension pins by SHA-256 with composer install at its stack root, one run per root at a time.",
+        "A root whose last successful install, recorded under vendor/, used its current composer.json and composer.lock is left alone.",
+        "On Windows the step writes the php.ini of the pinned PHP, which loads openssl, mbstring, curl, zip and fileinfo.",
+        "A run with offline dependencies installs nothing."
+      ]
     },
     {
       "id": "coverage-driver-is-optional",
-      "text": "A test task on a PHP with neither PCOV nor Xdebug runs PHPUnit with its JUnit report only, reads no Clover report, and reports the warning stacks.coverage_unavailable. The test summary is complete and no coverage summary is written. A PHP with a driver keeps the Clover report."
+      "text": [
+        "A test task on a PHP with neither PCOV nor Xdebug runs PHPUnit with its JUnit report only, reads no Clover report, and reports the warning stacks.coverage_unavailable.",
+        "The test summary is complete and no coverage summary is written.",
+        "A PHP with a driver keeps the Clover report."
+      ]
     },
     {
       "id": "checks-documentation-links",
-      "text": "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the SDK's documentation link check, and a broken one fails lint. The docs-links flag, on by default, turns the check off."
+      "text": [
+        "lint checks every relative link and anchor of the project's README.md files and doc/ trees with the SDK's documentation link check, and a broken one fails lint.",
+        "The docs-links flag, on by default, turns the check off."
+      ]
     },
     {
       "id": "filters-the-tests",
-      "text": "test with the test flag, short -t, passes its value to PHPUnit as one --filter argument, with or without coverage, and a project in which the filter selects no test passes when that PHPUnit lists --do-not-fail-on-empty-test-suite. The value is part of the task's key, so a filtered result never answers an unfiltered run."
+      "text": [
+        "test with the test flag, short -t, passes its value to PHPUnit as one --filter argument, with or without coverage, and a project in which the filter selects no test passes when that PHPUnit lists --do-not-fail-on-empty-test-suite.",
+        "The value is part of the task's key, so a filtered result never answers an unfiltered run."
+      ]
     },
     {
       "id": "fetches-the-locked-packages",
-      "text": "workspace-fetch downloads the packages of each stack root's composer.lock into the extension's Composer cache, with --no-scripts and --no-plugins and a private vendor directory, so it runs none of their code and writes nothing in the repository. A stack root with no composer.lock is skipped. With no PHP it warns and passes."
+      "text": [
+        "workspace-fetch downloads the packages of each stack root's composer.lock into the extension's Composer cache, with --no-scripts and --no-plugins and a private vendor directory, so it runs none of their code and writes nothing in the repository.",
+        "A stack root with no composer.lock is skipped.",
+        "With no PHP it warns and passes."
+      ]
     },
     {
       "id": "workspace-install-runs-composer",
-      "text": "workspace-install runs the pinned Composer's install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose last install is current, which the force flag installs again. A run with offline dependencies installs from the Composer cache with the network disabled. With no PHP it warns and passes."
+      "text": [
+        "workspace-install runs the pinned Composer's install at each stack root of the workspace's projects, except a project disable.tags excludes and a root whose last install is current, which the force flag installs again.",
+        "A run with offline dependencies installs from the Composer cache with the network disabled.",
+        "With no PHP it warns and passes."
+      ]
     },
     {
       "id": "serves-an-application",
-      "text": "serve runs php -S on 0.0.0.0 with the port flag, default 3000 and 0 for a free port, with public/ as document root and a router that answers a path that is no file with public/index.php, on an application after the toolchain check, and emits a ready event once the server accepts connections. A library is skipped. PHP reads its files on each request, so serve has no watcher."
+      "text": [
+        "serve runs php -S on 0.0.0.0 with the port flag, default 3000 and 0 for a free port, with public/ as document root and a router that answers a path that is no file with public/index.php, on an application after the toolchain check, and emits a ready event once the server accepts connections.",
+        "A library is skipped.",
+        "PHP reads its files on each request, so serve has no watcher."
+      ]
     },
     {
       "id": "runs-an-application-once",
-      "text": "run executes php with the entrypoint flag, default bin/console, in the directory of an application after the toolchain check, passes it the words of the args flag, and exits with its exit code. A library is skipped."
+      "text": [
+        "run executes php with the entrypoint flag, default bin/console, in the directory of an application after the toolchain check, passes it the words of the args flag, and exits with its exit code.",
+        "A library is skipped."
+      ]
     },
     {
       "id": "upgrades-the-dependencies",
@@ -88,11 +145,19 @@
     },
     {
       "id": "packages-an-application-image",
-      "text": "package with the docker channel assembles an OCI image of an application with no Docker daemon: a composer install --no-dev --no-scripts --optimize-autoloader layer, a layer of its files, and Apache serving public/ on the port flag, 8080 by default. The base is the official php:<pinned>-apache image pinned by digest, or a digest-pinned base the project names; a base with no digest fails. It runs as www-data and holds no auth.json, local environment file or decryption key. A library packages nothing."
+      "text": [
+        "package with the docker channel assembles an OCI image of an application with no Docker daemon: a composer install --no-dev --no-scripts --optimize-autoloader layer, a layer of its files, and Apache serving public/ on the port flag, 8080 by default.",
+        "The base is the official php:<pinned>-apache image pinned by digest, or a digest-pinned base the project names; a base with no digest fails.",
+        "It runs as www-data and holds no auth.json, local environment file or decryption key.",
+        "A library packages nothing."
+      ]
     },
     {
       "id": "publishes-an-application-image",
-      "text": "publish with the docker channel pushes the packaged image to the declared OCI registry through the shared publisher, and reports it as a release-set member. A library publishes nothing."
+      "text": [
+        "publish with the docker channel pushes the packaged image to the declared OCI registry through the shared publisher, and reports it as a release-set member.",
+        "A library publishes nothing."
+      ]
     }
   ],
   "decisions": [

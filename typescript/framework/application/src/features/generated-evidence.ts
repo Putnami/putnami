@@ -55,7 +55,7 @@ const CONTRIBUTION_KINDS = new Set<ContributionKind>([
 /** Kinds whose identity carries no subkind, matching the capability contract. */
 const KINDS_WITHOUT_SUBKIND = new Set<ContributionKind>(['config', 'package', 'requiredCapability']);
 
-/** One authored maturity requirement, as read from `putnami.features.json`. */
+/** One authored maturity requirement, as read from the authored feature declaration. */
 export interface AuthoredRequirement {
   readonly id: string;
   readonly stage: MaturityStage;

@@ -19,7 +19,10 @@
   "requirements": [
     {
       "id": "generated-context",
-      "text": "Context generation writes deterministic shared guidance, owns exactly one delimited block inside AGENTS.md and CLAUDE.md, inserts it into existing files without altering any other byte, preserves an edited block, and writes nothing else into the workspace root. It never creates, rewrites, or removes a .mcp.json, and the human-maintained .agents/constraints.md is only ever read. context pack prints each project's agent-context document and writes no file."
+      "text": [
+        "Context generation writes deterministic shared guidance, owns exactly one delimited block inside AGENTS.md and CLAUDE.md, inserts it into existing files without altering any other byte, preserves an edited block, and writes nothing else into the workspace root.",
+        "It never creates, rewrites, or removes a .mcp.json, and the human-maintained .agents/constraints.md is only ever read. context pack prints each project's agent-context document and writes no file."
+      ]
     },
     {
       "id": "workspace-map",
@@ -31,11 +34,17 @@
     },
     {
       "id": "provider-workspace-facts",
-      "text": "A collaboration provider operation that declares workspaceSelection receives resolved workspace membership and the resolved selection on its request, from the same resolver the CLI's own commands use, so an extension never re-derives project identity or impact; an operation that does not declare it receives neither."
+      "text": [
+        "A collaboration provider operation that declares workspaceSelection receives resolved workspace membership and the resolved selection on its request, from the same resolver the CLI's own commands use, so an extension never re-derives project identity or impact;",
+        "an operation that does not declare it receives neither."
+      ]
     },
     {
       "id": "read-preparation",
-      "text": "Analysis prepares exact locked registry extensions through the verified shared cache within a bounded deadline, falls back locally without ambient replacements, and never runs the full install lifecycle. Human files, sessions, locks and agent-artifact ownership receipts remain unchanged unless regeneration is explicitly forced."
+      "text": [
+        "Analysis prepares exact locked registry extensions through the verified shared cache within a bounded deadline, falls back locally without ambient replacements, and never runs the full install lifecycle.",
+        "Human files, sessions, locks and agent-artifact ownership receipts remain unchanged unless regeneration is explicitly forced."
+      ]
     },
     {
       "id": "settled-decisions-guidance",
@@ -43,19 +52,39 @@
     },
     {
       "id": "agent-context-languages",
-      "text": "A project's languages in an agent-context document come from the workspace providers, not from file names. Each language that a loaded extension's manifest declares counts for every project the workspace index records that extension's probe as claiming. The languages are sorted and listed once. A project no declaring provider claims reports none."
+      "text": [
+        "A project's languages in an agent-context document come from the workspace providers, not from file names.",
+        "Each language that a loaded extension's manifest declares counts for every project the workspace index records that extension's probe as claiming.",
+        "The languages are sorted and listed once.",
+        "A project no declaring provider claims reports none."
+      ]
     },
     {
       "id": "mcp-registration-removal",
-      "text": "init and the first-use install write no .mcp.json. An explicit install or upgrade deletes the putnami entry under mcpServers when it equals, as canonical JSON, the entry earlier releases wrote with command putnami or ./putnamiw, keeps other servers and keys, and deletes the file when nothing else remains. A changed entry stays byte for byte with a warning; an unparseable file stays untouched with a warning. This removal is deleted in the next minor release."
+      "text": [
+        "init and the first-use install write no .mcp.json.",
+        "An explicit install or upgrade deletes the putnami entry under mcpServers when it equals, as canonical JSON, the entry earlier releases wrote with command putnami or ./putnamiw, keeps other servers and keys, and deletes the file when nothing else remains.",
+        "A changed entry stays byte for byte with a warning; an unparseable file stays untouched with a warning.",
+        "This removal is deleted in the next minor release."
+      ]
     },
     {
       "id": "host-registration-removal",
-      "text": "The CLI installers register no server in Claude Code or Codex. A user-scoped putnami registration that matches, by meaning, the definition earlier installers wrote is removed through the host's CLI, read from a neutral directory so a project entry cannot shadow it. A customized registration stays, with a warning. PUTNAMI_NO_AGENT_HOSTS skips the step. This removal is deleted in the next minor release."
+      "text": [
+        "The CLI installers register no server in Claude Code or Codex.",
+        "A user-scoped putnami registration that matches, by meaning, the definition earlier installers wrote is removed through the host's CLI, read from a neutral directory so a project entry cannot shadow it.",
+        "A customized registration stays, with a warning.",
+        "PUTNAMI_NO_AGENT_HOSTS skips the step.",
+        "This removal is deleted in the next minor release."
+      ]
     },
     {
       "id": "project-graph-queries",
-      "text": "projects owner <path> prints the projects that own a path. projects deps <project> prints direct dependencies, or dependents with --dependents, and the closure with --transitive, sorted and without the project itself. projects why <from> <to> prints the impact path from <from> to <to> with edge kinds and task scope, or says there is none. Selectors take an id or a name. Each query is read-only and prints JSON Lines with --output jsonl."
+      "text": [
+        "projects owner <path> prints the projects that own a path. projects deps <project> prints direct dependencies, or dependents with --dependents, and the closure with --transitive, sorted and without the project itself. projects why <from> <to> prints the impact path from <from> to <to> with edge kinds and task scope, or says there is none.",
+        "Selectors take an id or a name.",
+        "Each query is read-only and prints JSON Lines with --output jsonl."
+      ]
     }
   ],
   "decisions": [

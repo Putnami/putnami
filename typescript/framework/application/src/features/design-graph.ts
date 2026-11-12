@@ -115,7 +115,7 @@ export interface FeatureContributionRef {
  * exact contribution that supports it.
  *
  * This is the whole authoring surface for generated technical evidence. The
- * stage comes from the authored requirement in `putnami.features.json`, and the
+ * stage comes from the authored requirement in the feature declaration, and the
  * evidence ID, issuer, source binding, provenance, and subject are computed by
  * the build — so a declaration states which fact proves which requirement, and
  * nothing else.

@@ -1,0 +1,98 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/toolchain-lock",
+    "type": "feature",
+    "name": "Reproducible toolchain lock",
+    "outcome": "Install pins, for each toolchain an installed extension answers for, an exact release and each platform's verified archive",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "extensions-answer-pins",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "install-asks-each-extension-that-resolves-once",
+            "the-request-carries-the-committed-entries"
+          ]
+        }
+      },
+      {
+        "id": "install-pins-before-installers",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "explicit-install-writes-the-answered-pins-at-format-5",
+            "an-identity-no-answer-pins-is-removed",
+            "a-format-4-lock-is-rewritten-at-format-5"
+          ]
+        }
+      },
+      {
+        "id": "implicit-install-fills-missing-pins",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-implicit-install-keeps-a-committed-pin-and-fills-a-missing-one"
+          ]
+        }
+      },
+      {
+        "id": "hosted-runs-write-no-pins",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-hosted-run-writes-no-pins"
+          ]
+        }
+      },
+      {
+        "id": "failed-answers-stop-the-install",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-problem-fails-install-with-its-remedy",
+            "two-extensions-that-disagree-fail-install",
+            "a-failed-answer-names-the-extension"
+          ]
+        }
+      },
+      {
+        "id": "init-records-pins",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "init-pins-what-the-extensions-answer"
+          ]
+        }
+      }
+    ]
+  }
+}

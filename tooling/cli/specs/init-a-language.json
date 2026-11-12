@@ -16,23 +16,39 @@
   "requirements": [
     {
       "id": "every-language",
-      "text": "putnami init --extension takes any language of the index, dart, dotnet, go, java, php, python, ruby, rust, swift and typescript, or a comma-separated list of them, and declares and installs the extension of each, once. ts and py name typescript and python. An unknown language, an empty item and an empty value are usage errors that list the languages, raised before anything is written."
+      "text": [
+        "putnami init --extension takes any language of the index, dart, dotnet, go, java, php, python, ruby, rust, swift and typescript, or a comma-separated list of them, and declares and installs the extension of each, once. ts and py name typescript and python.",
+        "An unknown language, an empty item and an empty value are usage errors that list the languages, raised before anything is written."
+      ]
     },
     {
       "id": "languages-come-from-the-extensions",
-      "text": "The language index the CLI embeds holds, for every extension the root putnami.workspace.json declares by path whose manifest declares workspace.language, its name, language, markers and excludes as that manifest states them, and nothing else. Each starter's template exists next to its language extension and names that extension."
+      "text": [
+        "The language index the CLI embeds holds, for every extension the root putnami.workspace.json declares by path whose manifest declares workspace.language, its name, language, markers and excludes as that manifest states them, and nothing else.",
+        "Each starter's template exists next to its language extension and names that extension."
+      ]
     },
     {
       "id": "init-adopts-what-it-finds",
-      "text": "When the directory holds a marker of a declared language, init runs putnami projects sync after it installs the extensions and the starter project, then installs the extensions the sync declared. A declared language whose markers are absent is installed and nothing is synchronized."
+      "text": [
+        "When the directory holds a marker of a declared language, init runs putnami projects sync after it installs the extensions and the starter project, then installs the extensions the sync declared.",
+        "A declared language whose markers are absent is installed and nothing is synchronized."
+      ]
     },
     {
       "id": "project-needs-a-starter",
-      "text": "--project renders the starter of the first language of --extension: typescript-web, go-server or python-server. A first language without a starter is a usage error, raised before anything is written, that names the languages that have one."
+      "text": [
+        "--project renders the starter of the first language of --extension: typescript-web, go-server or python-server.",
+        "A first language without a starter is a usage error, raised before anything is written, that names the languages that have one."
+      ]
     },
     {
       "id": "init-proposes-what-it-detects",
-      "text": "putnami init without --extension, --from or --project, in a directory that holds the markers of one or more languages, asks in a terminal which to declare, every detected language preselected, and then adopts the answer. Without a terminal it writes nothing and fails with a usage error that names the detected languages and suggests putnami init --extension with them. A directory without a marker declares typescript, as before."
+      "text": [
+        "putnami init without --extension, --from or --project, in a directory that holds the markers of one or more languages, asks in a terminal which to declare, every detected language preselected, and then adopts the answer.",
+        "Without a terminal it writes nothing and fails with a usage error that names the detected languages and suggests putnami init --extension with them.",
+        "A directory without a marker declares typescript, as before."
+      ]
     },
     {
       "id": "monorepo-tool-hint",
@@ -40,7 +56,10 @@
     },
     {
       "id": "detection-reads-names-only",
-      "text": "Detection matches the markers of the index against the directory and its subdirectories, the root included, reading no file. It skips .git, .putnami, directories git ignores and every directory a language of the walk excludes, and reports for each language the first directory that holds one of its markers."
+      "text": [
+        "Detection matches the markers of the index against the directory and its subdirectories, the root included, reading no file.",
+        "It skips .git, .putnami, directories git ignores and every directory a language of the walk excludes, and reports for each language the first directory that holds one of its markers."
+      ]
     }
   ],
   "decisions": [

@@ -23,7 +23,10 @@
     },
     {
       "id": "bounded-drain",
-      "text": "Stop runs a graceful drain under a deadline that defaults when unset, and force-closes the server when the deadline elapses so a long-lived stream cannot hang shutdown; stopping a server that never started is a no-op."
+      "text": [
+        "Stop runs a graceful drain under a deadline that defaults when unset, and force-closes the server when the deadline elapses so a long-lived stream cannot hang shutdown;",
+        "stopping a server that never started is a no-op."
+      ]
     },
     {
       "id": "reflection-opt-in",
@@ -31,27 +34,51 @@
     },
     {
       "id": "interceptor-chain",
-      "text": "Unary and stream interceptors run in registration order; the recovery interceptor converts a handler panic into an internal error without leaking the panic value; the dependency-injection interceptor creates one scope per RPC and passes the call through unchanged when no container is available."
+      "text": [
+        "Unary and stream interceptors run in registration order;",
+        "the recovery interceptor converts a handler panic into an internal error without leaking the panic value;",
+        "the dependency-injection interceptor creates one scope per RPC and passes the call through unchanged when no container is available."
+      ]
     },
     {
       "id": "gateway-mounting",
-      "text": "Connect handlers become reachable only when the gateway is registered on the HTTP server; a gateway that holds handlers but was never registered warns at start rather than serving nothing silently."
+      "text": [
+        "Connect handlers become reachable only when the gateway is registered on the HTTP server;",
+        "a gateway that holds handlers but was never registered warns at start rather than serving nothing silently."
+      ]
     },
     {
       "id": "api-bridge",
-      "text": "Every bound api endpoint is exposed at a Connect-style RPC URL taken from the published protobuf descriptor when one exists, so the mounted URL and the descriptor's method identity cannot diverge; the bridge refuses to start when they do. Document-only endpoints are skipped, and the JSON envelope keeps path parameters, query parameters, and body in separate sections so identically named fields cannot collide. A mounted bridge publishes the payload encodings it actually serves."
+      "text": [
+        "Every bound api endpoint is exposed at a Connect-style RPC URL taken from the published protobuf descriptor when one exists, so the mounted URL and the descriptor's method identity cannot diverge;",
+        "the bridge refuses to start when they do.",
+        "Document-only endpoints are skipped, and the JSON envelope keeps path parameters, query parameters, and body in separate sections so identically named fields cannot collide.",
+        "A mounted bridge publishes the payload encodings it actually serves."
+      ]
     },
     {
       "id": "connect-protocol",
-      "text": "The bridge serves Connect protocol version 1 for a provider that publishes a protobuf descriptor: JSON and protobuf unary bodies, the caller's Connect-Timeout-Ms, gzip bounded in the decompressed direction, the Connect error document carrying the gRPC code beside the stable first-party code in google.rpc.ErrorInfo, and a declared server stream as 5-byte-prefixed envelopes ended by exactly one EndStreamResponse. A codec it does not serve is refused, never guessed at."
+      "text": [
+        "The bridge serves Connect protocol version 1 for a provider that publishes a protobuf descriptor: JSON and protobuf unary bodies, the caller's Connect-Timeout-Ms, gzip bounded in the decompressed direction, the Connect error document carrying the gRPC code beside the stable first-party code in google.rpc.ErrorInfo, and a declared server stream as 5-byte-prefixed envelopes ended by exactly one EndStreamResponse.",
+        "A codec it does not serve is refused, never guessed at."
+      ]
     },
     {
       "id": "bridge-validation",
-      "text": "A bridged call re-enters the endpoint's own validation pipeline, so it accepts and rejects exactly what the equivalent REST call would, and a numeric path parameter keeps its original decimal text rather than passing through float64. A body the bridge cannot read or decode is refused with the framework code http.bad_request at status 400, and one it cannot re-encode with the code internal at status 500."
+      "text": [
+        "A bridged call re-enters the endpoint's own validation pipeline, so it accepts and rejects exactly what the equivalent REST call would, and a numeric path parameter keeps its original decimal text rather than passing through float64.",
+        "A body the bridge cannot read or decode is refused with the framework code http.bad_request at status 400, and one it cannot re-encode with the code internal at status 500."
+      ]
     },
     {
       "id": "service-inventory",
-      "text": "Describe emits one canonical service inventory from all composed surfaces. Native registrations run without a listener and include enabled reflection. One elected writer unions the facts of every surface. UseForDescribe is refused. A configured surface with no registrations emits an empty inventory."
+      "text": [
+        "Describe emits one canonical service inventory from all composed surfaces.",
+        "Native registrations run without a listener and include enabled reflection.",
+        "One elected writer unions the facts of every surface.",
+        "UseForDescribe is refused.",
+        "A configured surface with no registrations emits an empty inventory."
+      ]
     }
   ],
   "decisions": [

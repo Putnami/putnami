@@ -4,7 +4,7 @@
 // collects what the run observed, joins the two through the pure evaluator in
 // protocols/features, and hands the engine the one sanction decision. It
 // imports protocol types and the CLI's own result plumbing only — it never
-// parses putnami.features.json or specs/*.json.
+// parses an authored feature declaration or specs/*.json.
 //
 // This file owns the POLICY half: reading the committed, domain-keyed
 // options.sdd.verification object. The vocabulary and the one resolver live in

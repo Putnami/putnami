@@ -1,0 +1,103 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/engine-provenance",
+    "type": "feature",
+    "name": "Engine provenance",
+    "outcome": "A workspace states which putnami engine may run against it, and a workspace that builds its own engine refuses every binary it did not produce",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "source-workspace-declaration",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "pin-shows-a-lock-with-the-reserved-literal-as-built-from-this-workspace",
+            "a-metadata-refresh-stamps-no-protocol-version-on-the-source-sentinel-and-keeps-it",
+            "pin-remove-clears-the-source-sentinel",
+            "pin-replaces-the-source-sentinel"
+          ]
+        }
+      },
+      {
+        "id": "foreign-engine-refused",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-binary-not-built-from-this-tree-is-refused-with-the-putnamiw-recovery",
+            "a-keyed-from-source-run-execs-the-immutable-blob-and-exports-its-key",
+            "a-concurrent-relink-does-not-un-prove-a-running-from-source-engine",
+            "a-borrowed-engine-pin-on-a-foreign-binary-is-still-refused",
+            "a-correct-marker-on-a-foreign-binary-is-still-refused"
+          ]
+        }
+      },
+      {
+        "id": "content-keyed-source-build",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-edit-anywhere-in-the-keyed-pathspec-rebuilds-and-an-unchanged-tree-reuses",
+            "a-concurrent-run-at-another-tree-state-never-rewrites-an-earlier-blob"
+          ]
+        }
+      },
+      {
+        "id": "build-only-engine",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "print-engine-names-the-keyed-blob-and-runs-only-extensions-prepare"
+          ]
+        }
+      },
+      {
+        "id": "print-engine-installs-the-locked-go",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "print-engine-installs-the-locked-go-before-extensions-prepare"
+          ]
+        }
+      },
+      {
+        "id": "build-toolchain-stays-in-the-build",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-cli-receives-the-callers-go-environment-whether-or-not-the-run-builds",
+            "an-older-system-go-builds-with-the-managed-install",
+            "a-downloaded-go-is-installed-only-at-its-locked-or-published-sha256"
+          ]
+        }
+      }
+    ]
+  }
+}

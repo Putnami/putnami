@@ -17,23 +17,42 @@
   "requirements": [
     {
       "id": "ruby-components",
-      "text": "Walking past .git, node_modules, vendor, tmp, log, coverage and hidden directories, each directory with a package.yml is a component of source workspace, and each other one with a *.gemspec or a Gemfile one of source manifest, of ecosystem ruby: a Rails application's root is the component \".\". Its name is its gemspec's name, else a pack's directory, as packwerk names it. A package.yml whose dependencies do not read is a warning, and gives no edge."
+      "text": [
+        "Walking past .git, node_modules, vendor, tmp, log, coverage and hidden directories, each directory with a package.yml is a component of source workspace, and each other one with a *.gemspec or a Gemfile one of source manifest, of ecosystem ruby: a Rails application's root is the component \".\".",
+        "Its name is its gemspec's name, else a pack's directory, as packwerk names it.",
+        "A package.yml whose dependencies do not read is a warning, and gives no edge."
+      ]
     },
     {
       "id": "ruby-edges",
-      "text": "A pack depends on each pack its package.yml dependencies list, by its path from the repository root. A component depends on the component a gem entry of its Gemfile names with a path option, or within a path block, resolved against the Gemfile's directory, and on the component whose gemspec name an add_dependency, add_runtime_dependency or add_development_dependency of its gemspec names. A path outside the repository or to no component, and the component itself, are no edge."
+      "text": [
+        "A pack depends on each pack its package.yml dependencies list, by its path from the repository root.",
+        "A component depends on the component a gem entry of its Gemfile names with a path option, or within a path block, resolved against the Gemfile's directory, and on the component whose gemspec name an add_dependency, add_runtime_dependency or add_development_dependency of its gemspec names.",
+        "A path outside the repository or to no component, and the component itself, are no edge."
+      ]
     },
     {
       "id": "ruby-gemfile-lock",
-      "text": "Each Gemfile.lock is a lockfile of ecosystem gem, and belongs to the component that holds it. Its GEM and GIT sources give each spec's name and version, read from the name (version) line as Bundler reads it, with the platform after the first - dropped. The PATH sources' specs, the repository's own gems, are left out."
+      "text": [
+        "Each Gemfile.lock is a lockfile of ecosystem gem, and belongs to the component that holds it.",
+        "Its GEM and GIT sources give each spec's name and version, read from the name (version) line as Bundler reads it, with the platform after the first - dropped.",
+        "The PATH sources' specs, the repository's own gems, are left out."
+      ]
     },
     {
       "id": "ruby-reports",
-      "text": "Discovery finds the JUnit report of rspec_junit_formatter or of minitest-reporters and the coverage report of SimpleCov's Cobertura formatter, coverage/coverage.xml, or of simplecov-lcov, coverage/lcov/*.lcov. A test case goes to the component that holds the file its file attribute names, relative to the directory of the report's component, the repository root or the report's directory, and a covered file to the component that holds it."
+      "text": [
+        "Discovery finds the JUnit report of rspec_junit_formatter or of minitest-reporters and the coverage report of SimpleCov's Cobertura formatter, coverage/coverage.xml, or of simplecov-lcov, coverage/lcov/*.lcov.",
+        "A test case goes to the component that holds the file its file attribute names, relative to the directory of the report's component, the repository root or the report's directory, and a covered file to the component that holds it."
+      ]
     },
     {
       "id": "ruby-change-analysis",
-      "text": "On a Rails application with packs packs/pricing and packs/checkout, which lists pricing in its package.yml, and an engine gem engines/admin its Gemfile names by path, where a change edits pricing and bumps a gem in Gemfile.lock, the analyses list the four components with their edges and mark checkout dependent; the RSpec JUnit cases and the SimpleCov Cobertura lines land on the components, with none unattributed or unmapped; and the bump is a gem dependency change."
+      "text": [
+        "On a Rails application with packs packs/pricing and packs/checkout, which lists pricing in its package.yml, and an engine gem engines/admin its Gemfile names by path, where a change edits pricing and bumps a gem in Gemfile.lock, the analyses list the four components with their edges and mark checkout dependent;",
+        "the RSpec JUnit cases and the SimpleCov Cobertura lines land on the components, with none unattributed or unmapped;",
+        "and the bump is a gem dependency change."
+      ]
     }
   ],
   "decisions": [

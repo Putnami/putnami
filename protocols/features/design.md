@@ -384,8 +384,9 @@ participates in application composition or runtime behavior.
    identity includes its migration kind.
 3. Identity is timeless. Declaration and generated-artifact locations are
    precise provenance and never participate in identity.
-4. Authored intent is discovered only from `putnami.features.json` at the
-   workspace root and exact project roots. Evidence is stored in separate
+4. Authored intent is discovered only from `putnami.features.json`, or the
+   `features/*.json` documents, at the workspace root and exact project roots.
+   A root holds one form, never both. Evidence is stored in separate
    artifacts.
 5. Current maturity is derived from evidence. Missing, stale, and contradicted
    evidence remain visible, and human authority is mandatory for product
@@ -868,9 +869,13 @@ independent proof; each requirement must make a meaningful, reviewable claim.
 The loader obtains project roots from the workspace protocol; it never performs
 a recursive repository scan.
 
-1. Read `<workspace>/putnami.features.json` when present.
+1. Read `<workspace>/putnami.features.json` when present, or else the
+   lexically sorted direct `*.json` children of `<workspace>/features/`. A root
+   that holds both is a `features.manifest_form_conflict` finding and
+   contributes no feature.
 2. For each exact workspace project root, read
-   `<project>/putnami.features.json` when present.
+   `<project>/putnami.features.json` or `<project>/features/*.json` the same
+   way. A `features/` directory that is itself a project root is that project.
 3. At those same roots only, read the lexically sorted direct children matching
    `schema/feature-evidence/*.json`.
 4. Load each project's committed `schema/capabilities.json` through the

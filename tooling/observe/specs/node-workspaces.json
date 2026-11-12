@@ -18,15 +18,27 @@
   "requirements": [
     {
       "id": "workspace-members",
-      "text": "The members are the directories holding a package.json that match the packages of pnpm-workspace.yaml when it declares them, else the root package.json workspaces, a list or the packages of an object. A pattern takes *, ?, [...], {a,b} and **, and one starting with ! excludes; node_modules, .git and dot-directories no pattern names are skipped. Each member is a component named by its directory, with its package name and version. The root is not a member; a repository declaring no members is not detected."
+      "text": [
+        "The members are the directories holding a package.json that match the packages of pnpm-workspace.yaml when it declares them, else the root package.json workspaces, a list or the packages of an object.",
+        "A pattern takes *, ?, [...], {a,b} and **, and one starting with ! excludes; node_modules, .git and dot-directories no pattern names are skipped.",
+        "Each member is a component named by its directory, with its package name and version.",
+        "The root is not a member; a repository declaring no members is not detected."
+      ]
     },
     {
       "id": "internal-edges",
-      "text": "A member depends on another when one of its dependencies, devDependencies, optionalDependencies or peerDependencies names that member with the workspace: protocol, with file:, link: or portal: to its directory, or with a version range its version satisfies. pnpm counts a range only when linkWorkspacePackages is true in pnpm-workspace.yaml or link-workspace-packages=true in .npmrc. Any other dependency is external and is no edge."
+      "text": [
+        "A member depends on another when one of its dependencies, devDependencies, optionalDependencies or peerDependencies names that member with the workspace: protocol, with file:, link: or portal: to its directory, or with a version range its version satisfies. pnpm counts a range only when linkWorkspacePackages is true in pnpm-workspace.yaml or link-workspace-packages=true in .npmrc.",
+        "Any other dependency is external and is no edge."
+      ]
     },
     {
       "id": "probe-answer",
-      "text": "The detector answers a workspace probe request with a probe result the probe protocol accepts: a project per member with its path, package name, package.json, version and dependency paths, attributed to package-json when asked, and its metadata. A request's paths limit the answer to those members. The result watches the root package.json, pnpm-workspace.yaml, .npmrc and lockfiles, whether they exist or not."
+      "text": [
+        "The detector answers a workspace probe request with a probe result the probe protocol accepts: a project per member with its path, package name, package.json, version and dependency paths, attributed to package-json when asked, and its metadata.",
+        "A request's paths limit the answer to those members.",
+        "The result watches the root package.json, pnpm-workspace.yaml, .npmrc and lockfiles, whether they exist or not."
+      ]
     },
     {
       "id": "lockfile-and-reports",
@@ -34,7 +46,10 @@
     },
     {
       "id": "malformed-manifests",
-      "text": "A package.json or pnpm-workspace.yaml that cannot be read or parsed, a pattern that is not valid, two members with one package name and a walk that reaches its bound are diagnostics: the member is left out, the first directory keeps the name, or the walk stops, and the detector answers with what it read. It never fails the run."
+      "text": [
+        "A package.json or pnpm-workspace.yaml that cannot be read or parsed, a pattern that is not valid, two members with one package name and a walk that reaches its bound are diagnostics: the member is left out, the first directory keeps the name, or the walk stops, and the detector answers with what it read.",
+        "It never fails the run."
+      ]
     }
   ],
   "decisions": [

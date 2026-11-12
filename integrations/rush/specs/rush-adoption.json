@@ -16,11 +16,20 @@
   "requirements": [
     {
       "id": "projects-become-projects",
-      "text": "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and the name rush receives, the projects the observe Rush detector says it depends on, attributed build-graph, extension @putnami/rush, tag rush, the workspace root as stack root. In import mode, the default, it answers a project whose putnami.json names @putnami/rush as such, and every other rush.json project as bare, with no extension and no source name. A directory rush.json does not list is no project."
+      "text": [
+        "In delegate mode, the probe answers each rush.json project: its folder, its packageName as source name and the name rush receives, the projects the observe Rush detector says it depends on, attributed build-graph, extension @putnami/rush, tag rush, the workspace root as stack root.",
+        "In import mode, the default, it answers a project whose putnami.json names @putnami/rush as such, and every other rush.json project as bare, with no extension and no source name.",
+        "A directory rush.json does not list is no project."
+      ]
     },
     {
       "id": "sync-writes-the-project-graph",
-      "text": "The sync task writes in each project's putnami.json the extension of the mode, the mode param or else the recorded mode, import by default, an unknown one failing, and the project IDs it depends on, and removes the other mode's extension. In delegate mode it adds rush.json, command-line.json and the Rush lockfile as filePatterns, disables test and lint without a Rush command of that name, and retracts a former project; in import mode it disables a task with no script. It rewrites a file only on a change."
+      "text": [
+        "The sync task writes in each project's putnami.json the extension of the mode, the mode param or else the recorded mode, import by default, an unknown one failing, and the project IDs it depends on, and removes the other mode's extension.",
+        "In delegate mode it adds rush.json, command-line.json and the Rush lockfile as filePatterns, disables test and lint without a Rush command of that name, and retracts a former project;",
+        "in import mode it disables a task with no script.",
+        "It rewrites a file only on a change."
+      ]
     },
     {
       "id": "validate-fails-on-a-stale-graph",
@@ -28,11 +37,19 @@
     },
     {
       "id": "tasks-delegate-to-rush",
-      "text": "Each task compares the version the banner of rush --help states with the rushVersion of rush.json, then runs at the workspace root rush build --to <package>, or rush test or rush lint --to <package>. Each task depends only on its project's graph step, which runs no rush. Putnami's cache is off for every task, and the result records delegatedTo rush. A failing step fails with stacks.step_failed."
+      "text": [
+        "Each task compares the version the banner of rush --help states with the rushVersion of rush.json, then runs at the workspace root rush build --to <package>, or rush test or rush lint --to <package>.",
+        "Each task depends only on its project's graph step, which runs no rush.",
+        "Putnami's cache is off for every task, and the result records delegatedTo rush.",
+        "A failing step fails with stacks.step_failed."
+      ]
     },
     {
       "id": "reports-come-from-the-project-options",
-      "text": "The test task reads the JUnit and coverage files a project names in its putnami.json, under options.@putnami/rush.tasks.test.reports, into the test and coverage summary. A project that names none passes or fails on the exit code alone, and the sync lists those projects."
+      "text": [
+        "The test task reads the JUnit and coverage files a project names in its putnami.json, under options.@putnami/rush.tasks.test.reports, into the test and coverage summary.",
+        "A project that names none passes or fails on the exit code alone, and the sync lists those projects."
+      ]
     },
     {
       "id": "build-cache-warning",
@@ -40,7 +57,11 @@
     },
     {
       "id": "unmapped-commands-are-listed",
-      "text": "The sync writes nothing it cannot map. It lists, with the reason, each command-line.json bulk or phased command other than build, test and lint, and in import mode each project script other than build, test and lint; those keep running through Rush."
+      "text": [
+        "The sync writes nothing it cannot map.",
+        "It lists, with the reason, each command-line.json bulk or phased command other than build, test and lint, and in import mode each project script other than build, test and lint;",
+        "those keep running through Rush."
+      ]
     },
     {
       "id": "manifest-follows-the-profile",
@@ -48,11 +69,17 @@
     },
     {
       "id": "import-keeps-the-tool-that-checks-the-code",
-      "text": "In import mode, a build, test or lint script moves to @putnami/typescript only when that extension runs its tool: bun build or tsc alone, bun test, Vitest or Jest with no argument that picks a configuration or a subset, Biome or a bare ESLint, with no command chained. Any other script keeps running with rushx <task> in the project's directory: its putnami.json names @putnami/rush beside @putnami/typescript, disables each task for the extension that does not run it, and the sync lists the script (D-070)."
+      "text": [
+        "In import mode, a build, test or lint script moves to @putnami/typescript only when that extension runs its tool: bun build or tsc alone, bun test, Vitest or Jest with no argument that picks a configuration or a subset, Biome or a bare ESLint, with no command chained.",
+        "Any other script keeps running with rushx <task> in the project's directory: its putnami.json names @putnami/rush beside @putnami/typescript, disables each task for the extension that does not run it, and the sync lists the script (D-070)."
+      ]
     },
     {
       "id": "import-adopts-typescript-conventions",
-      "text": "In import mode, the sync adds exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json whose build script runs bun build, that declares no exports, names a file outside src/ there, holds src/index.ts and that rush.json does not publish, and writes a tsconfig.json extending the root's where a project holds no tsconfig*.json. It keeps every other byte, warns about each file it writes and each manifest it cannot edit, and a dry sync shows each diff."
+      "text": [
+        "In import mode, the sync adds exports {\".\": \"./src/index.ts\"} after the top-level main or types of a package.json whose build script runs bun build, that declares no exports, names a file outside src/ there, holds src/index.ts and that rush.json does not publish, and writes a tsconfig.json extending the root's where a project holds no tsconfig*.json.",
+        "It keeps every other byte, warns about each file it writes and each manifest it cannot edit, and a dry sync shows each diff."
+      ]
     }
   ],
   "decisions": [

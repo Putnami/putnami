@@ -15,19 +15,34 @@
   "requirements": [
     {
       "id": "one-manifest-identity-and-version",
-      "text": "The identity vocabulary is authored once, as the manifest schema/contracts.json. The manifest passes strict parsing and validation, names go.putnami.dev/protocol/identity, and declares the contracts protocol version in force."
+      "text": [
+        "The identity vocabulary is authored once, as the manifest schema/contracts.json.",
+        "The manifest passes strict parsing and validation, names go.putnami.dev/protocol/identity, and declares the contracts protocol version in force."
+      ]
     },
     {
       "id": "reviewed-claim-and-principal-vocabulary",
-      "text": "The manifest declares exactly the claims sub, iss, client_id, roles, scope, aud and exp, in that order, and exactly the principal kinds user and apikey. It declares exactly the enums ClaimName, PrincipalKind and AuthDecision, each constant keeping its pinned name and wire value. It declares no scopes, capabilities or grants."
+      "text": [
+        "The manifest declares exactly the claims sub, iss, client_id, roles, scope, aud and exp, in that order, and exactly the principal kinds user and apikey.",
+        "It declares exactly the enums ClaimName, PrincipalKind and AuthDecision, each constant keeping its pinned name and wire value.",
+        "It declares no scopes, capabilities or grants."
+      ]
     },
     {
       "id": "committed-twins-are-fresh",
-      "text": "Every committed artifact is a pure function of the manifest. The manifest is in canonical form. The Go twin, the JSON Schema and the reference tables match a fresh generation byte for byte. The committed TypeScript twin matches a fresh TypeScript emission byte for byte."
+      "text": [
+        "Every committed artifact is a pure function of the manifest.",
+        "The manifest is in canonical form.",
+        "The Go twin, the JSON Schema and the reference tables match a fresh generation byte for byte.",
+        "The committed TypeScript twin matches a fresh TypeScript emission byte for byte."
+      ]
     },
     {
       "id": "adopted-constants-mirror-the-enums",
-      "text": "The Go security decision labels equal the generated AuthDecision constants. The TypeScript ClaimName, PrincipalKind and AuthDecision constants equal the manifest enum names and wire values."
+      "text": [
+        "The Go security decision labels equal the generated AuthDecision constants.",
+        "The TypeScript ClaimName, PrincipalKind and AuthDecision constants equal the manifest enum names and wire values."
+      ]
     }
   ],
   "decisions": [

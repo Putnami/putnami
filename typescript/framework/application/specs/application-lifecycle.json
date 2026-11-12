@@ -40,11 +40,18 @@
     },
     {
       "id": "failed-start-unwind",
-      "text": "A startup failure stops only the plugins whose start() resolved, closes the container, leaves the application not running, and re-throws to the caller; every additional concurrent start failure is logged rather than discarded."
+      "text": [
+        "A startup failure stops only the plugins whose start() resolved, closes the container, leaves the application not running, and re-throws to the caller;",
+        "every additional concurrent start failure is logged rather than discarded."
+      ]
     },
     {
       "id": "completed-startup-readiness",
-      "text": "start() calls every plugin's startupCompleted(), then writes its ready record: a runtime-protocol workload readiness claim under the reserved putnami.ready key, with the endpoints every plugin's readyEndpoints() reports, such as the HTTP listener. Both happen only after every plugin start() resolved and before the runner runs, and the platform plugin's /readyz answers ready only from then on. A start() that is still pending delays all of it, and a start() that rejects means none of it happens."
+      "text": [
+        "start() calls every plugin's startupCompleted(), then writes its ready record: a runtime-protocol workload readiness claim under the reserved putnami.ready key, with the endpoints every plugin's readyEndpoints() reports, such as the HTTP listener.",
+        "Both happen only after every plugin start() resolved and before the runner runs, and the platform plugin's /readyz answers ready only from then on.",
+        "A start() that is still pending delays all of it, and a start() that rejects means none of it happens."
+      ]
     },
     {
       "id": "bootstrap-guard",
@@ -56,19 +63,33 @@
     },
     {
       "id": "darc-runtime-enforcement",
-      "text": "A TypeScript workload enforces a Domain Access & Replication Contract from the declaration itself: construction applies the architecture protocol's own verdict, and every read, write, rebuild, and deletion follows the declared freshness bound, ordering, late-event, single-writer, and deletion rules. Neither runtime is its own oracle: Go and TypeScript answer one shared conformance corpus, so a behavior that differs between them fails on one side instead of shipping as two runtimes."
+      "text": [
+        "A TypeScript workload enforces a Domain Access & Replication Contract from the declaration itself: construction applies the architecture protocol's own verdict, and every read, write, rebuild, and deletion follows the declared freshness bound, ordering, late-event, single-writer, and deletion rules.",
+        "Neither runtime is its own oracle: Go and TypeScript answer one shared conformance corpus, so a behavior that differs between them fails on one side instead of shipping as two runtimes."
+      ]
     },
     {
       "id": "darc-runtime-evidence",
-      "text": "A component that enforces a contract contributes one capability-manifest row carrying the declared contract verbatim, under the identity and provenance every other contribution carries. The row is evidence and never authority: emitting it cannot create a cross-domain permission, only a reviewed manifest edit can. A project that enforces nothing emits no rows, and the bytes TypeScript emits are the bytes the Go detector reads back."
+      "text": [
+        "A component that enforces a contract contributes one capability-manifest row carrying the declared contract verbatim, under the identity and provenance every other contribution carries.",
+        "The row is evidence and never authority: emitting it cannot create a cross-domain permission, only a reviewed manifest edit can.",
+        "A project that enforces nothing emits no rows, and the bytes TypeScript emits are the bytes the Go detector reads back."
+      ]
     },
     {
       "id": "route-loader-activation",
-      "text": "Every api() plugin that scans a route folder (a scanPath or autoScan on), every StaticPlugin without skipLoading, and every events() plugin that scans a handler folder exports its generated loader under its own key: <family>-loader for the first in module-tree registration order, <family>-<n>-loader for the others. The packaged entrypoint registers each key and each plugin resolves only its own, so a packaged workload serves every instance. A plugin that owns no loader resolves none."
+      "text": [
+        "Every api() plugin that scans a route folder (a scanPath or autoScan on), every StaticPlugin without skipLoading, and every events() plugin that scans a handler folder exports its generated loader under its own key: <family>-loader for the first in module-tree registration order, <family>-<n>-loader for the others.",
+        "The packaged entrypoint registers each key and each plugin resolves only its own, so a packaged workload serves every instance.",
+        "A plugin that owns no loader resolves none."
+      ]
     },
     {
       "id": "no-source-claim",
-      "text": "A scheduler stamp whose capability packages all carry sourceBindingUnavailable with an empty sourceBinding and a sourceRoot makes no source claim: build() emits the capability manifest bytes it emits for a bound stamp, writes no feature evidence, and removes stale scratch evidence. A marked package that carries a binding, a mix of marked and bound packages, an unmarked package without a valid binding, and a package without sourceRoot are refused, with the wording the Go producer uses."
+      "text": [
+        "A scheduler stamp whose capability packages all carry sourceBindingUnavailable with an empty sourceBinding and a sourceRoot makes no source claim: build() emits the capability manifest bytes it emits for a bound stamp, writes no feature evidence, and removes stale scratch evidence.",
+        "A marked package that carries a binding, a mix of marked and bound packages, an unmarked package without a valid binding, and a package without sourceRoot are refused, with the wording the Go producer uses."
+      ]
     }
   ],
   "decisions": [

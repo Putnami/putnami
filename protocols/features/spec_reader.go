@@ -276,7 +276,7 @@ func specTextBoundFindings(spec *Spec, referencePath string, reading SpecReading
 		mark(fmt.Sprintf("nonGoals[%d]", i), "non-goal", "two non-goals", nonGoal)
 	}
 	for i, requirement := range spec.Requirements {
-		mark(fmt.Sprintf("requirements[%d]", i), fmt.Sprintf("requirement %q", requirement.ID), "two requirements", requirement.Text)
+		mark(fmt.Sprintf("requirements[%d]", i), fmt.Sprintf("requirement %q", requirement.ID), "two requirements", requirement.Text.String())
 	}
 	return findings
 }

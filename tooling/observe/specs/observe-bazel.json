@@ -18,23 +18,43 @@
   "requirements": [
     {
       "id": "bazel-packages-are-components",
-      "text": "A root that holds MODULE.bazel, WORKSPACE or WORKSPACE.bazel is a Bazel workspace. Its export is bazel-graph.json at the root, or the file --bazel-graph names, as bazel query 'deps(//...)' writes it with --output=streamed_jsonproto or jsonproto. Each directory with a BUILD or BUILD.bazel file and a rule of the main repository in the export is a component of source orchestrator and ecosystem bazel, named by its package label, // at the root."
+      "text": [
+        "A root that holds MODULE.bazel, WORKSPACE or WORKSPACE.bazel is a Bazel workspace.",
+        "Its export is bazel-graph.json at the root, or the file --bazel-graph names, as bazel query 'deps(//...)' writes it with --output=streamed_jsonproto or jsonproto.",
+        "Each directory with a BUILD or BUILD.bazel file and a rule of the main repository in the export is a component of source orchestrator and ecosystem bazel, named by its package label, // at the root."
+      ]
     },
     {
       "id": "bazel-without-export",
-      "text": "Without an export, each directory with a BUILD or BUILD.bazel file, outside hidden, node_modules and root bazel-* directories and those .bazelignore or REPO.bazel ignore_directories names, is a manifest component without edges, unless another detector has a component at or above it; when it finds a package, the info observe.bazel_graph_missing names the export command. An export that does not parse or holds no main-repository rule is the warning observe.bazel_graph_unreadable, and the BUILD files answer."
+      "text": [
+        "Without an export, each directory with a BUILD or BUILD.bazel file, outside hidden, node_modules and root bazel-* directories and those .bazelignore or REPO.bazel ignore_directories names, is a manifest component without edges, unless another detector has a component at or above it; when it finds a package, the info observe.bazel_graph_missing names the export command.",
+        "An export that does not parse or holds no main-repository rule is the warning observe.bazel_graph_unreadable, and the BUILD files answer."
+      ]
     },
     {
       "id": "bazel-package-edges",
-      "text": "A rule of one package that names a target of another package of the main repository among its rule inputs makes its package depend on the other. A label of the main repository is //pkg:name, @//pkg:name or @@//pkg:name. A target of an external repository, such as @maven//... or @@rules_go~//..., a package with no component, and the package itself are no edge."
+      "text": [
+        "A rule of one package that names a target of another package of the main repository among its rule inputs makes its package depend on the other.",
+        "A label of the main repository is //pkg:name, @//pkg:name or @@//pkg:name.",
+        "A target of an external repository, such as @maven//... or @@rules_go~//..., a package with no component, and the package itself are no edge."
+      ]
     },
     {
       "id": "bazel-reports",
-      "text": "Discovery follows the bazel-testlogs and bazel-out links of the root: the test.xml of each test target, shard or run under bazel-testlogs, and bazel-out/_coverage/_coverage_report.dat, are report candidates, recognized by content and named through the link. The cases of a log under bazel-testlogs/<package>/<target>/ go to the package of its test target, or the component enclosing it: the export rule that matches the directory, else the longest package that prefixes it. Each LCOV file goes to its package."
+      "text": [
+        "Discovery follows the bazel-testlogs and bazel-out links of the root: the test.xml of each test target, shard or run under bazel-testlogs, and bazel-out/_coverage/_coverage_report.dat, are report candidates, recognized by content and named through the link.",
+        "The cases of a log under bazel-testlogs/<package>/<target>/ go to the package of its test target, or the component enclosing it: the export rule that matches the directory, else the longest package that prefixes it.",
+        "Each LCOV file goes to its package."
+      ]
     },
     {
       "id": "bazel-change-analysis",
-      "text": "On a repository with //pricing, //api that depends on it, and //web: with the export, the three packages and the edge from api to pricing, and a change to pricing marks api dependent and web unaffected; without it, the three packages without edges and the info diagnostic; the bazel-testlogs cases and the combined LCOV land on their packages, with no unattributed case or unmapped file; a malformed export is a warning, never a failed run."
+      "text": [
+        "On a repository with //pricing, //api that depends on it, and //web: with the export, the three packages and the edge from api to pricing, and a change to pricing marks api dependent and web unaffected;",
+        "without it, the three packages without edges and the info diagnostic;",
+        "the bazel-testlogs cases and the combined LCOV land on their packages, with no unattributed case or unmapped file;",
+        "a malformed export is a warning, never a failed run."
+      ]
     }
   ],
   "decisions": [

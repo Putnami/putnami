@@ -1,0 +1,46 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature.json",
+  "protocolVersion": 2,
+  "namespace": "cli",
+  "feature": {
+    "id": "cli/sdd-extraction",
+    "type": "feature",
+    "name": "SDD extraction parity",
+    "outcome": "The extracted SDD surfaces answer byte-for-byte what the built-in CLI answered before deletion, and the extension binary knows the workspace only through the wire",
+    "owner": "tooling",
+    "target": "modeled",
+    "requirements": [
+      {
+        "id": "recorded-parity-with-the-replaced-surface",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "every-subcommand-matches-the-recorded-builtin-byte-for-byte",
+            "the-human-output-matches-the-recorded-builtin",
+            "the-recording-covers-every-case-and-nothing-else",
+            "the-parity-cases-cover-the-whole-inventory",
+            "the-baseline-actually-reaches-the-extension"
+          ]
+        }
+      },
+      {
+        "id": "wire-only-workspace-knowledge",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-extension-module-never-replaces-into-tooling-cli",
+            "the-extension-source-never-imports-cli-internals-or-execs-putnami"
+          ]
+        }
+      }
+    ]
+  }
+}

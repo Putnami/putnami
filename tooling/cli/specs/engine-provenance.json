@@ -18,27 +18,54 @@
   "requirements": [
     {
       "id": "source-workspace-declaration",
-      "text": "A lock whose cli.source is the reserved literal \"workspace\" declares a workspace that builds its own CLI, and `putnami pin` shows it as built from this workspace. A metadata refresh stamps no protocolVersion on it and never erases it. `putnami pin <version>` replaces it with a real pin and `putnami pin --remove` clears it."
+      "text": [
+        "A lock whose cli.source is the reserved literal \"workspace\" declares a workspace that builds its own CLI, and `putnami pin` shows it as built from this workspace.",
+        "A metadata refresh stamps no protocolVersion on it and never erases it.",
+        "`putnami pin <version>` replaces it with a real pin and `putnami pin --remove` clears it."
+      ]
     },
     {
       "id": "foreign-engine-refused",
-      "text": "In a source workspace only a putnami built from that tree may run. The wrapper proves it with a pair: the workspace root, compared as resolved paths, and the content key whose immutable store blob the running binary must be. The pair is scoped to the inheriting process tree, so a concurrent wrapper run cannot retract the proof of a live CLI or its children. Anything else is a hard error naming the missing proof and the ./putnamiw recovery. A Go test binary runs as-is."
+      "text": [
+        "In a source workspace only a putnami built from that tree may run.",
+        "The wrapper proves it with a pair: the workspace root, compared as resolved paths, and the content key whose immutable store blob the running binary must be.",
+        "The pair is scoped to the inheriting process tree, so a concurrent wrapper run cannot retract the proof of a live CLI or its children.",
+        "Anything else is a hard error naming the missing proof and the ./putnamiw recovery.",
+        "A Go test binary runs as-is."
+      ]
     },
     {
       "id": "content-keyed-source-build",
-      "text": "The wrapper keys its from-source build on the content of the sources it compiles, not on timestamps. An unchanged tree reuses the cached build without invoking the compiler; a change anywhere in the keyed pathspec, including outside the CLI's own directory, rebuilds; two worktrees at the same tree state share one build; and a failed build stops the run instead of using a cached binary. Published blobs are immutable: a later run never rewrites one in use."
+      "text": [
+        "The wrapper keys its from-source build on the content of the sources it compiles, not on timestamps.",
+        "An unchanged tree reuses the cached build without invoking the compiler;",
+        "a change anywhere in the keyed pathspec, including outside the CLI's own directory, rebuilds;",
+        "two worktrees at the same tree state share one build;",
+        "and a failed build stops the run instead of using a cached binary.",
+        "Published blobs are immutable: a later run never rewrites one in use."
+      ]
     },
     {
       "id": "build-only-engine",
-      "text": "`./putnamiw --print-engine` builds or reuses the content-keyed store blob like a normal run, writes nothing under .putnami/bin, runs only `putnami extensions prepare` with it, and prints one JSON line on stdout: the absolute blob path, the source key and the absolute workspace root. Started with PUTNAMI_FROM_SOURCE, PUTNAMI_FROM_SOURCE_KEY and the same PUTNAMI_HOME, that blob is admitted as the workspace's own engine. Any failure or refusal, a failed prepare included, exits non-zero with nothing on stdout."
+      "text": [
+        "`./putnamiw --print-engine` builds or reuses the content-keyed store blob like a normal run, writes nothing under .putnami/bin, runs only `putnami extensions prepare` with it, and prints one JSON line on stdout: the absolute blob path, the source key and the absolute workspace root.",
+        "Started with PUTNAMI_FROM_SOURCE, PUTNAMI_FROM_SOURCE_KEY and the same PUTNAMI_HOME, that blob is admitted as the workspace's own engine.",
+        "Any failure or refusal, a failed prepare included, exits non-zero with nothing on stdout."
+      ]
     },
     {
       "id": "print-engine-installs-the-locked-go",
-      "text": "Before `./putnamiw --print-engine` runs `putnami extensions prepare`, whether it builds or reuses the blob, it installs the Go release the workspace lock pins under the Putnami home, unless the home holds it already, or $GOROOT/bin/go or the go on PATH runs as it in the workspace root with GOROOT unset and GOTOOLCHAIN=local. It installs that release only at the SHA-256 the lock records or go.dev publishes, and a Go it cannot install stops the mode before the command starts, with nothing on stdout."
+      "text": [
+        "Before `./putnamiw --print-engine` runs `putnami extensions prepare`, whether it builds or reuses the blob, it installs the Go release the workspace lock pins under the Putnami home, unless the home holds it already, or $GOROOT/bin/go or the go on PATH runs as it in the workspace root with GOROOT unset and GOTOOLCHAIN=local.",
+        "It installs that release only at the SHA-256 the lock records or go.dev publishes, and a Go it cannot install stops the mode before the command starts, with nothing on stdout."
+      ]
     },
     {
       "id": "build-toolchain-stays-in-the-build",
-      "text": "The wrapper builds with the go on PATH when it satisfies go.work, whose version is the higher of its go and toolchain lines, and otherwise with the managed install under the Putnami home, installed only at the SHA-256 the lock records or go.dev publishes. The resolved Go's GOROOT, its bin directory first on PATH, and GOTOOLCHAIN=local reach the build command alone: the CLI receives the caller's GOROOT, PATH and GOTOOLCHAIN, on a run that builds and on one that reuses the blob."
+      "text": [
+        "The wrapper builds with the go on PATH when it satisfies go.work, whose version is the higher of its go and toolchain lines, and otherwise with the managed install under the Putnami home, installed only at the SHA-256 the lock records or go.dev publishes.",
+        "The resolved Go's GOROOT, its bin directory first on PATH, and GOTOOLCHAIN=local reach the build command alone: the CLI receives the caller's GOROOT, PATH and GOTOOLCHAIN, on a run that builds and on one that reuses the blob."
+      ]
     }
   ],
   "decisions": [

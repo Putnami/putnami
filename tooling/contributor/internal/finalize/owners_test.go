@@ -128,8 +128,9 @@ func (h *ownersHost) channel(t *testing.T) *host.Channel {
 // featureless project with a feature manifest (former). Its head commit makes
 // changed featureless only on the branch, adds a feature manifest to
 // manifest, removes the one of former, gives the putnami.json of mistyped a
-// type error outside featureAuthority, and adds the new featureless project
-// fresh.
+// type error outside featureAuthority, adds the new featureless project
+// fresh, and adds a feature document under features/ to the featureless
+// project documents.
 type ownersRepo struct {
 	top, root, base string
 }
@@ -169,6 +170,7 @@ func newOwnersRepo(t *testing.T) ownersRepo {
 	project("owner", ownerConfig)
 	project("former", featurelessConfig)
 	project("mistyped", featurelessConfig)
+	project("documents", featurelessConfig)
 	write("former/putnami.features.json", "{}\n")
 	write("../outside.txt", "outside the workspace\n")
 	repo.git(t, "init", "-q", top)
@@ -178,6 +180,7 @@ func newOwnersRepo(t *testing.T) ownersRepo {
 	project("changed", featurelessConfig)
 	write("manifest/putnami.features.json", "{}\n")
 	remove("former/putnami.features.json")
+	write("documents/features/export.json", "{}\n")
 	project("fresh", featurelessConfig)
 	write("mistyped/putnami.json", `{"name":"mistyped","tags":"x","featureAuthority":{"none":"Internal plumbing with no user-facing feature."}}`)
 	repo.git(t, "add", "-A")
@@ -205,7 +208,7 @@ func (r ownersRepo) git(t *testing.T, args ...string) string {
 // belongs to its project.
 func projectOwners() map[string][]wire.OwningProject {
 	owners := map[string][]wire.OwningProject{}
-	for _, name := range []string{"lib", "changed", "manifest", "owner", "former", "mistyped", "fresh"} {
+	for _, name := range []string{"lib", "changed", "manifest", "owner", "former", "mistyped", "documents", "fresh"} {
 		owners[name+"/source.go"] = []wire.OwningProject{{ID: "/" + name, Path: name}}
 		owners[name+"/putnami.json"] = []wire.OwningProject{{ID: "/" + name, Path: name}}
 	}
@@ -231,6 +234,7 @@ func TestOwnersComeFromTheHostAndFeaturelessnessFromBothRevisions(t *testing.T) 
 		{name: "new on the branch", paths: []string{"ws/fresh/source.go"}},
 		{name: "a feature manifest at head", paths: []string{"ws/manifest/source.go"}, projects: []string{"/manifest"}},
 		{name: "a feature manifest at base", paths: []string{"ws/former/source.go"}, projects: []string{"/former"}},
+		{name: "a feature document at head", paths: []string{"ws/documents/source.go"}, projects: []string{"/documents"}},
 		{name: "a feature owner", paths: []string{"ws/owner/source.go"}, projects: []string{"/owner"}},
 		// The workspace loader decodes no config from this putnami.json, so the
 		// core reads the project as one that holds requirements.

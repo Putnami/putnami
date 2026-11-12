@@ -19,15 +19,27 @@
   "requirements": [
     {
       "id": "explicit-backend",
-      "text": "The binding's settings name the backend, file or git; no backend is chosen by default, and an unknown setting, a Git setting on the file backend, a branch that is not a branch name, a remote that could be read as an option, and a remote URL carrying a password, an HTTP user, a query or a fragment are refused as invalid settings before anything is read or written. Credentials come from Git's own helpers and SSH agent."
+      "text": [
+        "The binding's settings name the backend, file or git;",
+        "no backend is chosen by default, and an unknown setting, a Git setting on the file backend, a branch that is not a branch name, a remote that could be read as an option, and a remote URL carrying a password, an HTTP user, a query or a fragment are refused as invalid settings before anything is read or written.",
+        "Credentials come from Git's own helpers and SSH agent."
+      ]
     },
     {
       "id": "one-contract-every-backend",
-      "text": "context, mission, checkpoint and search behave identically on the file backend, the Git backend on a local branch and the Git backend behind a remote: the same contract scenarios run against all three. A mission is checkpointed, read back, checkpointed again against its revision and resumed by another process from the store alone; list answers are bounded pages in one kind-then-id order that a write between two pages neither repeats nor skips."
+      "text": [
+        "context, mission, checkpoint and search behave identically on the file backend, the Git backend on a local branch and the Git backend behind a remote: the same contract scenarios run against all three.",
+        "A mission is checkpointed, read back, checkpointed again against its revision and resumed by another process from the store alone;",
+        "list answers are bounded pages in one kind-then-id order that a write between two pages neither repeats nor skips."
+      ]
     },
     {
       "id": "compare-and-set-checkpoints",
-      "text": "A checkpoint states expectedRevision or mustNotExist, and the comparison and the write are one step: under an exclusive lock on the file store, or as a Git ref update or push conditional on the head it read. Of concurrent checkpoints from one revision, or concurrent creations, exactly one lands and every other is a conflict carrying the current revision, whether the writers are goroutines or processes. A Git writer that lost the race to another mission is rebuilt on the new head."
+      "text": [
+        "A checkpoint states expectedRevision or mustNotExist, and the comparison and the write are one step: under an exclusive lock on the file store, or as a Git ref update or push conditional on the head it read.",
+        "Of concurrent checkpoints from one revision, or concurrent creations, exactly one lands and every other is a conflict carrying the current revision, whether the writers are goroutines or processes.",
+        "A Git writer that lost the race to another mission is rebuilt on the new head."
+      ]
     },
     {
       "id": "readable-records",
@@ -35,19 +47,33 @@
     },
     {
       "id": "retries-never-duplicate",
-      "text": "A record keeps digests of the idempotency key and request that produced its revision: repeating that checkpoint replays it, and the key with other content is a conflict. A push whose answer was lost is reconciled by reading the remote branch first: it landed when the branch is or descends from its commit, did not when the branch is at the base, and is unresolved, never retryable, when the branch cannot be read, as is a file write whose directory sync failed after its rename. A write answers within 160 s."
+      "text": [
+        "A record keeps digests of the idempotency key and request that produced its revision: repeating that checkpoint replays it, and the key with other content is a conflict.",
+        "A push whose answer was lost is reconciled by reading the remote branch first: it landed when the branch is or descends from its commit, did not when the branch is at the base, and is unresolved, never retryable, when the branch cannot be read, as is a file write whose directory sync failed after its rename.",
+        "A write answers within 160 s."
+      ]
     },
     {
       "id": "layout-independent-context",
-      "text": "A record is selected when every identity member the request names is the record's or absent from it, its scope overlaps the requested scope, its kind is requested, and — for a narrowed project selection the orchestrator resolved — it names no scope or its scope overlaps a selected project; scopes compare as '/'-separated paths. The backend's file names play no part."
+      "text": [
+        "A record is selected when every identity member the request names is the record's or absent from it, its scope overlaps the requested scope, its kind is requested, and — for a narrowed project selection the orchestrator resolved — it names no scope or its scope overlaps a selected project;",
+        "scopes compare as '/'-separated paths.",
+        "The backend's file names play no part."
+      ]
     },
     {
       "id": "explicit-outage",
-      "text": "A store that cannot be read or written — a missing directory replaced by a file, no git executable, an unreachable remote — answers unavailable on every operation, and a checkpoint that failed before it could write changes nothing and asks for no reconciliation. A store holding records without its identity document answers unavailable (store.invalid) to every operation: a checkpoint never gives it a new identity."
+      "text": [
+        "A store that cannot be read or written — a missing directory replaced by a file, no git executable, an unreachable remote — answers unavailable on every operation, and a checkpoint that failed before it could write changes nothing and asks for no reconciliation.",
+        "A store holding records without its identity document answers unavailable (store.invalid) to every operation: a checkpoint never gives it a new identity."
+      ]
     },
     {
       "id": "contextual-memory",
-      "text": "A record carries its content, source references, evidence references (kind, locator, digest) and provenance exactly as a checkpoint gave them, and no member that states a verdict; the provider adds none."
+      "text": [
+        "A record carries its content, source references, evidence references (kind, locator, digest) and provenance exactly as a checkpoint gave them, and no member that states a verdict;",
+        "the provider adds none."
+      ]
     },
     {
       "id": "truthful-manifest",

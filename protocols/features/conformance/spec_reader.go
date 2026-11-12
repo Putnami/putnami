@@ -52,7 +52,7 @@ func (MinimalSpecReader) Read(input features.SpecInput) features.SpecReading {
 					reading.Findings = append(reading.Findings, diag.Errorf(features.ErrorCodeSpecRead, position.Field(), "requirement %q has no ID: add an anchor", name))
 					continue
 				}
-				reading.Spec.Requirements = append(reading.Spec.Requirements, features.SpecRequirement{ID: id, Text: text})
+				reading.Spec.Requirements = append(reading.Spec.Requirements, features.SpecRequirement{ID: id, Text: features.SpecText{text}})
 				reading.Requirements = append(reading.Requirements, features.SpecRequirementRecord{Position: position, Unanchored: unanchored, Scenarios: []features.SpecScenario{}})
 				anchor = ""
 			case "scenario":
