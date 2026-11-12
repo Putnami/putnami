@@ -24,17 +24,19 @@ func projectWithInputs(id, dir string, layer string, patterns ...string) *Projec
 // TestDeclaredInputRootsReduceAPatternToWhatItCanRead pins the reduction: the
 // literal prefix, resolved against the declaring project, is the deepest
 // directory a pattern can select from, and the answer never depends on what
-// happens to be on disk.
+// happens to be on disk. A "git:" prefix names the collector, not the path.
 func TestDeclaredInputRootsReduceAPatternToWhatItCanRead(t *testing.T) {
 	project := projectWithInputs("scaffold", "tooling/scaffold", "test",
 		"internal/packaging/testdata/golden.json",
 		"../contributor/src/**",
 		"../../go/templates/go-server/**",
 		"!../contributor/src/generated/**",
-		"../../../outside/**")
+		"../../../outside/**",
+		"git:../../cloud/clients/**/*.go")
 
 	got := DeclaredInputRoots(project)
 	want := []string{
+		"cloud/clients",
 		"go/templates/go-server",
 		"tooling/contributor/src",
 		"tooling/scaffold/internal/packaging/testdata/golden.json",

@@ -520,7 +520,9 @@ func (g *DependencyGraph) TransitiveDependentsOf(names []string) []string {
 // An EXCLUSION (`!…`) is not a read and contributes nothing. A pattern that
 // resolves outside the workspace root reads no project of it and is dropped.
 // A pattern that resolves TO the workspace root is kept as "." — it reads
-// everywhere, which is what its author declared.
+// everywhere, which is what its author declared. A "git:" prefix names where
+// the bytes are collected from, not where the path points, so the root is the
+// path after it.
 func DeclaredInputRoots(p *Project) []string {
 	if p == nil {
 		return nil
@@ -532,6 +534,7 @@ func DeclaredInputRoots(p *Project) []string {
 			if strings.HasPrefix(pattern, "!") {
 				continue
 			}
+			pattern, _ = wsproto.GitFilePattern(pattern)
 			if root, ok := resolveDeclaredInputRoot(base, pattern); ok {
 				roots = append(roots, root)
 			}
