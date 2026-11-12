@@ -9,6 +9,7 @@ import (
 	modelext "go.putnami.dev/cli/model/extension"
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	extensionproto "go.putnami.dev/protocol/extension"
+	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/jobs/scheduler"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
@@ -16,6 +17,11 @@ import (
 // extensionScopeSeparator joins an extension project id to a task scope inside
 // one scope entry (workspace.TaskIndex owns the spelling).
 const extensionScopeSeparator = "#"
+
+// closureScopePrefix marks a scope entry that names a read, not a task: a file
+// a task's `closure` port selects moved (workspace.TaskIndex owns the
+// spelling).
+const closureScopePrefix = "closure:"
 
 // narrowToTaskScopes applies an --impacted selection's task scopes to a plan
 // (workspace.ImpactedSelection.TaskScopes, ADR 0044).
@@ -28,11 +34,15 @@ const extensionScopeSeparator = "#"
 //   - its resolved traits declare side effects: the release-set coordinator
 //     decides which members a session releases, and a scope narrows what the
 //     diff VERIFIES, never what the session RELEASES;
-//   - its command's resolved traits declare the criteria kind (ADR 0072): such
-//     a command checks what the session verified, including the spec gate's
-//     criteria projection. A scope names the tasks a change's declared inputs
-//     reach, and no declaration names the session results these commands
-//     follow, so the kind stands in for that declaration;
+//   - its command's resolved traits declare the criteria kind (ADR 0072), and
+//     the scope names a task of a command that declares a kind
+//     (scopeReachesAResult): a criteria command checks the results the
+//     commands with a kind record, including the spec gate's criteria
+//     projection. A scope names the tasks a change's declared inputs reach, and
+//     no declaration names the results a criteria command follows, so the kinds
+//     stand in for that declaration. A scope that names only tasks of commands
+//     with no kind, such as `package~archives`, reached no result a criteria
+//     job judges, and keeps none;
 //   - a kept job depends on it, transitively: the kept plan stays a closed
 //     graph. A scoped `test` keeps the `build` it depends on whichever
 //     extension owns it, and a dependency's `^generate` step keeps running.
@@ -53,7 +63,11 @@ const extensionScopeSeparator = "#"
 // a new slice is returned for the reason dedupePlanByExtension states. A job
 // whose edges change is a copy, so the planned jobs keep the edges the planner
 // gave them.
-func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJob, scopes map[string][]string) []*scheduler.ScheduledJob {
+//
+// kinded holds the commands whose resolved traits declare a kind in a loaded
+// extension (commandsWithAKind). A nil set means the caller resolved none, and
+// every criteria job is then kept.
+func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJob, scopes map[string][]string, kinded map[string]bool) []*scheduler.ScheduledJob {
 	if len(scopes) == 0 {
 		return planned
 	}
@@ -64,6 +78,10 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJ
 		}
 	}
 	kept := make(map[string]bool, len(planned))
+	reachesAResult := make(map[string]bool, len(scopes))
+	for projectID, scope := range scopes {
+		reachesAResult[projectID] = scopeReachesAResult(scope, kinded)
+	}
 	var frontier []*scheduler.ScheduledJob
 	for _, job := range planned {
 		if job == nil || job.Project == nil || job.JobDef == nil {
@@ -74,7 +92,7 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJ
 		// declares, or its verb's default traits when it declares none. The core
 		// adds none of its own.
 		sideEffects := job.JobDef.Traits.SideEffects != extensionproto.SideEffectsNone
-		criteria := job.JobDef.Traits.Kind == extensionproto.CommandKindCriteria
+		criteria := job.JobDef.Traits.Kind == extensionproto.CommandKindCriteria && reachesAResult[job.Project.ID]
 		if !scoped || sideEffects || criteria || jobInScope(ws, job, scope) {
 			kept[job.Key()] = true
 			frontier = append(frontier, job)
@@ -149,6 +167,59 @@ func narrowToTaskScopes(ws *workspace.Workspace, planned []*scheduler.ScheduledJ
 		narrowed = append(narrowed, job)
 	}
 	return narrowed
+}
+
+// commandsWithAKind returns the commands whose resolved traits declare a kind
+// in any of the extensions: the commands that record a result a criteria
+// command may judge. Discovery resolved the traits, from the manifest or from
+// the verb's vocabulary, so no command name decides.
+func commandsWithAKind(extensions []*extension.ExtensionDescription) map[string]bool {
+	kinded := make(map[string]bool)
+	for _, ext := range extensions {
+		if ext == nil {
+			continue
+		}
+		for command, definition := range ext.Jobs {
+			if definition == nil || definition.Traits.Kind == "" {
+				continue
+			}
+			kinded[command] = true
+			if definition.CommandName != "" {
+				kinded[definition.CommandName] = true
+			}
+		}
+	}
+	return kinded
+}
+
+// scopeReachesAResult reports whether a scope names a task of a command that
+// declares a kind: verification, criteria, diagnostics or files. Such a task
+// records a result a criteria job of the project may judge, whether or not the
+// plan holds the job that runs it: the spec gate reads a verification report
+// from its cache entry.
+//
+// It errs wide. A bare project id is the whole of an extension's tasks, and a
+// nil set of kinded commands is a caller that resolved none: both answer true.
+// A read entry (`closure:<command>~<step>`) answers for its task.
+func scopeReachesAResult(scope []string, kinded map[string]bool) bool {
+	if kinded == nil {
+		return true
+	}
+	for _, entry := range scope {
+		_, task, qualified := strings.Cut(entry, extensionScopeSeparator)
+		if !qualified {
+			if strings.HasPrefix(entry, "/") {
+				return true
+			}
+			task = entry
+		}
+		task = strings.TrimPrefix(task, closureScopePrefix)
+		command, _, _ := strings.Cut(task, modelext.StepSeparator)
+		if kinded[command] {
+			return true
+		}
+	}
+	return false
 }
 
 // jobInScope reports whether a project's scope names this job.

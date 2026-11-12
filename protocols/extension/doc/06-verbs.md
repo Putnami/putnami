@@ -83,7 +83,7 @@ policy. The table gives the meaning each takes.
 | Trait | Value | Meaning |
 | --- | --- | --- |
 | `kind` | `verification` | The command runs the project's verification. Its jobs produce the verification report and coverage, and a session that names it carries the spec gate. |
-| `kind` | `criteria` | The command checks the project or the workspace against its criteria. A task scope never narrows it, and its declared `spec-criteria.json` output is the criteria projection. |
+| `kind` | `criteria` | The command checks the project or the workspace against its criteria. A task scope keeps it when the scope names a task of a command that declares a kind, and its declared `spec-criteria.json` output is the criteria projection. |
 | `kind` | `diagnostics` | The command's result is a tally of errors and warnings. |
 | `kind` | `files` | The command's result is a count of produced files. |
 | `workload` | `serve` | The command streams a workload until it is interrupted. |

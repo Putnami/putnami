@@ -14,6 +14,9 @@
 - **Amended**: 2026-10-23, §6, the first consequence and the
   `impact_scope_test.go` proof: a kept criteria job keeps the jobs it depends
   on and no verification job the scope does not name.
+- **Amended**: 2026-11-12, §6, a consequence and the `impact_scope_test.go`
+  proof: a task scope keeps a criteria job only when it names a task of a
+  command that declares a kind.
 
 ## Context
 
@@ -76,11 +79,27 @@ The core still decided by command name:
    one row per project and command. A replay serves a session that names the
    command that recorded it, and the live view attaches it to that command.
    The strict reader accepts a row under any named command.
-6. **A task scope never narrows a criteria job**, and a kept criteria job
-   keeps the jobs it depends on and no other. It keeps no verification job the
-   scope does not name: the spec gate reads that job's report from its cache
-   entry, and a check no entry answers warns (ADR 0026 §5). The side-effect
-   floor of ADR 0070 decision 1 is unchanged.
+6. **A task scope that names a task of a command with a kind never narrows a
+   criteria job**, and a kept criteria job keeps the jobs it depends on and no
+   other. It keeps no verification job the scope does not name: the spec gate
+   reads that job's report from its cache entry, and a check no entry answers
+   warns (ADR 0026 §5). The side-effect floor of ADR 0070 decision 1 is
+   unchanged.
+
+   A criteria command judges the results the commands with a kind record
+   (verification, criteria, diagnostics or files). A scope names a task of
+   such a command when the change reaches that result, whether or not the
+   plan holds the job: `validate --impacted` after `test --impacted` keeps
+   its criteria jobs on a project whose scope names `test~test`. A scope that
+   names only tasks of commands with no kind, such as `package~archives` or
+   `publish~docker`, reaches no result a criteria job judges, and keeps the
+   criteria job it names and no other. A scope entry that is a bare project
+   id is every task of an extension and keeps the criteria jobs; so does a
+   read entry (`closure:<command>~<step>`) of a command with a kind. Before
+   this amendment, a change confined to the declaration of the Go extension's
+   `package-archives` task planned 751 jobs on 135 projects of this
+   repository, 462 of them `validate`; it now plans 312 on 75, 23 of them
+   `validate`.
 7. **A workspace that loads the first-party manifests and `@putnami/sdd`
    behaves as before.** With them and the `@putnami/dev` vocabulary, the
    verification commands are `test`, the criteria commands are `validate` and
@@ -114,6 +133,10 @@ Behavior changes only for a manifest whose command name and kind disagree:
   narrowed by a task scope like any command, and is no projection producer.
 - A command of any name with the verification or criteria kind gains these
   behaviors.
+- A change that reaches a project only through tasks of commands with no
+  kind runs no criteria job on it. The cache key of each criteria job still
+  holds its inputs, so the next run that plans it serves a verdict those
+  inputs match.
 - The collector reads observations only from report producers. A pipeline
   step of a verification command that declares nothing but emits the report
   artifact no longer counts, so its project reads as silent.
@@ -147,8 +170,9 @@ Behavior changes only for a manifest whose command name and kind disagree:
   `internal/output/live_test.go`: coverage recorded and replayed under
   `check`.
 - `internal/engine/impact_scope_test.go`: a criteria command of any name is
-  never narrowed, a `validate` without the kind is, every first-party command
-  keeps what it kept, and a kept criteria job keeps no verification job the
-  scope does not name.
+  kept under a scope that names a task of a command with a kind and narrowed
+  under a scope that names none, a `validate` without the kind is narrowed,
+  every first-party command keeps what it kept, and a kept criteria job keeps
+  no verification job the scope does not name.
 - `internal/cli/e2e/specgate/spec_gate_matrix_test.go`: `criteria,check --all`
   verifies, blocks a contradicted check, and blocks again on the warm rerun.
