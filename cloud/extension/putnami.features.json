@@ -470,7 +470,7 @@
               "sign-in-uses-the-stored-session",
               "sign-in-runs-the-device-sign-in-without-a-session",
               "a-person-upload-names-the-repository-and-no-workspace",
-              "a-token-keeps-the-workspace-path"
+              "a-token-upload-names-the-repository"
             ]
           }
         },
