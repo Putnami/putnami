@@ -14,65 +14,31 @@
   "requirements": [
     {
       "id": "identity-is-declared-and-never-downgraded",
-      "text": [
-        "A binding that holds one of the two credentials of an alternative fails in the consumer with the client credential code, and the provider receives no request.",
-        "A forwarded user identity comes from the consumer's own inbound request, and the provider names that user.",
-        "An operation that declares neither a user credential nor an api key carries neither.",
-        "A WebSocket stream whose credential the provider refuses fails to open with 401 and no stream handle, and the next open acquires a new credential."
-      ]
+      "text": "A binding that holds one of the two credentials of an alternative fails in the consumer with the client credential code, and the provider receives no request. A forwarded user identity comes from the consumer's own inbound request, and the provider names that user. An operation that declares neither a user credential nor an api key carries neither. A WebSocket stream whose credential the provider refuses fails to open with 401 and no stream handle, and the next open acquires a new credential."
     },
     {
       "id": "a-result-is-what-the-contract-declared",
-      "text": [
-        "A declared error narrows to its generated type and keeps its stable code, its service and its operation.",
-        "A failure the operation does not declare stays a remote error with its status, narrows to no declared type and carries none of the provider's message.",
-        "A response missing a required declared property fails with client.response.",
-        "Opaque JSON members come back byte for byte, and an absent optional member stays absent."
-      ]
+      "text": "A declared error narrows to its generated type and keeps its stable code, its service and its operation. A failure the operation does not declare stays a remote error with its status, narrows to no declared type and carries none of the provider's message. A response missing a required declared property fails with client.response. Opaque JSON members come back byte for byte, and an absent optional member stays absent."
     },
     {
       "id": "the-declared-request-policy-is-the-one-applied",
-      "text": [
-        "A create that the provider fails twice with 503 succeeds on the third of the 3 declared attempts, and every attempt carries the same idempotency key.",
-        "A provider that keeps failing sees exactly 3 attempts.",
-        "A provider that answers after the declared 250 ms attempt budget fails the call in under 2.5 s.",
-        "After 2 failed calls the circuit opens: the next call fails with the circuit-open code and does not reach the provider."
-      ]
+      "text": "A create that the provider fails twice with 503 succeeds on the third of the 3 declared attempts, and every attempt carries the same idempotency key. A provider that keeps failing sees exactly 3 attempts. A provider that answers after the declared 250 ms attempt budget fails the call in under 2.5 s. After 2 failed calls the circuit opens: the next call fails with the circuit-open code and does not reach the provider."
     },
     {
       "id": "a-call-is-observable-and-ends-with-its-application",
-      "text": [
-        "The call span is a child of the inbound request span, the attempt span a child of the call span, and the provider receives the attempt span as traceparent.",
-        "Each unary call and each stream counts once in rpc.client.calls under its protocol.",
-        "No export carries a secret, payload, query string or unbounded label.",
-        "A raw octet call is traced and counted once without its octets.",
-        "A client kept after its application stopped refuses REST and Connect calls with the client-closed code, and the provider sees none."
-      ]
+      "text": "The call span is a child of the inbound request span, the attempt span a child of the call span, and the provider receives the attempt span as traceparent. Each unary call and each stream counts once in rpc.client.calls under its protocol. No export carries a secret, payload, query string or unbounded label. A raw octet call is traced and counted once without its octets. A client kept after its application stopped refuses REST and Connect calls with the client-closed code, and the provider sees none."
     },
     {
       "id": "generation-is-deterministic-and-a-break-is-detected",
-      "text": [
-        "Rendering the provider's routes through the build pipeline gives the committed clients/go/client.gen.go byte for byte, and the generated manifest records the hash of the current contract and of that file.",
-        "Rendering the contract without /whoami changes the bytes and drops ListWhoami.",
-        "The committed capability manifest is canonical, complete and round-trips to its bytes."
-      ]
+      "text": "The Go emitter renders one file, client.gen.go, from the contract the provider describes, with the same bytes on every run, and attributes each operation to the project and feature that operation's x-putnami-client producer names. Rendering the contract without /whoami changes the bytes and drops ListWhoami. The committed capability manifest is canonical, complete and round-trips to its bytes."
     },
     {
       "id": "a-declared-continuation-survives-an-instance-change",
-      "text": [
-        "After the first provider instance drains, the generated client reopens on the second one with the original query and the position of the last change it received.",
-        "Each change arrives once and in order, the feed ends explicitly, and nothing opens after it.",
-        "Both openings request and receive the putnami.sse.v1 wire.",
-        "A position the provider never issued ends with the declared not_found (404) and is never reopened.",
-        "The Go consumer and the TypeScript consumer each prove both, under checks of their own."
-      ]
+      "text": "After the first provider instance drains, the generated client reopens on the second one with the original query and the position of the last change it received. Each change arrives once and in order, the feed ends explicitly, and nothing opens after it. Both openings request and receive the putnami.sse.v1 wire. A position the provider never issued ends with the declared not_found (404) and is never reopened. The Go consumer and the TypeScript consumer each prove both, under checks of their own."
     },
     {
       "id": "the-matrix-index-is-checkable",
-      "text": [
-        "Each scenario in test-scenarios.json names a test that its file declares, states its auth, policy and encoding, and has the result pass.",
-        "For each consumer, the index states each cell and family exactly once: pass with known scenarios, n/a with the rule that makes it so, or missing with a reason."
-      ]
+      "text": "Each scenario in test-scenarios.json names a test that its file declares, states its auth, policy and encoding, and has the result pass. For each consumer, the index states each cell and family exactly once: pass with known scenarios, n/a with the rule that makes it so, or missing with a reason."
     }
   ],
   "decisions": [

@@ -63,9 +63,17 @@
         "In a workspace where no extension that the workspace declares provides the workspace-install job, there is nothing to install: install and deps install succeed and print one line saying so, and the implicit install before a job command succeeds and prints nothing.",
         "A declared extension that does not load is not that case: the install fails and names the extension with its reason, and a failed install, implicit or explicit, records no install marker."
       ]
+    },
+    {
+      "id": "a-fresh-worktree-restores-generated-clients",
+      "text": [
+        "After the implicit install of a fresh worktree, the first-run pass runs client-generate for every project that declares it, as an ordinary cached engine run: a hit restores, a miss renders.",
+        "When the workspace declares a generated client, install, init and upgrade write a core SessionStart handler that runs client-generate with auto-install on, and remove it when no client remains."
+      ]
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0012-install-trust-and-release-smoke.md"
+    "tooling/cli/doc/adr/0012-install-trust-and-release-smoke.md",
+    "tooling/cli/doc/adr/0087-a-fresh-worktree-restores-its-generated-clients.md"
   ]
 }

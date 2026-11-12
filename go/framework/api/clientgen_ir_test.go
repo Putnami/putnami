@@ -296,18 +296,14 @@ func TestGenerateClientFromIR_EmbedsFeatureTraceWhenDesignIsDeclared(t *testing.
 				OperationID: "getUsers",
 				HTTPMethod:  "GET",
 				Path:        "/users",
+				Client:      attributedOperation("example/provider", "users/manage"),
 			}},
 		}},
 	}
 	src, err := GenerateClientFromIR(spec, ClientGenOptions{
 		PackageName: "myclient",
 		ClientName:  "MyClient",
-		Design: &ClientDesignOptions{
-			SpecHash: "spec-123",
-			Operations: []ClientOperationProducer{
-				{Method: "GET", Path: "/users", ProducerProject: "example/provider", ProducerFeature: "users/manage"},
-			},
-		},
+		Design:      &ClientDesignOptions{SpecHash: "spec-123"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -326,7 +322,7 @@ func TestGenerateClientFromIR_EmbedsFeatureTraceWhenDesignIsDeclared(t *testing.
 }
 
 // One generated client routinely spans several producer features. Each operation
-// must carry its own, and an operation the attribution table does not name must
+// must carry its own, and an operation whose contract names no producer must
 // stay unattributed rather than inherit a neighbor's feature.
 func TestGenerateClientFromIR_AttributesEachOperationToItsOwnProducer(t *testing.T) {
 	spectest.Proves(t, "go/api-contracts", "producer-attribution", "each-operation-records-its-producing-project-and-feature")
@@ -336,8 +332,14 @@ func TestGenerateClientFromIR_AttributesEachOperationToItsOwnProducer(t *testing
 			Name:      "PlatformService",
 			ClassName: "PlatformClient",
 			Methods: []MethodIR{
-				{Name: "cliUsage", OperationID: "getV1_Operator_Cli-usage", HTTPMethod: "GET", Path: "/v1/operator/cli-usage"},
-				{Name: "invoices", OperationID: "getV1_Billing_Invoices", HTTPMethod: "GET", Path: "/v1/billing/invoices"},
+				{
+					Name: "cliUsage", OperationID: "getV1_Operator_Cli-usage", HTTPMethod: "GET", Path: "/v1/operator/cli-usage",
+					Client: attributedOperation("acme-platform", "platform/operator-cli-usage"),
+				},
+				{
+					Name: "invoices", OperationID: "getV1_Billing_Invoices", HTTPMethod: "GET", Path: "/v1/billing/invoices",
+					Client: attributedOperation("acme-platform", "platform/billing"),
+				},
 				{Name: "health", OperationID: "getV1_Health", HTTPMethod: "GET", Path: "/v1/health"},
 			},
 		}},
@@ -345,19 +347,7 @@ func TestGenerateClientFromIR_AttributesEachOperationToItsOwnProducer(t *testing
 	src, err := GenerateClientFromIR(spec, ClientGenOptions{
 		PackageName: "platformclient",
 		ClientName:  "PlatformClient",
-		Design: &ClientDesignOptions{
-			SpecHash: "spec-123",
-			Operations: []ClientOperationProducer{
-				{
-					Method: "GET", Path: "/v1/operator/cli-usage",
-					ProducerProject: "acme-platform", ProducerFeature: "platform/operator-cli-usage",
-				},
-				{
-					Method: "GET", Path: "/v1/billing/invoices",
-					ProducerProject: "acme-platform", ProducerFeature: "platform/billing",
-				},
-			},
-		},
+		Design:      &ClientDesignOptions{SpecHash: "spec-123"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -444,4 +434,9 @@ func TestGenerateClientFromIR_CatchAllParamSubstitution(t *testing.T) {
 	if strings.Contains(src, `url.PathEscape(fmt.Sprint(in.Params.Module))`) {
 		t.Errorf("catch-all param must not be url.PathEscape'd:\n%s", src)
 	}
+}
+
+// attributedOperation is an operation contract that names only its producer.
+func attributedOperation(project, feature string) *clientcontract.OperationV1 {
+	return &clientcontract.OperationV1{Producer: &clientcontract.OperationProducer{Project: project, Feature: feature}}
 }

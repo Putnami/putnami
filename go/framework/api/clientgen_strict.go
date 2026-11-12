@@ -79,7 +79,10 @@ func (generator *strictClientGen) render() (string, error) {
 				return "", err
 			}
 			operationVars = append(operationVars, lowerFirst(methodName)+"Operation")
-			designMethods = append(designMethods, methodEmit{Name: methodName, OperationID: method.OperationID, HTTPMethod: method.HTTPMethod, Path: method.Path})
+			designMethods = append(designMethods, methodEmit{
+				Name: methodName, OperationID: method.OperationID, HTTPMethod: method.HTTPMethod, Path: method.Path,
+				Producer: operationProducer(method),
+			})
 		}
 	}
 
@@ -158,7 +161,7 @@ func (generator *strictClientGen) render() (string, error) {
 }
 
 // specRuntimeCapabilities derives the runtime capabilities a first-party
-// contract's operations require, exactly as the generated manifest lists them.
+// contract's operations require.
 func specRuntimeCapabilities(spec SpecIR) []clientcontract.RuntimeCapability {
 	var operations []clientcontract.GeneratedOperation
 	for _, service := range spec.Services {
@@ -1078,9 +1081,9 @@ func lowerFirst(value string) string {
 }
 
 // strictMethodSymbols is the single source of the Go symbol every first-party
-// operation gets, keyed by operationId. The emitter and the generated ownership
-// manifest both call it on the same post-omission contract, so the two can
-// never disagree (ADR 0003).
+// operation gets, keyed by operationId. The emitter calls it once on the
+// post-omission contract, so every generated method takes its symbol from one
+// derivation (ADR 0003).
 //
 // Each operation starts from strictMethodSymbol. That derivation drops path
 // parameters, so routes that differ only by one — GET /x/{a}/deploy and
@@ -1528,4 +1531,13 @@ func connectObservableSchemas(method MethodIR) []clientcontract.Schema {
 		schemas = append(schemas, *method.Client.Messages.Output)
 	}
 	return schemas
+}
+
+// operationProducer returns the producer attribution the operation's contract
+// carries, or nil when it names none.
+func operationProducer(method MethodIR) *clientcontract.OperationProducer {
+	if method.Client == nil {
+		return nil
+	}
+	return method.Client.Producer
 }

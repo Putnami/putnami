@@ -669,12 +669,11 @@ func TestGenerateStrictClient_RefusesOperationsThatStillShareAGoMethod(t *testin
 	}
 }
 
-// The emitted client and its ownership manifest name every operation with the
-// same symbol, including an operation the collision rule renamed, and an
-// omission that dissolves a collision leaves the survivor its ordinary symbol
-// in both.
-func TestGeneratedGoManifest_NamesEachOperationAsTheEmittedClientDoes(t *testing.T) {
-	spectest.Proves(t, "go/api-contracts", "stable-operation-identity", "the-emitted-go-client-and-its-manifest-name-each-operation-alike")
+// The emitted client names every operation with the symbol the collision rule
+// resolves, including an operation the rule renamed, and an omission that
+// dissolves a collision leaves the survivor its ordinary symbol.
+func TestGeneratedGoClient_NamesEachOperationByItsResolvedSymbol(t *testing.T) {
+	spectest.Proves(t, "go/api-contracts", "stable-operation-identity", "the-emitted-go-client-names-each-operation-by-its-resolved-symbol")
 	list := symbolCollisionMethod("/x/{a}/deploy")
 	get := symbolCollisionMethod("/x/{a}/deploy/{b}")
 	runs := symbolCollisionMethod("/x/{a}/runs")
@@ -704,24 +703,25 @@ func TestGeneratedGoManifest_NamesEachOperationAsTheEmittedClientDoes(t *testing
 			if _, err := parser.ParseFile(token.NewFileSet(), "client.gen.go", source, parser.AllErrors); err != nil {
 				t.Fatalf("generated client does not parse: %v\n%s", err, source)
 			}
-			cfg := clientGenConfig{Go: clientGenConfigGo{ClientName: "XClient", OmitOperations: tc.omit}}
-			manifest, err := generatedGoManifestForImportPath("example.com/x/clients/go", cfg, []byte("{}"), []byte(source), spec)
+			kept, _, err := omitOperations(spec, tc.omit)
 			if err != nil {
-				t.Fatalf("generatedGoManifestForImportPath: %v", err)
+				t.Fatal(err)
 			}
-			got := map[string]string{}
-			for _, operation := range manifest.Operations {
-				got[operation.OperationID] = operation.MethodSymbol
-				signature := "func (c *XClient) " + operation.MethodSymbol + "(ctx context.Context, in " + operation.MethodSymbol + "Input) error {"
-				if !strings.Contains(source, signature) {
-					t.Errorf("manifest names %s %s, the client declares no %q:\n%s", operation.OperationID, operation.MethodSymbol, signature, source)
-				}
+			got, err := strictMethodSymbols(kept.Services)
+			if err != nil {
+				t.Fatal(err)
 			}
 			if !reflect.DeepEqual(got, tc.want) {
-				t.Fatalf("manifest symbols = %v, want %v", got, tc.want)
+				t.Fatalf("symbols = %v, want %v", got, tc.want)
+			}
+			for operationID, symbol := range got {
+				signature := "func (c *XClient) " + symbol + "(ctx context.Context, in " + symbol + "Input) error {"
+				if !strings.Contains(source, signature) {
+					t.Errorf("%s resolves to %s, the client declares no %q:\n%s", operationID, symbol, signature, source)
+				}
 			}
 			if methods := strings.Count(source, "func (c *XClient) "); methods != len(tc.want) {
-				t.Fatalf("client declares %d methods, manifest names %d:\n%s", methods, len(tc.want), source)
+				t.Fatalf("client declares %d methods, want %d:\n%s", methods, len(tc.want), source)
 			}
 		})
 	}

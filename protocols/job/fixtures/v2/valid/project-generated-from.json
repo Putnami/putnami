@@ -1,0 +1,49 @@
+{
+  "protocolVersion": 2,
+  "workspaceRoot": "/ws",
+  "outputPath": "/ws/.putnami/out/clients/items/client-generate",
+  "cacheRoot": "/ws/.putnami/store",
+  "workspace": {
+    "name": "putnami"
+  },
+  "project": {
+    "name": "go.putnami.dev/examples/items-client",
+    "path": "clients/items",
+    "fullPath": "/ws/clients/items",
+    "generatedFrom": {
+      "service": "items",
+      "language": "go",
+      "packageName": "itemsclient",
+      "clientName": "ItemsClient",
+      "omitOperations": [
+        "deleteItem"
+      ],
+      "contractPath": "services/items/schema/openapi.json",
+      "contractSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    }
+  },
+  "extension": {
+    "name": "@putnami/clientgen",
+    "root": "/ws/tooling/clientgen-extension"
+  },
+  "job": {
+    "name": "client-generate"
+  },
+  "identity": {
+    "key": "/clients/items:client-generate~go",
+    "scope": "project",
+    "project": {
+      "id": "/clients/items",
+      "name": "go.putnami.dev/examples/items-client"
+    },
+    "task": {
+      "name": "client-generate~go",
+      "command": "client-generate",
+      "kind": "client-generate"
+    },
+    "provider": {
+      "extension": "@putnami/clientgen"
+    }
+  },
+  "params": {}
+}

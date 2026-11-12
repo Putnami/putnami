@@ -99,16 +99,16 @@ func emptyContractWorkspace(t *testing.T, contract string) string {
 	return root
 }
 
-// TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget pins the
-// empty-first-party-contract declaration described in ADR 0004.
-// A provider may declare its service identity and leave every route out of the
-// client contract; go.putnami.dev/api then stages no client at all. The guard
-// must read that as a satisfied declaration, not as a target whose generation
-// broke — and it must reach the same verdict on the cold clone, where the only
-// input is the committed contract sidecar.
-func TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget(t *testing.T) {
+// TestADeclaredEmptyFirstPartyContractNeedsNoClient pins the
+// empty-first-party-contract declaration described in ADR 0004. A provider may
+// declare its service identity and leave every route out of the client
+// contract; go.putnami.dev/api then generates no client at all. The guard reads
+// that as a satisfied declaration and names no client for it, and it reaches
+// the same verdict on the cold clone, where the only input is the committed
+// contract sidecar.
+func TestADeclaredEmptyFirstPartyContractNeedsNoClient(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
-		"a-contract-that-declares-no-first-party-operation-needs-no-generated-target")
+		"a-contract-that-declares-no-first-party-operation-needs-no-client")
 	for _, contract := range []struct {
 		name     string
 		document string
@@ -118,80 +118,73 @@ func TestADeclaredEmptyFirstPartyContractNeedsNoGeneratedTarget(t *testing.T) {
 	} {
 		t.Run(contract.name, func(t *testing.T) {
 			root := emptyContractWorkspace(t, contract.document)
-			// The warm tree: the session's build wrote the generation contract
-			// the provider's papi.Clients(...) call declares, naming both
-			// targets. This is the state the issue reported.
-			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
+			// The provider commits a generation contract that names an
+			// in-module Go target, and a client project names its service.
+			writeWorkspaceFile(t, root, "services/gomod-server/clientgen.json", `{"targets":["go"],"go":{"output":"client"}}`)
+			writeWorkspaceFile(t, root, "services/gomod-server/go.mod", "module example.dev/gomod\n")
+			writeWorkspaceFile(t, root, ".putnami/workspace-index.json",
+				`{"version":4,"projects":[{"path":"clients/gomod"},{"path":"services/gomod-server"}]}`)
+			writeWorkspaceFile(t, root, "clients/gomod/putnami.json",
+				`{"name":"gomod-client","generatedFrom":{"service":"gomod-server","language":"go"}}`)
+			writeWorkspaceFile(t, root, "clients/gomod/go.mod", "module example.dev/gomodclient\n")
 
 			report := InspectCommitted(root, fixtureMembers(t, root))
 			if !report.Clean() {
 				t.Fatalf("a declared empty first-party contract produced findings: %+v", report.Findings)
 			}
-			if report.Coverage.Required != 0 || report.Coverage.Covered != 0 || report.Coverage.Percent != 100 {
-				t.Fatalf("coverage = %+v, want 0/0 at 100%%", report.Coverage)
-			}
 			if len(report.Providers) != 1 || report.Providers[0].ServiceID != "gomod-server" ||
-				report.Providers[0].Classification != ClassificationFirstParty {
+				report.Providers[0].Classification != ClassificationFirstParty || !report.Providers[0].EmptyContract {
 				t.Fatalf("the empty contract stopped being an audited first-party provider: %+v", report.Providers)
 			}
+			if clients := report.Providers[0].Clients; len(clients) != 0 {
+				t.Fatalf("an empty contract reported %d client(s) that generate nothing: %+v", len(clients), clients)
+			}
 
-			// The cold clone: nothing under .gen exists, so no generation
-			// contract and no committed manifest name a target. The verdict
-			// must not change.
-			if err := os.RemoveAll(filepath.Join(root, "services", "gomod-server", ".gen")); err != nil {
+			// Without the generation contract the verdict does not change.
+			if err := os.Remove(filepath.Join(root, "services", "gomod-server", "clientgen.json")); err != nil {
 				t.Fatal(err)
 			}
 			report = InspectCommitted(root, fixtureMembers(t, root))
 			if !report.Clean() {
-				t.Fatalf("the cold-tree verdict differs from the built-tree one: %+v", report.Findings)
+				t.Fatalf("the verdict without a generation contract differs: %+v", report.Findings)
 			}
-			if len(report.Providers) != 1 || report.Providers[0].ServiceID != "gomod-server" {
+			if len(report.Providers) != 1 || report.Providers[0].ServiceID != "gomod-server" || !report.Providers[0].EmptyContract {
 				t.Fatalf("the cold tree lost the declared service identity: %+v", report.Providers)
-			}
-
-			// A generation contract that configures no target stays satisfied:
-			// there is nothing for clientgen.no-targets to be about.
-			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":[]}`)
-			if report = InspectCommitted(root, fixtureMembers(t, root)); !report.Clean() {
-				t.Fatalf("an empty contract with no configured target produced findings: %+v", report.Findings)
 			}
 		})
 	}
 }
 
-// TestAContractWithFirstPartyOperationsStillNeedsItsGeneratedTarget is the other
-// half of the declaration: only a genuinely empty first-party operation set is satisfied
-// by no generated target. A provider that declares operations and commits no
-// client still fails exactly as it did before.
-func TestAContractWithFirstPartyOperationsStillNeedsItsGeneratedTarget(t *testing.T) {
+// TestAContractWithFirstPartyOperationsIsNotEmpty is the other half of the
+// declaration: only a genuinely empty first-party operation set counts. A
+// contract that declares an operation, including one under the trace method
+// the guard once dropped, is no empty contract, so a consumer is pointed at a
+// client and not told to classify.
+func TestAContractWithFirstPartyOperationsIsNotEmpty(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
-		"a-contract-with-first-party-operations-still-needs-its-generated-target")
-	root := emptyContractWorkspace(t, string(catalogContractForFixture(t)))
-	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
-
-	report := InspectCommitted(root, fixtureMembers(t, root))
-	assertFindingCodes(t, report, "clientgen.missing-manifest")
-	if count := findingCount(report, "clientgen.missing-manifest"); count != 2 {
-		t.Fatalf("missing-manifest findings = %d, want one per declared target", count)
+		"a-contract-with-first-party-operations-is-not-empty")
+	for name, document := range map[string]string{
+		"two operations":      string(catalogContractForFixture(t)),
+		"one trace operation": traceOperationContractDocument,
+	} {
+		t.Run(name, func(t *testing.T) {
+			root := emptyContractWorkspace(t, document)
+			report := InspectCommitted(root, fixtureMembers(t, root))
+			if !report.Clean() {
+				t.Fatalf("a provider without clients produced findings: %+v", report.Findings)
+			}
+			if len(report.Providers) != 1 || report.Providers[0].EmptyContract {
+				t.Fatalf("a provider with an operation was reported as an empty contract: %+v", report.Providers)
+			}
+		})
 	}
-	if report.Coverage.Required != 4 || report.Coverage.Covered != 0 {
-		t.Fatalf("coverage = %+v, want the two operations required per target and none covered", report.Coverage)
-	}
-
-	// The cold clone of the same provider names no target, so the guard says
-	// the provider generates clients and configured none.
-	if err := os.RemoveAll(filepath.Join(root, "services", "gomod-server", ".gen")); err != nil {
-		t.Fatal(err)
-	}
-	assertFindingCodes(t, InspectCommitted(root, fixtureMembers(t, root)), "clientgen.missing-config")
 }
 
 // TestAContractDiscoveryCouldNotReadIsNeverEmpty: an operation the guard could
 // not classify leaves the provider's inventory empty for a reason that is not a
-// declaration. Such a contract keeps failing for both reasons — the unreadable
-// operation and the target that never materialized — so a broken build, or an
-// external marker that names no authority, can never pass as a deliberately
-// empty contract.
+// declaration. Such a contract fails for the unreadable operation and is never
+// reported as empty, so a broken build, or an external marker that names no
+// authority, can never pass as a deliberately empty contract.
 func TestAContractDiscoveryCouldNotReadIsNeverEmpty(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
 		"a-contract-discovery-could-not-read-is-never-empty")
@@ -205,20 +198,13 @@ func TestAContractDiscoveryCouldNotReadIsNeverEmpty(t *testing.T) {
 	} {
 		t.Run(contract.name, func(t *testing.T) {
 			root := emptyContractWorkspace(t, contract.document)
-			writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go"]}`)
-			assertFindingCodes(t, InspectCommitted(root, fixtureMembers(t, root)), contract.code, "clientgen.missing-manifest")
+			report := InspectCommitted(root, fixtureMembers(t, root))
+			assertFindingCodes(t, report, contract.code)
+			if len(report.Providers) != 1 || report.Providers[0].EmptyContract {
+				t.Fatalf("an unreadable contract was reported as empty: %+v", report.Providers)
+			}
 		})
 	}
-}
-
-func findingCount(report Report, code string) int {
-	count := 0
-	for _, finding := range report.Findings {
-		if finding.Code == code {
-			count++
-		}
-	}
-	return count
 }
 
 // TestTheGuardReadsExactlyTheMethodsTheGeneratorGenerates pins httpMethods to
@@ -275,74 +261,12 @@ const traceOperationContractDocument = `{
 }
 `
 
-// TestAnOperationUnderAMethodTheGuardOnceDroppedStillNeedsItsTarget is the
-// regression for the hole the exemption opened: a provider whose single
-// first-party operation is a `trace` was invisible to discovery, so it reached
-// emptyFirstPartyContract with a real operation to generate and the guard
-// passed a tree that was genuinely missing its clients.
-func TestAnOperationUnderAMethodTheGuardOnceDroppedStillNeedsItsTarget(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
-		"a-contract-with-first-party-operations-still-needs-its-generated-target")
-	root := emptyContractWorkspace(t, traceOperationContractDocument)
-	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
-
-	report := InspectCommitted(root, fixtureMembers(t, root))
-	if count := findingCount(report, "clientgen.missing-manifest"); count != 2 {
-		t.Fatalf("missing-manifest findings = %d, want one per declared target; findings=%+v", count, report.Findings)
-	}
-	if report.Coverage.Required != 2 {
-		t.Fatalf("coverage = %+v, want the trace operation required once per target", report.Coverage)
-	}
-	if len(report.Providers) != 1 || report.Providers[0].EmptyContract {
-		t.Fatalf("a provider with a trace operation was reported as an empty contract: %+v", report.Providers)
-	}
-}
-
-// TestACommittedTargetOfAnEmptyContractIsStillJudgedInFull pins ADR 0004
-// decision 4. The exemption covers the ABSENCE of a manifest, never the content
-// of one: a client generated while the contract still had operations, and left
-// behind after the last one moved to an external authority, must fail as drift
-// rather than disappear with the target that no longer has to exist.
-func TestACommittedTargetOfAnEmptyContractIsStillJudgedInFull(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
-		"a-committed-target-of-an-empty-contract-is-still-judged-in-full")
-	item, expected := analyzerFixture(t)
-	// The provider's contract lost every first-party operation; the generated
-	// Go client beside it still claims two.
-	emptied := item
-	emptied.operations = nil
-
-	report := inspectWithReader("/workspace", ModeCheck, []provider{emptied}, nil, expected, expected)
-	assertFindingCodes(t, report, "clientgen.operation-coverage-drift")
-	if len(report.Providers) != 1 || len(report.Providers[0].Targets) != 1 {
-		t.Fatalf("a committed target of an empty contract vanished from the report: %+v", report.Providers)
-	}
-	if report.Providers[0].EmptyContract != true {
-		t.Fatalf("the emptied contract was not reported as empty: %+v", report.Providers[0])
-	}
-
-	// The recorded hashes are still checked against the bytes beside them.
-	edited := memoryReader{}
-	for path, content := range expected {
-		edited[path] = append([]byte(nil), content...)
-	}
-	edited["services/catalog/clients/go/client.gen.go"] = []byte("// hand edit of a generated file\n")
-	assertFindingCodes(t, inspectWithReader("/workspace", ModeCheck, []provider{emptied}, nil, edited, edited),
-		"clientgen.forged-generated-hash")
-
-	// And so is the lineage: a manifest cut from another contract still fails.
-	moved := emptied
-	moved.contractHash = "beef" + emptied.contractHash[4:]
-	assertFindingCodes(t, inspectWithReader("/workspace", ModeCheck, []provider{moved}, nil, expected, expected),
-		"clientgen.contract-drift")
-}
-
 // TestAConsumerOfAnEmptyContractIsToldToClassifyNotToRegenerate pins ADR 0004
 // decision 5, the consumer-facing half of the exemption. A Go module proxy is
 // exactly the provider whose callers hand-write transports, and the SDK drops a
 // job's data payload when the job fails, so this diagnostic sentence is the only
 // channel that reaches the developer. Telling them to regenerate a
-// client that cannot exist, or to declare a target that would generate nothing,
+// client that cannot exist, or to create a client that would generate nothing,
 // sends them after work that does not close the finding.
 func TestAConsumerOfAnEmptyContractIsToldToClassifyNotToRegenerate(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "empty-first-party-contract",
@@ -384,11 +308,11 @@ func call() { _, _ = http.Get("gomod-server") }
 		}
 	}
 
-	// An empty contract names no target at all, so there is no phantom entry
+	// An empty contract names no client at all, so there is no phantom entry
 	// for the advice — or any other consumer of the report — to walk.
 	writeWorkspaceFile(t, root, "services/gomod-server/putnami.json", `{"name":"gomod-server"}`)
 	writeWorkspaceFile(t, root, "services/gomod-server/schema/openapi.json", allExternalContractDocument)
-	writeWorkspaceFile(t, root, "services/gomod-server/.gen/clientgen/config.json", `{"targets":["go","ts"]}`)
+	writeWorkspaceFile(t, root, "services/gomod-server/clientgen.json", `{"targets":["go","ts"]}`)
 	writeSourceIndex(t, root, "consumer", "services/gomod-server")
 	inspected := InspectCommitted(root, fixtureMembers(t, root))
 	var found bool
@@ -400,8 +324,8 @@ func call() { _, _ = http.Get("gomod-server") }
 		if !reported.EmptyContract {
 			t.Fatalf("the empty contract is not marked in the report: %+v", reported)
 		}
-		if len(reported.Targets) != 0 {
-			t.Fatalf("an empty contract reported %d phantom target(s): %+v", len(reported.Targets), reported.Targets)
+		if len(reported.Clients) != 0 {
+			t.Fatalf("an empty contract reported %d phantom client(s): %+v", len(reported.Clients), reported.Clients)
 		}
 	}
 	if !found {

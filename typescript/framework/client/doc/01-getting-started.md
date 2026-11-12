@@ -72,7 +72,7 @@ const app = application()
     },
   }))
   .use(openapi({ title: 'Items API', version: '1.0.0' }))
-  .use(clientGenerator({ packageName: '@myorg/items-client' }));
+  .use(clientGenerator());
 ```
 
 The endpoint declaration remains authoritative for its schema, security, and
@@ -88,16 +88,33 @@ export const GET = endpoint()
 
 ### 2. Generate the client
 
+The provider commits its contract as `schema/openapi.json`. The client is a
+project of its own, whose `putnami.json` names the provider's service in
+`generatedFrom`:
+
+```json
+{
+  "name": "@myorg/items-client",
+  "type": "library",
+  "generatedFrom": { "service": "items", "language": "ts" }
+}
+```
+
+Generate it from the committed contract:
+
 ```bash
-putnami clientgen --projects @myorg/items-service
+putnami client-generate --projects @myorg/items-client
 ```
 
-This produces a publishable client package at `clients/ts/` with:
+`putnami build`, `test`, `lint`, `serve` and `package` run `client-generate`
+first, so building a consumer generates its clients too. The client project
+holds its authored files and the generated `src` tree, which Git ignores:
 
 ```
-clients/ts/
-├── package.json          → @myorg/users-client
-├── src/
+items-client/
+├── package.json          → @myorg/items-client (authored)
+├── putnami.json          → generatedFrom (authored)
+├── src/                  → generated
 │   ├── index.ts          → Re-exports
 │   ├── items-client.ts   → Typed ItemsClient class
 │   └── types.ts          → Request/response interfaces

@@ -301,16 +301,14 @@ func TestTheEmittedGoClientCarriesBothProviderOwnedWiresThroughTheRealRuntime(t 
 		"the-emitted-go-client-carries-both-provider-owned-wires-through-the-real-runtime")
 	httpServer, apiPlugin := providerWireGateway()
 	openapiPlugin := NewPlugin(PluginOptions{Title: "Gateway", Version: "1.0.0"}).From(apiPlugin)
-	clientsPlugin := api.Clients(api.ClientsOptions{
-		Go: api.GoClientOptions{PackageName: "gatewayclient", ClientName: "GatewayClient"},
-	}).From(apiPlugin)
+	clientsPlugin := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 	application := app.New("gateway")
 	application.Use(apiPlugin).Use(openapiPlugin).Use(clientsPlugin)
 	out := t.TempDir()
 	if err := application.Describe(out, []string{"openapi", "clients"}); err != nil {
 		t.Fatalf("Describe: %v", err)
 	}
-	source, err := os.ReadFile(filepath.Join(out, api.ClientStageDir, "go", "client.gen.go"))
+	source, err := emitDescribedGoClient(t, out, "gatewayclient", "GatewayClient")
 	if err != nil {
 		t.Fatalf("read generated client: %v", err)
 	}

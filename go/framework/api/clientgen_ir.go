@@ -174,6 +174,7 @@ func GenerateClientFromIR(spec SpecIR, opts ClientGenOptions) (string, error) {
 				HTTPMethod:  op.HTTPMethod,
 				Path:        op.Path,
 				OperationID: op.OperationID,
+				Producer:    operationProducer(op),
 				HasParams:   hasParams,
 				HasQuery:    hasQuery,
 				HasBody:     hasBody,

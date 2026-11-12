@@ -42,5 +42,14 @@ unset GOOS GOARCH
 unset GO386 GOAMD64 GOARM GOARM64 GOMIPS GOMIPS64 GOPPC64 GORISCV64 GOWASM
 unset GOEXPERIMENT GOFIPS140 GODEBUG GO_EXTLINK_ENABLED GO_LDSO
 
+# Git holds no generated client, and this runtime builds before any
+# client-generate job can run. The runtime generates the clients it compiles
+# from their committed contracts into a temporary directory, and the build
+# reads them through an overlay. The source tree is never written.
+temporary=${TMPDIR:-/tmp}
+clients=$(mktemp -d "${temporary%/}/putnami-cloud-clients.XXXXXX")
+trap 'rm -rf "$clients"' EXIT
+"$go_binary" run ./internal/cmd/runtime-clients --output "$clients"
+
 mkdir -p "$output/compiled"
-exec "$go_binary" build -o "$output/compiled/putnami-cloud" ./cmd/putnami-cloud
+"$go_binary" build -overlay "$clients/overlay.json" -o "$output/compiled/putnami-cloud" ./cmd/putnami-cloud

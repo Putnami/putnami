@@ -25,9 +25,9 @@ export const DEFAULT_CACHE_MAX_ENTRIES = 1000;
 export const STALE_SERVED_METRIC = 'rpc.client.cache.stale_served';
 
 /**
- * Contract capabilities this runtime implements. It equals the
- * `runtimeCapabilities` vocabulary of protocols/clientcontract's generated
- * manifest schema; a test pins the two together.
+ * Contract capabilities this runtime implements. It equals the TypeScript row
+ * of protocols/clientcontract's runtime capability table; a test pins the two
+ * together.
  */
 export const CLIENT_RUNTIME_CAPABILITIES: readonly string[] = Object.freeze(['response-cache', 'sse-continuation']);
 

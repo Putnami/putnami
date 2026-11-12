@@ -204,6 +204,13 @@
         "The CLI spawns a provider over each reserved call and reads its answer through the strict reader of this module: a probe, a toolchain-resolve and an input-resolve answer each round-trip.",
         "A provider that logs to stdout fails as a transport failure, and an answer to another question, such as an unasked identity or a reordered input, fails as an invalid result."
       ]
+    },
+    {
+      "id": "a-client-names-its-provider",
+      "text": [
+        "A project's putnami.json may declare generatedFrom: the provider's service id, required and non-empty, the language, go or ts, and for go the packageName, clientName and omitOperations.",
+        "An unknown member, a missing service, an unknown language or a go option on a ts client is refused with the field named."
+      ]
     }
   ],
   "decisions": [

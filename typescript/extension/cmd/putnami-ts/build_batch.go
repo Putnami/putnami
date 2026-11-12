@@ -17,7 +17,7 @@ import (
 
 // buildBatchProjectResult is one project's slice of a batched build-producer
 // invocation. Its Data mirrors EXACTLY what the corresponding solo handler
-// returns (nil for transpile/types/compile; {hash,exports,assets,clientOutput?}
+// returns (nil for transpile/types/compile; {hash,exports,assets}
 // for generate) so the scheduler caches and captures the batched result
 // byte-identically to a singleton run. Metrics carry the per-project build
 // counters (transpiled-files, type-declarations, generate-hash,
@@ -311,11 +311,7 @@ func runBuildGenerateBatch(ctx *pctx.Context) (string, map[string]any, error) {
 		res.Metrics = append(res.Metrics, buildBatchMetric{
 			Name: "generate-hash", Value: 1, Unit: "count",
 		})
-		data := generateResultData(projectPath, genResult)
-		if out, ok := generatedClientOutput(projectPath); ok {
-			data[GeneratedClientOutputPort] = out
-		}
-		res.Data = data
+		res.Data = generateResultData(projectPath, genResult)
 		results = append(results, res)
 	}
 	return "OK", map[string]any{"batchResults": results}, nil

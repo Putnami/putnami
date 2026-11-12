@@ -1,6 +1,7 @@
 # ADR 0054 — The contract edge fires on the committed contract
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0087](0087-a-fresh-worktree-restores-its-generated-clients.md) (decision 4: the identity folds the load-time digest; the edge orders no job)
 - **Scope**: `@putnami/cli-model` (`workspace.TraceChangeImpact`,
   `ImpactReach`, `Project.ContractPath`), `@putnami/cli` (`internal/workspace`
   contract bindings, `--impacted` trace, `impacted` MCP tool)

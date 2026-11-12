@@ -730,19 +730,6 @@
           }
         },
         {
-          "id": "committed-client-drift",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-generate-client-output-declares-fail-on-drift"
-            ]
-          }
-        },
-        {
           "id": "committed-openapi-drift",
           "stage": "coded",
           "evidenceKinds": [

@@ -465,6 +465,43 @@ describe('first-party OpenAPI client contract reader', () => {
     },
   );
 
+  it('reads an operation producer and refuses one the Go reader refuses, with the same code and field', () => {
+    const withProducer = (producer: unknown) => {
+      const document = fullDocument();
+      (document.paths['/documents/{id}']['get']['x-putnami-client'] as unknown as Record<string, unknown>)['producer'] =
+        producer;
+      return document;
+    };
+    const refusal = (producer: unknown) => {
+      try {
+        readOpenApiSpecWithOptions(withProducer(producer), { mode: 'firstParty' });
+      } catch (error) {
+        return error;
+      }
+      throw new Error('the reader accepted the producer');
+    };
+
+    const read = readOpenApiSpecWithOptions(withProducer({ project: '@demo/documents', feature: 'documents/read' }), {
+      mode: 'firstParty',
+    });
+    expect(read.services[0].methods[0].client?.producer).toEqual({
+      project: '@demo/documents',
+      feature: 'documents/read',
+    });
+    expect(refusal({ project: ' ', feature: 'documents/read' })).toMatchObject({
+      contractCode: 'client_contract.required',
+      field: 'x-putnami-client.producer.project',
+    });
+    expect(refusal({ project: '@demo/documents' })).toMatchObject({
+      contractCode: 'client_contract.required',
+      field: 'x-putnami-client.producer.feature',
+    });
+    expect(refusal({ project: '@demo/documents', feature: 'documents/read', module: 'x' })).toMatchObject({
+      contractCode: 'client_contract.unknown_field',
+      field: 'x-putnami-client.producer.module',
+    });
+  });
+
   it('names every contract diagnostic with the closed Go vocabulary', () => {
     // The reader must not invent a code the contract package does not publish.
     expect(new Set(CLIENT_CONTRACT_DIAGNOSTIC_CODES).size).toBe(CLIENT_CONTRACT_DIAGNOSTIC_CODES.length);

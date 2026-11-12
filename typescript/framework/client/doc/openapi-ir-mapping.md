@@ -90,32 +90,28 @@ nested object degrades (it is *not* a named type).
   `clientgen_first_party_required` rather than generated from a contract Putnami
   does not own.
 
-## `.gen/clientgen/config.json`
+## Generation options
 
-The `clientGenerator()` plugin writes this contract during `postGenerate()` —
-the single source of truth every emitter reads. A project with no app to build
-commits the same contract as `clientgen.json` at its root, and every emitter
-reads that file when no build wrote `.gen/clientgen/config.json`.
+No generation contract travels with the document. A client project names its
+provider and its options in the `generatedFrom` member of its own
+`putnami.json`:
 
 ```jsonc
 {
-  "targets": ["ts"],                       // ('ts' | 'go')[]
-  "ts": {
-    "output": "clients/ts",                // dir, relative to project root
-    "packageName": "<pkg>-client"          // npm package name (auto: <pkg>-client)
-  },
-  "go": {
-    "output": "clients/go",                // dir, relative to project root
-    "modulePath": "",                      // Go module path (required to enable the `go` target)
-    "packageName": "client",
-    "clientName": "Client",
-    "omitOperations": ["deployWorkspace"] // optional: operations the Go target leaves out; absent when empty
+  "generatedFrom": {
+    "service": "users.api",              // the provider's x-putnami-client service id
+    "language": "go",                    // "go" | "ts"
+    "packageName": "usersclient",        // Go only: package name of client.gen.go
+    "clientName": "UsersClient",         // Go only: client type name
+    "omitOperations": ["deployWorkspace"] // Go only: operations the Go client leaves out
   }
 }
 ```
 
-Defaults live in `src/generator/config.type.ts` (`CLIENTGEN_DEFAULTS`) and must
-stay in lockstep with the Go reader added in Phase 2b.
+The TypeScript package name is the client's own `package.json` name, and the Go
+import path is its own `go.mod` module. A provider whose Go client is a package
+of its own module commits the same Go options in `clientgen.json` at its root,
+with `go.output` naming the package directory.
 
 ## Golden fixtures
 

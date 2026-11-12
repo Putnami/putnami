@@ -58,14 +58,14 @@ func pageProvider(t *testing.T, path, audience string) (*httptest.Server, string
 			return phttp.JSON(page)
 		}))
 	publication := NewPlugin(PluginOptions{Title: "Pages", Version: "1"}).From(provider)
-	emitter := api.Clients(api.ClientsOptions{Go: api.GoClientOptions{PackageName: "pageclient", ClientName: "PageClient"}}).From(provider)
+	emitter := api.Clients(api.ClientsOptions{}).From(provider)
 	application := app.New("pages")
 	application.Use(provider).Use(publication).Use(emitter)
 	out := t.TempDir()
 	if err := application.Describe(out, []string{"openapi", "clients"}); err != nil {
 		t.Fatal(err)
 	}
-	source, err := os.ReadFile(filepath.Join(out, api.ClientStageDir, "go", "client.gen.go"))
+	source, err := emitDescribedGoClient(t, out, "pageclient", "PageClient")
 	if err != nil {
 		t.Fatal(err)
 	}

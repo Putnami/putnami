@@ -3,20 +3,23 @@
 A Go provider called by a Go consumer and by a TypeScript consumer, both through
 **generated, typed clients**.
 
-The provider declares an Items API and its first-party client contract.
-`putnami clientgen` generates Go and TypeScript clients from that declaration. A
-consumer registers the generated binding and calls `ItemsClient` without
-hand-written URLs, JSON, authentication or resilience code.
+The provider declares an Items API and its first-party client contract, and
+commits that contract as `schema/openapi.json`. `putnami client-generate`
+generates Go and TypeScript clients from the committed contract. A consumer
+registers the generated binding and calls `ItemsClient` without hand-written
+URLs, JSON, authentication or resilience code.
 
 The application declares `items/manage` once with `application.Feature(...)`.
-The API surface and both generated client targets are then discovered from the
+The API surface and each operation's producer are then discovered from the
 ordinary `api` and `api.Clients()` declarations:
 
 ```bash
 putnami build --projects go.putnami.dev/examples/service-to-service
-putnami clientgen --projects go.putnami.dev/examples/service-to-service
 putnami features inspect items/manage
 ```
+
+The build runs `client-generate` first, so it writes `clients/go/client.gen.go`
+before it compiles.
 
 `ItemsClientDesign` embeds the spec hash and the exact operation table, with the
 producer project and feature recorded on each operation — a client that spans
@@ -33,9 +36,9 @@ Four steps, in this order. Nothing else is consumer-owned.
    `service/service.go`: the service identity, the credential profiles, the query
    string, the request body, the response and the errors it may throw. Read that
    one file to know the whole contract.
-2. **Generate.** `putnami clientgen --projects go.putnami.dev/examples/service-to-service`
-   emits `clients/go` and `clients/ts` from the provider's own OpenAPI document,
-   each with an ownership manifest.
+2. **Generate.** `putnami client-generate` emits `clients/go/client.gen.go` and
+   the `clients/ts/src` tree from the provider's committed
+   `schema/openapi.json`. Every build, test and serve command runs it first.
 3. **Register the binding.** The consumer calls `client.Services(...)` and the
    generated `RegisterItemsClient(module)` (Go), or `registerItemsClient(app)`
    (TypeScript). The binding carries the base URL and the values for the
@@ -55,7 +58,7 @@ Provider (this service)            Consumer (./consumer)
   POST /items                          .CreateItems(...)
   (OpenAPI spec)                       .ListItems(...)
        │
-       └── api.Clients() ──▶ clients/go  (generated, typed)
+       └── schema/openapi.json ──▶ client-generate ──▶ clients/go  (generated, typed)
 ```
 
 ## Layout
@@ -64,35 +67,41 @@ Provider (this service)            Consumer (./consumer)
 |------|------|
 | `service/` | Provider types, handlers, routes; `NewApp()` wires HTTP + api + openapi + `api.Clients()` |
 | `main.go` | Runs the provider (`putnami serve .`) |
-| `clients/go/` | **Generated** typed client module (`go.putnami.dev/examples/service-to-service/clients/go`) |
-| `clients/ts/` | **Generated** typed TypeScript client project (`@example/go-items-client`) |
+| `schema/openapi.json` | The committed contract both clients are generated from |
+| `clientgen.json` | Declares the in-module Go client: its directory, package and client names |
+| `clients/go/` | **Generated** typed client package of the provider's module (`go.putnami.dev/examples/service-to-service/clients/go`) |
+| `clients/ts/` | **Generated** typed TypeScript client project (`@example/go-items-client`), which names the provider in `generatedFrom` |
 | `consumer/` | Go consumer: imports the generated client and calls the provider through it |
 | `consumer-ts/` | TypeScript consumer (`@example/go-items-consumer`): runs the compiled provider as a subprocess and calls it through the generated TypeScript client |
 | `test-scenarios.json` | Machine index of the matrix scenarios this sample proves |
 
-The provider does not import `clients/go`: the build-time describe step compiles the
-provider to generate the client, so the consumer that imports it lives in its own
-package.
+The provider does not import `clients/go`. The consumer that imports it lives
+in its own package.
 
 ## How the client is generated
 
-During `putnami build` and `putnami clientgen`:
+The two clients follow two layouts:
 
-1. Reads the OpenAPI spec from the `openapi` plugin (in-memory — no file-ordering race).
-2. Writes the contract to `.gen/clientgen/config.json`.
-3. Synchronizes `clients/go` and `clients/ts` with ownership manifests used by
-   workspace drift guards.
+1. **In-module Go client.** `clients/go` is a package of the provider's own Go
+   module, so the provider declares it in its committed `clientgen.json`
+   (`go.output`, `go.packageName`, `go.clientName`). The provider's
+   `client-generate` writes `clients/go/client.gen.go` from its own committed
+   `schema/openapi.json`.
+2. **Client project.** `clients/ts` is a project of its own. Its `putnami.json`
+   names the provider's service in `generatedFrom` (`"service": "items"`,
+   `"language": "ts"`), and its `client-generate` replaces its `src` tree from
+   the provider's committed contract.
 
-The build cache captures `clients/go/` under the project-scoped `clients` resource, so a
-cache hit re-materializes the generated client without re-running describe, and the
-workspace `go.work` stays stable.
-
-`clients/go/client.gen.go` is checked in (like generated protobuf) so the sample builds
-out of the box; `clientsync_test.go` regenerates it and fails if it drifts. Regenerate
-after an API change with:
+Git holds no generated file: `client.gen.go` and `clients/ts/src` are built,
+not committed. `client-generate` is cached, and its key folds the contract's
+digest, so a provider change that leaves `schema/openapi.json` alone restores
+both clients from the cache. `service/clientsync_test.go` renders the client
+from the described contract and proves the render is deterministic and that a
+removed operation breaks the consumer's compile. Regenerate after an API
+change with:
 
 ```bash
-putnami clientgen --projects go.putnami.dev/examples/service-to-service
+putnami build --projects go.putnami.dev/examples/service-to-service
 ```
 
 ## Opaque JSON
@@ -128,9 +137,8 @@ Like the Go client, it embeds the spec hash and the per-operation producer table
 (`ItemsClient.design`), so a call can be traced back to the project and feature
 that produced the operation.
 
-It is checked in for the same reason the Go client is, and it is a workspace
-project, so `putnami lint,test,build --impacted` covers it whenever the provider's
-contract changes.
+It is a workspace project, so `putnami lint,test,build --impacted` covers it
+whenever the provider's committed contract changes.
 
 ## Run
 
@@ -142,8 +150,9 @@ curl -s localhost:3910/items/1
 ```
 
 The provider does not call `openapiPlugin.RegisterOn(httpServer)`, so it does not
-serve the document over HTTP: the client generator reads it in memory, and
-`putnami build` commits it to `schema/openapi.json`. Add `RegisterOn` when
+serve the document over HTTP: `putnami build` writes it to
+`schema/openapi.json`, which the provider commits and the clients are generated
+from. Add `RegisterOn` when
 consumers should fetch the spec at runtime — and read
 [the disclosure note](../../framework/openapi/README.md#http-endpoint) first,
 because that route is unauthenticated.

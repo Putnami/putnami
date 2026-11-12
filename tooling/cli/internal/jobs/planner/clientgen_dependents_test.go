@@ -23,22 +23,24 @@ import (
 const (
 	dependentsClient    = "/clients/auth"
 	dependentsConsumer  = "/consumer"
-	dependentsGenerator = dependentsClient + ":clientgen~generate-go"
+	dependentsGenerator = dependentsClient + ":client-generate~go"
 )
 
-// dependentsWorkspace is a Go client project that carries the clientgen
-// extension and a Go application that depends on it.
+// dependentsWorkspace is a Go client project that names its provider in
+// generatedFrom and a Go application that depends on it.
 func dependentsWorkspace(t *testing.T) (*workspace.Workspace, []*workspace.Project) {
 	t.Helper()
 	root := t.TempDir()
 	writeProjectFile(t, root, "clients/auth", "go.mod", "module example.com/clients/auth\n\ngo 1.25\n")
 	writeProjectFile(t, root, "clients/auth", "client.gen.go", "package auth\n")
+	writeProjectFile(t, root, "clients/auth", "putnami.json",
+		"{\"name\":\"auth\",\"generatedFrom\":{\"service\":\"auth\",\"language\":\"go\"}}\n")
 	writeProjectFile(t, root, "consumer", "go.mod",
 		"module example.com/consumer\n\ngo 1.25\n\nrequire example.com/clients/auth v0.0.0\n")
 	writeProjectFile(t, root, "consumer", "main.go", "package main\n\nfunc main() {}\n")
 	client := &workspace.Project{
 		ID: dependentsClient, Name: "auth", Path: "clients/auth", Type: "library",
-		Extensions: []string{"@putnami/go", clientgenExtensionName},
+		Extensions: []string{"@putnami/go"},
 		Config:     wsproto.LoadProjectConfig(filepath.Join(root, "clients", "auth")),
 	}
 	consumer := &workspace.Project{
@@ -97,18 +99,40 @@ func planReaches(edges map[string][]string, from, to string) bool {
 	return false
 }
 
+// goWithoutClosureDependencies is the Go extension with no `^command`
+// dependency. Its lint and validate then reach the client's generator through
+// nothing but the dependents rule, so the fixture keeps the race the rule
+// closes.
+func goWithoutClosureDependencies(goExtension *extension.ExtensionDescription) *extension.ExtensionDescription {
+	stripped := *goExtension
+	stripped.Jobs = make(map[string]*extension.JobDefinition, len(goExtension.Jobs))
+	for name, job := range goExtension.Jobs {
+		copied := *job
+		copied.CommandDependsOn = slices.DeleteFunc(slices.Clone(job.CommandDependsOn), func(dependency string) bool {
+			return extension.ParseCommandDependency(dependency).Dependencies
+		})
+		stripped.Jobs[name] = &copied
+	}
+	return &stripped
+}
+
 // TestPlan_DependentsWaitForTheGeneratedClientWriter is the acceptance of the
 // dependents rule against the REAL Go and clientgen manifests. Every job of a
 // project that depends on the client runs after the client's generators, the
 // rule adds ordering edges to the generators and nothing else, and no
 // functional edge moves, so no cache key moves. Without the flag the same plan
 // leaves consumer jobs unordered with the generator, which is the race the
-// rule closes.
+// rule closes. A plan of client-generate and build alone shows no race: the
+// consumer's build waits for the client's build, which depends on
+// client-generate, so each command set here plans a consumer job that reaches
+// the client through no build. The Go extension's lint and validate also run
+// client-generate across the dependency closure, which orders them too, so the
+// fixture strips that dependency to keep the race.
 func TestPlan_DependentsWaitForTheGeneratedClientWriter(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "dependents-wait-for-an-output-they-read",
 		"every-dependent-job-waits-for-the-generated-client-writer")
-	goExtension := loadGoPlannerExtension(t)
-	for _, commands := range [][]string{{"clientgen", "build"}, {"lint", "test", "build", "validate"}} {
+	goExtension := goWithoutClosureDependencies(loadGoPlannerExtension(t))
+	for _, commands := range [][]string{{"client-generate", "lint"}, {"lint", "test", "build", "validate"}} {
 		t.Run(commands[0]+"-"+commands[len(commands)-1], func(t *testing.T) {
 			ws, selected := dependentsWorkspace(t)
 			planned, err := Plan(ws, commands, selected,
@@ -127,13 +151,13 @@ func TestPlan_DependentsWaitForTheGeneratedClientWriter(t *testing.T) {
 
 			var generators []string
 			for _, job := range planned {
-				if job.Project.ID == dependentsClient && job.CommandName() == "clientgen" {
+				if job.Project.ID == dependentsClient && job.CommandName() == "client-generate" {
 					generators = append(generators, job.Key())
 				}
 			}
 			sort.Strings(generators)
 			if !slices.Contains(generators, dependentsGenerator) {
-				t.Fatalf("clientgen jobs planned for the client = %v, want %s among them", generators, dependentsGenerator)
+				t.Fatalf("client-generate jobs planned for the client = %v, want %s among them", generators, dependentsGenerator)
 			}
 
 			edges := planEdges(planned)
@@ -241,11 +265,11 @@ func TestPlan_DependentsRuleOrdersOnlyDependentsAndKeepsThePlanADAG(t *testing.T
 		ID: "teardown", Task: "run", RunOn: extensionproto.StepRunOnFinally,
 		Finalizes: &extensionproto.FinalizesRelation{Producer: "setup", Consumers: []string{"run"}},
 	}
-	const writerKey = "/client:clientgen~generate"
-	const sharedKey = "/client:clientgen~shared"
+	const writerKey = "/client:client-generate~generate"
+	const sharedKey = "/client:client-generate~shared"
 	prepare := dependentsJob(consumer, ext, "build~prepare", run)
-	writer := dependentsJob(client, ext, "clientgen~generate", &extension.PipelineStep{ID: "generate", Task: "gen"}, prepare.Key())
-	shared := dependentsJob(client, ext, "clientgen~shared", &extension.PipelineStep{ID: "shared", Task: "shared"})
+	writer := dependentsJob(client, ext, "client-generate~generate", &extension.PipelineStep{ID: "generate", Task: "gen"}, prepare.Key())
+	shared := dependentsJob(client, ext, "client-generate~shared", &extension.PipelineStep{ID: "shared", Task: "shared"})
 	clientCompile := dependentsJob(client, ext, "build~compile", run)
 	compile := dependentsJob(consumer, ext, "build~compile", run, prepare.Key())
 	check := dependentsJob(consumer, ext, "lint~check", run, writerKey)
@@ -261,7 +285,7 @@ func TestPlan_DependentsRuleOrdersOnlyDependentsAndKeepsThePlanADAG(t *testing.T
 		dependsOn[job.Key()] = append([]string(nil), job.DependsOn...)
 	}
 
-	orderContractClients(jobs, ws)
+	orderDependentReaders(jobs, ws)
 
 	if err := ValidatePlanDAG(jobs); err != nil {
 		t.Fatalf("the dependents rule closed a cycle: %v", err)
@@ -309,12 +333,12 @@ func TestPlan_DependentsRuleOrdersAChainOfGenerators(t *testing.T) {
 
 	generate := &extension.PipelineStep{ID: "generate", Task: "gen"}
 	run := &extension.PipelineStep{ID: "run", Task: "run"}
-	baseWriter := dependentsJob(base, ext, "clientgen~generate", generate)
-	derivedWriter := dependentsJob(derived, ext, "clientgen~generate", generate)
+	baseWriter := dependentsJob(base, ext, "client-generate~generate", generate)
+	derivedWriter := dependentsJob(derived, ext, "client-generate~generate", generate)
 	compile := dependentsJob(consumer, ext, "build~compile", run)
 	jobs := []*jobmodel.ScheduledJob{compile, derivedWriter, baseWriter}
 
-	orderContractClients(jobs, ws)
+	orderDependentReaders(jobs, ws)
 
 	if err := ValidatePlanDAG(jobs); err != nil {
 		t.Fatalf("a chain of generators closed a cycle: %v", err)

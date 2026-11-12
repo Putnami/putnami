@@ -514,16 +514,15 @@ func cutPlanKey(key string) (project, step string, ok bool) {
 // TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator pins, on the
 // real Go and clientgen manifests, that a group shares beside a writer of
 // another command and that the group's dependents still wait for that writer.
-// The clientgen generators read the client's gen after the build and rewrite
-// the client a consumer compiles. The client's test generate adopts its build
-// generate and takes that earlier place, so the consumer no longer waits for
-// the generators through it: it waits because the generators declare their
-// client readByDependents. Without that flag the same shared plan leaves a
-// consumer job unordered with a generator.
+// The client-generate generator rewrites the client a consumer compiles. The
+// client's test generate adopts its build generate, and the consumer waits for
+// the generator because the generator declares its client readByDependents.
+// Without that flag the same shared plan leaves a consumer job unordered with
+// the generator.
 func TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator(t *testing.T) {
 	t.Parallel()
-	goExtension := loadGoPlannerExtension(t)
-	for _, commands := range [][]string{{"clientgen", "test", "build"}, {"lint", "test", "build", "validate"}} {
+	goExtension := goWithoutClosureDependencies(loadGoPlannerExtension(t))
+	for _, commands := range [][]string{{"client-generate", "lint", "test", "build"}, {"lint", "test", "build", "validate"}} {
 		ws, selected := dependentsWorkspace(t)
 		plan := func(clientgen *extension.ExtensionDescription) []*jobmodel.ScheduledJob {
 			planned, err := Plan(ws, commands, selected, []*extension.ExtensionDescription{goExtension, clientgen}, nil, nil, nil, nil)
@@ -538,12 +537,12 @@ func TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator(t *testing.T
 		clientTest := requirePlanKey(t, byKey, dependentsClient+":test~test")
 		var generators []*jobmodel.ScheduledJob
 		for _, job := range planned {
-			if job.Project.ID == dependentsClient && job.CommandName() == "clientgen" {
+			if job.Project.ID == dependentsClient && job.CommandName() == "client-generate" {
 				generators = append(generators, job)
 			}
 		}
 		if len(generators) == 0 {
-			t.Fatalf("plan %v: control: no clientgen generator planned for %s", commands, dependentsClient)
+			t.Fatalf("plan %v: control: no client-generate job planned for %s", commands, dependentsClient)
 		}
 
 		edges, unflagged := planEdges(planned), planEdges(plan(clientgenWithoutReadByDependents(t)))
@@ -843,4 +842,26 @@ func TestSharedExecutions_RealGoManifestLeavesNoConflictUnordered(t *testing.T) 
 			t.Fatalf("%v: control: %d steps write the project's gen, want the three generates at least", params, genWriters)
 		}
 	}
+}
+
+// TestSharedExecutions_AnOrderingStepPassesItsProducersThrough pins that a step
+// one command skips does not split a group. In CI the build's tidy flag is off
+// (ciDefault), so the client's build generate waits for client-generate
+// directly, while its test generate waits for it through test config-merge, an
+// ordering producer. Both name the same producer, so they stay one execution.
+func TestSharedExecutions_AnOrderingStepPassesItsProducersThrough(t *testing.T) {
+	t.Setenv("CI", "true")
+	ws, selected := dependentsWorkspace(t)
+	planned, err := Plan(ws, []string{"lint", "test", "build"}, selected,
+		[]*extension.ExtensionDescription{goWithoutClosureDependencies(loadGoPlannerExtension(t)), loadClientgenExtension(t)},
+		nil, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("plan: %v", err)
+	}
+	byKey := JobsByPlanKey(planned)
+	build := requirePlanKey(t, byKey, dependentsClient+":build~generate")
+	if slices.Contains(build.DependsOn, dependentsClient+":build~tidy") {
+		t.Fatalf("control: build~generate still waits for build~tidy under CI: %v", build.DependsOn)
+	}
+	requireShared(t, byKey, dependentsClient+":build~generate", dependentsClient+":test~generate")
 }

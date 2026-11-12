@@ -28,25 +28,15 @@ import (
 	"go.putnami.dev/security"
 )
 
-// Client generation settings, shared by NewApp (the api.Clients describer) and
-// the in-sync regeneration test (clientsync_test.go) so the committed clients/go
-// always matches what `putnami build` regenerates.
-//
-// No module path is set, so the client is emitted as a package inside this
-// module (clients/go) rather than a standalone module. That keeps go.work
-// untouched — there is no second module to register — while the consumer imports
-// it as go.putnami.dev/examples/service-to-service/clients/go. Set a module path
-// (see api.GoClientOptions.ModulePath) when the client must be a separately
-// publishable module; then register it in go.work and commit its go.mod.
+// ProjectName and FeatureID attribute every operation of the provider's
+// contract. ClientPackage and ClientName are the names the Go client is built
+// with; clientsync_test.go renders the client from the described contract with
+// them.
 const (
 	ProjectName   = "go.putnami.dev/examples/service-to-service"
 	FeatureID     = "items/manage"
 	ClientPackage = "itemsclient"
 	ClientName    = "ItemsClient"
-	// TSClientPackage names the cross-language TypeScript client emitted from this
-	// same OpenAPI spec by `putnami clientgen` (the neutral, scheduler-mediated
-	// command runs the Bun emitter; this Go binary never shells out to it).
-	TSClientPackage = "@example/go-items-client"
 	// ProtoPackage is the protobuf package of the published descriptor, which
 	// the bridge serves as the Connect protobuf codec.
 	ProtoPackage = "items.v1"
@@ -1119,8 +1109,9 @@ func Register(apiPlugin *api.Plugin) {
 }
 
 // NewApp builds the provider application: the HTTP server, the api endpoints, the
-// OpenAPI spec, and the Go client generator. Running it under `putnami build`
-// emits .gen/clientgen/config.json and regenerates clients/go from the spec.
+// OpenAPI spec, and the client declaration. Running it under `putnami build`
+// writes the contract, each operation attributed to this project and feature.
+// The client projects build their clients from the committed contract.
 func NewApp() *app.Application {
 	httpServer := http.NewServerPlugin(http.ServerConfig{Port: 3910})
 	httpServer.Use(IdentityResolver())
@@ -1138,20 +1129,7 @@ func NewApp() *app.Application {
 		Version: "1.0.0",
 	}).From(apiPlugin)
 
-	clients := api.Clients(api.ClientsOptions{
-		// Both targets: the Go client is emitted in-app by this describer (same
-		// language); the TypeScript client is emitted by `putnami clientgen` from
-		// the same spec recorded in .gen/clientgen/config.json.
-		Targets: []string{"go", "ts"},
-		Go: api.GoClientOptions{
-			PackageName: ClientPackage,
-			ClientName:  ClientName,
-		},
-		TS: api.TSClientOptions{
-			Output:      "clients/ts",
-			PackageName: TSClientPackage,
-		},
-	}).From(apiPlugin)
+	clients := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 
 	application := app.New(ProjectName)
 	application.Feature(app.Feature{

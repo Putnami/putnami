@@ -539,6 +539,39 @@ When `putnami.workspace.json` opts into an extension's agent content (`extension
 
 Content whose bytes do not match the extension's pin, or a file you own that the content would overwrite, fails the command with a non-zero exit and leaves your files unchanged. A separately declared artifact (`name`, `name:channel` or `/path`) is refused with nothing written, and the error gives the steps that replace it with an `extension:<name>` entry. `install` drops every pin under `agentArtifacts` in the lock, since no declaration uses one; a hosted install fails and names them instead. A workspace that declares no `agentArtifacts` skips the phase entirely. See [Agent Workflows](18-agent-workflows.md#lifecycle-init-install-upgrade).
 
+#### Host hooks
+
+`install`, `init` and `upgrade` write agent host hooks into
+`.claude/settings.json` (Claude Code) and `.codex/hooks.json` (Codex). No other
+command writes these files, and each run keeps every entry it did not write.
+
+- **Extension hooks.** An extension declares its hooks in its manifest. They are
+  written when the workspace opts into the extension's agent content and binds
+  the collaboration contract the hooks need. They never run the first-use
+  install. See
+  [ADR 0081](adr/0081-the-core-writes-declared-host-hooks.md).
+- **The client restore hook.** When a project declares a generated client, the
+  CLI writes a `SessionStart` hook that runs `client-generate --projects '*'`.
+  It names every project, so `disable.tags` does not skip one. No extension
+  declares it and no binding gates it. It keeps the first-use install
+  on, so an agent session in a fresh worktree installs the workspace and has
+  its clients before its first edit. The hook sends its output to stderr,
+  because a host adds a `SessionStart` hook's stdout to the agent's context. A
+  run removes the hook when no project declares a client. In a source
+  workspace it reads:
+
+  ```json
+  {
+    "type": "command",
+    "command": "\"$CLAUDE_PROJECT_DIR\"/putnamiw client-generate --projects '*' >&2 || true",
+    "timeout": 600
+  }
+  ```
+
+  Codex names the wrapper `"$(git rev-parse --show-toplevel)"/putnamiw`, and a
+  workspace that runs a published CLI names `putnami`. See
+  [ADR 0087](adr/0087-a-fresh-worktree-restores-its-generated-clients.md).
+
 #### Private registries: credentials at install time
 
 `@putnami/*` npm packages and `go.putnami.dev/*` Go modules are private. Both
@@ -621,6 +654,21 @@ It is inert under `--plan` and `--dry-run` (which only print a note when the
 workspace is out of date), and for the `install`/`deps`/`upgrade` commands
 themselves. Set `PUTNAMI_NO_AUTO_INSTALL=1` to disable it — for CI pipelines that
 prefer to run `putnami install` as an explicit, isolated step.
+
+A generated client is built, not committed, so a fresh worktree holds none.
+After a successful auto-install, the CLI runs `client-generate` over every
+project that declares a generated client, then runs your command. A project
+declares one when its `putnami.json` names a provider in `generatedFrom`, or
+when it holds a `clientgen.json`. The run is an ordinary cached run, the one
+`putnami client-generate --projects '*'` starts: a cache hit restores a
+client, and a miss renders it. It includes the projects that `disable.tags`
+disables, because `go.work` builds their modules too. It runs once, after the install it follows. It does not run
+for `putnami client-generate` itself, on a hosted run
+([`--credential-fd`](#run-credential---credential-fd)), or after a failed
+install. A failed generation prints
+`Generated clients were not restored: <reason>` on stderr, and your command
+still runs. See
+[ADR 0087](adr/0087-a-fresh-worktree-restores-its-generated-clients.md).
 
 ### `upgrade`
 

@@ -642,9 +642,8 @@ func projectListing(t *testing.T, dir string) []string {
 
 // TestRunTypes_NeverWritesIntoTheProjectDirectory pins that a project holds
 // exactly its own files while tsc runs, not only after RunTypes returns. A
-// provider's generated client at <provider>/clients/ts is a project of its own
-// and the declared output of the provider's clientgen~generate-ts, whose drift
-// check and capture can read that directory at any moment of the client's
+// generated client's src/ is the declared output of its own client-generate,
+// whose capture can read that directory at any moment of the client's
 // build~types.
 func TestRunTypes_NeverWritesIntoTheProjectDirectory(t *testing.T) {
 	for _, tc := range []struct {

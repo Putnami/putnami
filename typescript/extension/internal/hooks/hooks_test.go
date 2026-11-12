@@ -774,7 +774,7 @@ func failOnHookExec(t *testing.T) {
 // dependency is not installed fails hook discovery instead of running with
 // fewer hooks. The hook set is not part of any cache key: a generate that ran
 // without the @putnami/application hook succeeded in milliseconds with a .gen
-// lacking clientgen/config.json and schema/, under the same key as a complete
+// lacking schema/, under the same key as a complete
 // run, and the shared cache then served that tree to every checkout.
 func TestRunHooks_UninstalledDependencyFails(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "hook-discovery-fails-closed", "an-uninstalled-dependency-fails-discovery")

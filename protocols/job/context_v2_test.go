@@ -144,6 +144,11 @@ func TestV2InvalidFixtureCoverage(t *testing.T) {
 		"project.tags",
 		"project.tags[0]",
 		"project.tags[1]",
+		"project.generatedFrom",
+		"project.generatedFrom.service",
+		"project.generatedFrom.language",
+		"project.generatedFrom.packageName",
+		"project.generatedFrom.contractPath",
 		"selectedProjects[1].sourceName",
 		"selectedProjects[1].version",
 		"selectedProjects[1].dependencies",
@@ -209,6 +214,9 @@ func TestV1FixturesStayV1(t *testing.T) {
 		}
 		if ctx.Project.Tags != nil {
 			t.Errorf("v1 fixture %s carries the v2 project.tags member", path)
+		}
+		if ctx.Project.GeneratedFrom != nil {
+			t.Errorf("v1 fixture %s carries the v2 project.generatedFrom member", path)
 		}
 		if ctx.Selection != nil {
 			t.Errorf("v1 fixture %s carries the v2 selection member", path)
@@ -425,6 +433,9 @@ func TestValidate_V1RejectsLifecycleMembers(t *testing.T) {
 			}
 		}},
 		{"project.tags", func(c *Context) { c.Project.Tags = []string{"go"} }},
+		{"project.generatedFrom", func(c *Context) {
+			c.Project.GeneratedFrom = &GeneratedFrom{Service: "items", Language: GeneratedLanguageTypeScript}
+		}},
 		{"invocation", func(c *Context) {
 			c.Invocation = &Invocation{ID: "inv-1", ArtifactRoot: "/tmp/inv-1"}
 		}},
@@ -529,6 +540,9 @@ func TestV2LifecycleMembersAreOmittedWhenAbsent(t *testing.T) {
 	}
 	if _, ok := document.Project["tags"]; ok {
 		t.Error("project.tags must be omitted when unset")
+	}
+	if _, ok := document.Project["generatedFrom"]; ok {
+		t.Error("project.generatedFrom must be omitted when unset")
 	}
 	if document.Invocation != nil {
 		t.Error("invocation must be omitted when unset")

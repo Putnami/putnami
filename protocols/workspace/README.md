@@ -57,8 +57,8 @@ the project is importable by the projects of its own scope: the nearest ancestor
 directory whose `putnami.json` contributes scope configuration, which is the
 same chain `LoadScopeChain()` resolves. `public` means the whole workspace.
 A generated client that declares no visibility, and whose
-`client.putnami.json` names a provider in the workspace, is importable from
-every scope.
+`generatedFrom` names a service a provider in the workspace commits, is
+importable from every scope.
 
 The boundary is stated by the project that is IMPORTED, never by the importer,
 and it governs real imports — what `dependencySources` attributes to a go.mod or
@@ -67,6 +67,42 @@ unknown value is a validation error rather than a fallback: a typo must not
 widen a boundary. `ResolveVisibility` applies the default, `DefaultVisibility`
 names it, and `@putnami/cli` owns what a violation means
 ([ADR 0045](../../tooling/cli/doc/adr/0045-a-project-declares-who-may-import-it.md)).
+
+#### `generatedFrom` — the provider a generated client comes from
+
+`ProjectConfig.generatedFrom` makes a project a generated client and names the
+provider it is generated from. Absent, the project is an ordinary one.
+
+```json
+{
+  "name": "example.com/items/client",
+  "generatedFrom": {
+    "service": "items",
+    "language": "go",
+    "packageName": "itemsclient",
+    "clientName": "ItemsClient",
+    "omitOperations": ["deployItems"]
+  }
+}
+```
+
+| Member | Required | Meaning |
+| --- | --- | --- |
+| `service` | yes | The provider's `x-putnami-client` service id, as its committed `schema/openapi.json` declares it |
+| `language` | yes | `go` or `ts` (`GeneratedLanguageGo`, `GeneratedLanguageTypeScript`) |
+| `packageName` | no | Go only: the package name of the generated file |
+| `clientName` | no | Go only: the client type name |
+| `omitOperations` | no | Go only: provider operations the client leaves out, by operation id |
+
+The member names the provider by service id, not by project id: the contract
+is what the client is generated from, and `@putnami/cli` resolves the project
+that commits it. The Go import path is the client's own `go.mod` module, and
+the TypeScript package name is its own `package.json` name. The member stays
+stable while the provider's contract changes, so a client commits no file that
+moves with the contract. `GeneratedFrom` in [`project.go`](project.go) and
+`definitions.generatedFrom` in [`schemas/project.json`](schemas/project.json)
+define it
+([clientgen ADR 0007](../../tooling/clientgen-extension/doc/adr/0007-a-generated-client-is-built-not-committed.md)).
 
 #### `distribution` — who may pull what a project publishes
 

@@ -8,9 +8,9 @@ binding and calls typed methods.
 The happy path has four steps, and none of them is transport code:
 
 ```
-declare the provider  →  generate  →  register the binding  →  call
-   api.Endpoint(...)     putnami       client.Services()       items.GetItems(ctx, in)
-   api.Clients(...)      clientgen     RegisterItemsClient
+declare the provider  →  generate          →  register the binding  →  call
+   api.Endpoint(...)     generatedFrom        client.Services()       items.GetItems(ctx, in)
+   api.Clients(...)      client-generate      RegisterItemsClient
 ```
 
 `go/samples/service-to-service` runs all four end to end.
@@ -141,26 +141,49 @@ standard's own adapters. `External` stands alone: blank, combined with another
 client option, or declared without `api.WithClientService`, it fails the
 provider at start.
 
-Finally, declare the targets to emit:
+Finally, declare that the API is a client contract:
 
 ```go
-clients := api.Clients(api.ClientsOptions{
-    Targets: []string{"go", "ts"},
-    Go:      api.GoClientOptions{PackageName: "itemsclient", ClientName: "ItemsClient"},
-    TS:      api.TSClientOptions{Output: "clients/ts", PackageName: "@example/items-client"},
-}).From(apiPlugin)
+clients := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 ```
+
+`api.Clients` names no client: no target, output or package. It writes each
+operation's `producer`, the project and feature that own it, into the
+contract. The provider commits that contract as `schema/openapi.json`.
 
 ## 2. Generate
 
-```bash
-putnami clientgen --projects items-provider
+A client is a project of its own. Its `putnami.json` names the provider's
+service in `generatedFrom`, and its `go.mod` module is the client's import
+path:
+
+```json
+{
+  "name": "example.com/items/client",
+  "generatedFrom": {
+    "service": "items",
+    "language": "go",
+    "packageName": "itemsclient",
+    "clientName": "ItemsClient"
+  }
+}
 ```
+
+`putnami client-generate` writes the client's `client.gen.go` from the
+provider's committed `schema/openapi.json`. `putnami build`, `test`, `lint`,
+`serve` and `package` run it first, so building the consumer generates the
+client:
+
+```bash
+putnami build --projects items-consumer
+```
+
+Git holds no generated file: `client.gen.go` is built, not committed.
 
 Generation is strict for a provider-owned contract: a semantic the shared client
 IR cannot carry fails with the operation named and a remedy, rather than
-emitting a client that silently loses it. The workspace commands, the drift
-guard and the full diagnostic list are in
+emitting a client that silently loses it. The workspace commands, the guard
+and the full diagnostic list are in
 [Generated clients](/docs/tooling-&-workspace/generated-clients).
 
 ## 3. Register the binding
@@ -580,7 +603,7 @@ trace := itemsclient.ItemsClientDesign.Trace("getItems")
 
 ## Related guides
 
-- [Generated clients](/docs/tooling-&-workspace/generated-clients) — the workspace generate/sync/check commands, the drift guard, and migrating a handwritten client
+- [Generated clients](/docs/tooling-&-workspace/generated-clients) — the workspace generate and check commands, the guard, and migrating a handwritten client
 - [Smart Client Library](/docs/frameworks/typescript/smart-client) — the same four steps in TypeScript
 - [HTTP & Middleware](/docs/frameworks/go/http) — server-side HTTP
 - [gRPC & Connect](/docs/frameworks/go/grpc) — gRPC services

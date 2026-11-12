@@ -34,9 +34,14 @@
     {
       "id": "full-clone-required",
       "text": "A shallow clone or a checkout without tags is refused for version and publish; a full clone without a tag on the line yields 0.0.0."
+    },
+    {
+      "id": "a-client-line-follows-its-contract",
+      "text": "A version line that holds a generatedFrom client also reads its provider's committed contract when the contract lies outside the line, so a commit that changes only the contract advances the client and its conventional type decides the bump."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md"
+    "tooling/cli/doc/adr/0021-publish-version-and-deploy-follow-distribution-v2.md",
+    "tooling/cli/doc/adr/0087-a-fresh-worktree-restores-its-generated-clients.md"
   ]
 }

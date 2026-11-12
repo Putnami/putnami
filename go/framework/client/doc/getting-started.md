@@ -1,9 +1,12 @@
 # Generated service clients
 
 The first-party path starts at the provider declaration. Add
-`api.WithClientService`, declare endpoint schemas and policies, then run
-`putnami clientgen`. The generated package exposes a typed client and a
-`Register<Client>` binding function.
+`api.WithClientService`, declare endpoint schemas and policies, and commit the
+contract as `schema/openapi.json`. A client project names the provider's
+service in the `generatedFrom` member of its `putnami.json`, and
+`putnami client-generate` builds it; `putnami build` runs that first. The
+generated package exposes a typed client and a `Register<Client>` binding
+function.
 
 On the consumer, register the framework config and generated binding:
 

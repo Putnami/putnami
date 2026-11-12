@@ -1,8 +1,8 @@
 # Generated Clients
 
 A Putnami provider declares each operation once. The workspace turns that
-declaration into typed Go and TypeScript clients, keeps them synchronized, and
-fails the gate when a consumer bypasses them.
+declaration into typed Go and TypeScript clients, generates them before every
+command that reads them, and fails the gate when a consumer bypasses them.
 
 This page is the workspace half of the path. The declaration and call syntax
 live with each language: [Service Clients](/docs/frameworks/go/service-clients)
@@ -10,78 +10,121 @@ for Go, [Smart Client Library](/docs/frameworks/typescript/smart-client) for
 TypeScript.
 
 ```
-declare the provider  →  generate  →  register the binding  →  call
-                         putnami clientgen
-                         putnami clientgen-sync
-                         putnami clientgen-check
+declare the provider  →  name it in the client  →  generate  →  register the binding  →  call
+api.Clients(...)         generatedFrom             putnami client-generate
+clientGenerator()                                  putnami clientgen-check
 ```
 
 ## Opting a provider in
 
 A provider lists `/tooling/clientgen-extension` in its `putnami.json`
-`extensions`, then declares its targets — `api.Clients(...)` in Go,
-`clientGenerator(...)` in TypeScript. The provider build writes
-`.gen/clientgen/config.json` and the marked OpenAPI and Proto artifacts; those
-are the only seam between the two toolchains. A provider with no app to build,
-such as a `cloud/clients` slice, commits the same contract as `clientgen.json`
-at its root and its OpenAPI document as `schema/openapi.json`. The emitters and
-the guard read `clientgen.json` when no build wrote `.gen/clientgen/config.json`,
-and the emitters then read `schema/openapi.json` only, never a `.gen/schema`
-an earlier build left.
+`extensions`, then declares itself a client contract: `api.Clients(...)` in Go,
+`clientGenerator()` in TypeScript. The declaration names no client. It writes
+the `x-putnami-client` metadata into the provider's contract, including each
+operation's `producer`: the project and feature that produce it. The provider
+commits that contract as `schema/openapi.json`. It is the only seam between the
+two toolchains.
 
-The same-language client is emitted in-app during `putnami build`. The
-cross-language client is emitted by `putnami clientgen`, which runs the other
-toolchain's emitter against the provider's own contract. No extension shells out
-to the other.
+## Declaring a client
+
+A client is a project of its own. Its `putnami.json` names the provider's
+service in `generatedFrom`:
+
+```json
+{
+  "name": "@acme/items-client",
+  "generatedFrom": { "service": "items", "language": "ts" }
+}
+```
+
+| Member | Meaning |
+| --- | --- |
+| `service` | The provider's `x-putnami-client` service id, as its committed `schema/openapi.json` declares it. Required. |
+| `language` | `go` or `ts`. Required. |
+| `packageName` | Go only: the package name of the generated file. |
+| `clientName` | Go only: the client type name. |
+| `omitOperations` | Go only: operations the client leaves out, by `operationId`. |
+
+A Go client's import path is its own `go.mod` module. A TypeScript client's
+package name is its own `package.json` name. The client commits only these
+authored files and any handwritten code or tests. Git holds no generated file:
+every generated path is ignored.
+
+Putnami resolves the service to the provider whose committed
+`schema/openapi.json` declares it. A `generatedFrom` service that no provider
+declares fails the client's generation, naming the service.
+
+A provider that keeps its Go client inside its own module, as a package of the
+same module, commits a `clientgen.json` at its root instead:
+
+```json
+{
+  "targets": ["go"],
+  "go": { "output": "clients/go", "packageName": "itemsclient", "clientName": "ItemsClient" }
+}
+```
+
+`go.output` names the package directory inside the provider. `go.omitOperations`
+is accepted too. `clientgen.json` names only a Go target, and no `go.modulePath`:
+a client with a module of its own is a project with `generatedFrom`.
 
 A generated client is importable from every scope of the workspace, with
 nothing to declare: it is the service's published way in. This holds when the
-client's `client.putnami.json` names a service a provider in the workspace
-commits, and the client's `putnami.json` declares no `visibility`. A client
-that declares `"visibility": "scope"` keeps that boundary.
+client's `generatedFrom` names a service a provider in the workspace commits,
+and the client's `putnami.json` declares no `visibility`. A client that
+declares `"visibility": "scope"` keeps that boundary.
 
-## The three workspace commands
+## Generating a client
 
-They operate on every project in the Putnami project index, regardless of an
-impacted consumer-only selection.
+`putnami client-generate` runs as the client project. It reads the provider's
+committed `schema/openapi.json` and the client's own `generatedFrom`, and
+writes the generated closure only:
+
+- a Go client gets `client.gen.go` at its root;
+- a TypeScript client gets its `src` directory, which the engine empties first;
+- a provider with `clientgen.json` gets `client.gen.go` in its `go.output`
+  directory.
+
+No project writes into another, and no generation builds the provider. A
+contract with no first-party operation generates nothing.
+
+The `@putnami/go` and `@putnami/typescript` `build`, `test`, `lint`, `serve`
+and `package` commands depend on `client-generate`. Building a client, or a
+project that depends on one, generates the client first:
+
+```bash
+putnami build --projects my-consumer
+```
+
+A fresh worktree holds no client until a Putnami command plans one. The first
+Putnami command restores every client: after the implicit install, the
+first-run pass runs `client-generate` for every project that declares it, from
+the cache when it can. `putnami install`, `init` and `upgrade` also write a
+SessionStart hook that runs `putnamiw client-generate`, so an agent session has
+its clients before its first edit. Editors such as gopls and `tsc` find the
+clients after the first Putnami command.
+
+## Workspace commands
 
 | Command | Result |
 | --- | --- |
-| `putnami clientgen` | Generate the configured targets for the selected providers. |
-| `putnami clientgen-sync` | Build all provider contracts without cache reuse, generate every configured target, synchronize tracked files, rebuild every project as a compile gate, and emit the coverage, lineage and adaptation report. |
-| `putnami clientgen-check` | Judge every committed client against its committed manifest and the committed provider contract, and fail on missing coverage, forged or extra generated files, an unclassified external contract, or a handwritten first-party transport. It builds nothing and renders nothing. |
-| `putnami clientgen-adopt` | Rewrite authored imports and construction onto generated bindings, for the entries two emitter manifests can prove on their own. |
+| `putnami client-generate` | Generate each selected client project, and each selected provider's in-module client, from the committed contract. |
+| `putnami clientgen-check` | Validate provider discovery, the two inventories and the committed contracts, and fail on a tracked generated client file, an unclassified external contract, or a handwritten first-party transport. It builds nothing, generates nothing and spawns no Putnami. |
 
-Sync and adopt build the provider contracts through the Putnami that launched
-them, so an impacted consumer-only selection cannot leave a provider on a stale
-contract. The check spawns no Putnami.
-
-## Drift is the generator's verdict
-
-Whether a committed client is what the current contract generates is decided
-where the client is written. The tasks that write committed clients —
-`clientgen-go`, `clientgen-ts`, `@putnami/go` `build-describe` and
-`@putnami/typescript` `build-generate` — declare `drift: "fail"` on their
-client output. The engine compares what each writes (or what a cache hit
-restores) with the bytes present immediately before, and fails the task with
-the diagnostic `generated-output-drift` naming the changed files. The worktree
-then holds the regenerated client; commit it. A CI checkout of stale committed
-bytes fails the same way from the cache restore.
+The check operates on every project in the workspace, regardless of an
+impacted consumer-only selection.
 
 ## The validate guard
 
 `clientgen-check` is contributed to `putnami validate` with `workspace-once`
 activation, so the gate every project already runs verifies the whole
-workspace's committed clients exactly once — whatever the selection resolves
-to, and whether or not the selected projects declare the extension. A workspace
-opts out the ordinary way, by disabling the extension or the job.
+workspace exactly once — whatever the selection resolves to, and whether or
+not the selected projects declare the extension. A workspace opts out the
+ordinary way, by disabling the extension or the job.
 
-`validate` waits on the `!clientgen` session barrier: every selected provider
-regenerates its targets in place, under the engine's drift judgment, before the
-guard reads them; a consumer-only selection plans no generation. The guard
-itself reads committed inputs only — the project index, each provider's
-committed `schema/openapi.json`, its committed `client.putnami.json` manifests
-and the two root inventories — so a cold clone and a tree the session just
+`validate` plans no generation. The guard reads committed inputs only — each
+provider's committed `schema/openapi.json` and `clientgen.json`, and the
+inventories each project commits — so a cold clone and a tree the session just
 built reach one verdict. HEAD is never consulted: what CI builds, ships and
 caches is the worktree.
 
@@ -89,15 +132,10 @@ caches is the worktree.
 
 | Refusal | What to do |
 |---|---|
-| A generator task reports `generated-output-drift` | The worktree already holds the regenerated files: commit them. A first generation is a warning outside CI, and fails in CI until they are committed |
-| A generated file was hand-edited (its hash no longer matches the manifest), or an extra file sits in a generated directory | Revert it; the directory is a Putnami-owned output |
-| A committed manifest was cut from a contract other than the committed one | Select the provider (`putnami validate --projects <provider>`) or run `putnami clientgen-sync`, then commit |
-| A first-party operation has no generated client | Declare the target on the provider, then sync |
-| A provider declares operations and commits no `client.putnami.json` (`clientgen.missing-manifest`), or names no generation contract at all (`clientgen.missing-config`) | Generate and commit the target — unless the contract is empty by design (below) |
-| A manifest's `omittedOperations` names an operation the provider does not declare (`clientgen.omitted-operation-drift`) | Remove the name from `go.omitOperations`, then sync |
+| Git tracks a file that carries the generated marker (`clientgen.committed-generated-client`) | Run `git rm --cached <file>` and ignore the generated path: a generated client is built, not committed |
 | A handwritten transport call reaches a first-party provider | Replace it with the generated binding, or classify it (below) |
 | An unmarked OpenAPI document is generated without `thirdParty: true` | Mark the provider, or declare the contract external |
-| A project commits a file under `.gen/clientgen` or `.gen/schema`, which a build owns whole, or does not ignore `.gen` (`clientgen.committed-generated-contract`) | Run the command the finding names: `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`, `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`, or `git rm --cached` for a build's output. Then ignore `.gen` in `.gitignore` and drop any `!config.json` carve-out under it |
+| A project commits a file under `.gen/clientgen` or `.gen/schema`, which a build owns whole, or does not ignore `.gen` (`clientgen.committed-generated-contract`) | Run the command the finding names: `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json` for a config that lists only an in-module Go client, `git rm --cached` plus a client project per client for any other config, `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`, or `git rm --cached` for a build's output. Then ignore `.gen` in `.gitignore` and drop any `!config.json` carve-out under it |
 
 Every transport callsite the scanner finds is either associated with a
 first-party provider — which fails, because a generated binding must replace it
@@ -138,24 +176,18 @@ A provider may declare its service identity and no first-party operation at
 all: one whose every route names the authority that owns it
 (`x-putnami-external-contract`), or which serves none. A Go module proxy or an
 npm registry is the usual shape — it only speaks a standard protocol, so there
-is nothing to generate a client for, and `go.putnami.dev/api` stages no target.
+is nothing to generate a client for, and `client-generate` writes nothing for
+it.
 
-The guard reads that as a satisfied declaration. It raises no
-`clientgen.missing-manifest` for a declared target that never materialized, no
-`clientgen.missing-config`, and no `clientgen.no-targets`, and it counts nothing
-as required. The declaration lives in the provider's committed
-`schema/openapi.json` — the document-level `x-putnami-client` marker with an
-empty first-party operation set — so a cold clone reaches the same verdict as a
-tree the session just built. No flag declares it: the operation set does.
+The declaration lives in the provider's committed `schema/openapi.json` — the
+document-level `x-putnami-client` marker with an empty first-party operation
+set — so a cold clone reaches the same verdict as a tree the session just
+built. No flag declares it: the operation set does.
 
-Emptiness is exact, not a suppression. A contract that declares even one
-first-party operation still owes its declared targets a generated client, and a
-contract whose operations the guard could not read — an operation with no
-`x-putnami-client` metadata, an invalid marker, a missing `operationId`, an
-`x-putnami-external-contract` that names no authority — is unreadable, never
-empty, and keeps failing. A target that IS committed is judged in full, so a
-client left behind after its last operation moved to an external authority fails
-as `clientgen.operation-coverage-drift`.
+Emptiness is exact, not a suppression. A contract whose operations the guard
+could not read — an operation with no `x-putnami-client` metadata, an invalid
+marker, a missing `operationId`, an `x-putnami-external-contract` that names no
+authority — is unreadable, never empty, and keeps failing.
 
 Such a provider reports no target, because no target of it can carry a call. A
 handwritten transport that reaches it is still a failure, and its diagnostic
@@ -173,22 +205,17 @@ See `tooling/clientgen-extension/doc/adr/0004-an-empty-first-party-contract-is-a
 ## Migrating a handwritten client
 
 1. **Get the provider contract first.** Nothing can be generated until the
-   provider declares its operations and its client targets. Until it does, the
+   provider declares its operations as a client contract. Until it does, the
    consumer's callsites are `pending-provider-contract` in the consumer
    project's `clientgen.framework.json`, naming the operations they wait on.
-2. **Generate.** `putnami clientgen-sync` writes the client package and its
-   `client.putnami.json` manifest.
-3. **Adopt what the manifests can prove.** `putnami clientgen-adopt` rewrites a
-   generated package that moved, and the client constructor or registration call
-   the product contract promises for a service. Both sides need identical
-   contract bytes, service and operations. Go rewrites a qualified selector on
-   the exact identifier the file binds to that import; TypeScript rewrites the
-   specifier and its uses, and refuses a source where the name is also bound
-   locally or used in object-shorthand position. Every file is staged before any
-   file is written, so an adoption that cannot finish migrates nothing.
+2. **Declare the client project.** Create a project whose `putnami.json`
+   names the provider's service in `generatedFrom`, and add it as a dependency
+   of the consumer. The consumer's next build generates it.
+3. **Switch the callsites.** Import the generated package and register its
+   binding on the consumer module.
 4. **Work the queue.** Argument, credential and call-shape changes are never
-   inferred. The report's adaptation entries name the generated package and
-   binding symbols; the edit is yours.
+   inferred. The guard's diagnostic names the generated package and binding
+   symbol to call; the edit is yours.
 5. **Delete the inventory entry.** The `pending-provider-contract` entry that
    covered the old callsite now matches nothing, and an entry that matches
    nothing fails the check — which is how the state closes itself.
@@ -274,16 +301,12 @@ loses it. Both emitters raise `clientgen_unsupported_semantic`; the Go code is
 
 ### Leaving an operation out of the Go target
 
-`go.omitOperations` — `GoClientOptions.OmitOperations` in `api.Clients`, `go: {
-omitOperations }` in `clientGenerator` — names operations, by `operationId`,
-that the Go target leaves out instead of failing the whole provider. Use it for
-an operation the Go emitter cannot represent yet; the default stays a failure.
-Each operation left out is named in the generated client's doc comment, in the
-build output, and in `omittedOperations` of the committed `client.putnami.json`.
-The guard reads that list from the committed manifest, so a cold clone judges
-the omission exactly as a built tree does: the operation stays required in the
-coverage count and is never covered. A name the contract does not declare fails
-generation.
+`omitOperations` in a Go client's `generatedFrom` — or `go.omitOperations` in
+a provider's `clientgen.json` — names operations, by `operationId`, that the Go
+client leaves out instead of failing generation. Use it for an operation the Go
+emitter cannot represent yet; the default stays a failure. Each operation left
+out is named in the generated client's doc comment. A name the contract does
+not declare fails generation. The TypeScript client keeps every operation.
 
 An operation with several success statuses is no longer a reason to leave it
 out: the Go client returns a result carrying the answered status (see the
@@ -300,20 +323,28 @@ because it uses a non-REST transport.
 
 ## Determinism and caching
 
-Both project tasks are cacheable, so their cache keys name every input that
-decides an emitted byte: the clientgen configuration, the built contract, the
-provider `package.json` and — for the TypeScript target — the Biome
-configuration, its `extends` chain and the EditorConfig beside it, because the
-emitter canonicalizes every file it writes with Biome. A configuration this
-resolution cannot name as a workspace path fails generation instead of being
-silently left out of the key.
+The generation tasks are cacheable, so their keys name every input that
+decides an emitted byte. A client project keys on its `putnami.json`, which
+carries the generation options, and on its `go.mod` or `package.json`. Its
+identity folds the digest of its provider's committed contract, so a provider
+change that leaves `schema/openapi.json` alone reuses every client entry, and a
+contract change moves every client key. The in-module target keys on the
+provider's `clientgen.json` and `schema/openapi.json`. The TypeScript target
+also keys on the Biome configuration, its `extends` chain and the EditorConfig
+beside it, because the emitter canonicalizes every file it writes with Biome. A
+configuration this resolution cannot name as a workspace path fails generation
+instead of being silently left out of the key.
 
-Two runs of the same contract produce the same bytes. That is what makes drift a
-gate failure rather than a diff to review.
+A client's version line follows its provider's contract: a commit that changes
+only `schema/openapi.json` advances the client's version, and its conventional
+type decides the bump.
+
+Two runs of the same contract produce the same bytes, so a cache hit and a
+fresh render give every worktree the same client.
 
 ## Reference
 
 - `tooling/clientgen-extension/README.md` — the extension's own contract, the
   inventory schemas, and the execution model
-- `protocols/clientcontract/README.md` — the versioned metadata and manifest
-  formats, and the published WebSocket wire
+- `protocols/clientcontract/README.md` — the versioned metadata format and the
+  published WebSocket wire

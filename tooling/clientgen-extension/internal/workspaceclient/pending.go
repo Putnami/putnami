@@ -20,9 +20,10 @@ import (
 // would leave the repository unguarded for exactly as long as the migration
 // takes, which is when a NEW bypass is cheapest to add.
 //
-// So the guard blocks on drift, on an invalid manifest and on a NEW
-// handwritten callsite, and reports the census entries without failing. This
-// is not an allowlist and the distinction is load-bearing:
+// So the guard blocks on discovery and inventory findings, on a tracked
+// generated client and on a NEW handwritten callsite, and reports the census
+// entries without failing. This is not an allowlist and the distinction is
+// load-bearing:
 //
 //   - it names a COUNT per exact (code, file, transport, symbol), never a
 //     folder, a file or a transport as a class, so a second `http.Get` in a
@@ -67,8 +68,9 @@ type PendingTransport struct {
 }
 
 // pendingEligibleCodes are the handwritten-transport verdicts a census entry
-// may carry. Drift, forged bytes and invalid manifests are deliberately absent:
-// those are never pre-existing debt, they are a broken workspace.
+// may carry. Discovery, inventory and tracked-generated-client findings are
+// deliberately absent: those are never pre-existing debt, they are a broken
+// workspace.
 var pendingEligibleCodes = map[string]bool{
 	"clientgen.unclassified-transport":             true,
 	"clientgen.unclassified-handwritten-transport": true,

@@ -272,6 +272,10 @@ type DiscoveredRoute struct {
 	Throws        []ThrowsMeta
 	Security      *SecurityMeta
 	ClientOptions *api.ClientOperationOptions
+	// Producer names the project and feature that produce the operation
+	// (api.DiscoveredRoute.Producer). A first-party operation's
+	// x-putnami-client carries it; nil leaves the operation unattributed.
+	Producer *clientcontract.OperationProducer
 }
 
 // ThrowsMeta describes an error response.
@@ -717,6 +721,10 @@ func buildClientOperation(g *schemaGen, route DiscoveredRoute, document *clientc
 	}
 	if route.ClientOptions != nil {
 		operation.Resilience = cloneClientResilience(route.ClientOptions.Resilience)
+	}
+	if route.Producer != nil {
+		producer := *route.Producer
+		operation.Producer = &producer
 	}
 	return operation
 }

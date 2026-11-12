@@ -3,6 +3,7 @@ package job
 import (
 	"encoding/json"
 	"fmt"
+	"path"
 	"sort"
 	"strings"
 
@@ -21,6 +22,7 @@ type contextPresence struct {
 	projectType              bool
 	projectDependencyClosure bool
 	projectTags              bool
+	projectGeneratedFrom     bool
 	invocation               bool
 	selection                bool
 	workspaceProjects        bool
@@ -101,6 +103,10 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		if ctx.presence.projectTags || ctx.Project.Tags != nil {
 			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "project.tags",
 				"project.tags requires protocolVersion %d", ProtocolVersion2))
+		}
+		if ctx.presence.projectGeneratedFrom || ctx.Project.GeneratedFrom != nil {
+			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "project.generatedFrom",
+				"project.generatedFrom requires protocolVersion %d", ProtocolVersion2))
 		}
 		if ctx.presence.invocation || ctx.Invocation != nil {
 			diags = append(diags, diag.Errorf(ErrorCodeUnexpectedField, "invocation",
@@ -199,6 +205,7 @@ func validateVersioned(ctx *Context) []diag.Diagnostic {
 		diags = append(diags, validateDependencyClosure(
 			ctx.Project.DependencyClosure, ctx.presence.projectDependencyClosure)...)
 		diags = append(diags, validateProjectTags(ctx.Project.Tags, ctx.presence.projectTags)...)
+		diags = append(diags, validateGeneratedFrom(ctx.Project.GeneratedFrom, ctx.presence.projectGeneratedFrom)...)
 		diags = append(diags, validateInvocation(ctx.Invocation, ctx.presence.invocation)...)
 		diags = append(diags, validateUserScope(ctx.UserScope, ctx.presence.userScope)...)
 		diags = append(diags, validateInvocationDir(ctx.InvocationDir, ctx.presence.invocationDir)...)
@@ -455,6 +462,75 @@ func validateProjectTags(tags []string, present bool) []diag.Diagnostic {
 				tags[i-1], tags[i]))
 			break
 		}
+	}
+	return diags
+}
+
+// validateGeneratedFrom checks the project's resolved generation binding.
+//
+// A present member names a service and a known language: a task cannot
+// generate a client for neither. A Go option on a TypeScript client is refused,
+// as putnami.json refuses it, because a consumer would read it as a setting
+// that changes the output. The contract path, when the orchestrator resolved
+// one, is a clean workspace-relative slash path: a consumer joins it to the
+// workspace root, so an absolute path or an escape would read a file outside
+// the workspace. A PRESENT-but-null member is neither a client nor not one.
+func validateGeneratedFrom(from *GeneratedFrom, present bool) []diag.Diagnostic {
+	present = present || from != nil
+	if !present {
+		return nil
+	}
+	const field = "project.generatedFrom"
+	if from == nil {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidValue, field,
+			"%s must be omitted or contain a non-null object", field)}
+	}
+	var diags []diag.Diagnostic
+	if strings.TrimSpace(from.Service) == "" {
+		diags = append(diags, diag.Errorf(ErrorCodeMissingField, field+".service",
+			"%s.service is required", field))
+	}
+	switch from.Language {
+	case GeneratedLanguageGo:
+		for i, operation := range from.OmitOperations {
+			if strings.TrimSpace(operation) == "" {
+				diags = append(diags, diag.Errorf(ErrorCodeInvalidValue,
+					fmt.Sprintf("%s.omitOperations[%d]", field, i),
+					"%s.omitOperations[%d] is blank; name an operation id", field, i))
+			}
+		}
+	case GeneratedLanguageTypeScript:
+		for _, option := range []struct {
+			name string
+			set  bool
+		}{
+			{"clientName", from.ClientName != ""},
+			{"omitOperations", from.OmitOperations != nil},
+			{"packageName", from.PackageName != ""},
+		} {
+			if option.set {
+				diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field+"."+option.name,
+					"%s.%s is a Go option; a %s client carries none", field, option.name, GeneratedLanguageTypeScript))
+			}
+		}
+	default:
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field+".language",
+			"%s.language is %q; want %q or %q", field, from.Language, GeneratedLanguageGo, GeneratedLanguageTypeScript))
+	}
+	if contract := from.ContractPath; contract != "" {
+		if strings.Contains(contract, "\\") || path.IsAbs(contract) || path.Clean(contract) != contract ||
+			contract == "." || contract == ".." || strings.HasPrefix(contract, "../") {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field+".contractPath",
+				"%s.contractPath must be a clean workspace-relative slash path, got %q", field, contract))
+		}
+	}
+	switch digest := from.ContractSHA256; {
+	case (digest == "") != (from.ContractPath == ""):
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field+".contractSha256",
+			"%s.contractSha256 is present exactly when contractPath is", field))
+	case digest != "" && !isLowerHexSHA256(digest):
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field+".contractSha256",
+			"%s.contractSha256 must be 64 lowercase hex digits, got %q", field, digest))
 	}
 	return diags
 }
@@ -877,4 +953,17 @@ func validateStaging(staging *Staging) []diag.Diagnostic {
 	}
 
 	return diags
+}
+
+// isLowerHexSHA256 reports whether value is a sha256 digest in lowercase hex.
+func isLowerHexSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }

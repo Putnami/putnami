@@ -50,7 +50,7 @@ type doctorProject struct {
 	// "template").
 	kind string
 	// generatedClient is true for a project the client generator writes: its
-	// root holds client.putnami.json.
+	// putnami.json declares generatedFrom.
 	generatedClient bool
 	profile         doctor.Profile
 }

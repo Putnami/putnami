@@ -3,6 +3,7 @@ package clientcontract
 import (
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 
@@ -135,62 +136,28 @@ func TestACachePolicyRoundTripsThroughTheStrictReader(t *testing.T) {
 	}
 }
 
-func cachedManifest(capabilities []RuntimeCapability, cache *CachePolicy) *GeneratedClientManifestV1 {
-	return &GeneratedClientManifestV1{
-		ProtocolVersion: ProtocolVersion,
-		GeneratedBy:     GeneratedBy,
-		Language:        GeneratedLanguageTypeScript,
-		Service:         Service{ID: "identity", Audience: "identity"},
-		Binding: GeneratedBinding{ImportPath: "@example/identity-client", Clients: []GeneratedBindingClient{{
-			Service: "identity", ClientSymbol: "IdentityClient", BindingSymbol: "registerIdentityClient",
-		}}},
-		ContractSHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-		Operations: []GeneratedOperation{{
-			OperationID: "effectiveAccess", Service: "identity", MethodSymbol: "effectiveAccess", Stream: StreamUnary,
-			Transports: []Transport{{Protocol: TransportRESTJSON, Path: "/internal/authorization/effective-access", Encoding: EncodingJSON}},
-			Cache:      cache,
-		}},
-		RuntimeCapabilities: capabilities,
-		Files:               []GeneratedFile{},
+func TestACachePolicyRequiresTheResponseCacheRuntimeCapability(t *testing.T) {
+	spectest.Proves(t, cacheFeature, "response-cache-policy", "a-cache-policy-requires-the-response-cache-runtime-capability")
+	cached := GeneratedOperation{
+		OperationID: "effectiveAccess", Stream: StreamUnary,
+		Transports: []Transport{{Protocol: TransportRESTJSON, Path: "/internal/authorization/effective-access", Encoding: EncodingJSON}},
+		Cache:      &CachePolicy{FreshMs: 5000, StaleMs: intPointer(300000)},
 	}
-}
-
-func TestAManifestThatDeclaresACachePolicyRequiresTheResponseCacheRuntimeCapability(t *testing.T) {
-	spectest.Proves(t, cacheFeature, "response-cache-policy", "a-manifest-that-declares-a-cache-policy-requires-the-response-cache-runtime-capability")
-	policy := &CachePolicy{FreshMs: 5000, StaleMs: intPointer(300000)}
-	manifest := cachedManifest([]RuntimeCapability{RuntimeCapabilityResponseCache}, policy)
-	if got := RequiredRuntimeCapabilities(manifest.Operations); len(got) != 1 || got[0] != RuntimeCapabilityResponseCache {
+	if got := RequiredRuntimeCapabilities([]GeneratedOperation{cached}); !slices.Equal(got, []RuntimeCapability{RuntimeCapabilityResponseCache}) {
 		t.Fatalf("required capabilities = %v", got)
 	}
-	data, err := json.Marshal(manifest)
-	if err != nil {
-		t.Fatal(err)
+	uncached := cached
+	uncached.Cache = nil
+	if got := RequiredRuntimeCapabilities([]GeneratedOperation{uncached}); got != nil {
+		t.Fatalf("an uncached operation required %v", got)
 	}
-	if _, diags := ParseAndValidateGeneratedManifest(data); diag.HasErrors(diags) {
-		t.Fatalf("a consistent cached manifest was refused: %v", diags)
+	for _, language := range []GeneratedLanguage{GeneratedLanguageGo, GeneratedLanguageTypeScript} {
+		if !slices.Contains(RuntimeCapabilitiesImplementedBy(language), RuntimeCapabilityResponseCache) {
+			t.Fatalf("the %s runtime does not implement the response cache", language)
+		}
 	}
-
-	if diags := ValidateGeneratedManifest(cachedManifest(nil, policy)); !hasCode(diags, ErrorCodeUnsupportedRuntimeCapability) {
-		t.Fatalf("a cache policy without its runtime capability was accepted: %v", diags)
-	}
-	if diags := ValidateGeneratedManifest(cachedManifest([]RuntimeCapability{"response-cache-v2"}, policy)); !hasCode(diags, ErrorCodeUnsupportedRuntimeCapability) {
-		t.Fatalf("a capability no runtime implements was accepted: %v", diags)
-	}
-	if diags := ValidateGeneratedManifest(cachedManifest([]RuntimeCapability{RuntimeCapabilityResponseCache}, nil)); !hasCode(diags, ErrorCodeInvalidGeneratedManifest) {
-		t.Fatalf("a capability no operation needs was accepted: %v", diags)
-	}
-	if diags := ValidateGeneratedManifest(cachedManifest(nil, nil)); diag.HasErrors(diags) {
-		t.Fatalf("an uncached manifest without capabilities was refused: %v", diags)
-	}
-	withUnknownField := strings.Replace(string(data), `"freshMs":5000`, `"freshMs":5000,"mode":"lru"`, 1)
-	if _, diags := ParseAndValidateGeneratedManifest([]byte(withUnknownField)); !diag.HasErrors(diags) {
-		t.Fatal("a cache policy field this runtime does not implement was accepted")
-	}
-	stream := cachedManifest([]RuntimeCapability{RuntimeCapabilityResponseCache}, policy)
-	stream.Operations[0].Stream = StreamServer
-	stream.Operations[0].Transports = []Transport{{Protocol: TransportSSE, Path: "/events", Encoding: EncodingJSON}}
-	if diags := ValidateGeneratedManifest(stream); !hasCode(diags, ErrorCodeInvalidResilience) {
-		t.Fatalf("a cached stream operation was accepted in a manifest: %v", diags)
+	if got := RuntimeCapabilitiesImplementedBy("rust"); got != nil {
+		t.Fatalf("an unknown language implements %v", got)
 	}
 }
 

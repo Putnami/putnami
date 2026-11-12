@@ -76,37 +76,42 @@ the multi-segment semantics.
 
 ## Typed client generation
 
-`api.Clients(...)` is a build-time describer that generates a typed Go client from the
-provider's OpenAPI spec — the single contract both the Go and TypeScript client emitters
-share. Register it alongside the `openapi` plugin:
+`api.Clients(...)` declares that the API is a client contract. It names no
+client: no target, output, package or module. Register it beside the `openapi`
+plugin:
 
 ```go
 apiPlugin := api.New(httpServer, api.WithClientService(api.ClientServiceOptions{
     Service: clientcontract.Service{ID: "items", Audience: "urn:putnami:items"},
 }))
 openapiPlugin := openapi.NewPlugin(openapi.PluginOptions{Title: "Items"}).From(apiPlugin)
-clients := api.Clients(api.ClientsOptions{
-    Targets: []string{"go", "ts"},
-    Go: api.GoClientOptions{
-        PackageName: "itemsclient",
-        ClientName:  "ItemsClient",
-    },
-    TS: api.TSClientOptions{PackageName: "@example/items-client"},
-}).From(apiPlugin)
+clients := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 app.New("svc").Use(httpServer).Use(apiPlugin).Use(openapiPlugin).Use(clients)
 ```
 
-During `putnami build` the describer:
+The declaration decides two things about the contract the `openapi` plugin
+publishes:
 
-1. reads the canonical OpenAPI bytes in-memory from the `openapi` plugin
-   (discovered via the `SpecSource` interface — an explicit dependency, no
-   describe-ordering race); those are the same bytes the plugin serves and
-   describes, so publication that only reapplies the canonical object-key and
-   trailing-newline format preserves the generated client's `SpecHash` for
-   workspace regeneration;
-2. writes the client-generation contract to `.gen/clientgen/config.json`;
-3. `putnami clientgen` synchronizes every configured language target and writes a
-   validated ownership manifest beside each generated client.
+1. Each operation's `x-putnami-client` carries a `producer`: the project and
+   the feature of the module that owns the operation's api plugin. An
+   operation whose module declares no feature stays unattributed.
+2. Describe fails when the document has no `x-putnami-client`.
+   `ClientsOptions.ThirdParty` lifts that check for an external contract.
+
+The provider writes no client. A client project names the provider in the
+`generatedFrom` member of its own `putnami.json` and builds its client from the
+provider's committed `schema/openapi.json`. The Go emitter is
+`putnami-client-generate-go` (`cmd/clientgen`):
+
+```sh
+putnami-client-generate-go --contract <provider>/schema/openapi.json --output <client dir> \
+    --package itemsclient --client ItemsClient [--omit <operationId>]...
+```
+
+It writes only `<output>/client.gen.go`: no manifest, no `go.mod` and no
+`putnami.json`. Each operation's `producer` becomes its attribution in the
+generated client's design descriptor. A contract with no operation removes
+`client.gen.go`. A contract with no document-level `x-putnami-client` fails.
 
 The consumer registers `client.Services()` and the generated
 `RegisterItemsClient` binding, then calls typed methods. URL, client identity,
@@ -194,22 +199,13 @@ honor fails while the client is generated, never at the first call.
 | Several success statuses dispatched on Connect | A Connect response carries one success status, so the caller could not tell the variants apart |
 | Several success statuses beside a raw octet response | The single octet payload names no status |
 
-`GoClientOptions.OmitOperations` names operations, by `operationId`, that the
-Go target leaves out instead of failing the whole provider — the escape for an
-operation the Go emitter cannot represent yet, such as one with typed response
-headers. The default is unchanged: such an operation fails generation. Each
-operation left out is named in the build output, in the generated client's doc
-comment and in `omittedOperations` of its `client.putnami.json`, and workspace
-coverage counts it as uncovered. A name the contract does not declare fails.
-A TypeScript provider sets the same option as `go: { omitOperations }` on
-`clientGenerator(...)`.
-
-```go
-api.Clients(api.ClientsOptions{
-    Targets: []string{"ts", "go"},
-    Go: api.GoClientOptions{PackageName: "identityclient", OmitOperations: []string{"listAuditEvents"}},
-})
-```
+`omitOperations` in a client's `generatedFrom` (`--omit` of the emitter)
+names operations, by `operationId`, that the Go client leaves out instead of
+failing — the escape for an operation the Go emitter cannot represent yet, such
+as one with typed response headers. The default is unchanged: such an
+operation fails generation. Each operation left out is named in the emitter's
+output and in the generated client's doc comment. A name the contract does not
+declare fails.
 
 A `DELETE` body is representable and stays allowed. When the caller sends one it
 is decoded and validated like any other body; when the caller sends none the
@@ -298,9 +294,8 @@ Regression evidence covers the [endpoint builder and validation
 pipeline](endpoint_test.go), [transport dispatch, prefixes, and document-only
 routes](plugin_test.go), [streaming endpoints](stream_test.go), [design
 contribution](design_test.go), [client generation](clientgen_test.go), [spec
-reading](clientir_test.go), [the generation contract](clients_test.go),
-[standalone and in-module client projects](clientgen_project_test.go), and
-[cross-language client sync](clientgen_crosslang_test.go).
+reading](clientir_test.go), [the client declaration and producer
+attribution](clients_test.go), and [the Go client emitter](clientgen_emit_test.go).
 
 ## Caller-resolved page endpoints
 

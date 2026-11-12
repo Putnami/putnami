@@ -50,7 +50,7 @@ func nestedProjectWorkspace(t *testing.T) string {
 	writeFixtureFile(t, root, "app/test/index.test.ts", "const b   = 1;\nexport { b };\n")
 	writeFixtureFile(t, root, "app/clients/ts/src/client.ts", "const c   = 1;\nexport { c };\n")
 	writeFixtureFile(t, root, "app/clients/go/putnami.json", "{\"name\":\"go-client\",\"tags\":[\n\"go\"\n]}\n")
-	writeFixtureFile(t, root, "app/clients/go/client.putnami.json", "{\"a\":[\n1\n]}\n")
+	writeFixtureFile(t, root, "app/clients/go/settings.json", "{\"a\":[\n1\n]}\n")
 	writeFixtureFile(t, root, "app/clients/go/tools/gen.ts", "const d   = 1;\nexport { d };\n")
 	writeFixtureFile(t, root, "app/clients/go/tools/deeper/putnami.json", "{\"name\":\"deeper\"}\n")
 	writeFixtureFile(t, root, "app/node_modules/dep/putnami.json", "{\"name\":\"dep\"}\n")
@@ -66,7 +66,7 @@ func nestedProjectWorkspace(t *testing.T) string {
 var nestedProjectFiles = []string{
 	"app/.tools/sub/putnami.json",
 	"app/clients/go/putnami.json",
-	"app/clients/go/client.putnami.json",
+	"app/clients/go/settings.json",
 	"app/clients/go/tools/gen.ts",
 	"app/clients/go/tools/deeper/putnami.json",
 }

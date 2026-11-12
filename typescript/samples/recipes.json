@@ -22,13 +22,15 @@
       "sample": "typescript/samples/10-service-to-service",
       "primitives": [
         "@putnami/application: openapi()",
-        "@putnami/client/generator: clientGenerator({ packageName, targets })",
-        "putnami clientgen",
+        "@putnami/client/generator: clientGenerator(), with the contract committed at schema/openapi.json",
+        "client project putnami.json: generatedFrom { service, language: \"ts\" }; the package name comes from the client's package.json",
+        "putnami client-generate, or any build, test or lint of the client project",
         "@putnami/client: BaseClient (the generated classes extend it)"
       ],
       "antiPatterns": [
         "A fetch wrapper with request and response types copied by hand",
         "An edit inside a generated clients/ tree instead of a regeneration",
+        "A generated client file committed to Git instead of ignored and built",
         "A base URL, header or retry interceptor written in the consumer"
       ],
       "since": "0.0.0-20260917065345-3cc91b658"

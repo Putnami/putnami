@@ -47,9 +47,9 @@ package scheduler
 // excludes only the writers that hold that key: the tasks that declare a
 // durable output rooted in that project or in the workspace, such as the
 // generate task that declares .gen. A writer of the resource that declares no
-// such output holds no key and is not excluded: the tasks that write the
-// workspace-scoped workspace-clients declare no output, so a reader of
-// workspace-clients is not protected from them. The sources resource takes no
+// such output holds no key and is not excluded: a task that writes a
+// workspace-scoped resource and declares no output does not protect that
+// resource's readers from it. The sources resource takes no
 // key: the tasks that write it mutate the source tree, which no output key
 // covers. A reader key that no writer holds delays nobody.
 //

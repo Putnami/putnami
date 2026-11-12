@@ -207,16 +207,14 @@ func TestTheEmittedGoClientAnswersEachDeclaredSuccessStatusThroughTheRealRuntime
 		"a-client-constructed-without-di-calls-the-real-declared-provider")
 	httpServer, apiPlugin := multiStatusProvider()
 	openapiPlugin := NewPlugin(PluginOptions{Title: "Widgets", Version: "1.0.0"}).From(apiPlugin)
-	clientsPlugin := api.Clients(api.ClientsOptions{
-		Go: api.GoClientOptions{PackageName: "widgetsclient", ClientName: "WidgetsClient"},
-	}).From(apiPlugin)
+	clientsPlugin := api.Clients(api.ClientsOptions{}).From(apiPlugin)
 	application := app.New("widgets")
 	application.Use(apiPlugin).Use(openapiPlugin).Use(clientsPlugin)
 	out := t.TempDir()
 	if err := application.Describe(out, []string{"openapi", "clients"}); err != nil {
 		t.Fatalf("Describe: %v", err)
 	}
-	source, err := os.ReadFile(filepath.Join(out, api.ClientStageDir, "go", "client.gen.go"))
+	source, err := emitDescribedGoClient(t, out, "widgetsclient", "WidgetsClient")
 	if err != nil {
 		t.Fatalf("read generated client: %v", err)
 	}

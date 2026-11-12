@@ -32,7 +32,6 @@ func TestDeclaredRestoreStagesUnderTheScratchRoot(t *testing.T) {
 	})
 	f := newCaptureFixture(t, job)
 	clients := filepath.Join(f.ws.Root, captureTestProject, "clients")
-	writeFileAt(t, filepath.Join(clients, "ts", "client.putnami.json"), "{}\n")
 	writeFileAt(t, filepath.Join(clients, "ts", "src", "index.ts"), "export {};\n")
 	if !f.sched.storeDeclaredCapture(job, capturedResult(nil), captureHashA) {
 		t.Fatal("store declared entry")

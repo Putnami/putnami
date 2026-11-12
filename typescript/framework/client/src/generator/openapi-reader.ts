@@ -57,7 +57,6 @@ export type ClientContractDiagnosticCode =
   | 'client_contract.invalid_resilience'
   | 'client_contract.invalid_schema'
   | 'client_contract.invalid_protobuf'
-  | 'client_contract.invalid_generated_manifest'
   | 'client_contract.unsupported_runtime_capability';
 
 /** Every contract diagnostic this reader can emit, in the Go package's order. */
@@ -77,7 +76,6 @@ export const CLIENT_CONTRACT_DIAGNOSTIC_CODES: readonly ClientContractDiagnostic
   'client_contract.invalid_resilience',
   'client_contract.invalid_schema',
   'client_contract.invalid_protobuf',
-  'client_contract.invalid_generated_manifest',
   'client_contract.unsupported_runtime_capability',
 ];
 
@@ -1093,7 +1091,7 @@ function parseOperation(
   const operation = object(input, context, 'x-putnami-client');
   assertKnownKeys(
     operation,
-    ['stream', 'messages', 'transports', 'security', 'errors', 'idempotency', 'resilience'],
+    ['stream', 'messages', 'transports', 'security', 'errors', 'idempotency', 'resilience', 'producer'],
     context,
     'x-putnami-client',
   );
@@ -1115,6 +1113,7 @@ function parseOperation(
   validateSecurity(operation.security, contract, context);
   validateErrors(operation.errors, doc, context);
   validateIdempotency(operation.idempotency, context);
+  if (operation['producer'] !== undefined) validateProducer(operation['producer'], context);
   if (operation.resilience !== undefined) {
     const resilience = validateResilience(operation.resilience, context, 'x-putnami-client.resilience');
     if (resilience.cache !== undefined) validateCacheScope(operation, context);
@@ -1600,6 +1599,24 @@ function validateErrors(input: unknown, doc: OpenApiDocument, context: Operation
     if (seen.has(key)) unsupported('duplicate error', context, field, 'client_contract.duplicate');
     seen.add(key);
   });
+}
+
+/**
+ * An operation's producer names the project and the feature that serve it,
+ * both non-empty, and nothing else: the Go reader's `operationProducer`.
+ */
+function validateProducer(input: unknown, context: OperationContext): void {
+  const producer = object(input, context, 'x-putnami-client.producer');
+  assertKnownKeys(producer, ['project', 'feature'], context, 'x-putnami-client.producer');
+  for (const field of ['project', 'feature'] as const) {
+    if (typeof producer[field] !== 'string' || !(producer[field] as string).trim())
+      unsupported(
+        `an operation producer names its ${field}`,
+        context,
+        `x-putnami-client.producer.${field}`,
+        'client_contract.required',
+      );
+  }
 }
 
 function validateIdempotency(input: unknown, context: OperationContext): void {

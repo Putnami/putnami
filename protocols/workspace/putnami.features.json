@@ -368,6 +368,20 @@
               "the-cli-refuses-an-answer-the-contract-refuses"
             ]
           }
+        },
+        {
+          "id": "a-client-names-its-provider",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-valid-generated-from-decodes",
+              "an-invalid-generated-from-is-refused-with-its-field"
+            ]
+          }
         }
       ]
     }

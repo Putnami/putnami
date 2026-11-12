@@ -60,8 +60,8 @@ import (
 //     naming a workspace package no source file of the project imports.
 //     devDependencies are NOT in scope: a `workspace:` devDependency is how a
 //     project requests an EXTENSION, and the build reads it by running it.
-//  4. An orphan client.putnami.json: a committed generated-client manifest
-//     whose `service.id` no provider of this workspace declares any more.
+//  4. An orphan generatedFrom: a putnami.json `generatedFrom` whose service no
+//     single provider of this workspace declares.
 //
 // The check reports; `putnami deps prune` repairs what it has a writer for and
 // names the edit to make for the rest, and the check's advice says exactly
@@ -75,9 +75,9 @@ type DeclaredEdgeClass string
 const (
 	// DeclaredEdgeProjectConfig is a putnami.json `dependencies` entry.
 	DeclaredEdgeProjectConfig DeclaredEdgeClass = "putnami-json"
-	// DeclaredEdgeOrphanClient is a committed generated-client manifest whose
-	// provider no longer declares the service it names.
-	DeclaredEdgeOrphanClient DeclaredEdgeClass = "client-manifest"
+	// DeclaredEdgeOrphanClient is a putnami.json `generatedFrom` whose service no
+	// single provider declares.
+	DeclaredEdgeOrphanClient DeclaredEdgeClass = "generated-from"
 	// DeclaredEdgeManifest is an edge a PROVIDER reported and attributed to no
 	// import: the project's own language manifest states it and its sources do
 	// not read it. Which manifest that is, and how to edit it, belongs to the
@@ -310,14 +310,14 @@ func projectDeclaredEdges(ws *Workspace, project *Project,
 	return findings
 }
 
-// orphanClientFinding reports a committed generated-client manifest whose
-// service no provider of this workspace declares.
+// orphanClientFinding reports a putnami.json `generatedFrom` whose service no
+// single provider of this workspace declares.
 //
-// The manifest binds the client to a contract; with no provider answering to
-// its service identity, the contract edge does not exist, the client's key
-// mixes a contract nobody produces, and a regeneration has no source. The
-// repair is a deletion, never an edit, so this finding names the file and stops
-// there.
+// `generatedFrom` binds the client to a contract; with no provider answering
+// to its service identity, the contract edge does not exist, the client's key
+// folds the fixed unresolved marker, and its generation has no source. The
+// repair is a choice between the client and the provider's contract, so this
+// finding names the file and stops there.
 func orphanClientFinding(ws *Workspace, project *Project) *DeclaredEdgeFinding {
 	if project.GeneratedClient == nil || ws.Graph.ContractProviderOf(project.ID) != "" {
 		return nil
@@ -326,7 +326,7 @@ func orphanClientFinding(ws *Workspace, project *Project) *DeclaredEdgeFinding {
 		Project: project.ID, ProjectName: project.Name,
 		Entry: project.GeneratedClient.ServiceID,
 		Class: DeclaredEdgeOrphanClient,
-		File:  project.GeneratedClient.ManifestPath,
+		File:  projectRelativePath(project, wsproto.ConfigFilename),
 	}
 }
 
@@ -433,9 +433,9 @@ func DeclaredEdgeDiagnostics(ws *Workspace, mode DeclaredEdgesMode) []diag.Diagn
 func DeclaredEdgeMessage(finding DeclaredEdgeFinding) string {
 	if finding.Class == DeclaredEdgeOrphanClient {
 		return fmt.Sprintf(
-			"%s commits a generated client manifest for service %q, and no project of this workspace declares that "+
-				"service any more: the contract edge does not exist and nothing regenerates the client — delete %s "+
-				"(and the generated files it inventories), or restore the provider's contract",
+			"%s is generated from service %q, and no single project of this workspace declares that service: "+
+				"the contract edge does not exist and nothing can generate the client — remove generatedFrom from %s "+
+				"(or the client project), or restore the provider's contract",
 			finding.ProjectName, finding.Entry, finding.File)
 	}
 	suffix := "run `putnami deps prune` to remove it"

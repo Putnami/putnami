@@ -16,7 +16,6 @@
     "go/go-project-toolchain#bounded-test-output",
     "go/go-project-toolchain#channel-query-credentials",
     "go/go-project-toolchain#cli-compatibility-marker",
-    "go/go-project-toolchain#committed-client-drift",
     "go/go-project-toolchain#contract-canonicalization-preserves-declared-order",
     "go/go-project-toolchain#coverage-profile-lists-each-block-once",
     "go/go-project-toolchain#declared-compile-matrix",

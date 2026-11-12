@@ -1,8 +1,13 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "@example/go-items-client",
+  "generatedFrom": {
+    "service": "items",
+    "language": "ts"
+  },
   "type": "library",
   "tags": ["ts"],
+  "extensions": ["/typescript/extension", "/tooling/clientgen-extension"],
   "featureAuthority": {
     "none": "Generated client code mirrors provider-owned operations and does not own a separate user outcome."
   }

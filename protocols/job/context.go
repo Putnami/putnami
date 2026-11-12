@@ -251,6 +251,53 @@ type Project struct {
 	// the member, for example. A consumer whose answer depends on a tag then
 	// declines; it does not read a nil list as "no tags".
 	Tags []string `json:"tags,omitzero"`
+	// GeneratedFrom is the project's RESOLVED generation binding: the
+	// `generatedFrom` member its putnami.json declares, plus the provider's
+	// committed contract the orchestrator resolved the service to. v2 only —
+	// forbidden at v1. Absent means the project is not a generated client.
+	//
+	// Resolved, for the reason Type is: the service-to-provider resolution
+	// belongs to the orchestrator, and the client's cache key already folds the
+	// digest of the contract this member names. A task that searched the
+	// workspace for the provider itself would read a contract its key does not
+	// hold.
+	GeneratedFrom *GeneratedFrom `json:"generatedFrom,omitempty"`
+}
+
+// Generated client languages GeneratedFrom.Language may name. They are the
+// vocabulary of `generatedFrom.language` in putnami.json
+// (go.putnami.dev/protocol/workspace).
+const (
+	GeneratedLanguageGo         = "go"
+	GeneratedLanguageTypeScript = "ts"
+)
+
+// GeneratedFrom is a generated client's binding, as the orchestrator resolved
+// it: what the client's putnami.json declares and where its provider's
+// committed contract lies.
+type GeneratedFrom struct {
+	// Service is the provider's `x-putnami-client` service id.
+	Service string `json:"service"`
+	// Language is GeneratedLanguageGo or GeneratedLanguageTypeScript.
+	Language string `json:"language"`
+	// PackageName is the Go package name of the generated file. Go only.
+	PackageName string `json:"packageName,omitempty"`
+	// ClientName is the Go client type name. Go only.
+	ClientName string `json:"clientName,omitempty"`
+	// OmitOperations names the provider operations the Go client leaves out,
+	// by operation id, as putnami.json lists them. Go only.
+	OmitOperations []string `json:"omitOperations,omitempty"`
+	// ContractPath is the provider's committed contract, workspace-relative in
+	// slash form. Empty when no single provider declares Service: the client
+	// cannot be generated, and its generation fails naming the service.
+	ContractPath string `json:"contractPath,omitempty"`
+	// ContractSHA256 is the lowercase hex sha256 of the contract bytes the
+	// client's cache key folds, read when the orchestrator loaded the
+	// workspace. A task that generates the client checks the contract it reads
+	// against it: a provider build in the same session may rewrite the
+	// contract, and a client generated from other bytes must not be stored
+	// under this key. Empty exactly when ContractPath is.
+	ContractSHA256 string `json:"contractSha256,omitempty"`
 }
 
 // ProjectRef identifies one project the context references: a member of the

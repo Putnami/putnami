@@ -96,7 +96,17 @@
           "items": { "$ref": "#/$defs/declaredError" }
         },
         "idempotency": { "$ref": "#/$defs/idempotency" },
-        "resilience": { "$ref": "#/$defs/resilience" }
+        "resilience": { "$ref": "#/$defs/resilience" },
+        "producer": { "$ref": "#/$defs/operationProducer" }
+      }
+    },
+    "operationProducer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["project", "feature"],
+      "properties": {
+        "project": { "type": "string", "minLength": 1 },
+        "feature": { "type": "string", "minLength": 1 }
       }
     },
     "messageShapes": {

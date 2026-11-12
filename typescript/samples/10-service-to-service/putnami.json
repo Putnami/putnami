@@ -3,6 +3,7 @@
   "name": "@example/10-service-to-service",
   "tags": ["e2e", "ts"],
   "extensions": ["/typescript/extension", "/tooling/clientgen-extension", "/tooling/sdd-extension"],
+  "dependencies": ["/typescript/samples/10-service-to-service/clients/ts"],
   "options": {
     "test": {
       "coverage": false,

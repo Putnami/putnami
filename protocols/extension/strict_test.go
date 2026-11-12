@@ -673,7 +673,7 @@ func TestValidateManifest_CommandDependenciesRejectPipelineStepRefs(t *testing.T
 		Name: "@test/extension",
 		Commands: map[string]CommandDefinition{
 			"build": {
-				DependsOn: []string{"^build", "/workspace-install", "*generate", "!^generate", "prepare", "!lint"},
+				DependsOn: []string{"^build~compile", "/workspace-install", "*generate", "!^generate", "prepare", "!lint", "^build"},
 				Run:       []PipelineStep{{ID: "s1", Task: "t1"}},
 			},
 		},

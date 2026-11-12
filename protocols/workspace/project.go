@@ -57,6 +57,39 @@ type ProjectConfig struct {
 	// its own. Absent means the ordinary case: the project is expected to
 	// declare one, and completeness tooling says so when it does not.
 	FeatureAuthority *ProjectFeatureAuthority `json:"featureAuthority,omitempty"`
+	// GeneratedFrom makes this project a generated client and names the
+	// provider it is generated from. Absent means an ordinary project.
+	GeneratedFrom *GeneratedFrom `json:"generatedFrom,omitempty"`
+}
+
+// Generated client languages a GeneratedFrom may name.
+const (
+	GeneratedLanguageGo         = "go"
+	GeneratedLanguageTypeScript = "ts"
+)
+
+// GeneratedFrom binds a generated client project to its provider. It is
+// authored once and stays stable while the provider's contract changes, so a
+// client commits no file that moves with the contract.
+//
+// The provider is named by the service id its committed contract declares
+// (`x-putnami-client.service.id` in `schema/openapi.json`), not by a project
+// id: the contract is what the client is generated from, and the core
+// resolves the project that commits it.
+type GeneratedFrom struct {
+	// Service is the provider's `x-putnami-client` service id.
+	Service string `json:"service"`
+	// Language is the emitted language: GeneratedLanguageGo or
+	// GeneratedLanguageTypeScript.
+	Language string `json:"language"`
+	// PackageName is the Go package name of the generated file. Go only; the
+	// import path is the client's own go.mod module.
+	PackageName string `json:"packageName,omitempty"`
+	// ClientName is the Go client type name. Go only.
+	ClientName string `json:"clientName,omitempty"`
+	// OmitOperations names provider operations the Go client leaves out, by
+	// operation id. Go only.
+	OmitOperations []string `json:"omitOperations,omitempty"`
 }
 
 // ProjectFeatureAuthority answers "where is this project's user-facing feature"

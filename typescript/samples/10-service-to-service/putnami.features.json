@@ -73,8 +73,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-committed-surface-is-what-the-generator-renders",
-              "the-manifest-owns-the-current-contract-and-bytes",
+              "the-committed-contract-renders-reproducibly",
               "a-removed-operation-is-detected-rather-than-rendered-through"
             ]
           }

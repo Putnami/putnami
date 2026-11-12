@@ -55,6 +55,16 @@ func TestInvalidFixtureCoverage(t *testing.T) {
 			"invalid-distribution-visibility", "",
 		},
 		{
+			"fixtures/project/invalid/generated-from-language-unknown.json",
+			func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateProjectConfig(b); return d },
+			"invalid-value", "",
+		},
+		{
+			"fixtures/project/invalid/generated-from-go-option-on-ts.json",
+			func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateProjectConfig(b); return d },
+			"invalid-value", "",
+		},
+		{
 			"fixtures/scope/invalid/distribution-visibility-unknown.json",
 			func(b []byte) []diag.Diagnostic { _, d := ParseAndValidateScopeConfig(b); return d },
 			"invalid-distribution-visibility", "",

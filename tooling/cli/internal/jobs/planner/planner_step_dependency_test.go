@@ -242,7 +242,7 @@ func TestResolveCommandDeps_StepDependency(t *testing.T) {
 		{Project: other, JobDef: &extension.JobDefinition{Name: "build~compile", CommandName: "build", StepID: "compile", DependsOn: []string{"build~describe"}}},
 		dependent, leafReader,
 	}
-	resolveCommandDeps(jobs, computeCommandLeaves(jobs))
+	resolveCommandDeps(jobs, computeCommandLeaves(jobs), nil)
 	if want := []string{"/app:build~describe"}; !slices.Equal(dependent.DependsOn, want) {
 		t.Errorf("deps = %v, want %v", dependent.DependsOn, want)
 	}
@@ -275,7 +275,7 @@ func TestResolveCommandDeps_StepDependencySkipsAFinalizer(t *testing.T) {
 		},
 	}
 	jobs := []*jobmodel.ScheduledJob{teardown, dependent}
-	resolveCommandDeps(jobs, computeCommandLeaves(jobs))
+	resolveCommandDeps(jobs, computeCommandLeaves(jobs), nil)
 	if len(dependent.DependsOn) != 0 || len(dependent.SerializeAfter) != 0 {
 		t.Fatalf("deps = %v, order-only edges = %v, want none", dependent.DependsOn, dependent.SerializeAfter)
 	}

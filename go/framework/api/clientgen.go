@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/errors"
+	clientcontract "go.putnami.dev/protocol/clientcontract"
 )
 
 // ClientGenOptions configure typed Go client generation.
@@ -18,8 +19,8 @@ type ClientGenOptions struct {
 	// BaseURLDefault is an optional default BaseURL for the generated NewClient helper.
 	BaseURLDefault string
 	// Design, when present, embeds exact operation identity into the generated
-	// client descriptor and every outgoing request, plus the producer feature of
-	// each operation the attribution table names.
+	// client descriptor and every outgoing request, plus the producer project
+	// and feature of each operation whose contract names one.
 	Design *ClientDesignOptions
 	// OmitOperations names operations, by operationId, that the generated client
 	// leaves out instead of failing: the escape for an operation this emitter
@@ -32,45 +33,14 @@ type ClientGenOptions struct {
 }
 
 // ClientDesignOptions carry the build-time identity embedded into a generated
-// client. Producer attribution is a table keyed by HTTP method and route path
-// rather than a client-wide pair: one generated client routinely spans several
-// producer features, and an operation the table does not name is emitted
-// unattributed instead of inheriting a neighbor's feature.
+// client. Producer attribution is per operation and comes from the contract:
+// each operation's x-putnami-client producer. One generated client routinely
+// spans several producer features, and an operation whose contract names no
+// producer is emitted unattributed instead of inheriting a neighbor's feature.
 type ClientDesignOptions struct {
 	// SpecHash pins the contract the client was generated from. Defaulted from
 	// the spec IR when empty.
 	SpecHash string
-	// Operations is the producer attribution table. Order is irrelevant: the
-	// emitter joins it onto the spec's operations, which already have a
-	// deterministic order.
-	Operations []ClientOperationProducer
-}
-
-// ClientOperationProducer attributes one API operation to the feature that
-// produced it. Method and Path are the join key against the API contract — the
-// canonical operation id lives in the contract, so the attribution table never
-// has to reproduce (or normalize) it.
-//
-// This is also the on-disk shape of one `design.operations` entry in
-// .gen/clientgen/config.json, so the field order below fixes the emitted JSON
-// key order and must stay identical to the TypeScript emitter's object literal
-// (ClientGenConfigOperation in config.type.ts).
-type ClientOperationProducer struct {
-	Method          string `json:"method"`
-	Path            string `json:"path"`
-	ProducerProject string `json:"producerProject"`
-	ProducerFeature string `json:"producerFeature"`
-}
-
-// producerOf returns the attribution recorded for one operation, or the zero
-// value when the operation is unattributed.
-func (design ClientDesignOptions) producerOf(httpMethod, path string) ClientOperationProducer {
-	for _, operation := range design.Operations {
-		if strings.EqualFold(operation.Method, httpMethod) && operation.Path == path {
-			return operation
-		}
-	}
-	return ClientOperationProducer{}
 }
 
 // renderClient assembles the final source file from the registered struct
@@ -177,9 +147,12 @@ type methodEmit struct {
 	Path        string
 	Description string
 	OperationID string
-	HasParams   bool
-	HasQuery    bool
-	HasBody     bool
+	// Producer is the operation's producer attribution from its contract, or
+	// nil when the contract names none.
+	Producer  *clientcontract.OperationProducer
+	HasParams bool
+	HasQuery  bool
+	HasBody   bool
 	// Params and Query are the path/query fields used to build URL substitution
 	// and the query string. Only consulted when HasParams / HasQuery is set.
 	Params []fieldEntry
@@ -317,7 +290,7 @@ func emitMethod(b *strings.Builder, g *clientGen, m methodEmit, designName strin
 // emitClientDesign renders the client descriptor: the exact API contract plus,
 // per operation, the producer that owns it. Operations follow the method
 // emission order (itself derived from the deterministic spec walk), and an
-// operation missing from the attribution table is emitted without producer
+// operation whose contract names no producer is emitted without producer
 // fields so its lineage stays visibly unknown.
 func emitClientDesign(b *strings.Builder, designName, clientName string, design ClientDesignOptions, methods []methodEmit) {
 	fmt.Fprintf(b, "// %s identifies the exact API contract and the producer feature of each operation.\n", designName)
@@ -330,8 +303,8 @@ func emitClientDesign(b *strings.Builder, designName, clientName string, design 
 	b.WriteString("\tOperations: []client.GeneratedClientOperation{\n")
 	for _, method := range methods {
 		fmt.Fprintf(b, "\t\t{OperationID: %q, Method: %q, Path: %q", method.OperationID, method.HTTPMethod, method.Path)
-		if producer := design.producerOf(method.HTTPMethod, method.Path); producer.ProducerFeature != "" {
-			fmt.Fprintf(b, ", ProducerProject: %q, ProducerFeature: %q", producer.ProducerProject, producer.ProducerFeature)
+		if producer := method.Producer; producer != nil {
+			fmt.Fprintf(b, ", ProducerProject: %q, ProducerFeature: %q", producer.Project, producer.Feature)
 		}
 		b.WriteString("},\n")
 	}

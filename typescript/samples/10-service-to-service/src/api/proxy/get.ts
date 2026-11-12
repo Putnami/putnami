@@ -4,9 +4,9 @@ import { ItemsClient } from '../../../clients/ts/src';
 import { itemSchema } from '../../item-schema';
 
 // GET /proxy — Consumer endpoint that calls the provider via the GENERATED client
-// (produced from this provider's own OpenAPI spec by `putnami clientgen`; see
-// clientGenerator() in main.ts). The client arrives through DI: no base URL, no
-// interceptor, no header is written here.
+// (built by its client project from this provider's committed OpenAPI contract;
+// see clientGenerator() in main.ts). The client arrives through DI: no base URL,
+// no interceptor, no header is written here.
 export const GET = endpoint()
   .inject({ itemsClient: ItemsClient })
   .returns({ message: String, tenant: String, items: ArrayOf(itemSchema) })

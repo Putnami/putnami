@@ -154,7 +154,6 @@ func TestVisibilityViolationsAllowsAContractEdgeAcrossScopes(t *testing.T) {
 		ServiceID:      "catalog.items",
 		ContractSHA256: "2222222222222222222222222222222222222222222222222222222222222222",
 		Language:       "go",
-		ManifestPath:   "tooling/clients/catalog/client.putnami.json",
 	}
 	ws := NewWorkspace("/ws", nil, []*Project{provider, client})
 
@@ -180,10 +179,10 @@ func TestVisibilityViolationsKeepsAGeneratedClientThatDeclaresScope(t *testing.T
 	}
 }
 
-func TestVisibilityViolationsOpensNothingForAClientManifestNoProviderBacks(t *testing.T) {
+func TestVisibilityViolationsOpensNothingForAClientNoProviderBacks(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-model", "import-visibility", "a-cross-scope-import-of-a-scope-private-project-is-reported")
 	if got := VisibilityViolations(clientWorkspace("", false)); len(got) != 1 {
-		t.Fatalf("violations = %v, want the import refused: no provider backs the manifest", got)
+		t.Fatalf("violations = %v, want the import refused: no provider backs the client", got)
 	}
 }
 
@@ -198,7 +197,6 @@ func clientWorkspace(visibility wsproto.Visibility, withProvider bool) *Workspac
 		ServiceID:      "identity.api",
 		ContractSHA256: "3333333333333333333333333333333333333333333333333333333333333333",
 		Language:       "go",
-		ManifestPath:   "identity/api/clients/go/client.putnami.json",
 	}
 	provider := scoped("/identity/api", "identity-api", "identity/api", "identity/putnami.json")
 	if withProvider {

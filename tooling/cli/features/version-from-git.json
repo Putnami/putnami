@@ -66,6 +66,20 @@
             "shallow-clone-is-refused"
           ]
         }
+      },
+      {
+        "id": "a-client-line-follows-its-contract",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-contract-only-commit-advances-the-clients-line",
+            "a-contract-inside-the-line-adds-no-pathspec"
+          ]
+        }
       }
     ]
   }

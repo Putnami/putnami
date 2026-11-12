@@ -73,7 +73,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-committed-client-is-what-the-generator-renders",
+              "the-client-is-what-the-emitter-renders-from-the-described-contract",
               "a-removed-operation-is-detected-rather-than-rendered-through",
               "the-capability-manifest-is-canonical"
             ]

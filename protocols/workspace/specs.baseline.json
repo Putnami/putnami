@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "workspace/workspace-contract#a-client-names-its-provider",
     "workspace/workspace-contract#a-fixture-corpus-holds-every-shape",
     "workspace/workspace-contract#a-line-is-a-scope-that-is-not-inherited",
     "workspace/workspace-contract#a-lock-entry-binds-what-it-pins",

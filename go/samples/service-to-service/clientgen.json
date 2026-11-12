@@ -1,0 +1,8 @@
+{
+  "targets": ["go"],
+  "go": {
+    "output": "clients/go",
+    "packageName": "itemsclient",
+    "clientName": "ItemsClient"
+  }
+}

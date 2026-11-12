@@ -1,7 +1,8 @@
 # ADR 0006 — The guard reads the Git candidate cut and is keyed on it
 
 - **Status**: accepted. Amends decision 2 of
-  [ADR 0003](0003-drift-is-the-generator-tasks-verdict.md)
+  [ADR 0003](0003-drift-is-the-generator-tasks-verdict.md); amended by
+  [ADR 0007](0007-a-generated-client-is-built-not-committed.md) (the guard reads no manifest)
 - **Scope**: `@putnami/clientgen` (`tooling/clientgen-extension`), the
   `clientgen-workspace-check` task that `validate` and `clientgen-check` run
 

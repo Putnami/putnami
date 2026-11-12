@@ -108,6 +108,41 @@ func TestExtensionRuntimeDigestLeavesOutAVerdictPolicy(t *testing.T) {
 	}
 }
 
+// A replaced module's generated client is built, not committed: the runtime
+// generates it from the module's committed contract. A client-generate job
+// that writes the file into the tree moves neither the runtime digest nor what
+// staging copies, while the contract and clientgen.json stay inputs.
+func TestExtensionRuntimeDigestLeavesOutAReplacedModulesGeneratedClient(t *testing.T) {
+	root := t.TempDir()
+	extensionRoot, sdkRoot := writeRuntimeReplacementFixture(t, root)
+	mustWriteRuntimeFile(t, filepath.Join(sdkRoot, "clientgen.json"), `{"targets":["go"],"go":{"output":"go"}}`, 0o644)
+	mustWriteRuntimeFile(t, filepath.Join(sdkRoot, "schema", "openapi.json"), "{}\n", 0o644)
+	ext := runtimeTestExtension(extensionRoot)
+	before, err := ExtensionRuntimeDigest(ext)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mustWriteRuntimeFile(t, filepath.Join(sdkRoot, "go", "client.gen.go"), "package itemsapi\n", 0o644)
+	if after, err := ExtensionRuntimeDigest(ext); err != nil || after != before {
+		t.Fatalf("a generated client moved the runtime digest: %q, %q, %v", before, after, err)
+	}
+	tree, err := CollectRuntimeTree(sdkRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var rels []string
+	for _, entry := range tree {
+		rels = append(rels, entry.Rel)
+	}
+	if got, want := strings.Join(rels, " "), "clientgen.json go.mod schema/openapi.json sdk.go"; got != want {
+		t.Fatalf("the replaced module's tree = %q, want %q", got, want)
+	}
+	mustWriteRuntimeFile(t, filepath.Join(sdkRoot, "schema", "openapi.json"), "{\"paths\":{}}\n", 0o644)
+	if after, err := ExtensionRuntimeDigest(ext); err != nil || after == before {
+		t.Fatalf("a contract change left the runtime digest at %q (err %v)", after, err)
+	}
+}
+
 func writeRuntimeReplacementFixture(t *testing.T, root string) (string, string) {
 	t.Helper()
 	extensionRoot := filepath.Join(root, "extension")

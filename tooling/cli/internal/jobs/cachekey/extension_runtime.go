@@ -264,6 +264,29 @@ func RuntimeReplacementClosure(extensionRoot string) ([]RuntimeReplacement, erro
 	return replacements, nil
 }
 
+// runtimeGeneratedClientFile is the slash path, relative to a replaced
+// module's root, of the in-module Go client its committed clientgen.json
+// places, or empty when the module declares none.
+func runtimeGeneratedClientFile(root string) string {
+	data, err := os.ReadFile(filepath.Join(root, "clientgen.json")) //nolint:gosec // G304: a replaced module's committed file
+	if err != nil {
+		return ""
+	}
+	var config struct {
+		Go struct {
+			Output string `json:"output"`
+		} `json:"go"`
+	}
+	if json.Unmarshal(data, &config) != nil || config.Go.Output == "" {
+		return ""
+	}
+	output := path.Clean(filepath.ToSlash(config.Go.Output))
+	if output == "." || output == ".." || strings.HasPrefix(output, "../") || path.IsAbs(output) {
+		return ""
+	}
+	return output + "/client.gen.go"
+}
+
 // RuntimeTreeEntry is one member of a replaced module's tree. Staging and
 // hashing consume the same enumeration, so a prepared runtime's digest always
 // describes the tree its build actually reads.
@@ -278,9 +301,16 @@ type RuntimeTreeEntry struct {
 // CollectRuntimeTree returns the entries of a replaced module's tree under
 // root, sorted by path. It leaves out the directories runtimeReplacementIgnoredDir
 // names and every file wsproto.IsNamedOnlyInput reports: such a file configures
-// the CI plane, so no build of the module reads it.
+// the CI plane, so no build of the module reads it. It also leaves out the
+// generated client file the module's clientgen.json places: Git holds no
+// generated client, and the runtime builds before any client-generate job runs,
+// so a runtime generates that file itself from the module's committed contract
+// and clientgen.json, which the tree keeps (clientgen ADR 0007). A file a
+// client-generate job wrote there must neither move the digest nor reach the
+// build.
 func CollectRuntimeTree(root string) ([]RuntimeTreeEntry, error) {
 	root = filepath.Clean(root)
+	generatedClient := runtimeGeneratedClientFile(root)
 	var out []RuntimeTreeEntry
 	err := filepath.WalkDir(root, func(full string, entry os.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -300,7 +330,7 @@ func CollectRuntimeTree(root string) ([]RuntimeTreeEntry, error) {
 			}
 			return nil
 		}
-		if entry.IsDir() || wsproto.IsNamedOnlyInput(rel) {
+		if entry.IsDir() || wsproto.IsNamedOnlyInput(rel) || rel == generatedClient {
 			return nil
 		}
 		info, err := entry.Info()

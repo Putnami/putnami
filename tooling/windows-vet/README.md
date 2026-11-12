@@ -14,10 +14,15 @@ used to live in `@putnami/cli-documents`, whose test key is the whole tracked
 tree, so a change to a document re-ran a `go vet` of every module.
 
 Here the key holds what `go vet` reads: the tracked `.go` and `.s` files, every
-`go.mod` and `go.sum`, and `go.work` (`options.test.filePatterns`). A change that
+`go.mod` and `go.sum`, `go.work`, and the committed contracts and `putnami.json`
+files the generated clients come from (`options.test.filePatterns`). A change that
 touches none of them reuses the verdict. A file that a `//go:embed` directive
 names is not an input: the build of the project that embeds it fails on the same
 change.
 
-The module requires no workspace module, so the project has no dependency edge:
-it reads the other modules through the go command, not through imports.
+The module requires no workspace module: it reads the other modules through the
+go command, not through imports. Git holds no generated client, so the project
+depends on every `go.work` module that generates one, and the planner runs each
+`client-generate` before the gate. `TestTheGateDependsOnEveryGoModuleThatGeneratesAClient`
+keeps that list equal to the modules whose `putnami.json` declares a Go
+`generatedFrom` or the clientgen extension.

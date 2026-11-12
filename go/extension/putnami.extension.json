@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/go",
-  "cliContract": 16,
+  "cliContract": 22,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -48,6 +48,7 @@
   },
   "commands": {
     "build": {
+      "dependsOn": ["client-generate"],
       "description": "Build Go project: refresh dependencies and compile for the host platform. Cross-compilation is opt-in via `platforms` / `--target`; the full release matrix belongs to `package`.",
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
@@ -134,6 +135,7 @@
       ]
     },
     "test": {
+      "dependsOn": ["client-generate"],
       "description": "Run Go tests with coverage support.",
       "activationFiles": ["**/*_test.go", "go.mod"],
       "flags": {
@@ -221,6 +223,7 @@
       ]
     },
     "lint": {
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Lint Go code with golangci-lint and staticcheck.",
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
@@ -276,6 +279,7 @@
       ]
     },
     "validate": {
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Hold the breaking-change marker: for a Go project the root putnami.support.json lists as stable, or every Go project when the workspace has no catalog, compare the exported API, and the command-surface document a project that ships a CLI declares, with the last tag of the project's version line. An incompatible change fails unless a commit since that tag declares a breaking change with \"!\" or a BREAKING CHANGE: footer.",
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
@@ -287,6 +291,7 @@
       "run": [{ "id": "api", "task": "validate-api" }]
     },
     "serve": {
+      "dependsOn": ["client-generate"],
       "description": "Run Go application with hot-reload. Build-and-exec: the served process is compiled and run in one step, and no binary is emitted.",
       "traits": { "requiresRunnable": true, "workload": "serve" },
       "activationFiles": ["**/*.go", "go.mod"],
@@ -426,6 +431,7 @@
       "run": [{ "id": "deps-edit", "task": "deps-edit-exec" }]
     },
     "package": {
+      "dependsOn": ["client-generate"],
       "description": "Create distribution packages (archives, binaries, Docker images, Go modules).",
       "traits": { "injectPublishChannels": true },
       "sessionPrerequisites": [
@@ -645,7 +651,7 @@
       "outputs": {
         "data": { "description": "Test execution result with pass/fail counts and coverage breakdown" }
       },
-      "reads": ["gen", "sources", { "id": "workspace-clients", "scope": "workspace" }],
+      "reads": ["gen", "sources"],
       "cache": {
         "enabled": true
       },
@@ -721,7 +727,7 @@
       "outputs": {
         "data": { "description": "Race run status; its counts are logged, never reported as test totals" }
       },
-      "reads": ["gen", "sources", { "id": "workspace-clients", "scope": "workspace" }],
+      "reads": ["gen", "sources"],
       "cache": {
         "enabled": true,
         "noOutput": true
@@ -950,7 +956,7 @@
       }
     },
     "build-generate": {
-      "description": "Generate specs and config artifacts from the project's Go sources. Ownership decision: build-generate is the SINGLE PRODUCER of <project>/.gen and declares that subtree whole, minus the subpaths it CEDES to build-describe, to the two config-merge tasks, to package-deployment and to build-infra. Every task that writes inside the region generate keeps — config-extract's .gen/config-schema.json fallback — writes into generate-owned territory instead of claiming a slice of it, because file-vs-subtree nesting counts as the same path under ONE OWNER PER OUTPUT. The describe cedes exist because generate runs BEFORE describe: its capture predates everything describe writes, so a subtree a later task produces has to be owned by that task to survive a cache hit. Ceded AND claimed by build-describe: .gen/schema, .gen/clientgen, .gen/design, .gen/migrations.json, .gen/migration-bundle. Ceded to and claimed by package-deployment, for the same ordering reason as the describe cedes: .gen/deployment.json. Ceded to and claimed by build-infra, for the same reason: .gen/requirements.json and .gen/infra/runtime.json. Ceded to and claimed by cloud-image-layers of @putnami/cloud: .gen/layers. Ceded to and claimed by cloud-site-content-generate of @putnami/cloud: .gen/site-content, the generated sections of a site project. Ceded to and claimed by config-merge-exec and config-merge-test-exec: .gen/conf, for the opposite ordering reason — config-merge runs BEFORE this task, so this task's snapshot adopted whatever merged file happened to be on disk at capture and its restore swapped that snapshot over .gen, deleting .gen/conf/.env.test.yaml whenever the snapshot lacked it, while a config-merge cache hit reproduced nothing; a config-merge hit must restore the merged file, and a generate restore must not delete what config-merge wrote. Ceded and claimed by NOBODY, which protocol ADR 0003 states is a declaration rather than a defect: .gen/.describe.lock (a run-scoped lockedfile mutex) and .gen/config-deps.json (a fragment describe consumes in the same run) — keeping them made this task's entry depend on whether the tree happened to be clean, which alone makes a cache.deterministic task disagree with itself. Because .gen/schema is ceded, this task keeps its own pre-merge copy of what it writes there under .gen/generate-staging/schema, a path it still owns and still restores, and build-describe REBUILDS .gen/schema from it before merging — removing the tree first, so nothing an earlier build left there reaches describe's capture; .gen/schema/<rel> stays the only path a consumer ever reads. Two shared regions are deliberately NOT ceded: .gen/infra apart from build-infra's runtime.json, whose fragments this task deletes at the start of every run (the runtime defaults sidecar with them, which build-infra writes again after this task) so its entry is a pure function of its own producers and whose durable form is the committed infra/requirements.json, and .gen/generate-result.json, whose only reader is build-describe, before describe rewrites it. Declaring a project-rooted path on a task five commands schedule (build, test, serve, run, package) is plannable because the plan-time owner check counts one manifest task scheduled by several commands as ONE owner (sameManifestTask in tooling/cli/internal/jobs/planner/plan_contract.go). The committed sidecars this task ALSO writes for projects without a describe phase (schema/openapi.json, schema/config.json and its .jsonschema companion, infra/requirements.json) are deliberately NOT declared here: they are tracked source files whose writer is chosen at runtime by the describe-sole-committer rule — describe commits them for app projects, generate for library/CLI projects — so no static single owner exists. The one exception is schema/config.json, which the dedicated config-extract-exec task owns because its cache hit is the only one that has to reproduce it. A project with no describe phase may not set options.generate.schema=false: nothing restores .gen/schema for it, so the contract would have no durable home at all, and this task fails with that reason instead of losing the file on the next cache hit. The refusal is raised only when a contract is actually about to be written into the ceded subtree — the option is INHERITED, so refusing on the option alone would fail every library and CLI under a workspace-level default, none of which has anything to lose.",
+      "description": "Generate specs and config artifacts from the project's Go sources. Ownership decision: build-generate is the SINGLE PRODUCER of <project>/.gen and declares that subtree whole, minus the subpaths it CEDES to build-describe, to the two config-merge tasks, to package-deployment and to build-infra. Every task that writes inside the region generate keeps — config-extract's .gen/config-schema.json fallback — writes into generate-owned territory instead of claiming a slice of it, because file-vs-subtree nesting counts as the same path under ONE OWNER PER OUTPUT. The describe cedes exist because generate runs BEFORE describe: its capture predates everything describe writes, so a subtree a later task produces has to be owned by that task to survive a cache hit. Ceded AND claimed by build-describe: .gen/schema, .gen/design, .gen/migrations.json, .gen/migration-bundle. Ceded to and claimed by package-deployment, for the same ordering reason as the describe cedes: .gen/deployment.json. Ceded to and claimed by build-infra, for the same reason: .gen/requirements.json and .gen/infra/runtime.json. Ceded to and claimed by cloud-image-layers of @putnami/cloud: .gen/layers. Ceded to and claimed by cloud-site-content-generate of @putnami/cloud: .gen/site-content, the generated sections of a site project. Ceded to and claimed by config-merge-exec and config-merge-test-exec: .gen/conf, for the opposite ordering reason — config-merge runs BEFORE this task, so this task's snapshot adopted whatever merged file happened to be on disk at capture and its restore swapped that snapshot over .gen, deleting .gen/conf/.env.test.yaml whenever the snapshot lacked it, while a config-merge cache hit reproduced nothing; a config-merge hit must restore the merged file, and a generate restore must not delete what config-merge wrote. Ceded and claimed by NOBODY, which protocol ADR 0003 states is a declaration rather than a defect: .gen/.describe.lock (a run-scoped lockedfile mutex) and .gen/config-deps.json (a fragment describe consumes in the same run) — keeping them made this task's entry depend on whether the tree happened to be clean, which alone makes a cache.deterministic task disagree with itself. Because .gen/schema is ceded, this task keeps its own pre-merge copy of what it writes there under .gen/generate-staging/schema, a path it still owns and still restores, and build-describe REBUILDS .gen/schema from it before merging — removing the tree first, so nothing an earlier build left there reaches describe's capture; .gen/schema/<rel> stays the only path a consumer ever reads. Two shared regions are deliberately NOT ceded: .gen/infra apart from build-infra's runtime.json, whose fragments this task deletes at the start of every run (the runtime defaults sidecar with them, which build-infra writes again after this task) so its entry is a pure function of its own producers and whose durable form is the committed infra/requirements.json, and .gen/generate-result.json, whose only reader is build-describe, before describe rewrites it. Declaring a project-rooted path on a task five commands schedule (build, test, serve, run, package) is plannable because the plan-time owner check counts one manifest task scheduled by several commands as ONE owner (sameManifestTask in tooling/cli/internal/jobs/planner/plan_contract.go). The committed sidecars this task ALSO writes for projects without a describe phase (schema/openapi.json, schema/config.json and its .jsonschema companion, infra/requirements.json) are deliberately NOT declared here: they are tracked source files whose writer is chosen at runtime by the describe-sole-committer rule — describe commits them for app projects, generate for library/CLI projects — so no static single owner exists. The one exception is schema/config.json, which the dedicated config-extract-exec task owns because its cache hit is the only one that has to reproduce it. A project with no describe phase may not set options.generate.schema=false: nothing restores .gen/schema for it, so the contract would have no durable home at all, and this task fails with that reason instead of losing the file on the next cache hit. The refusal is raised only when a contract is actually about to be written into the ceded subtree — the option is INHERITED, so refusing on the option alone would fail every library and CLI under a workspace-level default, none of which has anything to lose.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build-generate"],
@@ -982,7 +988,6 @@
             "path": ".gen",
             "excludes": [
               ".gen/.describe.lock",
-              ".gen/clientgen",
               ".gen/conf",
               ".gen/config-deps.json",
               ".gen/deployment.json",
@@ -1001,7 +1006,7 @@
       }
     },
     "build-describe": {
-      "description": "Compile a host binary of the app, run it once in describe mode, and reconcile the artifacts its Describer plugins emit. That host binary is built with the SAME configuration as build-compile's host build — the cgo, buildvcs, tags, gcflags, asmflags, race, trimpath and buildmode parameters declared as inputs below, resolved by one helper both steps call — so the two builds are the same program and Go's build cache serves the second one: compile links what describe compiled instead of recompiling every package above `net`. -ldflags is deliberately not shared: linker flags never enter a compile action, so leaving the version stamp out of describe keeps a version bump from re-linking this binary. Ownership decision: everything this task writes under <project>/.gen is a subpath build-generate CEDES, because generate runs first and its capture predates every describe write — a run serving both tasks from cache would otherwise restore a .gen snapshotted before describe existed. This task DECLARES the five a LATER task reads, each at the documented contract path rather than a private staging copy: .gen/schema (the converged openapi/capabilities/http-routes/api.proto/feature-evidence tree that @putnami/clientgen discovery and go/framework/api read in PREFERENCE to the committed sidecar), .gen/clientgen (the clientgen contract and staged client the same discovery reads, which `validate` runs), .gen/design (the design graph @putnami/sdd and `putnami context` project features from), .gen/migrations.json and .gen/migration-bundle (release-set migration publication, deploy, the database test provider, database.ApplyBundle). Two more are ceded and claimed by NOBODY on purpose — .gen/.describe.lock, the run-scoped mutex that serializes a build and a test describe of one project, and .gen/config-deps.json, a fragment this job consumes in the same run — so neither varies a cached entry with the state the tree happened to be in. .gen/schema is the one region with TWO producers, resolved as generate stages and describe converges: generate writes its static output both to .gen/schema and to the generate-owned mirror .gen/generate-staging/schema, and this task REBUILDS .gen/schema from that mirror before it snapshots and merges, so its starting tree is identical whether generate executed or was restored from cache. The rebuild removes the tree first: declared capture walks the directory rather than this job's artifact list, so an artifact whose producer was DELETED from the app — a dropped proto.New, an openapi plugin that no longer configures — would otherwise be captured under this run's key and restored by every later hit on it. A describer that still runs drops its own stale output; the rebuild covers the one that does not run at all. .gen/clientgen is removed at the same point, so a describe whose app no longer configures a client generator leaves no earlier contract for the clientgen tasks to read. Both trees declare `emptied`, so the engine also empties them before this task executes, which covers a describe that skips, and on a restore of an entry that records them empty: neither holds a byte this task's key does not fix, and the clientgen keys fold that key instead of hashing the bytes. The other two optional project outputs, .gen/design and .gen/migration-bundle, are not emptied by the engine; the describe binary removes a stale one. What describe also owns exclusively is the generated typed client it mirrors out of .gen/clientgen/go into the project tree; that directory is chosen by the project's clientgen config, so it is declarable only through the clientOutputs data port (a declared output's pathFrom). The committed schema/infra sidecars describe converges for app projects (schema/openapi.json, schema/capabilities.json, infra/requirements.json, schema/config.json) are NOT declared: they are tracked source files whose writer is picked at runtime by the describe-sole-committer rule — describe for app projects, build-generate for library/CLI projects — so a static single owner would be a false claim, exactly like a merge point. Their converged build-time copies live under .gen/schema, which this task owns. The committed feature evidence, schema/feature-evidence/go-framework.json, is the exception: an app's describe binary is its only writer, so this task declares it (featureEvidence) and a hit restores it. Source input contract: the declared sources are the project's Go files MINUS `**/*_test.go`. The host binary is a `go build` of the project's main package and the two runtime predicates that gate the task (`ModuleHasMain`, `usesPutnamiApp`) skip test files by the same rule, so no byte this task emits is a function of a test file. The exclusion is load-bearing beyond this project: `^describe` is the cross-project edge every dependent's describe, compile and test sits behind, so a test file in this key would move the identity of a whole dependent closure for an edit none of it reads. The feature evidence this task writes names the project's source binding, which does cover test files, specs and putnami.features.json, so the cache policy declares `sourceBound`: the CLI stores and looks up this task's entry at a key that also binds the binding each execution was stamped with, so a stored result serves only at the binding it names, while this key and every dependent key stay as the inputs above define them.",
+      "description": "Compile a host binary of the app, run it once in describe mode, and reconcile the artifacts its Describer plugins emit. That host binary is built with the SAME configuration as build-compile's host build — the cgo, buildvcs, tags, gcflags, asmflags, race, trimpath and buildmode parameters declared as inputs below, resolved by one helper both steps call — so the two builds are the same program and Go's build cache serves the second one: compile links what describe compiled instead of recompiling every package above `net`. -ldflags is deliberately not shared: linker flags never enter a compile action, so leaving the version stamp out of describe keeps a version bump from re-linking this binary. Ownership decision: everything this task writes under <project>/.gen is a subpath build-generate CEDES, because generate runs first and its capture predates every describe write — a run serving both tasks from cache would otherwise restore a .gen snapshotted before describe existed. This task DECLARES the four a LATER task reads, each at the documented contract path rather than a private staging copy: .gen/schema (the converged openapi/capabilities/http-routes/api.proto/feature-evidence tree that @putnami/clientgen discovery and go/framework/api read in PREFERENCE to the committed sidecar), .gen/design (the design graph @putnami/sdd and `putnami context` project features from), .gen/migrations.json and .gen/migration-bundle (release-set migration publication, deploy, the database test provider, database.ApplyBundle). Two more are ceded and claimed by NOBODY on purpose — .gen/.describe.lock, the run-scoped mutex that serializes a build and a test describe of one project, and .gen/config-deps.json, a fragment this job consumes in the same run — so neither varies a cached entry with the state the tree happened to be in. .gen/schema is the one region with TWO producers, resolved as generate stages and describe converges: generate writes its static output both to .gen/schema and to the generate-owned mirror .gen/generate-staging/schema, and this task REBUILDS .gen/schema from that mirror before it snapshots and merges, so its starting tree is identical whether generate executed or was restored from cache. The rebuild removes the tree first: declared capture walks the directory rather than this job's artifact list, so an artifact whose producer was DELETED from the app — a dropped proto.New, an openapi plugin that no longer configures — would otherwise be captured under this run's key and restored by every later hit on it. A describer that still runs drops its own stale output; the rebuild covers the one that does not run at all. The tree declares `emptied`, so the engine also empties it before this task executes, which covers a describe that skips, and on a restore of an entry that records it empty: it holds no byte this task's key does not fix, and the clientgen keys fold that key instead of hashing the bytes. The other two optional project outputs, .gen/design and .gen/migration-bundle, are not emptied by the engine; the describe binary removes a stale one. Describe writes no generated client: a client project builds its own client from the provider's committed contract in its client-generate command, so nothing here reaches outside the provider. The committed schema/infra sidecars describe converges for app projects (schema/openapi.json, schema/capabilities.json, infra/requirements.json, schema/config.json) are NOT declared: they are tracked source files whose writer is picked at runtime by the describe-sole-committer rule — describe for app projects, build-generate for library/CLI projects — so a static single owner would be a false claim, exactly like a merge point. Their converged build-time copies live under .gen/schema, which this task owns. The committed feature evidence, schema/feature-evidence/go-framework.json, is the exception: an app's describe binary is its only writer, so this task declares it (featureEvidence) and a hit restores it. Source input contract: the declared sources are the project's Go files MINUS `**/*_test.go`. The host binary is a `go build` of the project's main package and the two runtime predicates that gate the task (`ModuleHasMain`, `usesPutnamiApp`) skip test files by the same rule, so no byte this task emits is a function of a test file. The exclusion is load-bearing beyond this project: `^describe` is the cross-project edge every dependent's describe, compile and test sits behind, so a test file in this key would move the identity of a whole dependent closure for an edit none of it reads. The feature evidence this task writes names the project's source binding, which does cover test files, specs and putnami.features.json, so the cache policy declares `sourceBound`: the CLI stores and looks up this task's entry at a key that also binds the binding each execution was stamped with, so a stored result serves only at the binding it names, while this key and every dependent key stay as the inputs above define them.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": ["build-describe"],
@@ -1029,13 +1034,10 @@
         "extensionVersion": { "from": "runtime" }
       },
       "outputs": {
-        "data": { "description": "Build-time describe artifacts (openapi, proto, …) emitted by Describer plugins" },
-        "clientOutputs": {
-          "description": "Project-relative directories of the generated typed clients this run manages, reported only when the project configures a client generator. This is the pathFrom anchor for the client half of the ownership decision above: the directory comes from the project's clientgen config, so this port is the only way the v3 task contract can name it. The consumer reads it back under this exact name (tooling/cli scheduler_exec.go resolves the managed directory from it)."
-        }
+        "data": { "description": "Build-time describe artifacts (openapi, proto, …) emitted by Describer plugins" }
       },
       "reads": ["gen", "sources"],
-      "writes": ["clients"],
+      "writes": ["gen"],
       "cache": {
         "enabled": true,
         "deterministic": true,
@@ -1043,22 +1045,6 @@
       },
       "declares": {
         "outputs": {
-          "client": {
-            "kind": "directory",
-            "pathFrom": "clientOutputs",
-            "optionalEmpty": true,
-            "preserves": [".gen", "go.mod", "go.sum", "putnami.json"],
-            "drift": "fail",
-            "description": "Generated typed client at the config-chosen directory the clientOutputs port reports; absent when the project configures no client generator, and empty when the generator produced no client (e.g. no routes). The client is committed, and this task is the FIRST writer of that directory in a session, so the engine compares what it writes (or a cache hit restores) with the bytes present before and fails the task on a difference — the worktree then holds the regenerated client to commit (protocols/extension ADR 0004). The project document and module files a workspace commits inside the directory are preserved: never captured, restored over, or judged (protocols/extension ADR 0005). The client project's own .gen directory, which the engine and that project's tasks write, is preserved the same way."
-          },
-          "clientgen": {
-            "kind": "directory",
-            "root": "project",
-            "path": ".gen/clientgen",
-            "optionalEmpty": true,
-            "emptied": true,
-            "description": "The clientgen contract (.gen/clientgen/config.json) and the staged client the describe binary emitted, at the path @putnami/clientgen discovery reads — the check `validate` runs reports a first-party provider with no config.json as a finding, so losing it on a cached build changed what validate said. Absent for a project that configures no client generator. Only this task writes the path, so the engine empties it before this task executes and on a restore of an entry that records it empty (protocols/extension ADR 0009), and this task removes it after its skip checks: the tree is a function of this task's key, which the clientgen keys fold instead of hashing it. A project that commits its generation contract does so as clientgen.json at its root, outside this output."
-          },
           "design": {
             "kind": "directory",
             "root": "project",

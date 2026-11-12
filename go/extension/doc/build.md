@@ -13,6 +13,13 @@ Compiles Go packages and binaries **for the host platform**, with cross-compilat
 ## Overview
 
 - Runs `go mod tidy` and syncs workspace dependencies before compiling
+- Runs the project's `client-generate` command first when it has one: a
+  generated client project builds its client from its provider's committed
+  contract before anything compiles it. `test`, `lint`, `validate`, `serve` and
+  `package` depend on `client-generate` the same way; a project without the
+  command plans nothing more. `lint` and `validate` also run `client-generate`
+  in every project the project depends on, directly or transitively, since
+  they type-check those projects' generated clients without building them
 - Generates schema artifacts before compiling
 - Runs build-time describe mode for runtime plugin artifacts such as OpenAPI
 - Compiles the describe entrypoint with the compile step's own configuration
@@ -763,7 +770,7 @@ Every declared output has exactly one owning task:
 | Task | Owns | Root |
 |------|------|------|
 | `build-generate` | `.gen/`, except the ceded subpaths listed below | project dir |
-| `build-describe` | `.gen/schema/`, `.gen/clientgen/`, `.gen/design/`, `.gen/migrations.json`, `.gen/migration-bundle/`, and the generated client directory (via the `clientOutputs` port, with `drift: "fail"`: the committed client is compared with the bytes present before this task wrote it, and a difference fails the task with `generated-output-drift` — commit the regenerated client) | project dir |
+| `build-describe` | `.gen/schema/`, `.gen/design/`, `.gen/migrations.json`, `.gen/migration-bundle/` | project dir |
 | `config-merge-exec` | `.gen/conf/.env.<APP_ENV or local>.yaml` (via the `mergedConfig` port) | project dir |
 | `config-merge-test-exec` | `.gen/conf/.env.test.yaml` | project dir |
 | `build-infra` | `.gen/requirements.json`, `.gen/infra/runtime.json` | project dir |
@@ -776,27 +783,25 @@ Every declared output has exactly one owning task:
 | `config-extract-exec` | `schema/config.json`, `schema/config.jsonschema.json` | project dir |
 
 Every output above except `.gen/` and `.gen/requirements.json` may legitimately
-be absent after a successful run — coverage is not instrumented for a project with `coverage: false`, a project with no
-client generator emits no client, a dry-run package writes no channel directory,
+be absent after a successful run — coverage is not instrumented for a project with `coverage: false`, a dry-run package writes no channel directory,
 a project that contributes no migration operation has no bundle, a project with
 nothing to merge writes no merged config file, a workload that authors
 `infra/runtime.json` gets no runtime defaults file,
 and a library's `bin/` is empty because its build evidence is a compile check.
 
-`build-describe`'s `.gen/schema/` and `.gen/clientgen/` also declare `emptied`
+`build-describe`'s `.gen/schema/` also declares `emptied`
 ([protocol ADR 0009](../../../protocols/extension/doc/adr/0009-an-optional-project-output-may-ask-to-be-emptied.md),
 [CLI ADR 0068](../../../tooling/cli/doc/adr/0068-an-emptied-optional-project-output-is-emptied-on-execution-and-on-an-empty-restore.md)).
-The engine empties both before the task executes, including a describe that
+The engine empties it before the task executes, including a describe that
 skips because the project has no main package, and on a restore of an entry
-that records them empty. Nothing committed lives under either path: a provider
-slice that commits its generation contract keeps it at `clientgen.json` in its
-root. The task itself rebuilds `.gen/schema/` from generate's staged copy and
-removes `.gen/clientgen/` before the describe binary runs.
+that records it empty. Nothing committed lives under it. The task itself
+rebuilds `.gen/schema/` from generate's staged copy before the describe binary
+runs.
 
 `build-generate` does NOT own every subpath of `.gen`. It declares the subtree
-with twelve paths excluded. Seven of them exist because it runs FIRST and its
+with eleven paths excluded. Six of them exist because it runs FIRST and its
 snapshot predates everything `build-describe` writes there — so a run serving
-both tasks from cache used to restore a `.gen` missing all of it; five of those
+both tasks from cache used to restore a `.gen` missing all of it; four of those
 `build-describe` declares, at the documented contract path rather than a
 private staging copy. `.gen/deployment.json` is ceded for the same reason: the
 `package` command's `deployment` step writes it after generate's snapshot and
@@ -815,7 +820,6 @@ nothing because the task declared no output:
 | Ceded subpath | Owner | The later reader that made it a defect |
 |---|---|---|
 | `.gen/schema/` | `build-describe` | `@putnami/clientgen` discovery and `go/framework/api` read `.gen/schema/openapi.json` in PREFERENCE to the committed sidecar. The output declares `emptied`, so neither clientgen key hashes it: they fold describe's key |
-| `.gen/clientgen/` | `build-describe` | the same discovery reads `.gen/clientgen/config.json` for generation, and the committed `clientgen.json` at the project root when no build wrote one; the `validate` guard reads committed inputs. The output declares `emptied`, so neither clientgen key hashes it |
 | `.gen/design/` | `build-describe` | `@putnami/sdd`'s feature projection and `putnami context` read `.gen/design/graph.json` |
 | `.gen/migrations.json` | `build-describe` | none; ceded so a project that stops contributing migrations cannot have a stale dump resurrected |
 | `.gen/migration-bundle/` | `build-describe` | release-set migration publication, deploy, `database.ApplyBundle`, the database test provider |

@@ -47,7 +47,7 @@ both, and the v1 corpus is unchanged.
 | Version | Members | Corpus |
 | --- | --- | --- |
 | 1 | everything above | `fixtures/{valid,invalid}` |
-| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `workspaceWarnings`, `ProjectRef.config`, `ProjectRef.extensions`, `ProjectRef.type` and `ProjectRef.runsWith` | `fixtures/v2/{valid,invalid}` |
+| 2 | v1 plus `identity`, `staging`, `extension.runtimePath`, `extension.cacheRoot`, `project.metadata`, `project.type`, `project.dependencyClosure`, `project.tags`, `project.generatedFrom`, `invocation`, `selection`, `workspaceProjects`, `userScope`, `workspaceWarnings`, `ProjectRef.config`, `ProjectRef.extensions`, `ProjectRef.type` and `ProjectRef.runsWith` | `fixtures/v2/{valid,invalid}` |
 
 **Putnami's orchestrator produces v2 only.** The CLI requires an extension
 contract whose SDK reads v2, so a subprocess that reaches this context is
@@ -146,6 +146,21 @@ defaults are) is the language extension's, the graph is core's.
   declines an absent member; it does not read it as "no tags" and it does not
   resolve the tags itself. `null` is neither answer and is rejected. A version
   1 document does not carry the member, even empty (`job.unexpected_field`).
+
+- **`project.generatedFrom`** — a generated client's binding: the
+  `generatedFrom` member of its `putnami.json` (`service`, `language`, and for
+  Go `packageName`, `clientName`, `omitOperations`) plus `contractPath`, the
+  provider's committed contract the orchestrator resolved the service to,
+  workspace-relative in slash form. The client's cache key folds that
+  contract's digest, so a task that reads the path reads what its key holds.
+  `contractSha256` is that digest, in lowercase hex: a provider build in the
+  same session may rewrite the contract, so the task checks the bytes it reads
+  against it and fails rather than store a client under another contract's key.
+  An empty `contractPath` says no single provider declares the service, and
+  `contractSha256` is present exactly when `contractPath` is.
+  A present value names a service (`job.missing_field`) and the language `go`
+  or `ts`, carries Go options only for `go`, and gives a clean relative path
+  (`job.invalid_value`). Absent means the project is not a generated client.
 
 - **`selection`** — how the command invocation chose the projects in scope:
   `mode` (`all`, `projects` or `impacted`), `scoped`, the `baseline` and

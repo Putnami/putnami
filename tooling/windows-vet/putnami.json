@@ -7,6 +7,24 @@
   "extensions": [
     "/go/extension"
   ],
+  "dependencies": [
+    "/cloud/clients/auth-server",
+    "/cloud/clients/cache-server",
+    "/cloud/clients/config-api",
+    "/cloud/clients/control-api",
+    "/cloud/clients/data-api",
+    "/cloud/clients/db-gateway",
+    "/cloud/clients/delivery-api",
+    "/cloud/clients/distribution-api",
+    "/cloud/clients/identity-api",
+    "/cloud/clients/observability-api",
+    "/cloud/clients/oci-server",
+    "/cloud/clients/put-server",
+    "/cloud/clients/runtime-api",
+    "/cloud/clients/source-api",
+    "/go/samples/service-to-service",
+    "/typescript/samples/10-service-to-service/clients/go"
+  ],
   "disable": {
     "jobs": [
       "serve"
@@ -24,6 +42,8 @@
         "git:../../**/*.s",
         "git:../../**/go.mod",
         "git:../../**/go.sum",
+        "git:../../**/schema/openapi.json",
+        "git:../../**/putnami.json",
         "../../go.work"
       ]
     }

@@ -36,8 +36,11 @@ type Plugin struct {
 	pending          []EndpointDefinition
 	dispatched       []EndpointDefinition
 	routes           []DiscoveredRoute
-	log              *logger.Logger
-	mu               sync.Mutex
+	// producer attributes every route of this plugin to the project and
+	// feature that own it. api.Clients sets it; nil leaves routes unattributed.
+	producer *clientcontract.OperationProducer
+	log      *logger.Logger
+	mu       sync.Mutex
 }
 
 // Option configures the api.Plugin via functional options.
@@ -244,7 +247,21 @@ func (p *Plugin) DiscoveredRoutes() []DiscoveredRoute {
 	defer p.mu.Unlock()
 	out := make([]DiscoveredRoute, len(p.routes))
 	copy(out, p.routes)
+	if p.producer != nil {
+		for i := range out {
+			producer := *p.producer
+			out[i].Producer = &producer
+		}
+	}
 	return out
+}
+
+// attributeRoutes records the project and feature that produce every route of
+// this plugin. DiscoveredRoutes carries the attribution on each route.
+func (p *Plugin) attributeRoutes(producer clientcontract.OperationProducer) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.producer = &producer
 }
 
 // Definitions returns the queued endpoint definitions before Configure runs, plus any

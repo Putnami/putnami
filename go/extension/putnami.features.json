@@ -815,19 +815,6 @@
           }
         },
         {
-          "id": "committed-client-drift",
-          "stage": "coded",
-          "evidenceKinds": [
-            "attestation"
-          ],
-          "verification": {
-            "kind": "acceptance",
-            "checks": [
-              "the-describe-client-output-declares-fail-on-drift"
-            ]
-          }
-        },
-        {
           "id": "locked-go-is-exact",
           "stage": "coded",
           "evidenceKinds": [

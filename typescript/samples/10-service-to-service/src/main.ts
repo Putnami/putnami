@@ -105,19 +105,10 @@ export function app(options: { port?: number } = {}) {
         publicRoute: '/openapi.json',
       }),
     )
-    .use(
-      clientGenerator({
-        packageName: '@example/items-client',
-        // Both targets are synchronized mechanically from this provider-owned
-        // contract by the workspace clientgen command.
-        targets: ['ts', 'go'],
-        go: {
-          modulePath: 'go.putnami.dev/examples/ts-items-client',
-          packageName: 'itemsclient',
-          clientName: 'ItemsClient',
-        },
-      }),
-    );
+    // The contract names each operation's producer. The clients under
+    // clients/ name this provider in their own generatedFrom and generate
+    // themselves from its committed schema/openapi.json.
+    .use(clientGenerator());
 
   const binding = selfBinding(port);
   registerItemsClient(instance, binding);

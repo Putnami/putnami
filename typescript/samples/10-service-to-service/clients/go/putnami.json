@@ -1,6 +1,12 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "name": "go.putnami.dev/examples/ts-items-client",
+  "generatedFrom": {
+    "service": "catalog.items",
+    "language": "go",
+    "packageName": "itemsclient",
+    "clientName": "ItemsClient"
+  },
   "tags": [
     "go",
     "generated-client"

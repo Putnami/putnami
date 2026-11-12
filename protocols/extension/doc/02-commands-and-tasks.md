@@ -37,7 +37,7 @@ A command is a user-facing operation invoked via `putnami <command>`:
 | `traits` | no | Orchestration hints that replace the verb's default traits: `heavy`, `requiresRunnable`, `injectPublishChannels`, `sideEffects`, and from contract 11 `kind`, `workload`, `rewritesSources` and `consumesReleaseSet` ([traits](06-verbs.md#declaring-traits)) |
 | `flags` | no | CLI flags the command accepts |
 | `defaults` | no | Default parameter values |
-| `dependsOn` | no | Command prerequisites. Bare names are same-project prerequisites; `command~step` waits for one step of a same-project prerequisite (contract 18); `!command` is a session barrier across the current project selection |
+| `dependsOn` | no | Command prerequisites. Bare names are same-project prerequisites; `command~step` waits for one step of a same-project prerequisite (contract 18); `!command` is a session barrier across the current project selection; `^command` plans the command in every project of the dependency closure (contract 22) |
 | `sessionPrerequisites` | no | Dependent-owned same-session commands with optional condition, selection, project policy, gates, and local parameter bindings |
 | `priority` | no | Higher priority sorts earlier when multiple extensions provide the same command |
 | `quiet` | no | Suppress from job recap |
@@ -108,8 +108,17 @@ for every `build` leaf job in the final plan. These are functional dependencies:
 if a barrier job fails, downstream release/deploy jobs are skipped.
 
 A session barrier names a whole command, so `!command~step` is invalid.
-Pipeline-step references prefixed with `^`, `/`, or `*` are invalid at command
-level; put them on the relevant entry in `run` instead.
+
+Names prefixed with `^` reach the dependency closure. `^client-generate` plans
+`client-generate` in every project the dependent's project depends on, directly
+or transitively, and every root step of the dependent command waits for each
+one's leaf steps. A project that does not run the command adds no dependency.
+Use it when a command reads what a prerequisite writes in its dependencies,
+such as a type check that compiles their generated clients. `^command~step` is
+invalid, and a manifest that uses the form requires `cliContract: 22`.
+
+Pipeline-step references prefixed with `/` or `*` are invalid at command level;
+put them on the relevant entry in `run` instead.
 
 ### Conditional Session Prerequisites
 

@@ -58,7 +58,6 @@ func TestClassifyChangedFile(t *testing.T) {
 		"bun.lock":                              ChangeGenerated,
 		"putnami.lock.json":                     ChangeGenerated,
 		"svc/clients/go/client.gen.go":          ChangeGenerated,
-		"svc/clients/ts/client.putnami.json":    ChangeGenerated,
 		"app/.gen/runtime.json":                 ChangeGenerated,
 		"api/client.go":                         ChangeGenerated,
 		"api/licensed.go":                       ChangeGenerated,

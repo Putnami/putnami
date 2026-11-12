@@ -68,7 +68,8 @@ const (
 // ParseCommandDependency. Every reader of CommandDependsOn parses through it.
 type CommandDependency = proto.CommandDependency
 
-// ParseCommandDependency reads `command`, `command~step` or `!command`.
+// ParseCommandDependency reads `command`, `command~step`, `!command` or
+// `^command`.
 var ParseCommandDependency = proto.ParseCommandDependency
 
 // CommandGroupDefinition is the protocol's structured command group of an
@@ -344,7 +345,7 @@ type JobDefinition struct {
 	Toolchains       []string
 	TimeoutMs        int
 	DependsOn        []string
-	CommandDependsOn []string // command-level deps (e.g., ["build"] and ["build~describe"] same-project, ["!build"] session barrier)
+	CommandDependsOn []string // command-level deps (e.g., ["build"] and ["build~describe"] same-project, ["!build"] session barrier, ["^client-generate"] dependency closure)
 	// SessionPrerequisites are dependent-command-owned, same-session command
 	// invocations with optional selection, policy, gates, and local params.
 	SessionPrerequisites []SessionPrerequisiteDefinition

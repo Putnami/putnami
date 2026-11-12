@@ -161,6 +161,9 @@
         { "required": ["dependents"] },
         { "required": ["provider"] }
       ]
+    },
+    "generatedFrom": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/generatedFrom"
     }
   },
   "if": {

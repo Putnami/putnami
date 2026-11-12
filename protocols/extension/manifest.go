@@ -63,7 +63,7 @@ func LoadManifest(path string) (*Manifest, error) {
 //     shadow is a hard error, and so is, from ChangedFilesContract, an input
 //     binding source the planner does not resolve, and, from
 //     StepDependencyContract, a command dependency that is not command,
-//     command~step or !command.
+//     command~step, !command or ^command.
 //   - contract absent (0) or below RequiredLoadContract → hard error naming
 //     the fix. The stamp is what proves an extension speaks the contracts its
 //     manifest relies on — the four that move together at 3 (task contract
@@ -134,6 +134,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.DependencyClosureContract:
+			reason = " for a dependency on a command across the dependency closure"
 		case required == protocolcli.BuildGraphEdgesContract:
 			reason = " for its build-graph edges"
 		case required == protocolcli.UserScopeSkillsContract:

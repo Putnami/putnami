@@ -64,22 +64,25 @@ sites/telemetry.putnami.dev/telemetry.putnami.dev
 *.types.json
 samples/bun.lock
 **/clients/ts/
-# The Go sample commits its cross-language TypeScript client (a workspace member
-# so @putnami/client resolves for typechecking); regular in-app clients/ts stay
-# ignored. Its node_modules (a bun workspace-install artifact) and .gen (the
-# per-project version.json build stamp) stay ignored — otherwise the stamp shows
-# up untracked and marks every publish dirty.
+# The two service-to-service samples keep their TypeScript client projects
+# tracked: the authored package.json, putnami.json and tsconfig.json make each
+# one a workspace member. client-generate writes its src tree, which stays
+# ignored, as do the install's node_modules and the .gen build stamp.
 !/go/samples/service-to-service/clients/ts/
 !/go/samples/service-to-service/clients/ts/**
 /go/samples/service-to-service/clients/ts/node_modules/
 /go/samples/service-to-service/clients/ts/.gen/
-# The TypeScript service-to-service sample commits its generated client so the
-# documented provider -> generate -> bind -> call path compiles from a fresh
-# checkout. Workspace/install artifacts within that package stay ignored.
+/go/samples/service-to-service/clients/ts/src/
 !/typescript/samples/10-service-to-service/clients/ts/
 !/typescript/samples/10-service-to-service/clients/ts/**
 /typescript/samples/10-service-to-service/clients/ts/node_modules/
 /typescript/samples/10-service-to-service/clients/ts/.gen/
+/typescript/samples/10-service-to-service/clients/ts/src/
+
+# Generated Go clients. client-generate writes client.gen.go from the provider's
+# committed contract, and Git holds none
+# (tooling/clientgen-extension/doc/adr/0007-a-generated-client-is-built-not-committed.md).
+client.gen.go
 
 # BEGIN PUTNAMI AUDIT MANAGED
 # Local audit attestations and parallel fleet-run state, written by the audit

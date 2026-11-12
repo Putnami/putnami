@@ -32,7 +32,7 @@ export const app = () =>
     .use(openapi({ title: 'Users API', version: '1.0.0' }))
     .use(proto({ packageName: 'users.v1' }))
     .use(grpc())
-    .use(clientGenerator({ packageName: '@myorg/users-client' }));
+    .use(clientGenerator());
 ```
 
 Then generate:

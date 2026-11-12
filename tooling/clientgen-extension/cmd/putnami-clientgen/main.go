@@ -1,16 +1,17 @@
-// Command putnami-clientgen is the extension runtime for project generation and
-// workspace-wide synchronization and drift verification.
+// Command putnami-clientgen is the extension runtime for client generation and
+// the workspace guard over generated clients and handwritten transports.
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
-	"time"
 
-	clientcontract "go.putnami.dev/protocol/clientcontract"
 	"go.putnami.dev/sdk/extension/cli"
 	pctx "go.putnami.dev/sdk/extension/context"
 	"go.putnami.dev/sdk/extension/jsonl"
@@ -24,166 +25,191 @@ var runtimeVersion string
 
 func commandHandlers() map[string]cli.JobFunc {
 	return map[string]cli.JobFunc{
-		"generate-go":     generateTarget(clientcontract.GeneratedLanguageGo),
-		"generate-ts":     generateTarget(clientcontract.GeneratedLanguageTypeScript),
-		"workspace-sync":  runWorkspace(workspaceclient.ModeSync),
-		"workspace-adopt": runWorkspace(workspaceclient.ModeAdopt),
-		"workspace-check": runWorkspace(workspaceclient.ModeCheck),
+		"generate-go":     generateClient(pctx.GeneratedLanguageGo),
+		"generate-ts":     generateClient(pctx.GeneratedLanguageTypeScript),
+		"generate-module": generateModuleTarget,
+		"workspace-check": runCheck,
 	}
 }
 
-func generateTarget(language clientcontract.GeneratedLanguage) cli.JobFunc {
+// generateClient is the client-generate task of a project that names its
+// provider in generatedFrom. The client generates itself: it reads its
+// provider's committed contract, whose path the core resolved into the job
+// context, and writes only into its own directory.
+func generateClient(language string) cli.JobFunc {
 	return func(ctx *pctx.Context, _ *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-		if ctx.Project.Name == "" {
-			return "FAILED", nil, errors.New("client generation requires a selected provider project")
+		from := ctx.Project.GeneratedFrom
+		if from == nil {
+			return "FAILED", nil, fmt.Errorf("%s has no resolved generatedFrom in its job context; a generated client "+
+				"names its provider's service in the generatedFrom member of its putnami.json", projectLabel(ctx))
 		}
-		projectRoot := ctx.Project.FullPath
-		if projectRoot == "" {
-			projectRoot = filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(ctx.Project.Path))
+		if from.Language != language {
+			return "FAILED", nil, fmt.Errorf("%s declares a %q client in generatedFrom, but this task generates a %q client",
+				projectLabel(ctx), from.Language, language)
 		}
-		output, generated, err := workspaceclient.SynchronizeTarget(ctx.WorkspaceRoot, projectRoot, language)
+		if from.ContractPath == "" {
+			return "FAILED", nil, fmt.Errorf("%s: no project in the workspace commits a schema/openapi.json that declares "+
+				"service %q, or several do; commit the provider's contract or fix the service name in generatedFrom",
+				projectLabel(ctx), from.Service)
+		}
+		projectRoot := projectRootOf(ctx)
+		contract, release, err := keyedContract(ctx.WorkspaceRoot, from)
 		if err != nil {
-			return "FAILED", nil, err
+			return "FAILED", nil, fmt.Errorf("%s: %w", projectLabel(ctx), err)
 		}
-		if !generated {
-			return "OK", map[string]any{}, nil
-		}
-		outputPort := "typescriptClientOutput"
-		if language == clientcontract.GeneratedLanguageGo {
-			outputPort = "goClientOutput"
-		}
-		return "OK", map[string]any{outputPort: output}, nil
-	}
-}
-
-func runWorkspace(mode workspaceclient.Mode) cli.JobFunc {
-	return func(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
-		if ctx.WorkspaceRoot == "" {
-			return "FAILED", nil, errors.New("workspace client command received no workspace root")
-		}
-		// Each phase is timed and reported (Report.Timings, one metric event per
-		// phase). The session record exposes this task as one durationMs, and
-		// the split behind that number is what decides where a slow guard
-		// spends its time.
-		timings := map[string]int64{}
-		phase := func(name string, run func() error) error {
-			started := time.Now()
-			err := run()
-			timings[name] = time.Since(started).Milliseconds()
-			return err
-		}
-		var report workspaceclient.Report
-		if mode == workspaceclient.ModeCheck {
-			// The check builds nothing and renders nothing. It reads the Git
-			// candidate cut its `git:**` key holds and the membership the
-			// orchestrator resolved from committed manifests, so a cold clone
-			// and a tree the session just built reach one verdict; whether the
-			// committed clients are what the current contract GENERATES is the
-			// generator tasks' own verdict, judged by the engine on their
-			// declared outputs (protocols/extension ADR 0004). This task keeps
-			// what no generator task can judge.
-			report = workspaceclient.InspectCommitted(ctx.WorkspaceRoot, memberPaths(ctx.WorkspaceProjects))
-		} else {
-			regenerated, err := synchronizeWorkspace(ctx.WorkspaceRoot, mode, phase)
+		defer release()
+		if language == pctx.GeneratedLanguageGo {
+			err := workspaceclient.GenerateGo(ctx.WorkspaceRoot, workspaceclient.GoGeneration{
+				Contract:       contract,
+				Output:         projectRoot,
+				PackageName:    from.PackageName,
+				ClientName:     from.ClientName,
+				OmitOperations: from.OmitOperations,
+			})
 			if err != nil {
 				return "FAILED", nil, err
 			}
-			report = regenerated
+			return "OK", map[string]any{}, nil
 		}
-		for name, elapsed := range timings {
-			if report.Timings == nil {
-				report.Timings = map[string]int64{}
-			}
-			report.Timings[name] = elapsed
+		packageName, err := workspaceclient.PackageName(projectRoot)
+		if err != nil {
+			return "FAILED", nil, fmt.Errorf("%s: %w", projectLabel(ctx), err)
 		}
-		for _, name := range sortedTimingNames(report.Timings) {
-			emit.Metric(workspaceclient.PhaseMetricPrefix+name, report.Timings[name], "ms")
+		err = workspaceclient.GenerateTypeScript(ctx.WorkspaceRoot, workspaceclient.TypeScriptGeneration{
+			Contract:    contract,
+			Project:     projectRoot,
+			PackageName: packageName,
+		})
+		if err != nil {
+			return "FAILED", nil, err
 		}
-		for _, finding := range report.Findings {
-			emit.DiagnosticWithCode("error", finding.Message, finding.Path, finding.Line, finding.Column, finding.Code)
-		}
-		// Censused debt is reported at warning severity: visible on every run,
-		// countable, and never the reason a gate is red.
-		for _, finding := range report.PendingTransports {
-			emit.DiagnosticWithCode("warning", finding.Message, finding.Path, finding.Line, finding.Column, finding.Code)
-		}
-		// The SDK drops a job's data payload when the job returns an error, so
-		// the counts that say HOW MUCH is unverified would disappear exactly
-		// when they are needed. The summary is emitted on both paths.
-		emit.SummaryWithData(
-			fmt.Sprintf("%d generated-client finding(s), %d censused pending transport(s), %d applied adaptation(s), %d/%d operation targets covered",
-				len(report.Findings), len(report.PendingTransports), len(report.AppliedAdaptations),
-				report.Coverage.Covered, report.Coverage.Required),
-			map[string]any{
-				"findings":           len(report.Findings),
-				"pendingTransports":  len(report.PendingTransports),
-				"appliedAdaptations": len(report.AppliedAdaptations),
-				"coverage":           report.Coverage,
-				"providers":          len(report.Providers),
-				"consumerEdges":      len(report.ConsumerEdges),
-				"timings":            report.Timings,
-			})
-		if !report.Clean() {
-			return "FAILED", nil, fmt.Errorf("first-party generated client verification found %d issue(s)", len(report.Findings))
-		}
-		return "OK", map[string]any{"report": report}, nil
+		return "OK", map[string]any{}, nil
 	}
 }
 
-// synchronizeWorkspace is the sync and adopt path: build every provider through
-// the spawning CLI, regenerate every target in place, compile every consumer,
-// then verify the worktree against a fresh render. Adoption additionally reads
-// the manifests as they stood before the regeneration, so an import or
-// construction rename is proven by two real emitter outputs.
-func synchronizeWorkspace(workspaceRoot string, mode workspaceclient.Mode, phase func(string, func() error) error) (workspaceclient.Report, error) {
-	var report workspaceclient.Report
-	// The "before" manifests are read before ANY write of this command: the
-	// provider build below already regenerates the same-language targets.
-	var before string
-	var snapshotFindings []workspaceclient.Finding
-	if mode == workspaceclient.ModeAdopt {
-		var cleanup func()
-		if err := phase(workspaceclient.PhaseSnapshot, func() (err error) {
-			before, cleanup, snapshotFindings, err = workspaceclient.SnapshotGeneratedArtifacts(workspaceRoot)
-			return err
-		}); err != nil {
-			return report, err
+// keyedContract reads the provider's contract once, checks it against the
+// digest the client's cache key folds, and returns a private copy of those
+// bytes for the emitter to read. The contract edge orders no job, so a
+// provider build in the same session may rewrite the contract while or before
+// the client generates. A client generated from other bytes than its key holds
+// must not be stored under that key, so the generation fails instead; the next
+// command loads the new contract and generates from it. A context with no
+// digest, from an older orchestrator, skips the check. release removes the copy.
+func keyedContract(workspaceRoot string, from *pctx.GeneratedFrom) (string, func(), error) {
+	data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(from.ContractPath))) //nolint:gosec // G304: the contract the orchestrator resolved
+	if err != nil {
+		return "", nil, fmt.Errorf("read the provider's contract: %w", err)
+	}
+	if from.ContractSHA256 != "" {
+		sum := sha256.Sum256(data)
+		if got := hex.EncodeToString(sum[:]); got != from.ContractSHA256 {
+			return "", nil, fmt.Errorf("the provider's contract %s changed after this command loaded the workspace "+
+				"(sha256 %s, the client's cache key holds %s): a provider build rewrote it; run the command again "+
+				"to generate the client from the new contract", from.ContractPath, got, from.ContractSHA256)
 		}
-		defer cleanup()
 	}
-	if err := phase(workspaceclient.PhaseMaterialize, func() error {
-		return workspaceclient.MaterializeWorkspaceContracts(workspaceRoot)
-	}); err != nil {
-		return report, err
+	dir, err := os.MkdirTemp("", "putnami-client-contract-")
+	if err != nil {
+		return "", nil, err
 	}
-	if err := phase(workspaceclient.PhaseSynchronize, func() error {
-		return workspaceclient.Synchronize(workspaceRoot)
-	}); err != nil {
-		return report, err
+	release := func() { _ = os.RemoveAll(dir) }
+	copied := filepath.Join(dir, "openapi.json")
+	if err := os.WriteFile(copied, data, 0o600); err != nil {
+		release()
+		return "", nil, err
 	}
-	var applied []workspaceclient.Adaptation
-	if mode == workspaceclient.ModeAdopt {
-		adopted, err := workspaceclient.ApplySafeBindingAdoptions(workspaceRoot, before)
-		if err != nil {
-			return report, err
-		}
-		applied = adopted
+	return copied, release, nil
+}
+
+// generateModuleTarget is the client-generate task of a provider whose Go
+// client is a package of its own module. The provider commits that target in
+// clientgen.json and generates it from its own committed contract, inside its
+// own tree. It reports the file it owns through the moduleClientOutput port.
+func generateModuleTarget(ctx *pctx.Context, _ *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+	projectRoot := projectRootOf(ctx)
+	target, err := workspaceclient.ReadModuleTarget(projectRoot)
+	if err != nil {
+		return "FAILED", nil, fmt.Errorf("%s: %w", projectLabel(ctx), err)
 	}
-	if err := workspaceclient.CompileWorkspaceConsumers(workspaceRoot); err != nil {
-		return report, err
+	contract := filepath.Join(projectRoot, "schema", "openapi.json")
+	if _, err := os.Stat(contract); err != nil {
+		return "FAILED", nil, fmt.Errorf("%s commits clientgen.json but no schema/openapi.json to generate its client from: %w",
+			projectLabel(ctx), err)
 	}
-	var expectedRoot string
-	var cleanup func()
-	if err := phase(workspaceclient.PhaseRender, func() (err error) {
-		expectedRoot, cleanup, err = workspaceclient.RenderExpected(workspaceRoot)
-		return err
-	}); err != nil {
-		return report, err
+	output := filepath.Join(projectRoot, filepath.FromSlash(target.Output))
+	if err := os.MkdirAll(output, 0o750); err != nil {
+		return "FAILED", nil, err
 	}
-	defer cleanup()
-	report = workspaceclient.InspectRendered(workspaceRoot, expectedRoot, mode).WithFindings(snapshotFindings...)
-	report.AppliedAdaptations = applied
-	return report, nil
+	err = workspaceclient.GenerateGo(ctx.WorkspaceRoot, workspaceclient.GoGeneration{
+		Contract:       contract,
+		Output:         output,
+		PackageName:    target.PackageName,
+		ClientName:     target.ClientName,
+		OmitOperations: target.OmitOperations,
+	})
+	if err != nil {
+		return "FAILED", nil, err
+	}
+	return "OK", map[string]any{"moduleClientOutput": path.Join(target.Output, "client.gen.go")}, nil
+}
+
+// runCheck is the guard: clientgen-check, and the validate contribution. It
+// builds nothing and renders nothing. It reads the Git candidate cut its
+// `git:**` key holds and the membership the orchestrator resolved from
+// the committed workspace and scope manifests, so a cold clone and a tree the session just built
+// reach one verdict.
+func runCheck(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[string]any, error) {
+	if ctx.WorkspaceRoot == "" {
+		return "FAILED", nil, errors.New("workspace client command received no workspace root")
+	}
+	report := workspaceclient.InspectCommitted(ctx.WorkspaceRoot, memberPaths(ctx.WorkspaceProjects))
+	// Each phase is timed and reported (Report.Timings, one metric event per
+	// phase). The session record exposes this task as one durationMs, and the
+	// split behind that number is what decides where a slow guard spends its
+	// time.
+	for _, name := range sortedTimingNames(report.Timings) {
+		emit.Metric(workspaceclient.PhaseMetricPrefix+name, report.Timings[name], "ms")
+	}
+	for _, finding := range report.Findings {
+		emit.DiagnosticWithCode("error", finding.Message, finding.Path, finding.Line, finding.Column, finding.Code)
+	}
+	// Censused debt is reported at warning severity: visible on every run,
+	// countable, and never the reason a gate is red.
+	for _, finding := range report.PendingTransports {
+		emit.DiagnosticWithCode("warning", finding.Message, finding.Path, finding.Line, finding.Column, finding.Code)
+	}
+	// The SDK drops a job's data payload when the job returns an error, so
+	// the counts that say HOW MUCH is unverified would disappear exactly
+	// when they are needed. The summary is emitted on both paths.
+	emit.SummaryWithData(
+		fmt.Sprintf("%d generated-client finding(s), %d censused pending transport(s)",
+			len(report.Findings), len(report.PendingTransports)),
+		map[string]any{
+			"findings":          len(report.Findings),
+			"pendingTransports": len(report.PendingTransports),
+			"providers":         len(report.Providers),
+			"timings":           report.Timings,
+		})
+	if !report.Clean() {
+		return "FAILED", nil, fmt.Errorf("first-party generated client verification found %d issue(s)", len(report.Findings))
+	}
+	return "OK", map[string]any{"report": report}, nil
+}
+
+// projectRootOf returns the absolute directory of the job's project.
+func projectRootOf(ctx *pctx.Context) string {
+	if ctx.Project.FullPath != "" {
+		return ctx.Project.FullPath
+	}
+	return filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(ctx.Project.Path))
+}
+
+// projectLabel names the job's project in a message.
+func projectLabel(ctx *pctx.Context) string {
+	if ctx.Project.Name != "" {
+		return ctx.Project.Name
+	}
+	return ctx.Project.Path
 }
 
 // memberPaths returns the workspace-relative directory of every member project

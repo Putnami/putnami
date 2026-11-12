@@ -15,71 +15,35 @@
   "requirements": [
     {
       "id": "git-candidate-inputs",
-      "text": [
-        "A git: file-pattern input selects tracked and non-ignored untracked candidates from the containing repository, matched against project-relative paths.",
-        "Its key covers raw bytes, the executable bit, symlink target text and file type, changes on addition, edit, chmod, rename or deletion, excludes ignored untracked state, and refuses failed Git enumeration, unmerged paths and submodules. git:** covers the whole repository.",
-        "Impact matches the same path grammar without requiring the changed path still to exist."
-      ]
+      "text": "A git: file-pattern input selects tracked and non-ignored untracked candidates from the containing repository, matched against project-relative paths. Its key covers raw bytes, the executable bit, symlink target text and file type, changes on addition, edit, chmod, rename or deletion, excludes ignored untracked state, and refuses failed Git enumeration, unmerged paths and submodules. git:** covers the whole repository. Impact matches the same path grammar without requiring the changed path still to exist."
     },
     {
       "id": "command-catalog",
-      "text": [
-        "One catalog defines core command paths, flags, help, completion, structured output and workspace requirements; it has no job or alias.",
-        "A root that left the core (channel, ci, change-plan, infra, dev, contributor) is a usage error unless an installed extension declares it as a group or job;",
-        "tree verify and proposals finalize always are.",
-        "So is putnami help of each.",
-        "The error precedes workspace bootstrap and links the moved-commands reference.",
-        "It names no extension; dev and contributor name core successors."
-      ]
+      "text": "One catalog defines core command paths, flags, help, completion, structured output and workspace requirements; it has no job or alias. A root that left the core (channel, ci, change-plan, infra, dev, contributor) is a usage error unless an installed extension declares it as a group or job; tree verify and proposals finalize always are. So is putnami help of each. The error precedes workspace bootstrap and links the moved-commands reference. It names no extension; dev and contributor name core successors."
     },
     {
       "id": "workspace-scoped-help",
-      "text": [
-        "Help lists the public commands the loaded extensions declare: the vocabulary's verbs first, in vocabulary order, then the other declared commands by name, with the vocabulary's aliases and the provider-bound global flags a loaded extension gives meaning.",
-        "Outside a workspace, help says no extension is loaded and how to add one, and reads no user-scope extension.",
-        "When an extension did not load, help keeps the vocabulary of those that did. --credential-fd is always listed."
-      ]
+      "text": "Help lists the public commands the loaded extensions declare: the vocabulary's verbs first, in vocabulary order, then the other declared commands by name, with the vocabulary's aliases and the provider-bound global flags a loaded extension gives meaning. Outside a workspace, help says no extension is loaded and how to add one, and reads no user-scope extension. When an extension did not load, help keeps the vocabulary of those that did. --credential-fd is always listed."
     },
     {
       "id": "job-flags-follow-job-commands",
-      "text": [
-        "Help, its references and shell completion list a flag that only extension commands read, such as --retry, only where a loaded extension declares a job command or command group, and a provider-bound flag, such as --providers, only where its provider is declared.",
-        "A core command refuses a flag that only extension commands read unless its own catalog entry declares it, with a usage error naming the flag, and its help and completion omit it. --help still prints. --credential-fd stays listed."
-      ]
+      "text": "Help, its references and shell completion list a flag that only extension commands read, such as --retry, only where a loaded extension declares a job command or command group, and a provider-bound flag, such as --providers, only where its provider is declared. A core command refuses a flag that only extension commands read unless its own catalog entry declares it, with a usage error naming the flag, and its help and completion omit it. --help still prints. --credential-fd stays listed."
     },
     {
       "id": "flags-follow-the-command",
-      "text": [
-        "A flag goes after the full command: putnami <command> [subcommand] [options].",
-        "A flag before the command word, before a subcommand of a command root, or before a word of the command help describes, is a usage error that names the flag and says where flags go;",
-        "nothing else runs in its place. --help, help --man and --markdown, and --version still answer, and flags alone still print help.",
-        "Shell completion follows: nothing after such a flag, and after help the command names, then their subcommands."
-      ]
+      "text": "A flag goes after the full command: putnami <command> [subcommand] [options]. A flag before the command word, before a subcommand of a command root, or before a word of the command help describes, is a usage error that names the flag and says where flags go; nothing else runs in its place. --help, help --man and --markdown, and --version still answer, and flags alone still print help. Shell completion follows: nothing after such a flag, and after help the command names, then their subcommands."
     },
     {
       "id": "help-lists-command-groups",
-      "text": [
-        "Help inside a workspace lists the command groups of the loaded extensions in a section titled Commands (from extensions), after the job commands: one row per group, in name order, with its description.",
-        "A group named like a core command is not listed, because the core answers that name first.",
-        "A name that a group shares with a flat extension command is listed once, as the group.",
-        "Outside a workspace the section is absent."
-      ]
+      "text": "Help inside a workspace lists the command groups of the loaded extensions in a section titled Commands (from extensions), after the job commands: one row per group, in name order, with its description. A group named like a core command is not listed, because the core answers that name first. A name that a group shares with a flat extension command is listed once, as the group. Outside a workspace the section is absent."
     },
     {
       "id": "completion-skips-carried-commands",
-      "text": [
-        "Top-level completion offers the command groups of the loaded extensions and their subcommands, and no flat command that a group carries, which fails typed directly.",
-        "Help and completion read one rule for a carried command."
-      ]
+      "text": "Top-level completion offers the command groups of the loaded extensions and their subcommands, and no flat command that a group carries, which fails typed directly. Help and completion read one rule for a carried command."
     },
     {
       "id": "completion-reads-names-literally",
-      "text": [
-        "Shell completion offers each name it lists as one literal word in bash, zsh and fish: a workspace command, alias, project group or project name, and an extension flag name.",
-        "A quote, space, newline, bracket, colon, backslash or command substitution in a name neither splits, changes nor runs it.",
-        "A backslash or bracket in a flag description hides no flag in zsh.",
-        "Bash matches the current word, and bash and zsh read each earlier word, without its quotes, running nothing: a quoted alias takes its command's flags."
-      ]
+      "text": "Shell completion offers each name it lists as one literal word in bash, zsh and fish: a workspace command, alias, project group or project name, and an extension flag name. A quote, space, newline, bracket, colon, backslash or command substitution in a name neither splits, changes nor runs it. A backslash or bracket in a flag description hides no flag in zsh. Bash matches the current word, and bash and zsh read each earlier word, without its quotes, running nothing: a quoted alias takes its command's flags."
     },
     {
       "id": "completion-keeps-a-colon-in-its-word",
@@ -87,81 +51,39 @@
     },
     {
       "id": "completion-offers-a-flag-value-in-its-slot",
-      "text": [
-        "After a flag that takes a value, completion offers only its values in bash, zsh and fish: project targets after --projects, project names after --exclude, the values the catalog or extension lists, and nothing for a free value, except files in fish after a path.",
-        "This holds after --flag=, a short spelling and a command alias.",
-        "A job-only flag on a core command offers nothing, and help nothing after --projects.",
-        "The word after the value completes as the word before the flag."
-      ]
+      "text": "After a flag that takes a value, completion offers only its values in bash, zsh and fish: project targets after --projects, project names after --exclude, the values the catalog or extension lists, and nothing for a free value, except files in fish after a path. This holds after --flag=, a short spelling and a command alias. A job-only flag on a core command offers nothing, and help nothing after --projects. The word after the value completes as the word before the flag."
     },
     {
       "id": "extension-verb-vocabulary",
-      "text": [
-        "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands.",
-        "The CLI merges the loaded vocabularies in extension-name order.",
-        "Help, completion, impact-plan and the live view read the result.",
-        "Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
-      ]
+      "text": "An extension manifest may declare a verb vocabulary: an ordered list of verbs, each with a description, aliases, default traits and related commands. The CLI merges the loaded vocabularies in extension-name order. Help, completion, impact-plan and the live view read the result. Its aliases are the only short command names; a same-named workspace alias hides one with a warning, and an alias never takes a verb, command, command group or core root."
     },
     {
       "id": "vocabulary-default-traits",
-      "text": [
-        "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary;",
-        "a job of a verb no vocabulary names takes none.",
-        "Declared traits replace them wholesale.",
-        "The core keeps no side-effect floor: a command's side effects are the traits its loaded jobs declare, which the git requirement, the cache trust floor and the task scope read.",
-        "A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from."
-      ]
+      "text": "After discovery loads every extension, a job whose manifest declares no traits takes the default traits of its verb in the merged vocabulary; a job of a verb no vocabulary names takes none. Declared traits replace them wholesale. The core keeps no side-effect floor: a command's side effects are the traits its loaded jobs declare, which the git requirement, the cache trust floor and the task scope read. A manifest that declares a vocabulary requires CLI contract 9 wherever it loads from."
     },
     {
       "id": "no-core-development-verb",
-      "text": [
-        "The core declares no job command, alias or default trait of build, test, lint, serve, run, format, package, publish, deploy, generate or validate.",
-        "Help, completion and dispatch read the loaded extensions' vocabulary and commands.",
-        "Every entry point refuses once, after extension discovery, a command no loaded extension declares as a job: a usage error saying how to add an extension, or an error naming each extension that did not load.",
-        "A workspace with no development extension shows none."
-      ]
+      "text": "The core declares no job command, alias or default trait of build, test, lint, serve, run, format, package, publish, deploy, generate or validate. Help, completion and dispatch read the loaded extensions' vocabulary and commands. Every entry point refuses once, after extension discovery, a command no loaded extension declares as a job: a usage error saying how to add an extension, or an error naming each extension that did not load. A workspace with no development extension shows none."
     },
     {
       "id": "selection-before-plan",
-      "text": [
-        "Every job run resolves one explicit project selection before planning and applies that selection to every requested command.",
-        "A channel publish sharing the session narrows itself alone: its members come from the channel head, every other command keeps the caller's selection, and the run reports both sets."
-      ]
+      "text": "Every job run resolves one explicit project selection before planning and applies that selection to every requested command. A channel publish sharing the session narrows itself alone: its members come from the channel head, every other command keeps the caller's selection, and the run reports both sets."
     },
     {
       "id": "recursive-activation-project-ownership",
-      "text": [
-        "Within a project's tree, recursive activation-file patterns use the loaded workspace project roots to exclude files owned by nested projects.",
-        "Neither a static prefix starting below a nested project nor the directory walk can source a match from that project.",
-        "Ordinary source subdirectories remain searchable, and a selected child or genuinely multi-language parent activates from its own matching files without requiring an explicit language-extension dependency for config-extract."
-      ]
+      "text": "Within a project's tree, recursive activation-file patterns use the loaded workspace project roots to exclude files owned by nested projects. Neither a static prefix starting below a nested project nor the directory walk can source a match from that project. Ordinary source subdirectories remain searchable, and a selected child or genuinely multi-language parent activates from its own matching files without requiring an explicit language-extension dependency for config-extract."
     },
     {
       "id": "dependency-plan",
-      "text": [
-        "Planning produces a deterministic dependency DAG that keeps functional dependencies apart from write-serialization edges, resolves same-session prerequisites across every contributing provider, and rejects missing selected commands.",
-        "A dependency on one step of a command plans the whole command, reads that step and runs after the command's other leaves.",
-        "A captured runner AFTER contract adds functional dependencies from every protected write to every required gate leaf; missing gates and cycles fail closed."
-      ]
+      "text": "Planning builds a deterministic DAG that keeps functional dependencies apart from write-serialization edges, resolves same-session prerequisites across providers, and rejects missing selected commands. A command~step dependency plans the whole command, reads that step and runs after its other leaves. A ^command dependency runs that command across the dependency closure. A captured runner AFTER contract makes every protected write depend on every required gate leaf; missing gates and cycles fail closed."
     },
     {
       "id": "dependents-wait-for-an-output-they-read",
-      "text": [
-        "A declared output may state readByDependents: the projects that depend on its project read it, such as a generated client they compile.",
-        "The validate command names each output it refuses.",
-        "Every planned job of a direct or transitive dependent runs after the writer over an ordering edge that never reaches a cache key.",
-        "Finalizers and jobs already running before the writer take no edge, so the plan stays a DAG."
-      ]
+      "text": "A declared output may state readByDependents: the projects that depend on its project read it, such as a generated client they compile. The validate command names each output it refuses. Every planned job of a direct or transitive dependent runs after the writer over an ordering edge that never reaches a cache key. Finalizers and jobs already running before the writer take no edge, so the plan stays a DAG."
     },
     {
       "id": "preview-no-effects",
-      "text": [
-        "Plan-only previews do not execute subprocesses, update successful-run markers, or write generated workspace state;",
-        "a command-level dry run executes only when its catalog or extension contract explicitly forwards a dry-run simulation.",
-        "For --plan and plan-only --dry-run, explicit JSON output carries one typed plan envelope and JSONL carries one terminal plan:end record, including an explicit zero-task plan when empty;",
-        "neither shape claims a run, session:end, or persisted session artifact."
-      ]
+      "text": "Plan-only previews do not execute subprocesses, update successful-run markers, or write generated workspace state; a command-level dry run executes only when its catalog or extension contract explicitly forwards a dry-run simulation. For --plan and plan-only --dry-run, explicit JSON output carries one typed plan envelope and JSONL carries one terminal plan:end record, including an explicit zero-task plan when empty; neither shape claims a run, session:end, or persisted session artifact."
     },
     {
       "id": "single-engine",
@@ -177,506 +99,231 @@
     },
     {
       "id": "release-set-channel-advance",
-      "text": [
-        "Resolve all heads once in the declared distribution namespace (workspace name by default).",
-        "Measure impact against the first advanced channel, or, when it has no head, against the named baseline channel, resolved with them and never advanced: republish members whose package execution-key fingerprint (excluding embedded version) changed and their dependents;",
-        "inherit the rest.",
-        "The snapshot is released through distribution/release-set-contract."
-      ]
+      "text": "Resolve all heads once in the declared distribution namespace (workspace name by default). Measure impact against the first advanced channel, or, when it has no head, against the named baseline channel, resolved with them and never advanced: republish members whose package execution-key fingerprint (excluding embedded version) changed and their dependents; inherit the rest. The snapshot is released through distribution/release-set-contract."
     },
     {
       "id": "release-set-reuse-channel",
-      "text": [
-        "A publication may name one reuse channel, resolved last, never advanced or used as baseline.",
-        "A selected member is released from the reuse head's record, rebound to this commit and the run's tree, with no package or publish job, when that record has the run's fingerprint, sorts above the advanced and baseline heads' records, matches the run's version but for the commit suffix, and names the final dependency versions. --all refuses it, a tagged run ignores it;",
-        "a plan that reuses nothing keeps its bytes."
-      ]
+      "text": "A publication may name one reuse channel, resolved last, never advanced or used as baseline. A selected member is released from the reuse head's record, rebound to this commit and the run's tree, with no package or publish job, when that record has the run's fingerprint, sorts above the advanced and baseline heads' records, matches the run's version but for the commit suffix, and names the final dependency versions. --all refuses it, a tagged run ignores it; a plan that reuses nothing keeps its bytes."
     },
     {
       "id": "release-set-reuse-source-revision",
-      "text": [
-        "A publication that names a reuse channel names --reuse-source-revision too: the full commit of that channel's reviewed final head.",
-        "Either flag alone, or a value that is not a full commit, is refused before anything is packaged; a tagged run then ignores both.",
-        "A member is reused only when its reuse-head record has exactly that revision, so a record the channel inherited from an earlier push is built.",
-        "The plan and selection.reuse record the revision."
-      ]
+      "text": "A publication that names a reuse channel names --reuse-source-revision too: the full commit of that channel's reviewed final head. Either flag alone, or a value that is not a full commit, is refused before anything is packaged; a tagged run then ignores both. A member is reused only when its reuse-head record has exactly that revision, so a record the channel inherited from an earlier push is built. The plan and selection.reuse record the revision."
     },
     {
       "id": "release-set-attribution-opt-in",
-      "text": [
-        "A selected member records its source project and artifact kind only when the repository's distribution policy declares memberAttribution;",
-        "by default the plan handed to publishing extensions and the released set carry neither field, so an extension or provider built before the fields existed decodes them strictly without error.",
-        "An unchanged member inherits its head record verbatim either way."
-      ]
+      "text": "A selected member records its source project and artifact kind only when the repository's distribution policy declares memberAttribution; by default the plan handed to publishing extensions and the released set carry neither field, so an extension or provider built before the fields existed decodes them strictly without error. An unchanged member inherits its head record verbatim either way."
     },
     {
       "id": "release-set-source-tree-opt-in",
-      "text": [
-        "With distribution.memberSourceTree declared, a republished member records sourceTree, HEAD's git tree, even when PUTNAMI_SOURCE_REVISION names another commit.",
-        "A dirty checkout, an unreadable tree, or a checkout that moved before the commit records none and never fails the publication.",
-        "By default neither plan nor released set carries the field.",
-        "An unchanged member inherits its head's tree either way."
-      ]
+      "text": "With distribution.memberSourceTree declared, a republished member records sourceTree, HEAD's git tree, even when PUTNAMI_SOURCE_REVISION names another commit. A dirty checkout, an unreadable tree, or a checkout that moved before the commit records none and never fails the publication. By default neither plan nor released set carries the field. An unchanged member inherits its head's tree either way."
     },
     {
       "id": "release-set-members-by-ecosystem",
-      "text": [
-        "Members retain ecosystem/coordinate identity, owning publish/package routes and dependency closure; unselected sibling steps are excluded.",
-        "Mixed runs retain requested verification providers without their unrelated publish jobs, even when no member changes.",
-        "The provider receives selected tuples and frozen route provenance through an invocation-owned private versioned file.",
-        "Inherited members and ambient/repository paths cannot supply same-run evidence."
-      ]
+      "text": "Members retain ecosystem/coordinate identity, owning publish/package routes and dependency closure; unselected sibling steps are excluded. Mixed runs retain requested verification providers without their unrelated publish jobs, even when no member changes. The provider receives selected tuples and frozen route provenance through an invocation-owned private versioned file. Inherited members and ambient/repository paths cannot supply same-run evidence."
     },
     {
       "id": "private-selected-publication-handoff",
-      "text": [
-        "After final executing plan attachment, a runner-private loopback callback receives the canonical selected publication tuple.",
-        "Callback and capability are captured before repository execution, never serialized into jobs.",
-        "Exact digest acknowledgment neither bypasses gates nor returns registry credentials.",
-        "Preview/dry-run do not arm publication.",
-        "An empty-member handoff arms only release-set authority to confirm the head.",
-        "A callback without AFTER is refused at capture with a credential-free diagnostic."
-      ]
+      "text": "After final executing plan attachment, a runner-private loopback callback receives the canonical selected publication tuple. Callback and capability are captured before repository execution, never serialized into jobs. Exact digest acknowledgment neither bypasses gates nor returns registry credentials. Preview/dry-run do not arm publication. An empty-member handoff arms only release-set authority to confirm the head. A callback without AFTER is refused at capture with a credential-free diagnostic."
     },
     {
       "id": "generated-output-drift",
-      "text": [
-        "A declared output with a drift policy is compared with the bytes at its path immediately before the task wrote it, on execution and on a hit.",
-        "A difference is the diagnostic generated-output-drift naming the paths; fail fails the task with its outputs still written, warn keeps its status.",
-        "Under fail, an output with no prior bytes warns, and fails in CI or a hosted run.",
-        "A pathFrom output is judged inside a digest of its project root.",
-        "Neither reference nor verdict reaches a key, an entry or the failure cache."
-      ]
+      "text": "A declared output with a drift policy is compared with the bytes at its path immediately before the task wrote it, on execution and on a hit. A difference is the diagnostic generated-output-drift naming the paths; fail fails the task with its outputs still written, warn keeps its status. Under fail, an output with no prior bytes warns, and fails in CI or a hosted run. A pathFrom output is judged inside a digest of its project root. Neither reference nor verdict reaches a key, an entry or the failure cache."
     },
     {
       "id": "spec-gate-records-an-empty-evaluation",
-      "text": [
-        "A session whose spec gate ran records a verdict with no group and no diagnostic when no selected project states a requirement: every selected project a criteria-projection producer applies to ran one that succeeded and none emitted a projection;",
-        "a project no producer applies to states none.",
-        "When a producer applies but did not run, or it failed, was canceled or was skipped, the session writes no record or one that carries only its collection findings."
-      ]
+      "text": "A session whose spec gate ran records a verdict with no group and no diagnostic when no selected project states a requirement: every selected project a criteria-projection producer applies to ran one that succeeded and none emitted a projection; a project no producer applies to states none. When a producer applies but did not run, or it failed, was canceled or was skipped, the session writes no record or one that carries only its collection findings."
     },
     {
       "id": "spec-gate-evidence-scope",
-      "text": [
-        "A selected project's requirements resolve from observations its transitive dependencies, its DIRECT dependents and the projects whose featureAuthority.owner is one of its features already published: an unplanned attester answers from its report producer's cache entry, provenance contained in the reporting project.",
-        "Other projects stay out of scope.",
-        "A consulted source that did not support a check, or an exhausted scope, still blocks under enforce; a check no reachable source could report is warned."
-      ]
+      "text": "A selected project's requirements resolve from observations its transitive dependencies, its DIRECT dependents and the projects whose featureAuthority.owner is one of its features already published: an unplanned attester answers from its report producer's cache entry, provenance contained in the reporting project. Other projects stay out of scope. A consulted source that did not support a check, or an exhausted scope, still blocks under enforce; a check no reachable source could report is warned."
     },
     {
       "id": "declared-verification-producers",
-      "text": [
-        "A session naming a verification command carries the spec gate, which plans those commands to recover cached reports and the declaring criteria commands to learn applicability.",
-        "A warm hit restores both the verification report and the criteria projection.",
-        "Coverage comes from verification jobs and replays under their command.",
-        "A local or remote hit reports the coverage its producing run measured, with or without its cached events."
-      ]
+      "text": "A session naming a verification command carries the spec gate, which plans those commands to recover cached reports and the declaring criteria commands to learn applicability. A warm hit restores both the verification report and the criteria projection. Coverage comes from verification jobs and replays under their command. A local or remote hit reports the coverage its producing run measured, with or without its cached events."
     },
     {
       "id": "batch-parity-and-live-cells-follow-declared-kinds",
-      "text": [
-        "A batch member tallies by its task's batchable.kind, names its phase from batchable.phase else its step id, and names its command in the meta event as a solo run does.",
-        "The live view values a cell, its Tasks line and its failure cause by the command's kind: diagnostics counts errors and warnings, verification tests and coverage, files produced files;",
-        "criteria or no kind shows status only.",
-        "Columns follow the loaded vocabulary, then name order; width and hide priority follow kind, side effects and workload."
-      ]
+      "text": "A batch member tallies by its task's batchable.kind, names its phase from batchable.phase else its step id, and names its command in the meta event as a solo run does. The live view values a cell, its Tasks line and its failure cause by the command's kind: diagnostics counts errors and warnings, verification tests and coverage, files produced files; criteria or no kind shows status only. Columns follow the loaded vocabulary, then name order; width and hide priority follow kind, side effects and workload."
     },
     {
       "id": "publication-follows-declared-effects",
-      "text": [
-        "A job publishes when its command traits declare the registry side effect, whatever its name, and has external effects when its traits or task declare a registry or cloud effect.",
-        "A job with external effects never reaches a remote cache.",
-        "A run naming a registry command joins the release set and reads the distribution policy; that command alone executes under --dry-run.",
-        "A member's package job is the one command its publisher's publish runs first with injectPublishChannels and the member's package step."
-      ]
+      "text": "A job publishes when its command traits declare the registry side effect, whatever its name, and has external effects when its traits or task declare a registry or cloud effect. A job with external effects never reaches a remote cache. A run naming a registry command joins the release set and reads the distribution policy; that command alone executes under --dry-run. A member's package job is the one command its publisher's publish runs first with injectPublishChannels and the member's package step."
     },
     {
       "id": "publish-run-checks-declared-channels",
-      "text": [
-        "A publishing run fails when a selected project declares a publish channel that no planned job serves.",
-        "A job serves a channel when its task declares it in publishChannels and the job is the project's own or depends on one of its jobs; the command's traits decide nothing.",
-        "The failure names the project and its unserved channels. --<channel>=false opts a declared channel out.",
-        "A project that declares no channel is not checked, and the owner of a release-set member is left to the release-set coordinator."
-      ]
+      "text": "A publishing run fails when a selected project declares a publish channel that no planned job serves. A job serves a channel when its task declares it in publishChannels and the job is the project's own or depends on one of its jobs; the command's traits decide nothing. The failure names the project and its unserved channels. --<channel>=false opts a declared channel out. A project that declares no channel is not checked, and the owner of a release-set member is left to the release-set coordinator."
     },
     {
       "id": "scoped-cache-bypass",
-      "text": [
-        "--no-cache-projects <selector> refuses cache reuse for the named projects' tasks and every planned task that transitively depends on one, while the rest of the run keeps its reuse.",
-        "A bypassed task is never looked up, served, published or failure-replayed, and records no failure; only its success deletes one.",
-        "The selector speaks the --projects grammar, ignores tag and exclude filters, and fails the run when it matches nothing. --no-cache subsumes it.",
-        "Neither reaches a cache key or task params."
-      ]
+      "text": "--no-cache-projects <selector> refuses cache reuse for the named projects' tasks and every planned task that transitively depends on one, while the rest of the run keeps its reuse. A bypassed task is never looked up, served, published or failure-replayed, and records no failure; only its success deletes one. The selector speaks the --projects grammar, ignores tag and exclude filters, and fails the run when it matches nothing. --no-cache subsumes it. Neither reaches a cache key or task params."
     },
     {
       "id": "concurrent-session-output-exclusion",
-      "text": [
-        "No two sessions of a workspace write one task output at once.",
-        "In one global order, a task locks its command-output directory, unless its serve step released it, and any project or workspace with a durable output, from a cache restore or execution through capture;",
-        "a preparation writing the project tree locks it until its subprocess starts.",
-        "A contended task names the holder's session, pid and tasks, then waits for release or cancellation.",
-        "Nested sessions hold their spawner's locks.",
-        "No lock is a cache input."
-      ]
+      "text": "No two sessions of a workspace write one task output at once. In one global order, a task locks its command-output directory, unless its serve step released it, and any project or workspace with a durable output, from a cache restore or execution through capture; a preparation writing the project tree locks it until its subprocess starts. A contended task names the holder's session, pid and tasks, then waits for release or cancellation. Nested sessions hold their spawner's locks. No lock is a cache input."
     },
     {
       "id": "concurrent-session-read-exclusion",
-      "text": [
-        "An executing task that reads a resource it does not write shares the lock its writers hold: its project's, or the workspace's for a workspace-scoped resource, from its preparation through its capture.",
-        "The sources resource takes none, and a restore reads nothing.",
-        "Readers in several sessions hold the lock together, a writer in another session waits for all of them, and a reader waits for that writer.",
-        "A wait behind readers prints one line saying another putnami process is reading, naming no holder."
-      ]
+      "text": "An executing task that reads a resource it does not write shares the lock its writers hold: its project's, or the workspace's for a workspace-scoped resource, from its preparation through its capture. The sources resource takes none, and a restore reads nothing. Readers in several sessions hold the lock together, a writer in another session waits for all of them, and a reader waits for that writer. A wait behind readers prints one line saying another putnami process is reading, naming no holder."
     },
     {
       "id": "a-serve-step-releases-its-command-output-once-it-started",
-      "text": [
-        "A serve-workload step, the terminal uncacheable step of a serve pipeline, whose task declares no command-output output releases its command-output lock once its process started, through its retries and capture, and keeps every other lock until capture.",
-        "Another session, such as a dependent's serve run, then runs that project's finite serve steps beside it.",
-        "A finite step, and a serve step whose task declares a command-output output, keep the lock until capture.",
-        "The process never sees the released lock held."
-      ]
+      "text": "A serve-workload step, the terminal uncacheable step of a serve pipeline, whose task declares no command-output output releases its command-output lock once its process started, through its retries and capture, and keeps every other lock until capture. Another session, such as a dependent's serve run, then runs that project's finite serve steps beside it. A finite step, and a serve step whose task declares a command-output output, keep the lock until capture. The process never sees the released lock held."
     },
     {
       "id": "scratch-generation-retention",
-      "text": [
-        "Workspace scratch has a 30-day generation lifetime.",
-        "The next idle execution, install hook, or workspace cache gc reclaims the expired generation independently of extension names or project inventory.",
-        "Shared leases protect runs and subprocesses; nested consumers never wait for exclusive ownership.",
-        "An active lease is the only silent skip; others warn.",
-        "Reaping requires cross-process locks, never follows symlinks, and retries failed deletion without extending retention.",
-        "This is retention, not a byte quota."
-      ]
+      "text": "Workspace scratch has a 30-day generation lifetime. The next idle execution, install hook, or workspace cache gc reclaims the expired generation independently of extension names or project inventory. Shared leases protect runs and subprocesses; nested consumers never wait for exclusive ownership. An active lease is the only silent skip; others warn. Reaping requires cross-process locks, never follows symlinks, and retries failed deletion without extending retention. This is retention, not a byte quota."
     },
     {
       "id": "failure-replay-cache",
-      "text": [
-        "A failed task is recorded locally at the key its success would use;",
-        "a later run with unchanged inputs replays it without running, with its status, exit code, diagnostics and logs plus age and attempts.",
-        "Canceled, skipped, bailed-out, leak and host-unsupported results are never recorded, nor is a timeout the CLI or an extension reports; one run counts one observation per key.",
-        "A success at that key deletes the record under any selection or bypass, --retry-failed re-executes, and no record is shared remotely."
-      ]
+      "text": "A failed task is recorded locally at the key its success would use; a later run with unchanged inputs replays it without running, with its status, exit code, diagnostics and logs plus age and attempts. Canceled, skipped, bailed-out, leak and host-unsupported results are never recorded, nor is a timeout the CLI or an extension reports; one run counts one observation per key. A success at that key deletes the record under any selection or bypass, --retry-failed re-executes, and no record is shared remotely."
     },
     {
       "id": "extension-implementation-cache-key",
-      "text": [
-        "Every task key names the implementation of the extension that runs it: a workspace-local prepared runtime by its digest, an installed extension by the content digest of its tree without the version a build stamps in its manifests, any other extension by its version.",
-        "A key with a digest omits the version, so version-only builds share entries; any other tree change or a toolchain pin moves the key.",
-        "A digest recorded beside an artifact-store entry is trusted only inside the store, under the current schema."
-      ]
+      "text": "Every task key names the implementation of the extension that runs it: a workspace-local prepared runtime by its digest, an installed extension by the content digest of its tree without the version a build stamps in its manifests, any other extension by its version. A key with a digest omits the version, so version-only builds share entries; any other tree change or a toolchain pin moves the key. A digest recorded beside an artifact-store entry is trusted only inside the store, under the current schema."
     },
     {
       "id": "go-embed-cache-inputs",
-      "text": [
-        "A task input that names an input selector keys the exact bytes of every file the extension that lists the selector answers through __putnami input-resolve, so a listed file edit moves the key and its dependents' keys and an older entry cannot restore.",
-        "A failed call, a rejected or error answer or an unlisted selector fails the task before restore or execution; portable admission fails on a deleted listed file.",
-        "Change impact reads listed files and basis paths only where the command may be planned."
-      ]
+      "text": "A task input that names an input selector keys the exact bytes of every file the extension that lists the selector answers through __putnami input-resolve, so a listed file edit moves the key and its dependents' keys and an older entry cannot restore. A failed call, a rejected or error answer or an unlisted selector fails the task before restore or execution; portable admission fails on a deleted listed file. Change impact reads listed files and basis paths only where the command may be planned."
     },
     {
       "id": "clientgen-key-reads-no-run-written-tree",
-      "text": [
-        "The clientgen-go and clientgen-ts keys ignore the .gen/schema and .gen/clientgen files the Go build-describe or the TypeScript build-generate writes during the run, and fold those producers' keys instead;",
-        "build-describe empties both trees before it executes and on an empty restore.",
-        "An edit to clientgen.json, schema/openapi.json or a .gen/clientgen/config.json Git tracks moves the keys.",
-        "When describe writes both trees, each clientgen job starts with the key the run computed before any job started."
-      ]
+      "text": "The client-generate-module key reads no file under .gen, which a build of the run writes: generation reads the committed clientgen.json and schema/openapi.json, and an edit to either moves the key. When a build writes .gen/schema and .gen/clientgen, the generation job starts with the key the run computed before any job started."
     },
     {
       "id": "result-only-remote-restore",
-      "text": [
-        "With a provider that echoes restore-result-only, a remote hit whose files no job of the run reads, in minimal mode or in toplevel mode outside the selected projects, moves no blob: it reports its cached status, writes nothing, and records a local result-only entry.",
-        "A task keeps its files when a planned job depends on it, or waits on it and reads a file it writes, or it declares readByDependents, shares the waiter's execution or is unplanned.",
-        "A run that reads the files restores the full entry or executes."
-      ]
+      "text": "With a provider that echoes restore-result-only, a remote hit whose files no job of the run reads, in minimal mode or in toplevel mode outside the selected projects, moves no blob: it reports its cached status, writes nothing, and records a local result-only entry. A task keeps its files when a planned job depends on it, or waits on it and reads a file it writes, or it declares readByDependents, shares the waiter's execution or is unplanned. A run that reads the files restores the full entry or executes."
     },
     {
       "id": "tree-keyed-task-cache",
-      "text": [
-        "Two runs on one tree, at one base version of its release line, compute the same task cache key, whatever the commit, the branch or the checkout directory.",
-        "A file pattern reads the build stamp without its build-time, commit and publication fields.",
-        "A generate asset under the workspace root contributes its workspace-relative path and content; a stamp inside it keeps all but its build time.",
-        "Otherwise, the commit reaches a key only through the publish version of a task with cache.versionAware or version-var."
-      ]
+      "text": "Two runs on one tree, at one base version of its release line, compute the same task cache key, whatever the commit, the branch or the checkout directory. A file pattern reads the build stamp without its build-time, commit and publication fields. A generate asset under the workspace root contributes its workspace-relative path and content; a stamp inside it keeps all but its build time. Otherwise, the commit reaches a key only through the publish version of a task with cache.versionAware or version-var."
     },
     {
       "id": "a-verdict-policy-is-no-build-input",
-      "text": [
-        "A putnami.verdict-policy.json file is no task input unless a pattern names it in its last segment.",
-        "A pattern by type or by directory, git:**, the empty pattern set, a generate asset directory and an extension runtime input leave it out of the key, so adding, editing or removing one moves no key and selects no task but those of a naming pattern.",
-        "The workspace protocol states the CI protocol's file name."
-      ]
+      "text": "A putnami.verdict-policy.json file is no task input unless a pattern names it in its last segment. A pattern by type or by directory, git:**, the empty pattern set, a generate asset directory and an extension runtime input leave it out of the key, so adding, editing or removing one moves no key and selects no task but those of a naming pattern. The workspace protocol states the CI protocol's file name."
     },
     {
       "id": "release-baseline-cache-key",
-      "text": [
-        "A task that declares the releaseBaseline runtime input keys on its project's release baseline: the repository state, the line's tag pattern, the tag of its last release, the tree that tag holds at the project, and whether a commit since that tag that touches the project declares a breaking change.",
-        "The key names no commit: a branch and its squash merge share it if they declare one break.",
-        "A new tag, other content at the tag, a shallow clone and a changed breaking marker, even in a squash title, move it."
-      ]
+      "text": "A task that declares the releaseBaseline runtime input keys on its project's release baseline: the repository state, the line's tag pattern, the tag of its last release, the tree that tag holds at the project, and whether a commit since that tag that touches the project declares a breaking change. The key names no commit: a branch and its squash merge share it if they declare one break. A new tag, other content at the tag, a shallow clone and a changed breaking marker, even in a squash title, move it."
     },
     {
       "id": "executed-directory-output-starts-empty",
-      "text": [
-        "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or declares emptied, keeping ceded and preserved subpaths and the build stamp.",
-        "A hit whose entry records such an output empty empties it too, or executes the task when it cannot.",
-        "Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task.",
-        "Other outputs are not emptied.",
-        "A key marker keeps entries stored without emptying from being served."
-      ]
+      "text": "Before a task executes, the engine empties each literal-path directory output that is required, under the command-output root, or declares emptied, keeping ceded and preserved subpaths and the build stamp. A hit whose entry records such an output empty empties it too, or executes the task when it cannot. Other hits and adopted results empty nothing; a retry empties again; a failure to empty fails the task. Other outputs are not emptied. A key marker keeps entries stored without emptying from being served."
     },
     {
       "id": "emptied-output-keeps-tracked-files",
-      "text": [
-        "An output that declares emptied and holds a file the Git index tracks outside its kept subpaths is never emptied: its execution fails before the subprocess starts, naming the output, its path, the file and the Git command that takes it out (git rm --cached when the file is gone from the worktree), and a hit whose restore would empty it is not served.",
-        "Outside a Git work tree it is emptied as before; a work tree with no git program to read its index fails the task, naming the missing program."
-      ]
+      "text": "An output that declares emptied and holds a file the Git index tracks outside its kept subpaths is never emptied: its execution fails before the subprocess starts, naming the output, its path, the file and the Git command that takes it out (git rm --cached when the file is gone from the worktree), and a hit whose restore would empty it is not served. Outside a Git work tree it is emptied as before; a work tree with no git program to read its index fails the task, naming the missing program."
     },
     {
       "id": "session-written-input-keys",
-      "text": [
-        "A task is looked up, stored and shared at the key of the bytes it reads when it starts: a declared output an earlier task of the session wrote, by executing, whatever its verdict, or by restoring its entry, moves that key.",
-        "A key computed before any task runs is never used for a task whose inputs another planned task may write.",
-        "A resource pruned on such a consumer key is confirmed from the consumer's key when its producer starts, and provisioned when a write that can move that key may finish later."
-      ]
+      "text": "A task is looked up, stored and shared at the key of the bytes it reads when it starts: a declared output an earlier task of the session wrote, by executing, whatever its verdict, or by restoring its entry, moves that key. A key computed before any task runs is never used for a task whose inputs another planned task may write. A resource pruned on such a consumer key is confirmed from the consumer's key when its producer starts, and provisioned when a write that can move that key may finish later."
     },
     {
       "id": "planned-write-reach",
-      "text": [
-        "Before any task runs, a planned write moves a key only when it can reach a file the key selects: not when the key's exclusions cover the written tree, its patterns do not match the written file, or, for an input selector, the write reaches neither a file the answer lists nor a path its basis selects, and no other planned write reaches that basis.",
-        "A path a task reports is written anywhere under its declared within bound, or its whole root without one.",
-        "A write the key may read under another name reaches it."
-      ]
+      "text": "Before any task runs, a planned write moves a key only when it can reach a file the key selects: not when the key's exclusions cover the written tree, its patterns do not match the written file, or, for an input selector, the write reaches neither a file the answer lists nor a path its basis selects, and no other planned write reaches that basis. A path a task reports is written anywhere under its declared within bound, or its whole root without one. A write the key may read under another name reaches it."
     },
     {
       "id": "job-context-names-member-types",
-      "text": [
-        "Every job context the core writes lists the complete workspace membership in workspaceProjects.",
-        "Each entry names the project's resolved type: the one its putnami.json authors, else its provider's, else application;",
-        "an entry without a type comes from a CLI that predates the member.",
-        "Each entry names its resolved runsWith: the list its putnami.json authors, else its provider's;",
-        "an entry without runsWith runs with nothing. selectedProjects and dependencyClosure carry neither."
-      ]
+      "text": "Every job context the core writes lists the complete workspace membership in workspaceProjects. Each entry names the project's resolved type: the one its putnami.json authors, else its provider's, else application; an entry without a type comes from a CLI that predates the member. Each entry names its resolved runsWith: the list its putnami.json authors, else its provider's; an entry without runsWith runs with nothing. selectedProjects and dependencyClosure carry neither."
     },
     {
       "id": "extension-command-host-rpc",
-      "text": [
-        "An interactive extension subcommand launch opens one host RPC channel: a fresh Unix socket in a directory only the user can open, named by PUTNAMI_HOST_RPC, with 32 random bytes hex-encoded in PUTNAMI_HOST_RPC_TOKEN.",
-        "The channel closes and its directory is removed when the process exits, whatever its exit.",
-        "A planned job, a provider call and a hosted run receive neither variable, and a process drops the pair it inherited."
-      ]
+      "text": "An interactive extension subcommand launch opens one host RPC channel: a fresh Unix socket in a directory only the user can open, named by PUTNAMI_HOST_RPC, with 32 random bytes hex-encoded in PUTNAMI_HOST_RPC_TOKEN. The channel closes and its directory is removed when the process exits, whatever its exit. A planned job, a provider call and a hosted run receive neither variable, and a process drops the pair it inherited."
     },
     {
       "id": "host-rpc-core-calls",
-      "text": [
-        "The channel speaks JSON-RPC 2.0, one request per line of at most 32 MiB; a larger frame is refused.",
-        "A request without the launch token is refused, compared in constant time, and its connection closed.",
-        "An unknown method is method-not-found.",
-        "Calls run one at a time, and stopping the channel cancels the call in flight. host.hello returns the protocol version and methods, collaboration.call the envelope putnami <contract> <operation> --output=json prints, and verification.report what the cache corroborates."
-      ]
+      "text": "The channel speaks JSON-RPC 2.0, one request per line of at most 32 MiB; a larger frame is refused. A request without the launch token is refused, compared in constant time, and its connection closed. An unknown method is method-not-found. Calls run one at a time, and stopping the channel cancels the call in flight. host.hello returns the protocol version and methods, collaboration.call the envelope putnami <contract> <operation> --output=json prints, and verification.report what the cache corroborates."
     },
     {
       "id": "host-rpc-workspace-owners",
-      "text": [
-        "workspace.owners takes workspace-relative paths in io/fs form and answers one entry per path, in request order.",
-        "A path's owners are the projects impact analysis treats as owners: its nearest project, every project that claims it as an asset, and, for a workspace-root file, every project whose provider watches it.",
-        "They are sorted by ID; none gives an empty list.",
-        "An empty list of paths, or a path outside io/fs form, is invalid params.",
-        "Outside a workspace the method is unavailable."
-      ]
+      "text": "workspace.owners takes workspace-relative paths in io/fs form and answers one entry per path, in request order. A path's owners are the projects impact analysis treats as owners: its nearest project, every project that claims it as an asset, and, for a workspace-root file, every project whose provider watches it. They are sorted by ID; none gives an empty list. An empty list of paths, or a path outside io/fs form, is invalid params. Outside a workspace the method is unavailable."
     },
     {
       "id": "host-rpc-version-lines",
-      "text": [
-        "version.lines answers the bound source revision and, for each version line or the one its scope names, the line's version at HEAD, whether HEAD carries the line's tag, the line's next release and the commits since the last release.",
-        "After a failed graph refresh it names the recorded graph it used.",
-        "A scope naming no line is invalid params, an invalid catalog or source revision is an invalid configuration, outside a workspace it is unavailable, and a git failure is a host error."
-      ]
+      "text": "version.lines answers the bound source revision and, for each version line or the one its scope names, the line's version at HEAD, whether HEAD carries the line's tag, the line's next release and the commits since the last release. After a failed graph refresh it names the recorded graph it used. A scope naming no line is invalid params, an invalid catalog or source revision is an invalid configuration, outside a workspace it is unavailable, and a git failure is a host error."
     },
     {
       "id": "host-rpc-workspace-probe",
-      "text": [
-        "workspace.probe answers a root and the projects and edges the workspace probes declare under it, merged as the workspace view merges them, sorted by path.",
-        "In a workspace it answers the workspace's synchronized view.",
-        "Outside one it runs the probes of the user scope's extensions on the caller's directory and writes nothing there.",
-        "A failed or invalid probe answer, and a merge conflict, are error diagnostics of the answer, never a refused call."
-      ]
+      "text": "workspace.probe answers a root and the projects and edges the workspace probes declare under it, merged as the workspace view merges them, sorted by path. In a workspace it answers the workspace's synchronized view. Outside one it runs the probes of the user scope's extensions on the caller's directory and writes nothing there. A failed or invalid probe answer, and a merge conflict, are error diagnostics of the answer, never a refused call."
     },
     {
       "id": "source-bound-cache",
-      "text": [
-        "A task that declares cache.sourceBound stores and looks up its entry, locally and remotely, at a key derived from its cache key and its project's source binding: the stamped binding when storing, the current one when looking up, the empty one in an unmanaged workspace.",
-        "A binding the CLI cannot compute inside a repository gives no hit and no store.",
-        "Dependents fold the unchanged cache key, so a test-only edit keeps every key.",
-        "A source-bound failure is never replayed, and its entry prunes no producer."
-      ]
+      "text": "A task that declares cache.sourceBound stores and looks up its entry, locally and remotely, at a key derived from its cache key and its project's source binding: the stamped binding when storing, the current one when looking up, the empty one in an unmanaged workspace. A binding the CLI cannot compute inside a repository gives no hit and no store. Dependents fold the unchanged cache key, so a test-only edit keeps every key. A source-bound failure is never replayed, and its entry prunes no producer."
     },
     {
       "id": "source-bound-settle",
-      "text": [
-        "A successful execution of a source-bound task that moves its own project's binding executes once more at the binding it left, with or without the cache, so its outputs, its entry and the tree it leaves name one binding.",
-        "A task settles at most once per run."
-      ]
+      "text": "A successful execution of a source-bound task that moves its own project's binding executes once more at the binding it left, with or without the cache, so its outputs, its entry and the tree it leaves name one binding. A task settles at most once per run."
     },
     {
       "id": "command-kinds-and-traits",
-      "text": [
-        "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set;",
-        "a batchable task may declare the kind and phase of its shared invocation.",
-        "The validate command names each field outside a vocabulary.",
-        "Discovery skips a manifest stamped below the contract these need, with the reason."
-      ]
+      "text": "A command's traits may declare its kind (verification, criteria, diagnostics or files), its workload (serve or once), that it rewrites sources, and that it consumes the release set; a batchable task may declare the kind and phase of its shared invocation. The validate command names each field outside a vocabulary. Discovery skips a manifest stamped below the contract these need, with the reason."
     },
     {
       "id": "publish-tasks-declare-their-channels",
-      "text": [
-        "A task's v3 declaration may list publishChannels, the publish channels the task publishes, in the grammar of a project's publish list.",
-        "The validate command names each task with an invalid list.",
-        "Discovery skips a manifest stamped below the contract the list needs, with the reason, and a planned job exposes its task's channels."
-      ]
+      "text": "A task's v3 declaration may list publishChannels, the publish channels the task publishes, in the grammar of a project's publish list. The validate command names each task with an invalid list. Discovery skips a manifest stamped below the contract the list needs, with the reason, and a planned job exposes its task's channels."
     },
     {
       "id": "an-extension-manifest-names-its-extension",
-      "text": [
-        "An extension manifest names its extension.",
-        "Strict validation and putnami extensions validate refuse a manifest without a name; the loader still loads an installed manifest without one, under its reference.",
-        "Discovery names an extension from its manifest, else the name in its putnami.json, else its reference, takes its version from the manifest alone, and reads no package.json."
-      ]
+      "text": "An extension manifest names its extension. Strict validation and putnami extensions validate refuse a manifest without a name; the loader still loads an installed manifest without one, under its reference. Discovery names an extension from its manifest, else the name in its putnami.json, else its reference, takes its version from the manifest alone, and reads no package.json."
     },
     {
       "id": "extension-flags-reach-their-command",
-      "text": [
-        "extensions validate refuses a manifest flag the core parses as a global flag, by name, short alias or boolean --no- negation, where its command never receives it, naming the field and the global.",
-        "All commands get --max-parallel and --no-cache.",
-        "A declaring subcommand or publisher gets --dry-run; other planned ones get a plan preview.",
-        "A serve workload, or a command with no workload trait, gets --watch; interactive, only if watch defaults true.",
-        "Interactive subcommands get --projects, --all and --baseline."
-      ]
+      "text": "extensions validate refuses a manifest flag the core parses as a global flag, by name, short alias or boolean --no- negation, where its command never receives it, naming the field and the global. All commands get --max-parallel and --no-cache. A declaring subcommand or publisher gets --dry-run; other planned ones get a plan preview. A serve workload, or a command with no workload trait, gets --watch; interactive, only if watch defaults true. Interactive subcommands get --projects, --all and --baseline."
     },
     {
       "id": "a-short-alias-reaches-the-task-under-its-long-name",
-      "text": [
-        "A flag spelled by the short alias a selected task or the extension subcommand declares reaches the params, the task inputs that read params, the cache key and the run marker under the flag's long name, so -t x and --test x run with the same key.",
-        "A spelling no selected task declares as a short alias keeps its name.",
-        "Spelling one flag both ways in one invocation is a usage error naming both spellings, and runs nothing."
-      ]
+      "text": "A flag spelled by the short alias a selected task or the extension subcommand declares reaches the params, the task inputs that read params, the cache key and the run marker under the flag's long name, so -t x and --test x run with the same key. A spelling no selected task declares as a short alias keeps its name. Spelling one flag both ways in one invocation is a usage error naming both spellings, and runs nothing."
     },
     {
       "id": "an-interactive-subcommand-refuses-a-preview-it-cannot-honor",
-      "text": [
-        "An interactive extension subcommand has no plan to preview.",
-        "It refuses --plan, and refuses --dry-run unless its resolved flags declare dry-run, in a workspace and outside one;",
-        "each refusal exits 2, names the flag and the subcommand, and runs nothing.",
-        "A declaring subcommand runs and receives dry-run: true."
-      ]
+      "text": "An interactive extension subcommand has no plan to preview. It refuses --plan, and refuses --dry-run unless its resolved flags declare dry-run, in a workspace and outside one; each refusal exits 2, names the flag and the subcommand, and runs nothing. A declaring subcommand runs and receives dry-run: true."
     },
     {
       "id": "source-bound-stamp",
-      "text": [
-        "A source-bound task rewrites its project's binding stamp whole, so a reader sees the earlier stamp or the new one.",
-        "The source-bound tasks of one project take turns from the stamp rewrite to the capture of their entry, within a session and across sessions.",
-        "A restore of paths the binding excludes keeps the project's computed binding."
-      ]
+      "text": "A source-bound task rewrites its project's binding stamp whole, so a reader sees the earlier stamp or the new one. The source-bound tasks of one project take turns from the stamp rewrite to the capture of their entry, within a session and across sessions. A restore of paths the binding excludes keeps the project's computed binding."
     },
     {
       "id": "workload-lifecycle",
-      "text": [
-        "A command whose traits declare the serve workload streams until interrupted: it, or a group invocation running it, is promoted to watch unless its own --no-watch is set;",
-        "a hosted run refuses it;",
-        "a serve run, as a composition member's, streams only each selected project's terminal uncacheable step;",
-        "no portable run carries it.",
-        "The once workload streams once and forwards its exit code.",
-        "A command declaring rewritesSources is never portable.",
-        "Neither behavior follows a command's name."
-      ]
+      "text": "A command whose traits declare the serve workload streams until interrupted: it, or a group invocation running it, is promoted to watch unless its own --no-watch is set; a hosted run refuses it; a serve run, as a composition member's, streams only each selected project's terminal uncacheable step; no portable run carries it. The once workload streams once and forwards its exit code. A command declaring rewritesSources is never portable. Neither behavior follows a command's name."
     },
     {
       "id": "an-interactive-launch-names-the-directory-it-was-typed-in",
-      "text": [
-        "An interactive extension subcommand launch carries the absolute directory it was typed in as the job context's invocationDir and PUTNAMI_INVOCATION_DIR, and the typed output globals as params: verbose (--verbose, --debug), quiet, and color (false for --no-color, true for --color).",
-        "The task keeps its working directory; userScope and PUTNAMI_CALLER_DIR stay absent in a workspace; outside one, the directory is the caller's.",
-        "A planned job carries none, so no cache key reads them; an inherited value is dropped."
-      ]
+      "text": "An interactive extension subcommand launch carries the absolute directory it was typed in as the job context's invocationDir and PUTNAMI_INVOCATION_DIR, and the typed output globals as params: verbose (--verbose, --debug), quiet, and color (false for --no-color, true for --color). The task keeps its working directory; userScope and PUTNAMI_CALLER_DIR stay absent in a workspace; outside one, the directory is the caller's. A planned job carries none, so no cache key reads them; an inherited value is dropped."
     },
     {
       "id": "a-group-default-takes-positionals",
-      "text": [
-        "When a command group's default subcommand declares positionals, `putnami <group> <word>` runs it for a word naming no subcommand of the group, with the word as its first argument.",
-        "A declared subcommand wins, so a project named like one needs its id; a default without positionals refuses an unknown word.",
-        "Help shows each positional in its usage line; completion offers project IDs after the group word for a first positional named project.",
-        "Discovery skips such a manifest stamped too low, with the reason."
-      ]
+      "text": "When a command group's default subcommand declares positionals, `putnami <group> <word>` runs it for a word naming no subcommand of the group, with the word as its first argument. A declared subcommand wins, so a project named like one needs its id; a default without positionals refuses an unknown word. Help shows each positional in its usage line; completion offers project IDs after the group word for a first positional named project. Discovery skips such a manifest stamped too low, with the reason."
     },
     {
       "id": "a-flag-takes-its-ci-default-when-ci-is-set",
-      "text": [
-        "A manifest flag may declare a ciDefault, which replaces its default when the CI environment variable is set.",
-        "Workspace options, project options and an explicit flag still win over it, and help shows both defaults.",
-        "A flag with a ciDefault keys only the tasks that declare it as an input, so a CI run and a local run of any other task of the command share one cache entry."
-      ]
+      "text": "A manifest flag may declare a ciDefault, which replaces its default when the CI environment variable is set. Workspace options, project options and an explicit flag still win over it, and help shows both defaults. A flag with a ciDefault keys only the tasks that declare it as an input, so a CI run and a local run of any other task of the command share one cache entry."
     },
     {
       "id": "a-step-reads-the-changed-files",
-      "text": [
-        "A step can gate on the run's changed files (activation.changedFiles) and bind them (from: context, path selection.changedFiles).",
-        "It is planned only for a project whose own directory holds a matching changed file, and binds the files its gate selects, project-relative and sorted, into its parameters and cache key;",
-        "other steps' keys ignore the change.",
-        "A run without a diff plans it nowhere; a portable request plans from the submitter's paths.",
-        "A finalizer waits for planned consumers.",
-        "It needs CLI contract 16."
-      ]
+      "text": "A step can gate on the run's changed files (activation.changedFiles) and bind them (from: context, path selection.changedFiles). It is planned only for a project whose own directory holds a matching changed file, and binds the files its gate selects, project-relative and sorted, into its parameters and cache key; other steps' keys ignore the change. A run without a diff plans it nowhere; a portable request plans from the submitter's paths. A finalizer waits for planned consumers. It needs CLI contract 16."
     },
     {
       "id": "an-interactive-command-stops-on-its-own-terms",
-      "text": [
-        "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit, then kills it;",
-        "the CLI's shutdown bound covers that budget from before the child starts.",
-        "A second signal kills the child at once, or as soon as it started.",
-        "A child that exits by itself after the signal keeps its exit code, 0 included; the run exits 130 only when the child died by the signal or the CLI killed it."
-      ]
+      "text": "After a terminal signal cancels an interactive extension subcommand, the CLI waits up to 90 seconds for the child, which shares the terminal, to exit, then kills it; the CLI's shutdown bound covers that budget from before the child starts. A second signal kills the child at once, or as soon as it started. A child that exits by itself after the signal keeps its exit code, 0 included; the run exits 130 only when the child died by the signal or the CLI killed it."
     },
     {
       "id": "project-setup-runs-in-the-project-extension",
-      "text": [
-        "projects create runs the project-setup job of the extension of the project it rendered, for it only, with params path and, in an init on a channel, putnami-channel;",
-        "an extension that declares none needs none.",
-        "When a toolchain the job requires does not resolve as it does for the job, create runs the job with stage prepare, pins what the lock misses, installs a newly pinned toolchain the extension locks, then runs the job once.",
-        "A failed job keeps the project and names the create to rerun with --force."
-      ]
+      "text": "projects create runs the project-setup job of the extension of the project it rendered, for it only, with params path and, in an init on a channel, putnami-channel; an extension that declares none needs none. When a toolchain the job requires does not resolve as it does for the job, create runs the job with stage prepare, pins what the lock misses, installs a newly pinned toolchain the extension locks, then runs the job once. A failed job keeps the project and names the create to rerun with --force."
     },
     {
       "id": "deps-add-refuses-the-version-none",
-      "text": [
-        "putnami deps add refuses a module spec at the version none before any job runs, with a usage error that names the deps remove command for those modules and the --projects selector the command was given.",
-        "A spec splits at its last @ that is not its first character, so @scope/pkg@none is refused as @scope/pkg, and @scope/pkg alone is not."
-      ]
+      "text": "putnami deps add refuses a module spec at the version none before any job runs, with a usage error that names the deps remove command for those modules and the --projects selector the command was given. A spec splits at its last @ that is not its first character, so @scope/pkg@none is refused as @scope/pkg, and @scope/pkg alone is not."
     },
     {
       "id": "deps-edit-runs-in-the-project-extension",
-      "text": [
-        "deps add and deps remove run the deps-edit job of the selected project's extension for that project only, with the params action, edits (one {project, path, modules} entry) and, under --dry-run, dry-run true;",
-        "the CLI prints a summary the job marks always visible. deps prune hands it each manifest finding with the target directories.",
-        "The extension is the first by name the project lists that declares the job.",
-        "A project whose extensions declare none is refused, naming them.",
-        "A failed job fails the command."
-      ]
+      "text": "deps add and deps remove run the deps-edit job of the selected project's extension for that project only, with the params action, edits (one {project, path, modules} entry) and, under --dry-run, dry-run true; the CLI prints a summary the job marks always visible. deps prune hands it each manifest finding with the target directories. The extension is the first by name the project lists that declares the job. A project whose extensions declare none is refused, naming them. A failed job fails the command."
     },
     {
       "id": "the-cache-provider-owns-its-configuration",
-      "text": [
-        "The core reads no remote cache configuration: no .putnami/cache.json and no PUTNAMI_CACHE_URL or PUTNAMI_CACHE_MODE.",
-        "When an extension declares the cache provider and the trust is not none, the run uses that provider, which resolves its configuration.",
-        "A provider that is not ready stops, and the run builds locally with no notice.",
-        "A run starts at most one provider."
-      ]
+      "text": "The core reads no remote cache configuration: no .putnami/cache.json and no PUTNAMI_CACHE_URL or PUTNAMI_CACHE_MODE. When an extension declares the cache provider and the trust is not none, the run uses that provider, which resolves its configuration. A provider that is not ready stops, and the run builds locally with no notice. A run starts at most one provider."
     },
     {
       "id": "a-declared-provider-that-cannot-serve-says-so-once",
-      "text": [
-        "When an extension declares the cache provider and the provider cannot serve the run, the run builds locally and says so once on stderr with the cause: a hosted run removed the provider from a path extension, the provider fails to start, or its initialize handshake fails.",
-        "An extension skipped for another reason adds no notice."
-      ]
+      "text": "When an extension declares the cache provider and the provider cannot serve the run, the run builds locally and says so once on stderr with the cause: a hosted run removed the provider from a path extension, the provider fails to start, or its initialize handshake fails. An extension skipped for another reason adds no notice."
     }
   ],
   "decisions": [

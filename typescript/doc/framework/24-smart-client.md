@@ -8,9 +8,9 @@ binding and calls typed methods.
 The happy path has four steps, and none of them is transport code:
 
 ```
-declare the provider  →  generate  →  register the binding  →  call
-   endpoint(), api()     putnami       register<Service>Client
-   clientGenerator()     clientgen     (or DI injection)        items.getItems(input)
+declare the provider  →  generate          →  register the binding  →  call
+   endpoint(), api()     generatedFrom        register<Service>Client
+   clientGenerator()     client-generate      (or DI injection)        items.getItems(input)
 ```
 
 `typescript/samples/10-service-to-service` runs all four end to end.
@@ -137,32 +137,45 @@ without a contract publishes them. `external` stands alone: blank, beside
 another client option, or declared without `api({ client })`, it fails before
 the route is bound and again at OpenAPI generation.
 
-Finally, declare the targets to emit. The generator is a build-time concern, so
-it comes from the `@putnami/client/generator` subpath — the package root exports
-the runtime only:
+Finally, declare that the API is a client contract. The generator is a
+build-time concern, so it comes from the `@putnami/client/generator` subpath —
+the package root exports the runtime only:
 
 ```typescript
 import { clientGenerator } from '@putnami/client/generator';
 
-.use(
-  clientGenerator({
-    packageName: '@example/items-client',
-    targets: ['ts', 'go'],
-    go: { modulePath: 'go.putnami.dev/examples/ts-items-client', packageName: 'itemsclient' },
-  }),
-)
+.use(clientGenerator())
 ```
+
+`clientGenerator()` names no client: no target, output or package. It records
+each operation's `producer`, the project and feature that own it, in the
+contract. The provider commits that contract as `schema/openapi.json`.
 
 ## 2. Generate
 
+A client is a project of its own. Its `putnami.json` names the provider's
+service in `generatedFrom`, and its `package.json` name is the package
+consumers import:
+
+```json
+{
+  "name": "@example/items-client",
+  "generatedFrom": { "service": "catalog.items", "language": "ts" }
+}
+```
+
+`putnami client-generate` writes the client's `src` tree from the provider's
+committed `schema/openapi.json`. `putnami build`, `test`, `lint`, `serve` and
+`package` run it first, so building the consumer generates the client:
+
 ```bash
-putnami clientgen --projects items-provider
+putnami build --projects items-consumer
 ```
 
 Generation is strict for a provider-owned contract: a semantic the shared client
 IR cannot carry fails with the operation named and a remedy, rather than
-emitting a client that silently loses it. The workspace commands, the drift
-guard and the full diagnostic list are in
+emitting a client that silently loses it. The workspace commands, the guard
+and the full diagnostic list are in
 [Generated clients](/docs/tooling-&-workspace/generated-clients).
 
 ## 3. Register the binding
@@ -287,29 +300,33 @@ These are contract decisions, and they do not change with a later release:
 
 ## Cross-language clients (TS ↔ Go)
 
-One provider generates clients in both languages from one contract. Set
-`targets` to include both, as above. How emission is split:
+One provider has clients in both languages from one contract. Each client is
+its own project that names the provider in `generatedFrom`; only the
+`language` and the Go options differ:
 
-- The **same-language** client is emitted in-app during `putnami build` (the
-  TypeScript client for a TypeScript provider; a Go provider emits its Go client
-  the same way through `api.Clients(...)`).
-- The **cross-language** client is emitted by **`putnami clientgen`**, a neutral
-  scheduler-mediated command that runs the other toolchain's emitter against the
-  provider's own contract. No extension shells out to the other. A provider
-  opts in by listing `/tooling/clientgen-extension` in its `putnami.json`
-  `extensions`.
-
-The result lives side by side under `clients/`:
-
-```
-clients/
-├── ts/   → the TypeScript package
-└── go/   → a standalone Go module (go.mod + client.gen.go), or a package when modulePath is empty
+```json
+{
+  "name": "go.putnami.dev/examples/ts-items-client",
+  "generatedFrom": {
+    "service": "catalog.items",
+    "language": "go",
+    "packageName": "itemsclient",
+    "clientName": "ItemsClient"
+  }
+}
 ```
 
-Generated clients are committed, like a `.pb.go`, and regenerated on demand. The
-workspace check fails the build when a committed client drifts from the
-contract.
+Each client runs its own language's emitter against the provider's committed
+contract: the TypeScript client gets its `src` tree, and the Go client gets
+`client.gen.go` beside its `go.mod`. No extension shells out to the other, and
+no generation builds the provider. A Go provider works the same way: it
+declares `api.Clients(...)`, commits its contract, and a TypeScript client
+project names it in `generatedFrom`.
+
+Generated clients are built, not committed: Git ignores `src` in a TypeScript
+client and `client.gen.go` in a Go one. `client-generate` is cached, and its
+key folds the provider contract's digest, so a contract change regenerates
+every client and any other provider change reuses them.
 
 ## Resilience and observability
 
@@ -346,8 +363,8 @@ circuitBreakerInterceptor({
 ### Spec drift detection
 
 Generated clients embed a spec hash. `checkDrift()` warns at startup when the
-live service spec differs. It is a warning, not a gate — the workspace check is
-what fails a build on drift.
+live service spec differs. It is a warning, not a gate: every build regenerates
+the client from the committed contract, so a build never runs a stale client.
 
 ## Low-level client
 
@@ -392,21 +409,25 @@ const search = await ClientBuilder.for(SearchClient)
 | `retry.jitter` | `boolean` | true | Randomize delay |
 | `interceptors` | `Interceptor[]` | [] | Custom interceptors |
 
-### ClientGeneratorConfig
+### generatedFrom
 
-| Option | Type | Default | Description |
+`clientGenerator()` takes no options. A client project declares its generation
+in the `generatedFrom` member of its `putnami.json`:
+
+| Member | Type | Default | Description |
 |---|---|---|---|
-| `targets` | `('ts' \| 'go')[]` | `['ts']` | Languages to generate |
-| `output` | `string` | `clients/ts` | TypeScript output directory |
-| `packageName` | `string` | auto | npm package name for the TS client |
-| `go.output` | `string` | `clients/go` | Go output directory |
-| `go.modulePath` | `string` | `''` | Go module path — set it to make `clients/go` a standalone module |
-| `go.packageName` | `string` | `client` | Go package name |
-| `go.clientName` | `string` | `Client` | Generated Go client struct name |
+| `service` | `string` | required | The provider's `x-putnami-client` service id |
+| `language` | `'ts' \| 'go'` | required | Language to generate |
+| `packageName` | `string` | — | Go only: package name of `client.gen.go` |
+| `clientName` | `string` | — | Go only: generated client struct name |
+| `omitOperations` | `string[]` | — | Go only: operations the Go client leaves out, by `operationId` |
+
+The TypeScript package name is the client's `package.json` name, and the Go
+import path is the client's `go.mod` module.
 
 ## Related guides
 
-- [Generated clients](/docs/tooling-&-workspace/generated-clients) — the workspace generate/sync/check commands, the drift guard, and migrating a handwritten client
+- [Generated clients](/docs/tooling-&-workspace/generated-clients) — the workspace generate and check commands, the guard, and migrating a handwritten client
 - [Service Clients](/docs/frameworks/go/service-clients) — the same four steps in Go
 - [WebSockets](/docs/frameworks/typescript/websockets) — the provider side of a stream
 - [Proto & gRPC](/docs/frameworks/typescript/proto-grpc) — the Connect provider

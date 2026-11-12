@@ -75,8 +75,8 @@ type VisibilityViolation struct {
 //   - An import of a generated client is allowed from every scope when the
 //     client resolves to a provider and declares no visibility. The client is
 //     that contract rendered for one language, the service's published way
-//     in. A client that declares `scope` keeps it, and a client manifest no
-//     provider backs opens nothing.
+//     in. A client that declares `scope` keeps it, and a client whose
+//     `generatedFrom` no provider backs opens nothing.
 //   - An import inside one scope is always allowed.
 //   - An import that leaves the imported project's scope is allowed only when
 //     that project declares wsproto.VisibilityPublic.

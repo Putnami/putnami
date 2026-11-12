@@ -217,7 +217,7 @@ func TestValidateRecordAcceptsExtensionCommands(t *testing.T) {
 	spectest.Proves(t, "telemetry/otlp-push-contract", "cli-usage-vocabulary-is-closed", "a-conforming-record-validates")
 	t.Parallel()
 	attrs := startAttrs()
-	attrs[AttrCommands] = telemetry.StringVal("clientgen,validate-workspace,cloud-deploy")
+	attrs[AttrCommands] = telemetry.StringVal("client-generate,validate-workspace,cloud-deploy")
 	if diags := ValidateRecord(recordFromAttrs(attrs)); diag.HasErrors(diags) {
 		t.Fatalf("session:start naming extension commands rejected: %v", diags)
 	}

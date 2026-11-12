@@ -163,7 +163,7 @@
               "duplicate-routes-are-disambiguated-numerically",
               "a-generated-descriptor-survives-symbol-normalization",
               "routes-sharing-a-go-client-symbol-are-disambiguated-by-their-path-parameters",
-              "the-emitted-go-client-and-its-manifest-name-each-operation-alike",
+              "the-emitted-go-client-names-each-operation-by-its-resolved-symbol",
               "the-emitted-go-client-calls-each-route-that-differs-only-by-a-path-parameter"
             ]
           }
@@ -273,7 +273,6 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "committed-spec-and-committed-generated-clients-stay-in-sync",
               "the-go-reader-matches-the-shared-first-party-corpus-expectations",
               "a-declared-integer-width-and-its-exact-bounds-survive-the-read"
             ]
@@ -423,7 +422,7 @@
             "checks": [
               "a-declared-cache-policy-is-published-in-the-operation-contract",
               "a-cache-on-a-non-idempotent-operation-or-an-undeclared-key-field-is-refused-at-publication",
-              "the-emitted-go-client-pins-the-response-cache-capability-and-its-manifest-declares-the-policy",
+              "the-emitted-go-client-pins-the-response-cache-capability",
               "the-emitted-go-client-answers-a-declared-cached-operation-through-the-real-runtime",
               "an-invalidation-field-naming-no-scalar-response-property-is-refused-at-publication"
             ]

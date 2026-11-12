@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"slices"
 	"sort"
 	"strings"
 
@@ -18,16 +17,6 @@ import (
 	"go.putnami.dev/typescript/extension/internal/hooks"
 	"go.putnami.dev/typescript/extension/internal/project"
 )
-
-// GeneratedClientOutputPort is the data output port build-generate reports the
-// project-relative generated-client directory on. The manifest declares a port
-// of this exact name (tasks.build-generate.outputs), and the consumer reads the
-// directory back under it — a generated client's location is chosen by the
-// project's clientgen config, so this port is the only way the v3 task contract
-// can name it (a declared output's pathFrom). Renaming it on either side
-// silently stops the client from being captured, so the name is a constant the
-// manifest-contract test pins.
-const GeneratedClientOutputPort = "clientOutput"
 
 func runBuildGenerate(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[string]any, error) {
 	if len(ctx.SelectedProjects) > 0 {
@@ -47,14 +36,7 @@ func runBuildGenerate(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (st
 	emit.PhaseEnd("generate", "success")
 	emit.Metric("generate-hash", 1, "count")
 
-	data := generateResultData(projectPath, genResult)
-	// Report the generated client directory so the scheduler captures clients/
-	// alongside .gen as a generate cache output (a cache hit must rematerialize the
-	// client, not just .gen). Reported only when a client was actually emitted.
-	if out, ok := generatedClientOutput(projectPath); ok {
-		data[GeneratedClientOutputPort] = out
-	}
-	return "OK", data, nil
+	return "OK", generateResultData(projectPath, genResult), nil
 }
 
 // generateResultData builds the generate job's wire payload. It is the one
@@ -71,40 +53,6 @@ func generateResultData(projectPath string, genResult *build.GenerateResult) map
 		"exports": genresult.Relativize(projectPath, genResult.Exports),
 		"assets":  genresult.Relativize(projectPath, genResult.Assets),
 	}
-}
-
-// generatedClientOutput reports the project-relative directory of the generated
-// TypeScript client when the client generator produced one. It reads the
-// clientgen contract the generator writes (.gen/clientgen/config.json) and
-// confirms the output directory exists and is non-empty — a project with no
-// client generator, or one whose API exposes no services, produces no directory
-// and reports nothing (so the generate step captures only .gen, as before).
-func generatedClientOutput(projectPath string) (string, bool) {
-	raw, err := os.ReadFile(filepath.Join(projectPath, ".gen", "clientgen", "config.json"))
-	if err != nil {
-		return "", false
-	}
-	var cfg struct {
-		Targets []string `json:"targets"`
-		TS      struct {
-			Output string `json:"output"`
-		} `json:"ts"`
-	}
-	if json.Unmarshal(raw, &cfg) != nil {
-		return "", false
-	}
-	if cfg.TS.Output == "" || !slices.Contains(cfg.Targets, "ts") {
-		return "", false
-	}
-	dir := filepath.Join(projectPath, cfg.TS.Output)
-	info, err := os.Stat(dir)
-	if err != nil || !info.IsDir() {
-		return "", false
-	}
-	if entries, _ := os.ReadDir(dir); len(entries) == 0 {
-		return "", false
-	}
-	return cfg.TS.Output, true
 }
 
 // doGenerate runs the full generate phase. hookLogs receives the log events of

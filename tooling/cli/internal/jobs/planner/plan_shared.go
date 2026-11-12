@@ -42,9 +42,9 @@ import (
 // lets a task that writes the project `gen` subtree share: no other declared
 // access to the subtree runs between the leader's write and a follower's
 // capture. A follower's dependents then no longer wait, through it, for a
-// later writer of another command, such as a `clientgen` generator. A task
+// later writer of another command, such as a `client-generate` task. A task
 // whose output the dependent projects read declares it readByDependents, and
-// they wait for that task itself (orderContractClients).
+// they wait for that task itself (orderDependentReaders).
 //
 // Deliberately NOT stamped here:
 //
@@ -151,7 +151,7 @@ func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.Sch
 	}
 	leaders := orderSharedExecutions(jobs, groups)
 	serializeWriteResources(jobs, leaders, ordered)
-	orderContractClients(jobs, ws)
+	orderDependentReaders(jobs, ws)
 	if len(groups) == 0 || ValidatePlanDAG(jobs) == nil {
 		return
 	}
@@ -160,7 +160,7 @@ func serializeWithSharedExecutions(ws *workspace.Workspace, jobs []*jobmodel.Sch
 		job.SharedExecutionID = ""
 	}
 	serializeWriteResources(jobs, nil, ordered)
-	orderContractClients(jobs, ws)
+	orderDependentReaders(jobs, ws)
 	// A plan that cannot be scheduled without sharing either has a cycle of its
 	// own, which Plan reports as an error, so only a plan that sharing broke
 	// warns.
@@ -325,33 +325,60 @@ func newSharedProducerIdentityResolver(
 	}
 }
 
-// upstreamIdentity returns an order-independent identity for the job's direct
-// functional producers. Each producer recursively carries its own producers,
-// so a behavioral difference anywhere in the dependency chain reaches the
-// candidate shared node.
+// upstreamIdentity returns an order-independent identity for the set of the
+// job's functional producers. Each producer recursively carries its own
+// producers, so a behavioral difference anywhere in the dependency chain
+// reaches the candidate shared node. An ordering producer passes through
+// (collectProducers).
 func (r *sharedProducerIdentityResolver) upstreamIdentity(job *jobmodel.ScheduledJob) (string, bool) {
 	if r == nil || job == nil || len(job.DependsOn) == 0 {
 		return "", r != nil && job != nil
 	}
 
-	depKeys := jobmodel.DedupeSorted(append([]string(nil), job.DependsOn...))
-	identities := make([]string, 0, len(depKeys))
-	for _, depKey := range depKeys {
+	var identities []string
+	if !r.collectProducers(job, job, false, &identities) {
+		return "", false
+	}
+	return strings.Join(jobmodel.DedupeSorted(identities), "\x1f"), true
+}
+
+// collectProducers adds the identity of each producer of from, as consumer
+// sees it. An ordering producer adds nothing of its own and passes through:
+// the producers it waits for in consumer's project (ownOnly) stand in its
+// place. So a step one command skips does not change which writers of the
+// project its successor names. A producer of another project reached through
+// it is left out, as the ordering producer was: each command reaches another
+// project through its own chain, and the group's leader runs after every
+// member's ordering producers.
+func (r *sharedProducerIdentityResolver) collectProducers(consumer, from *jobmodel.ScheduledJob, ownOnly bool, identities *[]string) bool {
+	for _, depKey := range from.DependsOn {
 		producer := r.jobsByKey[depKey]
-		if producer == nil {
-			return "", false
+		if producer == nil || producer.Project == nil {
+			return false
 		}
-		if orderingProducer(job, producer) {
+		if ownOnly && producer.Project.ID != consumer.Project.ID {
+			continue
+		}
+		if orderingProducer(consumer, producer) {
+			key := producer.Key()
+			if r.visiting[key] {
+				return false
+			}
+			r.visiting[key] = true
+			ok := r.collectProducers(consumer, producer, true, identities)
+			delete(r.visiting, key)
+			if !ok {
+				return false
+			}
 			continue
 		}
 		identity, ok := r.identity(producer)
 		if !ok {
-			return "", false
+			return false
 		}
-		identities = append(identities, identity)
+		*identities = append(*identities, identity)
 	}
-	sort.Strings(identities)
-	return strings.Join(identities, "\x1f"), true
+	return true
 }
 
 func (r *sharedProducerIdentityResolver) identity(job *jobmodel.ScheduledJob) (string, bool) {
@@ -395,7 +422,7 @@ func (r *sharedProducerIdentityResolver) identity(job *jobmodel.ScheduledJob) (s
 // in the consumer's project and declares no write resource. What it leaves in
 // the tree reaches the consumer only through files the consumer reads, which
 // the consumer's own key reads too. So it is left out of the producer
-// identity, and orderSharedExecutions runs a group's leader after every
+// identity, its producers in the consumer's project taking its place, and orderSharedExecutions runs a group's leader after every
 // member's ordering producers: the leader reads the files each of them left,
 // and keys on them.
 func orderingProducer(consumer, producer *jobmodel.ScheduledJob) bool {

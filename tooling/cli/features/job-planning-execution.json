@@ -231,7 +231,8 @@
             "write-serialization-stays-separate-from-functional-deps",
             "a-missing-selected-command-is-rejected",
             "runner-publication-functional-gates",
-            "a-step-dependency-reads-one-step-and-runs-after-the-command"
+            "a-step-dependency-reads-one-step-and-runs-after-the-command",
+            "a-closure-dependency-plans-the-command-across-the-dependency-closure"
           ]
         }
       },
@@ -725,8 +726,6 @@
           "kind": "acceptance",
           "checks": [
             "clientgen-key-ignores-the-describe-owned-trees",
-            "clientgen-key-reads-a-contract-the-project-commits-under-gen",
-            "clientgen-key-folds-describes-key-in-a-real-plan",
             "clientgen-start-key-equals-the-precomputed-key-when-describe-writes"
           ]
         }

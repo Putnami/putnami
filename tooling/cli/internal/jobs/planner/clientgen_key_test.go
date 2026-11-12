@@ -19,10 +19,12 @@ import (
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
-// clientgenTasks are the two generator tasks and the job each runs as.
+// clientgenTasks are the generator tasks that key on a provider's committed
+// files, and the job each runs as. A client project's generators key on its
+// own putnami.json, and its provider's contract reaches them through the
+// client's identity.
 var clientgenTasks = []struct{ name, job string }{
-	{"clientgen-go", "clientgen~generate-go"},
-	{"clientgen-ts", "clientgen~generate-ts"},
+	{"client-generate-module", "client-generate~module"},
 }
 
 // loadShippedExtension loads an extension manifest of this repository the way
@@ -132,7 +134,7 @@ func (f *clientgenKeyFixture) key(t *testing.T, clientgen *extension.ExtensionDe
 		Extension: clientgen,
 		Step:      &extension.PipelineStep{Task: task},
 		JobDef: &extension.JobDefinition{
-			Name: jobName, CommandName: "clientgen", ExtensionName: clientgen.Name, Cache: true,
+			Name: jobName, CommandName: "client-generate", ExtensionName: clientgen.Name, Cache: true,
 			TaskCachePolicy: &extension.TaskCachePolicy{Key: definition.Cache.Key},
 		},
 	}
@@ -144,18 +146,13 @@ func (f *clientgenKeyFixture) key(t *testing.T, clientgen *extension.ExtensionDe
 	return value
 }
 
-// The clientgen keys name no file a build of the run writes. build-describe
+// The generation key names no file a build of the run writes. build-describe
 // (Go) and build-generate (TypeScript) write .gen/schema and .gen/clientgen
 // during the run, so a key that hashed them would differ between the value the
 // run computes before any task starts and the value the task computes when it
-// starts. Those bytes are fixed by the producer's key instead, which the
-// clientgen keys fold through their dependency on build~generate and
-// build~describe: the Go describe declares both trees emptied, and the
-// TypeScript build-generate owns .gen whole as a required output, so each tree
-// holds what its producer's execution or restore wrote and nothing else. The
-// committed generation contract, clientgen.json, and the committed sidecar
-// schema/openapi.json are files no task writes, and an edit to either moves
-// the key.
+// starts. Generation reads the committed generation contract, clientgen.json,
+// and the committed sidecar schema/openapi.json instead: files no task writes,
+// whose edits move the key.
 func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "clientgen-key-reads-no-run-written-tree", "clientgen-key-ignores-the-describe-owned-trees")
 	clientgen := loadShippedExtension(t, "tooling/clientgen-extension", "@putnami/clientgen")
@@ -182,98 +179,12 @@ func TestClientgenKeyIgnoresTheDescribeOwnedTrees(t *testing.T) {
 			}
 		})
 	}
-
-	// The two trees the keys leave out are fixed by a producer's key, which
-	// they fold: the Go build-describe empties both before it executes and on
-	// a restore of an entry that records them empty.
-	goExtension := loadShippedExtension(t, "go/extension", "@putnami/go")
-	describe := &jobmodel.ScheduledJob{
-		Project:   &workspace.Project{ID: "/provider", Name: "provider", Path: "provider"},
-		Extension: goExtension,
-		Step:      &extension.PipelineStep{Task: "build-describe"},
-		JobDef:    &extension.JobDefinition{Name: "build~describe", Cache: true},
-	}
-	emptied := cachekey.EmptiedOutputIDs(describe)
-	for _, id := range []string{"clientgen", "schema"} {
-		if !slices.Contains(emptied, id) {
-			t.Errorf("build-describe empties %v, want it to empty %q: a clientgen key that leaves the tree out would omit bytes no folded key fixes", emptied, id)
-		}
-	}
-
-	// The TypeScript build-generate writes both trees inside .gen. It owns .gen
-	// whole: the output is required, so the engine empties it, and it cedes
-	// neither tree to another task. An optional .gen, or a cede of either tree,
-	// would leave bytes there that no folded key fixes.
-	typescript := loadShippedExtension(t, "typescript/extension", "@putnami/typescript")
-	generate := &jobmodel.ScheduledJob{
-		Project:   &workspace.Project{ID: "/provider", Name: "provider", Path: "provider"},
-		Extension: typescript,
-		Step:      &extension.PipelineStep{Task: "build-generate"},
-		JobDef:    &extension.JobDefinition{Name: "build~generate", Cache: true},
-	}
-	var gen *cachekey.EmptiedOutputDeclaration
-	for _, declared := range cachekey.EmptiedOutputDeclarations(generate) {
-		if declared.Rel == ".gen" {
-			gen = &declared
-		}
-	}
-	if gen == nil {
-		t.Fatalf("the TypeScript build-generate empties %v, want it to empty .gen", cachekey.EmptiedOutputIDs(generate))
-	}
-	if gen.Output.OptionalEmpty {
-		t.Errorf("the TypeScript build-generate .gen output %q is optional: a run that writes nothing there would keep an earlier run's trees", gen.ID)
-	}
-	atOrUnder := func(rel, root string) bool { return rel == root || strings.HasPrefix(rel, root+"/") }
-	for _, kept := range cachekey.OutputSkippedSubpaths(gen.Rel, gen.Output) {
-		for _, tree := range []string{"schema", "clientgen"} {
-			if atOrUnder(tree, kept) || atOrUnder(kept, tree) {
-				t.Errorf("the TypeScript build-generate .gen output keeps %q, which overlaps .gen/%s: the engine would leave bytes there that no folded key fixes", kept, tree)
-			}
-		}
-	}
 }
 
-// A project whose describe is not planned, such as a Go provider whose go.mod
-// does not name go.putnami.dev/app, can commit its generation contract at
-// .gen/clientgen/config.json, and every reader takes that file before
-// clientgen.json. No task of the run empties or restores it there, so no
-// folded key fixes it, and each key reads it as a Git candidate. A committed
-// file is a candidate: tracking it and editing it move the key. A built one in
-// a workspace that ignores .gen is not, so it never moves the key.
-func TestClientgenKeyReadsAContractTheProjectCommitsUnderGen(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "clientgen-key-reads-no-run-written-tree", "clientgen-key-reads-a-contract-the-project-commits-under-gen")
-	clientgen := loadShippedExtension(t, "tooling/clientgen-extension", "@putnami/clientgen")
-
-	for _, task := range clientgenTasks {
-		t.Run(task.name, func(t *testing.T) {
-			f := newClientgenKeyFixture(t)
-			contract := filepath.Join(f.dir, ".gen", "clientgen", "config.json")
-			before := f.key(t, clientgen, task.name, task.job)
-			writeTestFile(t, contract, "{\"targets\":[\"go\"]}\n")
-			if f.key(t, clientgen, task.name, task.job) != before {
-				t.Fatal("an ignored, built .gen/clientgen/config.json moved the key")
-			}
-			writeTestFile(t, contract, "{\"targets\":[\"ts\"]}\n")
-			if f.key(t, clientgen, task.name, task.job) != before {
-				t.Fatal("an edit to an ignored, built .gen/clientgen/config.json moved the key")
-			}
-
-			treeKeyedGit(t, f.root, "add", "-f", "provider/.gen/clientgen/config.json")
-			tracked := f.key(t, clientgen, task.name, task.job)
-			if tracked == before {
-				t.Fatal("a committed .gen/clientgen/config.json left the key unmoved")
-			}
-			writeTestFile(t, contract, "{\"targets\":[\"go\",\"ts\"]}\n")
-			if f.key(t, clientgen, task.name, task.job) == tracked {
-				t.Fatal("an edit to a committed .gen/clientgen/config.json left the key unmoved")
-			}
-		})
-	}
-}
-
-// clientgenPlan is the clientgen command planned with the shipped Go and
-// clientgen manifests on one Go provider whose go.mod names
-// go.putnami.dev/app, so describe is planned.
+// clientgenPlan is the client-generate and build commands planned with the
+// shipped Go and clientgen manifests on one Go provider whose go.mod names
+// go.putnami.dev/app, so describe is planned, and which commits an in-module
+// target in clientgen.json.
 type clientgenPlan struct {
 	ws      *workspace.Workspace
 	dir     string
@@ -293,6 +204,7 @@ func planClientgenOnAGoProvider(t *testing.T) *clientgenPlan {
 	writeTestFile(t, filepath.Join(dir, "go.mod"), "module example.com/provider\n\ngo 1.26\n\nrequire go.putnami.dev/app v0.0.0\n")
 	writeTestFile(t, filepath.Join(dir, "main.go"), "package main\n\nimport _ \"go.putnami.dev/app\"\n\nfunc main() {}\n")
 	writeTestFile(t, filepath.Join(dir, "schema", "openapi.json"), "{\"openapi\":\"3.1.0\"}\n")
+	writeTestFile(t, filepath.Join(dir, "clientgen.json"), "{\"targets\":[\"go\"],\"go\":{\"output\":\"client\"}}\n")
 	project := &workspace.Project{
 		ID: "/provider", Name: "provider", Path: "provider", Type: "application",
 		Extensions: []string{"@putnami/go", "@putnami/clientgen"},
@@ -303,9 +215,9 @@ func planClientgenOnAGoProvider(t *testing.T) *clientgenPlan {
 		loadShippedExtension(t, "go/extension", "@putnami/go"),
 		loadShippedExtension(t, "tooling/clientgen-extension", "@putnami/clientgen"),
 	}
-	planned, err := Plan(ws, []string{"clientgen"}, ws.Projects, exts, nil, nil, nil, nil)
+	planned, err := Plan(ws, []string{"client-generate", "build"}, ws.Projects, exts, nil, nil, nil, nil)
 	if err != nil {
-		t.Fatalf("plan clientgen: %v", err)
+		t.Fatalf("plan client-generate and build: %v", err)
 	}
 	return &clientgenPlan{ws: ws, dir: dir, planned: planned}
 }
@@ -328,10 +240,9 @@ func (p *clientgenPlan) job(t *testing.T, name string) *jobmodel.ScheduledJob {
 }
 
 // startKeys keys the plan the way a run keys each job when it starts: in
-// dependency order, each cacheable job on the tree its dependencies left, then
-// after(job, keys) stands for what the job writes. A fresh cache manager
-// stands for the run's own process.
-func (p *clientgenPlan) startKeys(t *testing.T, after func(job *jobmodel.ScheduledJob, keys map[string]string)) map[string]string {
+// dependency order, each cacheable job on the tree its dependencies left. A
+// fresh cache manager stands for the run's own process.
+func (p *clientgenPlan) startKeys(t *testing.T) map[string]string {
 	t.Helper()
 	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(p.ws.Root, ".putnami", "start")))
 	cache.SetInputResolver(noListedFiles{})
@@ -353,9 +264,6 @@ func (p *clientgenPlan) startKeys(t *testing.T, after func(job *jobmodel.Schedul
 				t.Fatalf("start key of %s: %v", job.Key(), err)
 			}
 			keys[job.Key()] = hash
-		}
-		if after != nil {
-			after(job, keys)
 		}
 		for _, dependent := range dependents[job.Key()] {
 			if indegree[dependent]--; indegree[dependent] == 0 {
@@ -379,61 +287,25 @@ func (p *clientgenPlan) precomputedKeys(t *testing.T) map[string]string {
 	return keys
 }
 
-// In a real plan the clientgen key folds describe's key: the clientgen command
-// depends on build~describe, so its generator job depends on the describe job.
-// A describe whose key moves therefore moves the clientgen key, which is what
-// lets the clientgen key leave out the trees describe writes.
-func TestClientgenKeyFoldsDescribesKeyInARealPlan(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "clientgen-key-reads-no-run-written-tree", "clientgen-key-folds-describes-key-in-a-real-plan")
-	plan := planClientgenOnAGoProvider(t)
-	describe := plan.job(t, "build~describe")
-	for _, task := range clientgenTasks {
-		generator := plan.job(t, task.job)
-		if !slices.Contains(generator.DependsOn, describe.Key()) {
-			t.Errorf("%s depends on %v, want it to depend on %s", generator.Key(), generator.DependsOn, describe.Key())
-		}
-	}
-
-	unmoved := plan.startKeys(t, nil)
-	moved := plan.startKeys(t, func(job *jobmodel.ScheduledJob, keys map[string]string) {
-		if job.Key() == describe.Key() {
-			keys[job.Key()] = "a describe key that moved"
-		}
-	})
-	for _, task := range clientgenTasks {
-		generator := plan.job(t, task.job)
-		if moved[generator.Key()] == "" || moved[generator.Key()] == unmoved[generator.Key()] {
-			t.Errorf("a moved describe key left the %s key unmoved", generator.Key())
-		}
-	}
-}
-
 // A fresh checkout: describe executes in a provider whose .gen is empty and
-// writes the generation contract and the OpenAPI document there. The key each
-// clientgen job computes when it starts equals the key the run computed before
-// any job started, so the job is served the entry the run looked up for it.
+// writes the generation contract and the OpenAPI document there. The key the
+// generation job computes when it starts equals the key the run computed
+// before any job started, so the job is served the entry the run looked up for
+// it. The trees are written before any job is keyed, so the claim holds
+// whichever of the two jobs the plan runs first.
 func TestClientgenStartKeyEqualsThePrecomputedKeyWhenDescribeWrites(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "clientgen-key-reads-no-run-written-tree", "clientgen-start-key-equals-the-precomputed-key-when-describe-writes")
 	plan := planClientgenOnAGoProvider(t)
-	describe := plan.job(t, "build~describe")
+	plan.job(t, "build~describe")
 	if _, err := os.Stat(filepath.Join(plan.dir, ".gen")); !os.IsNotExist(err) {
 		t.Fatalf("the provider starts with a .gen tree: %v", err)
 	}
 	precomputed := plan.precomputedKeys(t)
 
-	wrote := false
-	started := plan.startKeys(t, func(job *jobmodel.ScheduledJob, _ map[string]string) {
-		if job.Key() != describe.Key() {
-			return
-		}
-		wrote = true
-		writeTestFile(t, filepath.Join(plan.dir, ".gen", "clientgen", "config.json"), "{\"targets\":[\"go\",\"ts\"]}\n")
-		writeTestFile(t, filepath.Join(plan.dir, ".gen", "schema", "openapi.json"), "{\"openapi\":\"3.1.0\",\"paths\":{}}\n")
-		writeTestFile(t, filepath.Join(plan.dir, ".gen", "schema", "openapi.json.gz"), "compressed")
-	})
-	if !wrote {
-		t.Fatal("the run never reached describe")
-	}
+	writeTestFile(t, filepath.Join(plan.dir, ".gen", "clientgen", "config.json"), "{\"targets\":[\"go\",\"ts\"]}\n")
+	writeTestFile(t, filepath.Join(plan.dir, ".gen", "schema", "openapi.json"), "{\"openapi\":\"3.1.0\",\"paths\":{}}\n")
+	writeTestFile(t, filepath.Join(plan.dir, ".gen", "schema", "openapi.json.gz"), "compressed")
+	started := plan.startKeys(t)
 	for _, task := range clientgenTasks {
 		key := plan.job(t, task.job).Key()
 		if precomputed[key] == "" {

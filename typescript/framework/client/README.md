@@ -40,13 +40,16 @@ const app = application()
     },
   }))
   .use(openapi({ title: 'Items API', version: '1.0.0' }))
-  .use(clientGenerator({ packageName: '@myorg/items-client' }));
+  .use(clientGenerator());
 ```
 
 In `src/api/items/[id]/get.ts`, declare the operation shape with
 `endpoint().params({ id: String }).returns({ item: itemSchema })`.
 
-Run `putnami clientgen`, then register the generated binding in the consumer:
+Commit the provider's contract as `schema/openapi.json`. A client project names
+the provider's service in the `generatedFrom` member of its `putnami.json`, and
+`putnami client-generate` builds it; `putnami build` runs that first. Register
+the generated binding in the consumer:
 
 ```typescript
 import { application } from '@putnami/application';
@@ -156,7 +159,7 @@ needs to admit the call travels in the first frame. See
 | `telemetryInterceptor(name)` | Records request count, errors, and latency |
 | `retryInterceptor(config?)` | Exponential backoff with jitter |
 | `circuitBreakerInterceptor(config?)` | Fail-fast on repeated downstream failures |
-| `clientGenerator(config?)` | Plugin factory for the generator lifecycle |
+| `clientGenerator()` | Plugin that names each operation's producer in the provider's contract |
 | `resolveServiceUrl(name)` | Reads service URL from config or env var |
 | `ClientError` / subclasses | Typed error hierarchy with service/method context |
 

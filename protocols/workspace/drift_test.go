@@ -796,3 +796,11 @@ func TestLockSchemaAgreesWithTheCLIEntryValidator(t *testing.T) {
 			LockCLISourceWorkspace, source.Properties["source"])
 	}
 }
+
+func TestDrift_ProjectGeneratedFrom(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "the-schemas-and-the-go-types-agree", "every-schema-matches-its-go-type")
+	schemaFields := jsonSchemaDefinitionProperties(t, "schemas/project.json", "generatedFrom")
+	goFields := goTypeJSONFields(t, GeneratedFrom{})
+
+	assertFieldParity(t, "GeneratedFrom", schemaFields, goFields)
+}
