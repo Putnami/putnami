@@ -290,7 +290,6 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 			ExtensionName:              map[string]any{"graphSync": true, "filePatterns": inputs},
 			"@putnami/typescript":      map[string]any{"lint": map[string]any{"linter": "eslint"}},
 			"@putnami/typescript:test": map[string]any{"runner": "vitest", "types": false},
-			"@putnami/typescript:lint": map[string]any{"fix": false},
 		}) {
 		t.Errorf("apps/api = %v", api)
 	}
@@ -839,7 +838,7 @@ func TestAMovedTypeScriptTaskDoesWhatItsTaskDid(t *testing.T) {
 		{Name: "build", Command: "bun build src/index.ts"}, {Name: "lint", Command: "biome check --write ."}, {Name: "test", Command: "bun test"},
 	}}
 	plan := planImport(root, app, map[string]string{"build": "build", "lint": "lint", "test": "test"})
-	if len(plan.kept) != 0 || !plan.bunBuild || !plan.lintMoved || plan.lintChecksOnly || !plan.testMoved {
+	if len(plan.kept) != 0 || !plan.bunBuild || !plan.lintMoved || !plan.testMoved {
 		t.Errorf("app plans %+v, want every task moved, a lint that writes and a test", plan)
 	}
 }

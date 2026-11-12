@@ -180,17 +180,15 @@ type importPlan struct {
 	// bunBuild reports a build script the TypeScript extension builds with
 	// Bun.
 	bunBuild bool
-	// lintMoved reports a lint script that moved, and lintChecksOnly one
-	// that writes no fix; testMoved a test script that moved, which
-	// type-checked nothing.
-	lintMoved, lintChecksOnly, testMoved bool
+	// lintMoved reports a lint script that moved; testMoved a test script
+	// that moved, which type-checked nothing.
+	lintMoved, testMoved bool
 }
 
 // edit writes the steps of the tasks that stay on Rush and the options of
 // the TypeScript tasks that moved.
 func (plan importPlan) edit(doc map[string]any) {
 	rushxSteps.edit(plan.kept)(doc)
-	stacks.SetTypeScriptLintChecksOnly(doc, plan.lintChecksOnly)
 	stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
 }
 
@@ -226,7 +224,6 @@ func planImport(root string, p detect.Project, scripts map[string]string, publis
 			moved = append(moved, task)
 			plan.bunBuild = plan.bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
 			plan.lintMoved = plan.lintMoved || task == stacks.TaskLint
-			plan.lintChecksOnly = plan.lintChecksOnly || (task == stacks.TaskLint && !stacks.LintWrites(script))
 			plan.testMoved = plan.testMoved || task == stacks.TaskTest
 		default:
 			plan.kept = append(plan.kept, task)

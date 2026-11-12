@@ -407,10 +407,9 @@ type projectPlan struct {
 	// bunBuild reports a build the TypeScript extension takes over with its
 	// Bun build, which writes nothing in the project (D-066).
 	bunBuild bool
-	// lintMoved reports a lint target the TypeScript extension takes over,
-	// and lintChecksOnly one that writes no fix; testMoved a test target it
-	// takes over, which type-checked nothing.
-	lintMoved, lintChecksOnly, testMoved bool
+	// lintMoved reports a lint target the TypeScript extension takes over;
+	// testMoved a test target it takes over, which type-checked nothing.
+	lintMoved, testMoved bool
 }
 
 // planProject maps the targets of one project in the mode.
@@ -463,7 +462,6 @@ func planProject(root string, p detect.Project, mode string, typeScript bool) pr
 			if task == "lint" {
 				plan.eslint = lintsWithESLint(root, p.Path, target)
 				plan.lintMoved = true
-				plan.lintChecksOnly = !stacks.LintWrites(target.Command)
 			}
 		case typeScript && hasManifest(root, p.Path):
 			// The TypeScript extension claims the project too: the target
@@ -984,7 +982,6 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	stacks.SetTypeScriptRunner(doc, plan.runner)
 	setCompiler(doc, plan.typeScript && plan.compiler)
 	stacks.SetTypeScriptLinter(doc, plan.eslint)
-	stacks.SetTypeScriptLintChecksOnly(doc, plan.lintChecksOnly)
 	stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
 	if plan.nodeRuntime {
 		markNodeRuntime(doc)
@@ -1013,7 +1010,6 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	stacks.SetTypeScriptRunner(doc, "")
 	setCompiler(doc, false)
 	stacks.SetTypeScriptLinter(doc, false)
-	stacks.SetTypeScriptLintChecksOnly(doc, false)
 	stacks.SetTypeScriptTestTypesOff(doc, false)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil

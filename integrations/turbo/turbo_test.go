@@ -869,13 +869,12 @@ func TestAnImportedTaskDoesWhatItsScriptDid(t *testing.T) {
 		t.Errorf("unmapped = %+v, want the build kept for its entry", result.Unmapped)
 	}
 	want := map[string]any{
-		"@putnami/typescript:lint": map[string]any{"fix": false},
 		"@putnami/typescript:test": map[string]any{"types": false},
 	}
 	if !reflect.DeepEqual(pricing["options"], want) {
-		t.Errorf("pricing options = %v, want a lint that checks only and a test with no type check", pricing["options"])
+		t.Errorf("pricing options = %v, want a test with no type check", pricing["options"])
 	}
-	// A lint script that writes its fixes keeps the TypeScript lint's.
+	// A package whose test did not move gets no option.
 	if options := readProjectFile(t, root, "apps/api")["options"]; options != nil {
 		t.Errorf("api options = %v, want none", options)
 	}

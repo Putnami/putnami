@@ -106,7 +106,7 @@
     {
       "id": "a-moved-task-does-what-its-script-did",
       "text": [
-        "In import mode, a script that moves to @putnami/typescript does what it did: a lint script that writes no fix moves with options[\"@putnami/typescript:lint\"].fix false, and a test script moves with options[\"@putnami/typescript:test\"].types false, since the script type-checked nothing.",
+        "In import mode, a script that moves to @putnami/typescript does what it did: a test script moves with options[\"@putnami/typescript:test\"].types false, since the script type-checked nothing.",
         "A bun build script moves only when Putnami's Bun build writes the entries the package.json names: none outside src/, or entries D-066 rewrites; otherwise it stays on Turborepo and the sync says why.",
         "When a lint moves, the sync says that putnami lint --impacted lints the projects a change touches, not their dependents."
       ]

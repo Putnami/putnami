@@ -330,10 +330,9 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	}
 	// A test the TypeScript extension runs carries no Nx reports, and a bun
 	// test no runner. The moved test runs no type check its script did not
-	// run, and the moved biome check . writes no fix.
+	// run.
 	if got, want := readProjectFile(t, root, "packages/pricing")["options"], map[string]any{
 		TypeScriptExtension + ":test": map[string]any{"types": false},
-		TypeScriptExtension + ":lint": map[string]any{"fix": false},
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("pricing options = %v, want %v", got, want)
 	}

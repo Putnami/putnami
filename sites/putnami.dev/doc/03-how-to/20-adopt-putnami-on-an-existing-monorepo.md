@@ -30,9 +30,7 @@ tool:
 - Every other target, such as a webpack build, a Mocha test or an ESLint with
   arguments, keeps running as the repository defines it, through the tool.
   The sync lists it as not mapped, with its reason, and rewrites no script.
-- A target that moves does what it did. A lint that writes no fix, such as
-  `biome check .`, moves with `fix: false` in
-  `options["@putnami/typescript:lint"]`. A test moves with `types: false` in
+- A target that moves does what it did. A test moves with `types: false` in
   `options["@putnami/typescript:test"]`, since its script type-checked
   nothing. A `bun build` moves only when Putnami's Bun build writes the
   entries `package.json` names: entries under `src/`, or a `main` the import

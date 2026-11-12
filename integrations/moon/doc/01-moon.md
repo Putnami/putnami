@@ -147,9 +147,7 @@ claims. The sync names it and the tasks that keep running through
   or `jest`,
   under `options["@putnami/typescript:test"].runner`, with `types: false`
   there, since the task type-checked nothing, and `eslint` under
-  `options["@putnami/typescript"].lint.linter` for an ESLint lint that moved,
-  with `fix: false` under `options["@putnami/typescript:lint"]` when the task
-  writes no fix;
+  `options["@putnami/typescript"].lint.linter` for an ESLint lint that moved;
 - for a TypeScript project, the conventions of D-066: a `tsconfig.json` that
   extends the root's when it holds no `tsconfig*.json`, and
   `"exports": { ".": "./src/index.ts" }` when its build moves to the Bun

@@ -97,10 +97,9 @@ type member struct {
 	// nodeRuntime reports an imported TypeScript package whose start script
 	// runs node: its putnami.json declares the node runtime.
 	nodeRuntime bool
-	// lintChecksOnly reports a lint script that moved and writes no fix;
-	// testMoved a test script that moved, which type-checked nothing.
-	lintChecksOnly bool
-	testMoved      bool
+	// testMoved reports a test script that moved, which type-checked
+	// nothing.
+	testMoved bool
 }
 
 // Sync writes the package graph of the Turborepo repository at root into each
@@ -198,7 +197,6 @@ func Sync(root string, opts Options) (Result, error) {
 				// task already runs what the script runs.
 				m.disabled = append(m.disabled, ExtensionName+":"+task)
 				bunBuild = bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
-				m.lintChecksOnly = m.lintChecksOnly || (task == stacks.TaskLint && !stacks.LintWrites(script))
 				m.testMoved = m.testMoved || task == stacks.TaskTest
 				lintMoved = lintMoved || task == stacks.TaskLint
 			default:
@@ -362,7 +360,6 @@ func applyMember(root string, doc map[string]any, m member, owned map[string]boo
 	if m.nodeRuntime {
 		markNodeRuntime(doc)
 	}
-	stacks.SetTypeScriptLintChecksOnly(doc, m.lintChecksOnly)
 	stacks.SetTypeScriptTestTypesOff(doc, m.testMoved)
 }
 
@@ -373,7 +370,6 @@ func retract(root string, doc map[string]any, owned map[string]bool) {
 	setList(doc, "extensions", slices.DeleteFunc(stringList(doc["extensions"]), func(e string) bool { return slices.Contains(ownedExtensions, e) }))
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, owned) }))
 	setList(doc, "tags", slices.DeleteFunc(stringList(doc["tags"]), func(t string) bool { return t == Tag }))
-	stacks.SetTypeScriptLintChecksOnly(doc, false)
 	stacks.SetTypeScriptTestTypesOff(doc, false)
 	if disable, ok := doc["disable"].(map[string]any); ok {
 		setList(disable, "jobs", slices.DeleteFunc(stringList(disable["jobs"]), ownedJob))

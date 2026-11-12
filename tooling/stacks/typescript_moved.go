@@ -11,38 +11,8 @@ import (
 )
 
 // A moved TypeScript task does what the script it replaces did (ADR 0017):
-// a lint that only checks stays one that only checks, a test runs no type
-// check its script did not run, and a Bun build moves only when it writes
-// the entries its package.json names.
-
-// TypeScriptLintLayer is the option layer of the TypeScript extension's lint
-// command, whose fix member an import writes.
-const TypeScriptLintLayer = TypeScriptExtension + ":lint"
-
-// lintWriteFlags are the arguments with which Biome or ESLint write the
-// fixes they find.
-var lintWriteFlags = []string{"--write", "--fix", "--apply", "--apply-unsafe"}
-
-// LintWrites reports whether a lint script writes its fixes into the files
-// it lints. The TypeScript lint writes them unless its fix option is off, so
-// a lint script that only checks moves with fix off.
-func LintWrites(script string) bool {
-	for _, field := range strings.Fields(script) {
-		name, _, _ := strings.Cut(field, "=")
-		if slices.Contains(lintWriteFlags, name) {
-			return true
-		}
-	}
-	return false
-}
-
-// SetTypeScriptLintChecksOnly writes options["@putnami/typescript:lint"].fix
-// false into a putnami.json document when checksOnly is set, so the lint
-// that moved writes nothing, and otherwise removes a false fix, with every
-// object it empties.
-func SetTypeScriptLintChecksOnly(doc map[string]any, checksOnly bool) {
-	setFalse(doc, TypeScriptLintLayer, "fix", checksOnly)
-}
+// a test runs no type check its script did not run, and a Bun build moves
+// only when it writes the entries its package.json names.
 
 // SetTypeScriptTestTypesOff writes options["@putnami/typescript:test"].types
 // false into a putnami.json document when off is set, so the test that moved

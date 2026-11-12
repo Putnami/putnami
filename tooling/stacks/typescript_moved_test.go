@@ -8,45 +8,24 @@ import (
 	"testing"
 )
 
-func TestLintWritesReadsTheFixFlags(t *testing.T) {
-	for script, writes := range map[string]bool{
-		"biome check .":                     false,
-		"biome lint src":                    false,
-		"biome check --write .":             true,
-		"biome check --apply-unsafe .":      true,
-		"bunx @biomejs/biome check --fix":   true,
-		"biome format --write=true .":       true,
-		"eslint .":                          false,
-		"eslint --fix .":                    true,
-		"biome check --formatter-enabled .": false,
-	} {
-		if got := LintWrites(script); got != writes {
-			t.Errorf("LintWrites(%q) = %v, want %v", script, got, writes)
-		}
-	}
-}
-
-func TestAMovedLintThatChecksAndAMovedTestWriteTheirOptions(t *testing.T) {
+func TestAMovedTestWritesItsOptions(t *testing.T) {
 	doc := map[string]any{}
-	SetTypeScriptLintChecksOnly(doc, true)
 	SetTypeScriptTestTypesOff(doc, true)
 	want := map[string]any{"options": map[string]any{
-		TypeScriptLintLayer:   map[string]any{"fix": false},
 		TypeScriptRunnerLayer: map[string]any{"types": false},
 	}}
 	if !reflect.DeepEqual(doc, want) {
 		t.Fatalf("doc = %v", doc)
 	}
-	SetTypeScriptLintChecksOnly(doc, false)
 	SetTypeScriptTestTypesOff(doc, false)
 	if len(doc) != 0 {
 		t.Errorf("a cleared doc = %v", doc)
 	}
 	// A value the project set to true is its own choice and stays.
-	doc = map[string]any{"options": map[string]any{TypeScriptLintLayer: map[string]any{"fix": true}}}
-	SetTypeScriptLintChecksOnly(doc, false)
-	if doc["options"].(map[string]any)[TypeScriptLintLayer].(map[string]any)["fix"] != true {
-		t.Errorf("the project's fix changed: %v", doc)
+	doc = map[string]any{"options": map[string]any{TypeScriptRunnerLayer: map[string]any{"types": true}}}
+	SetTypeScriptTestTypesOff(doc, false)
+	if doc["options"].(map[string]any)[TypeScriptRunnerLayer].(map[string]any)["types"] != true {
+		t.Errorf("the project's types changed: %v", doc)
 	}
 }
 

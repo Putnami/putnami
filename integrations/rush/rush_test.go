@@ -783,10 +783,8 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 		"extensions":   []any{ExtensionName, TypeScriptExtension},
 		"dependencies": []any{"/libs/pricing"},
 		"disable":      map[string]any{"jobs": []any{"@putnami/rush:lint", "@putnami/typescript:test", "@putnami/typescript:build"}},
-		// Its eslint . writes no fix: the moved lint checks only.
 		"options": map[string]any{
-			ExtensionName:              map[string]any{"tasks": map[string]any{"build": keptSteps("build"), "test": keptSteps("test")}},
-			stacks.TypeScriptLintLayer: map[string]any{"fix": false},
+			ExtensionName: map[string]any{"tasks": map[string]any{"build": keptSteps("build"), "test": keptSteps("test")}},
 		},
 	}) {
 		t.Errorf("apps/api = %v", api)

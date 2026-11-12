@@ -115,13 +115,10 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    list, removes from the workspace config each extension the import
    declared that no `putnami.json` names after the sync.
 
-9. **A moved task does what its script did.** The TypeScript lint writes its
-   fixes by default, and the TypeScript test type-checks every file of the
-   project. A lint that moves from a script that writes no fix (no
-   `--write`, `--fix`, `--apply` or `--apply-unsafe`) gets `fix: false` in
-   `options["@putnami/typescript:lint"]`. A test that moves gets
+9. **A moved task does what its script did.** The TypeScript test
+   type-checks every file of the project. A test that moves gets
    `types: false` in `options["@putnami/typescript:test"]`, since no script
-   the rule moves type-checks. The sync owns both values and removes a
+   the rule moves type-checks. The sync owns that value and removes a
    `false` it no longer writes. The TypeScript lint reads only the project's
    own files, so `putnami lint --impacted` lints the projects a change
    touches and not their dependents (ADR 0044 of `tooling/cli`); the sync

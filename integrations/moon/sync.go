@@ -274,8 +274,8 @@ func editSteps(mapped map[string]string, delegated bool, then func(map[string]an
 }
 
 // typeScriptOptions writes, for a TypeScript project, what its moved tasks
-// run: the test runner, with no type check, and the ESLint linter, with no
-// fix when the task wrote none. It removes those it does not.
+// run: the test runner, with no type check, and the ESLint linter. It
+// removes those it does not.
 func typeScriptOptions(p detect.Project, plan importPlan) func(map[string]any) {
 	if p.Language != "typescript" {
 		return nil
@@ -284,7 +284,6 @@ func typeScriptOptions(p detect.Project, plan importPlan) func(map[string]any) {
 		stacks.SetTypeScriptRunner(doc, plan.runner)
 		stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
 		stacks.SetTypeScriptLinter(doc, plan.eslint)
-		stacks.SetTypeScriptLintChecksOnly(doc, plan.lintChecksOnly)
 	}
 }
 
