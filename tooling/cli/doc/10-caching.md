@@ -746,8 +746,9 @@ subpaths. A tracked file deleted from the worktree counts. When the index
 tracks one, the execution fails before its subprocess starts, with an error
 that names the output, its path and the first tracked file: an emptied output
 owns its path whole, so move the committed files out of it with `git mv`. For
-a clientgen provider, run
-`git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`. When
+a clientgen provider whose config lists only an in-module Go client, run
+`git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`; the
+clientgen guard names the command for any other config. When
 that file is gone from the worktree, the error says Git still tracks it and
 names the `git rm --cached` that stages its removal. A hit is not served, so
 the task executes and fails the same way. Outside a Git work tree the output

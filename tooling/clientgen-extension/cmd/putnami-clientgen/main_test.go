@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -70,7 +72,7 @@ func TestGenerateClientRunsTheEmitterOnTheProvidersCommittedContract(t *testing.
 	writeMainTestFile(t, root, "clients/items/package.json", `{"name":"@example/items-client"}`)
 	capture := filepath.Join(root, "calls")
 	writeMainTestFile(t, root, "node_modules/.bin/putnami-client-generate",
-		"#!/bin/sh\nprintf '%s\\n' \"$*\" > \""+capture+"\"\n")
+		"#!/bin/sh\nprintf '%s\\n' \"$*\" > \""+capture+"\"\ncat \"$2\" > \""+capture+".contract\"\n")
 	if err := os.Chmod(filepath.Join(root, "node_modules", ".bin", "putnami-client-generate"), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -84,7 +86,7 @@ func TestGenerateClientRunsTheEmitterOnTheProvidersCommittedContract(t *testing.
 		WorkspaceRoot: root,
 		Project: pctx.Project{Name: "@example/items-client", Path: "clients/items", FullPath: client,
 			GeneratedFrom: &pctx.GeneratedFrom{Service: "catalog.items", Language: pctx.GeneratedLanguageTypeScript,
-				ContractPath: "services/catalog/schema/openapi.json"}},
+				ContractPath: "services/catalog/schema/openapi.json", ContractSHA256: sha256Hex(`{"openapi":"3.1.0"}`)}},
 	}, nil, nil)
 	if err != nil || status != "OK" || len(output) != 0 {
 		t.Fatalf("generate = status %q output %v err %v", status, output, err)
@@ -93,14 +95,55 @@ func TestGenerateClientRunsTheEmitterOnTheProvidersCommittedContract(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	contract := filepath.Join(root, "services", "catalog", "schema", "openapi.json")
-	want := "--contract " + contract + " --output " + client + " --package-name @example/items-client --format-project " + client
-	if got := strings.TrimSpace(string(data)); got != want {
-		t.Fatalf("emitter call = %q, want %q", got, want)
+	contract, rest, found := strings.Cut(strings.TrimPrefix(strings.TrimSpace(string(data)), "--contract "), " ")
+	want := "--output " + client + " --package-name @example/items-client --format-project " + client
+	if !found || rest != want {
+		t.Fatalf("emitter call = %q, want --contract <the keyed contract> %s", data, want)
+	}
+	if read, err := os.ReadFile(capture + ".contract"); err != nil || string(read) != `{"openapi":"3.1.0"}` {
+		t.Fatalf("the emitter read %q (err %v), want the provider's committed contract", read, err)
+	}
+	if _, err := os.Stat(contract); !os.IsNotExist(err) {
+		t.Errorf("the keyed contract copy %s outlived the generation (stat: %v)", contract, err)
 	}
 	if after := readMainTree(t, filepath.Join(root, "services")); !reflect.DeepEqual(after, provider) {
 		t.Fatalf("the provider's tree changed: %v, want %v", after, provider)
 	}
+}
+
+// The contract edge orders no job, so a provider build may rewrite the
+// contract during the session. A client generated from other bytes than its
+// key holds is never produced: the generation fails, names the contract, and
+// runs no emitter.
+func TestGenerateClientRefusesAContractItsKeyDoesNotHold(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "client-owned-generation", "a-client-generates-only-from-the-contract-its-key-holds")
+	root := t.TempDir()
+	writeMainTestFile(t, root, "services/items/schema/openapi.json", `{"openapi":"3.1.0","paths":{"/new":{}}}`)
+	writeMainTestFile(t, root, "clients/items/package.json", `{"name":"@example/items-client"}`)
+	capture := filepath.Join(root, "calls")
+	writeMainTestFile(t, root, "node_modules/.bin/putnami-client-generate", "#!/bin/sh\ntouch \""+capture+"\"\n")
+	if err := os.Chmod(filepath.Join(root, "node_modules", ".bin", "putnami-client-generate"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	for _, language := range []string{pctx.GeneratedLanguageGo, pctx.GeneratedLanguageTypeScript} {
+		status, _, err := generateClient(language)(&pctx.Context{
+			WorkspaceRoot: root,
+			Project: pctx.Project{Name: "items", Path: "clients/items", FullPath: filepath.Join(root, "clients", "items"),
+				GeneratedFrom: &pctx.GeneratedFrom{Service: "items", Language: language,
+					ContractPath: "services/items/schema/openapi.json", ContractSHA256: sha256Hex(`{"openapi":"3.1.0"}`)}},
+		}, nil, nil)
+		if status != "FAILED" || err == nil || !strings.Contains(err.Error(), "services/items/schema/openapi.json changed") {
+			t.Fatalf("%s: rewritten contract = status %q err %v, want a failure naming the contract", language, status, err)
+		}
+	}
+	if _, err := os.Stat(capture); !os.IsNotExist(err) {
+		t.Fatalf("the emitter ran on a contract the key does not hold (stat: %v)", err)
+	}
+}
+
+func sha256Hex(body string) string {
+	sum := sha256.Sum256([]byte(body))
+	return hex.EncodeToString(sum[:])
 }
 
 // The TypeScript package name is the client's own: a package.json without a
@@ -108,6 +151,7 @@ func TestGenerateClientRunsTheEmitterOnTheProvidersCommittedContract(t *testing.
 func TestGenerateClientRequiresTheClientsOwnPackageName(t *testing.T) {
 	root := t.TempDir()
 	writeMainTestFile(t, root, "clients/items/package.json", `{"private":true}`)
+	writeMainTestFile(t, root, "services/items/schema/openapi.json", `{"openapi":"3.1.0"}`)
 	status, _, err := generateClient(pctx.GeneratedLanguageTypeScript)(&pctx.Context{
 		WorkspaceRoot: root,
 		Project: pctx.Project{Name: "items", Path: "clients/items", FullPath: filepath.Join(root, "clients", "items"),

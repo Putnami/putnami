@@ -317,7 +317,8 @@
             "checks": [
               "a-generatedfrom-client-generates-itself-from-its-providers-committed-contract",
               "a-consumer-only-selection-generates-or-restores-its-client",
-              "no-project-writes-into-another"
+              "no-project-writes-into-another",
+              "a-client-generates-only-from-the-contract-its-key-holds"
             ]
           }
         },

@@ -1080,7 +1080,7 @@ func collectArtifacts(projectPath, genDir string, commit bool, before schemaSnap
 		if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 			return err
 		}
-		if err := os.WriteFile(dst, body, 0o644); err != nil {
+		if err := promoteCommittedArtifact(dst, body); err != nil {
 			return err
 		}
 		artifacts = append(artifacts, rel)
@@ -1293,4 +1293,32 @@ func mergeIntoManifest(projectPath string, artifacts []string) error {
 		return err
 	}
 	return os.WriteFile(manifestPath, data, 0o644)
+}
+
+// promoteCommittedArtifact writes body to the committed artifact at dst. It
+// leaves a file that already holds body untouched, and replaces any other
+// through a rename, so a reader never sees a partial file. A generated
+// client's client-generate reads its provider's committed contract with no
+// ordering on this build (clientgen ADR 0007): an in-place rewrite of the same
+// bytes could hand it a truncated contract.
+func promoteCommittedArtifact(dst string, body []byte) error {
+	if current, err := os.ReadFile(dst); err == nil && bytes.Equal(current, body) { //nolint:gosec // G304: the project's own artifact
+		return nil
+	}
+	temp, err := os.CreateTemp(filepath.Dir(dst), "."+filepath.Base(dst)+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tempPath := temp.Name()
+	_, writeErr := temp.Write(body)
+	closeErr := temp.Close()
+	if err := errors.Join(writeErr, closeErr, os.Chmod(tempPath, 0o644)); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+	if err := os.Rename(tempPath, dst); err != nil {
+		_ = os.Remove(tempPath)
+		return err
+	}
+	return nil
 }

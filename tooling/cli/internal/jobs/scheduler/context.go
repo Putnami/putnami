@@ -450,7 +450,17 @@ func projectContextGeneratedFrom(project *workspace.Project) *protocoljob.Genera
 		ClientName:     declared.ClientName,
 		OmitOperations: append([]string(nil), declared.OmitOperations...),
 		ContractPath:   project.GeneratedClient.ContractPath,
+		ContractSHA256: contractDigestOf(project.GeneratedClient),
 	}
+}
+
+// contractDigestOf is the digest of the contract a resolved binding names, or
+// empty for an unresolved binding, whose digest is a placeholder.
+func contractDigestOf(binding *workspace.GeneratedClientBinding) string {
+	if binding.ContractPath == "" {
+		return ""
+	}
+	return binding.ContractSHA256
 }
 
 func projectContextOptions(project *workspace.Project) map[string]map[string]any {

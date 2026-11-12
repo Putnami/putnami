@@ -1,5 +1,5 @@
 import { file, Glob, gzipSync } from 'bun';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import {
   fileExists,
   getCurrentProject,
@@ -77,6 +77,25 @@ export interface OpenApiConfig {
    * it is a build-time artifact, never committed.
    */
   output?: string | false;
+}
+
+/**
+ * Writes the committed spec. A file that already holds these bytes is left
+ * untouched, and any other is replaced through a rename, so a reader never sees
+ * a partial file: a generated client's `client-generate` reads this contract
+ * with no ordering on the provider's build.
+ */
+function writeCommittedSpec(path: string, json: string): void {
+  try {
+    if (readFileSync(path, 'utf8') === json) {
+      return;
+    }
+  } catch {
+    // No current file: write it.
+  }
+  const temporary = `${path}.tmp-${process.pid}`;
+  writeFileSync(temporary, json);
+  renameSync(temporary, path);
 }
 
 const DEFAULT_OUTPUT_PATH = 'schema/openapi.json';
@@ -253,7 +272,7 @@ export class OpenApiPlugin implements Plugin {
     // rules and stays byte-stable when regenerated during lint/build — otherwise
     // a `generate` step that runs before `format --no-fix` leaves the file dirty
     // and fails the format gate.
-    writeFileSync(openapiPath, specJson);
+    writeCommittedSpec(openapiPath, specJson);
 
     // Write the compressed companion (always in .gen/, for runtime serving).
     writeFileSync(openapiGzPath, gzipSync(specJson));

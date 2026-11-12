@@ -62,7 +62,8 @@ package job
 // `project.generatedFrom` is a fourth: a generated client's `generatedFrom`
 // with the provider's committed contract the orchestrator resolved its service
 // to. The client's cache key folds that contract's digest, so a task that
-// reads the path here reads the contract its key holds. An empty
+// reads the path here reads the contract its key holds; `contractSha256` is
+// that digest, which the task checks the bytes it reads against. An empty
 // `contractPath` says no single provider declares the service.
 //
 // `selection` is the same kind of member for the same reason: the orchestrator

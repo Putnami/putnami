@@ -3,6 +3,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"os"
@@ -51,7 +53,11 @@ func generateClient(language string) cli.JobFunc {
 				projectLabel(ctx), from.Service)
 		}
 		projectRoot := projectRootOf(ctx)
-		contract := filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(from.ContractPath))
+		contract, release, err := keyedContract(ctx.WorkspaceRoot, from)
+		if err != nil {
+			return "FAILED", nil, fmt.Errorf("%s: %w", projectLabel(ctx), err)
+		}
+		defer release()
 		if language == pctx.GeneratedLanguageGo {
 			err := workspaceclient.GenerateGo(ctx.WorkspaceRoot, workspaceclient.GoGeneration{
 				Contract:       contract,
@@ -79,6 +85,40 @@ func generateClient(language string) cli.JobFunc {
 		}
 		return "OK", map[string]any{}, nil
 	}
+}
+
+// keyedContract reads the provider's contract once, checks it against the
+// digest the client's cache key folds, and returns a private copy of those
+// bytes for the emitter to read. The contract edge orders no job, so a
+// provider build in the same session may rewrite the contract while or before
+// the client generates. A client generated from other bytes than its key holds
+// must not be stored under that key, so the generation fails instead; the next
+// command loads the new contract and generates from it. A context with no
+// digest, from an older orchestrator, skips the check. release removes the copy.
+func keyedContract(workspaceRoot string, from *pctx.GeneratedFrom) (string, func(), error) {
+	data, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(from.ContractPath))) //nolint:gosec // G304: the contract the orchestrator resolved
+	if err != nil {
+		return "", nil, fmt.Errorf("read the provider's contract: %w", err)
+	}
+	if from.ContractSHA256 != "" {
+		sum := sha256.Sum256(data)
+		if got := hex.EncodeToString(sum[:]); got != from.ContractSHA256 {
+			return "", nil, fmt.Errorf("the provider's contract %s changed after this command loaded the workspace "+
+				"(sha256 %s, the client's cache key holds %s): a provider build rewrote it; run the command again "+
+				"to generate the client from the new contract", from.ContractPath, got, from.ContractSHA256)
+		}
+	}
+	dir, err := os.MkdirTemp("", "putnami-client-contract-")
+	if err != nil {
+		return "", nil, err
+	}
+	release := func() { _ = os.RemoveAll(dir) }
+	copied := filepath.Join(dir, "openapi.json")
+	if err := os.WriteFile(copied, data, 0o600); err != nil {
+		release()
+		return "", nil, err
+	}
+	return copied, release, nil
 }
 
 // generateModuleTarget is the client-generate task of a provider whose Go

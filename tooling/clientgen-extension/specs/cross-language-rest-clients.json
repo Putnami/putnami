@@ -93,7 +93,7 @@
     },
     {
       "id": "client-owned-generation",
-      "text": "A project whose putnami.json declares generatedFrom generates its own client from its provider's committed contract through client-generate. No project writes into another, and a consumer reaches a client through its ordinary dependency, so a consumer-only selection generates or restores it."
+      "text": "A project whose putnami.json declares generatedFrom generates its own client from its provider's committed contract through client-generate. No project writes into another, and a consumer reaches a client through its ordinary dependency, so a consumer-only selection generates or restores it. The generation reads the contract its cache key holds: when a provider build in the same session rewrote the contract, it fails rather than store a client under another contract's key."
     },
     {
       "id": "language-commands-wait-for-generation",

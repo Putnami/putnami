@@ -18,7 +18,8 @@
       "omitOperations": [
         "deleteItem"
       ],
-      "contractPath": "services/items/schema/openapi.json"
+      "contractPath": "services/items/schema/openapi.json",
+      "contractSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
   },
   "extension": {

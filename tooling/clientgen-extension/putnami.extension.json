@@ -137,12 +137,15 @@
       "timeoutMs": 300000,
       "reads": ["sources"],
       "writes": ["clients-ts"],
+      "inputs": {
+        "emitter": { "from": "closure", "files": ["package.json", "bin/generate.ts", "src/generator/**"] }
+      },
       "cache": {
         "enabled": true,
         "deterministic": true,
         "key": {
           "files": [".editorconfig", "biome.json", "package.json", "putnami.json"],
-          "workspaceFiles": [".editorconfig", "biome.json", "package.json", "tsconfig.base.json"]
+          "workspaceFiles": [".editorconfig", "biome.json", "bun.lock", "package.json", "tsconfig.base.json"]
         }
       },
       "declares": {

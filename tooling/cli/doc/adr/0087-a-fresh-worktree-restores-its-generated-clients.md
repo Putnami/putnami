@@ -35,6 +35,11 @@ unresolved marker, and the client's generation fails naming the service.
 **3. The contract edge no longer orders jobs.** It keeps change impact and
 identity. A client reads the provider's committed contract, so it waits on no
 provider job, and a provider may depend on its own client without a cycle.
+A provider build still rewrites its contract: it leaves equal bytes in place
+and replaces others through a rename. The job context carries the digest the
+client's key folds, and `client-generate` fails when the contract it reads has
+another digest, so no client is stored under a key its contract does not
+match. The next command loads the new contract and generates from it.
 
 **4. A client's version line follows its contract.** A client's line adds its
 provider's `ContractPath` to its pathspecs when the contract lies outside the

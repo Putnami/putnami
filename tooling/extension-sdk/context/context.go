@@ -27,7 +27,8 @@ type Project = job.Project
 // GeneratedFrom is a generated client's binding (Project.GeneratedFrom): what
 // its putnami.json `generatedFrom` declares, and ContractPath, the provider's
 // committed contract the orchestrator resolved the service to,
-// workspace-relative in slash form. ContractPath is empty when no single
+// workspace-relative in slash form, and ContractSHA256, the digest of the
+// contract the client's key folds. ContractPath is empty when no single
 // provider declares the service; the client cannot be generated then.
 type GeneratedFrom = job.GeneratedFrom
 

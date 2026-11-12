@@ -226,6 +226,10 @@ func generatedContractRemedy(files workspaceFiles, projectRel, rel string) strin
 	if !known {
 		return "git rm --cached " + rel
 	}
+	if inner == builtConfigFile && !declaresOnlyAnInModuleGoClient(files, rel) {
+		return "git rm --cached " + rel + ", then give each client it lists a project of its own that names " +
+			"this provider in generatedFrom: clientgen.json declares only an in-module Go client"
+	}
 	homeRel := joinRel(projectRel, home)
 	if files.isRegularFile(homeRel) {
 		return "git rm --cached " + rel + ", since " + homeRel + " already exists"
@@ -234,6 +238,21 @@ func generatedContractRemedy(files workspaceFiles, projectRel, rel string) strin
 		return "mkdir -p " + joinRel(projectRel, dir) + " && git mv " + rel + " " + homeRel
 	}
 	return "git mv " + rel + " " + homeRel
+}
+
+// declaresOnlyAnInModuleGoClient reports whether the generation config at rel
+// lists one Go target with no module of its own: the only target clientgen.json
+// still declares. Every other target is a client project of its own.
+func declaresOnlyAnInModuleGoClient(files workspaceFiles, rel string) bool {
+	data, err := files.Read(rel)
+	if err != nil {
+		return false
+	}
+	var config clientGenConfig
+	if json.Unmarshal(data, &config) != nil {
+		return false
+	}
+	return slices.Equal(config.Targets, []string{"go"}) && config.Go.ModulePath == ""
 }
 
 // ignoredByRules reports which of the slash paths rels, relative to root, an

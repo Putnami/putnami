@@ -153,7 +153,11 @@ defaults are) is the language extension's, the graph is core's.
   provider's committed contract the orchestrator resolved the service to,
   workspace-relative in slash form. The client's cache key folds that
   contract's digest, so a task that reads the path reads what its key holds.
-  An empty `contractPath` says no single provider declares the service.
+  `contractSha256` is that digest, in lowercase hex: a provider build in the
+  same session may rewrite the contract, so the task checks the bytes it reads
+  against it and fails rather than store a client under another contract's key.
+  An empty `contractPath` says no single provider declares the service, and
+  `contractSha256` is present exactly when `contractPath` is.
   A present value names a service (`job.missing_field`) and the language `go`
   or `ts`, carries Go options only for `go`, and gives a clean relative path
   (`job.invalid_value`). Absent means the project is not a generated client.

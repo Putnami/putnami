@@ -216,13 +216,24 @@ func TestTheCheckAsksToIgnoreGenForACandidateNoRuleExcludes(t *testing.T) {
 // The command that takes a candidate out of a tree a build owns: a git mv to
 // the contract's committed home, with the mkdir the home's directory needs,
 // and a git rm --cached for a file a build writes or a contract whose home
-// exists.
+// exists. A generation config that lists more than an in-module Go client has
+// no committed home: each client it lists becomes a project of its own.
 func TestTheGeneratedContractRemedyNamesTheGitCommand(t *testing.T) {
 	root := t.TempDir()
 	writeWorkspaceFile(t, root, "services/catalog/schema/openapi.json", "{}")
+	writeWorkspaceFile(t, root, ".gen/clientgen/config.json", `{"targets":["go"],"go":{"output":"clients/go"}}`)
+	writeWorkspaceFile(t, root, "services/web/.gen/clientgen/config.json", `{"targets":["go","ts"],"go":{"output":"clients/go"}}`)
+	writeWorkspaceFile(t, root, "services/mod/.gen/clientgen/config.json", `{"targets":["go"],"go":{"output":"clients/go","modulePath":"example.test/c"}}`)
 	files := workspaceFiles{root: root}
+	project := func(rel string) string {
+		return "git rm --cached " + rel + ", then give each client it lists a project of its own that names " +
+			"this provider in generatedFrom: clientgen.json declares only an in-module Go client"
+	}
 	for _, tc := range []struct{ project, rel, want string }{
 		{".", ".gen/clientgen/config.json", "git mv .gen/clientgen/config.json clientgen.json"},
+		{"services/web", "services/web/.gen/clientgen/config.json", project("services/web/.gen/clientgen/config.json")},
+		{"services/mod", "services/mod/.gen/clientgen/config.json", project("services/mod/.gen/clientgen/config.json")},
+		{"services/gone", "services/gone/.gen/clientgen/config.json", project("services/gone/.gen/clientgen/config.json")},
 		{"services/orders", "services/orders/.gen/schema/openapi.json",
 			"mkdir -p services/orders/schema && git mv services/orders/.gen/schema/openapi.json services/orders/schema/openapi.json"},
 		{"services/catalog", "services/catalog/.gen/schema/openapi.json",

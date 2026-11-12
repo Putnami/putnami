@@ -2,6 +2,7 @@ package scheduler
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -195,22 +196,23 @@ func TestBuildJobContext_CarriesTheResolvedGenerationBinding(t *testing.T) {
 
 	resolved := parse(t, client(&workspace.GeneratedClientBinding{
 		ServiceID: "items", Language: "go", ProviderID: "/services/items",
-		ContractPath: "services/items/schema/openapi.json", ContractSHA256: "abc",
+		ContractPath: "services/items/schema/openapi.json", ContractSHA256: strings.Repeat("ab", 32),
 	}))
 	want := protocoljob.GeneratedFrom{
 		Service: "items", Language: "go", PackageName: "itemsclient", ClientName: "ItemsClient",
 		OmitOperations: []string{"deleteItem"}, ContractPath: "services/items/schema/openapi.json",
+		ContractSHA256: strings.Repeat("ab", 32),
 	}
 	if got := resolved.Project.GeneratedFrom; got == nil || got.Service != want.Service || got.Language != want.Language ||
 		got.PackageName != want.PackageName || got.ClientName != want.ClientName || got.ContractPath != want.ContractPath ||
-		len(got.OmitOperations) != 1 || got.OmitOperations[0] != "deleteItem" {
+		got.ContractSHA256 != want.ContractSHA256 || len(got.OmitOperations) != 1 || got.OmitOperations[0] != "deleteItem" {
 		t.Fatalf("project.generatedFrom = %+v, want %+v", got, want)
 	}
 
 	unresolved := parse(t, client(&workspace.GeneratedClientBinding{
 		ServiceID: "items", Language: "go", ContractSHA256: workspace.UnresolvedContractDigest,
 	}))
-	if got := unresolved.Project.GeneratedFrom; got == nil || got.ContractPath != "" || got.Service != "items" {
+	if got := unresolved.Project.GeneratedFrom; got == nil || got.ContractPath != "" || got.ContractSHA256 != "" || got.Service != "items" {
 		t.Fatalf("unresolved project.generatedFrom = %+v, want the service with no contract path", got)
 	}
 

@@ -291,6 +291,13 @@ type GeneratedFrom struct {
 	// slash form. Empty when no single provider declares Service: the client
 	// cannot be generated, and its generation fails naming the service.
 	ContractPath string `json:"contractPath,omitempty"`
+	// ContractSHA256 is the lowercase hex sha256 of the contract bytes the
+	// client's cache key folds, read when the orchestrator loaded the
+	// workspace. A task that generates the client checks the contract it reads
+	// against it: a provider build in the same session may rewrite the
+	// contract, and a client generated from other bytes must not be stored
+	// under this key. Empty exactly when ContractPath is.
+	ContractSHA256 string `json:"contractSha256,omitempty"`
 }
 
 // ProjectRef identifies one project the context references: a member of the

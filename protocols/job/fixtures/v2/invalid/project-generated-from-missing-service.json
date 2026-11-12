@@ -12,7 +12,8 @@
     "fullPath": "/ws/p",
     "generatedFrom": {
       "language": "go",
-      "contractPath": "providers/items/schema/openapi.json"
+      "contractPath": "providers/items/schema/openapi.json",
+      "contractSha256": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     }
   },
   "extension": {

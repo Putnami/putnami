@@ -24,7 +24,12 @@ emptied output that holds a tracked file (CLI ADR 0068). The TypeScript
 `build-generate` owns `.gen` whole and deletes such a file. Migrate each
 provider in three steps:
 
-1. Run `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`.
+1. When the config lists only an in-module Go client (`"targets": ["go"]`
+   and no `go.modulePath`), run
+   `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`.
+   Otherwise run `git rm --cached <project>/.gen/clientgen/config.json`, and
+   give each client it lists a project of its own that names the provider in
+   `generatedFrom`: `clientgen.json` declares only an in-module Go client.
 2. Run `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`.
    When `schema/openapi.json` already exists, run
    `git rm --cached <project>/.gen/schema/openapi.json` instead.

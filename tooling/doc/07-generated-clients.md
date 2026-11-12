@@ -135,7 +135,7 @@ caches is the worktree.
 | Git tracks a file that carries the generated marker (`clientgen.committed-generated-client`) | Run `git rm --cached <file>` and ignore the generated path: a generated client is built, not committed |
 | A handwritten transport call reaches a first-party provider | Replace it with the generated binding, or classify it (below) |
 | An unmarked OpenAPI document is generated without `thirdParty: true` | Mark the provider, or declare the contract external |
-| A project commits a file under `.gen/clientgen` or `.gen/schema`, which a build owns whole, or does not ignore `.gen` (`clientgen.committed-generated-contract`) | Run the command the finding names: `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json`, `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`, or `git rm --cached` for a build's output. Then ignore `.gen` in `.gitignore` and drop any `!config.json` carve-out under it |
+| A project commits a file under `.gen/clientgen` or `.gen/schema`, which a build owns whole, or does not ignore `.gen` (`clientgen.committed-generated-contract`) | Run the command the finding names: `git mv <project>/.gen/clientgen/config.json <project>/clientgen.json` for a config that lists only an in-module Go client, `git rm --cached` plus a client project per client for any other config, `mkdir -p <project>/schema && git mv <project>/.gen/schema/openapi.json <project>/schema/openapi.json`, or `git rm --cached` for a build's output. Then ignore `.gen` in `.gitignore` and drop any `!config.json` carve-out under it |
 
 Every transport callsite the scanner finds is either associated with a
 first-party provider — which fails, because a generated binding must replace it

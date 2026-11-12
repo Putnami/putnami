@@ -524,6 +524,14 @@ func validateGeneratedFrom(from *GeneratedFrom, present bool) []diag.Diagnostic 
 				"%s.contractPath must be a clean workspace-relative slash path, got %q", field, contract))
 		}
 	}
+	switch digest := from.ContractSHA256; {
+	case (digest == "") != (from.ContractPath == ""):
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field+".contractSha256",
+			"%s.contractSha256 is present exactly when contractPath is", field))
+	case digest != "" && !isLowerHexSHA256(digest):
+		diags = append(diags, diag.Errorf(ErrorCodeInvalidValue, field+".contractSha256",
+			"%s.contractSha256 must be 64 lowercase hex digits, got %q", field, digest))
+	}
 	return diags
 }
 
@@ -945,4 +953,17 @@ func validateStaging(staging *Staging) []diag.Diagnostic {
 	}
 
 	return diags
+}
+
+// isLowerHexSHA256 reports whether value is a sha256 digest in lowercase hex.
+func isLowerHexSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }

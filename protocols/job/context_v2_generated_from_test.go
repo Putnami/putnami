@@ -8,6 +8,9 @@ import (
 	"go.putnami.dev/protocol/features/spectest"
 )
 
+// contractDigest is a well-formed contract digest.
+const contractDigest = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+
 // TestValidate_V2ProjectGeneratedFrom pins the form of a present
 // `project.generatedFrom`: a service, a known language, Go options only on a
 // Go client, and a clean workspace-relative contract path when one resolved.
@@ -24,6 +27,7 @@ func TestValidate_V2ProjectGeneratedFrom(t *testing.T) {
 		{name: "a resolved go client is accepted", from: &GeneratedFrom{
 			Service: "items", Language: GeneratedLanguageGo, PackageName: "itemsclient", ClientName: "ItemsClient",
 			OmitOperations: []string{"deleteItem"}, ContractPath: "services/items/schema/openapi.json",
+			ContractSHA256: contractDigest,
 		}},
 		{name: "an unresolved ts client is accepted", from: &GeneratedFrom{Service: "items", Language: GeneratedLanguageTypeScript}},
 		{name: "present null is rejected", present: true, code: ErrorCodeInvalidValue, field: "project.generatedFrom"},
@@ -45,6 +49,13 @@ func TestValidate_V2ProjectGeneratedFrom(t *testing.T) {
 			code: ErrorCodeInvalidValue, field: "project.generatedFrom.contractPath"},
 		{name: "an unclean contract path is rejected", from: &GeneratedFrom{Service: "items", Language: GeneratedLanguageGo, ContractPath: "s/./schema/openapi.json"},
 			code: ErrorCodeInvalidValue, field: "project.generatedFrom.contractPath"},
+		{name: "a contract path without its digest is rejected", from: &GeneratedFrom{Service: "items", Language: GeneratedLanguageGo, ContractPath: "s/schema/openapi.json"},
+			code: ErrorCodeInvalidValue, field: "project.generatedFrom.contractSha256"},
+		{name: "a digest without a contract path is rejected", from: &GeneratedFrom{Service: "items", Language: GeneratedLanguageGo, ContractSHA256: contractDigest},
+			code: ErrorCodeInvalidValue, field: "project.generatedFrom.contractSha256"},
+		{name: "a digest that is not lowercase hex sha256 is rejected", from: &GeneratedFrom{Service: "items", Language: GeneratedLanguageGo,
+			ContractPath: "s/schema/openapi.json", ContractSHA256: "ABC"},
+			code: ErrorCodeInvalidValue, field: "project.generatedFrom.contractSha256"},
 		{name: "a backslash contract path is rejected", from: &GeneratedFrom{Service: "items", Language: GeneratedLanguageGo, ContractPath: `s\schema\openapi.json`},
 			code: ErrorCodeInvalidValue, field: "project.generatedFrom.contractPath"},
 	}
@@ -80,6 +91,7 @@ func TestV2ProjectGeneratedFromFixtures(t *testing.T) {
 		{"project-generated-from-unknown-language.json", ErrorCodeInvalidValue, "project.generatedFrom.language"},
 		{"project-generated-from-go-option-on-ts.json", ErrorCodeInvalidValue, "project.generatedFrom.packageName"},
 		{"project-generated-from-absolute-contract-path.json", ErrorCodeInvalidValue, "project.generatedFrom.contractPath"},
+		{"project-generated-from-invalid-contract-digest.json", ErrorCodeInvalidValue, "project.generatedFrom.contractSha256"},
 		{"v1-with-project-generated-from.json", ErrorCodeUnexpectedField, "project.generatedFrom"},
 	}
 	for _, tc := range invalid {
@@ -104,7 +116,7 @@ func TestV2ProjectGeneratedFromFixtures(t *testing.T) {
 	}
 	if from.Service != "items" || from.Language != GeneratedLanguageGo || from.PackageName != "itemsclient" ||
 		from.ClientName != "ItemsClient" || !slices.Equal(from.OmitOperations, []string{"deleteItem"}) ||
-		from.ContractPath != "services/items/schema/openapi.json" {
+		from.ContractPath != "services/items/schema/openapi.json" || from.ContractSHA256 != contractDigest {
 		t.Errorf("project.generatedFrom = %+v, want the fixture's binding", *from)
 	}
 
