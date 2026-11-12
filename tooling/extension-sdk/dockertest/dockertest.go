@@ -6,14 +6,16 @@
 // on 127.0.0.1. A developer's helper can block on its desktop application,
 // which hangs the test until the job timeout.
 //
-// Every test binary that reaches a registry calls IsolateConfig in its
-// TestMain. Only tests and the helper packages that only tests import use this
-// package; no product package imports it.
+// A test binary that resolves registry credentials through the default
+// keychain calls IsolateConfig in its TestMain, and its registry fixture calls
+// RequireIsolated. Only tests and the helper packages that only tests import
+// use this package; no product package imports it.
 package dockertest
 
 import (
 	"os"
 	"path/filepath"
+	"testing"
 
 	"go.putnami.dev/sdk/extension/scratch"
 )
@@ -21,8 +23,9 @@ import (
 // configEnv names the directory the Docker clients read config.json from.
 const configEnv = "DOCKER_CONFIG"
 
-// isolated is the directory IsolateConfig last pointed DOCKER_CONFIG at.
-var isolated string
+// isolated is the directory IsolateConfig last pointed DOCKER_CONFIG at. The
+// variable keeps the directory reachable, and so owned, until restore runs.
+var isolated *scratch.Dir
 
 // IsolateConfig points DOCKER_CONFIG at a new directory that holds an empty
 // config.json, and answers a function that removes the directory and restores
@@ -45,7 +48,7 @@ func IsolateConfig() (restore func()) {
 		panic(err)
 	}
 	before := isolated
-	isolated = config.Path()
+	isolated = config
 	return func() {
 		isolated = before
 		if wasSet {
@@ -57,9 +60,17 @@ func IsolateConfig() (restore func()) {
 	}
 }
 
-// ConfigIsolated reports whether DOCKER_CONFIG still names the directory
-// IsolateConfig created. A fixture that serves a registry calls it to fail a
-// test whose binary would read the developer's Docker configuration.
+// ConfigIsolated reports whether DOCKER_CONFIG names the directory
+// IsolateConfig created.
 func ConfigIsolated() bool {
-	return isolated != "" && os.Getenv(configEnv) == isolated
+	return isolated != nil && os.Getenv(configEnv) == isolated.Path()
+}
+
+// RequireIsolated fails the test when its binary reads the developer's Docker
+// configuration. A fixture that serves a registry calls it first.
+func RequireIsolated(t testing.TB) {
+	t.Helper()
+	if !ConfigIsolated() {
+		t.Fatal("this test binary reads the developer's Docker configuration: call dockertest.IsolateConfig (go.putnami.dev/sdk/extension/dockertest) in TestMain, and leave DOCKER_CONFIG as it sets it")
+	}
 }

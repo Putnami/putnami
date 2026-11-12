@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/google/go-containerregistry/pkg/authn"
@@ -44,20 +45,10 @@ func developerConfig(t *testing.T) (string, string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	source, err := os.Open(self)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer source.Close()
-	target, err := os.OpenFile(helper, os.O_CREATE|os.O_WRONLY, 0o700)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := io.Copy(target, source); err != nil {
-		t.Fatal(err)
-	}
-	if err := target.Close(); err != nil {
-		t.Fatal(err)
+	// A link starts faster than a copy: macOS checks a new executable on its
+	// first run.
+	if os.Link(self, helper) != nil && os.Symlink(self, helper) != nil {
+		copyFile(t, self, helper)
 	}
 	if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte(`{"credsStore":"putnami-test"}`), 0o600); err != nil {
 		t.Fatal(err)
@@ -67,6 +58,25 @@ func developerConfig(t *testing.T) (string, string) {
 	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv(configEnv, dir)
 	return dir, calls
+}
+
+func copyFile(t *testing.T, from, to string) {
+	t.Helper()
+	source, err := os.Open(from)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer source.Close()
+	target, err := os.OpenFile(to, os.O_CREATE|os.O_WRONLY, 0o700)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := io.Copy(target, source); err != nil {
+		t.Fatal(err)
+	}
+	if err := target.Close(); err != nil {
+		t.Fatal(err)
+	}
 }
 
 func resolve(t *testing.T) authn.Authenticator {
@@ -144,5 +154,44 @@ func TestIsolateConfigRestoresAnUnsetVariable(t *testing.T) {
 	restore()
 	if value, set := os.LookupEnv(configEnv); set {
 		t.Errorf("DOCKER_CONFIG = %q after restore, want unset", value)
+	}
+}
+
+// fatalRecorder records the failure of the helper under test. Fatal ends the
+// goroutine, as testing.T does, so the helper runs in one of its own.
+type fatalRecorder struct {
+	testing.TB
+	message string
+}
+
+func (r *fatalRecorder) Helper() {}
+
+func (r *fatalRecorder) Fatal(args ...any) {
+	r.message = fmt.Sprint(args...)
+	runtime.Goexit()
+}
+
+// requireIsolated answers the failure RequireIsolated reports, or "".
+func requireIsolated(t *testing.T) string {
+	t.Helper()
+	recorder := &fatalRecorder{TB: t}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		RequireIsolated(recorder)
+	}()
+	<-done
+	return recorder.message
+}
+
+func TestRequireIsolatedFailsABinaryThatReadsTheDeveloperConfiguration(t *testing.T) {
+	t.Setenv(configEnv, t.TempDir())
+	if message := requireIsolated(t); !strings.Contains(message, "call dockertest.IsolateConfig") {
+		t.Fatalf("message = %q", message)
+	}
+	restore := IsolateConfig()
+	defer restore()
+	if message := requireIsolated(t); message != "" {
+		t.Errorf("an isolated binary fails: %s", message)
 	}
 }

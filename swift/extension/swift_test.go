@@ -42,8 +42,7 @@ func TestMain(m *testing.M) {
 		}
 		os.Exit(0)
 	}
-	// The default keychain would run the credential helper the developer's
-	// Docker configuration names, which can block until the job timeout.
+	// The tests stay away from the developer's Docker configuration.
 	restore := dockertest.IsolateConfig()
 	code := m.Run()
 	restore()

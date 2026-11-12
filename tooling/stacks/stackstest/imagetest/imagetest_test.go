@@ -1,7 +1,6 @@
 package imagetest
 
 import (
-	"fmt"
 	"os"
 	"runtime"
 	"strings"
@@ -20,31 +19,31 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// fatalRecorder records the failure of the helper under test. Fatal ends the
-// goroutine, as testing.T does, so the helper runs in one of its own.
-type fatalRecorder struct {
+// refusingT records that the fixture failed the test. Fatal ends the
+// goroutine, as testing.T does, so the fixture runs in one of its own.
+type refusingT struct {
 	testing.TB
-	message string
+	refused bool
 }
 
-func (r *fatalRecorder) Helper() {}
+func (r *refusingT) Helper() {}
 
-func (r *fatalRecorder) Fatal(args ...any) {
-	r.message = strings.TrimSpace(fmt.Sprintln(args...))
+func (r *refusingT) Fatal(...any) {
+	r.refused = true
 	runtime.Goexit()
 }
 
 func TestRegistryRefusesTheDeveloperDockerConfiguration(t *testing.T) {
 	t.Setenv("DOCKER_CONFIG", t.TempDir())
-	recorder := &fatalRecorder{TB: t}
+	recorder := &refusingT{TB: t}
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
 		Registry(recorder)
 	}()
 	<-done
-	if !strings.Contains(recorder.message, "call dockertest.IsolateConfig") {
-		t.Fatalf("message = %q", recorder.message)
+	if !recorder.refused {
+		t.Fatal("the registry serves a binary that reads the developer's Docker configuration")
 	}
 }
 

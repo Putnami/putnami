@@ -7,9 +7,7 @@ import (
 	"go.putnami.dev/sdk/extension/dockertest"
 )
 
-// TestMain keeps the tests from the developer's Docker configuration: the
-// default keychain would run the credential helper it names, which can block
-// until the job timeout.
+// TestMain keeps the tests from the developer's Docker configuration.
 func TestMain(m *testing.M) {
 	restore := dockertest.IsolateConfig()
 	code := m.Run()

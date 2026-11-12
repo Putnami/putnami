@@ -35,9 +35,7 @@ import (
 // need either value pin it with t.Setenv, which restores this cleared state.
 // A publication outbox inherited from an enclosing publication would turn
 // every managed publication under test into a pack, so it is cleared too.
-// It also keeps the tests from the developer's Docker configuration: the
-// default keychain would run the credential helper it names, which can block
-// until the job timeout.
+// It also keeps the tests from the developer's Docker configuration.
 func TestMain(m *testing.M) {
 	for _, key := range []string{privateOCIRegistryURLEnv, "DOCKER_REGISTRY", extproto.PublicationOutboxEnv} {
 		if err := os.Unsetenv(key); err != nil {
