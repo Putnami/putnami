@@ -49,9 +49,9 @@
     {
       "id": "reports-become-the-summary",
       "text": [
-        "After its steps, whatever their outcome, the test task copies into its output the test.xml and coverage.dat of each test run the build-event file lists and reads them into the test and coverage summary, merging a source file across runs.",
-        "It never removes a Bazel output, so Bazel's cache serves the next run.",
-        "A failed case fails the task with stacks.test_failed, a run with no JUnit report fails it with stacks.report_missing, a missing coverage report fails nothing, and a coverage file that is no LCOV tracefile is skipped with a warning."
+        "After its steps, whatever their outcome, the test task copies the test.xml and LCOV coverage.dat of each test run the build-event file lists and reads them into the test and coverage summary, merging a source file across runs; a coverage.dat that is no LCOV tracefile is skipped with a warning.",
+        "It never removes a Bazel output.",
+        "A failed case fails the task with stacks.test_failed, a run with no JUnit report with stacks.report_missing, and a missing coverage report fails nothing."
       ]
     },
     {
