@@ -82,8 +82,9 @@ type evidenceSubmitRequest struct {
 	Repository    *evidenceRepository    `json:"repository,omitempty"`
 }
 
-// evidenceRepository names the repository of a person's upload, which names no
-// workspace: Delivery resolves the observed workspace from it.
+// evidenceRepository names the repository of an upload. Delivery resolves the
+// observed workspace from it for a person's upload, which names no workspace,
+// and for an organization's ingest token.
 type evidenceRepository struct {
 	Host string `json:"host"`
 	Path string `json:"path"`
@@ -115,8 +116,7 @@ type evidenceReportBatch struct {
 	Components          []evidence.Component          `json:"components,omitempty"`
 	ChangedLineCoverage *evidence.ChangedLineCoverage `json:"changedLineCoverage,omitempty"`
 	DependencyChanges   []evidence.DependencyChange   `json:"dependencyChanges,omitempty"`
-	// Provider, Repo and Repository name the repository on a person's
-	// upload, as the run does.
+	// Provider, Repo and Repository name the repository, as the run does.
 	Provider   string              `json:"provider,omitempty"`
 	Repo       string              `json:"repo,omitempty"`
 	Repository *evidenceRepository `json:"repository,omitempty"`
@@ -174,6 +174,11 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 			return err
 		}
 		person = true
+	}
+	// Every upload names its repository. A person's upload and an
+	// organization's ingest token need it to find the observed workspace; a
+	// workspace token keeps its workspace, and Delivery ignores it there.
+	if person || (strings.TrimSpace(doc.Subject.Host) != "" && strings.TrimSpace(doc.Subject.Repository) != "") {
 		run.Repository = &evidenceRepository{Host: doc.Subject.Host, Path: doc.Subject.Repository}
 	}
 	if fields := strings.Fields(token); len(fields) != 1 || fields[0] != token {
@@ -211,7 +216,7 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 	var stored, already, failures []string
 	statesLeftOut := ""
 	for _, batch := range evidenceBatches(doc, run.SubmissionID) {
-		if person {
+		if run.Repository != nil {
 			batch.Provider, batch.Repo, batch.Repository = run.Provider, run.Repo, run.Repository
 		}
 		answer, refused, err := postEvidenceBatch(ioctx, controlURL, token, batch)

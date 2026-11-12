@@ -120,20 +120,29 @@ func TestSignInRunsTheDeviceSignInWithoutASession(t *testing.T) {
 	}
 }
 
-func TestATokenKeepsTheWorkspacePath(t *testing.T) {
-	spectest.Proves(t, evidenceFeature, "signs-a-person-in", "a-token-keeps-the-workspace-path")
+// An organization's ingest token names no workspace: Delivery finds the
+// observed workspace from the repository every request names.
+func TestATokenUploadNamesTheRepository(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "signs-a-person-in", "a-token-upload-names-the-repository")
 	fake := &evidenceFakeServer{}
 	env := personEnv(t, true)
 	env[evidenceTokenEnv] = evidenceTestToken
 	if _, _, err := runSignIn(t, fake, env, refuseSignIn(t), "--file", evidenceFixture("turbo-pull-request.json"), "--sign-in"); err != nil {
 		t.Fatalf("evidence-report: %v", err)
 	}
+	if len(fake.requests) < 2 {
+		t.Fatalf("requests %v", fake.paths())
+	}
 	for _, r := range fake.requests {
 		if r.Auth != "Bearer "+evidenceTestToken {
 			t.Errorf("%s rides %q", r.Path, r.Auth)
 		}
-		if _, ok := r.Body["repository"]; ok {
-			t.Errorf("%s names a repository on the workspace path", r.Path)
+		repository, _ := r.Body["repository"].(map[string]any)
+		if repository["host"] != "github.com" || repository["path"] != "acme/storefront" {
+			t.Errorf("%s names the repository %v", r.Path, r.Body["repository"])
+		}
+		if r.Body["provider"] != "github" || r.Body["repo"] == nil || r.Body["repo"] == "" {
+			t.Errorf("%s names provider %v, repo %v", r.Path, r.Body["provider"], r.Body["repo"])
 		}
 	}
 }
