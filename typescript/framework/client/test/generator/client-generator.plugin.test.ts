@@ -80,7 +80,7 @@ describe('clientGenerator()', () => {
     {
       feature: 'tooling/cross-language-rest-clients',
       requirement: 'contract-carries-attribution',
-      check: 'code-declarations-name-no-target',
+      check: 'typescript-code-declarations-name-no-target',
     },
     async () => {
       const app = application().use(widgetsModule(FEATURE)).use(clientGenerator());

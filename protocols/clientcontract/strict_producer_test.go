@@ -8,7 +8,7 @@ import (
 
 func TestValidateOperation_AProducerNamesProjectAndFeature(t *testing.T) {
 	spectest.Proves(t, "tooling/cross-language-rest-clients", "contract-carries-attribution",
-		"the-contract-carries-each-operations-producer-attribution")
+		"the-strict-reader-refuses-an-incomplete-producer")
 	base := `{"stream":"unary","transports":[{"protocol":"rest-json","path":"/items","encoding":"json"}],` +
 		`"security":{"alternatives":[{"allOf":[]}]},"errors":[],"idempotency":{"kind":"safe"}`
 	operation, diags := ParseOperation([]byte(base + `,"producer":{"project":"/svc","feature":"items"}}`))

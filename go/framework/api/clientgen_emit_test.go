@@ -53,7 +53,7 @@ func listDir(t *testing.T, dir string) []string {
 }
 
 func TestEmitGoClient_WritesOnlyTheClientFile(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "no-committed-client", "the-emitters-write-no-manifest")
+	spectest.Proves(t, clientgenFeature, "no-committed-client", "the-go-emitter-writes-no-manifest")
 	output := filepath.Join(t.TempDir(), "client")
 	result, err := EmitGoClient([]byte(strictItemsContract), output, itemsClientOptions)
 	if err != nil {

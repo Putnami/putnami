@@ -347,7 +347,8 @@
             "checks": [
               "a-tracked-generated-file-is-a-finding",
               "no-client-output-polices-drift",
-              "the-emitters-write-no-manifest"
+              "the-go-emitter-writes-no-manifest",
+              "the-typescript-emitter-writes-no-manifest"
             ]
           }
         },
@@ -360,8 +361,10 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "code-declarations-name-no-target",
-              "the-contract-carries-each-operations-producer-attribution"
+              "go-code-declarations-name-no-target",
+              "the-contract-carries-each-operations-producer-attribution",
+              "the-strict-reader-refuses-an-incomplete-producer",
+              "typescript-code-declarations-name-no-target"
             ]
           }
         }

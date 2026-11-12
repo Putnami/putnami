@@ -165,7 +165,7 @@ describe('generateClient (TypeScript)', () => {
     {
       feature: 'tooling/cross-language-rest-clients',
       requirement: 'no-committed-client',
-      check: 'the-emitters-write-no-manifest',
+      check: 'the-typescript-emitter-writes-no-manifest',
     },
     () => {
       const fixture = setupWorkspace();

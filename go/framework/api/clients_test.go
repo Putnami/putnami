@@ -26,7 +26,7 @@ func (f *fakeSpecSource) OpenAPISpecJSON() ([]byte, error) { return f.spec, f.er
 // The declaration names no client: its options decide only the contract, and
 // describe writes no client-generation contract and stages no client.
 func TestClients_NamesNoTargetAndWritesNothing(t *testing.T) {
-	spectest.Proves(t, clientgenFeature, "contract-carries-attribution", "code-declarations-name-no-target")
+	spectest.Proves(t, clientgenFeature, "contract-carries-attribution", "go-code-declarations-name-no-target")
 	options := reflect.TypeOf(ClientsOptions{})
 	fields := make([]string, 0, options.NumField())
 	for i := range options.NumField() {
