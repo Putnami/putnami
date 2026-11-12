@@ -100,7 +100,7 @@
   },
   "commands": {
     "test": {
-      "description": "Test each package with bazel coverage, read its JUnit and LCOV reports; Bazel keeps its own cache.",
+      "description": "Test each package with bazel test, read its JUnit reports and, when the project opts into coverage, its LCOV reports; Bazel keeps its own cache.",
       "run": [
         {
           "id": "graph",
@@ -184,7 +184,7 @@
       }
     },
     "test-run": {
-      "description": "Run bazel coverage //<package>:all in the workspace root for one package, after the Bazel version check, with a build-event file in the command output; then copy the test.xml and coverage.dat of each test run the build-event file lists into the command output and read them. A failed case, a step that exits non-zero, or a missing JUnit report fails the task. Putnami's cache is off: Bazel's cache decides what reruns, and Bazel's outputs are never removed.",
+      "description": "Run bazel test //<package>:all in the workspace root for one package, after the Bazel version check, with a build-event file in the command output; then copy the test.xml and the LCOV coverage.dat of each test run the build-event file lists into the command output and read them. A coverage.dat that is no LCOV tracefile is skipped with a warning. A failed case, a step that exits non-zero, or a missing JUnit report fails the task. Putnami's cache is off: Bazel's cache decides what reruns, and Bazel's outputs are never removed.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -288,7 +288,7 @@
       }
     },
     "workspace-sync-exec": {
-      "description": "Write in each Bazel package's putnami.json the extension, its dependencies as the project IDs of the packages the bazel-graph.json export at the workspace root, or bazel query //..., says it depends on, the module files of the root as its filePatterns, and test in disable.jobs when it holds no test rule. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "description": "Write in each Bazel package's putnami.json the extension, its dependencies as the project IDs of the packages the bazel-graph.json export at the workspace root, or bazel query //..., says it depends on, the module files of the root as its filePatterns, and test in disable.jobs when it holds no test rule that //<package>:all selects. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

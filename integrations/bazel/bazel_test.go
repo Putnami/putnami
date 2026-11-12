@@ -98,16 +98,18 @@ func coverageOf(report, dir string) string {
 }
 
 // stubBazel puts first on PATH a bazel that prints its version, prints the
-// demo's export for query, and for coverage //<pkg>:all writes the build-event
-// file of that package's test runs, whose outputs lie in an output tree
-// outside the workspace, as Bazel's do. It logs each call, with its working
-// directory, to $STUB_LOG, and returns the output tree's testlogs directory.
+// demo's export for query, and for test or coverage //<pkg>:all writes the
+// build-event file of that package's test runs, whose outputs lie in an
+// output tree outside the workspace, as Bazel's do; a coverage output only
+// for coverage, or for test with --collect_code_coverage. It logs each call,
+// with its working directory, to $STUB_LOG, and returns the output tree's
+// testlogs directory.
 func stubBazel(t *testing.T, d demo) string {
 	t.Helper()
 	bin, ci, outBase := t.TempDir(), t.TempDir(), t.TempDir()
 	stackstest.WriteFile(t, ci, "bazel-graph.json", d["ci"]["bazel-graph.json"])
 	testlogs := filepath.Join(outBase, "execroot", "_main", "bazel-out", "darwin-fastbuild", "testlogs")
-	events := map[string][]string{}
+	events, uncovered := map[string][]string{}, map[string][]string{}
 	for rel, content := range d["bazel"] {
 		logRel, ok := strings.CutPrefix(rel, "testlogs/")
 		if !ok || !strings.HasSuffix(logRel, "/test.xml") {
@@ -118,18 +120,28 @@ func stubBazel(t *testing.T, d demo) string {
 		stackstest.WriteFile(t, testlogs, logRel, content)
 		stackstest.WriteFile(t, testlogs, logDir+"/coverage.dat", coverageOf(d["bazel"]["out/_coverage/_coverage_report.dat"], pkg))
 		uri := func(name string) string { return "file://" + filepath.ToSlash(filepath.Join(testlogs, logDir, name)) }
-		event, _ := json.Marshal(map[string]any{
-			"id": map[string]any{"testResult": map[string]any{"label": "//" + pkg + ":" + target, "run": 1, "shard": 1, "attempt": 1}},
-			"testResult": map[string]any{"status": "PASSED", "testActionOutput": []map[string]string{
-				{"name": "test.log", "uri": uri("test.log")},
-				{"name": "test.xml", "uri": uri("test.xml")},
-				{"name": "test.lcov", "uri": uri("coverage.dat")},
-			}},
-		})
-		events[pkg] = append(events[pkg], string(event))
+		event := func(outputs ...string) string {
+			var listed []map[string]string
+			for _, o := range outputs {
+				file := o
+				if o == "test.lcov" {
+					file = "coverage.dat"
+				}
+				listed = append(listed, map[string]string{"name": o, "uri": uri(file)})
+			}
+			data, _ := json.Marshal(map[string]any{
+				"id":         map[string]any{"testResult": map[string]any{"label": "//" + pkg + ":" + target, "run": 1, "shard": 1, "attempt": 1}},
+				"testResult": map[string]any{"status": "PASSED", "testActionOutput": listed},
+			})
+			return string(data)
+		}
+		events[pkg] = append(events[pkg], event("test.log", "test.xml", "test.lcov"))
+		uncovered[pkg] = append(uncovered[pkg], event("test.log", "test.xml"))
 	}
 	for pkg, lines := range events {
-		stackstest.WriteFile(t, ci, "events/"+strings.ReplaceAll(pkg, "/", "_")+".json", `{"id":{"started":{}},"started":{"command":"coverage"}}`+"\n"+strings.Join(lines, "\n")+"\n")
+		flat := strings.ReplaceAll(pkg, "/", "_")
+		stackstest.WriteFile(t, ci, "events/"+flat+".json", `{"id":{"started":{}},"started":{"command":"coverage"}}`+"\n"+strings.Join(lines, "\n")+"\n")
+		stackstest.WriteFile(t, ci, "events/"+flat+".uncovered.json", `{"id":{"started":{}},"started":{"command":"test"}}`+"\n"+strings.Join(uncovered[pkg], "\n")+"\n")
 	}
 	script := `#!/bin/sh
 set -e
@@ -138,10 +150,11 @@ case "$1" in --version) echo "bazel ${STUB_VERSION:-` + version + `}"; exit 0;; 
 for a in "$@"; do last="$a"; done
 case "$1" in
   query) cat '` + ci + `/bazel-graph.json'; exit 0;;
-  coverage)
+  test|coverage)
     pkg="${last#//}"; pkg="${pkg%:all}"; flat="$(echo "$pkg" | tr / _)"
-    for a in "$@"; do case "$a" in --build_event_json_file=*) bep="${a#--build_event_json_file=}";; esac; done
-    if [ -e '` + ci + `'/events/"$flat".json ]; then cp '` + ci + `'/events/"$flat".json "$bep"; else echo '{"id":{"started":{}}}' > "$bep"; fi
+    kind=".uncovered"; [ "$1" = coverage ] && kind=""
+    for a in "$@"; do case "$a" in --build_event_json_file=*) bep="${a#--build_event_json_file=}";; --collect_code_coverage) kind="";; esac; done
+    if [ -e '` + ci + `'/events/"$flat".json ]; then cp '` + ci + `'/events/"$flat$kind".json "$bep"; else echo '{"id":{"started":{}}}' > "$bep"; fi
     exit "${STUB_TEST_EXIT:-0}";;
 esac
 exit 0
@@ -495,7 +508,7 @@ func TestATaskRunsBazelOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 
 	for task, want := range map[string]string{
 		stacks.TaskBuild: "bazel build //pricing:all",
-		stacks.TaskTest:  "bazel coverage --build_event_json_file=" + out + "/build-events.json //pricing:all",
+		stacks.TaskTest:  "bazel test --build_event_json_file=" + out + "/build-events.json //pricing:all",
 	} {
 		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
 		status, data, events := runJob(t, root, "pricing", task)
@@ -518,7 +531,7 @@ func TestATaskRunsBazelOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 	t.Setenv("STUB_VERSION", "")
 	t.Setenv("STUB_TEST_EXIT", "3")
 	if status, _, events := runJob(t, root, "pricing", stacks.TaskTest); status != "FAILED" || !strings.Contains(events, stacks.CodeStepFailed) {
-		t.Errorf("a failing bazel coverage fails the task: %s %s", status, events)
+		t.Errorf("a failing bazel test fails the task: %s %s", status, events)
 	}
 }
 
@@ -539,6 +552,7 @@ func TestTheBazelReportsBecomeTheTestAndCoverageSummary(t *testing.T) {
 	testlogs := stubBazel(t, d)
 	setRuntime(t)
 	root := repository(t, d, true)
+	optIntoCoverage(t, root, "pricing")
 	// A log a removed target left in the output tree is no run of this one.
 	stackstest.WriteFile(t, testlogs, "pricing/old_test/test.xml", `<testsuites><testsuite name="old" tests="1" failures="1"><testcase classname="old" name="TestGone"><failure message="gone"/></testcase></testsuite></testsuites>`)
 
@@ -569,7 +583,7 @@ func TestCollectReportsReadsTheBuildEventFile(t *testing.T) {
 	root, into := t.TempDir(), t.TempDir()
 	// A run whose outputs are remote is read from bazel-testlogs.
 	stackstest.WriteFile(t, root, "bazel-testlogs/api/api_test/test.xml", "<testsuites/>")
-	stackstest.WriteFile(t, root, "bazel-testlogs/api/api_test/coverage.dat", "end_of_record\n")
+	stackstest.WriteFile(t, root, "bazel-testlogs/api/api_test/coverage.dat", "SF:api/api.go\nDA:1,1\nend_of_record\n")
 	outputs := t.TempDir()
 	stackstest.WriteFile(t, outputs, "testlogs/pricing/pricing_test/shard_1_of_2/test.xml", "<testsuites/>")
 	events := filepath.Join(t.TempDir(), "build-events.json")
@@ -663,5 +677,92 @@ func TestTheQueryWaitsForTheTasksOfTheStackRoot(t *testing.T) {
 		}
 	case <-time.After(30 * time.Second):
 		t.Fatal("the query never ran after the lock was released")
+	}
+}
+
+// bazel test //<pkg>:all selects no test tagged manual, and exits 4 when it
+// selects none: a package whose tests are all manual has its test disabled.
+func TestTheSyncDisablesTheTestOfAPackageWhoseTestsAreAllManual(t *testing.T) {
+	d := readDemo(t)
+	t.Setenv("PATH", t.TempDir())
+	root := repository(t, d, true)
+	manual := `{"name":"tags","type":"STRING_LIST","stringListValue":["manual","exclusive"],"explicitlySpecified":true}`
+	stackstest.WriteFile(t, root, "store/linearizability/BUILD.bazel", "go_test(name = \"linearizability_test\", tags = [\"manual\"])\n")
+	stackstest.WriteFile(t, root, "bazel-graph.json", d["ci"]["bazel-graph.json"]+
+		`{"type":"RULE","rule":{"name":"//store/linearizability:linearizability_test","ruleClass":"go_test","attribute":[`+manual+`],"ruleInput":["//pricing:pricing"]}}`+"\n"+
+		`{"type":"RULE","rule":{"name":"//pricing:pricing_soak_test","ruleClass":"go_test","attribute":[`+manual+`],"ruleInput":["//pricing:pricing"]}}`+"\n")
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if disable := readProjectFile(t, root, "store/linearizability")["disable"]; !reflect.DeepEqual(disable, map[string]any{"jobs": []any{"test"}}) {
+		t.Errorf("a package of manual tests alone has disable = %v, want its test disabled", disable)
+	}
+	if disable, ok := readProjectFile(t, root, "pricing")["disable"]; ok {
+		t.Errorf("a package with a test beside a manual one has disable = %v, want its test kept", disable)
+	}
+}
+
+// optIntoCoverage overrides the test steps of the package dir with bazel
+// coverage, the way a project opts into coverage.
+func optIntoCoverage(t *testing.T, root, dir string) {
+	t.Helper()
+	stackstest.WriteFile(t, root, dir+"/putnami.json", `{"options": {"`+ExtensionName+`": {"tasks": {"test": {"steps": [["bazel", "coverage", "--build_event_json_file={output}/build-events.json", "//{component}:all"]]}}}}}`+"\n")
+}
+
+// bazel coverage can fail where bazel test passes, as on a C++ test whose
+// coverage tree holds a dangling link: test runs bazel test, coverage is
+// opted into, and a coverage file that is not LCOV, such as a raw LLVM
+// profile, is skipped with a warning.
+func TestTheTestTaskRunsBazelTestAndReadsOnlyAnLCOVCoverage(t *testing.T) {
+	d := readDemo(t)
+	testlogs := stubBazel(t, d)
+	setRuntime(t)
+	root := repository(t, d, true)
+	rootReal, _ := filepath.EvalSymlinks(root)
+	out := filepath.Join(root, ".putnami/out/pricing/test")
+
+	status, data, events := runJob(t, root, "pricing", stacks.TaskTest)
+	if want := rootReal + " bazel test --build_event_json_file=" + out + "/build-events.json //pricing:all"; status != "OK" || !slices.Contains(stubLog(t), want) {
+		t.Fatalf("status %s, calls %q, want %q: %s", status, stubLog(t), want, events)
+	}
+	if got := data["testSummary"].(map[string]any); got["total"] != 3 || got["passed"] != 3 {
+		t.Errorf("testSummary = %v, want pricing's 3 cases", got)
+	}
+	if got, ok := data["coverageSummary"]; ok {
+		t.Errorf("a run that collects no coverage has coverageSummary %v", got)
+	}
+
+	// A project opts into coverage; a coverage file that is no LCOV
+	// tracefile is skipped with a warning, and the tests still count.
+	optIntoCoverage(t, root, "pricing")
+	stackstest.WriteFile(t, testlogs, "pricing/pricing_test/coverage.dat", "\xfflprofi\x81\x00\x00\x00\x0a\x00\x00\x00")
+	status, data, events = runJob(t, root, "pricing", stacks.TaskTest)
+	if status != "OK" {
+		t.Fatalf("a run with a coverage file that is not LCOV: status %s: %s", status, events)
+	}
+	if got := data["testSummary"].(map[string]any); got["total"] != 3 {
+		t.Errorf("testSummary = %v, want pricing's 3 cases", got)
+	}
+	if got, ok := data["coverageSummary"]; ok {
+		t.Errorf("a coverage file that is not LCOV was read: coverageSummary %v", got)
+	}
+	if strings.Contains(events, "readers.malformed") {
+		t.Errorf("events = %s, want no malformed report", events)
+	}
+
+	// The warning is one line of the step's output.
+	var stderr strings.Builder
+	into := t.TempDir()
+	if err := CollectReports([]string{"--events", filepath.Join(out, "build-events.json"), "--root", root, "--into", into}, nil, &stderr); err != nil {
+		t.Fatal(err)
+	}
+	if want := "warning: pricing/pricing_test/coverage.dat is not an LCOV tracefile: its coverage is skipped\n"; stderr.String() != want {
+		t.Errorf("stderr = %q, want %q", stderr.String(), want)
+	}
+	if _, err := os.Stat(filepath.Join(into, "pricing/pricing_test/coverage.dat")); !os.IsNotExist(err) {
+		t.Errorf("a coverage file that is not LCOV was collected: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(into, "pricing/pricing_test/test.xml")); err != nil {
+		t.Errorf("the JUnit report of a run with no LCOV coverage was not collected: %v", err)
 	}
 }

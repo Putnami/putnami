@@ -49,7 +49,7 @@ in each package's `putnami.json`:
 | `extensions` | `@putnami/bazel`, beside any other extension the file names |
 | `dependencies` | The project ID of each package one of its rules reads a label of, such as `/pricing`; a label of an external repository is no edge, and a dependency on a project with no `BUILD` file is kept |
 | `options.@putnami/bazel.filePatterns` | The files at the root that every package reads, relative to the package: `MODULE.bazel`, `MODULE.bazel.lock`, `WORKSPACE`, `WORKSPACE.bazel`, `.bazelrc` and `.bazelversion`, those that exist, and the root `BUILD` file when the package reads a target of the root package. A change to one selects the package |
-| `disable.jobs` | `test` when the export lists no test rule of the package (a class that ends in `_test`, or a `test_suite`), so a package without tests runs no test task; the sync owns this entry and removes it from a package that has a test rule |
+| `disable.jobs` | `test` when the export lists no test rule of the package that `//<package>:all` selects (a class that ends in `_test`, or a `test_suite`, not tagged `manual`), so a package without such a test runs no test task, where `bazel test` would exit 4; the sync owns this entry and removes it from a package that has a test rule |
 
 It keeps every other member, and rewrites a file only when a member it owns
 changes, with two-space indentation and sorted keys. A package that left the
@@ -84,7 +84,7 @@ rules of the package, not those of the packages under it.
 
 | Task | Command |
 |---|---|
-| `test` | `bazel coverage --build_event_json_file=<output>/build-events.json //<package>:all` |
+| `test` | `bazel test --build_event_json_file=<output>/build-events.json //<package>:all` |
 | `build` | `bazel build //<package>:all` |
 
 Bazel declares no lint convention, so a Bazel package has no lint task.
@@ -97,7 +97,36 @@ coverage summary. A source file that several test runs cover counts each
 line once, covered when any run covered it. A log that a removed target left in `bazel-testlogs` is no
 run of this one, and is not read. A failed case, a command that exits
 non-zero, or a run with no JUnit report fails the task; a test rule without
-coverage support fails nothing.
+coverage support fails nothing. A `coverage.dat` that is no LCOV tracefile,
+such as the raw LLVM profile a C++ test can leave, is skipped with a warning
+in the task's output.
+
+### Coverage is opt-in
+
+`bazel test` collects no coverage, and `bazel coverage` can fail where
+`bazel test` passes, as on a C++ test whose coverage output holds a dangling
+link. To collect coverage for every package, add to `.bazelrc`:
+
+```
+test --collect_code_coverage
+```
+
+To collect it for one package, override its test command in its
+`putnami.json`:
+
+```json
+{
+  "options": {
+    "@putnami/bazel": {
+      "tasks": {
+        "test": {
+          "steps": [["bazel", "coverage", "--build_event_json_file={output}/build-events.json", "//{component}:all"]]
+        }
+      }
+    }
+  }
+}
+```
 
 ## Bazel keeps its cache
 

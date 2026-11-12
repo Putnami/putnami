@@ -15,7 +15,7 @@
   "tasks": {
     "test": {
       "steps": [
-        ["bazel", "coverage", "--build_event_json_file={output}/build-events.json", "//{component}:all"]
+        ["bazel", "test", "--build_event_json_file={output}/build-events.json", "//{component}:all"]
       ],
       "reportSteps": [
         ["{runtime}", "collect-reports", "--events", "{output}/build-events.json", "--root", "{root}", "--into", "{output}/reports"]

@@ -39,11 +39,16 @@ var testOutputs = map[string]string{
 // the build-event file lists into the directory --into, by its log directory
 // under bazel-testlogs. A run whose event names a local file is copied from
 // it; any other run is read from <root>/bazel-testlogs/<package>/<target>.
-// Bazel's own outputs are only read, never removed: a removed output would
-// make Bazel rerun a cached test. A missing build-event file, as when bazel
-// stopped before it wrote one, collects nothing and is no error: the task's
-// reports are missing then, and the step already failed.
-func CollectReports(args []string, _, _ io.Writer) error {
+// A coverage file that is no LCOV tracefile, such as the raw LLVM profile a
+// C++ test can leave, is skipped with a warning on stderr. Bazel's own
+// outputs are only read, never removed: a removed output would make Bazel
+// rerun a cached test. A missing build-event file, as when bazel stopped
+// before it wrote one, collects nothing and is no error: the task's reports
+// are missing then, and the step already failed.
+func CollectReports(args []string, _, stderr io.Writer) error {
+	if stderr == nil {
+		stderr = io.Discard
+	}
 	fs := flag.NewFlagSet(CollectReportsCommand, flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	events := fs.String("events", "", "the build-event file of the test run")
@@ -64,7 +69,12 @@ func CollectReports(args []string, _, _ io.Writer) error {
 	}
 	for _, run := range runs {
 		for name, src := range run.files(*root) {
-			dst := filepath.Join(*into, filepath.FromSlash(run.logDir), name)
+			rel := path.Join(run.logDir, name)
+			if name == coverageFile && !isLCOV(src) {
+				fmt.Fprintf(stderr, "warning: %s is not an LCOV tracefile: its coverage is skipped\n", rel)
+				continue
+			}
+			dst := filepath.Join(*into, filepath.FromSlash(rel))
 			if err := copyReport(src, dst); err != nil {
 				return err
 			}
@@ -201,6 +211,35 @@ func localOutput(uri string) (string, string, bool) {
 		return file, path.Dir(slashed[i+len("/testlogs/"):]), true
 	}
 	return file, "", true
+}
+
+// lcovStart are the records an LCOV tracefile starts with.
+var lcovStart = []string{"TN:", "SF:", "VER:"}
+
+// isLCOV reports whether a coverage file is an LCOV tracefile: empty, or text
+// whose first non-blank line opens one. A file that cannot be read is left to
+// the copy, which reports it.
+func isLCOV(file string) bool {
+	f, err := os.Open(file) //nolint:gosec // a test output the build-event file names
+	if err != nil {
+		return true
+	}
+	defer f.Close()
+	head := make([]byte, 4096)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return true
+	}
+	text := strings.TrimLeft(string(head[:n]), " \t\r\n")
+	if text == "" {
+		return true
+	}
+	for _, start := range lcovStart {
+		if strings.HasPrefix(text, start) {
+			return true
+		}
+	}
+	return false
 }
 
 // copyReport copies one report, read-only in Bazel's output tree, to a new

@@ -66,3 +66,18 @@ unless an extension declares it. A consumer that needs a
 ChangePlan runs `putnami impact-plan lint,test,build,validate --base
 <commit>` and projects the ImpactPlan with `ChangePlanFromImpactPlan`.
 `protocols/ci` keeps ChangePlan v1, its digest and its corpus unchanged.
+
+## Note (2026-11-12)
+
+Decision 5 changes for a workspace without a usable `putnami.ci.json`. The
+gate is the blocking commands of the CI protocol's default document that a
+loaded extension declares, in that order. A workspace whose extensions
+declare none of them keeps all three. A Bazel workspace, whose extension
+declares `test` and `build`, was told to run `lint`, which the engine refuses
+as undeclared
+([ADR 0073](0073-the-core-declares-no-development-verb.md)). No verb
+outside the default document joins the gate: `validate` still needs a
+`putnami.ci.json`. The guidance now reads the loaded extensions. It follows
+the committed lock, because context generation materializes the lock-pinned
+extensions before it writes. The generated guidance still names no
+extension.
