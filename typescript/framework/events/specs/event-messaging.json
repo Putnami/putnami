@@ -75,7 +75,5 @@
       "text": "The delivery lifecycle records match the shared cross-language corpus, so the TypeScript and Go brokers cannot drift on record vocabulary, ordering, or the attempt numbers they report."
     }
   ],
-  "decisions": [
-    "typescript/framework/events/doc/adr/0001-delivery-is-at-least-once-and-loss-is-recorded.md"
-  ]
+  "decisions": ["typescript/framework/events/doc/adr/0001-delivery-is-at-least-once-and-loss-is-recorded.md"]
 }

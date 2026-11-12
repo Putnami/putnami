@@ -56,7 +56,5 @@
       "text": "A project that declares tables emits the database and schemas it needs into its own infra requirements sidecar, including tables that live only in a dependency package, so deployment requirements are derived from code rather than restated by hand."
     }
   ],
-  "decisions": [
-    "typescript/framework/database/doc/adr/0001-the-request-is-the-transaction-boundary.md"
-  ]
+  "decisions": ["typescript/framework/database/doc/adr/0001-the-request-is-the-transaction-boundary.md"]
 }

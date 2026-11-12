@@ -59,7 +59,5 @@
       "text": "Repository, backend lifecycle, and transaction outcomes emit collection-scoped duration, failure, slow-operation, and active-transaction measurements while remaining safe when telemetry is disabled."
     }
   ],
-  "decisions": [
-    "typescript/framework/document/doc/adr/0001-portability-stops-at-explicit-adapter-capabilities.md"
-  ]
+  "decisions": ["typescript/framework/document/doc/adr/0001-portability-stops-at-explicit-adapter-capabilities.md"]
 }
