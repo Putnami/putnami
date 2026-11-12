@@ -20,8 +20,10 @@ import (
 // It names the modules through the go command's `work` pattern, which matches
 // every package of every go.work module. One root `./...` would stop at each
 // nested go.mod. The project's test inputs are the tracked Go sources, go.mod
-// and go.sum files of the repository and go.work, so a change to any of them
-// selects this gate and changes its cache key.
+// and go.sum files of the repository, go.work, and the committed contracts the
+// generated clients come from, so a change to any of them selects this gate and
+// changes its cache key. The generated clients themselves are not in Git: CI
+// generates them before the gate.
 
 // windowsVetPlatform is the platform the gate compiles for: the only Windows
 // target Putnami supports (D-W1).
@@ -49,10 +51,15 @@ func TestEveryGoWorkModuleVetsForWindows(t *testing.T) {
 	cmd.Dir = root
 	cmd.Env = env
 	if output, err := cmd.CombinedOutput(); err != nil {
-		t.Fatalf("%s go vet work: %v\n%s\nMove the Unix-only code behind a _unix.go file or a //go:build unix constraint, next to a Windows counterpart.",
-			strings.Join(windowsVetPlatform, " "), err, output)
+		t.Fatalf("%s go vet work: %v\n%s\nMove the Unix-only code behind a _unix.go file or a //go:build unix constraint, next to a Windows counterpart.\n%s",
+			strings.Join(windowsVetPlatform, " "), err, output, missingClientRemedy)
 	}
 }
+
+// missingClientRemedy names the fix for a package that imports a generated
+// client the checkout does not hold. Git holds no generated client, and the gate
+// plans only the clients its jobs declare, while this test reads every module.
+const missingClientRemedy = "When a package imports a generated client that is missing, run `putnami client-generate --projects '*'` first."
 
 // windowsVetEnv is the caller's environment pinned to the repository's go.work
 // and to windows/amd64. cgo is off, as it is for any cross-compilation without
@@ -82,7 +89,7 @@ func goOutputLines(t *testing.T, root string, env []string, args ...string) []st
 		if errors.As(err, &exit) {
 			stderr = string(exit.Stderr)
 		}
-		t.Fatalf("go %s: %v\n%s", strings.Join(args, " "), err, stderr)
+		t.Fatalf("go %s: %v\n%s\n%s", strings.Join(args, " "), err, stderr, missingClientRemedy)
 	}
 	seen := map[string]bool{}
 	lines := []string{}

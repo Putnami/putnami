@@ -234,6 +234,13 @@ jobs:
         run: |
           echo '{"enabled": false}' > .putnami/cache.json
 
+      # Git holds no generated client, and an explicit install runs no
+      # first-run restore. The gate plans the clients its jobs declare, but the
+      # Windows compile gate type-checks every go.work module, so every client
+      # must exist first. "*" names disabled projects too: go.work builds them.
+      - name: Generate every client
+        run: ./putnamiw client-generate --projects '*'
+
       # A green gate that selected zero projects is green over nothing. Publish
       # what was selected so a reviewer reads the scope, not just the checkmark.
       - name: Report what the gate covers

@@ -24,6 +24,7 @@
         "git:../../**/*.s",
         "git:../../**/go.mod",
         "git:../../**/go.sum",
+        "git:../../**/schema/openapi.json",
         "../../go.work"
       ]
     }
