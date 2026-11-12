@@ -85,8 +85,12 @@ type Result struct {
 	SBOM *evidence.SBOM `json:"sbom,omitempty"`
 	// Decisions are the decision records the change concerns, sorted by
 	// path.
-	Decisions   []evidence.Decision `json:"decisions,omitempty"`
-	Diagnostics []diag.Diagnostic   `json:"-"`
+	Decisions []evidence.Decision `json:"decisions,omitempty"`
+	// Declarations are the declaration files the change touches, with their
+	// two documents, in diff order; empty unless the repository is a Putnami
+	// workspace.
+	Declarations []evidence.Declaration `json:"declarations,omitempty"`
+	Diagnostics  []diag.Diagnostic      `json:"-"`
 }
 
 // Run analyzes one change.
@@ -116,6 +120,7 @@ func Run(in Input) Result {
 	r.dependencyChanges(in)
 	r.sbomFacts(in)
 	r.decisionRecords(in)
+	r.declarations(in)
 	return r
 }
 

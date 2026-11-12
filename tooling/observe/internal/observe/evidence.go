@@ -73,6 +73,8 @@ func Evidence(o Observation, now time.Time) *evidence.Document {
 	doc.DependencyChanges = o.Analysis.DependencyChanges
 	doc.SBOM = o.Analysis.SBOM
 	doc.Decisions = o.Analysis.Decisions
+	doc.Declarations = o.Analysis.Declarations
+	doc.SpecVerification = o.SpecVerification
 	diags := o.Diagnostics
 	if httpsURL(o.CI.URL) {
 		doc.CI.URL = o.CI.URL

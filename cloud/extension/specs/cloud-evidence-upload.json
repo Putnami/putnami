@@ -46,6 +46,13 @@
       ]
     },
     {
+      "id": "sends-the-declared-records",
+      "text": [
+        "A document's spec verification record and its declarations are each posted in a batch of their own under the run's submission id, copied from the document.",
+        "A document without them sends no such batch."
+      ]
+    },
+    {
       "id": "refuses-what-it-cannot-upload",
       "text": [
         "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a document whose subject names no numeric project id, it sends nothing and exits non-zero with a message that names the cause.",

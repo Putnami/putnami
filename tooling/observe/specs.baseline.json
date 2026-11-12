@@ -4,6 +4,7 @@
   "executableRequirements": [
     "tooling/observe#caller-directory-writes",
     "tooling/observe#ci-detection",
+    "tooling/observe#declared-repository-evidence",
     "tooling/observe#diff-base",
     "tooling/observe#evidence-document",
     "tooling/observe#external-specs",

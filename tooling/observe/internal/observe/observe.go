@@ -48,8 +48,12 @@ type Observation struct {
 	// Specs are the Spec Kit, OpenSpec, Kiro and Gherkin specs the
 	// repository keeps, with their requirements and whether the change
 	// touches them.
-	Specs       []specs.Spec      `json:"specs"`
-	Diagnostics []diag.Diagnostic `json:"diagnostics"`
+	Specs []specs.Spec `json:"specs"`
+	// SpecVerification is the newest spec verification record the
+	// repository's own Putnami workspace wrote; nil when it is no workspace
+	// or its CI verified no spec.
+	SpecVerification json.RawMessage   `json:"specVerification,omitempty"`
+	Diagnostics      []diag.Diagnostic `json:"diagnostics"`
 }
 
 // Options are the inputs of one run.
@@ -159,7 +163,9 @@ func Run(ctx context.Context, opts Options) Observation {
 	}
 	repoSpecs, specDiags := specs.Collect(specs.Request{Root: root, Owner: set.Owner, Changed: changed})
 	o.Specs = repoSpecs
-	o.Diagnostics = slices.Concat(detection.Diagnostics, subjectDiags, resolved.Diagnostics, reportDiags, set.Diagnostics, analysisDiags, o.Analysis.Diagnostics, specDiags)
+	record, recordDiags := readSpecVerification(root)
+	o.SpecVerification = record
+	o.Diagnostics = slices.Concat(detection.Diagnostics, subjectDiags, resolved.Diagnostics, reportDiags, set.Diagnostics, analysisDiags, o.Analysis.Diagnostics, specDiags, recordDiags)
 	if o.Diagnostics == nil {
 		o.Diagnostics = []diag.Diagnostic{}
 	}

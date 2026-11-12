@@ -295,6 +295,33 @@
               "a-document-without-architecture-validates-as-before"
             ]
           }
+        },
+        {
+          "id": "declarations-follow-the-diff",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-declaration-defect-gets-its-code",
+              "a-document-without-declarations-validates-as-before"
+            ]
+          }
+        },
+        {
+          "id": "the-spec-verification-record-is-carried-whole",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-spec-verification-record-is-one-bounded-object"
+            ]
+          }
         }
       ]
     }

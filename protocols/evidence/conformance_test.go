@@ -270,6 +270,7 @@ func TestConformance_SchemaEnumsAreTheGoVocabularies(t *testing.T) {
 		"vulnerability.severity": {root.Defs["vulnerability"].Properties["severity"].Enum, Severities},
 		"decision.status":        {root.Defs["decision"].Properties["status"].Enum, DecisionStatuses},
 		"decision.change":        {root.Defs["decision"].Properties["change"].Enum, FileStatuses},
+		"declaration.status":     {root.Defs["declaration"].Properties["status"].Enum, FileStatuses},
 		"architecture.status":    {root.Defs["architectureRule"].Properties["status"].Enum, ArchitectureStatuses},
 	}
 	for name, pair := range enums {
@@ -1007,4 +1008,87 @@ func TestConformance_ADocumentWithoutArchitectureValidatesAsBefore(t *testing.T)
 		}
 	}
 	expectCodes(t, "stripped", codesOf(t, "architecture-pull-request.json", func(d *Document) { d.Architecture = nil }))
+}
+
+func TestConformance_EachDeclarationDefectGetsItsCode(t *testing.T) {
+	spectest.Proves(t, feature, "declarations-follow-the-diff", "each-declaration-defect-gets-its-code")
+	text := func(s string) *string { return &s }
+	for label, mutate := range map[string]func(*Document){
+		"not a declaration": func(d *Document) {
+			d.Declarations[1].Path = "pricing/discount_test.go"
+			d.Declarations[1].Status = FileDeleted
+			d.Declarations[1].After = nil
+		},
+		"not a changed file":        func(d *Document) { d.Declarations[1].Path = "pricing/specs/refund.json" },
+		"another status":            func(d *Document) { d.Declarations[1].Status = FileAdded; d.Declarations[1].Before = nil },
+		"unknown status":            func(d *Document) { d.Declarations[1].Status = "edited" },
+		"renamed without its path":  func(d *Document) { d.Declarations[2].PreviousPath = "" },
+		"previous path not renamed": func(d *Document) { d.Declarations[1].PreviousPath = "pricing/specs/old.json" },
+		"added with a base":         func(d *Document) { d.Declarations[0].Before = text("") },
+		"deleted with a commit":     func(d *Document) { d.Declarations[3].After = text("{}") },
+	} {
+		expectCodes(t, label, codesOf(t, "declared-pull-request.json", mutate), ErrorCodeInvalidDeclaration)
+	}
+	expectCodes(t, "escaping previous path", codesOf(t, "declared-pull-request.json", func(d *Document) {
+		d.Declarations[2].PreviousPath = "../specs/pricing.json"
+	}), ErrorCodeInvalidPath)
+	expectCodes(t, "declaration twice", codesOf(t, "declared-pull-request.json", func(d *Document) {
+		d.Declarations = append(d.Declarations, d.Declarations[1])
+	}), ErrorCodeDuplicate)
+	expectCodes(t, "document over its bound", codesOf(t, "declared-pull-request.json", func(d *Document) {
+		d.Declarations[1].After = text(strings.Repeat("x", MaxDeclarationBytes+1))
+	}), ErrorCodeTooLarge)
+	// A declaration document is bounded by MaxDeclarationBytes, not by the
+	// bound of every other string.
+	large := strings.Repeat("x", MaxStringBytes+1)
+	expectCodes(t, "document over the string bound", codesOf(t, "declared-pull-request.json", func(d *Document) {
+		d.Declarations[1].After = &large
+	}))
+	// A file renamed out of the declarations is still one by its previous
+	// path.
+	expectCodes(t, "renamed out", codesOf(t, "declared-pull-request.json", func(d *Document) {
+		d.ChangedFiles[3].Path, d.Declarations[2].Path = "docs/pricing.json", "docs/pricing.json"
+	}))
+	_, diags := ParseAndValidate([]byte(strings.Replace(mustRead(t, "valid", "declared-pull-request.json"), `"after": "* @acme/pricing`, `"kind": "owners", "after": "* @acme/pricing`, 1)))
+	if len(diags) != 1 || diags[0].Code != ErrorCodeUnknownField || diags[0].Field != "declarations[0].kind" {
+		t.Errorf("an undeclared declaration member: diags = %v, want one unknown_field at declarations[0].kind", diags)
+	}
+}
+
+func TestConformance_ADocumentWithoutDeclarationsValidatesAsBefore(t *testing.T) {
+	spectest.Proves(t, feature, "declarations-follow-the-diff", "a-document-without-declarations-validates-as-before")
+	for _, name := range []string{"generic-minimal.json", "turbo-pull-request.json", "decisions-pull-request.json"} {
+		data, err := json.Marshal(readValid(t, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(data), `"declarations"`) || strings.Contains(string(data), `"specVerification"`) {
+			t.Errorf("%s marshals a member it does not carry: %s", name, data)
+		}
+	}
+	expectCodes(t, "stripped", codesOf(t, "declared-pull-request.json", func(d *Document) {
+		d.Declarations, d.SpecVerification = nil, nil
+	}))
+}
+
+func TestConformance_TheSpecVerificationRecordIsOneBoundedObject(t *testing.T) {
+	spectest.Proves(t, feature, "the-spec-verification-record-is-carried-whole", "the-spec-verification-record-is-one-bounded-object")
+	for label, record := range map[string]string{"array": `[1]`, "string": `"verified"`, "null": `null`} {
+		expectCodes(t, label, codesOf(t, "declared-pull-request.json", func(d *Document) {
+			d.SpecVerification = json.RawMessage(record)
+		}), ErrorCodeInvalidSpecVerification)
+	}
+	expectCodes(t, "over its bound", codesOf(t, "declared-pull-request.json", func(d *Document) {
+		d.SpecVerification = json.RawMessage(`{"groups":"` + strings.Repeat("x", MaxSpecVerificationBytes) + `"}`)
+	}), ErrorCodeTooLarge)
+	// The record's members are the features protocol's: the document neither
+	// refuses an unknown one nor bounds its strings.
+	doc, diags := ParseAndValidate([]byte(strings.Replace(mustRead(t, "valid", "declared-pull-request.json"),
+		`"protocolVersion": 1,
+    "generatedAt"`, `"protocolVersion": 1,
+    "futureMember": "`+strings.Repeat("x", MaxStringBytes+1)+`",
+    "generatedAt"`, 1)))
+	if diag.HasErrors(diags) || doc == nil || !strings.Contains(string(doc.SpecVerification), "futureMember") {
+		t.Errorf("a record member the document does not know: diags = %v", diags)
+	}
 }
