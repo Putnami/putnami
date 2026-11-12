@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	featureproto "go.putnami.dev/protocol/features"
-	"go.putnami.dev/protocol/features/spectest"
 	workspaceproto "go.putnami.dev/protocol/workspace"
 	workspace "go.putnami.dev/tooling/sdd/extension/internal/wsview"
 )
@@ -91,7 +90,6 @@ func TestDiscoverAuthoredManifestsReadsOneDocumentPerFeature(t *testing.T) {
 }
 
 func TestDiscoverAuthoredManifestsRefusesARootThatHoldsBothForms(t *testing.T) {
-	spectest.Proves(t, "features/feature-contracts", "one-file-per-feature", "a-root-that-holds-both-forms-is-refused")
 	root := t.TempDir()
 	writeDiscoveryFixture(t, filepath.Join(root, "tooling", featureproto.ManifestFilename), modeledManifestJSON("tooling/run", "tooling"))
 	writeDiscoveryFixture(t, filepath.Join(root, "tooling", "features", "init.json"), modeledDocumentJSON("tooling/init", "tooling"))
