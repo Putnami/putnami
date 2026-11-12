@@ -182,7 +182,7 @@ func ensureRootManifest(ctx *pctx.Context, emit *jsonl.Emitter, manager packageM
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("stat package.json: %w", err)
 	}
-	name, err := json.Marshal(workspaceManifestName(ctx))
+	name, err := marshalManifestValue(workspaceManifestName(ctx))
 	if err != nil {
 		return fmt.Errorf("marshal the workspace name: %w", err)
 	}
@@ -264,7 +264,7 @@ func ensureWorkspacePackageManager(ctx *pctx.Context, emit *jsonl.Emitter, bunBi
 		emit.Log("warn", fmt.Sprintf("bun %q is not a release version: package.json declares no packageManager, so the lock pins no bun", version))
 		return nil
 	}
-	declaration, err := json.Marshal("bun@" + version)
+	declaration, err := marshalManifestValue("bun@" + version)
 	if err != nil {
 		return fmt.Errorf("marshal packageManager: %w", err)
 	}
@@ -338,7 +338,7 @@ func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 	}
 	sort.Strings(added)
 	for _, name := range added {
-		version, err := json.Marshal(manifest.WorkspaceDevDeps[name])
+		version, err := marshalManifestValue(manifest.WorkspaceDevDeps[name])
 		if err != nil {
 			return fmt.Errorf("marshal devDependency %s: %w", name, err)
 		}
@@ -349,7 +349,7 @@ func ensureWorkspaceDevDeps(ctx *pctx.Context, emit *jsonl.Emitter) error {
 
 	// Write back devDependencies; the root manifest and the devDependencies
 	// keep the key order they were read in.
-	devDepsJSON, err := json.Marshal(orderedRawObject{keys: manifestKeyOrder(devDeps, devOrder), values: devDeps})
+	devDepsJSON, err := marshalManifestValue(orderedRawObject{keys: manifestKeyOrder(devDeps, devOrder), values: devDeps})
 	if err != nil {
 		return fmt.Errorf("marshal devDependencies: %w", err)
 	}

@@ -331,8 +331,10 @@ and the checksum covers the lines between the two markers:
 | `AGENTS.md` | created as a heading plus the block | block inserted after a leading `# ` heading (or at the top); every other byte kept | block refreshed in place |
 | `CLAUDE.md` | created as `# CLAUDE.md` plus `@AGENTS.md` | block inserted the same way, unless the file already imports `@AGENTS.md` | block refreshed in place |
 
-An edited block is preserved and reported, never overwritten. These rules are
-independent of the ownership records described below.
+An edited block is preserved and reported, never overwritten. A file that is a
+symbolic link is left as it is, whatever it links to: a `CLAUDE.md` that links to
+`AGENTS.md` shows the block `AGENTS.md` receives. These rules are independent of
+the ownership records described below.
 
 `putnami context generate --force` is the way back. It rewrites an edited block;
 it never changes a byte outside the block.

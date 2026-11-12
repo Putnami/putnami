@@ -814,7 +814,7 @@ func pinViaDependencies(pkgPath string, pkg map[string]json.RawMessage, order []
 	}
 
 	if depsChanged {
-		depsJSON, err := json.Marshal(deps)
+		depsJSON, err := marshalManifestValue(deps)
 		if err != nil {
 			return fmt.Errorf("marshal dependencies: %w", err)
 		}

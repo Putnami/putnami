@@ -404,7 +404,7 @@ putnami init --from rush        # Turn a Rush repository into a workspace, in th
 putnami workspace describe      # Show workspace details
 ```
 
-`init` writes a `README.md`, a `.gitignore` and a `.gitattributes` with `* text=auto eol=lf` when they do not exist. The README names the workspace and the commands that check a change. The `.gitattributes` gives every checkout, Windows included, LF line endings. An existing file is left as it is; `putnami doctor` reports a checkout that converts line endings.
+`init` writes a `README.md`, a `.gitignore` and a `.gitattributes` with `* text=auto eol=lf` when they do not exist. The README names the workspace and the commands that check a change. The `.gitattributes` gives every checkout, Windows included, LF line endings. An existing file is left as it is, and so is a symbolic link, even one whose target does not exist; `putnami doctor` reports a checkout that converts line endings.
 
 `--extension` names the languages to declare: `dart`, `dotnet`, `go`, `java`, `php`, `python`, `ruby`, `rust`, `swift` or `typescript`, or a comma-separated list of them for a repository of several languages, such as `--extension rust,java`. `ts` and `py` name `typescript` and `python`. `init` declares and installs the extension of each language, whose dependencies bring the rest (D-008). An unknown language is a usage error raised before anything is written.
 
