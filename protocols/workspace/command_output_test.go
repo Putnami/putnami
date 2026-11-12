@@ -34,7 +34,7 @@ func TestCommandOutputDir(t *testing.T) {
 	}
 }
 
-// TestCommandOutputRel_NoDirectoryContainsAnother pins #1082: across projects
+// TestCommandOutputRel_NoDirectoryContainsAnother pins that, across projects
 // that nest, are named after commands, or start with the marker, no command
 // output directory equals or contains another one.
 func TestCommandOutputRel_NoDirectoryContainsAnother(t *testing.T) {

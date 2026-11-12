@@ -445,7 +445,7 @@ func TestPlanContract_CededSubpathHasOneOwner(t *testing.T) {
 	}
 }
 
-// TestPlan_ChildProjectNamedAfterAVerbOwnsDisjointCommandOutputs pins #1082: a
+// TestPlan_ChildProjectNamedAfterAVerbOwnsDisjointCommandOutputs pins that a
 // project directory named after a command (`/a/test`, `/a/build`, `/a/lint`)
 // must not land its command outputs inside its parent's command directory. The
 // plan selects every project and every command, so each child's command output
