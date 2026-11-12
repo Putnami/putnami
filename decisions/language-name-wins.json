@@ -2,7 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "language-name-wins",
-  "statement": "when a monorepo tool and a language extension both claim a project, the language extension's name is the project's name: with @putnami/typescript declared and a named package.json, @putnami/nx and @putnami/moon report no source name and keep their own name as the task reference nx run and moon run receive",
+  "statement": "a project a monorepo tool and @putnami/typescript both claim takes its package.json name: @putnami/nx and @putnami/moon report no source name and keep their own name for nx run and moon run",
   "settled": "2026-11-12",
   "settledBy": "fdumay",
   "reviewOnly": true
