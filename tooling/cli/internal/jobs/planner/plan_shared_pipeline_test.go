@@ -521,7 +521,7 @@ func cutPlanKey(key string) (project, step string, ok bool) {
 // the generator.
 func TestSharedExecutions_DependentsWaitForAnotherCommandsGenerator(t *testing.T) {
 	t.Parallel()
-	goExtension := loadGoPlannerExtension(t)
+	goExtension := goWithoutClosureDependencies(loadGoPlannerExtension(t))
 	for _, commands := range [][]string{{"client-generate", "lint", "test", "build"}, {"lint", "test", "build", "validate"}} {
 		ws, selected := dependentsWorkspace(t)
 		plan := func(clientgen *extension.ExtensionDescription) []*jobmodel.ScheduledJob {

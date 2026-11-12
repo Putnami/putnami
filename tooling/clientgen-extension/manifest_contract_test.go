@@ -341,7 +341,9 @@ func TestClientGenerateReadsCommittedFilesAndBuildsNoProvider(t *testing.T) {
 // a generated client exists before a compiler, a linter or a packager reads
 // it. The dependency is a plain command name, not a session barrier: it plans
 // the project's own client-generate, which plans nothing where no step
-// activates.
+// activates. Lint and validate build nothing, so they also depend on
+// client-generate across the dependency closure (`^client-generate`): the
+// clients they type-check in a dependency exist before they read them.
 func TestLanguageCommandsWaitForClientGenerate(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "language-commands-wait-for-generation", "go-and-typescript-lifecycle-commands-depend-on-client-generate")
 	spectest.Proves(t, clientgenFeature, "language-commands-wait-for-generation", "a-project-without-client-generate-plans-nothing-more")
@@ -354,7 +356,7 @@ func TestLanguageCommandsWaitForClientGenerate(t *testing.T) {
 		if manifest == nil || diag.HasErrors(diags) {
 			t.Fatalf("parse %s: %s", manifestPath, formatDiagnostics(diags))
 		}
-		for _, name := range []string{"build", "test", "lint", "serve", "package"} {
+		for _, name := range []string{"build", "test", "lint", "validate", "serve", "package"} {
 			command, ok := manifest.Commands[name]
 			if !ok {
 				t.Errorf("%s declares no %s command", manifestPath, name)
@@ -363,9 +365,15 @@ func TestLanguageCommandsWaitForClientGenerate(t *testing.T) {
 			if !slices.Contains(command.DependsOn, "client-generate") {
 				t.Errorf("%s %s dependsOn = %v, want client-generate", manifestPath, name, command.DependsOn)
 			}
+			typeChecksWithoutBuilding := name == "lint" || name == "validate"
+			if typeChecksWithoutBuilding != slices.Contains(command.DependsOn, "^client-generate") {
+				t.Errorf("%s %s dependsOn = %v; lint and validate alone depend on ^client-generate",
+					manifestPath, name, command.DependsOn)
+			}
 			for _, dependency := range command.DependsOn {
-				if strings.TrimLeft(dependency, "!^") == "client-generate" && dependency != "client-generate" {
-					t.Errorf("%s %s depends on %q; a barrier or an upstream edge plans more than the project's own generation",
+				if strings.TrimLeft(dependency, "!^") == "client-generate" && dependency != "client-generate" &&
+					dependency != "^client-generate" {
+					t.Errorf("%s %s depends on %q; a session barrier plans more than the project's own generation",
 						manifestPath, name, dependency)
 				}
 			}

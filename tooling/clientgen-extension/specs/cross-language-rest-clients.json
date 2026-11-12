@@ -97,7 +97,7 @@
     },
     {
       "id": "language-commands-wait-for-generation",
-      "text": "The @putnami/go and @putnami/typescript build, test, lint, serve and package commands depend on client-generate, so generated code exists before a compiler, a linter or a packager reads it; a project that declares no client-generate plans nothing more."
+      "text": "The @putnami/go and @putnami/typescript build, test, lint, validate, serve and package commands depend on client-generate, so generated code exists before a compiler, a linter or a packager reads it; lint and validate also depend on it across the dependency closure; a project that declares no client-generate plans nothing more."
     },
     {
       "id": "no-committed-client",

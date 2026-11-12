@@ -1,5 +1,6 @@
 import { file, Glob, gzipSync } from 'bun';
-import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { robustRenameSync } from '@putnami/runtime/robustio';
 import {
   fileExists,
   getCurrentProject,
@@ -95,7 +96,7 @@ function writeCommittedSpec(path: string, json: string): void {
   }
   const temporary = `${path}.tmp-${process.pid}`;
   writeFileSync(temporary, json);
-  renameSync(temporary, path);
+  robustRenameSync(temporary, path);
 }
 
 const DEFAULT_OUTPUT_PATH = 'schema/openapi.json';
