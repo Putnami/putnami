@@ -171,7 +171,9 @@ func TestAnImportedNxProjectTakesItsPackageName(t *testing.T) {
 		`{"name": "shop", "extensions": ["/nx-extension", "/.ext/typescript", "/.ext/dev"], "includes": [], "options": {"@putnami/nx": {"mode": "import"}}}`)
 	clitest.WriteFile(t, filepath.Join(root, "packages/pricing/project.json"), `{"name": "pricing"}`)
 
-	for _, args := range [][]string{{"projects", "sync"}, {"projects", "list"}} {
+	// The probe merge is what this proves: the sync installs nothing, so the
+	// test needs no package manager.
+	for _, args := range [][]string{{"projects", "sync", "--skip-install"}, {"projects", "list"}} {
 		code, out := clitest.RunGateArgs(t, root, args...)
 		if code != 0 || strings.Contains(out, "merge-conflict") || strings.Contains(out, "probe failed") {
 			t.Fatalf("%s exit %d:\n%s", strings.Join(args, " "), code, out)
