@@ -153,7 +153,7 @@ func (s Stack) component(in runInput, emit reporter) (Metadata, Profile, error) 
 	// A stack root that holds no component runs no step, but a job at that
 	// root, such as an install, selects its toolchain: its profile resolves
 	// too.
-	profile, err := s.Resolved(in.projectAbs, meta.Variant)
+	profile, err := s.ResolvedIn(in.projectAbs, meta.Variant, in.options)
 	if err != nil {
 		return Metadata{}, Profile{}, failWith(emit, CodeProjectConfigInvalid, "%v", err)
 	}

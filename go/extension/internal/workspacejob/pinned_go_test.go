@@ -109,3 +109,48 @@ func TestFindGoBinaryInstallsNothing(t *testing.T) {
 		t.Fatalf("a Go release appeared under the Putnami home: %v", err)
 	}
 }
+
+// Every go on PATH is a candidate, in PATH order. A go earlier on PATH that
+// runs another release, such as a distribution's older go in /usr/bin, does not
+// hide one later on PATH that qualifies, such as /usr/local/go/bin/go. Neither
+// directory is /usr/local/bin, and the Putnami home holds no Go.
+func TestFindGoBinaryFindsAQualifyingGoLaterOnPath(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "locked-go-is-exact", "a-qualifying-go-later-on-path-is-found")
+	for _, tc := range []struct {
+		name    string
+		lock    string // the pinned release, or "" for no lock
+		earlier string // the release the first go on PATH runs
+		later   string // the release the go later on PATH runs
+	}{
+		{name: "no lock, the first go is older", earlier: "1.98.0", later: "1.99.5"},
+		{name: "a lock, the first go is not the pin", lock: lockedGo, earlier: "1.99.5", later: lockedGo},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ws := jobtest.RealTempDir(t)
+			jobtest.WriteFile(t, ws, "go.work", "go 1.99.0\n")
+			if tc.lock != "" {
+				writeLock(t, ws, map[string]any{
+					"version":     tc.lock,
+					"integrities": map[string]string{hostPlatform(): strings.Repeat("a", 64)},
+					"source":      forbiddenSource(t),
+				})
+			}
+			j, rec, fakes := shellFreeJob(t, ws)
+			goName := pkgmeta.ExecutableName(runtime.GOOS, "go")
+			fakes.GoRelease(t, filepath.Join(fakes.Dir, goName), tc.earlier)
+			laterDir := filepath.Join(jobtest.RealTempDir(t), "go", "bin")
+			later := fakes.GoRelease(t, filepath.Join(laterDir, goName), tc.later)
+			j.Env.Set("PATH", fakes.Dir+string(os.PathListSeparator)+laterDir)
+
+			if !j.FindGoBinary() {
+				t.Fatalf("FindGoBinary found no go:\n%s", rec.Transcript())
+			}
+			if j.GoBinary != later {
+				t.Fatalf("GoBinary = %q, want the go later on PATH %q:\n%s", j.GoBinary, later, rec.Transcript())
+			}
+			if invocations := fakes.Invocations(t); len(invocations) != 0 {
+				t.Fatalf("the selection started shell programs: %v", invocations)
+			}
+		})
+	}
+}

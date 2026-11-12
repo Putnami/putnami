@@ -1,6 +1,7 @@
 package stacks
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -455,9 +456,30 @@ func (s Stack) ProjectOverride(projectAbs string) (json.RawMessage, error) {
 // Resolved is the profile of one project: the profile, then its variant,
 // then the project's override.
 func (s Stack) Resolved(projectAbs, variant string) (Profile, error) {
+	return s.ResolvedIn(projectAbs, variant, nil)
+}
+
+// WorkspaceConfigFile is the workspace file whose options[<extension>] block
+// holds the options of every project.
+const WorkspaceConfigFile = "putnami.workspace.json"
+
+// ResolvedIn is the profile of one project in a workspace whose
+// options[<extension>] block is workspace: the profile, then its variant, then
+// the toolchain.check the block sets, then the project's override. The check
+// a workspace sets applies to every project whose own override sets none. The
+// block holds other members, such as an adoption mode, that are no part of a
+// profile, so only toolchain.check is read from it.
+func (s Stack) ResolvedIn(projectAbs, variant string, workspace json.RawMessage) (Profile, error) {
 	base, err := s.Profile.Variant(variant)
 	if err != nil {
 		return Profile{}, err
+	}
+	check, err := workspaceToolchainCheck(workspace)
+	if err != nil {
+		return Profile{}, fmt.Errorf("%s options[%q]: %w", WorkspaceConfigFile, s.Extension, err)
+	}
+	if check != "" {
+		base.Toolchain.Check = check
 	}
 	override, err := s.ProjectOverride(projectAbs)
 	if err != nil {
@@ -487,6 +509,32 @@ func (s Stack) Resolved(projectAbs, variant string) (Profile, error) {
 		}
 	}
 	return p, nil
+}
+
+// workspaceToolchainCheck returns the toolchain.check of the extension's block
+// of the workspace's options, or "" when the block sets none.
+func workspaceToolchainCheck(workspace json.RawMessage) (string, error) {
+	trimmed := bytes.TrimSpace(workspace)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return "", nil
+	}
+	var block struct {
+		Toolchain *struct {
+			Check *string `json:"check"`
+		} `json:"toolchain"`
+	}
+	if err := json.Unmarshal(trimmed, &block); err != nil {
+		return "", fmt.Errorf("toolchain.check cannot be read: %w", err)
+	}
+	if block.Toolchain == nil || block.Toolchain.Check == nil {
+		return "", nil
+	}
+	switch check := *block.Toolchain.Check; check {
+	case CheckFail, CheckWarn:
+		return check, nil
+	default:
+		return "", fmt.Errorf("toolchain.check: %q is not fail or warn", check)
+	}
 }
 
 // Selector is the input selector of a task: "<stack id>:<task>".

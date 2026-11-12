@@ -221,11 +221,11 @@
     },
     {
       "id": "locked-go-is-exact",
-      "text": "When the workspace lock pins a Go release that meets the workspace's go directive, the extension runs only that release: a go on PATH that reports another release is passed over for the pinned release the CLI provisions under the Putnami home. Without a pin, or with a pin older than the directive, the directive stays a minimum."
+      "text": "When the workspace lock pins a Go release that meets the workspace's go directive, the extension runs only that release: a go on PATH that reports another release is passed over for the pinned release the CLI provisions under the Putnami home. Without a pin, or with a pin older than the directive, the directive stays a minimum. Every go on PATH is a candidate, in PATH order: a go earlier on PATH that runs another release does not hide one later on PATH that qualifies."
     },
     {
       "id": "install-without-go",
-      "text": "workspace-install on a workspace that declares no Go (no Go member, no go.work, no root go.mod, no Go lock pin) and offers no go command skips the Go phase instead of failing. A workspace that declares Go and offers no go command that qualifies fails, naming `putnami install` as the remedy."
+      "text": "workspace-install on a workspace that declares no Go (no Go member, no go.work, no root go.mod, no Go lock pin) and offers no go command skips the Go phase instead of failing. A workspace that declares Go and offers no go command that qualifies fails, naming a step that provisions one: `putnami install` when the lock pins, or go.work declares, a Go that qualifies; otherwise a go on PATH, or a go.work that declares the release, which `putnami install` then pins and provisions."
     },
     {
       "id": "included-members-join-go-work",

@@ -836,7 +836,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-go-on-path-that-is-not-the-pin-is-passed-over"
+              "a-go-on-path-that-is-not-the-pin-is-passed-over",
+              "a-qualifying-go-later-on-path-is-found"
             ]
           }
         },
@@ -850,7 +851,8 @@
             "kind": "acceptance",
             "checks": [
               "workspace-install-skips-go-when-nothing-declares-it",
-              "a-declared-go-with-no-go-command-fails-naming-putnami-install"
+              "a-declared-go-with-no-go-command-fails-naming-putnami-install",
+              "an-unpinned-go-fails-naming-a-go-work-declaration"
             ]
           }
         },

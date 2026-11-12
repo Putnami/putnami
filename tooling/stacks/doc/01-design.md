@@ -400,7 +400,9 @@ the task reads the version on the machine with `toolchain.command`:
   both versions and the file that states the expected one. A project that
   accepts the difference sets
   `toolchain.check` to `warn`: the task runs and reports the diagnostic as a
-  warning;
+  warning. The same member in the extension's block of
+  `putnami.workspace.json` options sets it for every project, and a project's
+  own `putnami.json` outranks it;
 - the command is missing: the task fails with `stacks.toolchain_missing`.
 
 An extension may pin its toolchain, as `@putnami/php` and `@putnami/ruby` do

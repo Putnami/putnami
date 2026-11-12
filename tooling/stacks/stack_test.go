@@ -432,6 +432,55 @@ func TestRunFailsOnAFailedTestAMismatchAndAMissingReport(t *testing.T) {
 	}
 }
 
+// runTaskIn runs task as runTask does, in a workspace whose options block of
+// the extension is options.
+func runTaskIn(t *testing.T, s Stack, root, task, options string) (string, *recorder) {
+	t.Helper()
+	meta, _ := json.Marshal(Metadata{Component: "api", Root: "."})
+	rec := &recorder{}
+	var out bytes.Buffer
+	status, _, _ := s.run(context.Background(), runInput{
+		task: task, workspaceRoot: root, projectAbs: filepath.Join(root, "crates/api"),
+		metadata: meta, options: json.RawMessage(options),
+		outputRoot: filepath.Join(root, ".putnami/out/api/"+task), stdout: &out,
+	}, rec)
+	return status, rec
+}
+
+// toolchain.check in the extension's block of putnami.workspace.json applies
+// to every project, as the same member does in a project's putnami.json. The
+// project's own override wins, and a value that is neither fail nor warn fails
+// the task naming the workspace file.
+func TestTheWorkspaceToolchainCheckAppliesToEveryProject(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "rust-toolchain.toml", "[toolchain]\nchannel = \"1.82.0\"\n")
+	writeFile(t, root, "crates/api/Cargo.toml", "")
+	t.Setenv("STUB_ROOT", root)
+	t.Setenv("STUB_LOG", filepath.Join(root, "log"))
+	stubTools(t, "1.80.0", junitPass)
+	s := testProfileWithLcov(t)
+
+	if status, rec := runTaskIn(t, s, root, TaskTest, `{"mode":"delegate","toolchain":{"check":"warn"}}`); status != statusOK || rec.codes() != "warning:"+CodeToolchainMismatch {
+		t.Errorf("the workspace's warn lets the task run: %s %v", status, rec.diags)
+	}
+	if status, rec := runTaskIn(t, s, root, TaskTest, `{"toolchain":{"check":"fail"}}`); status != statusFailed || rec.codes() != "error:"+CodeToolchainMismatch {
+		t.Errorf("the workspace's fail fails the task: %s %v", status, rec.diags)
+	}
+
+	writeFile(t, root, "crates/api/putnami.json", `{"options": {"@putnami/rust": {"toolchain": {"check": "fail"}}}}`)
+	if status, rec := runTaskIn(t, s, root, TaskTest, `{"toolchain":{"check":"warn"}}`); status != statusFailed || rec.codes() != "error:"+CodeToolchainMismatch {
+		t.Errorf("the project's fail outranks the workspace's warn: %s %v", status, rec.diags)
+	}
+	if err := os.Remove(filepath.Join(root, "crates/api/putnami.json")); err != nil {
+		t.Fatal(err)
+	}
+
+	status, rec := runTaskIn(t, s, root, TaskTest, `{"toolchain":{"check":"never"}}`)
+	if status != statusFailed || rec.codes() != "error:"+CodeProjectConfigInvalid || !strings.Contains(strings.Join(rec.diags, "\n"), WorkspaceConfigFile) {
+		t.Errorf("an unknown check names the workspace file: %s %v", status, rec.diags)
+	}
+}
+
 // A test runner that exits non-zero on a failed case still has its report
 // read: the failed case names the failure, and a run that wrote no report is
 // a failed step, not a missing report.

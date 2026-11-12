@@ -22,17 +22,27 @@ const defaultGoProxy = "https://proxy.golang.org,direct"
 // Windows only an .exe is ever run: a .bat or .cmd file found on PATH would
 // start cmd.exe, and the lifecycle jobs start no shell.
 func (j *Job) LookPath(name string) string {
+	if all := j.lookPathAll(name); len(all) > 0 {
+		return all[0]
+	}
+	return ""
+}
+
+// lookPathAll returns the absolute path of every executable name on the job's
+// PATH, in PATH order, each once. It skips what LookPath skips.
+func (j *Job) lookPathAll(name string) []string {
 	file := pkgmeta.ExecutableName(runtime.GOOS, name)
+	var out []string
 	for _, dir := range filepath.SplitList(j.Env.Get("PATH")) {
 		if dir == "" || !filepath.IsAbs(dir) {
 			continue
 		}
 		candidate := filepath.Join(dir, file)
-		if isExecutable(candidate) && j.admits(candidate) {
-			return candidate
+		if !slices.Contains(out, candidate) && isExecutable(candidate) && j.admits(candidate) {
+			out = append(out, candidate)
 		}
 	}
-	return ""
+	return out
 }
 
 // RequestedGoVersion is the Go version the workspace asks for, normalized,
@@ -220,8 +230,10 @@ func (j *Job) FindGoBinary() bool {
 // Those are places the tasks look too, and the CLI puts the pinned go it
 // resolved first on the job's PATH. A pin older than requested is not exact:
 // until the lock pins the requested release, the version is a minimum as it is
-// without a pin. Then a go on PATH that satisfies it is used, then a toolchain
-// that go resolves, then a managed install.
+// without a pin. Then the first go on PATH that satisfies it is used, then a
+// toolchain the first go on PATH resolves, then a managed install. Every go on
+// PATH is a candidate, not only the first: a go earlier on PATH that runs
+// another release does not hide one later on PATH that qualifies.
 func (j *Job) findGoBinary(requested string) string {
 	if pinned := j.pinnedGoVersion(requested); pinned != "" {
 		return j.findPinnedGo(pinned)
@@ -229,12 +241,18 @@ func (j *Job) findGoBinary(requested string) string {
 
 	// Jobs run with GOTOOLCHAIN=local (SetupGoEnv), so a candidate is judged by
 	// the version it runs as in that mode, not the one it would switch to.
-	if system := j.LookPath("go"); system != "" {
-		systemVersion := j.goBinaryVersion(system, "local")
-		if requested == "" || (systemVersion != "" && GoVersionSatisfies(systemVersion, requested)) {
-			return system
+	if systems := j.lookPathAll("go"); len(systems) > 0 {
+		var systemVersion string
+		for i, system := range systems {
+			version := j.goBinaryVersion(system, "local")
+			if requested == "" || (version != "" && GoVersionSatisfies(version, requested)) {
+				return system
+			}
+			if i == 0 {
+				systemVersion = version
+			}
 		}
-		if toolchain := j.toolchainBinary(system, requested); toolchain != "" {
+		if toolchain := j.toolchainBinary(systems[0], requested); toolchain != "" {
 			return toolchain
 		}
 		shown := systemVersion
@@ -261,6 +279,18 @@ func (j *Job) findGoBinary(requested string) string {
 	return ""
 }
 
+// InstallProvisionsGo reports whether `putnami install` provisions a Go that
+// qualifies for requested: the workspace lock pins one, or go.work declares
+// one, which the CLI pins in the lock and then provisions. Without either,
+// the install provisions no Go.
+func (j *Job) InstallProvisionsGo(requested string) bool {
+	if j.pinnedGoVersion(requested) != "" {
+		return true
+	}
+	declared, err := GoWorkDeclaration(j.WorkspaceRoot)
+	return err == nil && declared != "" && (requested == "" || GoVersionSatisfies(declared, requested))
+}
+
 // pinnedGoVersion returns the Go release the workspace lock pins when it
 // satisfies requested, or "" when the lock pins none, cannot be read, or pins
 // an older release.
@@ -275,13 +305,19 @@ func (j *Job) pinnedGoVersion(requested string) string {
 	return lock.Version
 }
 
-// findPinnedGo returns the go on PATH when it runs version under
+// findPinnedGo returns the first go on PATH that runs version under
 // GOTOOLCHAIN=local, else the managed install of version, or "".
 func (j *Job) findPinnedGo(version string) string {
-	if system := j.LookPath("go"); system != "" {
-		systemVersion := j.goBinaryVersion(system, "local")
-		if systemVersion == version {
-			return system
+	if systems := j.lookPathAll("go"); len(systems) > 0 {
+		var systemVersion string
+		for i, system := range systems {
+			found := j.goBinaryVersion(system, "local")
+			if found == version {
+				return system
+			}
+			if i == 0 {
+				systemVersion = found
+			}
 		}
 		shown := systemVersion
 		if shown == "" {
