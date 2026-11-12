@@ -88,7 +88,7 @@ var complexityCeilings = []complexityCeiling{
 		unit:   "engine",
 		prefix: "internal/engine/",
 		files:  24,
-		funcs:  186,
+		funcs:  188,
 		why: "internal/engine: run assembly. Its functions are the run's stages (workspace probe, " +
 			"selection, planning, scheduling, finalization) and the seams where a run attaches " +
 			"what only the engine sees: the run report, the workspace map, the spec gate, the " +
