@@ -872,11 +872,13 @@ func TestAnImportedTaskDoesWhatItsScriptDid(t *testing.T) {
 	}
 	want := map[string]any{
 		"@putnami/typescript:test": map[string]any{"types": false},
+		"@putnami/typescript:lint": map[string]any{"fix": false},
 	}
 	if !reflect.DeepEqual(pricing["options"], want) {
-		t.Errorf("pricing options = %v, want a test with no type check", pricing["options"])
+		t.Errorf("pricing options = %v, want a test with no type check and a lint that only checks", pricing["options"])
 	}
-	// A package whose test did not move gets no option.
+	// A package whose test did not move, and whose lint writes, gets no
+	// option.
 	if options := readProjectFile(t, root, "apps/api")["options"]; options != nil {
 		t.Errorf("api options = %v, want none", options)
 	}
@@ -936,5 +938,37 @@ func TestAnImportThatMovesNoTaskDeclaresNothing(t *testing.T) {
 	}
 	if got, want := workspace.Extensions, []string{ExtensionName, TypeScriptExtension}; !slices.Equal(got, want) {
 		t.Errorf("declared extensions = %v, want %v", got, want)
+	}
+}
+
+func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-lint-only-checks", "a-moved-lint-with-no-write-flag-only-checks")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, "turbo.json", `{"tasks": {"lint": {}}}`)
+	// pricing's Biome lint only checks; api's writes its fixes.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "private": true, "scripts": {"lint": "biome check ."}}`)
+	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "private": true, "scripts": {"lint": "biome check --write ."}, "dependencies": {"@demo/pricing": "workspace:*"}}`)
+	result, err := Sync(root, Options{Mode: ModeImport})
+	if err != nil {
+		t.Fatal(err)
+	}
+	lintOptions := func(dir string) any {
+		options, _ := readProjectFile(t, root, dir)["options"].(map[string]any)
+		return options[stacks.TypeScriptLintLayer]
+	}
+	if got := lintOptions("packages/pricing"); !reflect.DeepEqual(got, map[string]any{"fix": false}) {
+		t.Errorf("pricing lint options = %v, want fix false", got)
+	}
+	if got := lintOptions("apps/api"); got != nil {
+		t.Errorf("api lint options = %v, want none for a lint that writes", got)
+	}
+	// The repository holds no Biome configuration: the lint keeps Biome's
+	// defaults, and the sync lists the file it writes for that.
+	if data, err := os.ReadFile(filepath.Join(root, "biome.json")); err != nil || string(data) != "{}\n" {
+		t.Errorf("root biome.json = %q, %v; want one that sets nothing", data, err)
+	}
+	if lines := strings.Join(Report(result, false), "\n"); !strings.Contains(lines, "biome.json: written with no setting") {
+		t.Errorf("report:\n%s", lines)
 	}
 }

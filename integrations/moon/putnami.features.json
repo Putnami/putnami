@@ -183,6 +183,19 @@
           }
         },
         {
+          "id": "a-moved-lint-only-checks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-moved-lint-with-no-write-flag-only-checks"
+            ]
+          }
+        },
+        {
           "id": "an-import-declares-only-what-moves",
           "stage": "coded",
           "evidenceKinds": [

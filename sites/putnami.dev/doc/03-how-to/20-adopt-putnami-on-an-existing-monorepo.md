@@ -32,7 +32,11 @@ tool:
   The sync lists it as not mapped, with its reason, and rewrites no script.
 - A target that moves does what it did. A test moves with `types: false` in
   `options["@putnami/typescript:test"]`, since its script type-checked
-  nothing. A `bun build` moves only when Putnami's Bun build writes the
+  nothing. A lint whose script passes no write flag moves with `fix: false`
+  in `options["@putnami/typescript:lint"]`: it checks and rewrites no file,
+  and when it runs Biome in a repository with no Biome configuration, the
+  sync writes a root `biome.json` that sets nothing, so the lint keeps
+  Biome's defaults. A `bun build` moves only when Putnami's Bun build writes the
   entries `package.json` names: entries under `src/`, or a `main` the import
   rewrites as described below. A published package, or one whose `exports`
   name a build output, keeps its build on the tool.

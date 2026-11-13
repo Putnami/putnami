@@ -154,6 +154,13 @@ extension's install runs `rush install`, which keeps Rush's lockfile under
 `package.json`. A root `package.json` that declares `packageManager` selects
 that manager instead. A hosted run does not install a Rush repository.
 
+A lint script that moves and passes no write flag (`--write`, `--fix`,
+`--apply`) moves with `fix: false` in `options["@putnami/typescript:lint"]`:
+it checks and rewrites no file. When a Biome lint moves and the repository
+root holds no `biome.json` or `biome.jsonc`, the sync writes a root
+`biome.json` that sets nothing, so the lint keeps Biome's defaults, and lists
+it.
+
 An import also adopts Putnami's TypeScript conventions (D-066), so each
 project builds and resolves its neighbours from their sources:
 

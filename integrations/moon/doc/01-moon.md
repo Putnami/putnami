@@ -152,6 +152,12 @@ claims. The sync names it and the tasks that keep running through
   under `options["@putnami/typescript:test"].runner`, with `types: false`
   there, since the task type-checked nothing, and `eslint` under
   `options["@putnami/typescript"].lint.linter` for an ESLint lint that moved;
+- for a TypeScript project, `fix: false` under
+  `options["@putnami/typescript:lint"]` for a lint that moved and whose
+  command passes no write flag (`--write`, `--fix`, `--apply`): it checks and
+  rewrites no file. When a Biome lint moves and the repository root holds no
+  `biome.json` or `biome.jsonc`, the sync writes a root `biome.json` that
+  sets nothing, so the lint keeps Biome's defaults, and lists it;
 - for a TypeScript project, the conventions of D-066: a `tsconfig.json` that
   extends the root's when it holds no `tsconfig*.json`, and
   `"exports": { ".": "./src/index.ts" }` when its build moves to the Bun

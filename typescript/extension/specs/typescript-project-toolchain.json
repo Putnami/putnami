@@ -74,6 +74,10 @@
       "text": "The lint command and its tasks cover every project file Biome can rewrite and never read or rewrite a file under a nested project root (a subdirectory with its own putnami.json, outside a symbolic link and the directories the cache key skips), resolve the workspace configuration from the config root while keeping an external configuration anchored at the project root, and bind the scheduler's CPU budget without overriding an explicit thread setting."
     },
     {
+      "id": "a-check-only-lint-skips-what-putnami-writes",
+      "text": "A lint that only checks (fix false) leaves out of Biome's targets what Putnami writes at the project root: putnami.json, .gen, .putnami and a tsconfig.json that only extends the workspace root's, as an import writes it. A lint that fixes keeps formatting them."
+    },
+    {
       "id": "lint-chooses-the-linter",
       "text": "A project's linter is options[\"@putnami/typescript\"].lint.linter, biome or eslint, else eslint when its package.json lint script runs eslint, else Biome; a configuration file present never chooses, and another value fails lint with typescript.lint_linter_unknown. An ESLint project runs no Biome formatter, and a batch lints each project with its own linter, its ESLint members in parallel."
     },

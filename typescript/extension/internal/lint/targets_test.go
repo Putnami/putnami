@@ -89,7 +89,7 @@ func TestBiomeTargets_SkipNestedProjectRoots(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "lint-covers-the-project", "a-nested-project-is-never-linted-by-its-parent")
 	root := nestedProjectWorkspace(t)
 
-	runDir, targets, err := biomeTargets("", []string{filepath.Join(root, "app")}, filepath.Join(root, "biome.json"))
+	runDir, targets, err := biomeTargets("", []string{filepath.Join(root, "app")}, filepath.Join(root, "biome.json"), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +109,7 @@ func TestBiomeTargets_KeepOneTargetWithoutNestedProject(t *testing.T) {
 	writeFixtureFile(t, root, "app/dist/putnami.json", "{}\n")
 	app := filepath.Join(root, "app")
 
-	runDir, targets, err := biomeTargets("", []string{app}, filepath.Join(root, "biome.json"))
+	runDir, targets, err := biomeTargets("", []string{app}, filepath.Join(root, "biome.json"), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -117,7 +117,7 @@ func TestBiomeTargets_KeepOneTargetWithoutNestedProject(t *testing.T) {
 		t.Fatalf("biomeTargets = %q %v, want %q [app]", runDir, targets, root)
 	}
 
-	runDir, targets, err = biomeTargets("", []string{app}, t.TempDir())
+	runDir, targets, err = biomeTargets("", []string{app}, t.TempDir(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +130,7 @@ func TestBiomeTargets_ExternalConfigCoverIsProjectRelative(t *testing.T) {
 	root := nestedProjectWorkspace(t)
 	app := filepath.Join(root, "app")
 
-	runDir, targets, err := biomeTargets("", []string{app}, t.TempDir())
+	runDir, targets, err := biomeTargets("", []string{app}, t.TempDir(), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,6 +150,7 @@ func TestBiomeTargets_BatchCoversEachProject(t *testing.T) {
 		root,
 		[]string{filepath.Join(root, "app"), filepath.Join(root, "lib")},
 		filepath.Join(root, "biome.json"),
+		false,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -160,9 +161,50 @@ func TestBiomeTargets_BatchCoversEachProject(t *testing.T) {
 	}
 }
 
+func TestBiomeTargets_ACheckOnlyLintLeavesOutWhatPutnamiWrites(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "a-check-only-lint-skips-what-putnami-writes", "a-check-only-lint-names-no-file-putnami-writes")
+	root := t.TempDir()
+	imported := "{\n  \"extends\": \"../../tsconfig.json\"\n}\n"
+	writeFixtureFile(t, root, "apps/web/putnami.json", "{}\n")
+	writeFixtureFile(t, root, "apps/web/tsconfig.json", imported)
+	writeFixtureFile(t, root, "apps/web/.gen/version.json", "{}\n")
+	writeFixtureFile(t, root, "apps/web/.putnami/out/index.js", "\n")
+	writeFixtureFile(t, root, "apps/web/package.json", "{}\n")
+	writeFixtureFile(t, root, "apps/web/src/index.ts", "export const a = 1;\n")
+	// A nested directory holds the same names: only the project root's are
+	// Putnami's.
+	writeFixtureFile(t, root, "apps/web/src/tsconfig.json", imported)
+	writeFixtureFile(t, root, "apps/web/src/.gen/a.json", "{}\n")
+	// The project's own tsconfig.json sets a member: it stays a target.
+	writeFixtureFile(t, root, "apps/api/putnami.json", "{}\n")
+	writeFixtureFile(t, root, "apps/api/tsconfig.json", "{\n  \"extends\": \"../../tsconfig.json\",\n  \"include\": [\"src\"]\n}\n")
+	// A project with nothing of Putnami's keeps one directory argument.
+	writeFixtureFile(t, root, "libs/plain/index.ts", "export const b = 1;\n")
+	projects := []string{filepath.Join(root, "apps/web"), filepath.Join(root, "apps/api"), filepath.Join(root, "libs/plain")}
+	config := filepath.Join(root, "biome.json")
+
+	_, targets, err := biomeTargets(root, projects, config, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"apps/web/package.json", "apps/web/src", "apps/api/tsconfig.json", "libs/plain"}
+	if !reflect.DeepEqual(targets, want) {
+		t.Fatalf("check-only targets = %v, want %v", targets, want)
+	}
+
+	// A lint that fixes formats every file of the project.
+	_, targets, err = biomeTargets(root, projects, config, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"apps/web", "apps/api", "libs/plain"}; !reflect.DeepEqual(targets, want) {
+		t.Fatalf("fixing targets = %v, want %v", targets, want)
+	}
+}
+
 func TestBiomeTargets_UnreadableProjectFails(t *testing.T) {
 	root := t.TempDir()
-	if _, _, err := biomeTargets("", []string{filepath.Join(root, "missing")}, filepath.Join(root, "biome.json")); err == nil {
+	if _, _, err := biomeTargets("", []string{filepath.Join(root, "missing")}, filepath.Join(root, "biome.json"), false); err == nil {
 		t.Fatal("expected an error for a project directory that cannot be read")
 	}
 }
@@ -183,7 +225,7 @@ func TestBiomeTargets_UnreadableSubdirectoryIsPassedWhole(t *testing.T) {
 
 	// A git-ignored bind mount owned by another user is the usual case: Biome
 	// skipped it before the scan existed, and it must still receive it whole.
-	_, targets, err := biomeTargets("", []string{filepath.Join(root, "app")}, filepath.Join(root, "biome.json"))
+	_, targets, err := biomeTargets("", []string{filepath.Join(root, "app")}, filepath.Join(root, "biome.json"), false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +250,7 @@ func TestBiomeTargets_SymlinksAreNamedNotFollowed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	_, targets, err := biomeTargets("", []string{filepath.Join(root, "app")}, filepath.Join(root, "biome.json"))
+	_, targets, err := biomeTargets("", []string{filepath.Join(root, "app")}, filepath.Join(root, "biome.json"), false)
 	if err != nil {
 		t.Fatal(err)
 	}

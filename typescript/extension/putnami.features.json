@@ -233,6 +233,19 @@
           }
         },
         {
+          "id": "a-check-only-lint-skips-what-putnami-writes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-check-only-lint-names-no-file-putnami-writes"
+            ]
+          }
+        },
+        {
           "id": "lint-chooses-the-linter",
           "stage": "coded",
           "evidenceKinds": [

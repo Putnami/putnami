@@ -7,6 +7,8 @@
   `package.json` names. 2026-11-12, rule 1: a project names its language
   extension only when one of its targets moves, and an import that moves
   no target declares and installs nothing.
+  2026-11-13, rule 9: a moved lint that only checked only checks, with
+  the Biome configuration its script read.
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), the import mode of
   `@putnami/nx`, `@putnami/turbo`, `@putnami/rush` and `@putnami/moon`;
   `putnami init --from`
@@ -132,6 +134,19 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    own files, so `putnami lint --impacted` lints the projects a change
    touches and not their dependents (ADR 0044 of `tooling/cli`); the sync
    says so when a lint moves.
+   The TypeScript lint formats and fixes by default. A lint whose script
+   passes no write flag (`--write`, `--fix`, `--apply`, `--apply-unsafe`) gets `fix: false` in
+   `options["@putnami/typescript:lint"]`, which the sync owns like `types`.
+   A lint that only checks leaves out of Biome's targets what Putnami
+   writes at the project root: `putnami.json`, `.gen`, `.putnami` and the
+   `tsconfig.json` an import writes (D-066), since the repository's Biome
+   configuration never formatted them. The TypeScript install writes
+   Putnami's `biome.json` where the root holds none, which would replace the
+   defaults the script ran with. So when a Biome lint moves and the root
+   holds no `biome.json` or `biome.jsonc`, the sync writes a root
+   `biome.json` that sets nothing, and lists it; the install keeps it.
+   The TypeScript lint reads `biome.json` alone: the sync warns about a
+   `biome.jsonc` the moved lint would read, and writes no file beside it.
 
 ## Rejected alternatives
 

@@ -204,10 +204,11 @@ func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *
 
 	// api builds with Bun and tests with Mocha, which @putnami/typescript
 	// does not run: its test keeps running with rushx (D-070). pricing builds
-	// with Bun, and web lints with Biome.
+	// with Bun, and web lints with Biome, which only checks: the repository
+	// holds no Biome configuration, and web's files follow Biome's defaults.
 	setScripts(t, root, "apps/api", `"build": "bun build src/index.ts --outdir lib", "test": "mocha"`)
 	setScripts(t, root, "libs/pricing", `"build": "bun build src/index.ts --outdir lib"`)
-	setScripts(t, root, "apps/web", `"lint": "biome check ."`)
+	clitest.WriteFile(t, filepath.Join(root, "apps/web/package.json"), webManifest)
 
 	// A rush on PATH that answers the version check and fails any other call,
 	// and a rushx that logs: an import runs Rush on no task, and rushx on the
@@ -267,6 +268,16 @@ func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *
 		t.Fatalf("root package.json = %s, %v; want the projects as workspaces", data, err)
 	}
 
+	// web's files after the sync and the install, before any lint.
+	web := map[string]string{}
+	for _, rel := range []string{"package.json", "putnami.json", "tsconfig.json", "src/index.ts"} {
+		data, err := os.ReadFile(filepath.Join(root, "apps/web", rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		web[rel] = string(data)
+	}
+
 	pinToolchains(t, root, "go")
 	code, out = clitest.RunGateArgs(t, root, "lint,test,build", "--all")
 	if code != 0 {
@@ -277,11 +288,31 @@ func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *
 	}
 	// Putnami's TypeScript tasks ran on each project; api's type check
 	// resolved pricing from its sources.
-	for _, task := range []string{"@demo/api build~types", "@demo/pricing build~types", "@demo/web lint~check"} {
+	for _, task := range []string{"@demo/api build~types", "@demo/pricing build~types", "@demo/web lint~check-only"} {
 		if !strings.Contains(out, task) {
 			t.Errorf("no %s ran:\n%s", task, out)
 		}
 	}
+	// web's lint only checked, as its script did, with Biome's defaults: it
+	// passed on the files the import wrote and rewrote none.
+	if data, err := os.ReadFile(filepath.Join(root, "biome.json")); err != nil || string(data) != "{}\n" {
+		t.Errorf("root biome.json = %q, %v; want one that sets nothing", data, err)
+	}
+	for rel, want := range web {
+		if data, err := os.ReadFile(filepath.Join(root, "apps/web", rel)); err != nil || string(data) != want {
+			t.Errorf("the lint rewrote apps/web/%s: %q, %v", rel, data, err)
+		}
+	}
+	// A file that breaks Biome's defaults fails the lint, and keeps its bytes.
+	const unformatted = "export const title = 'Demo'\n"
+	clitest.WriteFile(t, filepath.Join(root, "apps/web/src/index.ts"), unformatted)
+	if code, out := clitest.RunGateArgs(t, root, "lint", "--all"); code == 0 || !strings.Contains(out, "apps/web/src/index.ts") {
+		t.Errorf("lint on an unformatted file exit %d:\n%s", code, out)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "apps/web/src/index.ts")); string(data) != unformatted {
+		t.Errorf("the lint rewrote an unformatted file: %q", data)
+	}
+	clitest.WriteFile(t, filepath.Join(root, "apps/web/src/index.ts"), web["src/index.ts"])
 	if data, err := os.ReadFile(filepath.Join(root, "libs/pricing/package.json")); err != nil || !strings.Contains(string(data), `"exports": {`) {
 		t.Errorf("pricing gained no source exports: %s %v", data, err)
 	}
@@ -301,6 +332,10 @@ func TestAnImportedRushRepositoryPassesLintTestBuildWithTheGraphObserveReads(t *
 		t.Errorf("validate on a stale graph exit %d:\n%s", code, out)
 	}
 }
+
+// webManifest is web's package.json as Biome's defaults format it, with a
+// lint script that only checks.
+const webManifest = "{\n\t\"name\": \"@demo/web\",\n\t\"version\": \"1.0.0\",\n\t\"private\": true,\n\t\"scripts\": {\n\t\t\"lint\": \"biome check .\"\n\t},\n\t\"devDependencies\": {\n\t\t\"typescript\": \"~5.6.0\"\n\t}\n}\n"
 
 // setScripts gives the package.json of the project at dir the scripts, a
 // JSON object's members, after its name.

@@ -11,8 +11,9 @@ import (
 )
 
 // A moved TypeScript task does what the script it replaces did (ADR 0017):
-// a test runs no type check its script did not run, and a Bun build moves
-// only when it writes the entries its package.json names.
+// a test runs no type check its script did not run, a lint whose script
+// only checked only checks, and a Bun build moves only when it writes the
+// entries its package.json names.
 
 // SetTypeScriptTestTypesOff writes options["@putnami/typescript:test"].types
 // false into a putnami.json document when off is set, so the test that moved
@@ -20,6 +21,35 @@ import (
 // types, with every object it empties.
 func SetTypeScriptTestTypesOff(doc map[string]any, off bool) {
 	setFalse(doc, TypeScriptRunnerLayer, "types", off)
+}
+
+// TypeScriptLintLayer is the option layer of the TypeScript extension's lint
+// command, whose fix member an import writes.
+const TypeScriptLintLayer = TypeScriptExtension + ":lint"
+
+// lintWriteFlags are the arguments that make Biome or ESLint rewrite the
+// files it checks.
+var lintWriteFlags = []string{"--write", "--fix", "--apply", "--apply-unsafe"}
+
+// LintWrites reports whether a lint script passes its linter a write flag:
+// the TypeScript lint, which formats and fixes by default, then does what
+// the script did. A script without one only checks.
+func LintWrites(script string) bool {
+	for _, field := range strings.Fields(script) {
+		name, value, _ := strings.Cut(field, "=")
+		if slices.Contains(lintWriteFlags, name) && value != "false" {
+			return true
+		}
+	}
+	return false
+}
+
+// SetTypeScriptLintFixOff writes options["@putnami/typescript:lint"].fix
+// false into a putnami.json document when off is set, so the lint that
+// moved rewrites no file its script only checked, and otherwise removes a
+// false fix, with every object it empties.
+func SetTypeScriptLintFixOff(doc map[string]any, off bool) {
+	setFalse(doc, TypeScriptLintLayer, "fix", off)
 }
 
 // setFalse sets options[layer][member] false when set, and otherwise

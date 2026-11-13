@@ -94,6 +94,13 @@
       ]
     },
     {
+      "id": "a-moved-lint-only-checks",
+      "text": [
+        "In import mode, a lint script with no write flag moves with options[\"@putnami/typescript:lint\"].fix false: the lint checks and rewrites no file.",
+        "When a Biome lint moves and the repository root holds no biome.json or biome.jsonc, the sync writes a root biome.json that sets nothing, so the lint keeps Biome's defaults, and lists it."
+      ]
+    },
+    {
       "id": "an-import-declares-only-what-moves",
       "text": [
         "In import mode, a project names @putnami/typescript only when one of its scripts moves to it; a project none of whose scripts moves runs on Rush alone.",

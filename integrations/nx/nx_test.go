@@ -360,6 +360,7 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	// run.
 	if got, want := readProjectFile(t, root, "packages/pricing")["options"], map[string]any{
 		TypeScriptExtension + ":test": map[string]any{"types": false},
+		stacks.TypeScriptLintLayer:    map[string]any{"fix": false},
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("pricing options = %v, want %v", got, want)
 	}
@@ -1455,5 +1456,36 @@ func TestAnImportThatMovesNoTargetDeclaresNothing(t *testing.T) {
 	}
 	if got, want := readProjectFile(t, root, "packages/pricing")["extensions"], []any{ExtensionName, TypeScriptExtension}; !reflect.DeepEqual(got, want) {
 		t.Errorf("pricing extensions = %v, want %v", got, want)
+	}
+}
+
+func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-lint-only-checks", "a-moved-lint-with-no-write-flag-only-checks")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	// pricing's Biome lint only checks; api's writes its fixes.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "biome check ."}}`)
+	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "private": true, "scripts": {"lint": "biome check --write ."}, "dependencies": {"@demo/pricing": "1.0.0"}}`)
+	result := sync(t, root, SyncOptions{})
+	lintOptions := func(dir string) any {
+		options, _ := readProjectFile(t, root, dir)["options"].(map[string]any)
+		return options[stacks.TypeScriptLintLayer]
+	}
+	if got := lintOptions("packages/pricing"); !reflect.DeepEqual(got, map[string]any{"fix": false}) {
+		t.Errorf("pricing lint options = %v, want fix false", got)
+	}
+	if got := lintOptions("apps/api"); got != nil {
+		t.Errorf("api lint options = %v, want none for a lint that writes", got)
+	}
+	// The repository holds no Biome configuration: the lint keeps Biome's
+	// defaults, and the sync lists the file it writes for that.
+	if data, err := os.ReadFile(filepath.Join(root, "biome.json")); err != nil || string(data) != "{}\n" {
+		t.Errorf("root biome.json = %q, %v; want one that sets nothing", data, err)
+	}
+	if !slices.ContainsFunc(result.Conventions, func(n string) bool { return strings.HasPrefix(n, "biome.json: written with no setting") }) {
+		t.Errorf("conventions = %v, want the biome.json listed", result.Conventions)
+	}
+	if again := sync(t, root, SyncOptions{DryRun: true}); len(again.Changes) != 0 {
+		t.Errorf("a second import changes %v", again.Changes)
 	}
 }

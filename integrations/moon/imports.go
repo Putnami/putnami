@@ -217,6 +217,9 @@ type importPlan struct {
 	// lintMoved reports a TypeScript lint that moved; testMoved a TypeScript
 	// test that moved, which type-checked nothing.
 	lintMoved, testMoved bool
+	// lintChecks reports a TypeScript lint that moved and passes no write
+	// flag.
+	lintChecks bool
 }
 
 // planImport maps the moon tasks of a project whose language has an
@@ -258,6 +261,7 @@ func planImport(root string, p detect.Project, mapped map[string]string) importP
 		case stacks.TaskLint:
 			plan.eslint = stacks.LintsWithESLint(line)
 			plan.lintMoved = true
+			plan.lintChecks = !stacks.LintWrites(line)
 		case stacks.TaskBuild:
 			plan.bunBuild = stacks.TypeScriptBuildsWithBun(line)
 		}

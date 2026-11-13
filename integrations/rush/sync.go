@@ -127,7 +127,7 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 			continue
 		}
 		declare = true
-		convention.BunBuild = plan.bunBuild
+		convention.BunBuild, convention.BiomeLint = plan.bunBuild, plan.biomeLint
 		conventions = append(conventions, convention)
 	}
 	result, err := sync.Apply(root, packages, dry)
@@ -201,6 +201,9 @@ type importPlan struct {
 	// lintMoved reports a lint script that moved; testMoved a test script
 	// that moved, which type-checked nothing.
 	lintMoved, testMoved bool
+	// lintChecks reports a lint script that moved and passes no write flag;
+	// biomeLint one that moved and runs Biome.
+	lintChecks, biomeLint bool
 }
 
 // edit writes the steps of the tasks that stay on Rush and the options of
@@ -208,6 +211,7 @@ type importPlan struct {
 func (plan importPlan) edit(doc map[string]any) {
 	rushxSteps.edit(plan.kept)(doc)
 	stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
+	stacks.SetTypeScriptLintFixOff(doc, plan.lintChecks)
 }
 
 // retractEdit removes from a delegated or former project what an import
@@ -241,7 +245,11 @@ func planImport(root string, p detect.Project, scripts map[string]string, publis
 		case reason == "":
 			moved = append(moved, task)
 			plan.bunBuild = plan.bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
-			plan.lintMoved = plan.lintMoved || task == stacks.TaskLint
+			if task == stacks.TaskLint {
+				plan.lintMoved = true
+				plan.lintChecks = !stacks.LintWrites(script)
+				plan.biomeLint = !stacks.LintsWithESLint(script)
+			}
 			plan.testMoved = plan.testMoved || task == stacks.TaskTest
 		default:
 			plan.kept = append(plan.kept, task)

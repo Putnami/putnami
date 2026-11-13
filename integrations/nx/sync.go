@@ -238,7 +238,7 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 			result.Imported = append(result.Imported, p.Path)
 		}
 		if plan.typeScript {
-			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.Name, BunBuild: plan.bunBuild, PublishedBy: stacks.PackagePublished(root, p.Path)})
+			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.Name, BunBuild: plan.bunBuild, PublishedBy: stacks.PackagePublished(root, p.Path), BiomeLint: plan.lintMoved && !plan.eslint})
 		}
 		result.Unmapped = append(result.Unmapped, plan.unmapped...)
 		lintMoved = lintMoved || plan.lintMoved
@@ -421,6 +421,9 @@ type projectPlan struct {
 	// lintMoved reports a lint target the TypeScript extension takes over;
 	// testMoved a test target it takes over, which type-checked nothing.
 	lintMoved, testMoved bool
+	// lintChecks reports a lint target the TypeScript extension takes over
+	// whose command passes no write flag.
+	lintChecks bool
 }
 
 // planProjects maps the targets of each project, in the order of projects:
@@ -514,6 +517,7 @@ func planProject(root string, p detect.Project, mode string, declared bool, mapp
 			if task == "lint" {
 				plan.eslint = lintsWithESLint(root, p.Path, target)
 				plan.lintMoved = true
+				plan.lintChecks = !stacks.LintWrites(target.Command)
 			}
 		case declared && hasManifest(root, p.Path):
 			// The TypeScript extension claims the project too: the target
@@ -1039,6 +1043,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	setCompiler(doc, plan.typeScript && plan.compiler)
 	stacks.SetTypeScriptLinter(doc, plan.eslint)
 	stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
+	stacks.SetTypeScriptLintFixOff(doc, plan.lintChecks)
 	if plan.nodeRuntime {
 		markNodeRuntime(doc)
 	}
@@ -1068,6 +1073,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	setCompiler(doc, false)
 	stacks.SetTypeScriptLinter(doc, false)
 	stacks.SetTypeScriptTestTypesOff(doc, false)
+	stacks.SetTypeScriptLintFixOff(doc, false)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
 	}

@@ -300,6 +300,7 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 			ExtensionName:              map[string]any{"graphSync": true, "filePatterns": inputs},
 			"@putnami/typescript":      map[string]any{"lint": map[string]any{"linter": "eslint"}},
 			"@putnami/typescript:test": map[string]any{"runner": "vitest", "types": false},
+			"@putnami/typescript:lint": map[string]any{"fix": false},
 		}) {
 		t.Errorf("apps/api = %v", api)
 	}
@@ -833,7 +834,7 @@ func TestAMovedTypeScriptTaskDoesWhatItsTaskDid(t *testing.T) {
 		{Name: "build", Command: "bun build src/index.ts"}, {Name: "lint", Command: "biome check --write ."}, {Name: "test", Command: "bun test"},
 	}}
 	plan := planImport(root, app, map[string]string{"build": "build", "lint": "lint", "test": "test"})
-	if len(plan.kept) != 0 || !plan.bunBuild || !plan.lintMoved || !plan.testMoved {
+	if len(plan.kept) != 0 || !plan.bunBuild || !plan.lintMoved || plan.lintChecks || !plan.testMoved {
 		t.Errorf("app plans %+v, want every task moved, a lint that writes and a test", plan)
 	}
 }
@@ -929,5 +930,32 @@ func TestAnImportThatMovesNoTaskDeclaresNothing(t *testing.T) {
 	}
 	if got, want := result.Extensions, []string{"@putnami/typescript"}; !slices.Equal(got, want) {
 		t.Errorf("declared extensions = %v, want %v", got, want)
+	}
+}
+
+func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-lint-only-checks", "a-moved-lint-with-no-write-flag-only-checks")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, true)
+	// api's Biome lint only checks.
+	stackstest.WriteFile(t, root, ".moon/tasks/node.yml", "tasks:\n  lint:\n    command: 'biome check .'\n")
+	result, err := Sync(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	options, _ := readProjectFile(t, root, "apps/api")["options"].(map[string]any)
+	if got := options[stacks.TypeScriptLintLayer]; !reflect.DeepEqual(got, map[string]any{"fix": false}) {
+		t.Errorf("api lint options = %v, want fix false", got)
+	}
+	// The repository holds no Biome configuration: the lint keeps Biome's
+	// defaults, and the sync lists the file it writes for that.
+	if data, err := os.ReadFile(filepath.Join(root, "biome.json")); err != nil || string(data) != "{}\n" {
+		t.Errorf("root biome.json = %q, %v; want one that sets nothing", data, err)
+	}
+	if !slices.ContainsFunc(result.Warnings, func(w string) bool { return strings.HasPrefix(w, "biome.json: written with no setting") }) {
+		t.Errorf("warnings = %v, want the biome.json listed", result.Warnings)
+	}
+	if again, err := Stale(context.Background(), root); err != nil || len(again.Written) != 0 || len(again.Changes) != 0 {
+		t.Errorf("a second import changes %v %v, %v", again.Written, again.Changes, err)
 	}
 }

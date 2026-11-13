@@ -5,6 +5,8 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
+	"slices"
 )
 
 // projectManifest is the file that makes a directory a Putnami project root.
@@ -22,19 +24,26 @@ var errNoSharedRoot = errors.New("selected projects do not share workspace root"
 // project's sources. The scan skips the directories the input hasher skips, so
 // a marker it finds is a keyed input of the lint tasks (`**/*.json`), and
 // adding or removing a nested project changes the task key. The one exception
-// is `.gen`, which the read-only task leaves out of its key: git ignores it and
-// Biome never reads it, so a marker there changes nothing Biome lints.
+// is `.gen`, which the read-only task leaves out of its key: a lint that only
+// checks never gives Biome the `.gen` of a project root, so a marker there
+// changes nothing Biome lints.
+//
+// With checkOnly set, the lint writes nothing, and each project also leaves
+// out what Putnami writes at its root (writtenByPutnami): the repository's
+// Biome configuration never formatted those files, and a lint that only
+// checks cannot bring them to it.
 //
 // An empty list with a nil error means every file of the selected projects
-// belongs to a nested project, and there is nothing left for Biome to read.
-func biomeTargets(workspaceRoot string, projectPaths []string, configPath string) (string, []string, error) {
+// belongs to a nested project or is written by Putnami, and there is nothing
+// left for Biome to read.
+func biomeTargets(workspaceRoot string, projectPaths []string, configPath string, checkOnly bool) (string, []string, error) {
 	runDir, roots := biomeBatchRunContext(workspaceRoot, projectPaths, configPath)
 	if len(roots) == 0 {
 		return "", nil, errNoSharedRoot
 	}
 	targets := make([]string, 0, len(roots))
 	for _, root := range roots {
-		cover, err := projectCover(runDir, root)
+		cover, err := projectCover(runDir, root, checkOnly)
 		if err != nil {
 			return "", nil, err
 		}
@@ -45,9 +54,10 @@ func biomeTargets(workspaceRoot string, projectPaths []string, configPath string
 
 // projectCover returns the paths that cover the project at target, relative to
 // runDir, without entering a nested project. A project with no nested project
-// is covered by target itself, so Biome keeps one directory argument for it.
-func projectCover(runDir, target string) ([]string, error) {
-	kind, paths, err := coverDirectory(filepath.Join(runDir, filepath.FromSlash(target)), target, true)
+// and no left-out file is covered by target itself, so Biome keeps one
+// directory argument for it.
+func projectCover(runDir, target string, checkOnly bool) ([]string, error) {
+	kind, paths, err := coverDirectory(filepath.Join(runDir, filepath.FromSlash(target)), target, true, checkOnly)
 	if err != nil {
 		return nil, err
 	}
@@ -91,8 +101,9 @@ var unscannedDirectories = map[string]bool{
 // rewrite what this process cannot read, and it applies its own ignore rules
 // to it. A symbolic link is passed by name and never followed; a link whose
 // target is missing is left out, because Biome reports it as an error when it
-// is named explicitly.
-func coverDirectory(dir, rel string, root bool) (coverage, []string, error) {
+// is named explicitly. With checkOnly set, the entries of a project root that
+// Putnami writes are left out.
+func coverDirectory(dir, rel string, root, checkOnly bool) (coverage, []string, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if root {
@@ -108,6 +119,10 @@ func coverDirectory(dir, rel string, root bool) (coverage, []string, error) {
 	for _, entry := range entries {
 		name := entry.Name()
 		entryRel := path.Join(rel, name)
+		if root && checkOnly && writtenByPutnami(dir, entry) {
+			kind = coverPartial
+			continue
+		}
 		if entry.Type()&os.ModeSymlink != 0 {
 			if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
 				paths = append(paths, entryRel)
@@ -118,7 +133,7 @@ func coverDirectory(dir, rel string, root bool) (coverage, []string, error) {
 			paths = append(paths, entryRel)
 			continue
 		}
-		childKind, childPaths, err := coverDirectory(filepath.Join(dir, name), entryRel, false)
+		childKind, childPaths, err := coverDirectory(filepath.Join(dir, name), entryRel, false, checkOnly)
 		if err != nil {
 			return coverWhole, nil, err
 		}
@@ -143,6 +158,29 @@ func holdsProjectManifest(entries []os.DirEntry) bool {
 		if entry.Name() == projectManifest && !entry.IsDir() {
 			return true
 		}
+	}
+	return false
+}
+
+// importedTSConfig is the tsconfig.json an import writes in a project that
+// holds none: it extends the workspace root's and sets nothing else.
+var importedTSConfig = regexp.MustCompile(`^\{\n  "extends": "(\.\./)+tsconfig\.json"\n\}\n$`)
+
+// writtenByPutnami reports whether an entry of the project root dir is one
+// Putnami writes: the project manifest, a generated directory, or a
+// tsconfig.json with the bytes an import writes.
+func writtenByPutnami(dir string, entry os.DirEntry) bool {
+	name := entry.Name()
+	switch {
+	case entry.IsDir():
+		return slices.Contains(generatedDirectories, name)
+	case !entry.Type().IsRegular():
+		return false
+	case name == projectManifest:
+		return true
+	case name == "tsconfig.json":
+		data, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // a file of the project being linted
+		return err == nil && importedTSConfig.Match(data)
 	}
 	return false
 }

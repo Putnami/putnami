@@ -42,7 +42,7 @@ func CheckProjects(
 	if diagnosticLevel != "" {
 		args = append(args, "--diagnostic-level="+diagnosticLevel)
 	}
-	runDir, targets, err := biomeTargets(workspaceRoot, projectPaths, configPath)
+	runDir, targets, err := biomeTargets(workspaceRoot, projectPaths, configPath, !fix)
 	if err != nil {
 		return parse.EmptyBiomeReport(), false, fmt.Errorf("biome lint: %w", err)
 	}

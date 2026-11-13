@@ -189,7 +189,7 @@ func synchronize(ctx context.Context, root string, dry bool, given string) (Sync
 		}
 		result.Unmapped = append(result.Unmapped, plan.unmapped...)
 		if moved && p.Language == "typescript" {
-			conventions = append(conventions, stacks.ConventionProject{Dir: p.Dir, Name: p.ID, BunBuild: plan.bunBuild, PublishedBy: stacks.PackagePublished(root, p.Dir)})
+			conventions = append(conventions, stacks.ConventionProject{Dir: p.Dir, Name: p.ID, BunBuild: plan.bunBuild, PublishedBy: stacks.PackagePublished(root, p.Dir), BiomeLint: plan.lintMoved && !plan.eslint})
 		}
 		packages = append(packages, pkg)
 	}
@@ -288,6 +288,7 @@ func typeScriptOptions(p detect.Project, plan importPlan) func(map[string]any) {
 	return func(doc map[string]any) {
 		stacks.SetTypeScriptRunner(doc, plan.runner)
 		stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
+		stacks.SetTypeScriptLintFixOff(doc, plan.lintChecks)
 		stacks.SetTypeScriptLinter(doc, plan.eslint)
 	}
 }

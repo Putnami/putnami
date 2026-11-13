@@ -38,6 +38,9 @@ type ConventionProject struct {
 	// PublishedBy, when set, names what publishes the project, such as
 	// rush.json: its main stays the entry its consumers read.
 	PublishedBy string
+	// BiomeLint reports a lint the import moves to the TypeScript
+	// extension's Biome lint.
+	BiomeLint bool
 }
 
 // ConventionWrite is one file an import writes to adopt Putnami's
@@ -58,11 +61,26 @@ type ConventionWrite struct {
 // tsconfig.json that extends the root's where a project holds no
 // tsconfig*.json. A project that holds another tsconfig*.json keeps its
 // configuration, which its test runner or its linter may read (ADR 0017).
+// It also answers a root biome.json that sets nothing when a Biome lint
+// moves in a project that holds no Biome configuration and the root holds
+// none: the lint then keeps Biome's defaults, which its script ran with,
+// where the TypeScript install would write Putnami's configuration. The
+// TypeScript lint reads biome.json alone: a biome.jsonc such a lint would
+// read gives a warning, and no file.
 func ImportConventions(root string, projects []ConventionProject) ([]ConventionWrite, []string, error) {
 	var writes []ConventionWrite
 	var warnings []string
+	rootBiome := false
 	for _, p := range projects {
 		dir := filepath.Join(root, filepath.FromSlash(p.Dir))
+		if p.BiomeLint {
+			switch biomeConfig(dir) {
+			case "":
+				rootBiome = true
+			case biomeJSONC:
+				warnings = append(warnings, biomeJSONCWarning(path.Join(p.Dir, biomeJSONC)))
+			}
+		}
 		manifest := path.Join(p.Dir, "package.json")
 		data, err := os.ReadFile(filepath.Join(dir, "package.json")) //nolint:gosec // a project manifest under the workspace root
 		if err != nil && !errors.Is(err, fs.ErrNotExist) {
@@ -87,7 +105,39 @@ func ImportConventions(root string, projects []ConventionProject) ([]ConventionW
 			writes = append(writes, ConventionWrite{File: path.Join(p.Dir, rootTSConfig), After: []byte(body), What: "written, extending the root's"})
 		}
 	}
+	if rootBiome {
+		switch biomeConfig(root) {
+		case "":
+			writes = append(writes, ConventionWrite{File: biomeJSON, After: []byte("{}\n"), What: "written with no setting, so the lint that moved keeps Biome's defaults"})
+		case biomeJSONC:
+			warnings = append(warnings, biomeJSONCWarning(biomeJSONC))
+		}
+	}
 	return writes, warnings, nil
+}
+
+// biomeJSON and biomeJSONC are the configuration files Biome reads in a
+// directory; the TypeScript lint and install read biomeJSON alone.
+const (
+	biomeJSON  = "biome.json"
+	biomeJSONC = "biome.jsonc"
+)
+
+// biomeConfig answers the Biome configuration dir holds: biomeJSON, else
+// biomeJSONC, else "".
+func biomeConfig(dir string) string {
+	for _, name := range []string{biomeJSON, biomeJSONC} {
+		if _, err := os.Stat(filepath.Join(dir, name)); err == nil {
+			return name
+		}
+	}
+	return ""
+}
+
+// biomeJSONCWarning is the warning for a biome.jsonc a moved Biome lint
+// would read.
+func biomeJSONCWarning(file string) string {
+	return fmt.Sprintf("%s: the lint of %s reads %s alone, so the lint that moved does not check with this configuration; rename it %s, in place of the one the install writes", file, TypeScriptExtension, biomeJSON, biomeJSON)
 }
 
 // PackagePublished answers what publishes the package in dir: its

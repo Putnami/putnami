@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "monorepo/rush-adoption#a-moved-lint-only-checks",
     "monorepo/rush-adoption#a-moved-task-does-what-its-script-did",
     "monorepo/rush-adoption#an-import-declares-only-what-moves",
     "monorepo/rush-adoption#build-cache-warning",
