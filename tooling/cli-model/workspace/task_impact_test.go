@@ -30,6 +30,18 @@ type fakeTaskIndex struct {
 	// extension manifest moved, when the change stays inside task and step
 	// declarations. A pair absent from the map is a change that does not.
 	manifest map[string][]string
+	// checking holds the tasks only a command of a checking kind declares.
+	checking map[string]bool
+}
+
+func (f fakeTaskIndex) TasksBuildingRuntime(tasks []string) []string {
+	building := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		if !f.checking[task] {
+			building = append(building, task)
+		}
+	}
+	return building
 }
 
 func (f fakeTaskIndex) ReadsAsExtensionRuntime(projectID, path string) bool {
@@ -287,6 +299,68 @@ func TestTraceChangeImpact_ExtensionConsumerEdgeFiresOnlyWhenTheBinaryMoved(t *t
 		if got := r.Trace.ScopeOf("/apps/web"); !slices.Equal(got, tc.wantScope) {
 			t.Errorf("%s scoped /apps/web to %v, want %v", tc.file, got, tc.wantScope)
 		}
+	}
+}
+
+// A file a dependency's tests read reaches the extension that imports it
+// through the test pipeline's `^generate`, and the extension's tests reach its
+// own dependents in turn. Those are checking tasks: they build nothing the
+// extension's consumers execute, so the consumer edge does not fire. A source
+// file of the same dependency reaches the extension's build, which moves the
+// runtime, and every consumer runs every task of the extension. The extension's
+// own test layer is the same case.
+func TestTraceChangeImpact_ACheckingTaskMovesNoExtensionRuntime(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-model", "change-impact", "extension-consumers-run-the-changed-extension-tasks")
+	ws := NewWorkspace("/workspace", nil, []*Project{
+		{ID: "/protocols/features", Name: "features", Path: "protocols/features"},
+		{ID: "/go/extension", Name: "@putnami/go", Path: "go/extension", Dependencies: []string{"/protocols/features"}},
+		{ID: "/apps/web", Name: "web", Path: "apps/web", Extensions: []string{"/go/extension"}},
+	})
+	everyTask := []string{"/go/extension#build~describe", "/go/extension#test~generate", "/go/extension#test~test"}
+	index := fakeTaskIndex{
+		reading: map[string][]string{
+			"/protocols/features|protocols/features/fixtures/spec.json": {"test~generate", "test~test"},
+			"/protocols/features|protocols/features/feature.go":         {"build~describe", "test~generate", "test~test"},
+		},
+		reached: map[string][]string{
+			"build~describe": {"build~describe", "test~generate", "test~test"},
+			"test~generate":  {"test~generate", "test~test"},
+		},
+		extensionTasks: map[string][]string{"/go/extension": everyTask},
+		checking:       map[string]bool{"test~generate": true, "test~test": true},
+	}
+	// The extension's own test layer reads every spec of the workspace.
+	index.reading["/go/extension|go/extension/specs/spec.json"] = []string{"test~generate", "test~test"}
+
+	for _, file := range []string{"protocols/features/fixtures/spec.json", "go/extension/specs/spec.json"} {
+		r := TraceChangeImpact(ws, []string{file}, ChangeImpactOptions{Tasks: index})
+		if got, want := r.Trace.ScopeOf("/go/extension"), []string{"test~generate", "test~test"}; !slices.Equal(got, want) {
+			t.Errorf("%s scoped the extension to %v, want %v", file, got, want)
+		}
+		if selected := ownerProjectIDs(r.Projects); slices.Contains(selected, "/apps/web") {
+			t.Errorf("%s, which only tests read, selected the consumer: %v", file, selected)
+		}
+	}
+
+	r := TraceChangeImpact(ws, []string{"protocols/features/feature.go"}, ChangeImpactOptions{Tasks: index})
+	if got := r.Trace.ScopeOf("/apps/web"); !slices.Equal(got, everyTask) {
+		t.Errorf("a source file scoped the consumer to %v, want %v", got, everyTask)
+	}
+
+	// One diff moves the runtime and a file only tests read. The edge names
+	// the runtime input, never the test-only file the extension claimed first.
+	r = TraceChangeImpact(ws, []string{"go/extension/specs/spec.json", "protocols/features/feature.go"},
+		ChangeImpactOptions{Tasks: index})
+	want := ImpactEdge{From: "/go/extension", Kind: ImpactEdgeExtensionConsumer, Via: "protocols/features/feature.go", Cause: ImpactCauseRuntimeInput}
+	if got := r.Trace.Edges["/apps/web"]; got != want {
+		t.Errorf("edge into the consumer = %+v, want %+v", got, want)
+	}
+
+	// The same tasks declared by a producing command move the runtime.
+	index.checking = nil
+	r = TraceChangeImpact(ws, []string{"protocols/features/fixtures/spec.json"}, ChangeImpactOptions{Tasks: index})
+	if got := r.Trace.ScopeOf("/apps/web"); !slices.Equal(got, everyTask) {
+		t.Errorf("producing tasks scoped the consumer to %v, want %v", got, everyTask)
 	}
 }
 

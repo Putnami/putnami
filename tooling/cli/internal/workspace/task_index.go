@@ -147,6 +147,9 @@ type plannedKey struct {
 type indexedTask struct {
 	scope   string
 	command string
+	// jobs are the commands that declare the task, each once
+	// (TasksBuildingRuntime).
+	jobs []*extension.JobDefinition
 	// files are the project-relative patterns the task's inputs select, in the
 	// exact flattened, sorted form DeriveTaskCacheKey hands the cache hasher.
 	// A `closure` port's patterns are here too, for the reason
@@ -468,6 +471,9 @@ func (idx *taskIndex) mergeTask(
 	if !known {
 		task = &indexedTask{scope: scope, command: command}
 		idx.tasks[scope] = task
+	}
+	if !slices.Contains(task.jobs, job) {
+		task.jobs = append(task.jobs, job)
 	}
 	task.files = mergePatterns(task.files, files)
 	task.closureFiles = mergePatterns(task.closureFiles, closureFiles)
@@ -858,6 +864,53 @@ func (idx *taskIndex) TasksReachedFrom(tasks []string) []string {
 		}
 	}
 	return sortedSet(reached)
+}
+
+// checkingKinds are the command kinds whose result is a report on the
+// project, never a file a consumer executes.
+var checkingKinds = []string{
+	extproto.CommandKindVerification,
+	extproto.CommandKindCriteria,
+	extproto.CommandKindDiagnostics,
+}
+
+// TasksBuildingRuntime returns the entries of tasks that may build what an
+// extension's consumers execute: it drops an entry when every command that
+// declares it is of a checking kind. A qualified entry is answered by the
+// commands of its extension, a closure entry by the task it reads for. An
+// entry the index attributes to no command stays.
+func (idx *taskIndex) TasksBuildingRuntime(tasks []string) []string {
+	building := make([]string, 0, len(tasks))
+	for _, task := range tasks {
+		if !idx.checksOnly(task) {
+			building = append(building, task)
+		}
+	}
+	return building
+}
+
+// checksOnly reports whether every command that declares the task is of a
+// checking kind. A task no command is known to declare is not.
+func (idx *taskIndex) checksOnly(task string) bool {
+	scope := strings.TrimPrefix(task, closureScopePrefix)
+	jobs, qualified := idx.extensionCommands[scope]
+	if !qualified {
+		if _, unqualified, cut := strings.Cut(scope, extensionScopeSeparator); cut {
+			scope = unqualified
+		}
+		if indexed := idx.tasks[scope]; indexed != nil {
+			jobs = indexed.jobs
+		}
+	}
+	if len(jobs) == 0 {
+		return false
+	}
+	for _, job := range jobs {
+		if job == nil || !slices.Contains(checkingKinds, job.Traits.Kind) {
+			return false
+		}
+	}
+	return true
 }
 
 // TasksOfExtension returns the task scopes an in-workspace extension project's

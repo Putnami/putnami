@@ -10,6 +10,9 @@
   steps it moved and names the manifest.
 - **Amended**: 2026-11-12, §3: the edge reaches a consumer only for the tasks
   the extension may plan in it, and reaches no consumer it may plan none in.
+- **Amended**: 2026-11-13, §3: a task that only commands of a checking kind
+  declare (verification, criteria, diagnostics) does not move the runtime,
+  and the trace never names a file only such tasks read.
 
 ## Context
 
@@ -58,7 +61,14 @@ it, not the packages next to them.
 - The extension-consumer edge fires from an in-workspace extension whose
   runtime the change moved: the extension is fully impacted, or the tasks
   that read the changed files reach a dependent's task across a `^`
-  reference ([ADR 0044](0044-selection-is-task-level.md)). It carries every
+  reference ([ADR 0044](0044-selection-is-task-level.md)). A task counts
+  unless every command that declares it is of a checking kind
+  (`verification`, `criteria`, `diagnostics`); a command with no kind counts,
+  and so does a task the index attributes to no command. A checking task,
+  such as a `test~generate` that a dependent's test reads through
+  `^generate`, reports on the extension and builds nothing its consumers
+  execute: a spec file a dependency's test layer reads re-runs that
+  extension's tests, not its consumers' tasks. The edge carries every
   task the extension declares, and the trace names the runtime input, the
   changed file the walk traced the runtime to: `runtime input
   tooling/extension-sdk/registrycred/install.go` for a module the

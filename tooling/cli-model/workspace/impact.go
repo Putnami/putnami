@@ -62,6 +62,15 @@ type TaskImpactIndex interface {
 	// dependency edge or a contract edge, is the graph's business.
 	TasksReachedFrom(tasks []string) []string
 
+	// TasksBuildingRuntime returns the entries of tasks that may build what an
+	// extension's consumers execute: every entry but one that only commands
+	// of a checking kind declare. A verification, a check against criteria
+	// and a tally of diagnostics report on the project; none of them produces
+	// the extension's runtime, even when a dependent's step of the same
+	// command reads its output. An entry the index attributes to no command
+	// stays.
+	TasksBuildingRuntime(tasks []string) []string
+
 	// TasksOfExtension returns every task an in-workspace extension project's
 	// manifest declares, or nil when the project declares no extension
 	// manifest. It is the extension-consumer scope of ADR 0042 said in the
@@ -438,9 +447,11 @@ type impactScope struct {
 	// declaredBy is the manifest whose confined change the project claimed.
 	declaredBy string
 	// cause is the changed file the walk traces the project's runtime to: the
-	// claim that made it full, else the first claim whose tasks reach a
-	// dependent's task, else the cause of the project whose edge first reached
-	// it. The runtime extension-consumer edge names it.
+	// claim that made it full, else the first claim whose tasks that may build
+	// a runtime (TaskImpactIndex.TasksBuildingRuntime) reach a dependent's
+	// task, else the cause of the project whose edge first reached it. The
+	// runtime extension-consumer edge names it, so a file only checking tasks
+	// read is never named.
 	cause string
 }
 
@@ -711,7 +722,7 @@ func claimTasks(
 	}
 	if tasks := index.TasksReadingPath(p.ID, claim.File); len(tasks) > 0 {
 		scope.add(tasks)
-		if scope.cause == "" && !scope.full && len(index.TasksReachedFrom(tasks)) > 0 {
+		if scope.cause == "" && !scope.full && len(index.TasksReachedFrom(index.TasksBuildingRuntime(tasks))) > 0 {
 			scope.cause = claim.File
 		}
 		return true
@@ -826,7 +837,8 @@ func isExtensionManifestOf(p *Project, file string) bool {
 // (TaskImpactIndex.TasksPlannedIn); a consumer it may run none in is not
 // reached. Whether the runtime moved is the question
 // `^` already answers: the extension is full, or the tasks a claim or an edge
-// gave it reach a dependent's task at all. A `_test.go` inside an extension
+// gave it, those a checking command alone does not declare, reach a
+// dependent's task at all. A `_test.go` inside an extension
 // therefore re-runs that extension's tests and nothing else in the workspace,
 // while one byte of its implementation re-runs that extension's tasks on every
 // consumer, and the edge names the changed file it traced that runtime to. An
@@ -981,15 +993,23 @@ func (w *impactWalk) consumerEdgeFrom(extensionID string, scope *impactScope, ca
 	return edge, sortedKeys(scope.declared), true
 }
 
-// runtimeCarries reports whether the tasks a claim or an edge gave a project
+// runtimeCarries reports whether the tasks a claim or an edge gave a project,
+// those that may build its runtime (TaskImpactIndex.TasksBuildingRuntime),
 // reach a dependent's task. carries answers the same question for every task
-// it runs, the readers of a confined manifest change included, and the two
-// agree when it has no such readers.
+// the project runs, the readers of a confined manifest change and its
+// checking tasks included.
+//
+// A file a dependency's test layer reads, such as a spec every project
+// declares, seeds that dependency's test tasks. Their `^` references reach the
+// extension's test tasks, and those reach its dependents' tests in turn: the
+// extension then carries across its edges, but nothing its consumers execute
+// moved.
 func (w *impactWalk) runtimeCarries(scope *impactScope, carries bool) bool {
-	if !carries || w.index == nil || len(scope.runtimeTasks) == len(scope.tasks) {
+	if !carries || w.index == nil {
 		return carries
 	}
-	return len(w.index.TasksReachedFrom(sortedKeys(scope.runtimeTasks))) > 0
+	building := w.index.TasksBuildingRuntime(sortedKeys(scope.runtimeTasks))
+	return len(building) > 0 && len(w.index.TasksReachedFrom(building)) > 0
 }
 
 // carried answers what one project hands across an edge: the tasks a dependent
