@@ -316,7 +316,10 @@ func TestARealNodeAnswersOnThePortAfterEachEdit(t *testing.T) {
 	write := func(version string) {
 		source := "import http from \"node:http\";\n" +
 			"http.createServer((_q, r) => r.end(\"" + version + "\")).listen(Number(process.env.PORT));\n"
-		if err := os.WriteFile(entry, []byte(source), 0o644); err != nil {
+		if err := os.WriteFile(entry+".next", []byte(source), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(entry+".next", entry); err != nil {
 			t.Fatal(err)
 		}
 	}
