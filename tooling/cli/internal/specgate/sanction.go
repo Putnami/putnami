@@ -3,6 +3,7 @@ package specgate
 import (
 	"fmt"
 	"sort"
+	"strings"
 
 	"go.putnami.dev/cli/model/workspace"
 	features "go.putnami.dev/protocol/features"
@@ -60,10 +61,14 @@ func Sanctions(record *features.SpecVerificationRecord) map[string]Sanction {
 		return nil
 	}
 	totals := make(map[string]features.SpecVerificationCounts)
+	duplicated := make(map[string]int)
+	duplicates := make(map[string][]string)
 	for _, group := range record.Groups {
 		if !group.Blocked {
 			continue
 		}
+		duplicated[group.Project] += duplicatedRequirements(group.Requirements)
+		duplicates[group.Project] = append(duplicates[group.Project], duplicateFindings(group)...)
 		counts := totals[group.Project]
 		counts.SpecRequirements += group.Counts.SpecRequirements
 		counts.Executable += group.Counts.Executable
@@ -100,11 +105,84 @@ func Sanctions(record *features.SpecVerificationRecord) map[string]Sanction {
 		// whole picture.
 		unresolved := counts.SpecRequirements - counts.Verified - counts.Unobserved
 		sanctions[project] = Sanction{Code: features.ErrorCodeUnresolvedRequirement, Message: fmt.Sprintf(
-			"spec verification: %d of %d textual requirement(s) unresolved under enforce (unmapped %d, unexecutable %d, missing %d, stale %d, contradicted %d)%s; run `putnami specs verify` for the audit report (docs: https://putnami.dev/docs/spec-driven-development/validation-jobs)",
+			"spec verification: %d of %d textual requirement(s) unresolved under enforce (unmapped %d, unexecutable %d, missing %d%s, stale %d, contradicted %d)%s%s; run `putnami specs verify` for the audit report (docs: https://putnami.dev/docs/spec-driven-development/validation-jobs)",
 			unresolved, counts.SpecRequirements, counts.Unmapped, counts.Unexecutable,
-			counts.Missing, counts.Stale, counts.Contradicted, unobservedClause(counts.Unobserved))}
+			counts.Missing-duplicated[project], duplicatedCount(duplicated[project]), counts.Stale, counts.Contradicted,
+			duplicatesClause(duplicates[project]), unobservedClause(counts.Unobserved))}
 	}
 	return sanctions
+}
+
+// duplicatedRequirements counts the requirements whose only defect is a check
+// two reports carry: the requirement is missing on the wire, and each of its
+// checks is either satisfied or refused as a duplicate. Their proofs exist, one
+// too many, so the failure does not count them among the proofs nobody wrote.
+// A requirement that also has an unproven check stays counted as missing.
+func duplicatedRequirements(verdicts []features.SpecRequirementVerdict) int {
+	count := 0
+	for _, verdict := range verdicts {
+		if verdict.State != features.RequirementMissing {
+			continue
+		}
+		if onlyDuplicated(verdict.Checks) {
+			count++
+		}
+	}
+	return count
+}
+
+func onlyDuplicated(checks []features.SpecCheckVerdict) bool {
+	duplicate := false
+	for _, check := range checks {
+		switch {
+		case check.State == features.CheckSatisfied:
+		case check.Reason == features.ReasonDuplicateObservation:
+			duplicate = true
+		default:
+			return false
+		}
+	}
+	return duplicate
+}
+
+// duplicateFindings returns the group's duplicated-check findings, which name
+// the requirement, the check and the reporting projects.
+func duplicateFindings(group features.SpecVerificationGroup) []string {
+	var messages []string
+	for _, finding := range group.Diagnostics {
+		if finding.Code == features.ErrorCodeDuplicateObservation {
+			messages = append(messages, finding.Message)
+		}
+	}
+	return messages
+}
+
+func duplicatedCount(duplicated int) string {
+	if duplicated == 0 {
+		return ""
+	}
+	return fmt.Sprintf(", duplicated %d", duplicated)
+}
+
+// duplicateFindingsLimit bounds how many duplicated checks one failure spells
+// out. The record's group diagnostics carry every one, and the JSON audit
+// report prints them; its human rendering does not print group diagnostics.
+const duplicateFindingsLimit = 5
+
+// duplicatesClause repeats the duplicated-check findings in the failure, the
+// one message every surface prints, in deterministic order.
+func duplicatesClause(findings []string) string {
+	if len(findings) == 0 {
+		return ""
+	}
+	sort.Strings(findings)
+	more := ""
+	if len(findings) > duplicateFindingsLimit {
+		more = fmt.Sprintf("; and %d more duplicated check(s), in the group diagnostics of `putnami specs verify --output=json`",
+			len(findings)-duplicateFindingsLimit)
+		findings = findings[:duplicateFindingsLimit]
+	}
+	return ": " + strings.Join(findings, "; ") + more
 }
 
 func unobservedClause(unobserved int) string {
@@ -132,7 +210,9 @@ func WarningMessages(record *features.SpecVerificationRecord) map[string][]strin
 	messages := make(map[string][]string)
 	for _, group := range record.Groups {
 		for _, finding := range group.Diagnostics {
-			if finding.Code != features.WarningCodeUnobservedRequirement {
+			// A blocked group's duplicated checks are in its sanction already.
+			duplicate := finding.Code == features.ErrorCodeDuplicateObservation && !group.Blocked
+			if finding.Code != features.WarningCodeUnobservedRequirement && !duplicate {
 				continue
 			}
 			messages[group.Project] = append(messages[group.Project], finding.Message)

@@ -237,6 +237,7 @@
     "cli/job-planning-execution#source-bound-settle",
     "cli/job-planning-execution#source-bound-stamp",
     "cli/job-planning-execution#spec-gate-evidence-scope",
+    "cli/job-planning-execution#spec-gate-names-a-duplicated-proof",
     "cli/job-planning-execution#spec-gate-records-an-empty-evaluation",
     "cli/job-planning-execution#the-cache-provider-owns-its-configuration",
     "cli/job-planning-execution#tree-keyed-task-cache",

@@ -64,7 +64,7 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 	}
 
 	ordered := orderedJobs(planned, results)
-	observations, reportsByFeature, reportDiagnostics := collectObservations(ws.Root, ordered, results)
+	observations, reportsByFeature, reporters, reportDiagnostics := collectObservations(ws.Root, ordered, results)
 	record.Diagnostics = append(record.Diagnostics, reportDiagnostics...)
 	// The candidate set is derived from the FULL plan, not from the jobs that
 	// produced results: a project whose test was planned owns its own silence,
@@ -113,7 +113,7 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 		}
 		for _, criteria := range projection.Groups {
 			record.Groups = append(record.Groups, evaluateGroup(projectID, criteria, mode, source,
-				observations, reportsByFeature, at, evidence, owned))
+				observations, reportsByFeature, reporters, at, evidence, owned))
 		}
 	}
 	// Nothing was projected and nothing was diagnosed. The record is empty when
@@ -135,7 +135,7 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 // name one of them as their feature authority.
 func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode features.VerificationMode,
 	source features.VerificationModeSource, observations []features.VerificationObservation,
-	reportsByFeature map[string][]features.VerificationReportRef, at time.Time,
+	reportsByFeature map[string][]features.VerificationReportRef, reporters checkReporters, at time.Time,
 	evidence *evidenceSource, owned map[string]bool) features.SpecVerificationGroup {
 	group := features.SpecVerificationGroup{
 		Project:    projectID,
@@ -175,6 +175,7 @@ func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode f
 			joined = append(joined, observations...)
 			joined = append(joined, recovered.observations...)
 			verdicts, unexpected = evaluateVerdicts(criteria, specRequirements, joined, at)
+			reporters = reporters.with(recovered.reporters)
 			group.Reports = append(group.Reports, recovered.reportsByFeature[criteria.Feature]...)
 		}
 		if moved := reclassifyUnobserved(verdicts, recovered.unconsulted); moved > 0 {
@@ -190,6 +191,7 @@ func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode f
 		}
 	}
 
+	group.Diagnostics = append(group.Diagnostics, duplicateDiagnostics(criteria, verdicts, reporters)...)
 	group.Diagnostics = append(group.Diagnostics, unexpected...)
 	group.Requirements = verdicts
 	group.Counts = features.CountSpecVerdicts(verdicts)
@@ -234,6 +236,89 @@ func evaluateVerdicts(criteria features.SpecCriteriaGroup, specRequirements []fe
 	return verdicts, unexpected
 }
 
+// checkReporters names, per observed check, the projects whose reports carry
+// it, in the order the reports were read. An observation states no project, so
+// the collector records the one it read each from: that is the only place a
+// duplicated check can be traced back to the proofs to remove.
+type checkReporters map[string][]string
+
+func checkKey(feature, requirement, check string) string {
+	return feature + "\x00" + requirement + "\x00" + check
+}
+
+func (reporters checkReporters) add(observation features.VerificationObservation, project string) {
+	key := checkKey(observation.Feature, observation.Requirement, observation.Check)
+	reporters[key] = append(reporters[key], project)
+}
+
+// with returns the union of two indexes without changing either: the session's
+// index is shared by every group, and only the group that joined recovered
+// observations may see their reporters.
+func (reporters checkReporters) with(other checkReporters) checkReporters {
+	if len(other) == 0 {
+		return reporters
+	}
+	union := make(checkReporters, len(reporters)+len(other))
+	for key, projects := range reporters {
+		union[key] = append([]string(nil), projects...)
+	}
+	for key, projects := range other {
+		union[key] = append(union[key], projects...)
+	}
+	return union
+}
+
+// duplicateDiagnostics is the diagnosis of a check two reports carry. The pure
+// evaluator refuses to prefer one report and leaves the requirement missing
+// with reason duplicate-observation; alone, that reads as a proof nobody wrote.
+// The finding names the feature, the requirement, the check and the reporting
+// projects, so the author knows which proof to remove.
+//
+// It is a warning, not an error, for the reason exhaustedScopeDiagnostic gives:
+// the requirement's own state already blocks the group under enforce, and an
+// error here would block it a second time and change what report mode does.
+func duplicateDiagnostics(criteria features.SpecCriteriaGroup, verdicts []features.SpecRequirementVerdict,
+	reporters checkReporters) []diag.Diagnostic {
+	var diagnostics []diag.Diagnostic
+	for _, verdict := range verdicts {
+		for _, check := range verdict.Checks {
+			if check.Reason != features.ReasonDuplicateObservation {
+				continue
+			}
+			projects := reporters[checkKey(criteria.Feature, verdict.Requirement, check.Check)]
+			diagnostics = append(diagnostics, diag.Warningf(features.ErrorCodeDuplicateObservation, criteria.Spec,
+				"check %q of requirement %q of feature %q is reported %d times, by %s: "+
+					"a check has one proof, so keep one spectest.Proves call for it and remove the others",
+				check.Check, verdict.Requirement, criteria.Feature, len(projects), reportingProjects(projects)))
+		}
+	}
+	return diagnostics
+}
+
+// reportingProjects renders the reporters of one check: each project once, in
+// sorted order, and a project that reported it twice says so, because two
+// report tasks of one project are then the duplicate.
+func reportingProjects(projects []string) string {
+	if len(projects) == 0 {
+		return "reports this run could not attribute to a project"
+	}
+	times := make(map[string]int, len(projects))
+	for _, project := range projects {
+		times[project]++
+	}
+	names := make([]string, 0, len(times))
+	for project := range times {
+		names = append(names, project)
+	}
+	sort.Strings(names)
+	for i, project := range names {
+		if times[project] > 1 {
+			names[i] = fmt.Sprintf("%s (%d reports)", project, times[project])
+		}
+	}
+	return joinBounded(names)
+}
+
 // collectObservations reads every observation report the session's report
 // producers emitted (jobs.ProducesVerificationReport): the jobs of its
 // verification commands that can write the report. Observations survive only
@@ -241,10 +326,11 @@ func evaluateVerdicts(criteria features.SpecCriteriaGroup, specRequirements []fe
 // contained file of the REPORTING task's own project, so a report can never
 // claim another project's source as its proof.
 func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results map[string]*jobs.JobResult) (
-	[]features.VerificationObservation, map[string][]features.VerificationReportRef, []diag.Diagnostic) {
+	[]features.VerificationObservation, map[string][]features.VerificationReportRef, checkReporters, []diag.Diagnostic) {
 	var observations []features.VerificationObservation
 	var diagnostics []diag.Diagnostic
 	reportsByFeature := make(map[string][]features.VerificationReportRef)
+	reporters := make(checkReporters)
 	readPaths := make(map[string]bool)
 
 	for _, job := range ordered {
@@ -289,6 +375,7 @@ func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results ma
 					continue
 				}
 				observations = append(observations, observation)
+				reporters.add(observation, job.Project.ID)
 				if !seenFeature[observation.Feature] {
 					seenFeature[observation.Feature] = true
 					reportsByFeature[observation.Feature] = append(reportsByFeature[observation.Feature], reference)
@@ -296,7 +383,7 @@ func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results ma
 			}
 		}
 	}
-	return observations, reportsByFeature, diagnostics
+	return observations, reportsByFeature, reporters, diagnostics
 }
 
 // readProjection finds and reads one job's declared criteria projection.

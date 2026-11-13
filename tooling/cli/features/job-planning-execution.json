@@ -502,6 +502,21 @@
         }
       },
       {
+        "id": "spec-gate-names-a-duplicated-proof",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-duplicated-check-names-its-requirement-and-reporting-projects",
+            "the-failure-counts-a-duplicate-apart-from-missing",
+            "a-duplicate-under-report-is-printed-as-a-warning"
+          ]
+        }
+      },
+      {
         "id": "declared-verification-producers",
         "stage": "coded",
         "evidenceKinds": [

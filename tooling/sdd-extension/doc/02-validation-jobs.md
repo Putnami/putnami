@@ -479,6 +479,42 @@ scope was exhausted and that the fix is a `spectest.Proves` call rather than a
 wider selection, so a bare `check-not-observed` never reaches a reader on its
 own.
 
+## When two reports carry the same check
+
+A check has one proof. When the reports of two tasks carry the same check of a
+requirement, the gate prefers neither: the check resolves `unclassified` with
+reason `duplicate-observation`, the requirement stays `missing` in the record,
+and the group blocks under `enforce`. Each project alone passes, so the failure
+shows only when both reports are read: both projects are in the run, or the
+group has an unresolved requirement and the gate reads the other project's
+cache entry.
+
+The group carries a `features.duplicate_observation` warning that names the
+feature, the requirement, the check and the reporting projects:
+
+```text
+check "issue-check" of requirement "issue" of feature "billing/invoicing" is
+reported 2 times, by /billing, /ledger: a check has one proof, so keep one
+spectest.Proves call for it and remove the others
+```
+
+Under `enforce` the failure repeats that finding and counts the requirement as
+`duplicated`, apart from the `missing` ones, whose proof nobody wrote:
+
+```text
+spec verification: 1 of 34 textual requirement(s) unresolved under enforce
+(unmapped 0, unexecutable 0, missing 0, duplicated 1, stale 0, contradicted 0):
+check "issue-check" of requirement "issue" of feature "billing/invoicing" is
+reported 2 times, by /billing, /ledger: ...
+```
+
+A requirement with a check that is neither satisfied nor duplicated stays
+counted as missing. The failure spells out five duplicated checks at most;
+`putnami specs verify --output=json` lists every finding in the diagnostics of
+its group. Under `report` the run prints the finding as a warning and
+does not fail. To fix it, keep the proof in the project that owns the behavior
+and remove the other call, or give each implementation a check of its own.
+
 ## Caching, and the steps that are not cached
 
 A task may be cacheable only when its declared inputs cover what it reads.

@@ -135,8 +135,11 @@ type evidenceSource struct {
 type recoveredEvidence struct {
 	observations     []features.VerificationObservation
 	reportsByFeature map[string][]features.VerificationReportRef
-	unconsulted      []UnconsultedProject
-	diagnostics      []diag.Diagnostic
+	// reporters names the candidate project each recovered observation came
+	// from, so a check a restored report duplicates is traced like any other.
+	reporters   checkReporters
+	unconsulted []UnconsultedProject
+	diagnostics []diag.Diagnostic
 	// candidates is how many projects could have been asked at all. With
 	// unconsulted it says how much of the evidence scope actually answered,
 	// which is what separates "nobody could tell us" from "everybody told us
@@ -186,7 +189,8 @@ func (source *evidenceSource) forProject(projectID string, owned map[string]bool
 }
 
 func (source *evidenceSource) resolve(projectID string, owned map[string]bool) *recoveredEvidence {
-	evidence := &recoveredEvidence{reportsByFeature: map[string][]features.VerificationReportRef{}}
+	evidence := &recoveredEvidence{reportsByFeature: map[string][]features.VerificationReportRef{},
+		reporters: checkReporters{}}
 	candidates := source.candidates(projectID, owned)
 	evidence.candidates = len(candidates)
 	if len(candidates) == 0 {
@@ -236,6 +240,7 @@ func (source *evidenceSource) resolve(projectID string, owned map[string]bool) *
 				continue
 			}
 			evidence.observations = append(evidence.observations, observation)
+			evidence.reporters.add(observation, candidate.ID)
 			if !seenFeature[observation.Feature] {
 				seenFeature[observation.Feature] = true
 				evidence.reportsByFeature[observation.Feature] =
