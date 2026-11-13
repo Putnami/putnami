@@ -1,0 +1,91 @@
+A pnpm 10 workspace of two TypeScript packages that build with tsc, test with
+Vitest (core) and Jest with ts-jest (utils), and lint with ESLint 9's flat
+config: the repository a Node team brings to putnami init --from nx or turbo.
+The Nx and Turborepo import tests add the tool's config and its devDependency,
+and set packageManager to the pnpm on PATH.
+-- base/.gitignore --
+node_modules
+dist
+.putnami
+.gen
+reports
+coverage
+.nx
+.turbo
+-- base/package.json --
+{
+  "name": "demo",
+  "private": true,
+  "devDependencies": {
+    "@eslint/js": "9.39.1",
+    "@types/jest": "30.0.0",
+    "eslint": "9.39.1",
+    "jest": "30.2.0",
+    "ts-jest": "29.4.5",
+    "typescript": "5.9.3",
+    "typescript-eslint": "8.46.4",
+    "vitest": "4.0.8"
+  }
+}
+-- base/pnpm-workspace.yaml --
+packages:
+  - 'packages/*'
+-- base/tsconfig.base.json --
+{ "compilerOptions": { "target": "ES2022", "module": "NodeNext", "moduleResolution": "NodeNext", "strict": true, "declaration": true, "skipLibCheck": true, "esModuleInterop": true } }
+-- base/eslint.config.mjs --
+import js from '@eslint/js';
+import tseslint from 'typescript-eslint';
+export default tseslint.config(
+  { ignores: ['**/dist/**', '**/coverage/**', '**/*.config.*'] },
+  js.configs.recommended,
+  ...tseslint.configs.recommended,
+);
+-- base/packages/core/package.json --
+{
+  "name": "@demo/core",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc", "test": "vitest run", "lint": "eslint ." }
+}
+-- base/packages/core/tsconfig.json --
+{ "extends": "../../tsconfig.base.json", "compilerOptions": { "outDir": "dist", "rootDir": "src" }, "include": ["src"], "exclude": ["src/**/*.test.ts"] }
+-- base/packages/core/src/index.ts --
+export function add(a: number, b: number): number {
+  return a + b;
+}
+-- base/packages/core/src/index.test.ts --
+import { describe, expect, it } from 'vitest';
+import { add } from './index.js';
+describe('add', () => {
+  it('adds', () => {
+    expect(add(1, 2)).toBe(3);
+  });
+});
+-- base/packages/utils/package.json --
+{
+  "name": "@demo/utils",
+  "version": "1.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": { "build": "tsc", "test": "jest", "lint": "eslint ." },
+  "dependencies": { "@demo/core": "workspace:*" }
+}
+-- base/packages/utils/tsconfig.json --
+{ "extends": "../../tsconfig.base.json", "compilerOptions": { "module": "CommonJS", "moduleResolution": "Node10", "outDir": "dist", "rootDir": "src", "types": ["jest"] }, "include": ["src"], "exclude": ["src/**/*.test.ts"] }
+-- base/packages/utils/jest.config.js --
+module.exports = { preset: 'ts-jest', testEnvironment: 'node', testMatch: ['**/src/**/*.test.ts'] };
+-- base/packages/utils/src/index.ts --
+export function double(n: number): number {
+  return n * 2;
+}
+-- base/packages/utils/src/index.test.ts --
+import { double } from './index';
+describe('double', () => {
+  it('doubles', () => {
+    expect(double(2)).toBe(4);
+  });
+});

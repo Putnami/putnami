@@ -282,6 +282,8 @@ var spawnSites = map[string]spawnSite{
 	// Test support.
 	"cli/clitest/clitest.go:GitOutput":                                {spawns: 1, verdict: testSupport},
 	"cli/clitest/clitest.go:RunGit":                                   {spawns: 1, verdict: testSupport},
+	"cli/clitest/pnpmworkspace.go:PnpmInstall":                        {spawns: 1, verdict: testSupport},
+	"cli/clitest/pnpmworkspace.go:RequirePnpm":                        {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture.go:(*fixtureProvider).startSupervisor": {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture.go:superviseFixtureAttempt":            {spawns: 1, verdict: testSupport},
 	"cli/clitest/runnerfixture_unix.go:ProcessExited":                 {spawns: 1, verdict: testSupport},

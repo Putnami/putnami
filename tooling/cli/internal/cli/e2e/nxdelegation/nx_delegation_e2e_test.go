@@ -36,7 +36,14 @@ var repoRoot string
 // repository, head/ the change on top of it, ci/ what its CI wrote.
 func readDemo(t *testing.T) map[string]map[string]string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(repoRoot, "tooling/observe/internal/observe/testdata/demos/nx.txtar"))
+	return readArchive(t, "tooling/observe/internal/observe/testdata/demos/nx.txtar")
+}
+
+// readArchive reads the txtar archive at rel, under the repository root, by
+// section: the first element of each file name.
+func readArchive(t *testing.T, rel string) map[string]map[string]string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repoRoot, rel))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -97,7 +104,14 @@ func nxWorkspace(t *testing.T, demo map[string]map[string]string, runtime string
 	}
 	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\ndist\nnode_modules\nreports\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/nx-extension"], "includes": []}`)
+	writeNxExtension(t, root, runtime)
+	return root
+}
 
+// writeNxExtension writes, under nx-extension of the workspace at root, a
+// local copy of the @putnami/nx manifest whose prepare copies runtime.
+func writeNxExtension(t *testing.T, root, runtime string) {
+	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repoRoot, "integrations/nx/putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -128,7 +142,6 @@ func nxWorkspace(t *testing.T, demo map[string]map[string]string, runtime string
 	if err := os.Chmod(prepare, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return root
 }
 
 // stubNx puts first on PATH an npx that answers npx --no -- nx --version with

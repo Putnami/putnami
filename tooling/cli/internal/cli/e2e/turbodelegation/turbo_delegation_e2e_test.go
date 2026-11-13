@@ -37,7 +37,14 @@ const feature = "cli/init-from-a-monorepo-tool"
 // the repository, head/ the change on top of it, ci/ what its CI wrote.
 func readDemo(t *testing.T) map[string]map[string]string {
 	t.Helper()
-	data, err := os.ReadFile(filepath.Join(repoRoot, "tooling/observe/internal/observe/testdata/demos/turbo.txtar"))
+	return readArchive(t, "tooling/observe/internal/observe/testdata/demos/turbo.txtar")
+}
+
+// readArchive reads the txtar archive at rel, under the repository root, by
+// section: the first element of each file name.
+func readArchive(t *testing.T, rel string) map[string]map[string]string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(repoRoot, rel))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -109,7 +116,15 @@ func turboWorkspace(t *testing.T, demo map[string]map[string]string, runtime, mo
 	clitest.WriteFile(t, filepath.Join(root, ".gitignore"), ".putnami\n.gen\ndist\nnode_modules\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"),
 		`{"name": "shop", "extensions": ["/turbo-extension"], "includes": [], "options": {"@putnami/turbo": {"mode": "`+mode+`"}}}`)
+	writeTurboExtension(t, root, runtime)
+	return root
+}
 
+// writeTurboExtension writes, under turbo-extension of the workspace at
+// root, a local copy of the @putnami/turbo manifest whose prepare copies
+// runtime.
+func writeTurboExtension(t *testing.T, root, runtime string) {
+	t.Helper()
 	data, err := os.ReadFile(filepath.Join(repoRoot, "integrations/turbo/putnami.extension.json"))
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +156,6 @@ func turboWorkspace(t *testing.T, demo map[string]map[string]string, runtime, mo
 	if err := os.Chmod(prepare, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	return root
 }
 
 // stubTurbo puts first on PATH a turbo that prints the version the demo's
