@@ -322,6 +322,13 @@ func TestTheDeclaredBudgetsBoundAProviderOwnedWire(t *testing.T) {
 		}
 	})
 	t.Run("the declared heartbeat keeps a quiet wire alive", func(t *testing.T) {
+		// The margins are seconds, not milliseconds: on a loaded host a ping,
+		// its pong or the read loop can be late by far more than a few
+		// milliseconds. The idle budget spans twenty heartbeats, so only a
+		// heartbeat that does not refresh it fails the test; the quiet period
+		// still outlasts the budget, so without that refresh the wire dies.
+		const idleBudgetMs, heartbeatMs = 2000, 100
+		const quietFor = 3000 * time.Millisecond
 		server := newWSTestServer(t, wsTestOptions{play: func(peer *wsTestPeer) {
 			done := make(chan struct{})
 			go func() {
@@ -333,11 +340,11 @@ func TestTheDeclaredBudgetsBoundAProviderOwnedWire(t *testing.T) {
 					}
 				}
 			}()
-			time.Sleep(450 * time.Millisecond)
+			time.Sleep(quietFor)
 			_ = peer.conn.writeBinary([]byte("alive"))
 			<-done
 		}})
-		idle, heartbeat := 200, 40
+		idle, heartbeat := idleBudgetMs, heartbeatMs
 		stream, err := OpenByteStream(context.Background(), webSocketTestClient(t, server.URL), &Request{},
 			providerWireTestOperation(true, streamPolicy(clientcontract.StreamPolicy{IdleTimeoutMs: &idle, HeartbeatMs: &heartbeat}), nil))
 		if err != nil {
