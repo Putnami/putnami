@@ -104,6 +104,14 @@
         "Outside a CI and without --base, the base is the remote default branch, origin/HEAD, so putnami observe on a laptop needs no flag.",
         "A clone without origin/HEAD keeps the diagnostic of a missing base."
       ]
+    },
+    {
+      "id": "declared-repository-evidence",
+      "text": [
+        "In a repository that holds putnami.workspace.json, the evidence document carries the declaration files the change touches, each with its document at the base and at the head, and the newest spec verification record a `putnami test` run wrote under .putnami/sessions.",
+        "A workspace without a record gets the observe.spec_verification_missing warning, which names the step to add.",
+        "Another repository's document carries neither member."
+      ]
     }
   ],
   "decisions": [

@@ -430,6 +430,19 @@
           }
         },
         {
+          "id": "sends-the-declared-records",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-spec-verification-and-the-declarations-each-ride-alone"
+            ]
+          }
+        },
+        {
           "id": "sends-the-dependency-states",
           "stage": "coded",
           "evidenceKinds": [

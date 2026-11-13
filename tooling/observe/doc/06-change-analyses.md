@@ -305,6 +305,21 @@ A repository without decision records gets no `decisions` line and no
 diagnostic. The list says which decisions govern the change; it does not
 judge whether the change follows them.
 
+## Declarations of a Putnami workspace
+
+In a repository whose root holds `putnami.workspace.json`, the evidence
+document carries what the workspace declares:
+
+- `declarations`: each spec, `specs.baseline.json`, `putnami.features.json`,
+  `adr/*.md`, `decisions.json`, `putnami.architecture.json`, `putnami.ci.json`
+  or `CODEOWNERS` file the change touches, with its whole text before and
+  after the change. A document over 256 KiB is left out.
+- `specVerification`: the newest spec verification record under
+  `.putnami/sessions/`, which `putnami test` writes. Run `putnami test`
+  before `putnami observe`.
+
+Another repository carries neither member and gets no diagnostic.
+
 ## Diagnostics
 
 | Code | Meaning |
@@ -320,5 +335,9 @@ judge whether the change follows them.
 | `observe.decision_unread` | A decision record or directory cannot be read, or a `--decisions` entry is not a directory of the repository. |
 | `observe.decision_deleted` | The change deletes an accepted decision record. |
 | `observe.decisions_truncated` | The change concerns more than 1000 decisions, or a decision names more than 100 scope patterns or governs more than 1000 changed files; the rest is left out. |
+| `observe.declaration_unread` | A declaration file cannot be read at the base or the head, or is over 256 KiB, so it is left out. |
+| `observe.declarations_truncated` | The change touches more than 1024 declaration files; the rest is left out. |
+| `observe.spec_verification_missing` | A Putnami workspace has no spec verification record: run `putnami test` before `putnami observe`. |
+| `observe.spec_verification_unread` | The newest spec verification record cannot be read or is too large. |
 | `observe.fallback_split` | No detector found a component, so the repository is split by CODEOWNERS, by its top-level directories, or kept as one component. An info diagnostic that names the split. |
 | `observe.fallback_walk_bounded` | A top-level directory holds 200000 entries before any source file, so the directory split leaves it out. |

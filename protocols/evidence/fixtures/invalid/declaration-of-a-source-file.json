@@ -1,0 +1,91 @@
+{
+  "protocolVersion": 1,
+  "subject": {
+    "provider": "github",
+    "host": "github.com",
+    "projectId": "831204",
+    "repository": "acme/pricing",
+    "sha": "9b2e4c6a8d0f1e3b5c7a9d1f3e5b7c9a1d3f5e7b",
+    "baseSha": "1c3e5a7b9d2f4a6c8e0b2d4f6a8c0e2b4d6f8a0c",
+    "branch": "feat/discount",
+    "changeRequest": {
+      "number": 12
+    }
+  },
+  "ci": {
+    "system": "github-actions",
+    "runId": "9876543210",
+    "jobId": "observe",
+    "attempt": 1,
+    "url": "https://github.com/acme/pricing/actions/runs/9876543210"
+  },
+  "producer": {
+    "name": "@putnami/observe",
+    "version": "0.1.0"
+  },
+  "generatedAt": "2026-11-12T09:00:00Z",
+  "changedFiles": [
+    {
+      "path": "CODEOWNERS",
+      "status": "added",
+      "component": "."
+    },
+    {
+      "path": "pricing/discount_test.go",
+      "status": "deleted",
+      "component": "."
+    },
+    {
+      "path": "pricing/specs/discount.json",
+      "status": "modified",
+      "component": "."
+    },
+    {
+      "path": "specs/pricing.json",
+      "status": "renamed",
+      "previousPath": "pricing/specs/pricing.json",
+      "component": "."
+    },
+    {
+      "path": "pricing/specs/legacy.json",
+      "status": "deleted",
+      "component": "."
+    },
+    {
+      "path": "pricing/discount.go",
+      "status": "modified",
+      "component": "."
+    }
+  ],
+  "components": [
+    {
+      "id": ".",
+      "name": "github.com/acme/pricing",
+      "ecosystem": "go",
+      "source": "manifest",
+      "impact": "changed"
+    }
+  ],
+  "declarations": [
+    {
+      "path": "pricing/discount.go",
+      "status": "modified",
+      "before": "x",
+      "after": "y"
+    }
+  ],
+  "specVerification": {
+    "protocolVersion": 1,
+    "generatedAt": "2026-11-12T08:59:00Z",
+    "groups": [
+      {
+        "project": "pricing",
+        "feature": "pricing/discount",
+        "mode": "enforce",
+        "modeSource": "workspace",
+        "automaticEvaluation": true,
+        "blocked": false
+      }
+    ]
+  }
+}

@@ -8,9 +8,10 @@ import (
 
 // ErrInputSelector identifies an invalid input selection: a selector no
 // expander answers, a failed or rejected expansion, an expansion that is an
-// error, or a file it lists that cannot be read. A scheduler must fail such a
-// task before cache restoration or execution; an unrelated cache-store failure
-// may still fall back to execution.
+// error, or a file it lists that cannot be read, once the selector was
+// expanded again for a file that vanished (appendSelectorFiles). A scheduler
+// must fail such a task before cache restoration or execution; an unrelated
+// cache-store failure may still fall back to execution.
 var ErrInputSelector = errors.New("invalid input selector")
 
 // InputExpansion is what an input selector reads in one directory: the
