@@ -150,3 +150,61 @@ func TestADelegatedTurborepoImportsPricingAndPassesLintTestBuild(t *testing.T) {
 		t.Errorf("a delegated api task came from Putnami's cache:\n%s", out)
 	}
 }
+
+func TestAnImportThatMovesNoTaskLeavesTheLockfileAsItWas(t *testing.T) {
+	spectest.Proves(t, feature, "init-installs-only-what-moves", "an-import-that-moves-no-task-leaves-the-lockfile-as-it-was")
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	demo := readDemo(t)
+	root := turboWorkspace(t, demo, buildRuntime(t), "delegate")
+	stubTurbo(t)
+	// Every script runs a tool @putnami/typescript does not run: no task
+	// moves to it.
+	clitest.WriteFile(t, filepath.Join(root, "packages/pricing/package.json"),
+		`{"name": "@demo/pricing", "version": "1.0.0", "main": "dist/index.js", "scripts": {"build": "webpack", "test": "mocha"}, "dependencies": {"zod": "3.23.8"}}`+"\n")
+	clitest.WriteFile(t, filepath.Join(root, "apps/api/package.json"),
+		`{"name": "@demo/api", "version": "1.0.0", "private": true, "main": "dist/server.js", "scripts": {"build": "webpack", "test": "mocha"}, "dependencies": {"@demo/pricing": "workspace:*"}}`+"\n")
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	kept := []string{"pnpm-lock.yaml", "package.json", "packages/pricing/package.json", "apps/api/package.json"}
+	before := map[string][]byte{}
+	for _, rel := range kept {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		before[rel] = data
+	}
+
+	code, out := clitest.RunGateArgs(t, root, "init", "--from", "turbo", "--mode", "import", "--apply")
+	if code != 0 {
+		t.Fatalf("init --mode import --apply exit %d:\n%s", code, out)
+	}
+	for _, want := range []string{
+		"No task moves to a Putnami extension: every task keeps running through turbo, and no language extension was installed.",
+		"putnami init --from turbo --mode delegate gives the same result.",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("init prints %q:\n%s", want, out)
+		}
+	}
+	for _, rel := range kept {
+		if after, _ := os.ReadFile(filepath.Join(root, rel)); string(after) != string(before[rel]) {
+			t.Errorf("the import changed %s:\n%s", rel, after)
+		}
+	}
+	workspace, _ := os.ReadFile(filepath.Join(root, "putnami.workspace.json"))
+	if strings.Contains(string(workspace), "@putnami/typescript") || !strings.Contains(string(workspace), `"mode": "import"`) {
+		t.Errorf("the workspace config declares @putnami/typescript or records no import:\n%s", workspace)
+	}
+	for _, dir := range []string{"packages/pricing", "apps/api"} {
+		if doc := readProject(t, root, dir); !slices.Equal(doc.Extensions, []string{"@putnami/turbo"}) {
+			t.Errorf("%s putnami.json = %+v, want Turborepo alone", dir, doc)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(root, "node_modules")); !os.IsNotExist(err) {
+		t.Errorf("the import installed the repository's packages: %v", err)
+	}
+}

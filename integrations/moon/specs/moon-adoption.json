@@ -107,6 +107,20 @@
         "A bun build task moves only when Putnami's Bun build writes the entries the package.json names: none outside src/, or entries D-066 rewrites; otherwise it stays on moon and the sync says why.",
         "When a lint moves, the sync says that putnami lint --impacted lints the projects a change touches, not their dependents."
       ]
+    },
+    {
+      "id": "a-moved-lint-only-checks",
+      "text": [
+        "In import mode, a lint task with no write flag moves with options[\"@putnami/typescript:lint\"].fix false: the lint checks and rewrites no file.",
+        "When a Biome lint moves and the repository root holds no biome.json or biome.jsonc, the sync writes a root biome.json that sets nothing, so the lint keeps Biome's defaults, and lists it."
+      ]
+    },
+    {
+      "id": "an-import-declares-only-what-moves",
+      "text": [
+        "In import mode, a project names the extension of its language only when one of its tasks moves to it; a project none of whose tasks moves runs on moon alone.",
+        "The sync declares a language extension in putnami.workspace.json only when a project names it: an import that moves no task leaves the workspace config, every manifest and the lockfile as they were."
+      ]
     }
   ],
   "decisions": [

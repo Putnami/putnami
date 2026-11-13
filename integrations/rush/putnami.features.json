@@ -166,6 +166,32 @@
               "an-imported-task-does-what-its-script-did"
             ]
           }
+        },
+        {
+          "id": "a-moved-lint-only-checks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-moved-lint-with-no-write-flag-only-checks"
+            ]
+          }
+        },
+        {
+          "id": "an-import-declares-only-what-moves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-import-that-moves-no-script-declares-nothing"
+            ]
+          }
         }
       ]
     }

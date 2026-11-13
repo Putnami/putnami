@@ -23,9 +23,12 @@ putnami init --from rush
 In a terminal, `init` asks the mode, with `import` preselected. Without a
 terminal, such as in CI or under an agent, it imports. `--mode import` or
 `--mode delegate` skips the question. `init` records the mode under
-`options["@putnami/rush"].mode` of `putnami.workspace.json`, declares the
-extensions of the mode, installs them, and runs `putnami projects sync`. The
-sync reads that mode, `import` when it is absent. A value other than `import` or `delegate` fails the sync and the probe with
+`options["@putnami/rush"].mode` of `putnami.workspace.json`, declares and
+installs `@putnami/rush`, and runs `putnami projects sync`. In import mode,
+the sync declares `@putnami/typescript` only when a script moves to it, and
+`init` then installs it. When no script moves, `init` installs nothing more,
+leaves Rush's lockfile as it was, and says that `--mode delegate` gives the
+same result. The sync reads that mode, `import` when it is absent. A value other than `import` or `delegate` fails the sync and the probe with
 `stacks.adoption_mode_invalid`. In both modes,
 each edge the sync writes is attributed to Rush's project graph
 (`build-graph`), as a delegated stack's are, so `workspace.declared_edge` does
@@ -132,8 +135,9 @@ code of `rush test` alone.
 
 ## Import mode
 
-Each project becomes a `@putnami/typescript` project, and an import never
-changes the tool that checks the code (D-070). A `build`, `test` or `lint`
+A project one of whose scripts moves becomes a `@putnami/typescript`
+project, and an import never changes the tool that checks the code (D-070):
+a project none of whose scripts moves runs on Rush alone. A `build`, `test` or `lint`
 script moves to Putnami's TypeScript task only when that task runs the same
 tool: `bun build` or `tsc` alone, `bun test`, Vitest or Jest with no argument
 that picks a configuration or a subset of the suite, Biome or a bare
@@ -149,6 +153,13 @@ extension's install runs `rush install`, which keeps Rush's lockfile under
 `common/config/rush` and links each project's dependencies; it writes no root
 `package.json`. A root `package.json` that declares `packageManager` selects
 that manager instead. A hosted run does not install a Rush repository.
+
+A lint script that moves and passes no write flag (`--write`, `--fix`,
+`--apply`) moves with `fix: false` in `options["@putnami/typescript:lint"]`:
+it checks and rewrites no file. When a Biome lint moves and the repository
+root holds no `biome.json` or `biome.jsonc`, the sync writes a root
+`biome.json` that sets nothing, so the lint keeps Biome's defaults, and lists
+it.
 
 An import also adopts Putnami's TypeScript conventions (D-066), so each
 project builds and resolves its neighbours from their sources:

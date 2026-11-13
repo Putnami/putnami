@@ -50,7 +50,7 @@
     {
       "id": "init-from-nx",
       "text": [
-        "putnami init --from nx, at the root of a repository that holds nx.json, writes a workspace that declares @putnami/nx, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs putnami projects sync, which writes each Nx project's putnami.json through the extension's sync task.",
+        "putnami init --from nx, at the root of a repository that holds nx.json, writes a workspace that declares @putnami/nx, records the mode in its options, installs it and runs putnami projects sync, which writes each Nx project's putnami.json through the extension's sync task; in import mode init then installs @putnami/typescript when the sync declared it.",
         "Without nx.json it fails with a usage error that names the file."
       ]
     },
@@ -70,7 +70,11 @@
     },
     {
       "id": "init-leaving-import-removes-its-extensions",
-      "text": "Rerun with --mode delegate in a workspace that imported, with no import list, putnami init --from <tool> names in its preview each extension the import declared, @putnami/typescript or the language extensions moon's sync declares, and with --apply removes from the workspace config, the lock and the disk each one no putnami.json names after the sync, keeping with a note each one a project still names (D-070)."
+      "text": "Rerun with --mode delegate in a workspace that imported, with no import list, putnami init --from <tool> names in its preview each extension the import's sync declared, @putnami/typescript or a language extension moon's sync declares, and with --apply removes from the workspace config, the lock and the disk each one no putnami.json names after the sync, keeping with a note each one a project still names (D-070)."
+    },
+    {
+      "id": "init-installs-only-what-moves",
+      "text": "In import mode, or with --import, putnami init --from nx, turbo, rush or moon declares and installs a language extension only when the sync declared it, which it does only when a target moves to it (D-070). An import that moves no target installs nothing beside the tool's extension, leaves the lockfile and every package.json as they were, and says that no task moves and that --mode delegate gives the same result."
     },
     {
       "id": "nx-impact-runs-through-nx",
@@ -98,7 +102,7 @@
     {
       "id": "init-from-turbo",
       "text": [
-        "putnami init --from turbo, at the root of a repository that holds turbo.json, writes a workspace that declares @putnami/turbo, and @putnami/typescript in import mode, records the mode in options[\"@putnami/turbo\"].mode, installs the extensions, and runs putnami projects sync.",
+        "putnami init --from turbo, at the root of a repository that holds turbo.json, writes a workspace that declares @putnami/turbo, records the mode in options[\"@putnami/turbo\"].mode, installs the extension, and runs putnami projects sync; in import mode init then installs @putnami/typescript when the sync declared it.",
         "Without turbo.json it fails with a usage error that names the file."
       ]
     },
@@ -120,8 +124,8 @@
     {
       "id": "init-import-adds-projects",
       "text": [
-        "putnami init --from nx|turbo --import <path>,<path> in delegate mode adds each path not listed yet to options[\"@putnami/<tool>\"].import and declares @putnami/typescript.",
-        "In a workspace that exists, it previews the change and the sync's dry run with that list, and writes only with --apply, which records it, installs the extensions and runs projects sync.",
+        "putnami init --from nx|turbo --import <path>,<path> in delegate mode adds each path not listed yet to options[\"@putnami/<tool>\"].import.",
+        "In a workspace that exists, it previews the change and the sync's dry run with that list, and writes only with --apply, which records it, installs what the sync declares and runs projects sync.",
         "A new workspace records it with the mode. --import with another tool, no path, or import mode is a usage error."
       ]
     },
@@ -132,8 +136,8 @@
     {
       "id": "init-from-rush",
       "text": [
-        "putnami init --from rush, at the root of a repository that holds rush.json, declares @putnami/rush, records the mode in its options, also declares @putnami/typescript in import mode, installs them and runs projects sync, whose Rush sync task writes each Rush project's putnami.json.",
-        "In import mode the TypeScript install runs rush install and writes no root package.json, unless a root package.json declares another packageManager.",
+        "putnami init --from rush, at the root of a repository that holds rush.json, declares @putnami/rush, records the mode in its options, installs it and runs projects sync, which writes each Rush project's putnami.json; init then installs @putnami/typescript if the sync declared it.",
+        "That install runs rush install and writes no root package.json, unless a root package.json declares another packageManager.",
         "Without rush.json it is a usage error that names the file."
       ]
     },

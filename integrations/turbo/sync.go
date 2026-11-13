@@ -98,8 +98,8 @@ type member struct {
 	// runs node: its putnami.json declares the node runtime.
 	nodeRuntime bool
 	// testMoved reports a test script that moved, which type-checked
-	// nothing.
-	testMoved bool
+	// nothing; lintChecks a lint script that moved and passes no write flag.
+	testMoved, lintChecks bool
 }
 
 // Sync writes the package graph of the Turborepo repository at root into each
@@ -142,7 +142,7 @@ func Sync(root string, opts Options) (Result, error) {
 
 	var members []member
 	var conventions []stacks.ConventionProject
-	lintMoved := false
+	lintMoved, declare := false, false
 	current := map[string]bool{}
 	for _, p := range detection.Projects {
 		if p.Path == wsproto.ProbeRootPath {
@@ -164,19 +164,12 @@ func Sync(root string, opts Options) (Result, error) {
 			packageMode = ModeImport
 		}
 		imported := packageMode == ModeImport && isTypeScript(dir)
-		if imported && mode == ModeDelegate {
-			result.Imported = append(result.Imported, p.Path)
-		}
-		if imported {
-			m.extensions = append(m.extensions, TypeScriptExtension)
-			m.nodeRuntime = startScriptRunsNode(dir)
-		}
 		for _, dep := range p.Dependencies {
 			if dep != wsproto.ProbeRootPath {
 				m.deps = append(m.deps, wsproto.ProjectIDFromPath(dep))
 			}
 		}
-		bunBuild := false
+		bunBuild, moved, biomeLint := false, false, false
 		published := stacks.PackagePublished(root, p.Path)
 		for _, task := range MappedTasks {
 			declared := rootTasks[task] || rootTasks[p.SourceName+"#"+task] || own[task]
@@ -196,16 +189,32 @@ func Sync(root string, opts Options) (Result, error) {
 				// One extension runs each task: the TypeScript extension's
 				// task already runs what the script runs.
 				m.disabled = append(m.disabled, ExtensionName+":"+task)
+				moved = true
 				bunBuild = bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
 				m.testMoved = m.testMoved || task == stacks.TaskTest
-				lintMoved = lintMoved || task == stacks.TaskLint
+				if task == stacks.TaskLint {
+					lintMoved = true
+					m.lintChecks = !stacks.LintWrites(script)
+					biomeLint = !stacks.LintsWithESLint(script)
+				}
 			default:
 				m.disabled = append(m.disabled, TypeScriptExtension+":"+task)
 				unmapped[p.SourceName+"#"+task] = unmappedReason(task, script)
 			}
 		}
-		if imported {
-			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.SourceName, BunBuild: bunBuild, PublishedBy: published})
+		// An imported package names @putnami/typescript only when one of its
+		// tasks moves (ADR 0017 of tooling/stacks): one that moves none runs
+		// on Turborepo alone, as a delegated package does.
+		if moved {
+			m.extensions = append(m.extensions, TypeScriptExtension)
+			m.nodeRuntime = startScriptRunsNode(dir)
+			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.SourceName, BunBuild: bunBuild, PublishedBy: published, BiomeLint: biomeLint})
+			declare = true
+			if mode == ModeDelegate {
+				result.Imported = append(result.Imported, p.Path)
+			}
+		} else {
+			m.disabled = slices.DeleteFunc(m.disabled, func(job string) bool { return strings.HasPrefix(job, TypeScriptExtension+":") })
 		}
 		members = append(members, m)
 		current[p.Path] = true
@@ -294,6 +303,20 @@ func Sync(root string, opts Options) (Result, error) {
 		result.Diffs = append(result.Diffs, UnifiedDiff(w.File, w.Before, w.After))
 	}
 	result.Conventions = append(append(result.Conventions, notes...), warnings...)
+	// The workspace declares @putnami/typescript only when a task moves to
+	// it, so an import that moves none installs nothing.
+	if declare {
+		changed, change, err := stacks.DeclareExtensions(root, []string{TypeScriptExtension}, opts.DryRun)
+		if err != nil {
+			return Result{}, fmt.Errorf("%s: %w", wsproto.WorkspaceConfigFilename, err)
+		}
+		if changed {
+			result.Written = append(result.Written, wsproto.WorkspaceConfigFilename)
+		}
+		if change != nil {
+			result.Diffs = append(result.Diffs, UnifiedDiff(change.File, change.Before, change.After))
+		}
+	}
 	return result, nil
 }
 
@@ -361,6 +384,7 @@ func applyMember(root string, doc map[string]any, m member, owned map[string]boo
 		markNodeRuntime(doc)
 	}
 	stacks.SetTypeScriptTestTypesOff(doc, m.testMoved)
+	stacks.SetTypeScriptLintFixOff(doc, m.lintChecks)
 }
 
 // retract removes from the putnami.json of a former package what the sync
@@ -371,6 +395,7 @@ func retract(root string, doc map[string]any, owned map[string]bool) {
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, owned) }))
 	setList(doc, "tags", slices.DeleteFunc(stringList(doc["tags"]), func(t string) bool { return t == Tag }))
 	stacks.SetTypeScriptTestTypesOff(doc, false)
+	stacks.SetTypeScriptLintFixOff(doc, false)
 	if disable, ok := doc["disable"].(map[string]any); ok {
 		setList(disable, "jobs", slices.DeleteFunc(stringList(disable["jobs"]), ownedJob))
 		if len(disable) == 0 {

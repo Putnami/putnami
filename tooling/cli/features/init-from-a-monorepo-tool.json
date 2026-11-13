@@ -116,6 +116,19 @@
         }
       },
       {
+        "id": "init-installs-only-what-moves",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-import-that-moves-no-task-leaves-the-lockfile-as-it-was"
+          ]
+        }
+      },
+      {
         "id": "nx-impact-runs-through-nx",
         "stage": "coded",
         "evidenceKinds": [

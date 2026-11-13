@@ -92,6 +92,57 @@ func TestImportConventionsFollowTheBuild(t *testing.T) {
 	}
 }
 
+func TestAMovedBiomeLintKeepsBiomesDefaults(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, root, "web/tsconfig.json", "{}\n")
+	writeFile(t, root, "api/tsconfig.json", "{}\n")
+	writeFile(t, root, "api/biome.jsonc", "{}\n")
+	files := func(projects ...ConventionProject) []string {
+		t.Helper()
+		writes, _, err := ImportConventions(root, projects)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var out []string
+		for _, w := range writes {
+			out = append(out, w.File+" "+string(w.After))
+		}
+		return out
+	}
+	web := ConventionProject{Dir: "web", Name: "web", BiomeLint: true}
+	if got := files(web); !reflect.DeepEqual(got, []string{"biome.json {}\n"}) {
+		t.Errorf("a moved Biome lint writes %q, want a root biome.json that sets nothing", got)
+	}
+	// No Biome lint moves, or the project that moves one holds its own
+	// configuration: the root gains none.
+	if got := files(ConventionProject{Dir: "web", Name: "web"}, ConventionProject{Dir: "api", Name: "api", BiomeLint: true}); got != nil {
+		t.Errorf("no project reads the root's configuration, yet the import writes %q", got)
+	}
+	// The repository's own configuration stays. The TypeScript lint does
+	// not read a biome.jsonc: the import warns about each one a moved lint
+	// would read.
+	for _, name := range []string{"biome.json", "biome.jsonc"} {
+		writeFile(t, root, name, "{\"formatter\": {\"indentStyle\": \"space\"}}\n")
+		if got := files(web); got != nil {
+			t.Errorf("with a root %s the import writes %q", name, got)
+		}
+		_, warnings, err := ImportConventions(root, []ConventionProject{web, {Dir: "api", Name: "api", BiomeLint: true}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := []string{"api/biome.jsonc: the lint of @putnami/typescript reads biome.json alone, so the lint that moved does not check with this configuration; rename it biome.json, in place of the one the install writes"}
+		if name == "biome.jsonc" {
+			want = append(want, strings.Replace(want[0], "api/", "", 1))
+		}
+		if !reflect.DeepEqual(warnings, want) {
+			t.Errorf("with a root %s the warnings = %q, want %q", name, warnings, want)
+		}
+		if err := os.Remove(filepath.Join(root, name)); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestPackagePublishedReadsPrivate(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "open/package.json", `{"name": "a"}`)

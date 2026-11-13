@@ -60,33 +60,25 @@ type initSource struct {
 	// modes are the adoption modes the extension offers, the default first:
 	// import, delegate, or both, which makes init ask (D-064).
 	modes []string
-	// importExtensions are the extensions import mode hands targets to,
-	// which init declares and installs beside the tool's.
-	importExtensions []string
 	// importList reports that the extension reads options import, the
 	// projects a delegated workspace imports, which --import adds to.
 	importList bool
-	// syncExtensions are the extensions the tool's sync declares in import
-	// mode, beside importExtensions: the language extensions moon maps
-	// projects to.
+	// syncExtensions are the extensions the tool's sync declares for the
+	// projects it imports, each only when a target moves to it (ADR 0017
+	// of tooling/stacks): init installs them after the sync, so an import
+	// that moves no target installs nothing.
 	syncExtensions []string
-}
-
-// importDeclared are the extensions an import declares: those init declares
-// for import mode, and those the sync declares.
-func (s initSource) importDeclared() []string {
-	return append(slices.Clone(s.importExtensions), s.syncExtensions...)
 }
 
 // initSources are the tools --from accepts, by name.
 var initSources = map[string]initSource{
 	"bazel": {starter: initExtensionConfig{packageName: "@putnami/bazel"}, markers: []string{"MODULE.bazel", "WORKSPACE", "WORKSPACE.bazel"}, modes: []string{initModeDelegate}},
 	"nx": {
-		starter:          initExtensionConfig{packageName: "@putnami/nx"},
-		markers:          []string{"nx.json"},
-		modes:            []string{initModeImport, initModeDelegate},
-		importExtensions: []string{"@putnami/typescript"},
-		importList:       true,
+		starter:        initExtensionConfig{packageName: "@putnami/nx"},
+		markers:        []string{"nx.json"},
+		modes:          []string{initModeImport, initModeDelegate},
+		syncExtensions: []string{"@putnami/typescript"},
+		importList:     true,
 	},
 	// moon's import mode maps each project to its language's extension: the
 	// sync declares the ones the projects need, and init installs them after
@@ -102,17 +94,17 @@ var initSources = map[string]initSource{
 	// @putnami/typescript when its script already runs what that extension's
 	// task runs; every other task stays on Turborepo.
 	"turbo": {
-		starter:          initExtensionConfig{packageName: "@putnami/turbo"},
-		markers:          []string{"turbo.json"},
-		modes:            []string{initModeImport, initModeDelegate},
-		importExtensions: []string{"@putnami/typescript"},
-		importList:       true,
+		starter:        initExtensionConfig{packageName: "@putnami/turbo"},
+		markers:        []string{"turbo.json"},
+		modes:          []string{initModeImport, initModeDelegate},
+		syncExtensions: []string{"@putnami/typescript"},
+		importList:     true,
 	},
 	"rush": {
-		starter:          initExtensionConfig{packageName: "@putnami/rush"},
-		markers:          []string{"rush.json"},
-		modes:            []string{initModeImport, initModeDelegate},
-		importExtensions: []string{"@putnami/typescript"},
+		starter:        initExtensionConfig{packageName: "@putnami/rush"},
+		markers:        []string{"rush.json"},
+		modes:          []string{initModeImport, initModeDelegate},
+		syncExtensions: []string{"@putnami/typescript"},
 	},
 }
 
@@ -542,6 +534,10 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	extConfig := plan.starter()
 	declared := initDeclaredExtensions(plan.configs...)
 	var options map[string]initToolOptions
+	// fromMode and fromImports are the mode and import list of a tool's
+	// adoption, which the note after its sync reads.
+	var fromMode string
+	var fromImports []string
 	if source, ok := initSources[flags.from]; ok {
 		if !holdsAny(cwd, source.markers) {
 			return cmderr.Usagef("putnami init --from %s runs at the root of a %s repository, and %s holds no %s", flags.from, flags.from, cwd, strings.Join(source.markers, ", "))
@@ -554,7 +550,8 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		if err != nil {
 			return err
 		}
-		declared = source.extensionsFor(mode, len(imports) > 0)
+		fromMode, fromImports = mode, imports
+		declared = []string{source.starter.packageName}
 		options = initOptions(source, mode, imports)
 		if source.offersBothModes() {
 			iox.Fprintf(os.Stdout, "  Mode: %s\n", mode)
@@ -724,6 +721,8 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		if err := installSyncDeclaredExtensions(ctx, cwd, before, env); err != nil {
 			return err
 		}
+		installs = initDeclaredNames(cwd, wsproto.Load(cwd))
+		noteNothingMoves(cwd, flags.from, initSources[flags.from], fromMode, fromImports)
 	}
 
 	// A language whose markers the repository held is adopted: the sync

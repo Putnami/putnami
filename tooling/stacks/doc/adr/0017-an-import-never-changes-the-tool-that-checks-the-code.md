@@ -4,7 +4,11 @@
 - **Date**: 2026-11-11
 - **Amended**: 2026-11-12, rules 6 and 9: a moved task does what its script
   did, and a Bun build moves only when it writes the entries its
-  `package.json` names.
+  `package.json` names. 2026-11-12, rule 1: a project names its language
+  extension only when one of its targets moves, and an import that moves
+  no target declares and installs nothing.
+  2026-11-13, rule 9: a moved lint that only checked only checks, with
+  the Biome configuration its script read.
 - **Scope**: `tooling/stacks` (`@putnami/stacks`), the import mode of
   `@putnami/nx`, `@putnami/turbo`, `@putnami/rush` and `@putnami/moon`;
   `putnami init --from`
@@ -36,13 +40,20 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
 
 ## Decision
 
-1. **One rule for every tool.** In import mode, a project whose language has
-   a Putnami extension moves to that extension. Its `build`, `test` or `lint`
-   target moves to Putnami only when the extension runs the same tool as the
-   target. A target that runs another tool, or that no Putnami task takes
-   over, keeps running as the repository defines it, through the tool, and
-   the sync lists it as not mapped, with its reason. A project whose language
-   has no extension stays on the tool. D-065 and D-066 apply to every import.
+1. **One rule for every tool.** In import mode, a project's `build`, `test`
+   or `lint` target moves to the Putnami extension of its language only when
+   that extension runs the same tool as the target. A target that runs
+   another tool, or that no Putnami task takes over, keeps running as the
+   repository defines it, through the tool, and the sync lists it as not
+   mapped, with its reason. A project names its language extension only when
+   one of its targets moves: a project none of whose targets moves, or whose
+   language has no extension, stays on the tool alone. The sync declares a
+   language extension in the workspace only when a project names it, and
+   `putnami init --from` installs only what the sync declared. An import
+   that moves no target declares no language extension and installs
+   nothing, so the repository's lockfile and configuration stay as they
+   were; `init` says that no task moves and that `--mode delegate` gives the
+   same result. D-065 and D-066 apply to every project that moves a target.
 2. **The TypeScript rule is stated once.** `tooling/stacks` holds the rule
    that decides whether `@putnami/typescript` runs what a TypeScript script
    runs: `bun build` or a `tsc` alone for `build` (the `tscscript` package of
@@ -123,6 +134,19 @@ project. A `tsc` build writes its `outDir`, which that `main` names.
    own files, so `putnami lint --impacted` lints the projects a change
    touches and not their dependents (ADR 0044 of `tooling/cli`); the sync
    says so when a lint moves.
+   The TypeScript lint formats and fixes by default. A lint whose script
+   passes no write flag (`--write`, `--fix`, `--apply`, `--apply-unsafe`) gets `fix: false` in
+   `options["@putnami/typescript:lint"]`, which the sync owns like `types`.
+   A lint that only checks leaves out of Biome's targets what Putnami
+   writes at the project root: `putnami.json`, `.gen`, `.putnami` and the
+   `tsconfig.json` an import writes (D-066), since the repository's Biome
+   configuration never formatted them. The TypeScript install writes
+   Putnami's `biome.json` where the root holds none, which would replace the
+   defaults the script ran with. So when a Biome lint moves and the root
+   holds no `biome.json` or `biome.jsonc`, the sync writes a root
+   `biome.json` that sets nothing, and lists it; the install keeps it.
+   The TypeScript lint reads `biome.json` alone: the sync warns about a
+   `biome.jsonc` the moved lint would read, and writes no file beside it.
 
 ## Rejected alternatives
 

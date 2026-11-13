@@ -29,6 +29,36 @@ func TestAMovedTestWritesItsOptions(t *testing.T) {
 	}
 }
 
+func TestAMovedLintThatOnlyCheckedWritesFixFalse(t *testing.T) {
+	for script, writes := range map[string]bool{
+		"biome check .":                false,
+		"bunx biome lint ./src":        false,
+		"eslint .":                     false,
+		"biome check --write=false .":  false,
+		"biome check --write .":        true,
+		"biome check --fix .":          true,
+		"biome format --write=true .":  true,
+		"biome check --apply-unsafe .": true,
+		"npx eslint --fix .":           true,
+	} {
+		if got := LintWrites(script); got != writes {
+			t.Errorf("LintWrites(%q) = %v, want %v", script, got, writes)
+		}
+	}
+	doc := map[string]any{}
+	SetTypeScriptLintFixOff(doc, true)
+	want := map[string]any{"options": map[string]any{
+		TypeScriptLintLayer: map[string]any{"fix": false},
+	}}
+	if !reflect.DeepEqual(doc, want) {
+		t.Fatalf("doc = %v", doc)
+	}
+	SetTypeScriptLintFixOff(doc, false)
+	if len(doc) != 0 {
+		t.Errorf("a cleared doc = %v", doc)
+	}
+}
+
 func TestABunBuildMovesOnlyWhenItWritesTheEntriesThePackageNames(t *testing.T) {
 	const keeps = "it keeps running through the tool"
 	for _, c := range []struct {

@@ -1,6 +1,9 @@
 # ADR 0002 — A delegated workspace imports the projects a list names
 
-- **Status**: accepted
+- **Status**: accepted; amended by
+  [ADR 0017 of `tooling/stacks`](../../../../tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md):
+  `--import` declares nothing, and the sync declares `@putnami/typescript`
+  only when a target moves to it
 - **Date**: 2026-11-10
 - **Scope**: `integrations/nx` (`@putnami/nx`), `integrations/turbo`
   (`@putnami/turbo`) and `tooling/cli` (`putnami init --from`); amends

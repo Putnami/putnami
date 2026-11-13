@@ -360,6 +360,7 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 	// run.
 	if got, want := readProjectFile(t, root, "packages/pricing")["options"], map[string]any{
 		TypeScriptExtension + ":test": map[string]any{"types": false},
+		stacks.TypeScriptLintLayer:    map[string]any{"fix": false},
 	}; !reflect.DeepEqual(got, want) {
 		t.Errorf("pricing options = %v, want %v", got, want)
 	}
@@ -371,18 +372,24 @@ func TestImportMapsEachTypeScriptTargetToTheTypeScriptTask(t *testing.T) {
 		t.Errorf("api options = %v, want %v", got, want)
 	}
 
-	// Without @putnami/typescript in the workspace, import runs every target
-	// through Nx, and says why.
-	root = repository(t, d, ModeImport)
-	result = sync(t, root, SyncOptions{})
-	if got := jobs("packages/pricing"); !reflect.DeepEqual(got, []any{"lint"}) {
-		t.Errorf("jobs without the TypeScript extension = %v", got)
+	// Without @putnami/typescript in the workspace, import moves the same
+	// targets, and the sync declares the extension that runs them.
+	undeclared := repository(t, d, ModeImport)
+	for _, rel := range []string{"packages/pricing/package.json", "apps/api/project.json"} {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, undeclared, rel, string(data))
 	}
-	if got := readProjectFile(t, root, "packages/pricing")["extensions"]; !reflect.DeepEqual(got, []any{ExtensionName}) {
-		t.Errorf("extensions without the TypeScript extension = %v", got)
+	sync(t, undeclared, SyncOptions{})
+	for _, dir := range []string{"packages/pricing", "apps/api"} {
+		if got, want := readProjectFile(t, undeclared, dir), readProjectFile(t, root, dir); !reflect.DeepEqual(got, want) {
+			t.Errorf("%s without the TypeScript extension = %v, want %v", dir, got, want)
+		}
 	}
-	if !slices.ContainsFunc(result.Unmapped, func(u Unmapped) bool { return strings.Contains(u.Reason, "does not declare @putnami/typescript") }) {
-		t.Errorf("unmapped = %+v, want the undeclared extension named", result.Unmapped)
+	if data, _ := os.ReadFile(filepath.Join(undeclared, wsproto.WorkspaceConfigFilename)); !strings.Contains(string(data), TypeScriptExtension) {
+		t.Errorf("the sync declares no %s:\n%s", TypeScriptExtension, data)
 	}
 }
 
@@ -898,40 +905,38 @@ func TestTheDryRunOfASwitchToImportPreviewsWhatTheApplyWrites(t *testing.T) {
 			workspace, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
 
 			// The preview of putnami init --from nx --mode import: the mode,
-			// and @putnami/typescript, which --apply declares before its sync.
-			preview := sync(t, root, SyncOptions{Mode: ModeImport, DryRun: true, Declared: []string{TypeScriptExtension}})
+			// and the extension the sync declares once a target moves.
+			preview := sync(t, root, SyncOptions{Mode: ModeImport, DryRun: true})
 			var events strings.Builder
 			emit := jsonl.New()
 			emit.Observe(func(message string) { events.WriteString(message + "\n") })
 			ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{
-				"dryRun":      json.RawMessage(`true`),
-				ModeOption:    json.RawMessage(`"import"`),
-				DeclaredParam: json.RawMessage(`["@putnami/typescript"]`),
+				"dryRun":   json.RawMessage(`true`),
+				ModeOption: json.RawMessage(`"import"`),
 			}}
 			status, data, err := RunSync(ctx, emit, nil)
 			if err != nil || status != "OK" || !reflect.DeepEqual(data["written"], preview.Written) {
 				t.Fatalf("the job's dry run: status %s, data %v, err %v, want %v written\n%s", status, data, err, preview.Written, events.String())
 			}
-			if !strings.Contains(events.String(), `+      "@putnami/nx:build",`) {
-				t.Errorf("the preview moves pricing's build to @putnami/typescript:\n%s", events.String())
+			if !strings.Contains(events.String(), `+      "@putnami/nx:build",`) || !strings.Contains(events.String(), `+    "@putnami/typescript"`) {
+				t.Errorf("the preview moves pricing's build to @putnami/typescript and declares it:\n%s", events.String())
 			}
 			if after, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename)); string(after) != string(workspace) {
 				t.Errorf("a dry run wrote %s", after)
 			}
-			// Without the extension --apply declares, the dry run moves no
-			// target: it previewed something else than --apply writes.
-			if without := sync(t, root, SyncOptions{Mode: ModeImport, DryRun: true}); reflect.DeepEqual(changes(without), changes(preview)) {
-				t.Errorf("the dry run without the declared extension previews the apply: %v", changes(without))
-			}
 
-			// --apply records the mode and declares @putnami/typescript, then
-			// synchronizes in the recorded mode.
-			writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "extensions": ["@putnami/nx", "@putnami/typescript"], "options": {"@putnami/nx": {"mode": "import"}}}`)
+			// --apply records the mode, then synchronizes in it: the sync
+			// declares @putnami/typescript.
+			writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "extensions": ["@putnami/nx"], "options": {"@putnami/nx": {"mode": "import"}}}`)
 			applied := sync(t, root, SyncOptions{})
 			if len(applied.Written) == 0 || !reflect.DeepEqual(preview.Written, applied.Written) || !reflect.DeepEqual(preview.Retracted, applied.Retracted) {
 				t.Errorf("preview wrote %v and retracted %v, apply %v and %v", preview.Written, preview.Retracted, applied.Written, applied.Retracted)
 			}
-			if got, want := changes(preview), changes(applied); !reflect.DeepEqual(got, want) {
+			// The workspace config differs by the mode --apply recorded.
+			projects := func(r SyncResult) []string {
+				return slices.DeleteFunc(changes(r), func(c string) bool { return strings.HasPrefix(c, wsproto.WorkspaceConfigFilename+"\n") })
+			}
+			if got, want := projects(preview), projects(applied); !reflect.DeepEqual(got, want) {
 				t.Errorf("the preview's changes:\n%v\nthe apply's:\n%v", got, want)
 			}
 			if !reflect.DeepEqual(preview.Unmapped, applied.Unmapped) {
@@ -1275,9 +1280,10 @@ func TestImportMarksTheNodeRuntime(t *testing.T) {
 	spectest.Proves(t, feature, "import-marks-the-node-runtime", "a-node-start-script-or-the-node-executor-marks-the-node-runtime")
 	d := readDemo(t)
 	root := repository(t, d, ModeImport, TypeScriptExtension)
-	// pricing starts with node; the api serves through the Nx node executor
-	// and already declares a runtime, which the sync keeps.
-	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"start": "NODE_ENV=production node dist/main.js"}}`)
+	// pricing starts with node, and its test moves; the api serves through
+	// the Nx node executor and already declares a runtime, which the sync
+	// keeps.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"start": "NODE_ENV=production node dist/main.js", "test": "jest"}}`)
 	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {"serve": {"executor": "@nx/js:node"}}}`)
 	sync(t, root, SyncOptions{})
 	runtime := func(dir string) any {
@@ -1407,5 +1413,79 @@ func TestAnImportedTargetDoesWhatItsTargetDid(t *testing.T) {
 	}
 	if got := pricing["options"]; got != nil {
 		t.Errorf("pricing options = %v, want none for a lint that writes", got)
+	}
+}
+
+func TestAnImportThatMovesNoTargetDeclaresNothing(t *testing.T) {
+	spectest.Proves(t, feature, "an-import-declares-only-what-moves", "an-import-that-moves-no-target-declares-nothing")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport)
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "private": true, "main": "dist/index.js", "scripts": {"build": "webpack", "test": "mocha"}}`)
+	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "private": true, "main": "dist/server.js", "scripts": {"build": "webpack", "test": "mocha"}, "dependencies": {"@demo/pricing": "1.0.0"}}`)
+	before := stackstest.Snapshot(t, root)
+	result := sync(t, root, SyncOptions{})
+	// Each project runs on Nx alone, and only the putnami.json files change:
+	// the workspace config, the manifests and the lockfile keep their bytes.
+	for _, dir := range []string{"packages/pricing", "apps/api"} {
+		if got, want := readProjectFile(t, root, dir)["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s extensions = %v, want %v", dir, got, want)
+		}
+	}
+	for _, rel := range stackstest.Changed(t, root, before) {
+		if filepath.Base(rel) != wsproto.ConfigFilename {
+			t.Errorf("the sync changed %s", rel)
+		}
+	}
+	if slices.Contains(result.Written, wsproto.WorkspaceConfigFilename) || len(result.Imported) != 0 {
+		t.Errorf("written = %v, imported = %v, want no workspace config and no import", result.Written, result.Imported)
+	}
+
+	// Once a test moves, the sync declares the extension that runs it.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "private": true, "main": "dist/index.js", "scripts": {"build": "webpack", "test": "jest"}}`)
+	sync(t, root, SyncOptions{})
+	data, err := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workspace struct{ Extensions []string }
+	if err := json.Unmarshal(data, &workspace); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := workspace.Extensions, []string{ExtensionName, TypeScriptExtension}; !slices.Equal(got, want) {
+		t.Errorf("declared extensions = %v, want %v", got, want)
+	}
+	if got, want := readProjectFile(t, root, "packages/pricing")["extensions"], []any{ExtensionName, TypeScriptExtension}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing extensions = %v, want %v", got, want)
+	}
+}
+
+func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-lint-only-checks", "a-moved-lint-with-no-write-flag-only-checks")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	// pricing's Biome lint only checks; api's writes its fixes.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"lint": "biome check ."}}`)
+	writeFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "private": true, "scripts": {"lint": "biome check --write ."}, "dependencies": {"@demo/pricing": "1.0.0"}}`)
+	result := sync(t, root, SyncOptions{})
+	lintOptions := func(dir string) any {
+		options, _ := readProjectFile(t, root, dir)["options"].(map[string]any)
+		return options[stacks.TypeScriptLintLayer]
+	}
+	if got := lintOptions("packages/pricing"); !reflect.DeepEqual(got, map[string]any{"fix": false}) {
+		t.Errorf("pricing lint options = %v, want fix false", got)
+	}
+	if got := lintOptions("apps/api"); got != nil {
+		t.Errorf("api lint options = %v, want none for a lint that writes", got)
+	}
+	// The repository holds no Biome configuration: the lint keeps Biome's
+	// defaults, and the sync lists the file it writes for that.
+	if data, err := os.ReadFile(filepath.Join(root, "biome.json")); err != nil || string(data) != "{}\n" {
+		t.Errorf("root biome.json = %q, %v; want one that sets nothing", data, err)
+	}
+	if !slices.ContainsFunc(result.Conventions, func(n string) bool { return strings.HasPrefix(n, "biome.json: written with no setting") }) {
+		t.Errorf("conventions = %v, want the biome.json listed", result.Conventions)
+	}
+	if again := sync(t, root, SyncOptions{DryRun: true}); len(again.Changes) != 0 {
+		t.Errorf("a second import changes %v", again.Changes)
 	}
 }

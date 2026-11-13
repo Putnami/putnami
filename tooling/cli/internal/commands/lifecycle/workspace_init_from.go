@@ -105,15 +105,25 @@ func (s initSource) offersBothModes() bool {
 	return slices.Contains(s.modes, initModeImport) && slices.Contains(s.modes, initModeDelegate)
 }
 
-// extensionsFor are the extensions a workspace adopted in mode declares: the
-// tool's, then the ones its import mode hands targets to, which a delegated
-// workspace that imports some projects declares too.
-func (s initSource) extensionsFor(mode string, imports bool) []string {
-	out := []string{s.starter.packageName}
-	if mode == initModeImport || imports {
-		out = append(out, s.importExtensions...)
+// noteNothingMoves says, after the sync of a workspace that imports, that
+// no target moved when the sync declared none of the extensions an import
+// hands targets to: every task keeps running through the tool, as delegate
+// mode runs it, and the import installed no language extension.
+func noteNothingMoves(wsRoot, tool string, source initSource, mode string, imports []string) {
+	if len(source.syncExtensions) == 0 || (mode != initModeImport && len(imports) == 0) {
+		return
 	}
-	return out
+	declared := initDeclaredNames(wsRoot, wsproto.Load(wsRoot))
+	if slices.ContainsFunc(source.syncExtensions, func(e string) bool { return slices.Contains(declared, e) }) {
+		return
+	}
+	iox.Fprintln(os.Stdout)
+	iox.Fprintf(os.Stdout, "  No task moves to a Putnami extension: every task keeps running through %s, and no language extension was installed.\n", tool)
+	if mode == initModeImport {
+		iox.Fprintf(os.Stdout, "  putnami init --from %s --mode delegate gives the same result.\n", tool)
+		return
+	}
+	iox.Fprintf(os.Stdout, "  Delegate mode without an import list gives the same result.\n")
 }
 
 // initImportOption is the member of the extension's workspace options that
@@ -327,10 +337,8 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 	}
 	declared := initDeclaredNames(wsRoot, cfg)
 	var missing []string
-	for _, e := range source.extensionsFor(mode, mode == initModeDelegate && len(imports) > 0) {
-		if !slices.Contains(declared, e) {
-			missing = append(missing, e)
-		}
+	if !slices.Contains(declared, ext) {
+		missing = append(missing, ext)
 	}
 	modeChanges := source.offersBothModes() && recorded != mode
 	// A workspace that leaves import mode, with no import list, drops the
@@ -338,7 +346,7 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 	// of tooling/stacks). A workspace that records no mode imported.
 	var leaving []string
 	if modeChanges && mode == initModeDelegate && len(imports) == 0 && slices.Contains(declared, ext) {
-		for _, e := range source.importDeclared() {
+		for _, e := range source.syncExtensions {
 			if slices.Contains(declared, e) {
 				leaving = append(leaving, e)
 			}
@@ -422,6 +430,7 @@ func rerunInitFrom(ctx context.Context, wsRoot string, flags initFlags, source i
 	if err := dropImportExtensions(wsRoot, leaving); err != nil {
 		return protocolcli.WithNext(fmt.Errorf("remove the extensions the import declared: %w", err), "putnami extensions remove")
 	}
+	noteNothingMoves(wsRoot, flags.from, source, mode, imports)
 	iox.Fprintln(os.Stdout)
 	iox.Fprintf(os.Stdout, "  ✓ Adopted in %s mode\n", mode)
 	return nil

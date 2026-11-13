@@ -128,7 +128,7 @@ func FormatProjects(biomeBin string, projectPaths []string, workspaceRoot, confi
 		// noisy early project hide a later project's failure.
 		args = append(args, "--max-diagnostics=none")
 	}
-	runDir, targets, err := biomeTargets(workspaceRoot, projectPaths, configPath)
+	runDir, targets, err := biomeTargets(workspaceRoot, projectPaths, configPath, !fix)
 	if err != nil {
 		return parse.EmptyBiomeReport(), false, fmt.Errorf("biome format: %w", err)
 	}

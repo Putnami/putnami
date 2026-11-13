@@ -151,6 +151,7 @@
     "cli/init-from-a-monorepo-tool#init-from-rush",
     "cli/init-from-a-monorepo-tool#init-from-turbo",
     "cli/init-from-a-monorepo-tool#init-import-adds-projects",
+    "cli/init-from-a-monorepo-tool#init-installs-only-what-moves",
     "cli/init-from-a-monorepo-tool#init-leaving-import-removes-its-extensions",
     "cli/init-from-a-monorepo-tool#init-rerun-shows-a-diff",
     "cli/init-from-a-monorepo-tool#moon-delegate-runs-through-moon",

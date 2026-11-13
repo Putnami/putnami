@@ -83,6 +83,16 @@ did. With the default `warn` diagnostic level, assist findings (such as import
 organization) are reported at info level and filtered out, matching the prior
 behavior.
 
+A lint that only checks leaves out of Biome's targets what Putnami writes at
+the project root: `putnami.json`, `.gen`, `.putnami`, and a `tsconfig.json`
+that only extends the workspace root's, as an import writes it. The
+repository's Biome configuration never formatted those files, and a lint that
+writes nothing cannot bring them to it; the fix path formats them. An import
+from Nx, Turborepo, Rush or moon writes `fix: false` in
+`options["@putnami/typescript:lint"]` of each project whose lint script it
+moves and that passes no write flag, so that the moved lint only checks, as
+the script did.
+
 ### Fix path (writer)
 
 `putnami lint .` (default `--fix true`) keeps the format and lint phases

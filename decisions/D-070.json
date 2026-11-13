@@ -2,8 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-decision.json",
   "protocolVersion": 1,
   "id": "D-070",
-  "statement": "an import never changes the tool that checks the code: a project moves to its language's extension, a build, test or lint target moves only when that extension runs the same tool, every other target stays on the tool and is listed as not mapped",
-  "settled": "2026-11-11",
+  "statement": "an import never changes the tool that checks the code: a build, test or lint target moves to its language's extension only when it runs the same tool, and the import declares and installs that extension only when a target moves",
+  "settled": "2026-11-12",
   "settledBy": "fdumay",
   "adr": "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md",
   "reviewOnly": true

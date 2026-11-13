@@ -32,7 +32,11 @@ tool:
   The sync lists it as not mapped, with its reason, and rewrites no script.
 - A target that moves does what it did. A test moves with `types: false` in
   `options["@putnami/typescript:test"]`, since its script type-checked
-  nothing. A `bun build` moves only when Putnami's Bun build writes the
+  nothing. A lint whose script passes no write flag moves with `fix: false`
+  in `options["@putnami/typescript:lint"]`: it checks and rewrites no file,
+  and when it runs Biome in a repository with no Biome configuration, the
+  sync writes a root `biome.json` that sets nothing, so the lint keeps
+  Biome's defaults. A `bun build` moves only when Putnami's Bun build writes the
   entries `package.json` names: entries under `src/`, or a `main` the import
   rewrites as described below. A published package, or one whose `exports`
   name a build output, keeps its build on the tool.
@@ -293,9 +297,12 @@ At the repository root:
 putnami init --from nx --mode delegate
 ```
 
-`init` declares `@putnami/nx`, and `@putnami/typescript` in import mode,
-records the mode in `putnami.workspace.json`, installs the extensions and
-synchronizes the projects. The sync reads `graph.json` when the root holds
+`init` declares `@putnami/nx`, records the mode in `putnami.workspace.json`,
+installs the extension and synchronizes the projects. In import mode, the
+sync declares `@putnami/typescript` only when a target moves to it, and
+`init` then installs it; when no target moves, `init` installs nothing more,
+leaves the lockfile as it was, and says that `--mode delegate` gives the
+same result. The sync reads `graph.json` when the root holds
 one (`nx graph --file=graph.json`), else `nx.json`, each `project.json` and
 each workspace `package.json`, and writes in each project's `putnami.json`
 the extension, the projects it depends on, and the jobs it disables:
@@ -371,7 +378,7 @@ putnami init --from nx --mode import --apply
 ```
 
 Back to delegate mode with no import list, `--apply` also removes from the
-workspace each extension the import declared, `@putnami/typescript` here,
+workspace each extension the import's sync declared, `@putnami/typescript` here,
 once no `putnami.json` names it. The same holds for every tool, moon's
 language extensions included.
 
@@ -386,9 +393,9 @@ it to the import list:
 putnami init --from nx --import /packages/pricing
 ```
 
-`init` prints the entry it adds to `options["@putnami/nx"].import`, declares
-`@putnami/typescript` if the workspace does not, and shows the diff of each
-`putnami.json`, writing nothing. `--apply` records the list and synchronizes:
+`init` prints the entry it adds to `options["@putnami/nx"].import` and shows
+the diff of each `putnami.json`, and of the workspace config when the sync
+declares `@putnami/typescript` for a target that moves, writing nothing. `--apply` records the list and synchronizes:
 
 ```bash
 putnami init --from nx --import /packages/pricing --apply
@@ -570,8 +577,8 @@ Turborepo adopts in either mode:
   script that runs `tsc` alone compiles with that `tsc` into its `outDir`.
   Every other task, such as a bundler build, another `tsc` script, an ESLint
   with arguments, or a lint chained with `prettier`, keeps running through
-  Turborepo: moving it would change the tool that checks the code. Import mode also declares `@putnami/typescript`,
-  whose setup adds its devDependencies to the root `package.json`, lists the
+  Turborepo: moving it would change the tool that checks the code. Once a task
+  moves, the sync also declares `@putnami/typescript`, whose setup adds its devDependencies to the root `package.json`, lists the
   packages where the repository's package manager reads its members, writes a
   root `tsconfig.json` and `biome.json` when they are missing, and installs
   with that manager, which keeps its lockfile. When a package's `build` moves to
@@ -612,9 +619,12 @@ In a terminal, `init` asks the mode:
   Mode [1]:
 ```
 
-`init` declares `@putnami/turbo`, and `@putnami/typescript` in import mode,
-records the mode in `putnami.workspace.json`, installs the extensions and
-synchronizes the projects. The sync reads the package manifests and
+`init` declares `@putnami/turbo`, records the mode in `putnami.workspace.json`,
+installs the extension and synchronizes the projects. In import mode, the
+sync declares `@putnami/typescript` only when a task moves to it, and `init`
+then installs it; when no task moves, `init` installs nothing more, leaves
+the lockfile as it was, and says that `--mode delegate` gives the same
+result. The sync reads the package manifests and
 `turbo.json`, and writes in each package's `putnami.json` the extension that
 runs it and the packages it depends on. In delegate mode, a package of the
 demo reads:
@@ -714,9 +724,9 @@ and `bun test` for example, then add it to the import list:
 putnami init --from turbo --import /packages/pricing
 ```
 
-`init` prints the entry it adds to `options["@putnami/turbo"].import`,
-declares `@putnami/typescript` if the workspace does not, and shows the diff
-of each `putnami.json`, writing nothing. `--apply` records the list and
+`init` prints the entry it adds to `options["@putnami/turbo"].import` and
+shows the diff of each `putnami.json`, and of the workspace config when the
+sync declares `@putnami/typescript` for a task that moves, writing nothing. `--apply` records the list and
 synchronizes:
 
 ```bash

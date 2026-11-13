@@ -292,14 +292,15 @@ func TestAnImportWritesTypeScriptProjectsAndRetractsNone(t *testing.T) {
 	if len(result.Retracted) != 0 {
 		t.Errorf("an import retracted %v", result.Retracted)
 	}
-	// The demo's projects declare no script: each task is disabled.
+	// The demo's projects declare no script: none moves, so Rush alone runs
+	// each, with each task disabled.
 	if api := readProjectFile(t, root, "apps/api"); !reflect.DeepEqual(api, map[string]any{
 		"$schema":      stacks.ProjectSchema,
-		"extensions":   []any{TypeScriptExtension},
+		"extensions":   []any{ExtensionName},
 		"dependencies": []any{"/libs/pricing"},
 		"disable":      map[string]any{"jobs": []any{"test", "lint", "build"}},
 	}) {
-		t.Errorf("apps/api = %v, want a TypeScript project with its edge", api)
+		t.Errorf("apps/api = %v, want a Rush project with its edge", api)
 	}
 	if got := cacheWarnings(result.Warnings); len(got) != 0 {
 		t.Errorf("an import warns about Rush's cache: %v", got)
@@ -563,6 +564,8 @@ func TestTheModeParamOutranksTheRecordedMode(t *testing.T) {
 	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-from-rush-json")
 	d := readDemo(t)
 	root := repository(t, d, ModeDelegate, false)
+	// api's lint runs Biome, which @putnami/typescript runs: it moves.
+	stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "private": true, "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"lint": "biome check ."}}`)
 	ctx := &pctx.Context{WorkspaceRoot: root, Params: pctx.Params{ModeParam: json.RawMessage(`"import"`), "dryRun": json.RawMessage("true")}}
 	var events strings.Builder
 	emit := jsonl.New()
@@ -621,14 +624,15 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 	root := repository(t, d, ModeImport, false)
 	// pricing builds with Bun, so its main names an output nothing writes in
 	// the project; web keeps its own tsconfig and declares exports; api
-	// names no main.
+	// names no main, and its test moves.
 	pricingManifest := strings.Replace(d["base"]["libs/pricing/package.json"], `"main": "lib/index.js",`, `"main": "lib/index.js",
   "scripts": {
     "build": "bun build src/index.ts --outdir lib"
   },`, 1)
 	stackstest.WriteFile(t, root, "libs/pricing/package.json", pricingManifest)
 	stackstest.WriteFile(t, root, "apps/web/tsconfig.json", `{"compilerOptions": {"strict": true}}`)
-	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "main": "lib/index.js", "exports": "./lib/index.js"}`)
+	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "main": "lib/index.js", "exports": "./lib/index.js", "scripts": {"test": "bun test"}}`)
+	stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "private": true, "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"test": "bun test"}}`)
 
 	dry, err := Stale(context.Background(), root, &bytes.Buffer{})
 	if err != nil {
@@ -639,7 +643,7 @@ func TestAnImportAddsSourceExportsAndATSConfig(t *testing.T) {
 		diffs = append(diffs, diff.File)
 	}
 	slices.Sort(diffs)
-	want := []string{"apps/api/putnami.json", "apps/api/tsconfig.json", "apps/web/putnami.json", "libs/pricing/package.json", "libs/pricing/putnami.json", "libs/pricing/tsconfig.json"}
+	want := []string{"apps/api/putnami.json", "apps/api/tsconfig.json", "apps/web/putnami.json", "libs/pricing/package.json", "libs/pricing/putnami.json", "libs/pricing/tsconfig.json", wsproto.WorkspaceConfigFilename}
 	if !reflect.DeepEqual(diffs, want) {
 		t.Errorf("dry diffs = %v, want %v", diffs, want)
 	}
@@ -723,7 +727,8 @@ func TestAnImportKeepsTheEntryOfAProjectRushPublishes(t *testing.T) {
 	stackstest.WriteFile(t, root, "rush.json", strings.Replace(d["base"]["rush.json"], `"shouldPublish": false`, `"shouldPublish": true`, 1))
 	manifest := strings.Replace(d["base"]["libs/pricing/package.json"], `"main": "lib/index.js",`, `"main": "lib/index.js",
   "scripts": {
-    "build": "bun build src/index.ts --outdir lib"
+    "build": "bun build src/index.ts --outdir lib",
+    "test": "bun test"
   },`, 1)
 	stackstest.WriteFile(t, root, "libs/pricing/package.json", manifest)
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
@@ -752,19 +757,22 @@ func TestASwitchOfModeDropsTheOtherModesExtension(t *testing.T) {
 		t.Fatal(err)
 	}
 	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "import"}}}`)
+	// api's lint runs Biome, which @putnami/typescript runs: it moves.
+	stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "private": true, "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"lint": "biome check ."}}`)
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
 	api := readProjectFile(t, root, "apps/api")
-	if !reflect.DeepEqual(api["extensions"], []any{TypeScriptExtension}) || api["options"] != nil {
-		t.Errorf("after an import apps/api = %v, want the TypeScript extension alone", api)
+	if !reflect.DeepEqual(api["extensions"], []any{TypeScriptExtension}) || !reflect.DeepEqual(api["options"], map[string]any{stacks.TypeScriptLintLayer: map[string]any{"fix": false}}) {
+		t.Errorf("after an import apps/api = %v, want the TypeScript extension alone, with a lint that only checks", api)
 	}
 	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "options": {"@putnami/rush": {"mode": "delegate"}}}`)
 	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
 		t.Fatal(err)
 	}
-	if api := readProjectFile(t, root, "apps/api"); !reflect.DeepEqual(api["extensions"], []any{ExtensionName}) {
-		t.Errorf("after a delegation apps/api extensions = %v, want the Rush extension alone", api["extensions"])
+	api = readProjectFile(t, root, "apps/api")
+	if _, kept := api["options"].(map[string]any)[stacks.TypeScriptLintLayer]; kept || !reflect.DeepEqual(api["extensions"], []any{ExtensionName}) {
+		t.Errorf("after a delegation apps/api = %v, want the Rush extension alone and no option of the import", api)
 	}
 }
 
@@ -805,10 +813,15 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 		"dependencies": []any{"/libs/pricing"},
 		"disable":      map[string]any{"jobs": []any{"@putnami/rush:lint", "@putnami/typescript:test", "@putnami/typescript:build"}},
 		"options": map[string]any{
-			ExtensionName: map[string]any{"tasks": map[string]any{"build": keptSteps("build"), "test": keptSteps("test")}},
+			ExtensionName:              map[string]any{"tasks": map[string]any{"build": keptSteps("build"), "test": keptSteps("test")}},
+			stacks.TypeScriptLintLayer: map[string]any{"fix": false},
 		},
 	}) {
 		t.Errorf("apps/api = %v", api)
+	}
+	// No Biome lint moves: the root gains no Biome configuration.
+	if _, err := os.Stat(filepath.Join(root, "biome.json")); !os.IsNotExist(err) {
+		t.Errorf("an import that moves no Biome lint wrote biome.json: %v", err)
 	}
 	pricing := readProjectFile(t, root, "libs/pricing")
 	if !reflect.DeepEqual(pricing["disable"], map[string]any{"jobs": []any{"@putnami/rush:test", "@putnami/rush:build", "@putnami/typescript:lint"}}) {
@@ -821,9 +834,8 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 	if !slices.Contains(result.Warnings, stacks.LintDependentsNote) {
 		t.Errorf("warnings = %v, want the lint selection note", result.Warnings)
 	}
-	// web declares no script: the TypeScript extension alone, every task
-	// disabled.
-	if web := readProjectFile(t, root, "apps/web"); !reflect.DeepEqual(web["extensions"], []any{TypeScriptExtension}) {
+	// web declares no script: no task moves, so Rush alone runs it.
+	if web := readProjectFile(t, root, "apps/web"); !reflect.DeepEqual(web["extensions"], []any{ExtensionName}) {
 		t.Errorf("apps/web extensions = %v", web["extensions"])
 	}
 	for _, want := range []string{
@@ -840,16 +852,16 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 		t.Errorf("the import rewrote api's scripts: %s", data)
 	}
 
-	// The probe claims api, which keeps targets on Rush, and not web, which
-	// stays a bare member.
+	// The probe claims api, which keeps targets on Rush, and web, which runs
+	// on Rush alone.
 	var claimed []string
 	for _, p := range probe(t, root).Projects {
 		if slices.Contains(p.Extensions, ExtensionName) {
 			claimed = append(claimed, p.Path)
 		}
 	}
-	if !slices.Contains(claimed, "apps/api") || slices.Contains(claimed, "apps/web") {
-		t.Errorf("an import claims %v, want apps/api and not apps/web", claimed)
+	if !slices.Contains(claimed, "apps/api") || !slices.Contains(claimed, "apps/web") {
+		t.Errorf("an import claims %v, want apps/api and apps/web", claimed)
 	}
 	apiReal, _ := filepath.EvalSymlinks(filepath.Join(root, "apps/api"))
 	if status, data, events := runJob(t, root, "apps/api", stacks.TaskTest); status != "OK" || data["delegatedTo"] != "rush" {
@@ -868,5 +880,104 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 	layer, _ := api["options"].(map[string]any)[ExtensionName].(map[string]any)
 	if !reflect.DeepEqual(api["extensions"], []any{ExtensionName}) || layer["tasks"] != nil {
 		t.Errorf("after a delegation apps/api = %v", api)
+	}
+}
+
+func TestAnImportThatMovesNoScriptDeclaresNothing(t *testing.T) {
+	spectest.Proves(t, feature, "an-import-declares-only-what-moves", "an-import-that-moves-no-script-declares-nothing")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, false)
+	stackstest.WriteFile(t, root, "libs/pricing/package.json", strings.Replace(d["base"]["libs/pricing/package.json"], `"main": "lib/index.js",`, `"main": "lib/index.js",
+  "scripts": {
+    "build": "webpack",
+    "test": "mocha"
+  },`, 1))
+	before := stackstest.Snapshot(t, root)
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Each project runs on Rush alone, and only the putnami.json files
+	// change: the workspace config, the manifests and the lockfile keep their
+	// bytes.
+	for _, dir := range []string{"libs/pricing", "apps/api", "apps/web"} {
+		if got, want := readProjectFile(t, root, dir)["extensions"], []any{ExtensionName}; !reflect.DeepEqual(got, want) {
+			t.Errorf("%s extensions = %v, want %v", dir, got, want)
+		}
+	}
+	for _, rel := range stackstest.Changed(t, root, before) {
+		if filepath.Base(rel) != wsproto.ConfigFilename {
+			t.Errorf("the sync changed %s", rel)
+		}
+	}
+	if slices.Contains(result.Written, wsproto.WorkspaceConfigFilename) {
+		t.Errorf("written = %v, want no workspace config", result.Written)
+	}
+
+	// Once a test moves, the sync declares the extension that runs it.
+	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "private": true, "scripts": {"test": "vitest run"}}`)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var workspace struct{ Extensions []string }
+	if err := json.Unmarshal(data, &workspace); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := workspace.Extensions, []string{ExtensionName, TypeScriptExtension}; !slices.Equal(got, want) {
+		t.Errorf("declared extensions = %v, want %v", got, want)
+	}
+}
+
+func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-lint-only-checks", "a-moved-lint-with-no-write-flag-only-checks")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, false)
+	// web's Biome lint only checks; api's writes its fixes.
+	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "private": true, "scripts": {"lint": "biome check ."}}`)
+	stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "private": true, "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"lint": "biome check --write ."}}`)
+	lintOptions := func(dir string) any {
+		options, _ := readProjectFile(t, root, dir)["options"].(map[string]any)
+		return options[stacks.TypeScriptLintLayer]
+	}
+	dry, err := Stale(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.ContainsFunc(dry.Changes, func(c stacks.FileChange) bool { return c.File == "biome.json" && string(c.After) == "{}\n" }) {
+		t.Errorf("a dry import shows %v, want the root biome.json", dry.Changes)
+	}
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := lintOptions("apps/web"); !reflect.DeepEqual(got, map[string]any{"fix": false}) {
+		t.Errorf("web lint options = %v, want fix false", got)
+	}
+	if got := lintOptions("apps/api"); got != nil {
+		t.Errorf("api lint options = %v, want none for a lint that writes", got)
+	}
+	// The repository holds no Biome configuration: the lint keeps Biome's
+	// defaults, and the sync lists the file it writes for that.
+	if data, err := os.ReadFile(filepath.Join(root, "biome.json")); err != nil || string(data) != "{}\n" {
+		t.Errorf("root biome.json = %q, %v; want one that sets nothing", data, err)
+	}
+	if !slices.ContainsFunc(result.Warnings, func(w string) bool { return strings.HasPrefix(w, "biome.json: written with no setting") }) {
+		t.Errorf("warnings = %v, want the biome.json listed", result.Warnings)
+	}
+	if again, err := Stale(context.Background(), root, &bytes.Buffer{}); err != nil || len(again.Written) != 0 || len(again.Changes) != 0 {
+		t.Errorf("a second import changes %v %v, %v", again.Written, again.Changes, err)
+	}
+	// A repository that holds a Biome configuration keeps it.
+	const own = "{\"formatter\": {\"indentStyle\": \"space\"}}\n"
+	stackstest.WriteFile(t, root, "biome.json", own)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if data, _ := os.ReadFile(filepath.Join(root, "biome.json")); string(data) != own {
+		t.Errorf("the import rewrote the repository's biome.json: %s", data)
 	}
 }
