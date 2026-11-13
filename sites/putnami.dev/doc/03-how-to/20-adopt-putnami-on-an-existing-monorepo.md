@@ -319,6 +319,24 @@ also records its runner in `options["@putnami/typescript:test"].runner`. The
 sync owns these entries. The output lists each target Putnami does not run
 itself, such as `serve`, `e2e` or a `mocha` test, with the reason.
 
+A repository that names its targets by variant, such as `test:lib` and
+`test:eslint`, has no `test` and no `lint` target, so both tasks are
+disabled. Map each name to `build`, `test` or `lint` in
+`options["@putnami/nx"].targets` of `putnami.workspace.json`, then run
+`putnami projects sync`: the task runs the mapped targets through `nx run`
+on each project that has them, in both modes
+([Map a named target to a task](/docs/monorepo-tools/nx#map-a-named-target-to-a-task)).
+
+```json
+{
+  "options": {
+    "@putnami/nx": {
+      "targets": { "test:lib": "test", "test:eslint": "lint" }
+    }
+  }
+}
+```
+
 A Node service keeps running on Node. In import mode, a TypeScript project
 whose `start` script runs `node`, or whose `serve` target runs the
 `@nx/js:node` executor, gets `"runtime": "node"` under

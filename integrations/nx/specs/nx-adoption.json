@@ -7,13 +7,15 @@
     "In delegate mode, putnami lint, test and build run nx run on each affected project, and Nx's cache decides what reruns",
     "In import mode, a TypeScript project's build, test and lint run as @putnami/typescript tasks, and every other target keeps running through Nx",
     "In delegate mode, the projects options[\"@putnami/nx\"].import selects are imported as import mode imports them, so a team moves one project at a time",
+    "A team maps a named Nx target, such as test:lib, to build, test or lint, and that task then runs it on each project that has it",
     "The sync lists every target it does not map, with the reason, and a stale graph fails putnami validate"
   ],
   "nonGoals": [
     "Rewriting nx.json or project.json, or a package.json beyond the exports an import adds (D-066)",
     "Installing or switching a Nx version: the toolchain check compares and never installs",
     "Caching a delegated Nx result in Putnami's cache",
-    "Mapping a target other than build, test and lint to a Putnami task"
+    "Running a target as a Putnami task other than build, test and lint",
+    "Moving a mapped target to @putnami/typescript: it runs through Nx in both modes"
   ],
   "requirements": [
     {
@@ -78,6 +80,15 @@
         "The sync writes nothing it cannot map.",
         "It lists each target it maps to no Putnami task, such as serve or e2e, and in import mode each build, test or lint target that keeps running through Nx, with the project, the target and the reason, and each such target keeps running through nx run.",
         "The sync job prints one line per target name that no Putnami task runs on several projects, with their count and first three names, and its data still lists each project and target."
+      ]
+    },
+    {
+      "id": "named-targets-run-as-tasks",
+      "text": [
+        "options[\"@putnami/nx\"].targets in putnami.workspace.json maps a Nx target, such as test:lib, to build, test or lint.",
+        "A project with no target named after a task runs each target mapped to it, in name order, through nx run in both modes: the sync keeps the task on and owns the steps it writes in options[\"@putnami/nx\"].tasks.<task>.steps.",
+        "A target named after the task outranks a mapped one, which is listed.",
+        "An entry no project has warns with nx.target_unmatched; an invalid one fails the sync and validate."
       ]
     },
     {
@@ -149,6 +160,7 @@
     "integrations/nx/doc/adr/0002-a-delegated-workspace-imports-the-projects-a-list-names.md",
     "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
     "integrations/nx/doc/adr/0004-an-nx-js-tsc-build-moves-when-the-tsc-build-reproduces-its-emit.md",
-    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md"
+    "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md",
+    "integrations/nx/doc/adr/0005-a-named-target-runs-as-the-task-the-workspace-maps-it-to.md"
   ]
 }
