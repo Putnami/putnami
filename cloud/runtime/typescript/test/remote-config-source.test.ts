@@ -9,14 +9,18 @@ import {
   resetRemoteConfigSourceCacheForTest,
 } from '../src/runtime/remote-config-source';
 import { setSyncFetchForTest, type SyncFetchRequest } from '../src/runtime/sync-fetch';
+import { CONFIG_SERVER_TOKEN_ENV_NAMES } from '../src/runtime/token-source';
 import { resetDefaultLogger } from '@putnami/runtime';
 import { resetLoggerConfig } from '@putnami/runtime';
 
 describe('RemoteConfigSource', () => {
   const originalConsoleLog = console.log;
+  // Every variable token discovery reads is cleared, so an ambient
+  // PUTNAMI_CLOUD_TOKEN or GCP project never outranks the test's own token.
   const remoteEnvNames = [
     'CONFIG_SERVER_URL',
-    'CONFIG_SERVER_TOKEN',
+    ...CONFIG_SERVER_TOKEN_ENV_NAMES,
+    'GOOGLE_CLOUD_PROJECT',
     'CONFIG_SERVER_AUDIENCE',
     'CONFIG_SERVER_REQUIRED',
     'CONFIG_SERVER_TIMEOUT',
@@ -199,24 +203,14 @@ describe('RemoteConfigSource', () => {
       };
     });
 
-    const original = {
-      url: process.env.CONFIG_SERVER_URL,
-      token: process.env['CONFIG_SERVER_TOKEN'],
-      app: process.env['APP_NAME'],
-    };
     process.env.CONFIG_SERVER_URL = 'https://config.putnami.test';
     process.env['CONFIG_SERVER_TOKEN'] = 'discovered-token';
     process.env['APP_NAME'] = 'task-api';
-    try {
-      const source = discoverRemoteSource();
-      expect(source).toBeDefined();
-      source?.load();
-      expect(captured?.headers?.['Authorization']).toBe('Bearer discovered-token');
-    } finally {
-      process.env.CONFIG_SERVER_URL = original.url;
-      process.env['CONFIG_SERVER_TOKEN'] = original.token;
-      process.env['APP_NAME'] = original.app;
-    }
+
+    const source = discoverRemoteSource();
+    expect(source).toBeDefined();
+    source?.load();
+    expect(captured?.headers?.['Authorization']).toBe('Bearer discovered-token');
   });
 
   specTest(
