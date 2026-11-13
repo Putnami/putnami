@@ -527,7 +527,6 @@ type canonicalResponse struct {
 
 func TestOpenAPI_CanonicalProviderBytesKeepClientHashThroughUnchangedPublication(t *testing.T) {
 	spectest.Proves(t, "go/api-contracts", "generated-from-contract", "canonical-provider-bytes-keep-client-hash-through-unchanged-publication")
-	spectest.Proves(t, "tooling/cross-language-rest-clients", "contract-carries-attribution", "the-contract-carries-each-operations-producer-attribution")
 
 	server := &fakeServer{}
 	apiPlugin := api.New(server,

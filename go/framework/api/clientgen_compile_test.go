@@ -391,3 +391,68 @@ func TestTheEmittedGoClientAnswersADeclaredCachedOperationThroughTheRealRuntime(
 		t.Fatalf("the emitted cached client failed against the real runtime: %v\n%s", testErr, output)
 	}
 }
+
+// generatedLoadProbe is the only test of the throwaway module below: running
+// it loads the generated package, which is all the capability gate needs.
+const generatedLoadProbe = `package usersclient
+
+import "testing"
+
+func TestTheGeneratedPackageLoads(t *testing.T) {}
+`
+
+// A generated client that pins a runtime capability loads on the runtime that
+// implements it, and the same package pinned to a capability this repository's
+// runtime does not implement stops at load, before any of its code runs: the
+// emitted pin, compiled against the real runtime, is the gate.
+func TestAGeneratedGoClientFailsToLoadOnARuntimeWithoutItsCapability(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "runtime-capability-gate",
+		"a-generated-client-fails-to-load-on-a-runtime-without-its-capability")
+	// Only the cached operation, for the reason the test above gives: the
+	// package initializes every descriptor it embeds.
+	spec := compileFixtureSpec()
+	var cached []MethodIR
+	for _, method := range spec.Services[0].Methods {
+		if method.OperationID == "lookupUser" {
+			cached = append(cached, method)
+		}
+	}
+	spec.Services = []ServiceIR{{Methods: cached}}
+	source, err := GenerateClientFromIR(spec, ClientGenOptions{PackageName: "usersclient", ClientName: "UsersClient"})
+	if err != nil {
+		t.Fatalf("GenerateClientFromIR: %v", err)
+	}
+	const pin = `client.RequireRuntimeCapabilities("response-cache")`
+	if strings.Count(source, pin) != 1 {
+		t.Fatalf("the emitted client pins the response-cache capability %d times, want once:\n%s", strings.Count(source, pin), source)
+	}
+	load := func(t *testing.T, source string) ([]byte, error) {
+		t.Helper()
+		moduleDir := t.TempDir()
+		writeGeneratedClientModule(t, moduleDir, source)
+		if err := os.WriteFile(filepath.Join(moduleDir, "load_test.go"), []byte(generatedLoadProbe), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		command := exec.Command("go", "test", "-count=1", "./...")
+		command.Dir = moduleDir
+		command.Env = append(os.Environ(), "GOPROXY=off", "GOFLAGS=-mod=readonly", "GOWORK=off")
+		return command.CombinedOutput()
+	}
+
+	if output, err := load(t, source); err != nil {
+		t.Fatalf("the emitted client does not load on the runtime that implements its capability: %v\n%s", err, output)
+	}
+
+	// The contract of a later generator names a capability this runtime
+	// predates. Nothing else in the package changes.
+	const missing = "response-cache-v2"
+	later := strings.Replace(source, pin, `client.RequireRuntimeCapabilities("`+missing+`")`, 1)
+	output, err := load(t, later)
+	if err == nil {
+		t.Fatalf("a client that requires %q loaded on a runtime that does not implement it:\n%s", missing, output)
+	}
+	want := `generated client requires runtime capability "` + missing + `"`
+	if !strings.Contains(string(output), want) || strings.Contains(string(output), "TestTheGeneratedPackageLoads") {
+		t.Fatalf("the load did not stop on the capability gate (want %q before any test runs):\n%s", want, output)
+	}
+}

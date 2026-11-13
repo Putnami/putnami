@@ -31,7 +31,10 @@
         "../../../protocols/clientcontract/fixtures/**",
         "../client/*.go",
         "../client/go.mod",
-        "../client/go.sum"
+        "../client/go.sum",
+        "../openapi/*.go",
+        "../openapi/go.mod",
+        "../openapi/go.sum"
       ]
     },
     "publish": {
