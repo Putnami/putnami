@@ -379,44 +379,19 @@ func TestScheduler_CoalescesConcurrentColdMissAcrossWorktrees(t *testing.T) {
 	}
 
 	runs := []schedulerRun{newRun(), newRun()}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	// The budget only ends a fixture that hangs: the wait below judges the
+	// protocol on what the schedulers do.
+	ctx, cancel := context.WithTimeout(context.Background(), answerWaitBudget)
 	defer cancel()
-	ready := make(chan struct{}, len(runs))
-	start := make(chan struct{})
-	results := make(chan *SchedulerResult, len(runs))
-	for _, run := range runs {
-		run := run
-		go func() {
-			ready <- struct{}{}
-			<-start
-			results <- run.scheduler.Run(ctx)
-		}()
+	schedulers := make([]*Scheduler, len(runs))
+	for i, run := range runs {
+		schedulers[i] = run.scheduler
 	}
-	for range runs {
-		<-ready
-	}
-	close(start)
-
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		data, _ := os.ReadFile(counterPath)
-		if len(strings.Fields(string(data))) > 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("neither scheduler started the cold job")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	contention := startContendingSchedulers(ctx, schedulers)
 	// The release barrier is the scheduler's actual loser-before-wait boundary,
 	// not a guessed delay after the winner happened to start its subprocess.
-	select {
-	case <-leaseWaitEntered:
-	case <-ctx.Done():
-		t.Fatalf("sibling scheduler did not enter cache lease wait: %v", ctx.Err())
-	case <-time.After(3 * time.Second):
-		t.Fatal("sibling scheduler did not enter cache lease wait")
-	}
+	contention.awaitOwnerAndWaiter(t, ctx, counterPath, leaseWaitEntered, "cold job")
+	results := contention.results
 	if err := os.WriteFile(releasePath, []byte("release"), 0o644); err != nil {
 		t.Fatalf("release cold job: %v", err)
 	}
@@ -534,48 +509,19 @@ func TestScheduler_CoalescedSourceFixReexecutesInEveryWorktree(t *testing.T) {
 	}
 
 	runs := []schedulerRun{newRun(), newRun()}
-	// This suite runs beside hundreds of CPU-heavy jobs in the workspace gate.
-	// Give the two scheduler goroutines enough admission time before judging the
-	// lease protocol; the happy path remains immediate, and the bounded child
-	// plus this context still make a broken test terminate.
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	// The budget only ends a fixture that hangs: the wait below judges the
+	// protocol on what the schedulers do.
+	ctx, cancel := context.WithTimeout(context.Background(), answerWaitBudget)
 	defer cancel()
-	ready := make(chan struct{}, len(runs))
-	start := make(chan struct{})
-	results := make(chan *SchedulerResult, len(runs))
-	for _, run := range runs {
-		run := run
-		go func() {
-			ready <- struct{}{}
-			<-start
-			results <- run.scheduler.Run(ctx)
-		}()
+	schedulers := make([]*Scheduler, len(runs))
+	for i, run := range runs {
+		schedulers[i] = run.scheduler
 	}
-	for range runs {
-		<-ready
-	}
-	close(start)
-
-	deadline := time.Now().Add(10 * time.Second)
-	for {
-		data, _ := os.ReadFile(counterPath)
-		if len(strings.Fields(string(data))) > 0 {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatal("neither scheduler started the source fixer")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	contention := startContendingSchedulers(ctx, schedulers)
 	// The release barrier is the scheduler's actual loser-before-wait boundary,
 	// not a guessed delay after the winner happened to start its subprocess.
-	select {
-	case <-leaseWaitEntered:
-	case <-ctx.Done():
-		t.Fatalf("sibling scheduler did not enter cache lease wait: %v", ctx.Err())
-	case <-time.After(3 * time.Second):
-		t.Fatal("sibling scheduler did not enter cache lease wait")
-	}
+	contention.awaitOwnerAndWaiter(t, ctx, counterPath, leaseWaitEntered, "source fixer")
+	results := contention.results
 	if err := os.WriteFile(releasePath, []byte("release"), 0o644); err != nil {
 		t.Fatalf("release source fixer: %v", err)
 	}
@@ -600,6 +546,111 @@ func TestScheduler_CoalescedSourceFixReexecutesInEveryWorktree(t *testing.T) {
 	if executions := len(strings.Fields(string(data))); executions != 2 {
 		t.Fatalf("source fixer executions = %d, want owner plus re-executed follower", executions)
 	}
+}
+
+// schedulerContention is a set of schedulers released together to contend for
+// one cache entry.
+type schedulerContention struct {
+	started time.Time
+	// returned receives one value as each scheduler's Run returns, before its
+	// result is delivered: no scheduler may return while the owner's job is
+	// still held, so a value here before the release is the failure itself.
+	returned chan struct{}
+	results  chan *SchedulerResult
+}
+
+// startContendingSchedulers runs every scheduler from one starting line.
+func startContendingSchedulers(ctx context.Context, schedulers []*Scheduler) *schedulerContention {
+	contention := &schedulerContention{
+		returned: make(chan struct{}, len(schedulers)),
+		results:  make(chan *SchedulerResult, len(schedulers)),
+	}
+	ready := make(chan struct{}, len(schedulers))
+	start := make(chan struct{})
+	for _, scheduler := range schedulers {
+		go func() {
+			ready <- struct{}{}
+			<-start
+			result := scheduler.Run(ctx)
+			contention.returned <- struct{}{}
+			contention.results <- result
+		}()
+	}
+	for range schedulers {
+		<-ready
+	}
+	contention.started = time.Now()
+	close(start)
+	return contention
+}
+
+// awaitOwnerAndWaiter blocks until one scheduler has started the job, recorded
+// as a first line in counterPath, and a sibling has entered the cache lease
+// wait behind it. It fails on the events that prove the protocol broken: a
+// scheduler that returns while the owner's job is still held, or a context
+// that ends first. It judges no latency: the start it waits for takes tens of
+// milliseconds on an idle machine and hundreds on a saturated one.
+// The two elapsed times are logged, so the verbose transcript of a loaded run
+// shows how long the machine took.
+func (c *schedulerContention) awaitOwnerAndWaiter(
+	t *testing.T,
+	ctx context.Context,
+	counterPath string,
+	leaseWaitEntered <-chan struct{},
+	jobLabel string,
+) {
+	t.Helper()
+	jobStarted := func() bool {
+		data, _ := os.ReadFile(counterPath)
+		return len(strings.Fields(string(data))) > 0
+	}
+	failOnEarlyReturn := func(waitingFor string) {
+		t.Helper()
+		result := <-c.results
+		for key, jobResult := range result.Results {
+			t.Logf("early result %s = %+v", key, jobResult)
+		}
+		t.Fatalf("a scheduler returned after %s, before %s", time.Since(c.started), waitingFor)
+	}
+
+	poll := time.NewTicker(10 * time.Millisecond)
+	defer poll.Stop()
+	for !jobStarted() {
+		select {
+		case <-poll.C:
+		case <-c.returned:
+			if jobStarted() {
+				// The job started and its scheduler returned between two polls:
+				// the wait below reports that early return.
+				c.returned <- struct{}{}
+				continue
+			}
+			failOnEarlyReturn("either scheduler started the " + jobLabel)
+		case <-ctx.Done():
+			t.Fatalf("neither scheduler started the %s within %s: %v", jobLabel, time.Since(c.started), ctx.Err())
+		}
+	}
+	t.Logf("%s started %s after the schedulers were released", jobLabel, time.Since(c.started))
+
+	select {
+	case <-leaseWaitEntered:
+		// A scheduler that returned as well is the failure to report.
+		select {
+		case <-c.returned:
+			failOnEarlyReturn("the owner's job was released")
+		default:
+		}
+	case <-c.returned:
+		select {
+		case <-leaseWaitEntered:
+			failOnEarlyReturn("the owner's job was released")
+		default:
+			failOnEarlyReturn("the sibling scheduler entered the cache lease wait")
+		}
+	case <-ctx.Done():
+		t.Fatalf("sibling scheduler did not enter cache lease wait within %s: %v", time.Since(c.started), ctx.Err())
+	}
+	t.Logf("sibling entered the cache lease wait %s after the schedulers were released", time.Since(c.started))
 }
 
 // releaseWaitMaxPolls keeps the scheduler fixtures patient enough for their
