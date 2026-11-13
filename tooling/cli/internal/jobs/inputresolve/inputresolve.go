@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -151,28 +152,34 @@ func (r *Resolver) ResolveInput(query store.InputQuery) (store.InputExpansion, e
 	if expansion, ok := r.exact(key, query.Dir); ok {
 		return expansion, nil
 	}
-	answers, err := r.ask(query.Extension, []wsproto.InputResolveQuery{asked})
-	if err != nil {
-		return store.InputExpansion{}, fmt.Errorf("%w: %s %s: %w", store.ErrInputSelector, query.Extension, query.Selector, err)
+	// An answer that lists a file removed before its basis is digested is
+	// stale: ask again, and keep the last answer whatever it lists.
+	for attempt := 1; ; attempt++ {
+		answers, err := r.ask(query.Extension, []wsproto.InputResolveQuery{asked})
+		if err != nil {
+			return store.InputExpansion{}, fmt.Errorf("%w: %s %s: %w", store.ErrInputSelector, query.Extension, query.Selector, err)
+		}
+		answer := answers[0]
+		if answer.Error != "" {
+			return store.InputExpansion{}, fmt.Errorf("%w: %s answers %s in %s: %s",
+				store.ErrInputSelector, query.Extension, query.Selector, asked.Project, answer.Error)
+		}
+		expansion, recorded, err := r.keep(key, query.Dir, answer, attempt == staleAnswerAsks)
+		if err != nil {
+			return store.InputExpansion{}, fmt.Errorf("%w: %s %s in %s: %w", store.ErrInputSelector, query.Extension, query.Selector, asked.Project, err)
+		}
+		if recorded {
+			return expansion, nil
+		}
 	}
-	answer := answers[0]
-	if answer.Error != "" {
-		return store.InputExpansion{}, fmt.Errorf("%w: %s answers %s in %s: %s",
-			store.ErrInputSelector, query.Extension, query.Selector, asked.Project, answer.Error)
-	}
-	expansion, err := r.keep(key, query.Dir, answer)
-	if err != nil {
-		return store.InputExpansion{}, fmt.Errorf("%w: %s %s in %s: %w", store.ErrInputSelector, query.Extension, query.Selector, asked.Project, err)
-	}
-	return expansion, nil
 }
 
 // PrimeInputs asks each extension once, in one request, for every query it
-// keeps no answer for, and keeps each answer that is not an error. A nil
-// resolver asks nothing. An answer
+// keeps no answer for, and keeps each answer that is not an error and lists
+// no file that is gone. A nil resolver asks nothing. An answer
 // it keeps is checked when ResolveInput reads it. A query the resolver
-// refuses, an error answer and a failed call are left to ResolveInput, which
-// reports them for the input that reads them.
+// refuses, an error answer, an answer it did not keep and a failed call are
+// left to ResolveInput, which reports them for the input that reads them.
 func (r *Resolver) PrimeInputs(queries []store.InputQuery) {
 	if r == nil {
 		return
@@ -234,7 +241,7 @@ func (r *Resolver) prime(name string, inputs []pendingInput) {
 	}
 	for i, answer := range answers {
 		if answer.Error == "" {
-			_, _ = r.keep(ask[i].key, ask[i].dir, answer)
+			_, _, _ = r.keep(ask[i].key, ask[i].dir, answer, false)
 		}
 	}
 }
@@ -328,18 +335,36 @@ func (r *Resolver) exact(key, dir string) (store.InputExpansion, bool) {
 	return store.InputExpansion{}, false
 }
 
+// staleAnswerAsks bounds how many times ResolveInput asks for one input while
+// each answer lists a file that is gone once its basis is digested.
+const staleAnswerAsks = 3
+
 // keep records an answer that is not an error at key with the digest of its
-// basis under dir, and returns it as an expansion.
-func (r *Resolver) keep(key, dir string, answer wsproto.InputResolveAnswer) (store.InputExpansion, error) {
+// basis under dir, and returns it as an expansion, with whether it recorded
+// it.
+//
+// The digest reads the tree after the extension listed it. A listed file that
+// is gone by then was removed in between, as a write through a temporary file
+// and a rename removes one, so the digest describes a tree the list does not.
+// Such an answer is recorded only with evenStale: the extension then lists a
+// file that stays missing, and the key that reads the answer reports it.
+func (r *Resolver) keep(key, dir string, answer wsproto.InputResolveAnswer, evenStale bool) (store.InputExpansion, bool, error) {
 	expansion := store.InputExpansion{Files: slices.Clone(answer.Files), Basis: answer.Basis}
 	digest, err := wsproto.InputBasisDigest(dir, answer.Basis)
 	if err != nil {
-		return store.InputExpansion{}, fmt.Errorf("digest the answer's basis: %w", err)
+		return store.InputExpansion{}, false, fmt.Errorf("digest the answer's basis: %w", err)
+	}
+	if !evenStale {
+		for _, rel := range expansion.Files {
+			if _, err := os.Lstat(filepath.Join(dir, filepath.FromSlash(rel))); errors.Is(err, os.ErrNotExist) {
+				return expansion, false, nil
+			}
+		}
 	}
 	r.mu.Lock()
 	r.answers[key] = kept{expansion: expansion, digest: digest}
 	r.mu.Unlock()
-	return expansion, nil
+	return expansion, true, nil
 }
 
 // call returns the lock that runs the calls to one extension one at a time.

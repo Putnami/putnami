@@ -230,13 +230,44 @@ func collectPatternFiles(dir string, patterns []string) ([]fileEntry, error) {
 	return files, nil
 }
 
+// selectorExpansionAttempts bounds how many times one selector is expanded
+// for one collection, and how many times one digest collects its files, while
+// a listed file is gone.
+const selectorExpansionAttempts = 3
+
 // appendSelectorFiles appends the files expander lists for selector in dir,
 // each marked exact. A missing expander, a failed expansion and a listed file
 // that cannot be stated are each an invalid selection.
+//
+// A listed file that no longer exists makes the list stale, not the selection
+// invalid: a concurrent writer removed it after the expander listed it, as a
+// write through a temporary file and a rename does. The selector is then
+// expanded again, so the files are those of a list every file of which was
+// there, never a list less the file that vanished. A file the last expansion
+// still lists and that is still gone is an invalid selection.
 func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, selector string) ([]fileEntry, error) {
 	if expander == nil {
 		return nil, fmt.Errorf("%w: no expander for selector %q", ErrInputSelector, selector)
 	}
+	for attempt := 1; ; attempt++ {
+		listed, err := statSelectorFiles(dir, expander, selector)
+		if err == nil {
+			return append(files, listed...), nil
+		}
+		if attempt == selectorExpansionAttempts || !errors.Is(err, errListedFileGone) {
+			return nil, err
+		}
+	}
+}
+
+// errListedFileGone marks, inside an invalid selection, a file an expansion
+// listed that no longer exists.
+var errListedFileGone = errors.New("the listed file is gone")
+
+// statSelectorFiles expands selector in dir once and stats each file it
+// lists. A listed file that does not exist is an error errListedFileGone
+// marks.
+func statSelectorFiles(dir string, expander InputExpander, selector string) ([]fileEntry, error) {
 	expansion, err := expander.ExpandInput(dir, selector)
 	if err != nil {
 		if !errors.Is(err, ErrInputSelector) {
@@ -244,10 +275,14 @@ func appendSelectorFiles(dir string, files []fileEntry, expander InputExpander, 
 		}
 		return nil, err
 	}
+	files := make([]fileEntry, 0, len(expansion.Files))
 	for _, rel := range expansion.Files {
 		target := filepath.Join(dir, filepath.FromSlash(rel))
 		info, err := os.Lstat(target)
 		if err != nil {
+			if errors.Is(err, os.ErrNotExist) {
+				return nil, fmt.Errorf("%w: stat resolved input %s: %w (%w)", ErrInputSelector, target, err, errListedFileGone)
+			}
 			return nil, fmt.Errorf("%w: stat resolved input %s: %w", ErrInputSelector, target, err)
 		}
 		files = append(files, fileEntry{path: target, info: info, exact: true})
@@ -1090,15 +1125,28 @@ func hashFiles(dir string, patterns []string, expander InputExpander, scope Proj
 	if err != nil {
 		return "", err
 	}
-	files, err := collectFiles(dir, patterns, expander)
-	if err != nil {
-		return "", err
-	}
-
-	digests := hashFileContents(files, scope, projectDir)
-	for i, file := range files {
-		if file.exact && digests[i] == nil {
-			return "", fmt.Errorf("%w: cannot read %s", ErrInputSelector, file.path)
+	var files []fileEntry
+	var digests [][]byte
+	for attempt := 1; ; attempt++ {
+		files, err = collectFiles(dir, patterns, expander)
+		if err != nil {
+			return "", err
+		}
+		digests = hashFileContents(files, scope, projectDir)
+		unread := -1
+		for i, file := range files {
+			if file.exact && digests[i] == nil {
+				unread = i
+				break
+			}
+		}
+		if unread < 0 {
+			break
+		}
+		// A listed file that vanished between its stat and its read makes
+		// the list stale, as in appendSelectorFiles: collect again.
+		if _, statErr := os.Lstat(files[unread].path); attempt == selectorExpansionAttempts || !errors.Is(statErr, os.ErrNotExist) {
+			return "", fmt.Errorf("%w: cannot read %s", ErrInputSelector, files[unread].path)
 		}
 	}
 

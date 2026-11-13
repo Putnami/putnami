@@ -275,3 +275,124 @@ func TestFailedExpansionIsAnInvalidInputSelection(t *testing.T) {
 		t.Fatalf("a pattern set without a selector needs no expander: %v", err)
 	}
 }
+
+// vanishingExpander answers each selector with the files of its current
+// list, then runs the step after of that call, if any: a concurrent writer
+// that removes a file once the expander listed it.
+type vanishingExpander struct {
+	lists func(selector string) []string
+	after map[int]func()
+	calls int
+}
+
+func (e *vanishingExpander) ExpandInput(_, selector string) (InputExpansion, error) {
+	e.calls++
+	files := e.lists(selector)
+	if step := e.after[e.calls]; step != nil {
+		step()
+	}
+	return InputExpansion{Files: files}, nil
+}
+
+func (e *vanishingExpander) Identity() string { return "vanishing" }
+
+// existingFiles lists which of names exist in root: what an extension that
+// lists the directory answers at that moment.
+func existingFiles(root string, names ...string) []string {
+	var out []string
+	for _, name := range names {
+		if _, err := os.Lstat(filepath.Join(root, name)); err == nil {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// A file the expander listed and that a concurrent writer removed before the
+// key stats it, as the scheduler's stamp write removes its temporary file,
+// does not fail the key: the selector is expanded again, and the key is the
+// key of the tree without the file. A file every expansion lists and that
+// stays missing still fails the key (TestFailedExpansionIsAnInvalidInputSelection).
+func TestAListedFileThatVanishesBeforeItsStatIsExpandedAgain(t *testing.T) {
+	patterns := []string{"**/*.go", "sel:build"}
+	tree := func() string {
+		root := t.TempDir()
+		gitInputWrite(t, root, "main.go", "package main\n")
+		gitInputWrite(t, root, "payload.txt", "A")
+		return root
+	}
+	settled := tree()
+	want, err := hashFiles(settled, patterns, listExpander{"sel:build": {"payload.txt"}}, ProjectConfigScope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	root := tree()
+	temporary := filepath.Join(root, ".stamp-1.tmp")
+	gitInputWrite(t, root, ".stamp-1.tmp", "{}")
+	expander := &vanishingExpander{
+		lists: func(string) []string { return existingFiles(root, ".stamp-1.tmp", "payload.txt") },
+		after: map[int]func(){1: func() {
+			if err := os.Remove(temporary); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+	got, err := hashFiles(root, patterns, expander, ProjectConfigScope{})
+	if err != nil {
+		t.Fatalf("a listed file that vanished before its stat failed the key: %v", err)
+	}
+	if got != want {
+		t.Fatalf("key = %s, want %s: the key of the tree without the vanished file", got, want)
+	}
+	if expander.calls != 2 {
+		t.Fatalf("expansions = %d, want 2: the stale list and the one that replaces it", expander.calls)
+	}
+
+	missing := &vanishingExpander{lists: func(string) []string { return []string{"missing.txt"} }}
+	if _, err := CollectKeyFileSelection(root, patterns, missing); !errors.Is(err, ErrInputSelector) || !strings.Contains(err.Error(), "missing.txt") {
+		t.Fatalf("selection error = %v, want ErrInputSelector naming the file that stays missing", err)
+	}
+	if missing.calls != selectorExpansionAttempts {
+		t.Fatalf("expansions = %d, want %d: the retries are bounded", missing.calls, selectorExpansionAttempts)
+	}
+}
+
+// A listed file that vanishes after its stat and before its read does not
+// fail the key either: the files are collected again. Here the second
+// selector's expansion removes a file the first one listed and the collector
+// already stated.
+func TestAListedFileThatVanishesBeforeItsReadIsCollectedAgain(t *testing.T) {
+	patterns := []string{"sel:build", "sel:test"}
+	root := t.TempDir()
+	gitInputWrite(t, root, "payload.txt", "A")
+	want, err := hashFiles(root, patterns, listExpander{"sel:build": {"payload.txt"}, "sel:test": nil}, ProjectConfigScope{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	temporary := filepath.Join(root, ".stamp-1.tmp")
+	gitInputWrite(t, root, ".stamp-1.tmp", "{}")
+	expander := &vanishingExpander{
+		lists: func(selector string) []string {
+			if selector == "sel:test" {
+				return nil
+			}
+			return existingFiles(root, ".stamp-1.tmp", "payload.txt")
+		},
+		after: map[int]func(){2: func() {
+			if err := os.Remove(temporary); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+	got, err := hashFiles(root, patterns, expander, ProjectConfigScope{})
+	if err != nil {
+		t.Fatalf("a listed file that vanished before its read failed the key: %v", err)
+	}
+	if got != want {
+		t.Fatalf("key = %s, want %s: the key of the tree without the vanished file", got, want)
+	}
+	if expander.calls != 4 {
+		t.Fatalf("expansions = %d, want 4: two selectors, collected twice", expander.calls)
+	}
+}
