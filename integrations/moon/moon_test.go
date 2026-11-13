@@ -326,9 +326,10 @@ func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 		t.Errorf("workspace extensions %v (%v)", cfg.Extensions, err)
 	}
 	// The probe answers the project that stays delegated, and those that
-	// keep a task on moon.
+	// keep a task on moon. The TypeScript extension names api and web by
+	// their package.json, so moon reports no name for them.
 	got := probe(t, root)
-	if len(got) != 3 || got["apps/web"].SourceName != "web" || got["apps/api"].SourceName != "api" || got["packages/pricing"].SourceName != "pricing" {
+	if len(got) != 3 || got["apps/web"].SourceName != "" || got["apps/api"].SourceName != "" || got["packages/pricing"].SourceName != "pricing" {
 		t.Errorf("probe %+v", got)
 	}
 	// Back to delegate mode, every project runs moon again; the language
@@ -628,6 +629,28 @@ func TestImportDeclaresIntoTheObjectFormOfExtensions(t *testing.T) {
 	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"extensions": 3, "options": {"@putnami/moon": {"mode": "import"}}}`)
 	if _, err := Sync(context.Background(), root); err == nil || !strings.Contains(err.Error(), "neither a list") {
 		t.Errorf("extensions of another form fails the sync: %v", err)
+	}
+}
+
+func TestTheTypeScriptExtensionNamesAMoonProjectWithANamedPackage(t *testing.T) {
+	spectest.Proves(t, feature, "projects-and-tasks-are-read", "the-moon-projects-and-their-inherited-tasks-are-read")
+	// A delegated workspace that also declares @putnami/typescript: the
+	// TypeScript probe names api and web by their package.json, so moon
+	// reports no name for them and moon run still receives the project id.
+	// pricing has no package.json and keeps its moon id.
+	root := repository(t, readDemo(t), ModeDelegate, false)
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "demo", "extensions": ["@putnami/moon", "@putnami/typescript"], "options": {"@putnami/moon": {"mode": "delegate"}}}`+"\n")
+	got := probe(t, root)
+	for dir, want := range map[string]struct{ name, component string }{
+		"apps/api":         {"", "api"},
+		"apps/web":         {"", "web"},
+		"packages/pricing": {"pricing", "pricing"},
+	} {
+		p := got[dir]
+		var meta stacks.Metadata
+		if err := json.Unmarshal(p.Metadata, &meta); err != nil || p.SourceName != want.name || meta.Component != want.component {
+			t.Errorf("%s: source name %q, component %q (%v), want %q and %q", dir, p.SourceName, meta.Component, err, want.name, want.component)
+		}
 	}
 }
 
