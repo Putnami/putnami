@@ -202,6 +202,21 @@
         "its component names a component (evidence.unknown_component) that holds its file (evidence.invalid_component).",
         "A document without the architecture member validates as before."
       ]
+    },
+    {
+      "id": "declarations-follow-the-diff",
+      "text": [
+        "The optional declarations member lists at most 1024 declaration files the change touches (specs, baselines, bindings, architecture, decisions, CI configurations, CODEOWNERS), each a changed file with its status; a renamed one names its previous path.",
+        "No document at the base of an added file or the commit of a deleted one.",
+        "A path defect is evidence.invalid_path, a path twice evidence.duplicate, a document over 262144 bytes evidence.too_large, else evidence.invalid_declaration."
+      ]
+    },
+    {
+      "id": "the-spec-verification-record-is-carried-whole",
+      "text": [
+        "The optional specVerification member is the features protocol's spec verification record of the repository's own workspace, carried as the engine wrote it.",
+        "It is one JSON object, else evidence.invalid_spec_verification, of at most 524288 bytes, else evidence.too_large; the features protocol validates its contents."
+      ]
     }
   ],
   "decisions": [

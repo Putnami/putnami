@@ -116,6 +116,11 @@ type evidenceReportBatch struct {
 	Components          []evidence.Component          `json:"components,omitempty"`
 	ChangedLineCoverage *evidence.ChangedLineCoverage `json:"changedLineCoverage,omitempty"`
 	DependencyChanges   []evidence.DependencyChange   `json:"dependencyChanges,omitempty"`
+	// SpecVerification and Declarations are the document's own members. Each
+	// rides in a batch of its own: the declarations carry whole documents,
+	// and Delivery bounds the batch, not each member.
+	SpecVerification json.RawMessage        `json:"specVerification,omitempty"`
+	Declarations     []evidence.Declaration `json:"declarations,omitempty"`
 	// Provider, Repo and Repository name the repository, as the run does.
 	Provider   string              `json:"provider,omitempty"`
 	Repo       string              `json:"repo,omitempty"`
@@ -649,6 +654,15 @@ func evidenceBatches(doc *evidence.Document, submissionID string) []evidenceRepo
 	}
 	if len(members.Components) > 0 || members.ChangedLineCoverage != nil || len(members.DependencyChanges) > 0 {
 		batches = append(batches, members)
+	}
+	// A declared repository's spec verification record and declarations: the
+	// proofs and the promises a change may not lose or weaken without a
+	// person's decision.
+	if len(doc.SpecVerification) > 0 {
+		batches = append(batches, evidenceReportBatch{SubmissionID: submissionID, Stream: stream, SpecVerification: doc.SpecVerification})
+	}
+	if len(doc.Declarations) > 0 {
+		batches = append(batches, evidenceReportBatch{SubmissionID: submissionID, Stream: stream, Declarations: doc.Declarations})
 	}
 	return batches
 }

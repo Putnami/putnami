@@ -75,7 +75,7 @@ func (s *evidenceFakeServer) RoundTrip(req *http.Request) (*http.Response, error
 			return reportJSONResponse(s.refuseReports, map[string]any{"error": "request body too large", "message": "request body too large"}), nil
 		}
 		var stored []string
-		for _, kind := range []string{"tests", "coverage", "components", "changedLineCoverage", "dependencyChanges"} {
+		for _, kind := range []string{"tests", "coverage", "components", "changedLineCoverage", "dependencyChanges", "specVerification", "declarations"} {
 			if _, ok := body[kind]; ok {
 				stored = append(stored, kind)
 			}
@@ -273,6 +273,42 @@ func TestEvidenceReportSendsNoEmptyBatch(t *testing.T) {
 	}
 	if got := fake.paths(); len(got) != 2 {
 		t.Fatalf("requests = %v, want the run and the evidence batch alone", got)
+	}
+}
+
+func TestEvidenceReportSendsTheDeclaredRecordsInBatchesOfTheirOwn(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-declared-records", "the-spec-verification-and-the-declarations-each-ride-alone")
+	fake := &evidenceFakeServer{}
+	if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", evidenceFixture("declared-pull-request.json")); err != nil {
+		t.Fatalf("evidence-report: %v", err)
+	}
+	var fixture map[string]any
+	data, err := os.ReadFile(evidenceFixture("declared-pull-request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if got := fake.paths(); len(got) != 4 {
+		t.Fatalf("requests = %v, want the run, the components, the record and the declarations", got)
+	}
+	submission := fake.requests[0].Body["submissionId"]
+	for i, key := range map[int]string{2: "specVerification", 3: "declarations"} {
+		body := fake.requests[i].Body
+		if body["submissionId"] != submission {
+			t.Fatalf("the %s batch carries %v, want %v", key, body["submissionId"], submission)
+		}
+		got, _ := json.Marshal(body[key])
+		want, _ := json.Marshal(fixture[key])
+		if string(got) != string(want) {
+			t.Fatalf("%s = %s, want the document's own %s", key, got, want)
+		}
+		for _, other := range []string{"components", "specVerification", "declarations"} {
+			if _, ok := body[other]; ok && other != key {
+				t.Fatalf("the %s batch also carries %s", key, other)
+			}
+		}
 	}
 }
 
@@ -591,6 +627,7 @@ func TestEvidenceBatchMembersReachTheGeneratedClient(t *testing.T) {
 		{evidence.ChangedLineCoverageFile{}, deliveryapiclient.ChangedLineCoverageFile{}},
 		{evidence.DependencyChange{}, deliveryapiclient.DependencyChange{}},
 		{evidence.DependencyState{}, deliveryapiclient.DependencyState{}},
+		{evidence.Declaration{}, deliveryapiclient.DeclarationChange{}},
 		{evidence.Vulnerability{}, deliveryapiclient.Vulnerability{}},
 	} {
 		known := map[string]bool{}

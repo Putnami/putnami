@@ -261,6 +261,18 @@
         "$ref": "#/$defs/decision"
       }
     },
+    "declarations": {
+      "type": "array",
+      "maxItems": 1024,
+      "description": "The declaration files the change touches, each with its document at the base and at the head. Absent when the repository declares nothing or the change touches no declaration.",
+      "items": {
+        "$ref": "#/$defs/declaration"
+      }
+    },
+    "specVerification": {
+      "type": "object",
+      "description": "The spec verification record of the repository's own Putnami workspace, as the engine wrote it; the features protocol shapes it. At most 524288 bytes. Absent when the repository holds no Putnami workspace or its CI verified no spec before the producer ran."
+    },
     "diagnostics": {
       "type": "array",
       "maxItems": 500,
@@ -796,6 +808,46 @@
           ],
           "description": "The record's own file status, when the change adds, modifies, renames or deletes it; the record is then a changed file with that status.",
           "maxLength": 4096
+        }
+      }
+    },
+    "declaration": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "status"
+      ],
+      "description": "One declaration file the change touches: a spec, a specs baseline, a feature binding, an architecture manifest, a decisions file, a decision record, a CI configuration or a CODEOWNERS file. Its path is a changed file with the same status.",
+      "properties": {
+        "path": {
+          "$ref": "#/$defs/path",
+          "description": "The file at the commit, or its last path when deleted."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "added",
+            "modified",
+            "deleted",
+            "renamed"
+          ],
+          "description": "The file's status in the diff.",
+          "maxLength": 4096
+        },
+        "previousPath": {
+          "$ref": "#/$defs/path",
+          "description": "The path at the base of a renamed file; only a renamed declaration names one."
+        },
+        "before": {
+          "type": "string",
+          "maxLength": 262144,
+          "description": "The document at the base, at previousPath for a renamed file. Absent for an added file and for a document over 262144 bytes."
+        },
+        "after": {
+          "type": "string",
+          "maxLength": 262144,
+          "description": "The document at the commit. Absent for a deleted file and for a document over 262144 bytes."
         }
       }
     }

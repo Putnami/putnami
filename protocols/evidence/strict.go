@@ -34,6 +34,8 @@ const (
 	ErrorCodeInvalidDependencyChange    = "evidence.invalid_dependency_change"
 	ErrorCodeInvalidSBOM                = "evidence.invalid_sbom"
 	ErrorCodeInvalidDecision            = "evidence.invalid_decision"
+	ErrorCodeInvalidDeclaration         = "evidence.invalid_declaration"
+	ErrorCodeInvalidSpecVerification    = "evidence.invalid_spec_verification"
 	ErrorCodeInvalidArchitecture        = "evidence.invalid_architecture"
 	ErrorCodeInvalidTimestamp           = "evidence.invalid_timestamp"
 	ErrorCodeInvalidDiagnostic          = "evidence.invalid_diagnostic"
@@ -57,6 +59,8 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeInvalidDependencyChange:    true,
 	ErrorCodeInvalidSBOM:                true,
 	ErrorCodeInvalidDecision:            true,
+	ErrorCodeInvalidDeclaration:         true,
+	ErrorCodeInvalidSpecVerification:    true,
 	ErrorCodeInvalidArchitecture:        true,
 	ErrorCodeInvalidTimestamp:           true,
 	ErrorCodeInvalidDiagnostic:          true,
@@ -153,7 +157,13 @@ var documentShape = object(map[string]*member{
 	"decisions": array(object(map[string]*member{
 		"path": nil, "title": nil, "status": nil, "date": nil, "scope": nil, "governs": nil, "change": nil,
 	})),
-	"diagnostics": array(object(map[string]*member{"severity": nil, "code": nil, "message": nil, "field": nil})),
+	"declarations": array(object(map[string]*member{
+		"path": nil, "status": nil, "previousPath": nil, "before": nil, "after": nil,
+	})),
+	// specVerification is the features protocol's record, which that protocol
+	// shapes: the document carries it whole.
+	"specVerification": nil,
+	"diagnostics":      array(object(map[string]*member{"severity": nil, "code": nil, "message": nil, "field": nil})),
 })
 
 // ParseAndValidate strictly decodes a document and validates it.
@@ -249,10 +259,18 @@ func firstUnknownMember(value any, shape *member, path string) (string, bool) {
 }
 
 // firstOversizedString returns the dotted path of the first string longer than
-// MaxStringBytes, visiting object members in sorted order.
+// MaxStringBytes, visiting object members in sorted order. A declaration's
+// documents are bounded by MaxDeclarationBytes instead, and the spec
+// verification record by MaxSpecVerificationBytes as a whole.
 func firstOversizedString(value any, path string) (string, bool) {
+	if path == "specVerification" {
+		return "", true
+	}
 	switch typed := value.(type) {
 	case string:
+		if declarationDocument(path) {
+			return path, len(typed) <= MaxDeclarationBytes
+		}
 		return path, len(typed) <= MaxStringBytes
 	case map[string]any:
 		keys := make([]string, 0, len(typed))
@@ -273,6 +291,15 @@ func firstOversizedString(value any, path string) (string, bool) {
 		}
 	}
 	return "", true
+}
+
+// declarationDocument reports whether a dotted path is the before or after
+// document of a declaration.
+func declarationDocument(path string) bool {
+	if !strings.HasPrefix(path, "declarations[") {
+		return false
+	}
+	return strings.HasSuffix(path, "].before") || strings.HasSuffix(path, "].after")
 }
 
 func joinPath(parent, key string) string {
@@ -319,6 +346,8 @@ func ValidateDocument(document *Document) []diag.Diagnostic {
 	v.dependencyChanges(document.DependencyChanges, components, changed)
 	v.dependencyStates(document.DependencyChanges, document.SBOM)
 	v.decisions(document.Decisions, changed)
+	v.declarations(document.Declarations, changed)
+	v.specVerification(document.SpecVerification)
 	v.diagnostics(document.Diagnostics)
 	return v.diags
 }
@@ -410,6 +439,7 @@ func (v *validator) bounds(document *Document) bool {
 	}
 	over("dependencyChanges", len(document.DependencyChanges), MaxDependencyChanges)
 	over("decisions", len(document.Decisions), MaxDecisions)
+	over("declarations", len(document.Declarations), MaxDeclarations)
 	over("diagnostics", len(document.Diagnostics), MaxDiagnostics)
 	for index, decision := range document.Decisions {
 		over(fmt.Sprintf("decisions[%d].scope", index), len(decision.Scope), MaxDecisionScope)
@@ -922,6 +952,67 @@ func (v *validator) decisionChange(field string, decision Decision, changed map[
 		v.add(ErrorCodeInvalidDecision, field+".change", "record %q is not a changed file", decision.Path)
 	case status != decision.Change:
 		v.add(ErrorCodeInvalidDecision, field+".change", "record %q is %s, not %s", decision.Path, status, decision.Change)
+	}
+}
+
+// declarations checks the declaration files: each a declaration, once, with
+// the status and the previous path the diff gives it, and the documents its
+// status allows.
+func (v *validator) declarations(list []Declaration, changed map[string]string) {
+	seen := map[string]bool{}
+	for index, declaration := range list {
+		field := fmt.Sprintf("declarations[%d]", index)
+		v.path(field+".path", declaration.Path)
+		if seen[declaration.Path] {
+			v.add(ErrorCodeDuplicate, field+".path", "declaration %q is listed twice", declaration.Path)
+		}
+		seen[declaration.Path] = true
+		if !IsDeclaration(declaration.Path) && !IsDeclaration(declaration.PreviousPath) {
+			v.add(ErrorCodeInvalidDeclaration, field+".path", "%q is not a declaration", declaration.Path)
+		}
+		switch status, isChanged := changed[declaration.Path]; {
+		case !slices.Contains(FileStatuses, declaration.Status):
+			v.add(ErrorCodeInvalidDeclaration, field+".status", "status %q is not one of %s", declaration.Status, strings.Join(FileStatuses, ", "))
+		case !isChanged:
+			v.add(ErrorCodeInvalidDeclaration, field+".path", "declaration %q is not a changed file", declaration.Path)
+		case status != declaration.Status:
+			v.add(ErrorCodeInvalidDeclaration, field+".status", "declaration %q is %s, not %s", declaration.Path, status, declaration.Status)
+		}
+		switch {
+		case declaration.Status == FileRenamed && declaration.PreviousPath == "":
+			v.add(ErrorCodeInvalidDeclaration, field+".previousPath", "a renamed declaration names its previous path")
+		case declaration.Status == FileRenamed:
+			v.path(field+".previousPath", declaration.PreviousPath)
+		case declaration.PreviousPath != "":
+			v.add(ErrorCodeInvalidDeclaration, field+".previousPath", "only a renamed declaration names a previous path")
+		}
+		if declaration.Status == FileAdded && declaration.Before != nil {
+			v.add(ErrorCodeInvalidDeclaration, field+".before", "an added declaration has no document at the base")
+		}
+		if declaration.Status == FileDeleted && declaration.After != nil {
+			v.add(ErrorCodeInvalidDeclaration, field+".after", "a deleted declaration has no document at the commit")
+		}
+		for side, document := range []*string{declaration.Before, declaration.After} {
+			if document != nil && len(*document) > MaxDeclarationBytes {
+				v.add(ErrorCodeTooLarge, field+"."+[]string{"before", "after"}[side], "the document is longer than %d bytes", MaxDeclarationBytes)
+			}
+		}
+	}
+}
+
+// specVerification checks that the spec verification record is one JSON
+// object within its bound. The features protocol validates its contents.
+func (v *validator) specVerification(record json.RawMessage) {
+	if record == nil {
+		return
+	}
+	if len(record) > MaxSpecVerificationBytes {
+		v.add(ErrorCodeTooLarge, "specVerification", "specVerification is longer than %d bytes", MaxSpecVerificationBytes)
+		return
+	}
+	var object map[string]json.RawMessage
+	if err := json.Unmarshal(record, &object); err != nil || object == nil {
+		v.add(ErrorCodeInvalidSpecVerification, "specVerification", "specVerification must be a JSON object")
 	}
 }
 

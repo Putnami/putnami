@@ -172,6 +172,21 @@
               "a-laptop-run-measures-from-the-remote-default-branch"
             ]
           }
+        },
+        {
+          "id": "declared-repository-evidence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-workspace-change-carries-its-declarations",
+              "a-workspace-carries-its-newest-spec-verification-record",
+              "another-repository-declares-nothing"
+            ]
+          }
         }
       ]
     },

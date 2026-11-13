@@ -8,6 +8,7 @@
     "evidence/change-evidence-document#counts-add-up",
     "evidence/change-evidence-document#decision-records-are-well-formed",
     "evidence/change-evidence-document#decisions-follow-the-diff",
+    "evidence/change-evidence-document#declarations-follow-the-diff",
     "evidence/change-evidence-document#dependency-changes-are-well-formed",
     "evidence/change-evidence-document#dependency-states-are-well-formed",
     "evidence/change-evidence-document#impact-is-consistent",
@@ -20,6 +21,7 @@
     "evidence/change-evidence-document#the-ci-run-is-identified",
     "evidence/change-evidence-document#the-ci-system-is-recognized-by-its-marker",
     "evidence/change-evidence-document#the-document-is-bounded",
+    "evidence/change-evidence-document#the-spec-verification-record-is-carried-whole",
     "evidence/change-evidence-document#the-subject-names-the-change",
     "evidence/change-evidence-document#timestamps-and-diagnostics-are-well-formed",
     "evidence/change-evidence-document#version-1-and-closed-vocabularies"

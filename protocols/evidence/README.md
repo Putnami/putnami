@@ -32,6 +32,8 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 | `dependencyChanges` | The lockfile difference: ecosystem, lockfile, package, `added`, `removed`, `upgraded`, `downgraded` or `changed`, from and to versions. From a software bill of materials (SBOM), a `before` and an `after` state: the package's licences and known vulnerabilities, each an id and a severity (`critical`, `high`, `medium`, `low`, `info`, `none`, `unknown`). |
 | `sbom` | The SBOMs the states were read from: a `head` and a `base` document, each with its `format` (`cyclonedx` or `spdx`) and `specVersion`. Absent when the producer read none. Without a `base`, every base state is unknown. |
 | `decisions` | The decision records the change concerns: each record's `path`, `title`, `status` (`proposed`, `accepted`, `rejected`, `deprecated`, `superseded`, `unknown`), `date`, the path patterns of its `scope`, the changed files it `governs`, and its own file status as `change` when the change adds, modifies, renames or deletes it. Absent when the producer found none. See `doc/adr/0002-the-decision-records-a-change-concerns.md`. |
+| `declarations` | The declaration files the change adds, modifies, renames or deletes in a Putnami workspace: specs, `specs.baseline.json`, `putnami.features.json`, `adr/*.md`, `decisions.json`, `putnami.architecture.json`, `putnami.ci.json` and `CODEOWNERS`. Each carries its `path`, its `status` as the changed file has it, its `previousPath` when renamed, and its whole text `before` and `after` the change (no `before` when added, no `after` when deleted). Absent when the change touches none. |
+| `specVerification` | The spec verification record the workspace's own test run wrote, carried whole as one JSON object. Absent when the producer read none. |
 | `diagnostics` | The producer's own findings (a missing report, an unresolved base). They never make the document invalid. |
 
 ## Rules
@@ -70,8 +72,14 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   diagnostics, 50 failing cases per tests entry, 1000 architecture rules, 50
   violations per rule, 200 uncovered line numbers per file, 20 licences and
   200 vulnerabilities per dependency state, 1000 decisions with at most 100
-  scope patterns and 1000 governed files each, and 4096 bytes per string
-  (`evidence.too_large`).
+  scope patterns and 1000 governed files each, 1024 declarations of at most
+  256 KiB per document, a spec verification record of at most 512 KiB, and
+  4096 bytes per other string (`evidence.too_large`).
+- **Declarations follow the diff.** A declaration names a declaration file
+  the change touches, with the same status; a renamed one names its previous
+  path, an added one has no `before` and a deleted one no `after`
+  (`evidence.invalid_declaration`). The spec verification record is one JSON
+  object (`evidence.invalid_spec_verification`).
 - **Open where stacks grow.** Ecosystems are slugs: a new stack needs no
   protocol change. A new code host, CI system or component source is a
   protocol change: it extends a closed vocabulary of version 1, a reader built
@@ -79,7 +87,8 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   `evidence.invalid_ci`, `evidence.invalid_component`), so a reader updates
   before its producers write it.
 - **Optional members stay optional.** The `sbom` member, the dependency
-  states, the `decisions` member and the `architecture` member are optional
+  states, the `decisions`, `architecture`, `declarations` and
+  `specVerification` members are optional
   members of version 1
   (`doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md`):
   a document without them validates as before, and a producer that read no

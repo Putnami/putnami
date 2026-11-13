@@ -18,6 +18,8 @@
 package evidence
 
 import (
+	"encoding/json"
+	"path"
 	"strings"
 
 	"go.putnami.dev/protocol/codehost"
@@ -228,6 +230,12 @@ const (
 	MaxFailingCases            = 50
 	MaxUncoveredLines          = 200
 	MaxDecisions               = 1000
+	// MaxDeclarations caps the declaration files; MaxDeclarationBytes caps
+	// one declaration document, which no other string bound applies to.
+	MaxDeclarations     = 1024
+	MaxDeclarationBytes = 256 * 1024
+	// MaxSpecVerificationBytes caps the spec verification record.
+	MaxSpecVerificationBytes = 512 * 1024
 	// MaxDecisionScope and MaxGovernedFiles cap one decision.
 	MaxDecisionScope = 100
 	MaxGovernedFiles = 1000
@@ -283,6 +291,16 @@ type Document struct {
 	// scope matches a changed file and those the change adds, modifies,
 	// renames or deletes. Absent when the producer found none.
 	Decisions []Decision `json:"decisions,omitempty"`
+	// Declarations are the declaration files the change touches, each with
+	// its document at the base and at the head. Absent when the repository
+	// declares nothing or the change touches no declaration.
+	Declarations []Declaration `json:"declarations,omitempty"`
+	// SpecVerification is the spec verification record of the repository's
+	// own workspace: the features protocol's record the Putnami engine writes
+	// when it verifies the specs. The document carries it as the engine wrote
+	// it. Absent when the repository holds no Putnami workspace or its CI
+	// verified no spec before the producer ran.
+	SpecVerification json.RawMessage `json:"specVerification,omitempty"`
 	// Diagnostics are the producer's findings: a missing or malformed report, an
 	// unresolved base. They never make the document invalid.
 	Diagnostics []diag.Diagnostic `json:"diagnostics,omitempty"`
@@ -546,4 +564,44 @@ type Decision struct {
 	// Change is the record's own file status when the change adds, modifies,
 	// renames or deletes it.
 	Change string `json:"change,omitempty"`
+}
+
+// Declaration is one declaration file the change touches. A declaration is a
+// committed file that states what the repository promises or how it is
+// checked (see IsDeclaration). A reader judges from its two documents whether
+// the change weakens it.
+type Declaration struct {
+	// Path is the file at the commit, or its last path when deleted.
+	Path string `json:"path"`
+	// Status is the file's status in the diff: added, modified, deleted or
+	// renamed.
+	Status string `json:"status"`
+	// PreviousPath is the path at the base of a renamed file.
+	PreviousPath string `json:"previousPath,omitempty"`
+	// Before is the document at the base, at PreviousPath for a renamed file.
+	// Absent for an added file and for a document over MaxDeclarationBytes.
+	Before *string `json:"before,omitempty"`
+	// After is the document at the commit. Absent for a deleted file and for
+	// a document over MaxDeclarationBytes.
+	After *string `json:"after,omitempty"`
+}
+
+// IsDeclaration reports whether a repository path is a declaration: a spec
+// (a JSON file in a specs directory), a specs baseline, a feature binding, an
+// architecture manifest, a decisions file, a decision record (a Markdown file
+// in an adr directory), a CI configuration or a CODEOWNERS file.
+// putnami.workspace.json is not one: it configures the tooling.
+func IsDeclaration(file string) bool {
+	name := path.Base(file)
+	parent := path.Base(path.Dir(file))
+	switch {
+	case name == "specs.baseline.json", name == "putnami.features.json", name == "decisions.json",
+		name == "putnami.architecture.json", name == "putnami.ci.json", name == "CODEOWNERS":
+		return true
+	case parent == "specs" && strings.HasSuffix(name, ".json"):
+		return true
+	case parent == "adr" && strings.HasSuffix(name, ".md"):
+		return true
+	}
+	return false
 }
