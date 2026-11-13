@@ -59,13 +59,20 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-// edit rewrites a source of the project with new content.
+// edit replaces a source of the project with new content in one step: it
+// writes the content beside the source and renames it over the source, so a
+// watch reads either the previous file or the new one, never a truncated one.
 func edit(t *testing.T, project, content string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Join(project, "src"), 0o755); err != nil {
+	source := filepath.Join(project, "src", "main.ts")
+	if err := os.MkdirAll(filepath.Dir(source), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(project, "src", "main.ts"), []byte(content), 0o644); err != nil {
+	next := source + ".next"
+	if err := os.WriteFile(next, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(next, source); err != nil {
 		t.Fatal(err)
 	}
 }
