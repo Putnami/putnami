@@ -175,7 +175,7 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 		}
 	}
 	if !buildCacheEnabled(root) {
-		result.Warnings = append(result.Warnings, fmt.Sprintf("Rush's build cache is off (%s does not set buildCacheEnabled to true): each delegated task reruns the projects upstream of its own; turn the cache on to keep them cached", BuildCacheFile))
+		result.Warnings = append(result.Warnings, fmt.Sprintf("Rush's build cache is off (%s does not set buildCacheEnabled to true): each delegated build reruns the projects upstream of its own; turn the cache on to keep them cached", BuildCacheFile))
 	}
 	return result, nil
 }
@@ -390,7 +390,7 @@ func readCommands(root string) (map[string]command, error) {
 }
 
 // runsPerProject reports whether a command kind runs on each selected
-// project, so rush <name> --to <package> means something.
+// project, so rush <name> --only <package> or --to <package> means something.
 func runsPerProject(kind string) bool {
 	return kind == "bulk" || kind == "phased"
 }

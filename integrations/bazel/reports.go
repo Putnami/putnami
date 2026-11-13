@@ -17,7 +17,8 @@ import (
 )
 
 // CollectReportsCommand is the runtime command the test task's report step
-// runs: {runtime} collect-reports --events <file> --root <dir> --into <dir>.
+// runs: {runtime} collect-reports --events <file> --root <dir>
+// [--package <dir>] --into <dir>.
 const CollectReportsCommand = "collect-reports"
 
 // Report file names: the JUnit log and the LCOV coverage of a test run, as
@@ -40,11 +41,15 @@ var testOutputs = map[string]string{
 // under bazel-testlogs. A run whose event names a local file is copied from
 // it; any other run is read from <root>/bazel-testlogs/<package>/<target>.
 // A coverage file that is no LCOV tracefile, such as the raw LLVM profile a
-// C++ test can leave, is skipped with a warning on stderr. Bazel's own
-// outputs are only read, never removed: a removed output would make Bazel
-// rerun a cached test. A missing build-event file, as when bazel stopped
-// before it wrote one, collects nothing and is no error: the task's reports
-// are missing then, and the step already failed.
+// C++ test can leave, is skipped with a warning on stderr. With --package,
+// a coverage copy keeps the records of the sources under that package
+// directory alone: the test steps instrument every source of the main
+// repository, so a test's coverage also holds the packages it depends on,
+// which are projects of their own. Bazel's own outputs are only read, never
+// removed: a removed output would make Bazel rerun a cached test. A missing
+// build-event file, as when bazel stopped before it wrote one, collects
+// nothing and is no error: the task's reports are missing then, and the step
+// already failed.
 func CollectReports(args []string, _, stderr io.Writer) error {
 	if stderr == nil {
 		stderr = io.Discard
@@ -53,12 +58,13 @@ func CollectReports(args []string, _, stderr io.Writer) error {
 	fs.SetOutput(io.Discard)
 	events := fs.String("events", "", "the build-event file of the test run")
 	root := fs.String("root", "", "the Bazel workspace root")
+	pkg := fs.String("package", "", "the package whose sources the coverage keeps")
 	into := fs.String("into", "", "the directory the reports are copied to")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
 	if *events == "" || *root == "" || *into == "" || fs.NArg() != 0 {
-		return errors.New("usage: collect-reports --events <file> --root <dir> --into <dir>")
+		return errors.New("usage: collect-reports --events <file> --root <dir> [--package <dir>] --into <dir>")
 	}
 	runs, err := testRuns(*events)
 	if errors.Is(err, os.ErrNotExist) {
@@ -75,7 +81,11 @@ func CollectReports(args []string, _, stderr io.Writer) error {
 				continue
 			}
 			dst := filepath.Join(*into, filepath.FromSlash(rel))
-			if err := copyReport(src, dst); err != nil {
+			var keep func(string) bool
+			if name == coverageFile && *pkg != "" {
+				keep = underPackage(*pkg)
+			}
+			if err := copyReport(src, dst, keep); err != nil {
 				return err
 			}
 		}
@@ -242,9 +252,18 @@ func isLCOV(file string) bool {
 	return false
 }
 
+// underPackage keeps an LCOV record whose source file lies under the
+// package directory pkg, as the filter ^//<pkg>[/:] Bazel derives for one
+// package does.
+func underPackage(pkg string) func(string) bool {
+	prefix := strings.Trim(pkg, "/") + "/"
+	return func(source string) bool { return strings.HasPrefix(source, prefix) }
+}
+
 // copyReport copies one report, read-only in Bazel's output tree, to a new
-// writable file.
-func copyReport(src, dst string) error {
+// writable file; with keep, an LCOV tracefile whose records keep accepts
+// by their source file.
+func copyReport(src, dst string, keep func(string) bool) error {
 	in, err := os.Open(src) //nolint:gosec // a test output the build-event file names
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -260,9 +279,53 @@ func copyReport(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	_, werr := io.Copy(out, in)
+	var werr error
+	if keep == nil {
+		_, werr = io.Copy(out, in)
+	} else {
+		werr = filterLCOV(out, in, keep)
+	}
 	if cerr := out.Close(); werr == nil {
 		werr = cerr
 	}
 	return werr
+}
+
+// filterLCOV copies the LCOV records of in whose SF source keep accepts, each
+// from its first line to its end_of_record, to out.
+func filterLCOV(out io.Writer, in io.Reader, keep func(string) bool) error {
+	reader := bufio.NewReader(in)
+	var record strings.Builder
+	kept := true
+	flush := func() error {
+		if kept && record.Len() > 0 {
+			if _, err := io.WriteString(out, record.String()); err != nil {
+				return err
+			}
+		}
+		record.Reset()
+		kept = true
+		return nil
+	}
+	for {
+		line, err := reader.ReadString('\n')
+		if line != "" {
+			record.WriteString(line)
+			text := strings.TrimRight(line, "\r\n")
+			if source, ok := strings.CutPrefix(text, "SF:"); ok {
+				kept = keep(source)
+			}
+			if text == "end_of_record" {
+				if ferr := flush(); ferr != nil {
+					return ferr
+				}
+			}
+		}
+		if errors.Is(err, io.EOF) {
+			return flush()
+		}
+		if err != nil {
+			return err
+		}
+	}
 }

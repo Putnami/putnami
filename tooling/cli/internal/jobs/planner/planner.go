@@ -171,6 +171,9 @@ func Plan(
 	resolveExternalDeps(allJobs, ws)
 	serializeWithSharedExecutions(ws, allJobs, attachSharedExecutions(ws, allJobs, commandParams))
 
+	if err := validateCyclicComponents(allJobs, ws); err != nil {
+		return nil, err
+	}
 	if err := ValidatePlanDAG(allJobs); err != nil {
 		return nil, err
 	}

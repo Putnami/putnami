@@ -84,8 +84,15 @@ rules of the package, not those of the packages under it.
 
 | Task | Command |
 |---|---|
-| `test` | `bazel test --build_event_json_file=<output>/build-events.json //<package>:all` |
-| `build` | `bazel build //<package>:all` |
+| `test` | `bazel test --instrumentation_filter=^// --build_event_json_file=<output>/build-events.json //<package>:all` |
+| `build` | `bazel build --instrumentation_filter=^// //<package>:all` |
+
+Every command passes the same `--instrumentation_filter`. Bazel discards its
+analysis cache when a command's build options differ from the previous
+command's, and a command that collects coverage with no filter derives one
+from its target pattern, `^//<package>[/:]`, so each package would get its
+own. `^//` instruments every source of the main repository, and no external
+repository. It overrides a filter that `.bazelrc` sets.
 
 Bazel declares no lint convention, so a Bazel package has no lint task.
 
@@ -99,7 +106,9 @@ run of this one, and is not read. A failed case, a command that exits
 non-zero, or a run with no JUnit report fails the task; a test rule without
 coverage support fails nothing. A `coverage.dat` that is no LCOV tracefile,
 such as the raw LLVM profile a C++ test can leave, is skipped with a warning
-in the task's output.
+in the task's output. The copy of a `coverage.dat` keeps the records of the
+package's own sources: a package it depends on is a project of its own, with
+its own coverage.
 
 ### Coverage is opt-in
 
@@ -108,11 +117,16 @@ in the task's output.
 link. To collect coverage for every package, add to `.bazelrc`:
 
 ```
-test --collect_code_coverage
+build --collect_code_coverage
 ```
 
+A `build` line applies to `bazel build` and `bazel test` alike. A `test` line
+alone gives the two commands different options, so Bazel discards its
+analysis cache each time a run switches between a build and a test.
+
 To collect it for one package, override its test command in its
-`putnami.json`:
+`putnami.json`, with the same filter. Its test options then differ from every
+other command's, so Bazel analyzes again before and after it:
 
 ```json
 {
@@ -120,7 +134,7 @@ To collect it for one package, override its test command in its
     "@putnami/bazel": {
       "tasks": {
         "test": {
-          "steps": [["bazel", "coverage", "--build_event_json_file={output}/build-events.json", "//{component}:all"]]
+          "steps": [["bazel", "coverage", "--instrumentation_filter=^//", "--build_event_json_file={output}/build-events.json", "//{component}:all"]]
         }
       }
     }

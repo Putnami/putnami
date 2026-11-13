@@ -6,7 +6,7 @@ project, in one of two modes:
 | Mode | Who runs the tasks | Who installs | Whose cache |
 |---|---|---|---|
 | `import` | Putnami, through `@putnami/typescript`, for each script it runs with the same tool; `rushx <script>` for the others | Putnami, with Bun | Putnami's |
-| `delegate` | Rush: `rush build`, `rush test` or `rush lint --to <package>` | Rush | Rush's build cache |
+| `delegate` | Rush: `rush build --to <package>`, `rush test` or `rush lint --only <package>` | Rush | Rush's build cache |
 
 ## Adopt it
 
@@ -84,16 +84,20 @@ Each task checks that the Rush banner of `rush --help` reports the
 | Command | Step |
 |---|---|
 | `putnami build` | `rush build --to <package>` |
-| `putnami test` | `rush test --to <package>` |
-| `putnami lint` | `rush lint --to <package>` |
+| `putnami test` | `rush test --only <package>` |
+| `putnami lint` | `rush lint --only <package>` |
 
 Putnami's cache is off for every task, and its result records
 `delegatedTo: rush`. Putnami selects what a change affects: a changed project
 and the projects that depend on it run, and a project it depends on runs no
 task of its own. `rush build --to` also builds the projects upstream of the
-one it names; Rush's build cache makes that cheap. That cache is opt-in: when
-`common/config/rush/build-cache.json` does not set `buildCacheEnabled` to
-`true`, the sync warns that each delegated task reruns its upstream projects.
+one it names, because a build needs their outputs; Rush's build cache makes
+that cheap. That cache is opt-in: when `common/config/rush/build-cache.json`
+does not set `buildCacheEnabled` to `true`, the sync warns that each delegated
+build reruns its upstream projects. `rush test --only` and `rush lint --only`
+run on the named project alone, against the upstream outputs already on disk:
+a lint or a test of one project never lints or tests the projects it depends
+on.
 
 `putnami validate` fails with `rush.sync_stale` when a project's
 `putnami.json` no longer matches `rush.json` and the project manifests, such as

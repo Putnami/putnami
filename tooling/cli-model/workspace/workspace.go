@@ -81,6 +81,10 @@ type Workspace struct {
 	// dependency edges, so it reaches every cache key that observes project
 	// metadata — see probe_view.go for the equality that makes that safe.
 	probe probeView
+
+	// delegation answers which extensions delegate their tasks to a build
+	// tool, which decides whether a dependency cycle loads (CycleError).
+	delegation delegationView
 }
 
 // ProjectPaths returns every project's path, relative to the workspace root, in

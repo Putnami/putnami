@@ -57,8 +57,8 @@ func emitUpstreamJobs(
 				}
 				stepID := dep[1:]
 				// Emission is gated on the SAME exact identity that resolution
-				// uses.
-				for _, depName := range ws.Graph.DependenciesOf(job.Project.ID) {
+				// uses, over the same upstream projects.
+				for _, depName := range ws.Graph.UpstreamOf(job.Project.ID) {
 					if len(index.matchingKeys(depName, cmdName, stepID)) > 0 {
 						continue
 					}
@@ -1188,9 +1188,12 @@ func resolveExternalDeps(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace)
 
 			switch {
 			case strings.HasPrefix(dep, "^"):
-				// ^ = upstream dependencies
+				// ^ = upstream dependencies: the direct dependencies outside
+				// the project's own component, so the members of a cycle
+				// never wait for each other and the component waits for
+				// what any member depends on.
 				stepID := dep[1:]
-				for _, depName := range ws.Graph.DependenciesOf(job.Project.ID) {
+				for _, depName := range ws.Graph.UpstreamOf(job.Project.ID) {
 					resolved = append(resolved, idx.matchingKeys(depName, cmdName, stepID)...)
 				}
 
@@ -1289,10 +1292,14 @@ func orderDependentReaders(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspac
 		return false
 	}
 	// dependentsOf returns, sorted, every project that depends on projectID
-	// through declared dependency edges, directly or transitively, without
-	// projectID itself.
+	// through declared dependency edges, directly or transitively, outside
+	// projectID's own component: the members of a cycle are ordered by the
+	// build tool that runs them, not by each other.
 	dependentsOf := func(projectID string) []string {
 		seen := map[string]bool{projectID: true}
+		for _, member := range graph.ComponentOf(projectID) {
+			seen[member] = true
+		}
 		queue := append([]string(nil), graph.ImpactDependentsOf(projectID)...)
 		var dependents []string
 		for len(queue) > 0 {
@@ -1403,14 +1410,14 @@ func computeCommandLeaves(jobs []*jobmodel.ScheduledJob) map[string][]string {
 }
 
 // dependencyClosureOf returns every project the project depends on, directly
-// or transitively, without the project itself, sorted: the projects a
-// `^command` dependency plans its command in.
+// or transitively, outside the project's own component, sorted: the projects a
+// `^command` dependency plans its command in. A member of a cycle reaches its
+// whole component, and waiting for it would close a cycle of jobs.
 func dependencyClosureOf(ws *workspace.Workspace, projectID string) []string {
 	if ws == nil || ws.Graph == nil {
 		return nil
 	}
-	closure := ws.Graph.TransitiveDependenciesOf(ws.Graph.DependenciesOf(projectID))
-	return slices.DeleteFunc(closure, func(id string) bool { return id == projectID })
+	return ws.Graph.TransitiveDependenciesOf(ws.Graph.UpstreamOf(projectID))
 }
 
 // resolveCommandDeps wires command-level dependsOn into job-level deps.
@@ -1607,4 +1614,50 @@ func (idx *plannedIndex) matchingKeys(projectID, cmdName, stepID string) []strin
 		}
 	}
 	return jobmodel.DedupeSorted(keys)
+}
+
+// validateCyclicComponents refuses a plan that runs, in a project of a
+// dependency cycle, a task no build tool orders.
+//
+// The workspace loads a cycle whose projects name only delegating extensions
+// (Workspace.CycleError), and the planner orders a cycle's projects as one
+// component: no member waits for another. That is sound only when a build tool
+// runs every task of every member and orders their targets itself. A task can
+// still reach such a project from an extension the project does not name,
+// through activation files; the plan holds it, so the plan is where it is
+// refused.
+func validateCyclicComponents(jobs []*jobmodel.ScheduledJob, ws *workspace.Workspace) error {
+	if ws == nil || ws.Graph == nil {
+		return nil
+	}
+	cyclic := ws.Graph.CyclicComponents()
+	if len(cyclic) == 0 {
+		return nil
+	}
+	componentOf := make(map[string]int)
+	for i, members := range cyclic {
+		for _, id := range members {
+			componentOf[id] = i
+		}
+	}
+	for _, job := range jobs {
+		if job.Project == nil || job.JobDef == nil {
+			continue
+		}
+		i, inCycle := componentOf[job.Project.ID]
+		if !inCycle || delegatesTasks(job) {
+			continue
+		}
+		return fmt.Errorf("dependency cycle among %s: %s runs %s of %s, a task Putnami orders; "+
+			"only tasks of an extension that declares workspace.buildGraphEdges may run in a cycle, "+
+			"since its build tool orders the targets",
+			strings.Join(cyclic[i], ", "), job.Project.ID, job.PlanName(), job.JobDef.ExtensionName)
+	}
+	return nil
+}
+
+// delegatesTasks reports whether a job's extension hands its tasks to a build
+// tool that states and orders the edges between its own targets.
+func delegatesTasks(job *jobmodel.ScheduledJob) bool {
+	return job.Extension != nil && job.Extension.Workspace != nil && job.Extension.Workspace.BuildGraphEdges
 }

@@ -225,8 +225,8 @@ After a change to `pricing`, Putnami runs `pricing` and the packages that
 depend on it, `api` here, each with one command at the root:
 
 ```text
-bazel coverage --build_event_json_file=<output>/build-events.json //pricing:all
-bazel coverage --build_event_json_file=<output>/build-events.json //api:all
+bazel test --instrumentation_filter=^// --build_event_json_file=<output>/build-events.json //pricing:all
+bazel test --instrumentation_filter=^// --build_event_json_file=<output>/build-events.json //api:all
 ```
 
 A change to `api` alone runs `api` alone: Putnami never runs Bazel on the
@@ -238,8 +238,9 @@ build-event file lists into its own output, and reads them into its test and
 coverage summary. It never removes a Bazel output, so a test Bazel has cached
 returns as fast as Bazel does. Its result records `delegatedTo: bazel`, and
 Putnami stores no cache entry for it. `putnami build` runs `bazel build` the
-same way. Bazel declares no lint convention, so a Bazel package has no lint
-task.
+same way. Every command passes the same `--instrumentation_filter`, so Bazel
+keeps its analysis cache from one command to the next. Bazel declares no lint
+convention, so a Bazel package has no lint task.
 
 `putnami validate` fails with `bazel.sync_stale` when the edges no longer
 match Bazel: run `putnami projects sync` and commit the result.
@@ -826,11 +827,12 @@ A project it depends on runs no task of its own. Each result records
 `delegatedTo: rush`, and Putnami stores no cache entry. `rush build --to`
 also builds the projects upstream of the one it names, so turn Rush's build
 cache on in `common/config/rush/build-cache.json`: without it, the sync warns
-that each task reruns them.
+that each build reruns them.
 
-`putnami test` and `putnami lint` run `rush test` and `rush lint --to
+`putnami test` and `putnami lint` run `rush test` and `rush lint --only
 <package>` when `command-line.json` declares a bulk or phased command of that
-name; otherwise the sync disables them. Rush has no report convention, so the
+name; otherwise the sync disables them. `--only` runs on that project alone:
+a lint or a test never reaches the projects it depends on. Rush has no report convention, so the
 test task reads the JUnit and coverage files a project names under
 `options["@putnami/rush"].tasks.test.reports` of its `putnami.json`; without
 them its result is the exit code, and the sync names those projects.
