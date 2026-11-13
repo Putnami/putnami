@@ -445,6 +445,11 @@ func joinRel(dir, name string) string {
 // ProjectConfigFile is the project file a project's overrides live in.
 const ProjectConfigFile = "putnami.json"
 
+// GeneratedDir is the directory of a project that a Putnami run writes: the
+// generated output and the build stamp .gen/version.json. A delegated
+// selector leaves it out at any depth.
+const GeneratedDir = ".gen"
+
 // ProjectOverride reads the override of a project from its own putnami.json:
 // options[<extension>]. A project without the file or the block has none.
 func (s Stack) ProjectOverride(projectAbs string) (json.RawMessage, error) {
@@ -632,9 +637,17 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 			skipped = append(skipped, dir)
 		}
 	}
+	// A delegated tool's task reads none of the files Putnami writes in the
+	// project, so its walk skips .gen as it skips .git and .putnami: the
+	// stamp a finished task writes there would move the basis, and its
+	// temporary file could be listed and gone before it is read.
+	walkExcludes := p.Excludes
+	if p.Delegated {
+		walkExcludes = appendNew(slices.Clone(p.Excludes), GeneratedDir)
+	}
 	var files []string
 	for _, pattern := range patterns {
-		matches, err := globFilesSkipping(projectAbs, pattern, p.Excludes, skipped)
+		matches, err := globFilesSkipping(projectAbs, pattern, walkExcludes, skipped)
 		if err != nil {
 			return fail("%v", err)
 		}
@@ -654,12 +667,19 @@ func (s Stack) answer(root string, q wsproto.InputResolveQuery, c found) wsproto
 	// excluded directory, such as the report a run writes, does not move its
 	// digest; the files no exclusion leaves out then have a set of their own.
 	// The answer lists only what its basis selects.
-	basis := [][]string{slices.Clone(basisSet(patterns, p.Excludes))}
+	basis := [][]string{slices.Clone(basisSet(patterns, walkExcludes))}
 	if len(excludes) > 0 {
 		for _, e := range excludes {
 			basis[0] = append(basis[0], "!"+e)
 		}
-		basis = append(basis, kept)
+		basis = append(basis, slices.Clone(kept))
+	}
+	// Each set of a delegated answer leaves .gen out, even under a pattern
+	// that names it, so the answer lists no file there.
+	if p.Delegated {
+		for i := range basis {
+			basis[i] = appendNew(basis[i], "!**/"+GeneratedDir+"/**")
+		}
 	}
 	files = slices.DeleteFunc(files, func(f string) bool {
 		return !slices.ContainsFunc(basis, func(set []string) bool { return wsproto.SelectsPath(f, set) })

@@ -151,6 +151,57 @@ func TestASelectorNamesAnInputSetAndLeavesOutADirectory(t *testing.T) {
 	}
 }
 
+func TestADelegatedSelectorLeavesOutTheGeneratedDirectory(t *testing.T) {
+	root := t.TempDir()
+	for _, f := range []string{"package.json", "src/main.ts", "target/out.js", ".gen/version.json", ".gen/client.ts", "packages/ui/.gen/version.json"} {
+		writeFile(t, root, "apps/web/"+f, "x")
+	}
+	s := testStack(t)
+	s.Profile.Delegated = true
+	// The moon profile's sources: everything, no exclusion. A set may also
+	// name a file under .gen, and exclude a build directory.
+	s.Profile.Inputs["all"] = []string{"**", ".gen/client.ts"}
+	s.Profile.Inputs["package"] = []string{"**/*", "!target/**"}
+	s.SelectorSets = []string{"all", "package"}
+	project := filepath.Join(root, "apps/web")
+	for _, selector := range []string{"rust:all", "rust:package"} {
+		got := resolveOne(t, s, root, "apps/web", selector)
+		if got.Error != "" {
+			t.Fatal(got.Error)
+		}
+		if !slices.Contains(got.Files, "src/main.ts") {
+			t.Errorf("%s: files %v miss src/main.ts", selector, got.Files)
+		}
+		for _, f := range got.Files {
+			if strings.HasPrefix(f, ".gen/") || strings.Contains(f, "/.gen/") {
+				t.Errorf("%s lists %s, under the directory Putnami writes", selector, f)
+			}
+		}
+		// The stamp a finished task writes, and its temporary file, move no
+		// digest.
+		before, err := wsproto.InputBasisDigest(project, got.Basis)
+		if err != nil {
+			t.Fatal(err)
+		}
+		writeFile(t, root, "apps/web/.gen/version.json", `{"buildTime": "later"}`)
+		writeFile(t, root, "apps/web/.gen/.version.json-1.tmp", "{}")
+		writeFile(t, root, "apps/web/.gen/client.ts", "changed")
+		writeFile(t, root, "apps/web/packages/ui/.gen/version.json", "{}")
+		if after, err := wsproto.InputBasisDigest(project, got.Basis); err != nil || after != before {
+			t.Errorf("%s: a write under .gen moved the digest (%v)", selector, err)
+		}
+		writeFile(t, root, "apps/web/src/main.ts", selector)
+		if after, _ := wsproto.InputBasisDigest(project, got.Basis); after == before {
+			t.Errorf("%s: a source change moves the digest", selector)
+		}
+	}
+	// A stack Putnami runs keeps .gen: a generated client is an input.
+	s.Profile.Delegated = false
+	if got := resolveOne(t, s, root, "apps/web", "rust:all"); !slices.Contains(got.Files, ".gen/client.ts") {
+		t.Errorf("a language stack's selector misses its generated client: %v", got.Files)
+	}
+}
+
 func TestResolveInputsAnswersTheProfileFiles(t *testing.T) {
 	root := t.TempDir()
 	writeFile(t, root, "Cargo.lock", "")

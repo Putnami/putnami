@@ -324,11 +324,17 @@ the crate. A walk does not enter a directory an exclusion of the form
 `!<dir>/**` leaves out, so the build directory is never read.
 
 A selector answers files under the project only, never under a `.git` or
-`.putnami` directory. The stack-root files
-(`{root}/…`, and the toolchain files at the root) reach the key through a
-second, static input of each task, `from: "workspace"`, which lists the
-shipped profile's stack-root patterns of that task; the conformance kit holds
-the two equal. So an override may narrow the stack-root inputs but not add
+`.putnami` directory. A delegated stack's selector also leaves out every
+`.gen` directory, at any depth and whatever its patterns name: a delegated
+task feeds no Putnami cache and `.gen` is never an impact seed, so a file
+there is state the run writes, and the build stamp a finished task writes in
+`.gen/version.json` would otherwise move the selector's basis
+([ADR 0008](adr/0008-a-delegated-stack-keeps-its-tool-cache.md)). A language
+stack keeps `.gen`, since a generated client there is an input. The
+stack-root files (`{root}/…`, and the toolchain files at the root) reach the
+key through a second, static input of each task, `from: "workspace"`, which
+lists the shipped profile's stack-root patterns of that task; the conformance
+kit holds the two equal. So an override may narrow the stack-root inputs but not add
 one.
 
 ### A nested stack root is an input-only project

@@ -8,12 +8,15 @@ package stackstest
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"reflect"
 	"slices"
 	"strings"
 	"testing"
 
+	diag "go.putnami.dev/protocol/diagnostic"
 	proto "go.putnami.dev/protocol/extension"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/stacks"
 )
 
@@ -88,6 +91,61 @@ func CheckManifest(t testing.TB, path string, s stacks.Stack) {
 			continue
 		}
 		checkTask(t, doc, s, task)
+	}
+	if s.Profile.Delegated {
+		checkGeneratedLeftOut(t, s)
+	}
+}
+
+// checkGeneratedLeftOut resolves each selector of a delegated stack on a
+// project where Putnami wrote its build stamp, the stamp's temporary file and
+// a nested stamp: no answer lists a file under .gen, and rewriting the stamp
+// moves no basis digest.
+func checkGeneratedLeftOut(t testing.TB, s stacks.Stack) {
+	t.Helper()
+	root := t.TempDir()
+	project := filepath.Join(root, "apps", "web")
+	for _, f := range s.Profile.Markers {
+		WriteFile(t, project, f, "{}")
+	}
+	WriteFile(t, project, "src/main.txt", "x")
+	WriteFile(t, project, stacks.GeneratedDir+"/version.json", "{}")
+	WriteFile(t, project, stacks.GeneratedDir+"/.version.json-1.tmp", "{}")
+	WriteFile(t, project, "packages/ui/"+stacks.GeneratedDir+"/version.json", "{}")
+	// The fixture's project is no component the tool knows: the profile
+	// answers it as is, with no tool to run.
+	s.Detect = func(string, wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) { return nil, nil }
+	var queries []wsproto.InputResolveQuery
+	for _, selector := range s.Selectors() {
+		queries = append(queries, wsproto.InputResolveQuery{Project: "apps/web", Selector: selector})
+	}
+	result := s.ResolveInputs(root, wsproto.InputResolveRequest{Version: wsproto.InputResolveProtocolVersion, Extension: s.Extension, Inputs: queries})
+	var before []string
+	for _, answer := range result.Inputs {
+		if answer.Error != "" {
+			t.Errorf("selector %s: %s", answer.Selector, answer.Error)
+			continue
+		}
+		for _, f := range answer.Files {
+			if strings.HasPrefix(f, stacks.GeneratedDir+"/") || strings.Contains(f, "/"+stacks.GeneratedDir+"/") {
+				t.Errorf("selector %s lists %s, under the directory Putnami writes", answer.Selector, f)
+			}
+		}
+		digest, err := wsproto.InputBasisDigest(project, answer.Basis)
+		if err != nil {
+			t.Fatalf("selector %s: %v", answer.Selector, err)
+		}
+		before = append(before, digest)
+	}
+	WriteFile(t, project, stacks.GeneratedDir+"/version.json", `{"buildTime": "later"}`)
+	WriteFile(t, project, stacks.GeneratedDir+"/.version.json-2.tmp", "{}")
+	for i, answer := range result.Inputs {
+		if answer.Error != "" {
+			continue
+		}
+		if after, err := wsproto.InputBasisDigest(project, answer.Basis); err != nil || after != before[i] {
+			t.Errorf("selector %s: a stamp write moved the basis digest (%v)", answer.Selector, err)
+		}
 	}
 }
 

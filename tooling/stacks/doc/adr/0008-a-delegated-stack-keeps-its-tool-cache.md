@@ -88,3 +88,12 @@ package's `putnami.json` with the edges of the `pants peek ::` export.
 - Rush keeps its build cache the same way when a workspace adopts it in
   delegate mode. Its cache is opt-in: without it, each delegated task reruns
   the projects upstream of its own, so the Rush sync warns.
+- A delegated selector leaves out every `.gen` directory, at any depth and
+  whatever its patterns name, in the stack core rather than in each profile.
+  The scheduler writes the build stamp `.gen/version.json` after each task of
+  a project; a delegated task feeds no Putnami cache and `.gen` is never an
+  impact seed, so a file there is state the run writes, not an input.
+  Listing it moved the selector's basis at each stamp write and let the
+  stamp's temporary file vanish between the list and the read. A language
+  stack keeps `.gen`: its cache is on, and a generated client there, such as
+  the one `rust:package` packages, is an input.
