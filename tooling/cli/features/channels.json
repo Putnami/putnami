@@ -8,7 +8,7 @@
     "name": "Distribution channels",
     "outcome": "A user moves the CLI, the extensions, and the framework dependencies onto a distribution channel through the registries the workspace declares, with the credential that channel needs",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "archives-follow-the-put-projection",

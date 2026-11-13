@@ -717,7 +717,7 @@ Where it surfaces:
   `--debug` (and `--trace-profile`) also print the critical path and ready wait.
 - **Session metadata** — `session.json` includes a machine-readable `scheduler`
   object, and `events.jsonl` records a `scheduler:parallel` event at run start.
-  Inspect with `putnami sessions show --output=jsonl`.
+  Inspect with `putnami sessions inspect --output=jsonl`.
 
 ### Failure Handling
 

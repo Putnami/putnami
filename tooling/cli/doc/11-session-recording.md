@@ -43,7 +43,7 @@ The timestamp prefix enables chronological sorting. The random suffix prevents c
 ([`protocols/cli/doc/02-result-v2.md`](../../../protocols/cli/doc/02-result-v2.md)):
 both carry `protocolVersion: 2`, and a recorded document WITHOUT the member is
 version 1, written by a CLI build published before the v1 writers were removed.
-`putnami sessions show` reads **both** versions, so a
+`putnami sessions inspect` reads **both** versions, so a
 workspace that upgraded across the flip keeps opening the sessions already on
 disk. Only the writer is v2-only.
 

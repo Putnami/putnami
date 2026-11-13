@@ -4,7 +4,7 @@
 - **Scope**: `@putnami/cli` (`internal/hostrpc`, `internal/cli`,
   `internal/jobs`), `go.putnami.dev/protocol/extension` (`hostrpc`) and
   `go.putnami.dev/sdk/extension` (`hostrpc`, `scratch`)
-- **Decisions**: D-014 of the root `decisions.json`
+- **Decisions**: D-014 of the root `decisions/` registry
 
 ## Context
 

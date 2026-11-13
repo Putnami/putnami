@@ -1,6 +1,6 @@
 # ADR 0072 — The spec gate and task scopes follow declared outputs and command kinds
 
-- **Status**: proposed
+- **Status**: accepted
 - **Scope**: `@putnami/cli-model` (`jobs`) and `@putnami/cli`
   (`internal/specgate`, `internal/engine`, `internal/jobs/cachekey`,
   `internal/workspace_state`, `internal/output`)
@@ -10,7 +10,7 @@
   [ADR 0070](0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md),
   decision 2 ("`validate` and `validate-workspace` stay never narrowed by
   name"). The rest of both holds.
-- **Decisions**: D-006 and D-021 of the root `decisions.json`
+- **Decisions**: D-006 and D-021 of the root `decisions/` registry
 - **Amended**: 2026-10-23, §6, the first consequence and the
   `impact_scope_test.go` proof: a kept criteria job keeps the jobs it depends
   on and no verification job the scope does not name.

@@ -41,7 +41,7 @@
     {
       "id": "root-declarations-stay-out",
       "text": [
-        "A template's top-level entry stays out of what it ships and of what a render creates when its name starts with a dot or is node_modules, putnami.json, putnami.features.json, features, specs or specs.baseline.json.",
+        "A template's top-level entry stays out of what it ships and of what a render creates when its name starts with a dot or is node_modules, putnami.json, putnami.features.json, features, specs, specs.baseline.json or putnami.verdict-policy.json.",
         "Every other entry, and those names below the root, are template content."
       ]
     }

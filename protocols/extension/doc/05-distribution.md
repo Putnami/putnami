@@ -4,10 +4,11 @@ Extensions can be distributed as standalone packages, installed into workspaces,
 
 ## Packaging
 
-Package an extension for distribution:
+An extension is a workspace project, and its language extension packages it
+for distribution:
 
 ```bash
-putnami extensions package [path]
+putnami package <project>
 ```
 
 This creates a distributable archive containing:

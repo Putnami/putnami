@@ -9,7 +9,7 @@
       "name": "Extension authoring SDK",
       "outcome": "Someone writing a Putnami extension gets the orchestrator-facing halves \u2014 the event stream, the job context, the manifest with its validated task declarations, subprocess execution, and the shared lifecycle primitives \u2014 as a library, so the extension only has to supply what its own ecosystem knows",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "release-plan-compatibility",

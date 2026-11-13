@@ -1,7 +1,7 @@
-# ADR 0066 — A main publication releases what its pull request published
+# ADR 0094 — A main publication releases what its pull request published
 
 - **Status**: accepted
-- **Scope**: `@putnami/cli` (`tooling/cli/internal/jobs/release_set.go`,
+- **Scope**: `@putnami/cli` (`tooling/cli/internal/jobs/publication/release_set.go`,
   `tooling/cli/internal/engine`, `tooling/cli/internal/cli`,
   `tooling/cli/internal/machine`)
 - **Amends**: [ADR 0017](0017-one-release-set-plan-against-the-channel-head.md),

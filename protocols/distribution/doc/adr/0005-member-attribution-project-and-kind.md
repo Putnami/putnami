@@ -88,7 +88,7 @@ Rules:
    release-set bytes`. Turn an opt-in on only after every reader of the
    affected channels carries the field: the extensions the workspace pins, the
    release-set provider extension and its backend, every CLI that resolves
-   those channels (publishing from any branch, `putnami channel`,
+   those channels (publishing from any branch, `putnami cloud channels`,
    `putnami upgrade --release` in consumer workspaces), and the extensions
    those consumer workspaces pin that read a resolved head. The CLI cannot
    observe the backend. Once a head carries a field, every later plan inherits

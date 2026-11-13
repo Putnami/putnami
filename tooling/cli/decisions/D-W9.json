@@ -5,5 +5,6 @@
   "statement": "on Windows, process trees run in a Job Object with KILL_ON_JOB_CLOSE; graceful stop sends CTRL_BREAK_EVENT, then terminates the job after the grace period",
   "settled": "2026-09-26",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md",
   "reviewOnly": true
 }

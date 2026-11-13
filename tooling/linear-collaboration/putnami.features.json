@@ -9,7 +9,7 @@
       "name": "Linear collaboration provider",
       "outcome": "A workspace binds its tasks to one Linear team and calls the tasks contract without knowing Linear's workflow states, labels or identifiers, while a lost answer never duplicates an issue and the API key never leaves the provider",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "workflow-state-mapping",

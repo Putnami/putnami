@@ -1,6 +1,8 @@
-# ADR 0055 — Repository rules live in `.agents/constraints.md`, and Putnami writes no `.AI/` directory
+# ADR 0092 — Repository rules live in `.agents/constraints.md`, and Putnami writes no `.AI/` directory
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0082](0082-putnami-serves-no-mcp-server.md): Putnami writes no
+  `.mcp.json`, and the MCP contract baseline of decision 4 is deleted
 - **Scope**: `@putnami/cli` (`internal/commands/agentctx`, `internal/mapgen`,
   `internal/engine`, the `mcp` command), public onboarding docs
 

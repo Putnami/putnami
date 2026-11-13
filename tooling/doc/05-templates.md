@@ -81,8 +81,8 @@ Files that describe the template as a project *in the workspace it lives in* are
 never staged into the archive, and `putnami projects create` skips them when it
 renders a template straight from the workspace, so a generated project does not
 inherit them:
-`putnami.json`, `putnami.features.json`, `specs/`, `specs.baseline.json`,
-`node_modules/`, and anything whose name starts with a dot.
+`putnami.json`, `putnami.features.json`, `features/`, `specs/`,
+`specs.baseline.json`, `putnami.verdict-policy.json`, `node_modules/`, and anything whose name starts with a dot.
 
 ## Template discovery
 

@@ -21,11 +21,6 @@
     },
     "publish": {
       "npm": true
-    },
-    "sdd": {
-      "verification": {
-        "specs": "enforce"
-      }
     }
   }
 }

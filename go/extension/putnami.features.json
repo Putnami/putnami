@@ -9,7 +9,7 @@
       "name": "Go project toolchain",
       "outcome": "A Go project builds, tests, lints, serves, runs and packages through one managed toolchain that discovers Go projects itself, keeps the workspace module graph resolvable, and publishes the contracts the project's own code declares",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "archive-matrix-honesty",
@@ -1032,7 +1032,7 @@
       "name": "Go project setup",
       "outcome": "A Go project putnami projects create renders is in go.work, states the workspace's go directive, pins each framework module to a released version and is tidy, set up by the Go extension that ships the template",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "create-sets-up-a-go-project",
@@ -1118,7 +1118,7 @@
       "name": "Go dependency edits",
       "outcome": "putnami deps add, deps remove and deps prune edit a Go module's requirements through the Go extension, which resolves no version go.mod already names and tidies the module as the workspace build resolves it",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "deps-edit-reads-no-replaced-version",

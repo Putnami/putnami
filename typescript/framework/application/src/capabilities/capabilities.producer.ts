@@ -1521,6 +1521,7 @@ function buildFeatureEvidenceDocument(
     manifest.lifecycleHooks,
     manifest.packages,
     manifest.requiredCapabilities,
+    manifest.domainAccess,
   ] as Array<Array<{ identity: ContributionIdentity }> | undefined>) {
     for (const { identity } of entries ?? []) contributions.push(identity);
   }

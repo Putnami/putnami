@@ -9,7 +9,7 @@
       "name": "Go gRPC services",
       "outcome": "Go services expose gRPC and Connect endpoints with secure server defaults, ordered interceptors, and an explicit gateway boundary",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "api-bridge",

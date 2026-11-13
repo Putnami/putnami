@@ -1393,6 +1393,7 @@ func TestNormalizeManifest_DerivesCacheKey(t *testing.T) {
 // A manifest names its extension: strict validation refuses one without a
 // name, with a required-field diagnostic on the name field, and nothing else.
 func TestValidateManifest_RequiresName(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-manifest-names-itself", "a-manifest-without-a-name-fails-strict-validation")
 	data := []byte(`{
 		"commands": {"build": {"run": [{"id": "s1", "task": "t1"}]}},
 		"tasks": {"t1": {"kind": "command", "command": "go"}}

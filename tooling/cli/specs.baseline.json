@@ -168,6 +168,7 @@
     "cli/job-planning-execution#a-declared-provider-that-cannot-serve-says-so-once",
     "cli/job-planning-execution#a-flag-takes-its-ci-default-when-ci-is-set",
     "cli/job-planning-execution#a-group-default-takes-positionals",
+    "cli/job-planning-execution#a-run-records-whether-the-remote-cache-answered",
     "cli/job-planning-execution#a-serve-step-releases-its-command-output-once-it-started",
     "cli/job-planning-execution#a-short-alias-reaches-the-task-under-its-long-name",
     "cli/job-planning-execution#a-step-may-read-no-command-option-layer",

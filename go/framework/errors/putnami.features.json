@@ -9,7 +9,7 @@
       "name": "Go structured errors",
       "outcome": "Go framework code carries machine-readable error meaning across package boundaries while keeping internal details out of client responses",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "creation",

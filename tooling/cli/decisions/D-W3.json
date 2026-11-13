@@ -5,5 +5,6 @@
   "statement": "workspace hooks run through sh -c on every platform; on Windows, sh from Git for Windows is a documented prerequisite and the CLI names it when missing",
   "settled": "2026-09-26",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md",
   "reviewOnly": true
 }

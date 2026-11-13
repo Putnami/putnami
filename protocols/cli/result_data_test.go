@@ -3,10 +3,13 @@ package cli
 import (
 	"fmt"
 	"testing"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestWithResultDataKeepsTheErrorAndCarriesTheData(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/machine-contract", "a-failure-envelope-carries-its-data", "a-failure-keeps-its-class-and-carries-its-data")
 	if WithResultData(nil, "data") != nil {
 		t.Fatal("WithResultData(nil, data) is not nil")
 	}

@@ -35,6 +35,6 @@
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0056-a-publish-dry-run-asks-each-registry.md"
+    "tooling/cli/doc/adr/0093-a-publish-dry-run-asks-each-registry.md"
   ]
 }

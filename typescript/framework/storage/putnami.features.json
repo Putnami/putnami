@@ -9,7 +9,7 @@
       "name": "TypeScript object storage",
       "outcome": "A TypeScript workload reads and writes objects through declared buckets that behave identically on memory, filesystem, S3, and the remote service, and hands browsers time-bounded signed URLs instead of credentials",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "backend-lifecycle",

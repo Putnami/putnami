@@ -359,7 +359,7 @@ Unary deadlines continue through consumption; EOF, cancellation, Close and
 application stop release the body. Uploads are never replayed, including on a
 credential rejection, and streamed operations cannot use the response cache.
 These are raw HTTP bodies, without stream framing. Bounded `api.Binary` methods
-keep their existing behavior. See [ADR 0007](doc/adr/0007-unframed-binary-bodies-transfer-ownership.md).
+keep their existing behavior. See [ADR 0010](doc/adr/0010-unframed-binary-bodies-transfer-ownership.md).
 
 ## Verbatim success bodies
 

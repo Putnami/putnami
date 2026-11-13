@@ -9,7 +9,7 @@
       "name": "Go library template",
       "outcome": "A project created from the go-library template is the smallest Go library that works: an exported function and a test beside it pass go vet, go build, go test and the linters putnami lint runs as created",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "relations": [
         {
           "kind": "parent",

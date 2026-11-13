@@ -9,7 +9,7 @@
       "name": "Go platform endpoints",
       "outcome": "An operator probes liveness, readiness, build metadata, and optional profiles on the same operational surface for every Go workload",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "deferred-discovery",

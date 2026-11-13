@@ -8,7 +8,7 @@
     "name": "Publication through providers",
     "outcome": "A user who publishes, locally or on a hosted runner, gets a run whose ancestry and publish credential are fixed before any repository code runs, whose uploads and channel release go through one credential provider session, and in which neither the engine nor a repository process holds a publish credential, while a run or a bound request that only gates starts no publication",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "ancestry-is-read-before-repository-code",

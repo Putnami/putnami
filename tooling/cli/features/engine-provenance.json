@@ -8,7 +8,7 @@
     "name": "Engine provenance",
     "outcome": "A workspace states which putnami engine may run against it, and a workspace that builds its own engine refuses every binary it did not produce",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "source-workspace-declaration",

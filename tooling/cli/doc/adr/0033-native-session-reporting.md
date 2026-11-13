@@ -44,7 +44,7 @@ before it.
 
 - **The telemetry observer.** It fires for runs that record no session
   (`--dry-run`, the outer `--watch` loop) and before the session exists.
-- **The failed-task record** ([ADR 0030](0030-a-failed-task-is-cached-until-its-inputs-change.md)).
+- **The failed-task record** ([ADR 0090](0090-a-failed-task-is-cached-until-its-inputs-change.md)).
   It needs the cache key, must be forgotten synchronously on success, and
   serves results before execution, which an observation seam must never do.
 

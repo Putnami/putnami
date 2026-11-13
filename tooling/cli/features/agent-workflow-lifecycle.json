@@ -8,7 +8,7 @@
     "name": "Agent workflow lifecycle",
     "outcome": "A workspace that opts into an extension's agent content receives the files of the extension release it pinned through init, install and upgrade, and never loses a file it owns",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "optin",

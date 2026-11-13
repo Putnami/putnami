@@ -9,7 +9,7 @@
       "name": "TypeScript declarative schema",
       "outcome": "A TypeScript author declares one data shape and reuses it for configuration, request and response validation, and generated documentation, in both server and browser builds",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "required-and-default",

@@ -9,7 +9,7 @@
       "name": "Go dependency injection",
       "outcome": "Go applications resolve constructor-based or token-based dependencies with validated lifetimes and deterministic cleanup",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "cleanup",

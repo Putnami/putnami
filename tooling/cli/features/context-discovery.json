@@ -8,7 +8,7 @@
     "name": "Context discovery",
     "outcome": "A user or script can discover workspace structure and project context, and ask who owns a path and why one project impacts another, through public CLI commands that share one authority, and an extension can contribute a workspace-answering provider operation to the collaboration routing without re-deriving any of it",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "generated-context",

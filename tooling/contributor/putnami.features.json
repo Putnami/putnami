@@ -9,7 +9,7 @@
       "name": "Contributor executable",
       "outcome": "A contributor verifies a native workflow record, finalizes a squash-ready proposal and evaluates the language rule with the putnami change verify, change finalize and change language commands that the @putnami/contributor executable serves",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "provider-neutral-publication",
@@ -199,7 +199,7 @@
       "name": "Agent session hooks",
       "outcome": "A Claude Code or Codex session publishes its state, loop stage, token usage, end, plan, delivered messages, decisions and replies to its mission through the hooks @putnami/contributor declares, and receives the owner's messages and answers",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "session-start-sheet",
@@ -398,7 +398,7 @@
       "name": "Change estimate",
       "outcome": "A contributor writes a change plan in one validated format, and putnami change estimate sizes it S, M or L with a token and a duration range, the same answer for the same plan",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "plan-validation",
@@ -457,7 +457,7 @@
       "name": "Epic plan and status",
       "outcome": "An epic session checks its plan of issues, orders them in waves under one envelope, and follows each child's task, proposal and sessions from one command",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "epic-plan-validation",

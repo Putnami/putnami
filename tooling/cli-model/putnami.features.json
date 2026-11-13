@@ -9,7 +9,7 @@
       "name": "CLI workspace model",
       "outcome": "Every consumer of the CLI's workspace model sees one deterministic answer for what a target expression selects, what depends on what, and what a change reaches — from a pure library the engine cannot reach back into",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "target-expression-grammar",
@@ -154,6 +154,19 @@
               "a-dependent-that-may-run-nothing-reached-is-not-selected"
             ]
           }
+        },
+        {
+          "id": "a-checking-task-moves-no-extension-runtime",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-file-only-checking-tasks-read-selects-no-consumer"
+            ]
+          }
         }
       ]
     },
@@ -163,7 +176,7 @@
       "name": "CLI job model",
       "outcome": "Every consumer of the CLI's job model sees one deterministic answer for what traits, side effects, kind and verification outputs a job has, from a pure library the engine cannot reach back into",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "extension-verb-vocabulary",

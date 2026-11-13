@@ -9,7 +9,7 @@
       "name": "Repository areas",
       "outcome": "A repository splits into the areas an agent works in, from its own manifests and without Putnami configuration",
       "owner": "intelligence",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "area-names",

@@ -6,7 +6,7 @@
   `internal/extension`, `internal/engine`, `internal/jobs`),
   `go.putnami.dev/protocol/cli` and `go.putnami.dev/protocol/extension`
   (contract rung 8), and the Go and TypeScript packagers
-- **Decisions**: D-007 of the root `decisions.json`
+- **Decisions**: D-007 of the root `decisions/` registry
 - **Amended**: 2026-10-21, decisions 3, 8 and 13: no extension loads from
   `node_modules`, and the root `package.json` development dependencies load
   none, so the sentence on the edges of an extension loaded from

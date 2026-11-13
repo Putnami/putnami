@@ -9,7 +9,7 @@
       "name": "Experimental Python workspace integration",
       "outcome": "Experimenters can explicitly opt Python projects into Putnami workspace jobs backed by uv, Ruff, and pytest",
       "owner": "python",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "explicit-opt-in",
@@ -201,7 +201,7 @@
       "name": "Experimental Python server template",
       "outcome": "Experimenters can explicitly scaffold a minimal FastAPI service configured for the Python extension",
       "owner": "python",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "explicit-template",
@@ -251,7 +251,7 @@
       "name": "Experimental Python library template",
       "outcome": "Experimenters can explicitly scaffold an importable Python package configured for the Python extension",
       "owner": "python",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "explicit-template",

@@ -9,7 +9,7 @@
       "name": "TypeScript relational persistence",
       "outcome": "A TypeScript workload persists relational data through typed tables and repositories whose transaction boundary is the request, whose cancellation reaches the database, and whose failures are reported as classified causes that carry no secret",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "lazy-transaction",
@@ -93,7 +93,7 @@
       "name": "Shared physical pool per database with per-operation search_path",
       "outcome": "TypeScript workloads that declare several datasources on one physical database share one connection pool per database, and every unqualified query still resolves in its own datasource's schema",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "acquire-time-search-path",
@@ -170,7 +170,7 @@
       "name": "TypeScript SQL migrations",
       "outcome": "A relational schema evolves through migrations that apply in one order on every machine and in every language, that cannot half-apply, and that refuse to run when the committed SQL no longer matches what was applied",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "byte-order-apply",

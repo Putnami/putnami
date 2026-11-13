@@ -7,6 +7,7 @@ import (
 
 	archproto "go.putnami.dev/protocol/architecture"
 	protocaps "go.putnami.dev/protocol/capabilities"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // The evidence half of this workload's Domain Access & Replication Contracts.
@@ -73,6 +74,7 @@ var wantDomainAccessRows = []domainAccessRow{
 // stops emitting, and a stale committed manifest keeps claiming a component
 // that no longer runs.
 func TestCommittedEvidenceMatchesTheEnforcedContracts(t *testing.T) {
+	spectest.Proves(t, "telemetry-putnami-dev/cli-usage-receiver", "the-receiver-imports-only-what-it-declares", "the-committed-evidence-matches-the-enforced-contracts")
 	rows := committedDomainAccess(t)
 
 	got := make([]domainAccessRow, 0, len(rows))
@@ -120,6 +122,7 @@ func TestCommittedEvidenceMatchesTheEnforcedContracts(t *testing.T) {
 // contract a running process can enforce: they authorize observable dependency
 // edges and are maintained by `architecture sync` against the resolved graph.
 func TestEnforcedContractsAreTheDeclarationVerbatim(t *testing.T) {
+	spectest.Proves(t, "telemetry-putnami-dev/cli-usage-receiver", "the-receiver-imports-only-what-it-declares", "the-enforced-contracts-are-the-declaration-verbatim")
 	declared := declaredImports(t)
 
 	if len(domainAccessImports) != len(declared) {

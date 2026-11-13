@@ -8,7 +8,7 @@
     "name": "Workspace discovery and selection",
     "outcome": "A user can find the workspace and its projects, then select the exact project, scope, target, or impacted closure intended for a command",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "workspace-root",

@@ -8,7 +8,7 @@
     "name": "Workspace without git",
     "outcome": "A user builds, tests and serves a workspace in a directory Git does not manage, and every command that needs git history refuses in one line that names git and the command to run",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "no-source-claim",

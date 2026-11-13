@@ -9,7 +9,7 @@
       "name": "Putnami Cloud runtime destination for Go",
       "outcome": "A Go workload on Putnami Cloud loads its configuration and secrets from the platform's configuration service, signed with its workload identity, and falls back to local configuration or a snapshot only where the contract allows it",
       "owner": "cloud",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "cancellation",

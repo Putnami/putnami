@@ -9,7 +9,7 @@
       "name": "GitLab collaboration provider",
       "outcome": "A workspace binds its tasks to the issues of one GitLab project and its change proposals to that project's merge requests, and calls the tasks and proposals contracts without knowing GitLab's labels, states, draft prefix or identifiers, while a lost answer never duplicates an issue, a merge request or a review and a credential never leaves the provider",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "label-states",

@@ -8,6 +8,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // hostHooksFixture is a manifest stamped 17 that declares host hooks for both
@@ -44,6 +45,7 @@ var hostHooksInvalidFixtureCodes = map[string][]string{
 }
 
 func TestHostHooks_InvalidFixturesReportExactCodes(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "host-hooks-are-closed-and-bounded", "host-hook-counter-examples-report-exact-codes")
 	for name, codes := range hostHooksInvalidFixtureCodes {
 		t.Run(name, func(t *testing.T) {
 			m := loadFixtureManifest(t, filepath.Join("fixtures/invalid", name))
@@ -76,6 +78,7 @@ func TestHostHooks_ValidFixtureValidates(t *testing.T) {
 // A manifest that declares host hooks requires rung 17 from every origin, and
 // the stamped fixture loads.
 func TestHostHooks_RequireTheirContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "host-hooks-require-contract-17")
 	m := loadFixtureManifest(t, hostHooksFixture)
 	if got := RequiredLoadContract(m); got != protocolcli.HostHooksContract {
 		t.Errorf("RequiredLoadContract = %d, want %d", got, protocolcli.HostHooksContract)
@@ -96,6 +99,7 @@ func TestHostHooks_RequireTheirContract(t *testing.T) {
 // remedy that moves it. An older reader would install the extension without
 // the hooks the workspace opted into.
 func TestHostHooks_BelowTheirContractAreRefused(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "host-hooks-below-contract-17-do-not-load")
 	for _, stamp := range []int{protocolcli.AgentContentContract, protocolcli.HostHooksContract - 1} {
 		m := loadFixtureManifest(t, hostHooksFixture)
 		m.CLIContract = stamp
@@ -125,6 +129,7 @@ func TestHostHooks_InertWithoutTheMember(t *testing.T) {
 // A member the vocabulary does not name, such as a probe command, fails the
 // strict parse rather than being dropped.
 func TestHostHooks_StrictParseRefusesUnknownMembers(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "host-hooks-are-closed-and-bounded", "a-host-hook-refuses-an-unknown-member")
 	for _, body := range []string{
 		`{"name":"@x/y","hostHooks":{"requires":{"contract":"missions"},"command":["a","b"],"hosts":{},"probe":["a"]}}`,
 		`{"name":"@x/y","hostHooks":{"requires":{"contract":"missions"},"command":["a","b"],"hosts":{"codex":[{"event":"Stop","timeoutSeconds":1,"probe":true}]}}}`,
@@ -162,6 +167,7 @@ func TestHostHooks_CommandPathResolvesNestedSubcommands(t *testing.T) {
 
 // The closed lists the writer reads are the ones the validator enforces.
 func TestHostHooks_ClosedLists(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "host-hooks-are-closed-and-bounded", "host-hook-hosts-and-events-are-closed")
 	if got := HostHookHosts(); !reflect.DeepEqual(got, []string{HostClaudeCode, HostCodex}) {
 		t.Fatalf("hosts = %v", got)
 	}

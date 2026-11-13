@@ -1,15 +1,15 @@
 # ADR 0070 — A task scope keeps a job by its declared side effects
 
-- **Status**: proposed. Decision 1 is amended by
+- **Status**: accepted. Decision 1 is amended by
   [ADR 0073](0073-the-core-declares-no-development-verb.md): no reader
   counts a well-known verb's default side effect. Decision 2 is superseded by
-  [ADR 0072](0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md)
-  (proposed): a task scope never narrows a command of the criteria kind.
+  [ADR 0072](0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md):
+  a task scope never narrows a command of the criteria kind.
 - **Scope**: `@putnami/cli` (`internal/engine` plan narrowing)
 - **Supersedes in part**: [ADR 0044](0044-selection-is-task-level.md),
   decision 5, the bullet "`publish`, `deploy`, `validate` and
   `validate-workspace` are never narrowed", for `publish` and `deploy`
-- **Decisions**: D-006 of the root `decisions.json`
+- **Decisions**: D-006 of the root `decisions/` registry
 
 ## Context
 

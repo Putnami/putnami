@@ -94,7 +94,7 @@
     "tooling/cli/doc/adr/0024-lazy-workspace-initialization.md",
     "tooling/cli/doc/adr/0030-settled-decisions-are-a-registry-validate-reads.md",
     "protocols/features/doc/adr/0007-one-file-per-decision.md",
-    "tooling/cli/doc/adr/0055-repository-rules-live-in-agents-constraints.md",
+    "tooling/cli/doc/adr/0092-repository-rules-live-in-agents-constraints.md",
     "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

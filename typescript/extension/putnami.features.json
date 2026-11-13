@@ -9,7 +9,7 @@
       "name": "TypeScript project toolchain",
       "outcome": "A TypeScript project builds, tests and lints on Bun and Biome through independently cached phases, serves, runs and packages its workload on Bun or on Node, installs its workspace dependencies with the package manager the repository declares, from one shared version catalog where that manager reads one, and ships an npm or Docker artifact that loads exactly as it did in the workspace",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "phase-isolation",

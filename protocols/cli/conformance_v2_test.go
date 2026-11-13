@@ -161,6 +161,42 @@ func TestConformanceCorpus(t *testing.T) {
 	}
 }
 
+// runCorpusCases runs the document cases whose id contains fragment, each
+// against its exact violation set, and fails when none matches.
+func runCorpusCases(t *testing.T, fragment string) {
+	t.Helper()
+	ran := 0
+	for _, testCase := range loadConformanceManifest(t).Cases {
+		if !strings.Contains(testCase.ID, fragment) {
+			continue
+		}
+		ran++
+		t.Run(testCase.ID, func(t *testing.T) {
+			want := expectedViolations(t, testCase)
+			got := ValidateDocument(testCase.Document, testCase.document(t))
+			if len(got) == 0 {
+				got = nil
+			}
+			if !reflect.DeepEqual(got, want) {
+				t.Errorf("case %s (%s) violations mismatch\n  got:  %v\n  want: %v", testCase.ID, testCase.Summary, got, want)
+			}
+		})
+	}
+	if ran == 0 {
+		t.Fatalf("no corpus case id contains %q", fragment)
+	}
+}
+
+func TestConformanceCorpus_WorkspaceWarningsTravelInTheEnvelope(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "workspace-warnings-travel-in-the-envelope", "the-workspace-warning-cases-meet-their-expectation")
+	runCorpusCases(t, "workspace-warning")
+}
+
+func TestConformanceCorpus_ASessionRecordsTheReuseItTook(t *testing.T) {
+	spectest.Proves(t, "cli/machine-contract", "a-session-records-the-reuse-it-took", "the-session-reuse-cases-meet-their-expectation")
+	runCorpusCases(t, "session-file.reuse-")
+}
+
 func expectedStreamViolations(t *testing.T, testCase conformanceStreamCase) []Violation {
 	t.Helper()
 	switch testCase.Expect {

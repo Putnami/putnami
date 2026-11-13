@@ -1,7 +1,7 @@
 # ADR 0058 — A hit no job reads is restored without its files
 
 - **Status**: accepted, rule 2 amended by
-  [ADR 0082](0082-an-order-only-waiter-keeps-files-only-when-its-key-reads-them.md)
+  [ADR 0096](0096-an-order-only-waiter-keeps-files-only-when-its-key-reads-them.md)
 - **Scope**: `@putnami/cli` (`internal/jobs`, `internal/store`,
   `internal/cacheprovider`), `go.putnami.dev/protocol/cache` (provider RPC)
 
@@ -87,7 +87,7 @@ A task-owned entry promises its declared outputs: its descriptor lists them,
 and every restore of it writes them. A record without files at the same
 address would break that promise for every reader, including the spec gate's
 report read and the drift judgment. A separate address domain, like the failure
-record of [ADR 0030](0030-a-failed-task-is-cached-until-its-inputs-change.md),
+record of [ADR 0090](0090-a-failed-task-is-cached-until-its-inputs-change.md),
 keeps every existing reader unaware of it.
 
 ### Why negotiation decides after `initialize`

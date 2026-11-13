@@ -8,7 +8,7 @@
 
 ## Context
 
-Decision D-011 in the root `decisions.json` settles that `@putnami/contributor`
+Decision D-011 in the root `decisions/` registry settles that `@putnami/contributor`
 owns the change commands. D-016 names them: `change verify`, `change finalize`
 and `change language` replace `tree verify`, `proposals finalize` and
 `contributor language`. D-014 settles that an extension command calls the

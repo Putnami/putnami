@@ -114,7 +114,7 @@ PostgreSQL-backed storage. Requires `@putnami/database` package.
 
 1. Install the SQL package:
 ```bash
-putnami add @putnami/database
+bun add @putnami/database
 ```
 
 2. Import it (auto-registers the store):

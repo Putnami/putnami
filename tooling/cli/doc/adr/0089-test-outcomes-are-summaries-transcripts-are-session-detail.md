@@ -1,4 +1,4 @@
-# ADR 0026 — Test outcomes are summaries; transcripts are session detail
+# ADR 0089 — Test outcomes are summaries; transcripts are session detail
 
 - **Status**: accepted
 - **Scope**: Go and TypeScript test producers, the CLI session recorder and

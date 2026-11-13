@@ -8,7 +8,7 @@
     "name": "Windows consumer install and golden path",
     "outcome": "A user on Windows 10 version 1803 or later or Windows 11, on amd64, installs the CLI with one PowerShell line that verifies what it downloads and needs no administrator rights, then initializes and serves the TypeScript starter as on macOS and Linux, with every Windows prerequisite named where it is missing",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "powershell-installer-trust",

@@ -118,7 +118,7 @@
   "decisions": [
     "tooling/cli/doc/adr/0001-cli-foundation-boundaries.md",
     "tooling/cli/doc/adr/0002-cli-vnext-contracts.md",
-    "tooling/cli/doc/adr/0026-test-outcomes-are-summaries-transcripts-are-session-detail.md",
+    "tooling/cli/doc/adr/0089-test-outcomes-are-summaries-transcripts-are-session-detail.md",
     "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
   ]
 }

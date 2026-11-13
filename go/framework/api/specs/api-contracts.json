@@ -173,7 +173,7 @@
     "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md",
     "go/framework/api/doc/adr/0010-a-provider-owned-wire-admits-on-the-upgrade.md",
     "protocols/clientcontract/doc/adr/0011-an-external-authority-can-own-an-operation.md",
-    "go/framework/api/doc/adr/0011-a-generated-go-client-can-bind-before-di.md",
+    "go/framework/api/doc/adr/0012-a-generated-go-client-can-bind-before-di.md",
     "protocols/clientcontract/doc/adr/0013-an-sse-stream-declares-how-it-continues-and-a-negotiated-stream-ends-explicitly.md"
   ]
 }

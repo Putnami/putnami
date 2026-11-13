@@ -9,7 +9,7 @@
       "name": "TypeScript migration orchestration",
       "outcome": "A TypeScript application collects the migrations its plugins contribute, runs them through one backend-free contract with a reproducible cross-kind order, and derives the infrastructure they need instead of restating it",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "backend-free",

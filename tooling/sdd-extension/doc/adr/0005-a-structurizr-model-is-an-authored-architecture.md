@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Settled**: 2026-11-07, decisions D-061 and D-062 of the root
-  `decisions.json`, approved by the owner with the plan of the Structurizr import
+  `decisions/` registry, approved by the owner with the plan of the Structurizr import
 - **Amends**: nothing. `architecture sync` still never writes an import, and
   ADR 0001 of `protocols/architecture` still forbids turning an observation
   into a permission.

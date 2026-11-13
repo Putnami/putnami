@@ -16,7 +16,7 @@
   its Go module
 - **Supersedes in part**: [ADR 0002](0002-the-dev-extension-serves-version-get-and-tag.md)
   §1, on the manifest keeping CLI contract 11
-- **Decisions**: D-006 and D-007 of the root `decisions.json`;
+- **Decisions**: D-006 and D-007 of the root `decisions/` registry;
   [ADR 0079](../../../cli/doc/adr/0079-compose-and-qualify-move-to-putnami-dev.md)
   and [ADR 0080](../../../cli/doc/adr/0080-compose-requests-each-member-as-a-serve-run.md)
   of `@putnami/cli`;

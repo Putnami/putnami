@@ -4,7 +4,7 @@
   [ADR 0079](0079-compose-and-qualify-move-to-putnami-dev.md): `putnami qualify`
   is served by `@putnami/dev` (`tooling/dev/internal/qualify`), and a hosted
   run refuses it
-- **Scope**: `putnami qualify` (`tooling/cli/internal/qualify`), the
+- **Scope**: `putnami qualify` (`tooling/dev/internal/qualify`), the
   `protocols/qualify` contract, and its TypeScript twin in
   `@putnami/cli-protocol`
 

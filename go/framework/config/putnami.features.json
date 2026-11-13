@@ -9,7 +9,7 @@
       "name": "Go typed configuration",
       "outcome": "Go applications load typed configuration from ordered sources without silently accepting invalid or exposed sensitive values",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "cancellation",

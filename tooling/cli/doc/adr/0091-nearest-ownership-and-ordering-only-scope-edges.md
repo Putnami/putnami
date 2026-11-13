@@ -1,4 +1,4 @@
-# ADR 0038 — The nearest project owns a path, and an implicit scope edge orders without carrying impact
+# ADR 0091 — The nearest project owns a path, and an implicit scope edge orders without carrying impact
 
 - **Status**: accepted
 - **Scope**: `@putnami/cli-model` (`workspace` path ownership, dependency

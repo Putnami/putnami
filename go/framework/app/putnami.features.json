@@ -9,7 +9,7 @@
       "name": "Go application lifecycle",
       "outcome": "Go services compose modules, plugins, and dependencies into a bounded startup and shutdown lifecycle",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "default-plugins",

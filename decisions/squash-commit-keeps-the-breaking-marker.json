@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "squash-commit-keeps-the-breaking-marker",
+  "statement": "a pull request's squash message keeps the breaking-change marker any commit of its branch carries; validate-workspace fails a message that drops it",
+  "settled": "2026-11-13",
+  "settledBy": "fdumay",
+  "adr": "tooling/sdd-extension/doc/adr/0001-the-squash-commit-keeps-the-breaking-marker.md",
+  "reviewOnly": true
+}

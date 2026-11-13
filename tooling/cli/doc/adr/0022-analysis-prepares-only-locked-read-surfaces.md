@@ -1,6 +1,8 @@
 # ADR 0022 — Analysis prepares only locked read surfaces
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0082](0082-putnami-serves-no-mcp-server.md): Putnami serves no MCP
+  server, so §2, the MCP initialization instructions, no longer holds
 - **Scope**: `@putnami/cli`, MCP initialization, extension guidance
 
 ## Context

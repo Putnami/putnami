@@ -8,7 +8,7 @@
     "name": "Native execution session reporting",
     "outcome": "Each explicitly selected reporter receives live execution facts, the session reporter also receives the persisted terminal session, and each resumes delivery without rebuilding work",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "engine-lifecycle",

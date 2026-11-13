@@ -5,5 +5,6 @@
   "statement": "Windows support targets windows/amd64 on Windows 10 1803 or later and Windows 11; windows/arm64 is added only when a host can prove it",
   "settled": "2026-09-26",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md",
   "reviewOnly": true
 }

@@ -1,4 +1,4 @@
-# ADR 0056 — A publish dry run asks each registry
+# ADR 0093 — A publish dry run asks each registry
 
 - **Status**: accepted
 - **Scope**: `go.putnami.dev/protocol/extension` (`MemberProbe`),

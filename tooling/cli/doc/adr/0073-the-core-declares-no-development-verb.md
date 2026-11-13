@@ -1,6 +1,6 @@
 # ADR 0073 — The core declares no development verb
 
-- **Status**: proposed, amended by
+- **Status**: accepted, amended by
   [ADR 0079](0079-compose-and-qualify-move-to-putnami-dev.md): `compose` and
   `qualify` moved to `@putnami/dev`, so no core literal names them, and the
   portable, MCP `run_jobs` and `--no-watch` checks read their traits
@@ -11,7 +11,7 @@
   decisions 3, 4 and 5, D2, D4 and its consequences;
   [ADR 0070](0070-a-task-scope-keeps-a-job-by-its-declared-side-effects.md)
   decision 1 and its consequence on the four readers
-- **Decisions**: D-006 of the root `decisions.json`
+- **Decisions**: D-006 of the root `decisions/` registry
 
 ## Context
 

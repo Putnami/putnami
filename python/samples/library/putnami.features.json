@@ -9,7 +9,7 @@
       "name": "Python example library utilities",
       "outcome": "The Python sample library demonstrates a Putnami-managed package whose utility behavior is protected by executable spec checks",
       "owner": "python",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "clamp-bounds",

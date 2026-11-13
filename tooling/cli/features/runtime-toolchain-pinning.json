@@ -8,7 +8,7 @@
     "name": "Lock-pinned extension runtime toolchains",
     "outcome": "An extension prepares its runtime and runs its tasks with the exact toolchain the workspace lock pins, and results are keyed under that identity",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "exact-lock-resolution",

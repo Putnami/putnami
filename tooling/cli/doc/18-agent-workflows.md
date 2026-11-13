@@ -342,7 +342,7 @@ it never changes a byte outside the block.
 Putnami writes no other file into a workspace root. `.agents/constraints.md` is
 a file you write yourself when you have repository rules to state, and Putnami
 only reads it
-([ADR 0055](adr/0055-repository-rules-live-in-agents-constraints.md)).
+([ADR 0092](adr/0092-repository-rules-live-in-agents-constraints.md)).
 
 An earlier Putnami wrote a `putnami` entry to `.mcp.json`. `putnami install` and
 `putnami upgrade` remove that entry when it is byte for byte the one Putnami

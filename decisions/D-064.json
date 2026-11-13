@@ -5,5 +5,6 @@
   "statement": "putnami init --from <tool> adopts in one of two modes, import or delegate: in a terminal it asks with import preselected, without a terminal it imports unless --mode delegate is given, and --mode import|delegate skips the question",
   "settled": "2026-11-09",
   "settledBy": "fdumay",
+  "adr": "integrations/nx/doc/adr/0001-the-adoption-mode-is-a-workspace-option.md",
   "reviewOnly": true
 }

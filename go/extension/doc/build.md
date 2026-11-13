@@ -147,7 +147,7 @@ Samples and templates have no separate build path on purpose. A sample is an
 ordinary project and is validated exactly like the nature it has. A template is a
 workspace project, but it holds `*.template` sources rather than `.go` files, so
 nothing activates on it and `putnami build` reports *no jobs matched* — its
-validation is that `putnami new` can materialise it, which is the scaffold
+validation is that `putnami projects create` can materialise it, which is the scaffold
 extension's contract, not this one's. Inventing a build nature for either would
 add a classification axis with no behaviour behind it.
 

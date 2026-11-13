@@ -24,6 +24,7 @@ import (
 	"go.putnami.dev/openapi"
 	"go.putnami.dev/platform"
 	"go.putnami.dev/proto"
+	protocaps "go.putnami.dev/protocol/capabilities"
 	clientcontract "go.putnami.dev/protocol/clientcontract"
 	"go.putnami.dev/security"
 )
@@ -1138,6 +1139,7 @@ func NewApp() *app.Application {
 		Outcome: "Consumers can list and retrieve catalog items through a typed client",
 		Owner:   "samples",
 	})
+	application.Use(clientMatrixFeature())
 	application.Use(httpServer)
 	application.Use(platformPlugin)
 	application.Use(apiPlugin)
@@ -1146,4 +1148,59 @@ func NewApp() *app.Application {
 	application.Use(openapiPlugin)
 	application.Use(clients)
 	return application
+}
+
+// matrixFeatureID is the sample's own feature, authored in putnami.features.json.
+const matrixFeatureID = "samples/go-first-party-client-matrix"
+
+// matrixRoutes are the routes the provider serves for the client matrix.
+var matrixRoutes = []string{
+	"GET /blobs/{id}", "GET /credential-check", "GET /items", "GET /items/changes", "GET /items/{id}",
+	"GET /items/{id}/adjust", "GET /items/{id}/history", "GET /items/{id}/negotiate", "GET /items/{id}/watch",
+	"GET /quotes/{id}", "GET /quotes/{id}/snapshot", "GET /quotes/{id}/ticks", "GET /tenant-check", "GET /whoami",
+	"POST /audit", "POST /blobs/echo", "POST /body-counter", "POST /body-fidelity", "POST /body-nullable",
+	"POST /body-values", "POST /items",
+}
+
+// matrixLifecycles are the plugins whose start and stop bound every call the
+// matrix makes.
+var matrixLifecycles = []string{"grpc-api-bridge", "http", "openapi", "platform", "proto"}
+
+// clientMatrixFeature declares the matrix feature on a module of its own, so
+// the provider keeps attributing its operations to FeatureID. Proves maps each
+// contribution of the composition to the matrix requirement it supports: the
+// published contracts to deterministic generation, each route to the result
+// its contract declares, and each start and stop to the calls they bound.
+func clientMatrixFeature() *app.Module {
+	proofs := []app.FeatureProof{
+		{
+			Requirement:  "generation-is-deterministic-and-a-break-is-detected",
+			Contribution: app.ContributionRef{Kind: protocaps.ContributionKindSchema, Subkind: "openapi", Key: "openapi"},
+		},
+		{
+			Requirement:  "generation-is-deterministic-and-a-break-is-detected",
+			Contribution: app.ContributionRef{Kind: protocaps.ContributionKindSchema, Subkind: "proto", Key: "api-proto"},
+		},
+	}
+	for _, route := range matrixRoutes {
+		proofs = append(proofs, app.FeatureProof{
+			Requirement:  "a-result-is-what-the-contract-declared",
+			Contribution: app.ContributionRef{Kind: protocaps.ContributionKindSchema, Subkind: "route", Key: route},
+		})
+	}
+	for _, plugin := range matrixLifecycles {
+		for _, phase := range []string{"starter", "stopper"} {
+			proofs = append(proofs, app.FeatureProof{
+				Requirement:  "a-call-is-observable-and-ends-with-its-application",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindLifecycle, Subkind: phase, Key: plugin},
+			})
+		}
+	}
+	return app.NewModule("client-matrix").Feature(app.Feature{
+		ID:      matrixFeatureID,
+		Name:    "Go-provider first-party client matrix",
+		Outcome: "Every transport this Go provider declares is exercised by a generated client of both languages against the running provider, and the machine index states, cell by cell, what that proves and what it does not",
+		Owner:   "samples",
+		Proves:  proofs,
+	})
 }

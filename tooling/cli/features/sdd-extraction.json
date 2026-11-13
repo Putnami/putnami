@@ -8,7 +8,7 @@
     "name": "SDD extraction parity",
     "outcome": "The extracted SDD surfaces answer byte-for-byte what the built-in CLI answered before deletion, and the extension binary knows the workspace only through the wire",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "recorded-parity-with-the-replaced-surface",

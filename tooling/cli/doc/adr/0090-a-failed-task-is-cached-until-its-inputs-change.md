@@ -1,4 +1,4 @@
-# ADR 0030 — A failed task is cached until its inputs change
+# ADR 0090 — A failed task is cached until its inputs change
 
 - **Status**: accepted
 - **Scope**: `@putnami/cli` (`internal/store`, `internal/jobs`,

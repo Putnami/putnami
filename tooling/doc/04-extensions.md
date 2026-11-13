@@ -846,8 +846,8 @@ putnami extensions install           # Install extensions from workspace config,
 putnami extensions update            # Update to latest compatible versions, dependencies included
 putnami extensions remove <ext>      # Remove an installed extension and the dependencies nothing else requires
 putnami extensions validate [path]   # Validate an extension manifest
-putnami extensions test [path]       # Run extension tests
-putnami extensions package [path]    # Package for distribution
+putnami test <project>               # Run an extension project's tests
+putnami package <project>            # Package an extension project for distribution
 ```
 
 A dependency resolves from the lock while its version satisfies every

@@ -1,8 +1,8 @@
 # ADR 0004 — a rule names the channel its publish measures against
 
 - **Status**: accepted
-- **Scope**: `go.putnami.dev/protocol/ci` (`protocols/ci`), `@putnami/cli`
-  (`putnami ci explain`)
+- **Scope**: `go.putnami.dev/protocol/ci` (`protocols/ci`), `@putnami/cloud`
+  (`putnami cloud ci explain`)
 
 ## Context
 
@@ -35,7 +35,7 @@ The document needs a way to say "measure against `canary`, do not move it".
    `rules[i].baseline`, when the rule publishes nothing or declares
    `publish: false`.
 8. **Absence** means the rule measures against its own first channel only.
-9. **`putnami ci explain` reports it** with the matched rule, in the human form
+9. **`putnami cloud ci explain` reports it** with the matched rule, in the human form
    and in `Explanation.baseline`, and resolves nothing. A runner renders
    `publish` as `--channel` and `baseline` as `--baseline-channel`.
 

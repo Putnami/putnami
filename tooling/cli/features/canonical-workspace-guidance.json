@@ -8,7 +8,7 @@
     "name": "Canonical workspace guidance",
     "outcome": "A new contributor can discover the supported commands, choose the correct validation gate, find workspace facts through the CLI, and recover from failures using generated and public guidance",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "generated-help",

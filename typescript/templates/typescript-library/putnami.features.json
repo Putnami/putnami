@@ -9,7 +9,7 @@
       "name": "TypeScript library template",
       "outcome": "A project created from the typescript-library template is the smallest library that works: an exported function and a test beside it pass putnami lint, the type-check and their tests as created",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "relations": [
         {
           "kind": "parent",

@@ -8,7 +8,7 @@
     "name": "Portable runner",
     "outcome": "A user can run an ordinary verification command locally or through an optional runner provider by changing one placement option, and receives the same canonical session either way",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "optional-placement",

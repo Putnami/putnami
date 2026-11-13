@@ -21,7 +21,7 @@ CLI: an edge would fold the CLI's sources into the key. The tests still prove
 checks of four CLI features (`cli/first-use-path`, `cli/windows-consumers`,
 `cli/context-discovery` and `cli/init-channel`). The CLI's spec gate reads
 those proofs because `featureAuthority.owner` names `cli/first-use-path`
-([ADR 0081](../cli/doc/adr/0081-a-feature-authority-project-attests-for-the-spec-owner.md)).
+([ADR 0095](../cli/doc/adr/0095-a-feature-authority-project-attests-for-the-spec-owner.md)).
 
 The CLI pins one value to the scripts itself: a test of `tooling/cli/internal/git`
 checks that `smoke-check-release.ps1` requires the CLI's line-ending policy.

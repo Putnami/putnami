@@ -9,7 +9,7 @@
       "name": "TypeScript web application template",
       "outcome": "A project created from the typescript-web template is the smallest server-rendered React application that works: the pages it renders and a test beside it pass putnami lint, the type-check and their tests as created",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "relations": [
         {
           "kind": "parent",

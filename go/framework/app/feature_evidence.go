@@ -225,7 +225,7 @@ func publishedContributionIdentities(manifest *protocaps.ManifestV2) []protocaps
 	identities := make([]protocaps.ContributionIdentity, 0,
 		len(manifest.ConfigDefinitions)+len(manifest.Schemas)+len(manifest.Discoverers)+
 			len(manifest.Migrations)+len(manifest.InfraRequirements)+len(manifest.HealthContributors)+
-			len(manifest.LifecycleHooks)+len(manifest.Packages)+len(manifest.RequiredCapabilities))
+			len(manifest.LifecycleHooks)+len(manifest.Packages)+len(manifest.RequiredCapabilities)+len(manifest.DomainAccess))
 	for _, value := range manifest.ConfigDefinitions {
 		identities = append(identities, value.Identity)
 	}
@@ -251,6 +251,9 @@ func publishedContributionIdentities(manifest *protocaps.ManifestV2) []protocaps
 		identities = append(identities, value.Identity)
 	}
 	for _, value := range manifest.RequiredCapabilities {
+		identities = append(identities, value.Identity)
+	}
+	for _, value := range manifest.DomainAccess {
 		identities = append(identities, value.Identity)
 	}
 	return identities

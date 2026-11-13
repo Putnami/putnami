@@ -1,7 +1,7 @@
 # ADR 0006 — Agent content is an extension contribution under an additive contract
 
 - **Status**: accepted, amended by decision D-013 in the root
-  `decisions.json`: `putnami migrate agent-content` is deleted, so
+  `decisions/` registry: `putnami migrate agent-content` is deleted, so
   `supersedes` has one consumer, the refusal. Amended by
   [ADR 0004 of the collaboration contracts](../../../collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
   the manifest has no `tools` section, so "a command, an MCP tool or agent

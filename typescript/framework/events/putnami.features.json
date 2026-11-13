@@ -9,7 +9,7 @@
       "name": "TypeScript event messaging",
       "outcome": "A TypeScript workload publishes and handles typed events with at-least-once delivery whose retries are bounded, whose dead letters are kept rather than logged away, and whose every lost message leaves exactly one record",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "at-least-once",

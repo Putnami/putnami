@@ -8,7 +8,7 @@
     "name": "Versions derived from git",
     "outcome": "A user gets the exact version every version line is at, derived from the line's git tags and the conventional commits that touch it",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "tag-sets-the-version",

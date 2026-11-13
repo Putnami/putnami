@@ -311,7 +311,8 @@ In a repository whose root holds `putnami.workspace.json`, the evidence
 document carries what the workspace declares:
 
 - `declarations`: each spec, `specs.baseline.json`, `putnami.features.json`,
-  `adr/*.md`, `decisions.json`, `putnami.architecture.json`, `putnami.ci.json`
+  `features/*.json`, `adr/*.md`, `decisions.json`, `decisions/*.json`,
+  `putnami.architecture.json`, `putnami.ci.json`, `putnami.verdict-policy.json`
   or `CODEOWNERS` file the change touches, with its whole text before and
   after the change. A document over 256 KiB is left out.
 - `specVerification`: the newest spec verification record under

@@ -587,18 +587,24 @@ type Declaration struct {
 }
 
 // IsDeclaration reports whether a repository path is a declaration: a spec
-// (a JSON file in a specs directory), a specs baseline, a feature binding, an
-// architecture manifest, a decisions file, a decision record (a Markdown file
-// in an adr directory), a CI configuration or a CODEOWNERS file.
-// putnami.workspace.json is not one: it configures the tooling.
+// (a JSON file in a specs directory), a specs baseline, a feature binding
+// (putnami.features.json, or a JSON file in a features directory), an
+// architecture manifest, a decisions file (decisions.json, or a JSON file in a
+// decisions directory), a decision record (a Markdown file in an adr
+// directory), a CI configuration, a verdict policy or a CODEOWNERS file.
+// putnami.workspace.json and a project's putnami.json are not: they configure
+// the tooling.
 func IsDeclaration(file string) bool {
 	name := path.Base(file)
 	parent := path.Base(path.Dir(file))
 	switch {
 	case name == "specs.baseline.json", name == "putnami.features.json", name == "decisions.json",
-		name == "putnami.architecture.json", name == "putnami.ci.json", name == "CODEOWNERS":
+		name == "putnami.architecture.json", name == "putnami.ci.json", name == "putnami.verdict-policy.json",
+		name == "CODEOWNERS":
 		return true
-	case parent == "specs" && strings.HasSuffix(name, ".json"):
+	case name == "putnami.json":
+		return false
+	case (parent == "specs" || parent == "features" || parent == "decisions") && strings.HasSuffix(name, ".json"):
 		return true
 	case parent == "adr" && strings.HasSuffix(name, ".md"):
 		return true

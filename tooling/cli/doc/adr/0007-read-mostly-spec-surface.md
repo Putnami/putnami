@@ -1,6 +1,8 @@
 # ADR 0007 — The spec surface stays read-mostly and non-destructive
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0082](0082-putnami-serves-no-mcp-server.md): Putnami serves no MCP
+  server, so the two read-only MCP tools of §3 are gone
 - **Amended**: 2026-11-04, §1 and §2, by
   [ADR 0004 of `@putnami/sdd`](../../../sdd-extension/doc/adr/0004-a-spec-may-live-in-an-external-market-format.md):
   `specs init <feature> --from <format>:<path>` drafts one native spec from

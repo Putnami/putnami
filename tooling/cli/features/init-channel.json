@@ -8,7 +8,7 @@
     "name": "Init resolves on one channel",
     "outcome": "A user who runs putnami init or putnami projects create on a release channel gets extensions, a template and starter dependencies that all come from that channel, and the workspace pins no channel",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "one-channel-choice",

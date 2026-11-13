@@ -9,7 +9,7 @@
       "name": "Cookieless web analytics collection",
       "outcome": "A Putnami web application records page views, declared actions, sessions, and daily aggregates in its own database without cookies, consent banners, or third-party egress, and a retried event is stored exactly once",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "a-pre-rendered-page-reports-from-the-browser",

@@ -595,7 +595,7 @@ never appears in the cached count of the run summary.
 
 There is **no expiry clock**. A failure that the inputs cannot explain is a
 determinism bug, and an expiry would hide exactly the signal worth seeing. See
-[ADR 0030](adr/0030-a-failed-task-is-cached-until-its-inputs-change.md).
+[ADR 0090](adr/0090-a-failed-task-is-cached-until-its-inputs-change.md).
 
 **A green run clears the record, however you ran it.** A success at a key is
 proof that the failure recorded there is stale, so it is deleted whatever the

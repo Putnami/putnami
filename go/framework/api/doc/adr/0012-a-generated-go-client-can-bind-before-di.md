@@ -1,4 +1,4 @@
-# ADR 0011 — A generated Go client can bind before DI
+# ADR 0012 — A generated Go client can bind before DI
 
 - **Status**: accepted
 - **Scope**: `go.putnami.dev/api` and `go.putnami.dev/client`

@@ -8,7 +8,7 @@
     "name": "Diagnostics and results",
     "outcome": "A user or agent can diagnose a failed or unsafe run from structured diagnostics, doctor guidance, session reports, and stable exit outcomes, and can collect and summarize the recorded sessions before a disposable worktree takes them with it",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "located-diagnostics",

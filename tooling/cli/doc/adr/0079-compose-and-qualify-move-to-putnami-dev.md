@@ -23,7 +23,7 @@
   scope and the consequence on `no_serve_command` and `ambiguous_serve`;
   decision 3 of
   [runner ADR 0006](../../../../protocols/runner/doc/adr/0006-commit-addressed-engine-planned-request.md)
-- **Decisions**: D-006 and D-007 of the root `decisions.json`;
+- **Decisions**: D-006 and D-007 of the root `decisions/` registry;
   [ADR 0013 of the extension protocol](../../../../protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md)
   and [ADR 0002 of `@putnami/dev`](../../../dev/doc/adr/0002-the-dev-extension-serves-version-get-and-tag.md)
   set the precedents this one follows

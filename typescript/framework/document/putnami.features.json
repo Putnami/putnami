@@ -9,7 +9,7 @@
       "name": "TypeScript document repository",
       "outcome": "TypeScript workloads store validated document-shaped data through one typed repository contract whose queries, pagination, transactions, and backend limits stay explicit",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "adapter-capabilities",

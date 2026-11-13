@@ -11,7 +11,7 @@
 
 ## Context
 
-Decision D-016 in the root `decisions.json` names `change finalize` as the
+Decision D-016 in the root `decisions/` registry names `change finalize` as the
 replacement of the core's `proposals finalize`. D-011 settles that
 `@putnami/contributor` serves it, and D-014 settles that an extension command
 reaches the collaboration providers through an RPC call to the core. ADR 0005

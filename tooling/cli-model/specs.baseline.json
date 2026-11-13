@@ -6,6 +6,7 @@
     "cli/job-model#declared-verification-producers",
     "cli/job-model#extension-verb-vocabulary",
     "cli/job-model#vocabulary-default-traits",
+    "cli/workspace-model#a-checking-task-moves-no-extension-runtime",
     "cli/workspace-model#a-dependent-takes-only-the-step-references-it-may-run",
     "cli/workspace-model#a-verdict-policy-selects-only-the-tasks-that-name-it",
     "cli/workspace-model#canonical-identity",

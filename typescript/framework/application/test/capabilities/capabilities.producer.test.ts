@@ -12,6 +12,7 @@ import {
   type CapabilitiesProducerOptions,
   createCapabilitiesProducer,
 } from '../../src/capabilities/capabilities.producer';
+import type { DomainAccessContributor } from '../../src/capabilities/domain-access';
 import type { CapabilityInventoryContributor } from '../../src/capabilities/inventory';
 import type { CapabilityProvenanceContributor } from '../../src/capabilities/provenance';
 import type { RequiredCapabilityContributor } from '../../src/capabilities/requirement';
@@ -591,6 +592,47 @@ describe('capabilities producer', () => {
     await producer.postGenerate?.(app, {});
     expect(readFileSync(manifestPath(root), 'utf8')).toBe(firstManifest);
     expect(readFileSync(evidencePath(root), 'utf8')).toBe(firstEvidence);
+  });
+
+  it('resolves a proof of an enforced domain access contract', async () => {
+    const root = projectRoot('domain-access-evidence');
+    writeAuthoredFeatures(root);
+    const access: Plugin & DomainAccessContributor = {
+      domainAccessContracts: () => [
+        { import: 'capabilities.protocol-contracts.v1', mode: 'reference', status: 'active' },
+      ],
+    };
+    const producer = sourceBoundProducer(root, 'domain-access-proof', { registeredConfigDefinitions: () => [] });
+    const app = application()
+      .feature({
+        id: 'capabilities/typescript-evidence',
+        name: 'TypeScript capability evidence',
+        outcome: 'A build proves a feature requirement from an exact capability contribution',
+        owner: 'capabilities',
+        proves: [
+          {
+            requirement: 'implementation',
+            contribution: { kind: 'domainAccess', subkind: 'reference', key: 'capabilities.protocol-contracts.v1' },
+          },
+        ],
+      })
+      .use(access);
+    stampDeclarationSite(app);
+
+    await producer.postGenerate?.(app, {});
+
+    expect(JSON.parse(readFileSync(evidencePath(root), 'utf8'))).toMatchObject({
+      evidence: [
+        {
+          feature: 'capabilities/typescript-evidence',
+          requirement: 'implementation',
+          subject: {
+            kind: 'capability',
+            contribution: { kind: 'domainAccess', subkind: 'reference', key: 'capabilities.protocol-contracts.v1' },
+          },
+        },
+      ],
+    });
   });
 
   it('leaves an unproven contribution out of the evidence document', async () => {

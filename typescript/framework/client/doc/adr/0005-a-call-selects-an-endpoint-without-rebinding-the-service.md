@@ -3,7 +3,7 @@
 - **Status**: accepted
 - **Scope**: `@putnami/client` (`typescript/framework/client`)
 
-The shared rule is [go/framework/client ADR 0007](../../../../../go/framework/client/doc/adr/0007-a-call-selects-an-endpoint-without-rebinding-the-service.md); this record states the TypeScript surface.
+The shared rule is [go/framework/client ADR 0009](../../../../../go/framework/client/doc/adr/0009-a-call-selects-an-endpoint-without-rebinding-the-service.md); this record states the TypeScript surface.
 
 Generated TypeScript methods accept `endpoint?: string` in their call options.
 They select an immutable bound client view, leaving all transport, credential,

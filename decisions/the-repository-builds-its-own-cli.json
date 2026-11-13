@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "the-repository-builds-its-own-cli",
+  "statement": "this repository builds its own CLI: the root lock records cli.source workspace, ./putnamiw is the only supported entrypoint, and every extension whose source lives here loads from that source",
+  "settled": "2026-11-13",
+  "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0028-self-hosted-cli-source-workspace.md",
+  "check": {
+    "kind": "json-value",
+    "files": [
+      "putnami.lock.json"
+    ],
+    "pointer": "/cli/source",
+    "rule": "equals",
+    "value": "workspace",
+    "whenMissing": "violated"
+  }
+}

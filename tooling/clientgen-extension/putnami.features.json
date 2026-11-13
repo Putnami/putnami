@@ -9,7 +9,7 @@
       "name": "First-party generated service client lifecycle",
       "outcome": "A Putnami provider contract is discovered and rendered into strict Go and TypeScript clients that each client project generates for itself from committed files, with exact output ownership, and a guard no tracked generated client or handwritten transport can slip past",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "spec-mediated-generation",

@@ -9,7 +9,7 @@
       "name": "TypeScript CLI machine-output binding",
       "outcome": "A TypeScript program reads Putnami CLI machine output through typed, validated documents instead of guessing at JSON shapes",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "recorded-output-stays-readable",

@@ -261,6 +261,45 @@
               "the-goldens-encode-the-strict-verdict-and-abort-precedence"
             ]
           }
+        },
+        {
+          "id": "workspace-warnings-travel-in-the-envelope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-workspace-warning-cases-meet-their-expectation"
+            ]
+          }
+        },
+        {
+          "id": "a-failure-envelope-carries-its-data",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failure-keeps-its-class-and-carries-its-data"
+            ]
+          }
+        },
+        {
+          "id": "a-session-records-the-reuse-it-took",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-session-reuse-cases-meet-their-expectation"
+            ]
+          }
         }
       ]
     }

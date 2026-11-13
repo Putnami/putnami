@@ -9,7 +9,7 @@
       "name": "TypeScript web application delivery",
       "outcome": "TypeScript applications deliver file-routed React pages through explicit SSR or static rendering, bounded hydration, server-owned data mutations, and fail-closed request security",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "browser-security-hint",
@@ -333,7 +333,7 @@
       "name": "TypeScript web localization",
       "outcome": "TypeScript web applications serve each route at a stable URL per locale, with typed messages, complete published catalogs that track their source text, and language metadata for search engines and assistive technology",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "locale-configuration",

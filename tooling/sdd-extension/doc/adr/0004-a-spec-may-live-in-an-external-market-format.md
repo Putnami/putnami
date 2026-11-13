@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Settled**: 2026-11-04, decisions D-039 to D-047 of the root
-  `decisions.json`; D-056, taken on 2026-11-05 by a build session for the
+  `decisions/` registry; D-056, taken on 2026-11-05 by a build session for the
   owner to review, details decision 8
 - **Amends**:
   [ADR 0007](../../../cli/doc/adr/0007-read-mostly-spec-surface.md), §1 and

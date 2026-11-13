@@ -54,6 +54,7 @@ export const TEMPLATE_ROOT_EXCLUSIONS: readonly string[] = [
   'features',
   'specs',
   'specs.baseline.json',
+  'putnami.verdict-policy.json',
 ];
 
 /**

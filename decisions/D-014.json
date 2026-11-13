@@ -5,5 +5,6 @@
   "statement": "an extension command calls the collaboration providers through an RPC call to the core, made with an SDK client",
   "settled": "2026-10-16",
   "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md",
   "reviewOnly": true
 }

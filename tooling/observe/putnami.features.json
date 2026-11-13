@@ -9,7 +9,7 @@
       "name": "Observe a change in a repository that keeps its own CI",
       "outcome": "A CI job in a repository without a Putnami workspace runs putnami observe after its own build and tests, and learns which CI and repository it runs in, which commit the change is measured against even on a shallow clone, which files changed, and which test and coverage reports it can read, without changing its pipeline and without failing on a missing report, and can keep it as a change evidence document",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "runs-without-a-workspace",
@@ -196,7 +196,7 @@
       "name": "Find the Composer components and areas of a Symfony application",
       "outcome": "putnami observe reads the composer.json manifests of a PHP repository without running Composer and knows its components, the edges its path repositories create, the src/ directories that are areas of a component, and the lockfile, test directories and PHPUnit report outputs each component carries, so each changed file maps to its component or area",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "components-from-manifests",
@@ -262,7 +262,7 @@
       "name": "Read the projects and dependency graph of an Nx workspace",
       "outcome": "putnami observe learns the Nx projects of a repository, which directory each one owns, which projects each one depends on, where its tests write their reports and which lockfile pins its dependencies, from the graph export the CI wrote when there is one and from the Nx configuration otherwise, without running nx",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "graph-export",
@@ -328,7 +328,7 @@
       "name": "Explain what a change touches in a repository that keeps its own CI",
       "outcome": "putnami observe tells the CI log, and the evidence document, which components a change touched and which depend on them, the tests and coverage of each one, the coverage of the changed lines, the dependency versions the change moved and, from a software bill of materials the CI wrote, the licences and known vulnerabilities of each moved dependency, from the detectors, the git diff, the reports and the lockfiles, without running a build",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "components",
@@ -457,7 +457,7 @@
       "name": "Detect the packages of a Node workspace",
       "outcome": "putnami observe names the packages of an npm, pnpm or yarn workspace, Turborepo and Lerna on those workspaces included, as components with the packages each one depends on, the lockfile whose diff is the dependency change, and where each package writes its test and coverage reports, from the repository's own files and without running a package manager",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "workspace-members",
@@ -541,7 +541,7 @@
       "name": "Find the Go modules of a repository that keeps its own CI",
       "outcome": "putnami observe, in a Go repository without a Putnami workspace, knows its modules from go.work and go.mod, which module owns each file, which modules depend on which, which module and file a Go test or coverage report names, and which dependency versions each module locks, without running go",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "go-modules-are-components",
@@ -622,7 +622,7 @@
       "name": "Find the Python projects of a repository that keeps its own CI",
       "outcome": "putnami observe, in a Python repository without a Putnami workspace, knows its projects from the uv workspace and the pyproject.toml manifests, which project owns each file and which projects depend on which through their local sources, without running uv, Poetry or pip, so a change to a shared library marks the services that use it",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "python-projects-are-components",
@@ -688,7 +688,7 @@
       "name": "Find the projects and declared edges of a moon workspace",
       "outcome": "putnami observe, in a moon monorepo without a Putnami workspace, knows its moon projects, which directory each one owns and which projects each one depends on, from the project graph export the CI wrote when there is one and from .moon/workspace.yml and each moon.yml otherwise, whatever language a project is written in and without running moon, so a change to a shared project marks the projects that depend on it",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "moon-graph-export",
@@ -765,7 +765,7 @@
       "name": "Find the components of a Pants repository that keeps its own CI",
       "outcome": "putnami observe, in a Pants repository without a Putnami workspace, knows one component per target directory and the edges Pants infers from imports, from the peek export the CI wrote, without running pants, so a change to a shared library marks the code that imports it, its tests and coverage land on the right component, and a resolve lockfile bump is a dependency change",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "pants-targets-are-components",
@@ -883,7 +883,7 @@
       "name": "Read the packages and dependency graph of a Bazel repository",
       "outcome": "putnami observe, in a Bazel repository, knows its packages, which package owns each file and which packages depend on which from the query export the CI wrote, and places the tests and coverage Bazel wrote on their packages, without running bazel, so a change to a shared library marks the packages that use it",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "bazel-packages-are-components",
@@ -966,7 +966,7 @@
       "name": "Detect the projects of a Rush monorepo",
       "outcome": "putnami observe, in a Rush monorepo, names its Rush projects as components with the projects each one depends on, and reads the lockfile Rush keeps under common/config as the dependency changes, from rush.json and the projects' package.json files, without running rush or a package manager",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "rush-projects-are-components",
@@ -1035,7 +1035,7 @@
       "name": "Hand the change evidence document to a reporter",
       "outcome": "A CI job adds --upload to putnami observe and its change evidence document reaches the reporter it selected, Putnami Cloud by default; a person adds --open and gets the full report after signing in; an upload that fails is a diagnostic that never fails the job",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "upload-hands-the-document-to-the-reporter",
@@ -1114,7 +1114,7 @@
       "name": "Publish the change summary on the pull or merge request",
       "outcome": "A CI job adds --upload --publish to putnami observe and the pull request or merge request gets a commit status and one summary note that link to the full report, updated in place by the next run, and a job without an upload, a failed upload, a missing token or a job outside a pull or merge request publishes nothing and never fails the job",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "publish-status",
@@ -1198,7 +1198,7 @@
       "name": "Find the components of a Gradle or Maven repository that keeps its own CI",
       "outcome": "putnami observe, in a Java or Kotlin repository built with Gradle or Maven, Android included, and without a Putnami workspace, knows one component per Gradle project or Maven module and the edges between them, without running the build, so a change to a shared library marks the projects that use it, the JUnit and JaCoCo reports land on the right component, and a Gradle lockfile or version catalog bump is a dependency change",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "gradle-projects-are-components",
@@ -1344,7 +1344,7 @@
       "name": "Find the components of an iOS or Swift repository that keeps its own CI",
       "outcome": "putnami observe, in an iOS or Swift repository without a Putnami workspace, knows one component per Swift package, package target and Xcode project, and the edges between them, from the describe export the CI wrote or from Package.swift and project.pbxproj, without running any Apple tool, so a change to a local package marks the packages and the app that use it, its tests and coverage land on the right component, and a Package.resolved or Podfile.lock bump is a dependency change",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "swiftpm-export-targets",
@@ -1515,7 +1515,7 @@
       "name": "Find the packages of a Dart or Flutter repository that keeps its own CI",
       "outcome": "putnami observe, in a Dart or Flutter repository without a Putnami workspace, knows one component per Dart package, from pub workspaces, melos and each pubspec.yaml, and the path and workspace dependencies between them, without running dart, flutter or melos, so a change to a shared package marks the apps that use it, the per-package coverage and the tojunit reports land on the right package, and a pubspec.lock bump is a dependency change",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "dart-packages-are-components",
@@ -1596,7 +1596,7 @@
       "name": "Find the .NET projects of a repository that keeps its own CI",
       "outcome": "putnami observe, in a .NET repository without a Putnami workspace, knows its projects from the root solution and the project files, which project owns each file and which projects reference which, without running dotnet or MSBuild, so a change to a shared library marks the projects that reference it, the TRX and Coverlet reports land on the right projects, and a NuGet package bump is a dependency change",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "dotnet-projects-are-components",
@@ -1676,7 +1676,7 @@
       "name": "Find the components of a Ruby or Rails repository that keeps its own CI",
       "outcome": "putnami observe, in a Ruby or Rails repository without a Putnami workspace, knows one component per packwerk pack, gem and application and the edges their package.yml, Gemfile and gemspec files declare, without running Ruby, so a change to a pack marks the packs that depend on it, its RSpec or Minitest tests and SimpleCov coverage land on the right component, and a Gemfile.lock bump is a dependency change",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "ruby-components",
@@ -1756,7 +1756,7 @@
       "name": "Find the crates of a Rust repository that keeps its own CI",
       "outcome": "putnami observe, in a Rust repository without a Putnami workspace, knows its crates from the Cargo workspace and the Cargo.toml manifests, which crate owns each file and which crates depend on which through their path and workspace dependencies, without running cargo, so a change to a shared crate marks the crates that use it, its nextest and llvm-cov reports land on the right crates, and a Cargo.lock bump is a dependency change",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "rust-crates-are-components",
@@ -1849,7 +1849,7 @@
       "name": "Observe a change in GitHub Actions with one Marketplace step",
       "outcome": "A GitHub Actions workflow adds uses: Putnami/observe-action@v1 after its tests and gets the change summary in its log, and with a Putnami token the evidence upload and the pull request note, without copying install lines and without failing on what it observes",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "action-installs-the-cli",
@@ -1965,7 +1965,7 @@
       "name": "Show the MADR decisions that govern the files a change touches",
       "outcome": "putnami observe, in a repository that keeps its decisions as MADR files, lists for each change the decisions whose scope covers the files it touches and the decision records it adds, edits or deletes, with their status, in the summary and the change evidence document, read-only, and flags a change that deletes an accepted decision",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "madr-records",
@@ -2082,7 +2082,7 @@
       "name": "Show the architecture rules a CI already checks, per component",
       "outcome": "A team that checks its architecture with ArchUnit, deptrac or import-linter sees in putnami observe and in the evidence document each rule its CI checked, kept or broken, and each violation with its file, its line and the component that holds the file, with no rule to rewrite",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "architecture-report-discovery",

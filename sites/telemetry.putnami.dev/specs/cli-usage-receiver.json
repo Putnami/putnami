@@ -60,6 +60,13 @@
     {
       "id": "undeclared-requests-are-rejected",
       "text": "A request outside the declared surface never reaches workload logic, and the receiver never answers a request with a redirect."
+    },
+    {
+      "id": "the-receiver-imports-only-what-it-declares",
+      "text": [
+        "The receiver references two contracts of other domains, the shared wire contracts and the Go application runtime, each an active import its architecture manifest declares.",
+        "The contracts it enforces are those declarations verbatim, and its committed evidence lists exactly the contracts it enforces."
+      ]
     }
   ],
   "decisions": [

@@ -9,7 +9,7 @@
       "name": "Go persistence and transactions",
       "outcome": "Go services persist PostgreSQL data through pool-scoped repositories and explicit transaction or request unit-of-work boundaries",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "autocommit-context",
@@ -131,7 +131,7 @@
       "name": "Shared physical pool per database with acquire-time search_path",
       "outcome": "Go workloads that declare several datasources on one physical database share one connection pool per database, and every unqualified query still resolves in its own datasource's schema",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "acquire-time-search-path",
@@ -232,7 +232,7 @@
       "name": "SQL migration execution",
       "outcome": "A SQL migration body and the record marking it applied commit or roll back together, read-only observation works without migration authority, re-application is idempotent with divergence surfaced as drift, and rollback only ever runs persisted hash-verified SQL",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "atomic-record",

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "putnami-dev/localized-pages",
+  "outcomes": [
+    "A French reader reads the site's pages in French under the /fr prefix, with the privacy notice at /fr/confidentialite",
+    "Every documentation page stays in English at one address, and a French address of a docs page leads to it"
+  ],
+  "nonGoals": [
+    "Translating the documentation, which stays English",
+    "Choosing the reader's language for them: the site only suggests one"
+  ],
+  "requirements": [
+    {
+      "id": "the-docs-stay-english",
+      "text": "Every docs page under the /fr prefix, generated or static and at any depth, is admitted by the edge for GET and HEAD and refused for POST, so the request reaches the app that answers it with the English page."
+    }
+  ]
+}

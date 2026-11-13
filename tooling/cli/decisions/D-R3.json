@@ -5,5 +5,6 @@
   "statement": "a batch line that several members share leaves the session reporter's upload just before the task:end of the first member that fails, and is dropped when every member passes",
   "settled": "2026-10-28",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md",
   "reviewOnly": true
 }

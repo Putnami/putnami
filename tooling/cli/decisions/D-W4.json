@@ -5,5 +5,6 @@
   "statement": "workspaces check out with LF line endings through a .gitattributes the scaffold writes and doctor checks; the content hasher never normalizes line endings",
   "settled": "2026-09-26",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md",
   "reviewOnly": true
 }

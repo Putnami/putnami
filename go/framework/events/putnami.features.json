@@ -9,7 +9,7 @@
       "name": "Go event delivery",
       "outcome": "Go services exchange typed events with explicit distribution, retry, duplicate, dead-letter, and shutdown behavior",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "delivery-semantics",

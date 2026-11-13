@@ -12,7 +12,7 @@
 - **Scope**: `@putnami/dev` (`tooling/dev`), the manifests of `@putnami/go`,
   `@putnami/typescript` and `@putnami/python`, and this repository's
   `putnami.workspace.json`
-- **Decisions**: D-006, D-007 and D-012 of the root `decisions.json`;
+- **Decisions**: D-006, D-007 and D-012 of the root `decisions/` registry;
   [ADR 0066](../../../cli/doc/adr/0066-an-extension-installs-and-loads-its-extension-dependencies.md)
   and [ADR 0067](../../../cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md)
   of `@putnami/cli`

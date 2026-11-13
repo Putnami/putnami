@@ -5,5 +5,6 @@
   "statement": "on Windows, the Microsoft Visual C++ runtime (vcruntime140.dll) that Biome needs is a documented prerequisite that doctor checks; Putnami neither bundles nor installs it",
   "settled": "2026-09-28",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md",
   "reviewOnly": true
 }

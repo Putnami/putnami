@@ -1,4 +1,4 @@
-# ADR 0082 — An order-only waiter keeps a task's files only when its key reads them
+# ADR 0096 — An order-only waiter keeps a task's files only when its key reads them
 
 - **Status**: accepted
 - **Date**: 2026-10-28

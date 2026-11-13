@@ -354,6 +354,7 @@ func TestTraceChangeImpact_ExtensionConsumerEdgeFiresOnlyWhenTheBinaryMoved(t *t
 // runtime, and every consumer runs every task of the extension. The extension's
 // own test layer is the same case.
 func TestTraceChangeImpact_ACheckingTaskMovesNoExtensionRuntime(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-model", "a-checking-task-moves-no-extension-runtime", "a-file-only-checking-tasks-read-selects-no-consumer")
 	spectest.Proves(t, "cli/workspace-model", "change-impact", "extension-consumers-run-the-changed-extension-tasks")
 	ws := NewWorkspace("/workspace", nil, []*Project{
 		{ID: "/protocols/features", Name: "features", Path: "protocols/features"},

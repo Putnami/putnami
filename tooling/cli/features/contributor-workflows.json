@@ -8,7 +8,7 @@
     "name": "Contributor workflows",
     "outcome": "A workspace uses build to carry its requested outcome, issue or epic through delivery planning, bounded experiments, independent artifact challenge and verified delivery on both supported hosts, with native requirement coverage, portable records, canonical entry points and proof-consuming Go publication under its existing mandate and provider policy",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "one-contributor-extension",

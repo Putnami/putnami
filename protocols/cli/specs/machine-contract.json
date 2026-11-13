@@ -142,6 +142,24 @@
         "The CLI's --output=json envelope, its bounded JSONL stream and its two recorded session files each pass ValidateDocument as version 2 and match a committed golden.",
         "No value of the retired selection variable makes the CLI write another contract, and the goldens encode the strict verdict and abort precedence."
       ]
+    },
+    {
+      "id": "workspace-warnings-travel-in-the-envelope",
+      "text": [
+        "The envelope's optional workspaceWarnings lists the warnings the workspace load recorded, beside any status and an unchanged data payload.",
+        "Each warning is closed and carries a non-empty code and message; a load that recorded none leaves the member out rather than writing an empty array."
+      ]
+    },
+    {
+      "id": "a-failure-envelope-carries-its-data",
+      "text": "WithResultData attaches a data payload to an error without changing its class or its exit code, and ResultData reads the payload back, so a failure envelope can carry data."
+    },
+    {
+      "id": "a-session-records-the-reuse-it-took",
+      "text": [
+        "A session file's optional selection.reuse names the full commit its reused records came from, the head it took them from and at least one member, each with its version.",
+        "Members are sorted by ecosystem then coordinate, each once, and a plan that reused nothing records no reuse block."
+      ]
     }
   ],
   "decisions": [

@@ -9,7 +9,7 @@
       "name": "Go cache lifecycle",
       "outcome": "Go services cache owned byte values with explicit expiration and bounded eviction",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "eviction",

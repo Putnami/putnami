@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "putnami-dev/cookieless-audience-measurement#what-the-site-records-is-what-the-notice-says",
+    "putnami-dev/localized-pages#the-docs-stay-english",
     "putnami-dev/public-documentation#agent-surfaces-track-the-docs-tree",
     "putnami-dev/public-documentation#docs-enumeration-is-build-order-independent",
     "putnami-dev/public-documentation#documentation-sources-are-version-addressed-snapshots",

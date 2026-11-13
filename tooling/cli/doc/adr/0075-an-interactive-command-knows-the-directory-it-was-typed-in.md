@@ -1,6 +1,6 @@
 # ADR 0075 — An interactive command knows the directory it was typed in
 
-- **Status**: proposed
+- **Status**: accepted
 - **Scope**: `@putnami/cli` (`internal/cli`, `internal/jobs/scheduler`),
   `@putnami/cli-model` (`jobs.ScheduledJob`), `go.putnami.dev/protocol/job`
   (`invocationDir`), the extension SDK (`context.ResolvePath`)

@@ -1,4 +1,4 @@
-# ADR 0007 — A call selects an endpoint without rebinding the service
+# ADR 0009 — A call selects an endpoint without rebinding the service
 
 - **Status**: accepted
 - **Scope**: generated Go and TypeScript service clients

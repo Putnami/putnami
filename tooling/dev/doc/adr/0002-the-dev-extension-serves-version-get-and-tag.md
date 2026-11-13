@@ -1,12 +1,14 @@
 # ADR 0002 — The dev executable serves `version get` and `version tag`
 
-- **Status**: accepted
+- **Status**: accepted, superseded in part by
+  [ADR 0003](0003-the-dev-executable-serves-compose-and-qualify.md): §1, the
+  manifest's CLI contract 11
 - **Scope**: `@putnami/dev` (`tooling/dev`): its manifest, its runtime and its
   Go module
 - **Supersedes in part**: [ADR 0001](0001-the-dev-extension-declares-the-development-verbs.md)
   §1, on the manifest declaring no command, command group, task or runtime,
   and §4, on the executable answering only the runtime handshake
-- **Decisions**: D-010, D-014 and D-018 of the root `decisions.json`;
+- **Decisions**: D-010, D-014 and D-018 of the root `decisions/` registry;
   [ADR 0071](../../../cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md)
   of `@putnami/cli`
 

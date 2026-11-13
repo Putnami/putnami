@@ -20,7 +20,7 @@
     },
     {
       "id": "documentation-sources-are-version-addressed-snapshots",
-      "text": "Every documentation source another domain owns is enforced as a version-addressed snapshot: the build resolves the section's file inventory through the snapshot's latest state, a source that is absent fails closed instead of publishing an empty section, a version is the content digest of the source tree, and re-attaching a version with different content is refused."
+      "text": "Every documentation source another domain owns is enforced as a version-addressed snapshot: the build resolves the section's file inventory through the snapshot's latest state, a source that is absent fails closed instead of publishing an empty section, a version is the content digest of the source tree, and re-attaching a version with different content is refused. The site's access evidence lists every snapshot and reference it enforces, and only those."
     },
     {
       "id": "no-generated-mirror-in-source",

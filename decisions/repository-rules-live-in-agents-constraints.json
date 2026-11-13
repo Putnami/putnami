@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "repository-rules-live-in-agents-constraints",
+  "statement": "the repository's rules for people and agents live in .agents/constraints.md, which only people edit; Putnami writes no .AI/ directory and no other generated context file",
+  "settled": "2026-11-13",
+  "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0092-repository-rules-live-in-agents-constraints.md",
+  "reviewOnly": true
+}

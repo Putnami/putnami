@@ -9,7 +9,7 @@
       "name": "TypeScript spec-test binding",
       "outcome": "A TypeScript author binds an ordinary bun test to a declared spec check, and the executable-spec gate resolves the resulting evidence exactly as it resolves the Go and Python runtimes'",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "honest-verdict",

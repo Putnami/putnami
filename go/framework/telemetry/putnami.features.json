@@ -9,7 +9,7 @@
       "name": "Go service telemetry",
       "outcome": "A Go service pushes traces, metrics, and logs to an OTLP collector and keeps serving traffic unchanged when that collector is unavailable",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "bounded-shutdown",

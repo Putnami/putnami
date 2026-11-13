@@ -45,7 +45,7 @@ import type { Plugin } from '@putnami/application';
 import { sqlSourceInline } from '@putnami/database';
 import type { MigrationContributor, MigrationSource } from '@putnami/migration';
 
-import { iamMigrations } from './.gen/migrations.gen'; // emitted by `putnami generate`
+import { iamMigrations } from './.gen/migrations.gen'; // emitted by the generate phase of `putnami build`
 
 export class IamPlugin implements Plugin, MigrationContributor {
   name = 'iam';

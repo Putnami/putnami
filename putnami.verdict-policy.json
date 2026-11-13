@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-verdict-policy.json",
+  "gaps": {
+    "unproven-requirement": {
+      "modeled": "inform",
+      "coded": "accept"
+    }
+  }
+}

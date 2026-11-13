@@ -1,6 +1,6 @@
 # ADR 0074 — Deployment and publication follow declared traits
 
-- **Status**: proposed
+- **Status**: accepted
 - **Scope**: `@putnami/cli` (`internal/engine`, `internal/jobs/publication`,
   `internal/jobs/cachekey`, `internal/jobs/remotecache`,
   `internal/jobs/scheduler`, `internal/jobs/planner`, `internal/machine`,
@@ -8,7 +8,7 @@
 - **Amends**: [ADR 0017](0017-one-release-set-plan-against-the-channel-head.md)
   decision 2 and [ADR 0021](0021-publish-version-and-deploy-follow-distribution-v2.md)
   decisions 13 and 14, which name the `deploy` command
-- **Decisions**: D-021 of the root `decisions.json`
+- **Decisions**: D-021 of the root `decisions/` registry
 
 ## Context
 

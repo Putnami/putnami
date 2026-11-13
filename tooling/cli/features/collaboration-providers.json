@@ -8,7 +8,7 @@
     "name": "Collaboration provider routing",
     "outcome": "A workspace binds its task, change-proposal, memory and missions backends independently, and a user, a script or an extension calls the same versioned operations through the CLI or the extension host channel without knowing which backend answers, while a missing binding or capability, a refused precondition and an uncertain write are stated rather than hidden",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "explicit-binding",

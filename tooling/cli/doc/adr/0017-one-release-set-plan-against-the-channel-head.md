@@ -1,16 +1,16 @@
 # ADR 0017 — One release-set plan, measured against the channel head
 
 - **Status**: accepted, amended by
-  [ADR 0066](0066-a-main-publication-releases-what-its-pull-request-published.md)
+  [ADR 0094](0094-a-main-publication-releases-what-its-pull-request-published.md)
   (decisions 1, 3 and 4: the reuse channel). A run whose credential provider negotiates
   `publication-v1` resolves and releases through that session instead of a
   release-set provider process
   ([ADR 0057](0057-publication-authority-stays-in-the-engine.md)). Decision
   2 is amended by
-  [ADR 0074](0074-deployment-follows-the-declared-release-set-trait.md)
-  (proposed): the combined session is a publish beside any command whose
+  [ADR 0074](0074-deployment-follows-the-declared-release-set-trait.md):
+  the combined session is a publish beside any command whose
   traits declare `consumesReleaseSet`.
-- **Scope**: `@putnami/cli` (`tooling/cli/internal/jobs/release_set.go`,
+- **Scope**: `@putnami/cli` (`tooling/cli/internal/jobs/publication/release_set.go`,
   `tooling/cli/internal/engine`) and `@putnami/extension-sdk`
   (`tooling/extension-sdk/releaseset`)
 

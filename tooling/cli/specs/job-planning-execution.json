@@ -336,6 +336,13 @@
     {
       "id": "the-impact-index-answers-for-the-tasks-a-project-runs",
       "text": "A project's option layer claims only the tasks of commands the planner may run in that project, as a task's own input ports do. A `^` reference reaches a dependent only when a command that declares it may be planned there, so one stack's `^test` carries no other stack's test step to a dependent."
+    },
+    {
+      "id": "a-run-records-whether-the-remote-cache-answered",
+      "text": [
+        "A run's cache record holds remote only when the run looked a remote cache up: answered is true when every lookup got an answer, a hit or a miss, so a cold cache answers.",
+        "Otherwise the record counts the failed lookups and gives one reason from a closed set, refused over unreachable over timeout, and every lookup failure maps into that set."
+      ]
     }
   ],
   "decisions": [
@@ -347,7 +354,7 @@
     "tooling/cli/doc/adr/0023-private-selected-publication-handoff.md",
     "tooling/cli/doc/adr/0026-spec-gate-evidence-scope.md",
     "tooling/cli/doc/adr/0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md",
-    "tooling/cli/doc/adr/0030-a-failed-task-is-cached-until-its-inputs-change.md",
+    "tooling/cli/doc/adr/0090-a-failed-task-is-cached-until-its-inputs-change.md",
     "tooling/cli/doc/adr/0031-scratch-generations-expire-between-consumers.md",
     "tooling/cli/doc/adr/0034-a-declared-output-polices-its-own-drift.md",
     "tooling/cli/doc/adr/0084-a-first-generation-warns-outside-ci.md",
@@ -357,7 +364,7 @@
     "tooling/cli/doc/adr/0062-a-release-baseline-input-names-the-baseline-not-the-commit.md",
     "tooling/cli/doc/adr/0064-an-executing-task-starts-from-an-empty-owned-directory.md",
     "tooling/cli/doc/adr/0065-an-optional-command-output-directory-is-emptied-on-execution-and-on-an-empty-restore.md",
-    "tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md",
+    "tooling/cli/doc/adr/0094-a-main-publication-releases-what-its-pull-request-published.md",
     "tooling/cli/doc/adr/0067-putnami-dev-declares-the-development-verbs.md",
     "tooling/cli/doc/adr/0073-the-core-declares-no-development-verb.md",
     "tooling/cli/doc/adr/0071-an-extension-command-calls-the-core-over-a-host-rpc-channel.md",

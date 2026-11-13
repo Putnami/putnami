@@ -146,6 +146,7 @@ func TestValidateManifest_StepDependencyForms(t *testing.T) {
 // it with the remedy that moves it: an older reader would read the entry as a
 // pipeline-step reference and plan nothing.
 func TestDependencyClosureRequiresItsContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "a-closure-command-dependency-requires-contract-22")
 	spectest.Proves(t, "extension/manifest-contract", "an-additive-vocabulary-raises-the-contract-floor", "each-additive-vocabulary-requires-its-contract")
 	m := stepDependencyManifest(protocolcli.DependencyClosureContract, "client-generate", "^client-generate")
 	if !DeclaresDependencyClosure(m) {

@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Date**: 2026-11-10
-- **Decision**: D-067 of the root `decisions.json`; D-008 stays as written
+- **Decision**: D-067 of the root `decisions/` registry; D-008 stays as written
 - **Scope**: `@putnami/cli` (`internal/commands/lifecycle`: `workspace_init.go`,
   `init_languages.go`, `init_languages.json`; `internal/workspace`:
   `project_scan.go`; `internal/commandmeta`)

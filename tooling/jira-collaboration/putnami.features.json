@@ -9,7 +9,7 @@
       "name": "Jira collaboration provider",
       "outcome": "A workspace binds its tasks to one Jira Cloud project and calls the tasks contract without knowing Jira's statuses, JQL or identifiers, while a lost answer never duplicates a ticket and a credential never leaves the provider",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "state-by-category",

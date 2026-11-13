@@ -1080,7 +1080,7 @@ to `events.jsonl`. Whole-session validation enforces that distinction by
 requiring a terminal `session:end`; accepting `plan:end` as an individual JSONL
 document does not make it a persisted session event.
 
-The CLI's own session readers (`putnami sessions show`, `putnami sessions inspect`)
+The CLI's own session readers (`putnami sessions list`, `putnami sessions inspect`)
 read both versions: sessions recorded before the flip stay openable. Only the
 writer is v2-only.
 

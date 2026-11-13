@@ -8,7 +8,7 @@
     "name": "Reproducible toolchain lock",
     "outcome": "Install pins, for each toolchain an installed extension answers for, an exact release and each platform's verified archive",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "extensions-answer-pins",

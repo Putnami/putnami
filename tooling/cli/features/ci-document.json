@@ -8,7 +8,7 @@
     "name": "CI document",
     "outcome": "A repository declares in one reviewed file the commands its CI runs, and the guidance the CLI generates names them as the gate",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "commands-not-gate",

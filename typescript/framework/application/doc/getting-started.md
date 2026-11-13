@@ -14,12 +14,6 @@ This guide will help you set up your first application with `@putnami/applicatio
 bun add @putnami/application
 ```
 
-Or using Putnami CLI:
-
-```bash
-putnami add @putnami/application
-```
-
 ## Project Setup
 
 ### 1. Create Your Application Entry Point

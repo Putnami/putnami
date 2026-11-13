@@ -211,7 +211,7 @@ request closes or merges, and no environment follows it, so nothing is
 deployed from a pull request. After the merge, the `main` run can release into
 `canary` the artifacts the pull request's reviewed final head published,
 instead of building them again
-([ADR 0066](tooling/cli/doc/adr/0066-a-main-publication-releases-what-its-pull-request-published.md)).
+([ADR 0094](tooling/cli/doc/adr/0094-a-main-publication-releases-what-its-pull-request-published.md)).
 `putnami cloud ci explain --event pull_request --pr <number> --branch <branch>`
 shows what a pull request run would publish. The generated agent guidance
 derives its gate line from the same document.

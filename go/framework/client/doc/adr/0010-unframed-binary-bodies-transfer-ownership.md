@@ -1,4 +1,4 @@
-# ADR 0007 — Unframed binary bodies transfer ownership
+# ADR 0010 — Unframed binary bodies transfer ownership
 
 - **Status**: accepted
 - **Scope**: `go.putnami.dev/client` (`go/framework/client`)

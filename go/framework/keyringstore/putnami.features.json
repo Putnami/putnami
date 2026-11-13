@@ -9,7 +9,7 @@
       "name": "Go signing key rotation",
       "outcome": "Go services persist and rotate signing keys without half-rotations or disclosure of private key material",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "durable-owner-document",

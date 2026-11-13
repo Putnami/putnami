@@ -9,7 +9,7 @@
       "name": "TypeScript service clients",
       "outcome": "A TypeScript workload calls another service through a client generated from that service's contract, with one latency budget that retries cannot exceed, cancellation that actually stops the call, and a circuit that stops feeding a service that is already failing",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "success-body",

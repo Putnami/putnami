@@ -9,7 +9,7 @@
       "name": "File and Git memory provider",
       "outcome": "A workspace keeps its agents' memory in a directory or on a Git branch it owns, and every agent reads context and saves checkpoints through the memory contract without knowing which, never overwriting another agent's checkpoint and never writing one twice",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "explicit-backend",

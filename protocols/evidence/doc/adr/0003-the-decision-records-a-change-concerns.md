@@ -1,4 +1,4 @@
-# ADR 0002 — The decision records a change concerns
+# ADR 0003 — The decision records a change concerns
 
 - **Status**: Accepted
 - **Date**: 2026-11-07

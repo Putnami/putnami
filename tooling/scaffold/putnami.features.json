@@ -9,7 +9,7 @@
       "name": "Project scaffolding",
       "outcome": "A new project starts from a distributable template archive rather than a copied directory, and an extension that ships only agent content arrives the same way: both are packaged, versioned and published like any other artifact by one content packager, and `putnami projects create` or `putnami install` materializes them",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "manifest-selects-the-template",

@@ -1,4 +1,4 @@
-# ADR 0081 — A feature-authority project attests for the spec owner
+# ADR 0095 — A feature-authority project attests for the spec owner
 
 - **Status**: accepted
 - **Date**: 2026-10-27

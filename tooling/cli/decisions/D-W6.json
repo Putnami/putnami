@@ -5,5 +5,6 @@
   "statement": "Windows uses directory junctions where Unix uses directory symlinks, with no Developer Mode requirement; replacing a link is remove-then-create under the lock",
   "settled": "2026-09-26",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md",
   "reviewOnly": true
 }

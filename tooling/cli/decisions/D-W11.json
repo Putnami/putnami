@@ -5,5 +5,6 @@
   "statement": "Windows support is proven on an on-demand Windows VM created for each QA run and deleted after it; the contributor gate runs GOOS=windows go vet on every go.work module",
   "settled": "2026-09-26",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0052-windows-consumers-junctions-job-objects-lf-and-long-paths.md",
   "reviewOnly": true
 }

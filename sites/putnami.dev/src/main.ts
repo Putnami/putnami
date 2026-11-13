@@ -16,6 +16,7 @@ import { sql } from '@putnami/database';
 import { react } from '@putnami/web';
 import { siteEvents } from './analytics';
 import './config';
+import { audienceMeasurementFeature, publicDocumentationFeature } from './features';
 import { publicDocumentationAccess } from './lib/darc/public-docs';
 import { contentBundles } from './plugins/content-bundle.plugin';
 import { contentOverlay } from './plugins/content-overlay.plugin';
@@ -60,6 +61,8 @@ export const app = () => {
       .use(platform({ prefix: '/_' }))
       .use(trace())
       .use(api())
+      .use(audienceMeasurementFeature())
+      .use(publicDocumentationFeature())
       // Audience measurement, in the site's own database. `sql()` first:
       // the four analytics tables are the plugin's own migration source, and
       // `autoApply` stays off so a deploy applies them in its migrate job and a

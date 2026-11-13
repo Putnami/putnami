@@ -49,7 +49,6 @@ putnami serve my-app         # Serve an app with its dependencies
 putnami package .            # Create distributable artifacts
 putnami publish .            # Publish a package
 putnami deploy my-app        # Deploy through a deployer extension
-putnami format .             # Format code
 ```
 
 Run multiple jobs in a single invocation:
@@ -126,8 +125,7 @@ These built-in commands manage workspace infrastructure:
 - `putnami extensions install --user <@scope/name[@version]>` — Pin one extension in the user scope (`~/.putnami/user`), outside any workspace; its subcommands declared `workspace: "optional"` then run in any directory that is not a workspace
 - `putnami extensions list --user` / `putnami extensions remove --user <ext>` — List or drop user-scope pins
 - `putnami extensions validate [path]` — Validate an extension manifest
-- `putnami extensions test [path]` — Run extension tests
-- `putnami extensions package [path]` — Package an extension for distribution
+- An extension is a workspace project: `putnami test <project>` runs its tests and `putnami package <project>` packages it for distribution, through its language extension
 
 ### `putnami templates`
 

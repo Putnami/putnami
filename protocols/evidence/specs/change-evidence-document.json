@@ -206,7 +206,7 @@
     {
       "id": "declarations-follow-the-diff",
       "text": [
-        "The optional declarations member lists at most 1024 declaration files the change touches (specs, baselines, bindings, architecture, decisions, CI configurations, CODEOWNERS), each a changed file with its status; a renamed one names its previous path.",
+        "The optional declarations member lists at most 1024 changed declarations, each with its status and a renamed one's previous path: specs, baselines, architecture, CI and verdict policy files, CODEOWNERS, bindings and decisions, features/*.json and decisions/*.json included.",
         "No document at the base of an added file or the commit of a deleted one.",
         "A path defect is evidence.invalid_path, a path twice evidence.duplicate, a document over 262144 bytes evidence.too_large, else evidence.invalid_declaration."
       ]
@@ -221,7 +221,7 @@
   ],
   "decisions": [
     "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md",
-    "protocols/evidence/doc/adr/0002-the-decision-records-a-change-concerns.md",
+    "protocols/evidence/doc/adr/0003-the-decision-records-a-change-concerns.md",
     "protocols/evidence/doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md"
   ]
 }

@@ -306,7 +306,8 @@
             "kind": "acceptance",
             "checks": [
               "each-declaration-defect-gets-its-code",
-              "a-document-without-declarations-validates-as-before"
+              "a-document-without-declarations-validates-as-before",
+              "every-declaration-form-is-a-declaration"
             ]
           }
         },

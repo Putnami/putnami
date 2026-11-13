@@ -9,7 +9,7 @@
       "name": "Bounded parallel Go work",
       "outcome": "Go applications fan work out with a concurrency bound, ordered results, cancellation, and panic containment",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "concurrency",

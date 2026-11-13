@@ -9,7 +9,7 @@
       "name": "Bounded Go request contexts",
       "outcome": "Go framework operations apply one consistent deadline rule to bounded request work, including work detached from caller cancellation",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "detached-context",

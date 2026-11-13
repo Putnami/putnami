@@ -9,7 +9,7 @@
       "name": "TypeScript UI system",
       "outcome": "React applications compose responsive, themeable user interfaces whose server-rendered styles, interaction semantics, and rich-content safety remain predictable through hydration",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "external-link-containment",

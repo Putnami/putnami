@@ -29,6 +29,11 @@
     },
     "publish": {
       "archives": false
+    },
+    "sdd": {
+      "verification": {
+        "specs": "report"
+      }
     }
   }
 }

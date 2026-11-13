@@ -8,7 +8,7 @@
     "name": "Extension dependencies",
     "outcome": "Declaring an extension installs, pins and loads every extension it depends on, so the dependency graph decides what a workspace gets",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "install-resolves-the-graph",

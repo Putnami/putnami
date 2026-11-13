@@ -311,7 +311,7 @@
     "protocols/clientcontract/doc/adr/0007-a-response-cache-is-declared-per-operation.md",
     "protocols/clientcontract/doc/adr/0010-a-provider-owned-websocket-wire-is-declared-not-inferred.md",
     "go/framework/api/doc/adr/0010-a-provider-owned-wire-admits-on-the-upgrade.md",
-    "go/framework/client/doc/adr/0007-unframed-binary-bodies-transfer-ownership.md",
+    "go/framework/client/doc/adr/0010-unframed-binary-bodies-transfer-ownership.md",
     "go/framework/client/doc/adr/0007-static-binding-headers-are-non-credential-defaults.md",
     "typescript/framework/client/doc/adr/0006-static-binding-headers-are-non-credential-defaults.md",
     "go/framework/client/doc/adr/0008-a-call-delivers-its-success-body-through-a-caller-owned-sink.md",

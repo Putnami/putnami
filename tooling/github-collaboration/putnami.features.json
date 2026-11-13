@@ -9,7 +9,7 @@
       "name": "GitHub collaboration provider",
       "outcome": "A workspace binds its tasks, its change proposals, or both to one GitHub repository and calls the collaboration contracts without knowing GitHub's labels, commands or identifiers, while a lost answer never duplicates an issue, pull request or review and a credential never leaves the provider",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "configurable-state-mapping",

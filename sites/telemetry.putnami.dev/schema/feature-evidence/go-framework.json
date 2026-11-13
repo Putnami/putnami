@@ -3,6 +3,96 @@
   "protocolVersion": 1,
   "evidence": [
     {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/declared-surface-is-complete/1f1f30a04263",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "declared-surface-is-complete",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "lifecycle",
+          "subkind": "stopper",
+          "key": "http"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/declared-surface-is-complete/e38c61e560b8",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "declared-surface-is-complete",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "lifecycle",
+          "subkind": "starter",
+          "key": "http"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/expiry-runs-without-the-service/105867420b41",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "expiry-runs-without-the-service",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "lifecycle",
+          "subkind": "stopper",
+          "key": "database"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
       "id": "telemetry-putnami-dev/cli-usage-receiver/expiry-runs-without-the-service/679d267c3ace",
       "feature": "telemetry-putnami-dev/cli-usage-receiver",
       "requirement": "expiry-runs-without-the-service",
@@ -15,7 +105,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:bf4bc292695ff5447b1f1eb71c8f00ac2ddce80b82f1e862ac6c94474af5eb5d"
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
       },
       "subject": {
         "kind": "capability",
@@ -24,6 +114,36 @@
           "kind": "migration",
           "subkind": "sql",
           "key": "cliagg"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/expiry-runs-without-the-service/7679c3ce9966",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "expiry-runs-without-the-service",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "health",
+          "subkind": "health",
+          "key": "database"
         }
       },
       "provenance": {
@@ -45,7 +165,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:bf4bc292695ff5447b1f1eb71c8f00ac2ddce80b82f1e862ac6c94474af5eb5d"
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
       },
       "subject": {
         "kind": "capability",
@@ -54,6 +174,156 @@
           "kind": "discoverer",
           "subkind": "source",
           "key": "sql:cliagg"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/expiry-runs-without-the-service/f5187ba4b548",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "expiry-runs-without-the-service",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "infra",
+          "subkind": "database",
+          "key": "telemetry"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/sent-fields-are-aggregated/173697228c38",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "sent-fields-are-aggregated",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "lifecycle",
+          "subkind": "stopper",
+          "key": "cli-usage-aggregator"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/sent-fields-are-aggregated/6d1c54ee1ab5",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "sent-fields-are-aggregated",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "lifecycle",
+          "subkind": "starter",
+          "key": "cli-usage-aggregator"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/the-receiver-imports-only-what-it-declares/6e10e5647c15",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "the-receiver-imports-only-what-it-declares",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "domainAccess",
+          "subkind": "reference",
+          "key": "observability.application-runtime.v1"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "main.go",
+        "symbol": "main.main"
+      }
+    },
+    {
+      "id": "telemetry-putnami-dev/cli-usage-receiver/the-receiver-imports-only-what-it-declares/b79c1e04629d",
+      "feature": "telemetry-putnami-dev/cli-usage-receiver",
+      "requirement": "the-receiver-imports-only-what-it-declares",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "telemetry.putnami.dev",
+        "binding": "source-v1:sha256:54c2899fccae51c1a27ee953486f2b1f5498d81bc78ef247a9fcb5529a41517c"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "telemetry.putnami.dev",
+          "kind": "domainAccess",
+          "subkind": "reference",
+          "key": "observability.protocol-contracts.v1"
         }
       },
       "provenance": {

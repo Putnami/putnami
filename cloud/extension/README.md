@@ -104,8 +104,8 @@ setup and install configure an existing Putnami workspace but do not discover
 projects or synchronize language-owned workspace metadata; `workspace-install`
 is an explicit lifecycle command, not a discovery or synchronization claim.
 
-The extension owns the Cloud login surface directly and does not call the
-built-in `putnami auth` commands. Login is global to the user; workspace
+The extension owns the Cloud login surface: the core CLI has no `auth`
+command. Login is global to the user; workspace
 targeting is configured separately by `putnami cloud setup`. OAuth
 tokens are stored in the standard Putnami CLI credential file:
 

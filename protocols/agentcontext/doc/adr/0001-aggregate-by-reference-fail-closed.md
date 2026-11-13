@@ -1,6 +1,9 @@
 # ADR 0001 — Aggregate by reference, and fail closed before the document leaves the workspace
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0082 of `@putnami/cli`](../../../../tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md):
+  Putnami serves no MCP server, so `putnami context pack` is the document's
+  only consumer
 - **Amended**: 2026-10-24, decisions 2, 4 and 5, with document protocol
   version 2: no producer writes the document to a file, the tests section
   carries no test policy, and the overrides file keeps its own version, 1.

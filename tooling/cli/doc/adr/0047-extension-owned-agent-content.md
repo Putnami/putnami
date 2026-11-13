@@ -1,7 +1,7 @@
 # ADR 0047 — An extension is the only way agent content is installed, and the extension's pin is its pin
 
 - **Status**: accepted, amended by decisions D-012 and D-013 in the root
-  `decisions.json`. D-012: no built-in starter declares
+  `decisions/` registry. D-012: no built-in starter declares
   `@putnami/contributor`, so `init` installs no agent content unless a starter
   names an extension. D-013: `putnami migrate agent-content` is deleted, so the
   refusals in §2 name no command. They say which entry to replace or which

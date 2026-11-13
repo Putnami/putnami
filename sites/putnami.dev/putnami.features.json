@@ -9,12 +9,12 @@
       "name": "Cookieless audience measurement",
       "outcome": "The site knows which pages are read, which searches find nothing, and which platforms the CLI is downloaded for, without a cookie, a consent banner, or a third party — and a visitor can read exactly what is recorded on a page the footer links from",
       "owner": "putnami.dev",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "what-the-site-records-is-what-the-notice-says",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": ["attestation", "capability"],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -32,7 +32,7 @@
       "name": "Public documentation site",
       "outcome": "A visitor reaches what Putnami is, how to install it, which language surfaces exist, and where each package and feature is documented, from one site, without reading the repository",
       "owner": "putnami.dev",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "one-source-per-section",
@@ -51,7 +51,7 @@
         {
           "id": "documentation-sources-are-version-addressed-snapshots",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": ["attestation", "capability"],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -91,7 +91,7 @@
         {
           "id": "route-inventory-is-complete",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": ["attestation", "capability"],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -116,7 +116,7 @@
         {
           "id": "agent-surfaces-track-the-docs-tree",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": ["attestation", "capability"],
           "verification": {
             "kind": "acceptance",
             "checks": ["index-and-raw-markdown-share-a-doc-route"]
@@ -192,7 +192,7 @@
       "name": "Published support catalog",
       "outcome": "A visitor sees the reviewed public support status of every classified package and protocol, rendered from the single reviewed catalog so the published page cannot disagree with it",
       "owner": "putnami.dev",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "catalog-is-the-only-source",
@@ -277,6 +277,25 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["support-page-is-published-before-enumeration"]
+          }
+        }
+      ]
+    },
+    {
+      "id": "putnami-dev/localized-pages",
+      "type": "feature",
+      "name": "Localized site pages",
+      "outcome": "A French reader reads the site's pages in French under the /fr prefix, the privacy notice included, while every documentation page stays in English at one address",
+      "owner": "putnami.dev",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-docs-stay-english",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-edge-admits-every-docs-page-under-the-french-prefix"]
           }
         }
       ]

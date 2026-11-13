@@ -9,7 +9,7 @@
       "name": "TypeScript dependency injection",
       "outcome": "TypeScript workloads resolve their services from one container tree whose lifetimes, visibility, and disposal order are decided at composition time rather than at first use",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "graph-validation",
@@ -100,7 +100,7 @@
       "name": "TypeScript typed configuration",
       "outcome": "TypeScript workloads read validated, environment-aware configuration whose precedence is fixed and whose secret values never reach a log, an error, or a config dump",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "source-precedence",

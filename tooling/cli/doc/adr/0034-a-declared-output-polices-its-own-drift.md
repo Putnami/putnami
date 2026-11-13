@@ -42,7 +42,7 @@ Both write paths belong to the scheduler, so the scheduler judges drift.
    (`TestDriftReferenceIsNeverACacheKeyInput`). The verdict is applied after
    `finalizeExecutedJob` publishes the task-owned entry, so the successful
    entry stands and the diagnostic never travels in it. `recordableFailure`
-   refuses the code, so the failure cache ([ADR 0030](0030-a-failed-task-is-cached-until-its-inputs-change.md))
+   refuses the code, so the failure cache ([ADR 0090](0090-a-failed-task-is-cached-until-its-inputs-change.md))
    never records a verdict that depends on the worktree. The next run hits the
    entry and judges its own worktree.
 4. **Three rules keep the two paths at one verdict.**

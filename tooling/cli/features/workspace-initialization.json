@@ -8,7 +8,7 @@
     "name": "Lazy workspace initialization",
     "outcome": "A fresh worktree provides its workspace graph without a full installation, while installation restores independent artifacts concurrently and reports completed actions compactly",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "graph-readiness",

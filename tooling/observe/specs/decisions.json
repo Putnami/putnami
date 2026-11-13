@@ -71,6 +71,6 @@
     }
   ],
   "decisions": [
-    "protocols/evidence/doc/adr/0002-the-decision-records-a-change-concerns.md"
+    "protocols/evidence/doc/adr/0003-the-decision-records-a-change-concerns.md"
   ]
 }

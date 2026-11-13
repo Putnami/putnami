@@ -50,6 +50,7 @@ const CONTRIBUTION_KINDS = new Set<ContributionKind>([
   'lifecycle',
   'package',
   'requiredCapability',
+  'domainAccess',
 ]);
 
 /** Kinds whose identity carries no subkind, matching the capability contract. */

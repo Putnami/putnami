@@ -1,9 +1,10 @@
 # ADR 0021 — Publish, version, and deploy follow the distribution v2 model
 
-- **Status**: accepted, superseded in part by [ADR 0061](0061-channel-and-ci-commands-leave-the-core-cli.md).
+- **Status**: accepted, superseded in part by [ADR 0061](0061-channel-and-ci-commands-leave-the-core-cli.md):
+  decision 5 and the `putnami ci validate` sentence of decision 7.
   Decisions 13 and 14 are amended by
-  [ADR 0074](0074-deployment-follows-the-declared-release-set-trait.md)
-  (proposed): they hold for every command whose traits declare
+  [ADR 0074](0074-deployment-follows-the-declared-release-set-trait.md):
+  they hold for every command whose traits declare
   `consumesReleaseSet`, and for no other
 - **Scope**: `@putnami/cli` (`tooling/cli`), `@putnami/extension-sdk`
   (`tooling/extension-sdk`), and the publishers of `@putnami/typescript`,
@@ -85,7 +86,7 @@ and the release call themselves follow
    `fix` and `perf` are patch, anything else does not advance. A pre-release is
    always at least a patch above the last tag. A line with no reachable tag
    starts at `0.0.0` with no advance. A shallow clone degrades an ordinary build
-   to `0.0.0`; a publication refuses it. D-004 in the root `decisions.json`
+   to `0.0.0`; a publication refuses it. D-004 in the root `decisions/` registry
    supersedes the `feat` rule: before 1.0 a `feat` is a patch. D-005 caps at a
    patch a commit that touches no project the support catalog lists as stable
    and no unlisted project a stable one depends on.

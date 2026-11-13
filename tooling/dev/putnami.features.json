@@ -9,7 +9,7 @@
       "name": "Development verb vocabulary",
       "outcome": "A workspace that installs a language extension also loads @putnami/dev, and reads from it the order, descriptions, aliases, related commands and default traits of the eleven development verbs, which the language extensions keep running",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "eleven-ordered-verbs",
@@ -90,7 +90,7 @@
       "name": "Version commands",
       "outcome": "A user reads the version every version line is at with putnami version get, and releases one line with putnami version tag, which writes its changelog, its release commit and its tag, from the versions the core computes",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "get-prints-every-line",
@@ -213,7 +213,7 @@
       "name": "Workload qualification",
       "outcome": "A user or agent runs a changed workload the way it is shipped, with the workloads and databases it needs, from one command, and proves with one derived smoke contract and one fail-closed verdict that it boots and serves real requests on the tree or deployed build it names",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "runs-with-closure-served-behind-stable-proxies",

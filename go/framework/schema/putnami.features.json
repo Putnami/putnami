@@ -9,7 +9,7 @@
       "name": "Go struct-tag validation",
       "outcome": "Untrusted input is checked against constraints declared on the struct that receives it, producing the same field errors at every boundary",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "absent-fields",

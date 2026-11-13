@@ -319,6 +319,79 @@
               "the-package-step-refuses-an-unshipped-user-scope-skill"
             ]
           }
+        },
+        {
+          "id": "later-rungs-raise-the-contract-floor",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "changed-files-require-contract-16",
+              "changed-files-below-contract-16-do-not-load",
+              "host-hooks-require-contract-17",
+              "host-hooks-below-contract-17-do-not-load",
+              "a-closure-command-dependency-requires-contract-22"
+            ]
+          }
+        },
+        {
+          "id": "host-hooks-are-closed-and-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "host-hook-counter-examples-report-exact-codes",
+              "host-hook-hosts-and-events-are-closed",
+              "a-host-hook-refuses-an-unknown-member"
+            ]
+          }
+        },
+        {
+          "id": "a-binding-reads-only-the-changed-files",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unresolved-binding-at-contract-16-does-not-load",
+              "an-unresolved-binding-below-contract-16-loads-as-before"
+            ]
+          }
+        },
+        {
+          "id": "a-manifest-names-itself",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-manifest-without-a-name-fails-strict-validation"
+            ]
+          }
+        },
+        {
+          "id": "a-dependency-name-follows-the-grammar",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-dependency-name-outside-the-grammar-is-refused",
+              "the-dependency-name-grammar-is-pinned"
+            ]
+          }
         }
       ]
     }

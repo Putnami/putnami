@@ -58,7 +58,7 @@
       "required": ["ownerProject", "kind", "key"],
       "properties": {
         "ownerProject": { "type": "string", "minLength": 1 },
-        "kind": { "type": "string", "enum": ["config", "schema", "discoverer", "migration", "infra", "health", "lifecycle", "package", "requiredCapability"] },
+        "kind": { "type": "string", "enum": ["config", "schema", "discoverer", "migration", "infra", "health", "lifecycle", "package", "requiredCapability", "domainAccess"] },
         "subkind": { "type": "string", "minLength": 1 },
         "key": { "type": "string", "minLength": 1 }
       }

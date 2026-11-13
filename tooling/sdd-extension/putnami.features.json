@@ -9,7 +9,7 @@
       "name": "Specification-driven development",
       "outcome": "A workspace that opts in can author features, specs and architecture contracts, have them checked as ordinary DAG jobs in the same gate as build and test, and read them from a terminal or an agent through one shared engine \u2014 while a workspace that does not opt in carries none of it",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "opt-in-activation",

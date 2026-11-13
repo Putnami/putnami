@@ -8,12 +8,6 @@ A Bun-native application framework with plugin architecture for building HTTP se
 bun add @putnami/application
 ```
 
-Or using Putnami CLI:
-
-```bash
-putnami add @putnami/application
-```
-
 ## Features
 
 - **Plugin Architecture** - Extensible plugin system with lifecycle hooks

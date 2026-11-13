@@ -9,7 +9,7 @@
       "name": "Release rehearsal",
       "outcome": "A release approver can run one repeatable, read-only rehearsal over the current tree and read an explicit GO or NO-GO verdict, with every blocked evidence item naming its missing input and owner",
       "owner": "tooling",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "read-only-rehearsal",

@@ -8,7 +8,7 @@
     "name": "Deploy environments",
     "outcome": "A user synchronizes a declared environment on the release set its channel points at, with each workload receiving the exact members it owns",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "deploy-follows-the-environment-channel",

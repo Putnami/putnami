@@ -8,7 +8,7 @@
     "name": "First-use path on a bare machine",
     "outcome": "A new user on macOS or Linux pastes the documented block into a shell that holds only Bash, curl, tar and a SHA-256 tool, and gets a served starter; each release proves that block, the checks and the Go path in an image that holds nothing else",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "pasted-block-reaches-the-command",

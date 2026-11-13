@@ -9,7 +9,7 @@
       "name": "Go typed service clients",
       "outcome": "A Go service calls another service through a client generated from the provider's published contract, with bounded retries, a circuit breaker, and per-operation producer lineage",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "success-body",

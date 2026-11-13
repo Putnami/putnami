@@ -1,6 +1,8 @@
 # ADR 0013 — SDD is a standalone extension, not part of the CLI
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0082](0082-putnami-serves-no-mcp-server.md): Putnami serves no MCP
+  server, so the extension's MCP tools and their dotted names are gone
 - **Scope**: `@putnami/cli` (`tooling/cli`) and `@putnami/sdd`
   (`tooling/sdd-extension`): the `features`, `specs`, `architecture`, and
   `contracts` command groups, their MCP tools, and the `validate` /

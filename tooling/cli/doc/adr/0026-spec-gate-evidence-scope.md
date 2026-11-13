@@ -2,8 +2,8 @@
 
 - **Status**: accepted. The producer rule of §2 and the `test` plan of §7 are
   superseded by
-  [ADR 0072](0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md)
-  (proposed): a producer is a task that declares the file, under a command of
+  [ADR 0072](0072-the-spec-gate-and-task-scopes-follow-declared-outputs-and-command-kinds.md):
+  a producer is a task that declares the file, under a command of
   the verification or criteria kind, whatever the command is called.
 - **Amended**: 2026-10-23, §1, §2, §4 and §7: on a local miss, the gate
   reads a report task's entry from the remote cache the run executes with,
@@ -11,7 +11,7 @@
 - **Amended**: 2026-10-23, §5: a narrowed run with no cache to read warns on
   every unresolved check, and this repository's contributor CI is such a run.
 - **Amended**: 2026-10-27, §2, by
-  [ADR 0081](0081-a-feature-authority-project-attests-for-the-spec-owner.md): a
+  [ADR 0095](0095-a-feature-authority-project-attests-for-the-spec-owner.md): a
   project whose `featureAuthority.owner` names a feature the owner declares is
   also a candidate.
 - **Scope**: `@putnami/cli` spec gate (`internal/specgate`, the observation

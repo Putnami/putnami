@@ -81,7 +81,7 @@ const CreateUsersTable = {
 ```
 
 > For larger projects, author migrations as paired `.up.sql` / `.down.sql`
-> files and let `putnami generate` emit them. See [Migrations](./migrations.md).
+> files and let the generate phase of `putnami build` emit them. See [Migrations](./migrations.md).
 
 ## Step 4: Create a Repository
 

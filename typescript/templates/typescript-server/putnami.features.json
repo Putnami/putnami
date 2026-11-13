@@ -9,7 +9,7 @@
       "name": "TypeScript server template",
       "outcome": "A project created from the typescript-server template is the smallest HTTP server that works: the API routes it serves and a test beside it pass putnami lint, the type-check and their tests as created",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "relations": [
         {
           "kind": "parent",

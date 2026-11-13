@@ -100,7 +100,7 @@ not carry these Cloud concerns, because extensions work without Cloud.
   constraints; `putnami deploy --env <name>` from a laptop does the same.
 - The CLI reads `envs` for `deploy --env` and `distribution` to build the
   `release` request; it computes no visibility itself.
-- `putnami ci explain` reports the commands, the matching rule, and the
+- `putnami cloud ci explain` reports the commands, the matching rule, and the
   environments that follow each channel the rule advances. It resolves no
   remote decision and labels each one unresolved.
 - The agent guidance generator derives its gate line from `commands`.

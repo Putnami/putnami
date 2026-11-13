@@ -16,8 +16,8 @@ const ManifestFilename = "putnami.template.json"
 // stays out of what the template ships: a name that starts with a dot, local
 // installed state, or a declaration that describes the template project in its
 // source workspace rather than content for the rendered project (its project
-// configuration, its features in either form, its specs and the baseline that
-// protects them).
+// configuration, its features in either form, its specs, the baseline that
+// protects them and its verdict policy).
 // The archive leaves these entries out, and a render from the source directory
 // skips them, so both produce the same project. Nested entries are ordinary
 // template content.
@@ -26,7 +26,8 @@ func IsTemplateRootPackagingExclusion(name string) bool {
 		return true
 	}
 	switch name {
-	case "node_modules", "putnami.json", "putnami.features.json", "features", "specs", "specs.baseline.json":
+	case "node_modules", "putnami.json", "putnami.features.json", "features", "specs", "specs.baseline.json",
+		"putnami.verdict-policy.json":
 		return true
 	default:
 		return false

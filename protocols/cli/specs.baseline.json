@@ -3,6 +3,8 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "cli/machine-contract#a-commit-is-read-one-way",
+    "cli/machine-contract#a-failure-envelope-carries-its-data",
+    "cli/machine-contract#a-session-records-the-reuse-it-took",
     "cli/machine-contract#exit-codes-and-error-classification",
     "cli/machine-contract#one-run-verdict-on-every-surface",
     "cli/machine-contract#one-validator-and-a-shared-corpus",
@@ -16,6 +18,7 @@
     "cli/machine-contract#the-report-is-a-bounded-projection",
     "cli/machine-contract#the-reporting-wire",
     "cli/machine-contract#the-schemas-and-the-types-agree",
-    "cli/machine-contract#version-2-is-the-only-machine-contract"
+    "cli/machine-contract#version-2-is-the-only-machine-contract",
+    "cli/machine-contract#workspace-warnings-travel-in-the-envelope"
   ]
 }

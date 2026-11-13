@@ -12,6 +12,7 @@
     "telemetry-putnami-dev/cli-usage-receiver#ingest-is-anonymous",
     "telemetry-putnami-dev/cli-usage-receiver#sent-fields-are-aggregated",
     "telemetry-putnami-dev/cli-usage-receiver#small-groups-are-withheld",
+    "telemetry-putnami-dev/cli-usage-receiver#the-receiver-imports-only-what-it-declares",
     "telemetry-putnami-dev/cli-usage-receiver#undeclared-requests-are-rejected"
   ]
 }

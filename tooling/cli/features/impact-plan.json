@@ -8,7 +8,7 @@
     "name": "Impact plan",
     "outcome": "An extension asks the engine for the impacted plan of a change, for the commands it names, and reads it with the protocol package alone",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "one-projection",

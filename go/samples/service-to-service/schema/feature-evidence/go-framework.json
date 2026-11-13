@@ -1,0 +1,996 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-feature-evidence.json",
+  "protocolVersion": 1,
+  "evidence": [
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/0d479f3109db",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "stopper",
+          "key": "grpc-api-bridge"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/11f609721213",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "starter",
+          "key": "proto"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/4b279c05205a",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "stopper",
+          "key": "http"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/59a63832c9f6",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "starter",
+          "key": "openapi"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/60c6dc30fe51",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "stopper",
+          "key": "platform"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/6d6d51522be2",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "stopper",
+          "key": "proto"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/9ed6ed805bbd",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "starter",
+          "key": "grpc-api-bridge"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/d723dac90735",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "stopper",
+          "key": "openapi"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/e0c8d226d0c4",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "starter",
+          "key": "http"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-call-is-observable-and-ends-with-its-application/e226e8109f13",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-call-is-observable-and-ends-with-its-application",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "lifecycle",
+          "subkind": "starter",
+          "key": "platform"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/1a85a634fac4",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /items/{id}/adjust"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/1c224c17d050",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "POST /body-nullable"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/30f73014318d",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "POST /body-fidelity"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/38a802103041",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /items/{id}"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/541955b8b2f0",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /credential-check"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/607f831de9e2",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /items/changes"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/671aa90d729c",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /items/{id}/negotiate"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/67b4b050fc0b",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "POST /blobs/echo"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/8fa528e17c7e",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /whoami"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/9678880b77a5",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /quotes/{id}"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/99c87c604fe6",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "POST /items"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/a6e2fbc7edf8",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "POST /audit"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/af42245525ce",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /items"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/b4a053adc2b0",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /quotes/{id}/snapshot"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/c37884109eb7",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /blobs/{id}"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/cee6112a9e6d",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /tenant-check"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/d260cd737271",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /quotes/{id}/ticks"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/d36876e639a0",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /items/{id}/watch"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/d53fd0dcd7a3",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "POST /body-values"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/e1f90d165bd4",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "GET /items/{id}/history"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/a-result-is-what-the-contract-declared/fb99f23cb335",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "a-result-is-what-the-contract-declared",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "route",
+          "key": "POST /body-counter"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/generation-is-deterministic-and-a-break-is-detected/1fb434cb41d1",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "generation-is-deterministic-and-a-break-is-detected",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "openapi",
+          "key": "openapi"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    },
+    {
+      "id": "samples/go-first-party-client-matrix/generation-is-deterministic-and-a-break-is-detected/781dc0f9d1df",
+      "feature": "samples/go-first-party-client-matrix",
+      "requirement": "generation-is-deterministic-and-a-break-is-detected",
+      "stage": "coded",
+      "outcome": "supports",
+      "issuer": {
+        "kind": "build",
+        "id": "go.putnami.dev/app"
+      },
+      "source": {
+        "root": "project",
+        "ownerProject": "go.putnami.dev/examples/service-to-service",
+        "binding": "source-v1:sha256:21112f1adf1483c7a65520c72187d357b80143ccd6c1df5594093678dee8c09d"
+      },
+      "subject": {
+        "kind": "capability",
+        "contribution": {
+          "ownerProject": "go.putnami.dev/examples/service-to-service",
+          "kind": "schema",
+          "subkind": "proto",
+          "key": "api-proto"
+        }
+      },
+      "provenance": {
+        "root": "project",
+        "path": "service/service.go",
+        "symbol": "go.putnami.dev/examples/service-to-service/service.clientMatrixFeature"
+      }
+    }
+  ]
+}

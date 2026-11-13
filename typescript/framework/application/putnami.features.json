@@ -9,7 +9,7 @@
       "name": "TypeScript application lifecycle",
       "outcome": "TypeScript workloads compose plugins and modules into one bounded build, startup, and shutdown lifecycle that never leaves a half-started process behind",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "bootstrap-guard",
@@ -231,7 +231,7 @@
       "name": "TypeScript server streams",
       "outcome": "A TypeScript provider serves a declared server stream over SSE with admission decided before the first body byte and every byte it writes bounded",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "sse-admission-and-bounds",
@@ -270,7 +270,7 @@
       "name": "TypeScript API contracts",
       "outcome": "A TypeScript provider declares an operation or a stream once and serves it over every transport its published contract advertises, admitting a first-party WebSocket caller through the first frame rather than through headers a browser cannot set",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "relations": [
         {
           "kind": "dependsOn",
@@ -534,7 +534,7 @@
       "name": "TypeScript authentication and authorization",
       "outcome": "A TypeScript application signs browsers in through OAuth2, keeps their session encrypted, resolves callers through configured strategies, refuses cross-site state changes and decides every protected request as 401 or 403 without disclosing a credential",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "oauth-authorization-code-flow",
@@ -700,7 +700,7 @@
       "name": "TypeScript cache lifecycle",
       "outcome": "A TypeScript service caches loader results in memory, on disk or in layers, never serves an entry past its TTL or eviction, and publishes HTTP cache headers that let a client revalidate with 304",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "cache-aside-fetch",
@@ -840,7 +840,7 @@
       "name": "TypeScript gRPC and Connect services",
       "outcome": "TypeScript workloads serve their HTTP endpoints as gRPC and Connect RPCs on the same port, through the same endpoint pipeline, with standard health and reflection services and a codec that survives malformed input",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "route-derived-services",
@@ -988,7 +988,7 @@
       "name": "TypeScript HTTP services",
       "outcome": "A TypeScript workload serves its routes, middleware and static files through one secure-by-default HTTP server that bounds every request, logs each one once and reports the address and routes it serves",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "routing",
@@ -1195,7 +1195,7 @@
       "name": "TypeScript service telemetry",
       "outcome": "A TypeScript service that opts in pushes its metrics, spans and logs as OTLP/JSON to the collector it names, with bounded metric series and without a failing collector ever failing the service",
       "owner": "typescript",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "opt-in-with-explicit-endpoint",

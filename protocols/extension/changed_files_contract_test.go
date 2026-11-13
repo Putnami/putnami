@@ -8,6 +8,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // changedFilesFixture is a manifest stamped 16 whose `test-race` step gates on
@@ -32,6 +33,7 @@ func readChangedFilesFixture(t *testing.T) *Manifest {
 // A change gate and a context binding each require rung 16 from every origin,
 // and the stamped fixture loads with both forms intact.
 func TestChangedFilesRequireTheirContract(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "changed-files-require-contract-16")
 	m := readChangedFilesFixture(t)
 	if !DeclaresChangedFiles(m) {
 		t.Fatal("DeclaresChangedFiles = false for a step that gates on and binds the changed files")
@@ -79,6 +81,7 @@ func TestChangedFilesRequireTheirContract(t *testing.T) {
 // changed files, with the remedy that moves it: an older reader would plan the
 // step on every run and key it without the files.
 func TestChangedFilesBelowTheirContractAreRefused(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "later-rungs-raise-the-contract-floor", "changed-files-below-contract-16-do-not-load")
 	for _, stamp := range []int{protocolcli.CurrentContract, protocolcli.ChangedFilesContract - 1} {
 		m := readChangedFilesFixture(t)
 		m.CLIContract = stamp
@@ -138,6 +141,7 @@ func bindingManifest(stamp int, binding InputBinding) *Manifest {
 // pair is the new form. Strict validation, which gates packaging, refuses each
 // spelling, and the packager therefore never stamps one.
 func TestUnresolvedBindingsBelowTheContractLoadAsBefore(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-binding-reads-only-the-changed-files", "an-unresolved-binding-below-contract-16-loads-as-before")
 	for name, binding := range map[string]InputBinding{
 		"command source":     {From: "command", Path: "params.target"},
 		"other context path": {From: InputBindingFromContext, Path: "workspace.name"},
@@ -164,6 +168,7 @@ func TestUnresolvedBindingsBelowTheContractLoadAsBefore(t *testing.T) {
 // source the planner does not resolve is refused at load rather than keying
 // the step without the input its author meant to bind.
 func TestUnresolvedBindingsAtTheContractAreRefused(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-binding-reads-only-the-changed-files", "an-unresolved-binding-at-contract-16-does-not-load")
 	for name, binding := range map[string]InputBinding{
 		"command source": {From: "command", Path: "params.target"},
 		"mistyped path":  {From: InputBindingFromContext, Path: "selection.changedFile"},

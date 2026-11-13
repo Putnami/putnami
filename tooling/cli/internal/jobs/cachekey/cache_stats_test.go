@@ -7,6 +7,7 @@ import (
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // TestCacheStats_RemoteAnswer pins the remote member of the snapshot: absent
@@ -14,6 +15,7 @@ import (
 // with the preferred reason.
 func TestCacheStats_RemoteAnswer(t *testing.T) {
 	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "a-run-records-whether-the-remote-cache-answered", "the-remote-answer-counts-lookups-and-ranks-reasons")
 	if remote := (&CacheStats{}).Snapshot().Remote; remote != nil {
 		t.Fatalf("a run with no remote lookup recorded %+v", remote)
 	}

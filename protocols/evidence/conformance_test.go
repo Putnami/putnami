@@ -1055,6 +1055,35 @@ func TestConformance_EachDeclarationDefectGetsItsCode(t *testing.T) {
 	}
 }
 
+func TestConformance_EveryDeclarationFormIsADeclaration(t *testing.T) {
+	spectest.Proves(t, feature, "declarations-follow-the-diff", "every-declaration-form-is-a-declaration")
+	for file, want := range map[string]bool{
+		"CODEOWNERS":                                            true,
+		"decisions.json":                                        true,
+		"decisions/D-001.json":                                  true,
+		"tooling/cli/decisions/D-R2.json":                       true,
+		"putnami.features.json":                                 true,
+		"tooling/cli/features/job-planning-execution.json":      true,
+		"pricing/specs/discount.json":                           true,
+		"pricing/specs.baseline.json":                           true,
+		"pricing/putnami.architecture.json":                     true,
+		"putnami.ci.json":                                       true,
+		"putnami.verdict-policy.json":                           true,
+		"go/samples/putnami.verdict-policy.json":                true,
+		"tooling/cli/doc/adr/0001-cli-foundation-boundaries.md": true,
+		"decisions/notes.md":                                    false,
+		"features/discount.feature":                             false,
+		"protocols/features/putnami.json":                       false,
+		"putnami.workspace.json":                                false,
+		"pricing/discount_test.go":                              false,
+		"pricing/doc/adr.json":                                  false,
+	} {
+		if got := IsDeclaration(file); got != want {
+			t.Errorf("IsDeclaration(%q) = %v, want %v", file, got, want)
+		}
+	}
+}
+
 func TestConformance_ADocumentWithoutDeclarationsValidatesAsBefore(t *testing.T) {
 	spectest.Proves(t, feature, "declarations-follow-the-diff", "a-document-without-declarations-validates-as-before")
 	for _, name := range []string{"generic-minimal.json", "turbo-pull-request.json", "decisions-pull-request.json"} {

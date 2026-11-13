@@ -1,6 +1,8 @@
 # ADR 0024 — Lazy workspace initialization
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0082](0082-putnami-serves-no-mcp-server.md): Putnami serves no MCP
+  server, so no index is prepared at an MCP start
 - **Scope**: `@putnami/cli`, workspace probes, artifact restoration,
   installation output
 

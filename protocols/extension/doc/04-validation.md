@@ -517,13 +517,15 @@ an unrelated reason.
 
 ## Behavioral Testing
 
-Beyond static validation, extensions should be tested against fixture projects:
+Beyond static validation, an extension's own tests run its commands against
+fixture projects. An extension is a workspace project, so its language
+extension runs those tests:
 
 ```bash
-putnami extensions test [path]
+putnami test <project>
 ```
 
-This runs each command against a minimal fixture project and verifies:
+Each command, run against a minimal fixture project, should show that:
 - The command produces valid JSONL output
 - A `result` event is emitted with a valid status
 - Declared output artifacts exist after execution

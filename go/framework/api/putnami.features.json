@@ -9,7 +9,7 @@
       "name": "Go API contracts",
       "outcome": "A Go service declares each endpoint once and serves it while publishing the OpenAPI and Protobuf contracts that describe the same operations",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "streamed-binary-payloads",

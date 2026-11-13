@@ -65,10 +65,14 @@
         "A dependency or contract edge carries into each dependent only the tasks a `^` reference reaches when a command that declares the reference may be planned in that dependent;",
         "a dependent it reaches nothing in is not selected through the edge."
       ]
+    },
+    {
+      "id": "a-checking-task-moves-no-extension-runtime",
+      "text": "A changed file that only the checking-kind tasks of an extension read, such as its tests, scopes the extension to those tasks and moves no runtime its consumers execute, so it selects none of them."
     }
   ],
   "decisions": [
-    "tooling/cli/doc/adr/0038-nearest-ownership-and-ordering-only-scope-edges.md",
+    "tooling/cli/doc/adr/0091-nearest-ownership-and-ordering-only-scope-edges.md",
     "tooling/cli/doc/adr/0042-impacted-plans-from-the-commit-and-records-why.md",
     "tooling/cli/doc/adr/0044-selection-is-task-level.md",
     "tooling/cli/doc/adr/0054-the-contract-edge-fires-on-the-committed-contract.md",

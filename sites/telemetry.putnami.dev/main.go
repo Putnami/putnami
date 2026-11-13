@@ -83,11 +83,10 @@ func main() {
 
 	a := app.New(appName)
 
-	// The product outcome this workload implements, declared once. Proves names
-	// the two contributions that make "expiry-runs-without-the-service" true:
+	// The product outcome this workload implements, declared once. Proves maps
+	// every contribution of the workload to the requirement it supports.
 	// cliagg.Source() carries the migration that calls cron.schedule_in_database,
-	// and the source discoverer is what applies it. Neither alone schedules the
-	// expiry, and both come from that one declaration. The build derives the
+	// and the source discoverer is what applies it. The build derives the
 	// evidence; nothing here asserts a stage or a source binding.
 	a.Feature(app.Feature{
 		ID:      "telemetry-putnami-dev/cli-usage-receiver",
@@ -108,6 +107,47 @@ func main() {
 					Subkind: string(protocaps.DiscovererKindSource),
 					Key:     "sql:" + cliagg.MigrationNamespace,
 				},
+			},
+			// The database the expiry runs in: its declaration, its probe and
+			// the stop that closes its pool.
+			{
+				Requirement:  "expiry-runs-without-the-service",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindInfra, Subkind: "database", Key: "telemetry"},
+			},
+			{
+				Requirement:  "expiry-runs-without-the-service",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindHealth, Subkind: "health", Key: "database"},
+			},
+			{
+				Requirement:  "expiry-runs-without-the-service",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindLifecycle, Subkind: "stopper", Key: "database"},
+			},
+			// The aggregator that folds every sent field into its bounded aggregate.
+			{
+				Requirement:  "sent-fields-are-aggregated",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindLifecycle, Subkind: "starter", Key: "cli-usage-aggregator"},
+			},
+			{
+				Requirement:  "sent-fields-are-aggregated",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindLifecycle, Subkind: "stopper", Key: "cli-usage-aggregator"},
+			},
+			// The HTTP server that serves the declared surface, and nothing else.
+			{
+				Requirement:  "declared-surface-is-complete",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindLifecycle, Subkind: "starter", Key: "http"},
+			},
+			{
+				Requirement:  "declared-surface-is-complete",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindLifecycle, Subkind: "stopper", Key: "http"},
+			},
+			// The two contracts of other domains the receiver references.
+			{
+				Requirement:  "the-receiver-imports-only-what-it-declares",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindDomainAccess, Subkind: "reference", Key: protocolContractsImport.ID},
+			},
+			{
+				Requirement:  "the-receiver-imports-only-what-it-declares",
+				Contribution: app.ContributionRef{Kind: protocaps.ContributionKindDomainAccess, Subkind: "reference", Key: applicationRuntimeImport.ID},
 			},
 		},
 	})

@@ -9,7 +9,7 @@
       "name": "Go migration CLI",
       "outcome": "Operators run migration apply, rollback, status, inspect, and drift verification against the service's real application graph without starting runtime listeners",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "cancellation-cleanup",

@@ -9,7 +9,7 @@
       "name": "Go HTTP services",
       "outcome": "Go services route HTTP requests through an ordered middleware chain with per-request dependency scopes, bounded streams, and a graceful shutdown",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "streamed-responses",

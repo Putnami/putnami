@@ -11,9 +11,12 @@ Key steps:
 - write generated source and export metadata to `.gen/`
 - copy configured generated assets into the project output
 
+Generate is not a command of its own: `putnami build` and `putnami test` run
+it first.
+
 ```bash
-putnami generate .
-putnami generate . --clear
+putnami build .
+putnami build . --clear
 ```
 
 ## Options
@@ -21,7 +24,7 @@ putnami generate . --clear
 | Option | Use |
 |--------|-----|
 | `--verbose` | Show detailed generation output |
-| `--clear` | Remove existing generated artifacts before running |
+| `--clear` | Clear the dist folder before building |
 
 ## Pre-build hooks
 

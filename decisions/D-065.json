@@ -5,5 +5,6 @@
   "statement": "an adoption in import mode lets Putnami install the dependencies: the language extension adds the members to the list the repository's package manager reads, adds no list where it keeps none, and installs with that manager and its lockfile (D-068)",
   "settled": "2026-11-10",
   "settledBy": "fdumay",
+  "adr": "tooling/stacks/doc/adr/0017-an-import-never-changes-the-tool-that-checks-the-code.md",
   "reviewOnly": true
 }

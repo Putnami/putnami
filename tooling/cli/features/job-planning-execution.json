@@ -8,7 +8,7 @@
     "name": "Job planning and execution",
     "outcome": "A user can select public jobs, preview their dependency plan, execute them through one engine, and receive a stable result",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "command-catalog",
@@ -1332,6 +1332,20 @@
           "checks": [
             "a-layer-claims-no-task-of-a-command-the-project-does-not-run",
             "a-step-reference-reaches-only-a-dependent-that-may-run-its-command"
+          ]
+        }
+      },
+      {
+        "id": "a-run-records-whether-the-remote-cache-answered",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-remote-answer-counts-lookups-and-ranks-reasons",
+            "a-lookup-failure-is-a-closed-reason"
           ]
         }
       }

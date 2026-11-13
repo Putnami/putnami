@@ -2,7 +2,7 @@
 
 - **Status**: accepted
 - **Scope**: `go.putnami.dev/protocol/ci` (`protocols/ci`), `@putnami/cli`
-  (`putnami impact-plan`, `putnami change-plan`)
+  (`putnami impact-plan`; `ChangePlanFromImpactPlan` replaces `putnami change-plan`)
 
 ## Context
 

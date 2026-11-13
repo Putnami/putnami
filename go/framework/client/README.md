@@ -17,7 +17,7 @@ are never automatically replayed; streamed operations cannot use the response
 cache. The operation's attempt and total deadlines remain active while a
 download is consumed. EOF, cancellation, Close and application stop release it.
 Bounded binary operations retain their existing byte limits and buffered result.
-See [the ownership decision](doc/adr/0007-unframed-binary-bodies-transfer-ownership.md).
+See [the ownership decision](doc/adr/0010-unframed-binary-bodies-transfer-ownership.md).
 
 ## Response validation
 

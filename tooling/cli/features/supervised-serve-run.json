@@ -8,7 +8,7 @@
     "name": "Supervised serve run",
     "outcome": "A supervisor starts a workload with one putnami serve run, hands its serve step the process environment the workload needs on stdin, and reads from the session stream which process group the workload runs in and when it is ready, however many ordinary log lines the workload writes",
     "owner": "tooling",
-    "target": "modeled",
+    "target": "coded",
     "requirements": [
       {
         "id": "serve-env-reaches-only-serve-steps",

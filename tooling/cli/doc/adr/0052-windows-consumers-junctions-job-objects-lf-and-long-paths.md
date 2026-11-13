@@ -27,7 +27,7 @@ Five Unix assumptions fail on native Windows:
   long paths itself; its Git, Bun and Go children need the Windows setting.
 - `HOME` and `os.UserHomeDir` resolve to different directories.
 
-The Windows decisions are D-W1 to D-W12 in `tooling/cli/decisions.json`. This
+The Windows decisions are D-W1 to D-W12 in `tooling/cli/decisions/`. This
 record gives the reasons for D-W4, D-W6, D-W7, D-W8, D-W9 and D-W12, and owns
 the Windows installer.
 

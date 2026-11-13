@@ -1,8 +1,8 @@
 # ADR 0003 — a published channel declares its lifetime
 
 - **Status**: accepted
-- **Scope**: `go.putnami.dev/protocol/ci` (`protocols/ci`), `@putnami/cli`
-  (`putnami ci explain`)
+- **Scope**: `go.putnami.dev/protocol/ci` (`protocols/ci`), `@putnami/cloud`
+  (`putnami cloud ci explain`)
 
 ## Context
 
@@ -39,7 +39,7 @@ cannot execute it: it owns no channel and retracts nothing.
 6. **The contract says what is expected, never how.** Retraction and expiry
    name a channel head; the immutable sets it pointed at may still be
    referenced elsewhere. When and how a provider reaps is the provider's part.
-7. **`putnami ci explain` reports the lifetime** with the matched rule, in the
+7. **`putnami cloud ci explain` reports the lifetime** with the matched rule, in the
    human form and in `Explanation.retain`, and says so when none is declared.
 
 ## Rejected alternatives

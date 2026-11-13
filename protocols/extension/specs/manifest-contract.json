@@ -162,6 +162,36 @@
         "The package step copies it and refuses a name the built content does not ship as a skill.",
         "Declaring it requires contract 20 (UserScopeSkillsContract), so a CLI that predates the member refuses the manifest instead of installing the extension in the user scope without its skills."
       ]
+    },
+    {
+      "id": "later-rungs-raise-the-contract-floor",
+      "text": [
+        "A step that gates on or binds the run's changed files requires contract 16, a hostHooks member contract 17, and a dependency on a command across the dependency closure, ^command, contract 22, each only when used.",
+        "A manifest stamped below the rung its vocabulary requires does not load."
+      ]
+    },
+    {
+      "id": "host-hooks-are-closed-and-bounded",
+      "text": [
+        "A hostHooks member names only the hosts claude-code and codex, and only the events that host runs a hook at; PostToolUse alone takes a tool matcher.",
+        "A timeout is at most 3600 seconds, and every name, argument and matcher list is bounded.",
+        "The strict parser refuses an unknown member, and each counter-example reports its exact code."
+      ]
+    },
+    {
+      "id": "a-binding-reads-only-the-changed-files",
+      "text": [
+        "A step input binding reads only the context path selection.changedFiles; any other source or path is unresolvable-binding under strict validation.",
+        "A manifest stamped at contract 16 or above that holds one does not load, and the error names the binding; below that rung it loads as before."
+      ]
+    },
+    {
+      "id": "a-manifest-names-itself",
+      "text": "Strict validation, ValidateManifest and FullValidateManifest alike, requires the manifest's name and reports required-field without it."
+    },
+    {
+      "id": "a-dependency-name-follows-the-grammar",
+      "text": "An extensionDependencies key is @scope/name or an unscoped package name, each part matching [a-z0-9][a-z0-9._-]*; any other key reports invalid-extension-dependency at its field."
     }
   ],
   "decisions": [

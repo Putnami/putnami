@@ -57,6 +57,7 @@ func TestIsRegistryName(t *testing.T) {
 }
 
 func TestIsDependencyName(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-dependency-name-follows-the-grammar", "the-dependency-name-grammar-is-pinned")
 	for name, want := range map[string]bool{
 		"@putnami/go":   true,
 		"local-tool":    true,
@@ -82,6 +83,7 @@ func TestIsDependencyName(t *testing.T) {
 // grammars, at the key that holds it, and the schema states the same grammar
 // for the list and the map form.
 func TestValidateManifest_DependencyNameFollowsTheGrammar(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-dependency-name-follows-the-grammar", "a-dependency-name-outside-the-grammar-is-refused")
 	spectest.Proves(t, "extension/manifest-contract", "strict-manifests-and-a-fixture-corpus", "each-counter-example-reports-its-exact-codes")
 	m := &Manifest{
 		Name:     "@test/extension",

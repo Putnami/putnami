@@ -17,6 +17,7 @@ import (
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
 	cache "go.putnami.dev/protocol/cache"
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/tooling/cli/internal/cacheprovider"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/store"
@@ -290,6 +291,7 @@ func TestFetchTaskEntryTellsAnUnconfiguredProviderFromAFailure(t *testing.T) {
 // reason session.json states, and that the run's own cancellation counts no
 // lookup.
 func TestLookupFailureIsAClosedReason(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-run-records-whether-the-remote-cache-answered", "a-lookup-failure-is-a-closed-reason")
 	for _, testCase := range []struct {
 		err  error
 		want string

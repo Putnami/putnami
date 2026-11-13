@@ -7,9 +7,9 @@
   their goldens live in `@putnami/dev` (`tooling/dev/internal/compose` and
   `tooling/dev/internal/qualify`), a member runs `serve`, and the codes
   `no_serve_command` and `ambiguous_serve` are deleted
-- **Scope**: `@putnami/cli` (`internal/compose`, `internal/qualify`,
-  `internal/commands/composecmd`, `internal/commands/qualifycmd`,
-  `internal/engine`, `internal/jobs/scheduler`), feature
+- **Scope**: `@putnami/dev` (`tooling/dev/internal/compose`,
+  `tooling/dev/internal/qualify`), `@putnami/cli` (`internal/engine`,
+  `internal/jobs/scheduler`), feature
   `cli/workload-qualification`
 
 ## Context

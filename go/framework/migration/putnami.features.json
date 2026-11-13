@@ -9,7 +9,7 @@
       "name": "Go migration execution",
       "outcome": "Go services discover, order, apply, roll back, and verify owned migrations through a backend-neutral registry",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "deterministic-order",

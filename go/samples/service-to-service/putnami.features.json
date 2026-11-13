@@ -28,7 +28,7 @@
         {
           "id": "a-result-is-what-the-contract-declared",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": ["attestation", "capability"],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -56,7 +56,7 @@
         {
           "id": "a-call-is-observable-and-ends-with-its-application",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": ["attestation", "capability"],
           "verification": {
             "kind": "acceptance",
             "checks": [
@@ -69,7 +69,7 @@
         {
           "id": "generation-is-deterministic-and-a-break-is-detected",
           "stage": "coded",
-          "evidenceKinds": ["attestation"],
+          "evidenceKinds": ["attestation", "capability"],
           "verification": {
             "kind": "acceptance",
             "checks": [

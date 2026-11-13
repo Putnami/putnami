@@ -16,7 +16,7 @@ dependent command wait for every leaf step of the prerequisite.
 `clientgen` declares `"dependsOn": ["build"]`. It reads the contract that the
 `describe` step of a Go build, or the `generate` step of a TypeScript build,
 writes under `.gen`. It never reads the executable. Since
-[ADR 0082 of `@putnami/cli`](../../../../tooling/cli/doc/adr/0082-an-order-only-waiter-keeps-files-only-when-its-key-reads-them.md)
+[ADR 0096 of `@putnami/cli`](../../../../tooling/cli/doc/adr/0096-an-order-only-waiter-keeps-files-only-when-its-key-reads-them.md)
 removed the `infra → compile` edge, `compile` is a leaf of the Go build, so
 `generate-go` and `generate-ts` depend on it directly.
 
@@ -37,7 +37,7 @@ names a command.
    step, and reads its files. It is also ordered after every other leaf step
    of the command, by an order-only edge (`SerializeAfter`), so it runs where
    a dependency on `<command>` runs it. Under
-   [ADR 0082 of `@putnami/cli`](../../../../tooling/cli/doc/adr/0082-an-order-only-waiter-keeps-files-only-when-its-key-reads-them.md),
+   [ADR 0096 of `@putnami/cli`](../../../../tooling/cli/doc/adr/0096-an-order-only-waiter-keeps-files-only-when-its-key-reads-them.md),
    an order-only edge keeps a leaf's files only when the dependent's key reads
    a file the leaf writes. The `!` session barrier keeps naming whole
    commands; `!<command>~<step>` is invalid.

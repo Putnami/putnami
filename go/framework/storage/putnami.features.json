@@ -9,7 +9,7 @@
       "name": "Go object storage",
       "outcome": "Go services store and retrieve objects through isolated memory, filesystem, S3, GCS, or managed-binding backends, with upload constraints enforced on the plugin-provided backend",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "backend-contract",

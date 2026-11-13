@@ -265,18 +265,26 @@ describe('putnami.dev canonical HTTP route inventory', () => {
       },
     );
 
-    it('admits the redirect of each docs page under the French prefix', () => {
-      // The docs stay English; /fr/docs/x answers 308 to /docs/x, built or not,
-      // and the edge must let that request reach the app.
-      const docs = webPagePaths().filter((path) => path === '/docs' || path.startsWith('/docs/'));
-      expect(docs.length).toBeGreaterThan(1);
-      for (const path of [...docs, '/docs/a/b/c', ...registeredStaticPaths().filter((p) => p.startsWith('/docs/'))]) {
-        for (const method of ['GET', 'HEAD']) {
-          expect(admits(`/fr${path}`, method)).toBe(true);
+    specTest(
+      'admits the redirect of each docs page under the French prefix',
+      {
+        feature: 'putnami-dev/localized-pages',
+        requirement: 'the-docs-stay-english',
+        check: 'the-edge-admits-every-docs-page-under-the-french-prefix',
+      },
+      () => {
+        // The docs stay English; /fr/docs/x answers 308 to /docs/x, built or not,
+        // and the edge must let that request reach the app.
+        const docs = webPagePaths().filter((path) => path === '/docs' || path.startsWith('/docs/'));
+        expect(docs.length).toBeGreaterThan(1);
+        for (const path of [...docs, '/docs/a/b/c', ...registeredStaticPaths().filter((p) => p.startsWith('/docs/'))]) {
+          for (const method of ['GET', 'HEAD']) {
+            expect(admits(`/fr${path}`, method)).toBe(true);
+          }
+          expect(admits(`/fr${path}`, 'POST')).toBe(false);
         }
-        expect(admits(`/fr${path}`, 'POST')).toBe(false);
-      }
-    });
+      },
+    );
 
     it('admits the docs catch-all subtree at any depth', () => {
       for (const path of ['/docs/getting-started', '/docs/frameworks/go/caching', '/docs/a/b/c/d']) {

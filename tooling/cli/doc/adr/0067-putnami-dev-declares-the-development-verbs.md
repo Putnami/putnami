@@ -12,7 +12,7 @@
   `go.putnami.dev/protocol/extension` and `go.putnami.dev/protocol/cli`
   (contract rung 9), and the `@putnami/dev` extension
 - **Decisions**: D-006, D-007, D-009, D-010 and D-012 of the root
-  `decisions.json`
+  `decisions/` registry
 
 ## Context
 
@@ -112,9 +112,9 @@ per verb and project to every plan, and change every recorded session.
 
 This ADR states D1 to D10 as proposals that answer the open questions of
 the `@putnami/dev` slice. Merging this ADR adopts them. The change that
-implements D9 records it in the root `decisions.json` as an amendment of
+implements D9 records it in the root `decisions/` registry as an amendment of
 D-009, and the change that implements D2 records it in
-`tooling/cli/decisions.json`.
+`tooling/cli/decisions/`.
 
 - **D1 — contributor skills.** A manifest field on `@putnami/dev` opts the
   workspaces of its dependents into the agent content of

@@ -420,7 +420,7 @@ user-facing feature is one the owner declares. It is a test-only project split o
 of the owner so that only the files its tests read key it, so it shares no
 dependency edge with the owner on purpose. A declaration that names another
 feature admits nothing. See
-[ADR 0081](../../cli/doc/adr/0081-a-feature-authority-project-attests-for-the-spec-owner.md).
+[ADR 0095](../../cli/doc/adr/0095-a-feature-authority-project-attests-for-the-spec-owner.md).
 
 ## When nothing could be consulted
 

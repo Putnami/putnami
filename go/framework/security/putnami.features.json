@@ -9,7 +9,7 @@
       "name": "Go authentication and authorization",
       "outcome": "Go services resolve bounded caller identities and enforce explicit role, scope, client, and contextual authorization decisions fail-closed",
       "owner": "go",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "authorization-decision",

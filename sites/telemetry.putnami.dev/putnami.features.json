@@ -9,7 +9,7 @@
       "name": "Anonymous CLI-usage telemetry receiver",
       "outcome": "Putnami maintainers see aggregate CLI usage without the receiver ever retaining a raw event, a caller address, or anything that identifies a user, and a CLI run is never affected by whether the receiver answers",
       "owner": "telemetry.putnami.dev",
-      "target": "modeled",
+      "target": "coded",
       "requirements": [
         {
           "id": "ingest-is-anonymous",
@@ -108,7 +108,8 @@
           "id": "sent-fields-are-aggregated",
           "stage": "coded",
           "evidenceKinds": [
-            "attestation"
+            "attestation",
+            "capability"
           ],
           "verification": {
             "kind": "acceptance",
@@ -150,7 +151,8 @@
           "id": "declared-surface-is-complete",
           "stage": "coded",
           "evidenceKinds": [
-            "attestation"
+            "attestation",
+            "capability"
           ],
           "verification": {
             "kind": "acceptance",
@@ -173,6 +175,21 @@
             "checks": [
               "an-undeclared-request-never-reaches-workload-logic",
               "the-receiver-never-answers-with-a-redirect"
+            ]
+          }
+        },
+        {
+          "id": "the-receiver-imports-only-what-it-declares",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation",
+            "capability"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-enforced-contracts-are-the-declaration-verbatim",
+              "the-committed-evidence-matches-the-enforced-contracts"
             ]
           }
         }

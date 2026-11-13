@@ -1,6 +1,9 @@
 # ADR 0028 — The `putnami` repository is the source of its own CLI
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0082](0082-putnami-serves-no-mcp-server.md): Putnami serves no MCP
+  server and writes no `.mcp.json`, so the wrapper relay rationale no longer
+  holds
 - **Scope**: root `putnami.lock.json`, root `putnamiw`, `@putnami/cli` (`internal/lockfile`, `internal/launch`, `internal/commands/extensions`)
 
 ## Context

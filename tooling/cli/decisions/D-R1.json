@@ -5,5 +5,6 @@
   "statement": "from a task's first debug line to its task:end, the session reporter's upload holds every task:event of that task, so a failed task's lines keep their order and its info, warn and diagnostic events leave at its end",
   "settled": "2026-10-28",
   "settledBy": "fdumay",
+  "adr": "doc/adr/0083-the-session-reporter-uploads-a-trimmed-view-of-the-event-stream.md",
   "reviewOnly": true
 }
