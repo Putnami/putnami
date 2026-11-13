@@ -425,6 +425,9 @@ func TestMergeProbeResults_ConflictingScalarsAreHardErrors(t *testing.T) {
 	if merged["svc"].Type != "" {
 		t.Errorf("type = %q, want empty — the merge must not silently pick a winner", merged["svc"].Type)
 	}
+	if d := diags[0]; d.Field != "svc" || !strings.Contains(d.Message, `set "type" in svc/putnami.json to resolve`) {
+		t.Errorf("conflict = %q: %q, want the project path and the putnami.json key that resolves it", d.Field, d.Message)
+	}
 
 	// Provider order must not change the verdict or the message.
 	_, reversed := MergeProbeResults([]ProbeResult{b, a}, nil)

@@ -55,7 +55,7 @@
       "id": "import-visibility",
       "text": [
         "Every dependency edge carries the manifest family it came from — a declaration, a go.mod require or replace, a package.json dependency, or a generated client's contract — without changing which edges the graph carries.",
-        "A project is importable within its own scope, the nearest ancestor directory whose putnami.json contributes scope configuration;",
+        "A project is importable in its scope, the nearest ancestor directory whose putnami.json sets scope fields, and from projects inside its directory;",
         "an import that leaves it is reported unless the imported project is public or a generated client, and a contract edge is always allowed."
       ]
     }

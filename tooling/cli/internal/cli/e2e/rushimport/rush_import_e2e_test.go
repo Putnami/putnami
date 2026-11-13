@@ -321,3 +321,43 @@ func setScripts(t *testing.T, root, dir, scripts string) {
 	}
 	clitest.WriteFile(t, file, string(data)+"\n")
 }
+
+// A change that adds an edge between two imported projects selects them
+// against its baseline, and validate fails: the putnami.json files no longer
+// carry the edges a sync writes.
+func TestValidateAgainstABaselineFailsOnANewEdgeInAnImportedRushRepository(t *testing.T) {
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	root := importWorkspace(t, buildRuntime(t))
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	commit := func(message string) {
+		clitest.RunGit(t, root, "add", "-A")
+		clitest.RunGit(t, root, "-c", "user.name=test", "-c", "user.email=test@example.com", "commit", "-qm", message)
+	}
+	clitest.RunGit(t, root, "init", "-q")
+	commit("import")
+
+	// web, which depends on nothing, gains pricing.
+	file := filepath.Join(root, "apps/web/package.json")
+	data, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest map[string]json.RawMessage
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	manifest["dependencies"] = json.RawMessage(`{"@demo/pricing": "workspace:*"}`)
+	if data, err = json.MarshalIndent(manifest, "", "  "); err != nil {
+		t.Fatal(err)
+	}
+	clitest.WriteFile(t, file, string(data)+"\n")
+	commit("web depends on pricing")
+
+	code, out := clitest.RunGateArgs(t, root, "validate", "--baseline", "HEAD~1")
+	if code == 0 || !strings.Contains(out, "rush.sync_stale") || !strings.Contains(out, "apps/web/putnami.json no longer matches") {
+		t.Fatalf("validate --baseline HEAD~1 exit %d, want rush.sync_stale on web:\n%s", code, out)
+	}
+}
