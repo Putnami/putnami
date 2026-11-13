@@ -16,6 +16,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
@@ -347,11 +348,18 @@ const staleAnswerAsks = 3
 // is gone by then was removed in between, as a write through a temporary file
 // and a rename removes one, so the digest describes a tree the list does not.
 // Such an answer is recorded only with evenStale: the extension then lists a
-// file that stays missing, and the key that reads the answer reports it.
+// file that stays missing, and the key that reads the answer reports it. A
+// path of the basis that is gone when the digest reads it makes the answer
+// stale alike, and an error once evenStale.
 func (r *Resolver) keep(key, dir string, answer wsproto.InputResolveAnswer, evenStale bool) (store.InputExpansion, bool, error) {
 	expansion := store.InputExpansion{Files: slices.Clone(answer.Files), Basis: answer.Basis}
 	digest, err := wsproto.InputBasisDigest(dir, answer.Basis)
 	if err != nil {
+		// A path the walk listed and that is gone when it reads it was
+		// removed in between: the answer is stale for the same reason.
+		if !evenStale && errors.Is(err, fs.ErrNotExist) {
+			return expansion, false, nil
+		}
 		return store.InputExpansion{}, false, fmt.Errorf("digest the answer's basis: %w", err)
 	}
 	if !evenStale {

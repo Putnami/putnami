@@ -419,11 +419,16 @@ func TestNewAsksThePreparedRuntime(t *testing.T) {
 type listingProvider struct {
 	root  string
 	after func(call int)
-	calls int
+	// before runs when a call starts.
+	before func(call int)
+	calls  int
 }
 
 func (p *listingProvider) ResolveInputs(request wsproto.InputResolveRequest) (wsproto.InputResolveResult, error) {
 	p.calls++
+	if p.before != nil {
+		p.before(p.calls)
+	}
 	result := wsproto.InputResolveResult{Version: wsproto.InputResolveProtocolVersion, Extension: request.Extension}
 	for _, input := range request.Inputs {
 		result.Inputs = append(result.Inputs, wsproto.InputResolveAnswer{
@@ -507,4 +512,35 @@ func (p *missingProvider) ResolveInputs(request wsproto.InputResolveRequest) (ws
 		})
 	}
 	return result, nil
+}
+
+// A path of the basis that is gone when the resolver digests it, here the
+// project directory a writer replaces while the extension answers, makes the
+// answer stale and not the input invalid: the resolver asks again.
+func TestABasisPathGoneAtItsDigestIsAskedAgain(t *testing.T) {
+	root, app := selectorWorkspace(t)
+	moved := app + ".moved"
+	p := &listingProvider{root: root}
+	p.after = func(call int) {
+		if call == 1 {
+			if err := os.Rename(app, moved); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	p.before = func(call int) {
+		if call == 2 {
+			if err := os.Rename(moved, app); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	resolver := newResolver(root, []*extension.ExtensionDescription{selectorsExtension()}, func(string) provider { return p })
+	got, err := resolver.ResolveInput(query(app))
+	if err != nil {
+		t.Fatalf("a basis path gone at its digest failed the input: %v", err)
+	}
+	if !slices.Equal(got.Files, []string{"a.txt", "sub/b.txt"}) || p.calls != 2 {
+		t.Fatalf("answer = %v after %d calls, want the project's files after 2", got.Files, p.calls)
+	}
 }

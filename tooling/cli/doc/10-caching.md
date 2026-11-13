@@ -255,8 +255,8 @@ execution, including when caching is disabled; other cache errors keep the
 normal unkeyed fallback. A listed file that no longer exists when the key
 stats or reads it was removed after the extension listed it, as a write
 through a temporary file and a rename removes one: the list is stale, so the
-core asks for it again, up to three times, and the key hashes a list every
-file of which was there. It never hashes a list less the file that vanished,
+core asks for it again, a bounded number of times, and the key hashes a list
+every file of which was there. It never hashes a list less the file that vanished,
 and a file the last answer still lists and that is still missing fails the
 task. A portable run binds each listed file and refuses one
 that Git ignores beneath `.gen`, `node_modules`, `.putnami` or a declared
