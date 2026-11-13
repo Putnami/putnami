@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -59,13 +60,20 @@ func waitFor(t *testing.T, what string, cond func() bool) {
 	}
 }
 
-// edit rewrites a source of the project with new content.
+// edit replaces a source of the project with new content in one step: it
+// writes the content beside the source and renames it over the source, so a
+// watch reads either the previous file or the new one, never a truncated one.
 func edit(t *testing.T, project, content string) {
 	t.Helper()
-	if err := os.MkdirAll(filepath.Join(project, "src"), 0o755); err != nil {
+	source := filepath.Join(project, "src", "main.ts")
+	if err := os.MkdirAll(filepath.Dir(source), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(project, "src", "main.ts"), []byte(content), 0o644); err != nil {
+	next := source + ".next"
+	if err := os.WriteFile(next, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(next, source); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -80,6 +88,29 @@ type watchFixture struct {
 	done    chan bool
 	once    sync.Once
 	stopped bool
+	// events holds the message of every log and diagnostic the watch emitted.
+	eventsMu sync.Mutex
+	events   []string
+	// returned is set once the watch returned.
+	returned atomic.Bool
+}
+
+// reportOnFailure logs, when the test failed, what the watch left behind: the
+// start log as written, the bundle count, whether the watch returned, and the
+// events it emitted, among them a node that did not start.
+func (f *watchFixture) reportOnFailure(t *testing.T) {
+	if !t.Failed() {
+		return
+	}
+	starts, err := os.ReadFile(f.log)
+	if err != nil {
+		starts = []byte(err.Error())
+	}
+	f.eventsMu.Lock()
+	events := slices.Clone(f.events)
+	f.eventsMu.Unlock()
+	t.Logf("start log: %q; bundles: %d; watch returned: %t; watch events: %q",
+		starts, f.bundles.Load(), f.returned.Load(), events)
 }
 
 // build is the bundle the fixture's bundler returns: built from src/main.ts.
@@ -120,7 +151,17 @@ func startWatch(t *testing.T) *watchFixture {
 		},
 	}
 	env := NodeEnv(os.Environ(), f.project, f.serve.Port)
-	go func() { f.done <- watchNode(jsonl.New(), f.serve, f.build(), env, f.sigCh) }()
+	emit := jsonl.New()
+	emit.Observe(func(message string) {
+		f.eventsMu.Lock()
+		f.events = append(f.events, message)
+		f.eventsMu.Unlock()
+	})
+	go func() {
+		stopped := watchNode(emit, f.serve, f.build(), env, f.sigCh)
+		f.returned.Store(true)
+		f.done <- stopped
+	}()
 	t.Cleanup(func() {
 		stopped := make(chan struct{})
 		go func() {
@@ -133,6 +174,7 @@ func startWatch(t *testing.T) *watchFixture {
 			t.Error("the watch did not stop")
 		}
 	})
+	t.Cleanup(func() { f.reportOnFailure(t) })
 	waitFor(t, "the first start", func() bool { return len(readStarts(t, f.log)) == 1 })
 	return f
 }
@@ -309,7 +351,10 @@ func TestARealNodeAnswersOnThePortAfterEachEdit(t *testing.T) {
 	write := func(version string) {
 		source := "import http from \"node:http\";\n" +
 			"http.createServer((_q, r) => r.end(\"" + version + "\")).listen(Number(process.env.PORT));\n"
-		if err := os.WriteFile(entry, []byte(source), 0o644); err != nil {
+		if err := os.WriteFile(entry+".next", []byte(source), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Rename(entry+".next", entry); err != nil {
 			t.Fatal(err)
 		}
 	}
