@@ -19,6 +19,9 @@ type fakeTaskIndex struct {
 	reached map[string][]string
 	// everyReached is the answer for a project that runs every task.
 	everyReached []string
+	// reachedIn maps a dependent project id to the tasks it may run of what
+	// reached answers. A project absent from the map may run every task.
+	reachedIn map[string][]string
 	// extensionTasks maps an extension project id to the tasks it declares.
 	extensionTasks map[string][]string
 	// plannedIn maps a project id to the extension tasks the planner may run
@@ -66,6 +69,23 @@ func (f fakeTaskIndex) TasksReachedFrom(tasks []string) []string {
 	}
 	slices.Sort(out)
 	return out
+}
+
+// TasksReachedIn keeps what TasksReachedFrom answers, unless the fake names
+// the tasks a dependent may run.
+func (f fakeTaskIndex) TasksReachedIn(projectID string, tasks []string) []string {
+	reached := f.TasksReachedFrom(tasks)
+	may, restricted := f.reachedIn[projectID]
+	if !restricted {
+		return reached
+	}
+	kept := []string{}
+	for _, task := range reached {
+		if slices.Contains(may, task) {
+			kept = append(kept, task)
+		}
+	}
+	return kept
 }
 
 func (f fakeTaskIndex) TasksOfExtension(extensionProjectID string) []string {
@@ -178,6 +198,30 @@ func TestTraceChangeImpact_ASourceFileReachesEveryImporterThroughTheTaskEdge(t *
 	}
 	if edge, ok := r.Trace.Edges["/apps/service"]; !ok || edge.From != "/libs/api" || edge.Kind != ImpactEdgeDependency {
 		t.Errorf("/apps/service was reached by %+v, want a dependency edge from /libs/api", edge)
+	}
+}
+
+// The walk asks the index what each dependent may run of what moved: a
+// dependent keeps only those tasks, and one that may run none of them is not
+// selected, nor is anything behind it through that edge.
+func TestTraceChangeImpact_AnEdgeCarriesIntoEachDependentWhatItMayRun(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-model", "a-dependent-takes-only-the-step-references-it-may-run",
+		"an-edge-carries-into-each-dependent-what-it-may-run")
+	spectest.Proves(t, "cli/workspace-model", "a-dependent-takes-only-the-step-references-it-may-run",
+		"a-dependent-that-may-run-nothing-reached-is-not-selected")
+	index := taskImpactIndex()
+	index.reachedIn = map[string][]string{"/libs/api": {"build~compile", "build~describe"}}
+	r := TraceChangeImpact(taskImpactWorkspace(), []string{"libs/http/http.go"},
+		ChangeImpactOptions{Tasks: index})
+	if got, want := r.Trace.ScopeOf("/libs/api"), []string{"build~compile", "build~describe"}; !slices.Equal(got, want) {
+		t.Errorf("scoped /libs/api to %v, want %v", got, want)
+	}
+
+	index.reachedIn = map[string][]string{"/libs/api": {}}
+	r = TraceChangeImpact(taskImpactWorkspace(), []string{"libs/http/http.go"},
+		ChangeImpactOptions{Tasks: index})
+	if got, want := ownerProjectIDs(r.Projects), []string{"/libs/http"}; !slices.Equal(got, want) {
+		t.Errorf("a dependent that may run nothing reached selected %v, want %v", got, want)
 	}
 }
 

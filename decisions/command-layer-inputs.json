@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "command-layer-inputs",
+  "statement": "a pipeline step with commandLayerInputs: false reads no filePatterns or envInputs from its project's command option layers, in its cache key and in impact selection alike; the extension layer still reaches it",
+  "settled": "2026-11-13",
+  "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0089-a-step-may-read-no-command-option-layer.md",
+  "reviewOnly": true
+}

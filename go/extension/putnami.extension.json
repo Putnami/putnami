@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/go",
-  "cliContract": 22,
+  "cliContract": 23,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-go",
@@ -180,17 +180,20 @@
         {
           "id": "config-merge",
           "task": "config-merge-test-exec",
+          "commandLayerInputs": false,
           "dependsOn": ["^config-merge"]
         },
         {
           "id": "generate",
           "task": "build-generate",
+          "commandLayerInputs": false,
           "dependsOn": ["^generate", "config-merge"]
         },
         {
           "id": "describe",
           "heavy": true,
           "task": "build-describe",
+          "commandLayerInputs": false,
           "dependsOn": ["^describe", "generate"],
           "activation": { "contains": { "go.mod": "go.putnami.dev/app" } }
         },

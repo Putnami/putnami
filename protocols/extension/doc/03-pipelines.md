@@ -34,6 +34,7 @@ Each step in a command's `run` array references a task and declares its position
 | `timeoutMs` | no | Per-step timeout override |
 | `heavy` | no | Marks the step CPU/memory heavy for worker tuning, overriding the command's `heavy` trait |
 | `cpuWeight` | no | Relative multiplier on deterministic, history-derived CPU demand (default 1, capped by machine capacity). A project's `putnami.json` `tasks` entry overrides it. Execution hint only — never part of cache keys |
+| `commandLayerInputs` | no | `false` keeps the project's command option layers (`options.<command>`, `options.<extension>:<command>`) out of the step: their `filePatterns` and `envInputs` neither reach its cache key nor select it in an impact plan. The extension layer still reaches it. Absent or `true` reads every layer. Requires `cliContract` 23 |
 
 ## Dependency References
 

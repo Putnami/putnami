@@ -243,3 +243,62 @@ func TestNewTaskIndex_OnlyWorkspaceOnceDeclarationsIsANilInterface(t *testing.T)
 		t.Fatalf("NewTaskIndex = %T, want a nil interface", idx)
 	}
 }
+
+// A `^command` dependency carries a moved prerequisite through the walk: the
+// prerequisite travels on through a dependent that plans nothing of it, and
+// reaches the dependent command only where a command that declares the
+// dependency may be planned.
+func TestTraceChangeImpact_AClosureDependencyCarriesThePrerequisiteToTheDependentCommand(t *testing.T) {
+	lintExt := &extension.ExtensionDescription{
+		Name: "@fixture/lint", RelPath: "lint/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"lint-exec": {Inputs: map[string]extproto.TaskInputPort{
+				"sources": {From: extproto.TaskInputFromProject, Files: []string{"**/*.go"}},
+			}},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"lint": {
+				CommandName: "lint", CommandDependsOn: []string{"^client-generate"},
+				PipelineSteps: []extproto.PipelineStep{{ID: "lint", Task: "lint-exec"}},
+			},
+		},
+	}
+	clientgenExt := &extension.ExtensionDescription{
+		Name: "@fixture/clientgen", RelPath: "clientgen/extension",
+		Tasks: map[string]extproto.TaskDefinition{"client-go": {Inputs: map[string]extproto.TaskInputPort{
+			"contract": {From: extproto.TaskInputFromProject, Files: []string{"clientgen.json"}},
+		}}},
+		Jobs: map[string]*extension.JobDefinition{
+			"client-generate": {CommandName: "client-generate", PipelineSteps: []extproto.PipelineStep{{ID: "go", Task: "client-go"}}},
+		},
+	}
+	projects := []*Project{
+		{ID: "/lint/extension", Name: "@fixture/lint", Path: "lint/extension"},
+		{ID: "/clientgen/extension", Name: "@fixture/clientgen", Path: "clientgen/extension"},
+		{ID: "/libs/api", Name: "api", Path: "libs/api", Extensions: []string{"/clientgen/extension"}},
+		{ID: "/libs/mid", Name: "mid", Path: "libs/mid", Dependencies: []string{"/libs/api"}},
+		{ID: "/apps/web", Name: "web", Path: "apps/web", Extensions: []string{"/lint/extension"}, Dependencies: []string{"/libs/mid"}},
+		{ID: "/apps/bare", Name: "bare", Path: "apps/bare", Dependencies: []string{"/libs/api"}},
+	}
+	ws := NewWorkspace(t.TempDir(), nil, projects)
+	ws.Graph = BuildGraph(projects)
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{lintExt, clientgenExt}, nil)
+	if idx == nil {
+		t.Fatal("NewTaskIndex returned nil")
+	}
+	ti := idx.(*taskIndex)
+	moved := []string{"client-generate~go"}
+	if got, want := ti.TasksReachedIn("/apps/web", moved), []string{"client-generate~go", "lint~lint"}; !slices.Equal(got, want) {
+		t.Errorf("a dependent that lints runs %v when client-generate~go moved, want %v", got, want)
+	}
+	if got, want := ti.TasksReachedIn("/apps/bare", moved), []string{"client-generate~go"}; !slices.Equal(got, want) {
+		t.Errorf("a dependent that lints nothing carries %v, want the prerequisite alone", got)
+	}
+	if got := ti.TasksReachedIn("/apps/web", nil); !slices.Contains(got, "lint~lint") || !slices.Contains(got, "client-generate~go") {
+		t.Errorf("a dependent of a whole project carries %v, want lint~lint and client-generate~go", got)
+	}
+	got := traceChangeImpact(ws, []string{"libs/api/clientgen.json"}, ChangeImpactOptions{Tasks: idx})
+	if scope := got.Trace.ScopeOf("/apps/web"); !slices.Contains(scope, "lint~lint") {
+		t.Errorf("the dependent two edges up runs %v, want lint~lint", scope)
+	}
+}

@@ -112,6 +112,8 @@ generate ──→ discover ──→ run ──→ parse
 
 If no test files are found, the command returns `SKIP` (exit 0) unless `--pass-with-no-tests` is `false`.
 
+The `generate`, `tsc` and `tsc-auto` steps of `test` declare `commandLayerInputs: false`: a project's `options.test.filePatterns` and `options.test.envInputs` key and select the steps that run the tests, not the generation and compilation they share with `build`. A dependent's tests therefore do not run again when a file only this project's tests read changes. Declare an input the generation reads in the extension layer (`options."@putnami/typescript"`), which still reaches every step.
+
 ## Type-check
 
 Bun strips types when it runs a test, and `build~types` reads only `src/`, `bin/` and `.gen/`. The `test~types` step is the one that type-checks the rest: it runs `tsc --noEmit` over every `.ts`, `.tsx`, `.mts` and `.cts` file of the project, tests, fixtures, benchmarks and dot-directories such as `.gen/` or `.storybook/` included. A dot-named file, such as the generated `.react-client.gen.tsx` the browser bundle reads, stays out, as in `build~types`. A type error, or a `@ts-expect-error` that no longer marks an error, fails `putnami test`.

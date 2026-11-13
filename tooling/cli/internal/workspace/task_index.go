@@ -90,6 +90,16 @@ type taskIndex struct {
 	// reachedByAny is the union of reachedBy's values: what a project that runs
 	// every task carries across an edge.
 	reachedByAny []string
+	// reachedVia maps a task scope to the dependent task scopes that name it
+	// through a `^` step reference or a `^command` dependency, each with the
+	// commands that declare the reference (TasksReachedIn).
+	reachedVia map[string]map[string][]*extension.JobDefinition
+	// travelsOn holds the task scopes of a command another names through a
+	// `^command` dependency. Such a prerequisite runs across the whole
+	// dependency closure of the project that plans the dependent command, so
+	// it reaches every dependent, whatever that dependent plans, and travels on
+	// (TasksReachedIn).
+	travelsOn map[string]bool
 	// byCommand maps a command name to its task scopes, sorted.
 	byCommand map[string][]string
 	// byExtension maps an extension's name and its workspace-relative path to
@@ -170,6 +180,10 @@ type indexedTask struct {
 	// (TasksReadingPath). files, closureFiles and workspaceFiles keep their
 	// union for the questions no project asks.
 	declarations []indexedPatterns
+	// readsCommandLayer is set when a step that declares the task reads its
+	// project's command option layers: every step but one that declares
+	// commandLayerInputs false (layerTasks).
+	readsCommandLayer bool
 }
 
 // indexedPatterns is the file patterns one command's step declares for a task
@@ -211,6 +225,8 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 		tasks:             make(map[string]*indexedTask),
 		closure:           make(map[string][]string),
 		reachedBy:         make(map[string][]string),
+		reachedVia:        make(map[string]map[string][]*extension.JobDefinition),
+		travelsOn:         make(map[string]bool),
 		byCommand:         make(map[string][]string),
 		byExtension:       make(map[string][]string),
 		extensionProjects: make(map[string][]string),
@@ -226,7 +242,7 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 	// commandDeps collects command-level prerequisites, resolved once every
 	// manifest is folded in: a command another extension contributes steps to
 	// must be complete before its steps can be linked.
-	commandDeps := make(map[string]map[string]bool)
+	commandDeps := make(map[string]map[string][]*extension.JobDefinition)
 	for _, ext := range extensions {
 		idx.addExtension(ext, successors, commandDeps)
 	}
@@ -270,7 +286,7 @@ func (idx *taskIndex) attributes() bool {
 func (idx *taskIndex) addExtension(
 	ext *extension.ExtensionDescription,
 	successors map[string]map[string]bool,
-	commandDeps map[string]map[string]bool,
+	commandDeps map[string]map[string][]*extension.JobDefinition,
 ) {
 	if ext == nil {
 		return
@@ -301,18 +317,16 @@ func (idx *taskIndex) addExtension(
 			if prerequisite.Session || prerequisite.Command == "" {
 				continue
 			}
+			key := command
 			if prerequisite.Dependencies {
-				dependent := dependencyClosureKey + command
-				if commandDeps[dependent] == nil {
-					commandDeps[dependent] = make(map[string]bool)
-				}
-				commandDeps[dependent][prerequisite.Command] = true
-				continue
+				key = dependencyClosureKey + command
 			}
-			if commandDeps[command] == nil {
-				commandDeps[command] = make(map[string]bool)
+			if commandDeps[key] == nil {
+				commandDeps[key] = make(map[string][]*extension.JobDefinition)
 			}
-			commandDeps[command][prerequisite.Command] = true
+			if !slices.Contains(commandDeps[key][prerequisite.Command], job) {
+				commandDeps[key][prerequisite.Command] = append(commandDeps[key][prerequisite.Command], job)
+			}
 		}
 	}
 }
@@ -352,15 +366,22 @@ const dependencyClosureKey = "^"
 // projects the dependent's project depends on, transitively. Each of its task
 // scopes reaches the dependent command's scopes in a dependent project, and
 // reaches itself, so the change travels on to every project further up the
-// closure, as a closure port does.
-func (idx *taskIndex) linkCommandDeps(successors map[string]map[string]bool, commandDeps map[string]map[string]bool) {
+// closure, as a closure port does. The dependent command's scopes are reached
+// in a dependent project only where a command that declares the dependency
+// may be planned (reachedVia); the prerequisite's own scopes travel on
+// whatever the dependent plans (travelsOn).
+func (idx *taskIndex) linkCommandDeps(successors map[string]map[string]bool, commandDeps map[string]map[string][]*extension.JobDefinition) {
 	for command, prerequisites := range commandDeps {
 		if dependent, closure := strings.CutPrefix(command, dependencyClosureKey); closure {
-			for prerequisite := range prerequisites {
+			for prerequisite, declaring := range prerequisites {
 				for _, before := range idx.byCommand[prerequisite] {
 					register(idx.reachedBy, before, before)
+					idx.travelsOn[before] = true
 					for _, after := range idx.byCommand[dependent] {
 						register(idx.reachedBy, before, after)
+						for _, job := range declaring {
+							idx.registerReachedVia(before, after, job)
+						}
 					}
 				}
 			}
@@ -388,6 +409,7 @@ func (idx *taskIndex) addCommand(
 		// A command with no pipeline is one job named after the command.
 		scope := command
 		idx.mergeTask(scope, command, job, job.FilePatterns, nil, nil, nil)
+		idx.tasks[scope].readsCommandLayer = true
 		return []string{scope}
 	}
 	scopes := make([]string, 0, len(job.PipelineSteps))
@@ -395,6 +417,9 @@ func (idx *taskIndex) addCommand(
 		scope := taskScope(command, step.ID)
 		files, closureFiles, workspaceFiles := stepKeyPatterns(ext, step.Task)
 		idx.mergeTask(scope, command, job, append(files, job.FilePatterns...), closureFiles, workspaceFiles, stepSelectors(ext, job, step.Task))
+		if step.ReadsCommandLayer() {
+			idx.tasks[scope].readsCommandLayer = true
+		}
 		scopes = append(scopes, scope)
 		for _, dep := range step.DependsOn {
 			if upstream, ok := strings.CutPrefix(dep, "^"); ok {
@@ -402,6 +427,7 @@ func (idx *taskIndex) addCommand(
 				// dependency: this step runs after the SAME command's step of
 				// that name, in the other project.
 				register(idx.reachedBy, taskScope(command, upstream), scope)
+				idx.registerReachedVia(taskScope(command, upstream), scope, job)
 				continue
 			}
 			link(successors, taskScope(command, dep), scope)
@@ -690,7 +716,9 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 			continue
 		}
 		for _, scope := range idx.layerTasks(layer) {
-			reading[scope] = true
+			if idx.plannedFor(scope, project) {
+				reading[scope] = true
+			}
 		}
 	}
 	if len(reading) == 0 {
@@ -866,6 +894,86 @@ func (idx *taskIndex) TasksReachedFrom(tasks []string) []string {
 	return sortedSet(reached)
 }
 
+// TasksReachedIn is TasksReachedFrom for one dependent project: a `^` step
+// reference or a `^command` dependency reaches the project only when a
+// command that declares it may be planned there, so one stack's `^test`
+// carries no other stack's test step. A closure scope, and the prerequisite
+// of a `^command` dependency, travel as they do in TasksReachedFrom. A nil
+// list stands for every task; an unknown project gets TasksReachedFrom.
+func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string {
+	project := idx.ws.ProjectByID(projectID)
+	if project == nil {
+		return idx.TasksReachedFrom(tasks)
+	}
+	reached := make(map[string]bool)
+	through := func(upstream string) {
+		if idx.travelsOn[upstream] {
+			for _, next := range idx.closureOf([]string{upstream}) {
+				reached[next] = true
+			}
+		}
+		for scope, jobs := range idx.reachedVia[upstream] {
+			if idx.anyPlanned(jobs, project) {
+				for _, next := range idx.closureOf([]string{scope}) {
+					reached[next] = true
+				}
+			}
+		}
+	}
+	travel := func(scope string) {
+		reached[closureScopePrefix+scope] = true
+		for _, next := range idx.closure[scope] {
+			reached[next] = true
+		}
+	}
+	if tasks == nil {
+		for upstream := range idx.reachedVia {
+			through(upstream)
+		}
+		for upstream := range idx.travelsOn {
+			through(upstream)
+		}
+		for scope, task := range idx.tasks {
+			if len(task.closureFiles) > 0 {
+				travel(scope)
+			}
+		}
+		return sortedSet(reached)
+	}
+	for _, task := range tasks {
+		if inner, closure := strings.CutPrefix(task, closureScopePrefix); closure {
+			travel(inner)
+			continue
+		}
+		through(task)
+	}
+	return sortedSet(reached)
+}
+
+// registerReachedVia records that job's step of scope names upstream through
+// a `^` reference.
+func (idx *taskIndex) registerReachedVia(upstream, scope string, job *extension.JobDefinition) {
+	via := idx.reachedVia[upstream]
+	if via == nil {
+		via = make(map[string][]*extension.JobDefinition)
+		idx.reachedVia[upstream] = via
+	}
+	if !slices.Contains(via[scope], job) {
+		via[scope] = append(via[scope], job)
+	}
+}
+
+// anyPlanned reports whether one of jobs answers for projects and may be
+// planned in project.
+func (idx *taskIndex) anyPlanned(jobs []*extension.JobDefinition, project *Project) bool {
+	for _, job := range jobs {
+		if answersForProjects(job) && idx.mayPlan(job, project) {
+			return true
+		}
+	}
+	return false
+}
+
 // checkingKinds are the command kinds whose result is a report on the
 // project, never a file a consumer executes.
 var checkingKinds = []string{
@@ -964,9 +1072,11 @@ func (idx *taskIndex) TasksPlannedIn(projectID string, tasks []string) []string 
 // layerTasks attributes one option layer to task scopes, by the same rule the
 // cache key's layer grouping applies: a COMMAND layer reaches that command's
 // tasks, an EXTENSION layer reaches the tasks that extension declares, and
-// `<extension>:<command>` reaches the intersection. A layer that resolves to
-// neither reaches every task — an unattributed declaration is read by whoever
-// asks for it, and erring wide here costs a cache hit.
+// `<extension>:<command>` reaches the intersection. A command layer, bare or
+// qualified, leaves out a task whose every declaring step declares
+// commandLayerInputs false. A layer that resolves to neither reaches every
+// task — an unattributed declaration is read by whoever asks for it, and
+// erring wide here costs a cache hit.
 func (idx *taskIndex) layerTasks(layer string) []string {
 	if extRef, command, qualified := strings.Cut(layer, ":"); qualified {
 		scopes := idx.extensionRefTasks(extRef)
@@ -975,15 +1085,34 @@ func (idx *taskIndex) layerTasks(layer string) []string {
 			// declaration, exactly like an unqualified one below.
 			return idx.every
 		}
-		return intersectSorted(scopes, idx.byCommand[command])
+		return idx.commandLayerReaders(intersectSorted(scopes, idx.byCommand[command]))
 	}
 	if scopes, ok := idx.byCommand[layer]; ok {
-		return scopes
+		return idx.commandLayerReaders(scopes)
 	}
 	if scopes := idx.extensionRefTasks(layer); len(scopes) > 0 {
 		return scopes
 	}
 	return idx.every
+}
+
+// plannedFor reports whether a command that declares the task scope may be
+// planned in project: an option layer is read only by a task the project runs,
+// as a task's own ports are (readsWhere).
+func (idx *taskIndex) plannedFor(scope string, project *Project) bool {
+	task := idx.tasks[scope]
+	return task == nil || idx.anyPlanned(task.jobs, project)
+}
+
+// commandLayerReaders keeps the scopes a step reads its command layers for.
+func (idx *taskIndex) commandLayerReaders(scopes []string) []string {
+	readers := make([]string, 0, len(scopes))
+	for _, scope := range scopes {
+		if idx.tasks[scope].readsCommandLayer {
+			readers = append(readers, scope)
+		}
+	}
+	return readers
 }
 
 // extensionRefTasks resolves an option layer's extension reference — a package

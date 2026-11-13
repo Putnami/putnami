@@ -243,6 +243,7 @@ func ExpandPipelineWithOptions(
 			Traits:               commandDef.Traits,
 			Heavy:                step.Heavy,
 			CPUWeight:            step.CPUWeight,
+			NoCommandLayerInputs: !step.ReadsCommandLayer(),
 			ContractDigest:       proto.TaskContractDigest(task),
 		}
 

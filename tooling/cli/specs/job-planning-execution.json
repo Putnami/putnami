@@ -328,6 +328,14 @@
     {
       "id": "a-declared-provider-that-cannot-serve-says-so-once",
       "text": "When an extension declares the cache provider and the provider cannot serve the run, the run builds locally and says so once on stderr with the cause: a hosted run removed the provider from a path extension, the provider fails to start, or its initialize handshake fails. An extension skipped for another reason adds no notice."
+    },
+    {
+      "id": "a-step-may-read-no-command-option-layer",
+      "text": "A pipeline step with commandLayerInputs: false takes no filePatterns or envInputs from its project's command option layers (options.<command> and its <extension>:<command> forms): a file only such a layer selects moves neither its cache key nor its selection, nor its dependents' through it. The extension layer still reaches it; a step without the field reads every layer. The field requires CLI contract 23. The TypeScript and Go test steps that run build tasks declare it."
+    },
+    {
+      "id": "the-impact-index-answers-for-the-tasks-a-project-runs",
+      "text": "A project's option layer claims only the tasks of commands the planner may run in that project, as a task's own input ports do. A `^` reference reaches a dependent only when a command that declares it may be planned there, so one stack's `^test` carries no other stack's test step to a dependent."
     }
   ],
   "decisions": [
@@ -359,6 +367,7 @@
     "tooling/cli/doc/adr/0078-the-core-asks-extensions-to-expand-their-input-selectors.md",
     "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md",
     "protocols/extension/doc/adr/0015-a-step-reads-the-changed-files-from-contract-16.md",
-    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md"
+    "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md",
+    "tooling/cli/doc/adr/0089-a-step-may-read-no-command-option-layer.md"
   ]
 }

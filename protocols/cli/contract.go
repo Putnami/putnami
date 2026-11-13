@@ -329,7 +329,14 @@ const BuildGraphEdgesContract = 21
 // step reference and plan nothing, refuses the stamp instead.
 const DependencyClosureContract = 22
 
+// CommandLayerInputsContract is required by a manifest whose pipeline step
+// declares commandLayerInputs. A reader at this contract keeps the project's
+// command option layers out of a step that declares it false, in its cache key
+// and in impact selection. An older reader drops the field it does not know
+// and would read every layer, so it refuses the stamp instead.
+const CommandLayerInputsContract = 23
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = DependencyClosureContract
+const LatestContract = CommandLayerInputsContract

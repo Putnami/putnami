@@ -53,12 +53,13 @@ func TestAdditiveContractsAreOrdered(t *testing.T) {
 		HostHooksContract != ChangedFilesContract+1 ||
 		StepDependencyContract != HostHooksContract+1 || ProviderContract != StepDependencyContract+1 ||
 		UserScopeSkillsContract != ProviderContract+1 || BuildGraphEdgesContract != UserScopeSkillsContract+1 ||
-		DependencyClosureContract != BuildGraphEdgesContract+1 || LatestContract != DependencyClosureContract {
-		t.Fatalf("additive contract ladder = base %d, agent %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, input selectors %d, default positionals %d, changed files %d, host hooks %d, step dependency %d, providers %d, user-scope skills %d, build-graph edges %d, dependency closure %d, latest %d",
+		DependencyClosureContract != BuildGraphEdgesContract+1 ||
+		CommandLayerInputsContract != DependencyClosureContract+1 || LatestContract != CommandLayerInputsContract {
+		t.Fatalf("additive contract ladder = base %d, agent %d, release baseline %d, dependencies %d, verbs %d, source-bound cache %d, command kinds %d, publish channels %d, provisioned toolchain %d, input selectors %d, default positionals %d, changed files %d, host hooks %d, step dependency %d, providers %d, user-scope skills %d, build-graph edges %d, dependency closure %d, command layer inputs %d, latest %d",
 			CurrentContract, AgentContentContract, ReleaseBaselineInputContract,
 			ExtensionDependenciesContract, VerbVocabularyContract, SourceBoundCacheContract, CommandKindContract,
 			PublishChannelsContract, ProvisionedToolchainContract, InputSelectorsContract, DefaultPositionalsContract,
-			ChangedFilesContract, HostHooksContract, StepDependencyContract, ProviderContract, UserScopeSkillsContract, BuildGraphEdgesContract, DependencyClosureContract, LatestContract)
+			ChangedFilesContract, HostHooksContract, StepDependencyContract, ProviderContract, UserScopeSkillsContract, BuildGraphEdgesContract, DependencyClosureContract, CommandLayerInputsContract, LatestContract)
 	}
 	// Rung 7 names two meanings that one CLI release added together.
 	if GitInputModeContract != ReleaseBaselineInputContract {

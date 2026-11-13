@@ -177,6 +177,7 @@ type scopedIndex struct{}
 
 func (scopedIndex) TasksReadingPath(string, string) []string              { return nil }
 func (scopedIndex) TasksReachedFrom([]string) []string                    { return []string{"build"} }
+func (scopedIndex) TasksReachedIn(string, []string) []string              { return []string{"build"} }
 func (scopedIndex) TasksOfExtension(string) []string                      { return nil }
 func (scopedIndex) TasksBuildingRuntime(tasks []string) []string          { return tasks }
 func (scopedIndex) TasksPlannedIn(_ string, tasks []string) []string      { return tasks }

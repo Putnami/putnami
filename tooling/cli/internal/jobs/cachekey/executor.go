@@ -553,15 +553,30 @@ func workspaceExtensionReferences(ws *workspace.Workspace) []string {
 // ProjectEnvInputs read the SAME layers, so file and env cache-key inputs are
 // declared uniformly; keeping the layer list in one place stops the two readers
 // from drifting. Callers guard proj/Config/Options non-nil before calling.
+//
+// A step that declares commandLayerInputs false gets the extension layers
+// alone: no {cmd} layer and no {ext}:{cmd} form. The task index attributes a
+// command layer by the same rule (workspace.taskIndex.layerTasks).
 func projectOptionLayers(ws *workspace.Workspace, job *jobmodel.ScheduledJob) []string {
 	cmdName := jobmodel.JobCommandName(job)
-	layers := []string{cmdName, job.Extension.Name, job.Extension.Name + ":" + cmdName}
+	command := !job.JobDef.NoCommandLayerInputs
+	var layers []string
+	if command {
+		layers = append(layers, cmdName)
+	}
+	layers = append(layers, job.Extension.Name)
+	if command {
+		layers = append(layers, job.Extension.Name+":"+cmdName)
+	}
 	for _, ref := range job.Project.Config.Extensions {
 		if ref == job.Extension.Name || !strings.HasPrefix(ref, "/") {
 			continue
 		}
 		if filepath.Join(ws.Root, ref) == job.Extension.Path {
-			layers = append(layers, ref, ref+":"+cmdName)
+			layers = append(layers, ref)
+			if command {
+				layers = append(layers, ref+":"+cmdName)
+			}
 		}
 	}
 	return layers

@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "impact-reads-only-what-a-project-runs",
+  "statement": "impact selection attributes a project's option layer only to tasks of commands it may run, and a ^ reference carries into a dependent only when a command declaring it may run there",
+  "settled": "2026-11-13",
+  "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0089-a-step-may-read-no-command-option-layer.md",
+  "reviewOnly": true
+}

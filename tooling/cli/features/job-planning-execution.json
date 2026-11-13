@@ -1303,6 +1303,37 @@
             "a-skipped-extension-adds-no-cache-notice"
           ]
         }
+      },
+      {
+        "id": "a-step-may-read-no-command-option-layer",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-step-that-leaves-the-command-layer-keys-on-no-command-layer-input",
+            "a-step-that-leaves-the-command-layer-keeps-the-extension-layer",
+            "a-command-layer-file-selects-only-the-steps-that-read-the-layer",
+            "a-manifest-with-command-layer-inputs-requires-contract-23",
+            "the-typescript-and-go-test-steps-shared-with-build-read-no-command-layer"
+          ]
+        }
+      },
+      {
+        "id": "the-impact-index-answers-for-the-tasks-a-project-runs",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-layer-claims-no-task-of-a-command-the-project-does-not-run",
+            "a-step-reference-reaches-only-a-dependent-that-may-run-its-command"
+          ]
+        }
       }
     ]
   }

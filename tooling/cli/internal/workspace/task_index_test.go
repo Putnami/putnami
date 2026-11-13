@@ -203,6 +203,134 @@ func TestTaskIndex_OptionLayersAreAttributedToTheTasksThatReadThem(t *testing.T)
 	}
 }
 
+// A step that declares commandLayerInputs false reads none of its project's
+// command layers: a file only `options.test` or `options.@fixture/go:test`
+// selects reaches the test steps that read the layer, never `test~describe`,
+// which dependents name through `^describe`. The extension layer still reaches
+// it, and a scope another declaring step reads the layer for keeps it.
+func TestTaskIndex_AStepThatLeavesTheCommandLayerIsNotSeededByIt(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-step-may-read-no-command-option-layer",
+		"a-command-layer-file-selects-only-the-steps-that-read-the-layer")
+	leaving := func() *extension.ExtensionDescription {
+		ext := taskIndexExtension()
+		no := false
+		ext.Jobs["test"].PipelineSteps[0].CommandLayerInputs = &no
+		return ext
+	}
+	config := projectOptions(map[string][]string{
+		"test":             {"fixtures/**"},
+		"@fixture/go:test": {"qualified/**"},
+		"@fixture/go":      {"golden/**"},
+	})
+	idx := NewTaskIndex(taskIndexWorkspace(t, config), []*extension.ExtensionDescription{leaving()}, nil)
+	readers := []string{"test~teardown", "test~test", "test~test-env"}
+	every := []string{
+		"build~compile", "build~describe", "build~generate", "lint~lint",
+		"test~describe", "test~teardown", "test~test", "test~test-env",
+	}
+	cases := []struct {
+		path string
+		want []string
+	}{
+		{path: "libs/http/fixtures/case.json", want: readers},
+		{path: "libs/http/qualified/case.json", want: readers},
+		{path: "libs/http/golden/out.txt", want: every},
+	}
+	for _, tc := range cases {
+		if got := idx.TasksReadingPath("/libs/http", tc.path); !slices.Equal(got, tc.want) {
+			t.Errorf("%s is read by %v, want %v", tc.path, got, tc.want)
+		}
+	}
+	// Another manifest whose step of the same scope reads the layer keeps the
+	// scope a reader.
+	reading := &extension.ExtensionDescription{
+		Name: "@fixture/other", RelPath: "other/extension",
+		Tasks: map[string]extproto.TaskDefinition{"build-describe": {}},
+		Jobs: map[string]*extension.JobDefinition{
+			"test": {CommandName: "test", PipelineSteps: []extproto.PipelineStep{{ID: "describe", Task: "build-describe"}}},
+		},
+	}
+	idx = NewTaskIndex(taskIndexWorkspace(t, config), []*extension.ExtensionDescription{leaving(), reading}, nil)
+	want := []string{"test~describe", "test~teardown", "test~test", "test~test-env"}
+	if got := idx.TasksReadingPath("/libs/http", "libs/http/fixtures/case.json"); !slices.Equal(got, want) {
+		t.Errorf("with a second declaring step that reads the layer, fixtures are read by %v, want %v", got, want)
+	}
+}
+
+// stackExtension is a second stack whose `test` steps the Go fixture's
+// projects never run: a `graph` step its dependents name through `^graph`, and
+// a `test` step that depends on `^test`, the Dart and Java shape.
+func stackExtension() *extension.ExtensionDescription {
+	return &extension.ExtensionDescription{
+		Name:    "@fixture/dart",
+		RelPath: "dart/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"graph-run": {},
+			"test-run":  {Inputs: map[string]extproto.TaskInputPort{"tests": {From: extproto.TaskInputFromProject, Files: []string{"test/**"}}}},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"test": {CommandName: "test", PipelineSteps: []extproto.PipelineStep{
+				{ID: "graph", Task: "graph-run", DependsOn: []string{"^graph"}},
+				{ID: "test", Task: "test-run", DependsOn: []string{"graph", "^test"}},
+			}},
+		},
+	}
+}
+
+// A project's option layer claims only the tasks of commands the project may
+// run: the Go project's `test` layer seeds none of the Dart stack's `test`
+// steps, whose `^graph` would carry it to every dependent.
+func TestTaskIndex_ALayerClaimsNoTaskOfACommandTheProjectDoesNotRun(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-impact-index-answers-for-the-tasks-a-project-runs",
+		"a-layer-claims-no-task-of-a-command-the-project-does-not-run")
+	ws := NewWorkspace("/workspace", nil, []*Project{
+		{ID: "/go/extension", Name: "@fixture/go", Path: "go/extension"},
+		{ID: "/dart/extension", Name: "@fixture/dart", Path: "dart/extension"},
+		{ID: "/libs/http", Name: "http", Path: "libs/http", Extensions: []string{"/go/extension"},
+			Config: projectOptions(map[string][]string{"test": {"fixtures/**"}})},
+	})
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{taskIndexExtension(), stackExtension()}, nil)
+	want := []string{"test~describe", "test~teardown", "test~test", "test~test-env"}
+	if got := idx.TasksReadingPath("/libs/http", "libs/http/fixtures/case.json"); !slices.Equal(got, want) {
+		t.Errorf("fixtures are read by %v, want %v", got, want)
+	}
+}
+
+// A `^` reference reaches a dependent only when a command that declares it may
+// run there: the Dart stack's `^test` carries a moved `test~test` to a Dart
+// dependent and to no Go dependent. TasksReachedFrom names no project and
+// keeps the wide answer.
+func TestTaskIndex_AStepReferenceReachesOnlyADependentThatMayRunItsCommand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-impact-index-answers-for-the-tasks-a-project-runs",
+		"a-step-reference-reaches-only-a-dependent-that-may-run-its-command")
+	ws := NewWorkspace("/workspace", nil, []*Project{
+		{ID: "/go/extension", Name: "@fixture/go", Path: "go/extension"},
+		{ID: "/dart/extension", Name: "@fixture/dart", Path: "dart/extension"},
+		{ID: "/apps/go", Name: "go-app", Path: "apps/go", Extensions: []string{"/go/extension"}},
+		{ID: "/apps/dart", Name: "dart-app", Path: "apps/dart", Extensions: []string{"/dart/extension"}},
+	})
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{taskIndexExtension(), stackExtension()}, nil)
+	ti := idx.(*taskIndex)
+	moved := []string{"test~test"}
+	if got := ti.TasksReachedIn("/apps/go", moved); len(got) != 0 {
+		t.Errorf("a Go dependent runs %v when test~test moved, want nothing", got)
+	}
+	if got, want := ti.TasksReachedIn("/apps/dart", moved), []string{"test~teardown", "test~test"}; !slices.Equal(got, want) {
+		t.Errorf("a Dart dependent runs %v when test~test moved, want %v", got, want)
+	}
+	if got := idx.TasksReachedFrom(moved); !slices.Contains(got, "test~test") {
+		t.Errorf("TasksReachedFrom(%v) = %v, want the wide answer with test~test", moved, got)
+	}
+	// A project that moved whole carries to each dependent only what that
+	// dependent may run: the Go `^describe` and `^generate` edges, never the
+	// Dart `^graph` or `^test`.
+	for _, scope := range ti.TasksReachedIn("/apps/go", nil) {
+		if scope == "test~graph" {
+			t.Errorf("a Go dependent of a whole project runs %s", scope)
+		}
+	}
+}
+
 // A project may declare an input ABOVE its own root, and two projects in this
 // workspace do — `@putnami/cli` watches "../../**/putnami.json" and
 // `@putnami/cli-documents` watches "git:**". The model seeds such a project from

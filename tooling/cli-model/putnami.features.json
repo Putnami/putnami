@@ -140,6 +140,20 @@
               "a-public-project-a-generated-client-and-a-contract-edge-are-allowed"
             ]
           }
+        },
+        {
+          "id": "a-dependent-takes-only-the-step-references-it-may-run",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-edge-carries-into-each-dependent-what-it-may-run",
+              "a-dependent-that-may-run-nothing-reached-is-not-selected"
+            ]
+          }
         }
       ]
     },

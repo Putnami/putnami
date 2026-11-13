@@ -58,12 +58,20 @@
         "A project is importable in its scope, the nearest ancestor directory whose putnami.json sets scope fields, and from projects inside its directory;",
         "an import that leaves it is reported unless the imported project is public or a generated client, and a contract edge is always allowed."
       ]
+    },
+    {
+      "id": "a-dependent-takes-only-the-step-references-it-may-run",
+      "text": [
+        "A dependency or contract edge carries into each dependent only the tasks a `^` reference reaches when a command that declares the reference may be planned in that dependent;",
+        "a dependent it reaches nothing in is not selected through the edge."
+      ]
     }
   ],
   "decisions": [
     "tooling/cli/doc/adr/0038-nearest-ownership-and-ordering-only-scope-edges.md",
     "tooling/cli/doc/adr/0042-impacted-plans-from-the-commit-and-records-why.md",
     "tooling/cli/doc/adr/0044-selection-is-task-level.md",
-    "tooling/cli/doc/adr/0054-the-contract-edge-fires-on-the-committed-contract.md"
+    "tooling/cli/doc/adr/0054-the-contract-edge-fires-on-the-committed-contract.md",
+    "tooling/cli/doc/adr/0089-a-step-may-read-no-command-option-layer.md"
   ]
 }

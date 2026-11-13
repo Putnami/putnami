@@ -316,6 +316,14 @@ dependency. A reader below 22 would read the entry as a pipeline-step
 reference, plan nothing and run the dependent before what it reads, so it
 refuses the stamp. The floor binds a manifest wherever it loads from. Only a
 manifest with such an entry is stamped 22.
+Contract `23` (`CommandLayerInputsContract`) is additive for a pipeline step
+that declares `commandLayerInputs`. From 23 on, a step that declares it
+`false` takes no `filePatterns` and no `envInputs` from its project's command
+option layers, in its cache key and in impact selection; the extension layer
+still reaches it. A reader below 23 drops the field it does not know and would
+read every layer, so it refuses the stamp instead. The floor binds a manifest
+wherever it loads from. Only a manifest whose step declares the field is
+stamped 23.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

@@ -330,6 +330,18 @@ type PipelineStep struct {
 	// tasks entry overrides it. The machine capacity caps the resulting budget.
 	// Execution hint only — never affects cache keys.
 	CPUWeight *float64 `json:"cpuWeight,omitempty"`
+	// CommandLayerInputs false keeps the project's command option layers
+	// (options.<command> and its <extension>:<command> forms) out of the step:
+	// their filePatterns and envInputs neither key nor select it. The extension
+	// layer still reaches it. Absent or true reads every layer. Declaring it
+	// requires protocolcli.CommandLayerInputsContract.
+	CommandLayerInputs *bool `json:"commandLayerInputs,omitempty"`
+}
+
+// ReadsCommandLayer reports whether the step reads its project's command
+// option layers: every step but one that declares commandLayerInputs false.
+func (s PipelineStep) ReadsCommandLayer() bool {
+	return s.CommandLayerInputs == nil || *s.CommandLayerInputs
 }
 
 // FinalizesRelation makes invocation-resource cleanup derivable from the

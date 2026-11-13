@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
 	jobmodel "go.putnami.dev/cli/model/jobs"
+	"go.putnami.dev/protocol/features/spectest"
 	protocoljob "go.putnami.dev/protocol/job"
 	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -1208,6 +1210,92 @@ func TestCacheKeyIncludesProjectDeclaredEnvInputs(t *testing.T) {
 			t.Fatal("declaring a var both literally and via a matching glob must yield the same key as declaring it once (dedupe/stability)")
 		}
 	})
+}
+
+// A step that declares commandLayerInputs false keys on none of its project's
+// command layers — options.test, options.@putnami/typescript:test and the
+// path-reference form — neither their filePatterns nor their envInputs, and
+// still keys on the extension layer. The same project's test step keys on all.
+func TestCacheKeyLeavesTheCommandLayersOutOfAStepThatDeclaresSo(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-step-may-read-no-command-option-layer",
+		"a-step-that-leaves-the-command-layer-keys-on-no-command-layer-input")
+	spectest.Proves(t, "cli/job-planning-execution", "a-step-may-read-no-command-option-layer",
+		"a-step-that-leaves-the-command-layer-keeps-the-extension-layer")
+	ws := makeExecutorTestWorkspace(t)
+	extPath := filepath.Join(ws.Root, "typescript", "extension")
+	config := &wsproto.ProjectConfig{}
+	if err := json.Unmarshal([]byte(`{
+		"extensions": ["/typescript/extension"],
+		"options": {
+			"test": {"filePatterns": ["fixtures/**"], "envInputs": ["PUTNAMI_TEST_LAYER_TARGET"]},
+			"@putnami/typescript:test": {"filePatterns": ["qualified/**"]},
+			"/typescript/extension:test": {"filePatterns": ["by-path/**"]},
+			"/typescript/extension": {"filePatterns": ["golden/**"]}
+		}
+	}`), config); err != nil {
+		t.Fatal(err)
+	}
+	project := &workspace.Project{ID: "/proj", Name: "proj", Path: "proj", Config: config}
+	mkJob := func(name string, leaves bool) *jobmodel.ScheduledJob {
+		return &jobmodel.ScheduledJob{
+			Project:   project,
+			Extension: &extension.ExtensionDescription{Name: "@putnami/typescript", Path: extPath},
+			JobDef: &extension.JobDefinition{
+				Name: name, ExtensionName: "@putnami/typescript", Cache: true,
+				FilePatterns: []string{"src/**/*"}, NoCommandLayerInputs: leaves,
+			},
+		}
+	}
+	generate, run := mkJob("test~generate", true), mkJob("test~test", false)
+	if got := ProjectFilePatterns(ws, generate); !slices.Equal(got, []string{"golden/**"}) {
+		t.Errorf("the generate step reads layer patterns %v, want the extension layer's alone", got)
+	}
+	if got := ProjectEnvInputs(ws, generate); len(got) != 0 {
+		t.Errorf("the generate step reads layer env inputs %v, want none", got)
+	}
+	if got := ProjectFilePatterns(ws, run); !slices.Equal(got, []string{"fixtures/**", "qualified/**", "golden/**", "by-path/**"}) {
+		t.Errorf("the test step reads layer patterns %v, want every layer", got)
+	}
+
+	hashFor := func(job *jobmodel.ScheduledJob) string {
+		t.Helper()
+		cm := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
+		h, err := ComputeJobCacheHash(ws, job, nil, nil, cm, nil)
+		if err != nil {
+			t.Fatalf("compute cache key: %v", err)
+		}
+		return h
+	}
+	write := func(rel, content string) {
+		writeTestFile(t, filepath.Join(ws.Root, "proj", filepath.FromSlash(rel)), content)
+	}
+	write("src/a.ts", "export const a = 1\n")
+	for _, rel := range []string{"fixtures/case.json", "qualified/case.json", "by-path/case.json", "golden/out.txt"} {
+		write(rel, "1")
+	}
+	t.Setenv("PUTNAMI_TEST_LAYER_TARGET", "one")
+	generateKey, runKey := hashFor(generate), hashFor(run)
+	for _, rel := range []string{"fixtures/case.json", "qualified/case.json", "by-path/case.json"} {
+		write(rel, "2")
+		if got := hashFor(generate); got != generateKey {
+			t.Errorf("an edit of %s moved the generate step's key", rel)
+		}
+		if got := hashFor(run); got == runKey {
+			t.Errorf("an edit of %s left the test step's key unchanged", rel)
+		}
+		runKey = hashFor(run)
+	}
+	t.Setenv("PUTNAMI_TEST_LAYER_TARGET", "two")
+	if got := hashFor(generate); got != generateKey {
+		t.Error("a command-layer env input moved the generate step's key")
+	}
+	if got := hashFor(run); got == runKey {
+		t.Error("a command-layer env input left the test step's key unchanged")
+	}
+	write("golden/out.txt", "2")
+	if got := hashFor(generate); got == generateKey {
+		t.Error("an edit of an extension-layer file left the generate step's key unchanged")
+	}
 }
 
 func writeTestFile(t *testing.T, path, contents string) {

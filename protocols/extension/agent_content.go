@@ -221,7 +221,29 @@ func RequiredLoadContract(m *Manifest) int {
 	if DeclaresProviders(m) {
 		required = max(required, protocolcli.ProviderContract)
 	}
+	// A step's command-layer opt-out parses and keys only in a reader that
+	// knows the field, whatever origin the manifest loads from.
+	if DeclaresCommandLayerInputs(m) {
+		required = max(required, protocolcli.CommandLayerInputsContract)
+	}
 	return required
+}
+
+// DeclaresCommandLayerInputs reports whether a pipeline step of the manifest
+// declares commandLayerInputs, true or false: the vocabulary of
+// protocolcli.CommandLayerInputsContract.
+func DeclaresCommandLayerInputs(m *Manifest) bool {
+	if m == nil {
+		return false
+	}
+	for _, command := range m.Commands {
+		for _, step := range command.Run {
+			if step.CommandLayerInputs != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // DeclaresProvisionedToolchain reports whether a runtime toolchain of the

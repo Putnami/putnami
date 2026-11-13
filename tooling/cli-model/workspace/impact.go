@@ -62,6 +62,14 @@ type TaskImpactIndex interface {
 	// dependency edge or a contract edge, is the graph's business.
 	TasksReachedFrom(tasks []string) []string
 
+	// TasksReachedIn is TasksReachedFrom for one dependent project: a `^` step
+	// reference or a `^command` dependency reaches it only when a command that
+	// declares the reference may be planned there, so one stack's `^test`
+	// carries no other stack's test step; the prerequisite of a `^command`
+	// dependency travels on whatever the dependent plans. The walk asks it on
+	// every dependency and contract edge.
+	TasksReachedIn(projectID string, tasks []string) []string
+
 	// TasksBuildingRuntime returns the entries of tasks that may build what an
 	// extension's consumers execute: every entry but one that only commands
 	// of a checking kind declare. A verification, a check against criteria
@@ -933,11 +941,15 @@ func (w *impactWalk) run() {
 			// contract edge reads only the contract.
 			cause := scope.carriedCause()
 			for _, next := range w.ws.Graph.ImpactDependentsOf(current) {
-				w.reach(next, ImpactEdge{From: current, Kind: ImpactEdgeDependency}, carried, cause)
+				if into, reaches := w.carriedInto(next, scope, carried); reaches {
+					w.reach(next, ImpactEdge{From: current, Kind: ImpactEdgeDependency}, into, cause)
+				}
 			}
 			if edge, fires := w.contractEdgeFrom(current); fires {
 				for _, next := range w.ws.Graph.contractClientsOf(current) {
-					w.reach(next, edge, carried, cause)
+					if into, reaches := w.carriedInto(next, scope, carried); reaches {
+						w.reach(next, edge, into, cause)
+					}
 				}
 			}
 		}
@@ -1025,6 +1037,18 @@ func (w *impactWalk) carried(scope *impactScope) ([]string, bool) {
 	}
 	reached := w.index.TasksReachedFrom(scope.source())
 	return reached, len(reached) > 0
+}
+
+// carriedInto narrows what a project carries to what one dependent may run
+// (TaskImpactIndex.TasksReachedIn). The second result is false when the
+// dependent may run none of it, and the edge then selects nothing there.
+// Without an index the project carries its whole self.
+func (w *impactWalk) carriedInto(next string, scope *impactScope, carried []string) ([]string, bool) {
+	if w.index == nil {
+		return carried, true
+	}
+	into := w.index.TasksReachedIn(next, scope.source())
+	return into, len(into) > 0
 }
 
 // contractEdgeFrom returns the edge a provider's contract edges record, and

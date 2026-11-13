@@ -301,7 +301,8 @@ that names one step of another command (`build~describe`),
 a workspace adapter that declares `buildGraphEdges`, or
 `protocols/cli.DependencyClosureContract` (22) for a command `dependsOn` entry
 that names a command across the project's dependency closure
-(`^client-generate`). Rung 6 named the
+(`^client-generate`), or `protocols/cli.CommandLayerInputsContract` (23) for
+a pipeline step that declares `commandLayerInputs`. Rung 6 named the
 `go-embed:build` and `go-embed:test` selectors the CLI expanded itself; rung
 14 retires it.
 `protocols/cli.GitInputModeContract` names the same rung 7 for a task whose

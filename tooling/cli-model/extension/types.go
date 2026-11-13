@@ -377,6 +377,10 @@ type JobDefinition struct {
 	Traits          CommandTraits // resolved orchestration traits (verb defaults or manifest override)
 	Heavy           *bool         // per-step heavy override from the pipeline step
 	CPUWeight       *float64      // per-step relative CPU-demand multiplier
+	// NoCommandLayerInputs is set for a pipeline step that declares
+	// commandLayerInputs false: the project's command option layers give it no
+	// filePatterns and no envInputs.
+	NoCommandLayerInputs bool
 	// TraitsDeclared is set when the manifest declared the command's traits.
 	// ApplyVocabularyTraits leaves such a job alone.
 	TraitsDeclared bool

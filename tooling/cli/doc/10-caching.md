@@ -348,7 +348,14 @@ key by construction.
 
 `options.<command>.filePatterns` in a project manifest folds into the key of
 **every** task of that command, so a document declared for one test is an input
-of the whole suite. That is why the gates reading this repository's own
+of the whole suite. The one exception is a pipeline step that declares
+`commandLayerInputs: false`: it takes no `filePatterns` and no `envInputs` from
+the command layers (`options.<command>`, `options.<extension>:<command>`), only
+from the extension layer. The TypeScript and Go `test` steps that prepare the
+project — `generate`, `tsc` and `tsc-auto`, and `config-merge`, `generate` and
+`describe` — declare it, so a test fixture keys and selects the steps that run
+the tests, and no dependent's tests through `^generate`
+([ADR 0089](adr/0089-a-step-may-read-no-command-option-layer.md)). That is why the gates reading this repository's own
 documents — the governance surface, the contributor recipe, the release plan and
 its recorded verdict, the public-cut candidate — live in
 [`tooling/cli-documents`](../../cli-documents/README.md) rather than in

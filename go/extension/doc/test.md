@@ -26,6 +26,8 @@ Runs Go tests with `go test -json`, parses results into structured metrics, and 
    - Emit metrics and diagnostics
    - Generate HTML report if `--coverhtml` is set
 
+The `config-merge`, `generate` and `describe` steps of `test` declare `commandLayerInputs: false`: a project's `options.test.filePatterns` and `options.test.envInputs` key and select the steps that run the tests, not the steps that prepare the project (the config merge, generation and describe). A dependent's tests therefore do not run again when a file only this project's tests read changes. Declare an input those steps read in the extension layer (`options."@putnami/go"`), which still reaches every step.
+
 ### Workspace batching
 
 Go projects that are ready at the same moment and have the same effective test

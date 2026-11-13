@@ -1,7 +1,7 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "name": "@putnami/typescript",
-  "cliContract": 22,
+  "cliContract": 23,
   "extensionDependencies": {"@putnami/dev": ""},
   "runtime": {
     "executable": "compiled/putnami-ts",
@@ -442,6 +442,7 @@
         {
           "id": "generate",
           "task": "build-generate",
+          "commandLayerInputs": false,
           "dependsOn": [
             "^generate"
           ],
@@ -454,6 +455,7 @@
         {
           "id": "tsc-auto",
           "task": "build-tsc",
+          "commandLayerInputs": false,
           "dependsOn": [
             "generate",
             "^tsc",
@@ -469,6 +471,7 @@
         {
           "id": "tsc",
           "task": "build-tsc",
+          "commandLayerInputs": false,
           "dependsOn": [
             "generate",
             "^tsc",
