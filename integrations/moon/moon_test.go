@@ -241,6 +241,16 @@ func TestTheSyncWritesEachMoonProjectPutnamiJSON(t *testing.T) {
 	}
 }
 
+func TestABareImportMemberKeepsTheEdgesTheSyncWrites(t *testing.T) {
+	spectest.Proves(t, feature, "import-attributes-the-edges-it-writes", "a-bare-import-member-keeps-the-edges-the-sync-writes")
+	// api, imported into @putnami/typescript, is a bare member that keeps its
+	// edge to pricing; probe checks that moon's graph is the edge's source.
+	api := probe(t, repository(t, readDemo(t), ModeImport, true))["apps/api"]
+	if len(api.Extensions) != 0 || !slices.Equal(api.Dependencies, []string{"packages/pricing"}) || api.DependencySources == nil {
+		t.Errorf("api = %+v, want a bare member with its edge to pricing", api)
+	}
+}
+
 func TestImportModeMapsAProjectToItsLanguageExtension(t *testing.T) {
 	spectest.Proves(t, feature, "import-maps-to-language-extensions", "import-mode-maps-a-project-to-its-language-extension")
 	d := readDemo(t)

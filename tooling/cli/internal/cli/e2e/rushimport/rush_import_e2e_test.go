@@ -322,6 +322,62 @@ func setScripts(t *testing.T, root, dir, scripts string) {
 	clitest.WriteFile(t, file, string(data)+"\n")
 }
 
+// A project whose scripts all move to @putnami/typescript no longer names
+// @putnami/rush, yet the sync writes the edges Rush reads, a devDependency
+// no source imports among them. Rush's probe attributes those edges to its
+// graph without claiming the project, so deps prune leaves them alone and
+// the next sync finds nothing to write back.
+func TestAnEdgeTheRushSyncWritesIsNoPhantom(t *testing.T) {
+	spectest.Proves(t, "cli/init-from-a-monorepo-tool", "rush-import-keeps-the-edges-the-sync-writes", "an-edge-the-rush-sync-writes-is-no-phantom")
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	root := importWorkspace(t, buildRuntime(t))
+	// web lints with Biome, which @putnami/typescript runs, and builds with a
+	// devDependency on pricing that no source of web imports, as a shared
+	// build tool or configuration package is.
+	setScripts(t, root, "apps/web", `"lint": "biome check ."`)
+	file := filepath.Join(root, "apps/web/package.json")
+	clitest.WriteFile(t, file, `{
+  "name": "@demo/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {"lint": "biome check ."},
+  "devDependencies": {"@demo/pricing": "workspace:*", "typescript": "~5.6.0"}
+}
+`)
+
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	web := filepath.Join(root, "apps/web/putnami.json")
+	synced, err := os.ReadFile(web)
+	if err != nil || !strings.Contains(string(synced), `"/libs/pricing"`) || strings.Contains(string(synced), "@putnami/rush") {
+		t.Fatalf("web putnami.json = %s (%v), want the edge to pricing and no @putnami/rush", synced, err)
+	}
+
+	// prune reads the provider view, which a run that loads the workspace
+	// records after the sync's writes.
+	if code, out := clitest.RunGateArgs(t, root, "validate", "--all"); code != 0 {
+		t.Fatalf("validate exit %d:\n%s", code, out)
+	}
+	code, out := clitest.RunGateArgs(t, root, "deps", "prune", "--dry-run")
+	if code != 0 || !strings.Contains(out, "No declared dependency edge without an import.") {
+		t.Errorf("deps prune --dry-run exit %d lists an edge the sync writes:\n%s", code, out)
+	}
+	if code, out := clitest.RunGateArgs(t, root, "deps", "prune"); code != 0 {
+		t.Fatalf("deps prune exit %d:\n%s", code, out)
+	}
+	if data, _ := os.ReadFile(web); string(data) != string(synced) {
+		t.Errorf("deps prune rewrote web putnami.json:\n%s", data)
+	}
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if data, _ := os.ReadFile(web); string(data) != string(synced) {
+		t.Errorf("the next sync rewrote web putnami.json:\n%s", data)
+	}
+}
+
 // A change that adds an edge between two imported projects selects them
 // against its baseline, and validate fails: the putnami.json files no longer
 // carry the edges a sync writes.

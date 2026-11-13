@@ -88,6 +88,10 @@
       "text": "On the moon fixture of the putnami observe detector, putnami init --from moon --mode import --apply writes the project graph observe reads, moves to its language's extension each moon task that extension runs with the same tool, keeps every other task and each project of a language without an extension on @putnami/moon, lists each task it keeps in its output, and putnami lint,test,build then pass."
     },
     {
+      "id": "moon-import-keeps-the-edges-the-sync-writes",
+      "text": "On a moon workspace in import mode whose api runs only ESLint and Vitest tasks, which move to @putnami/typescript, and states dependsOn tooling, a devDependencies workspace package no source of api imports: after projects sync, putnami deps prune --dry-run lists no edge, putnami deps prune leaves api's putnami.json unchanged, and the next sync writes nothing back."
+    },
+    {
       "id": "moon-delegate-runs-through-moon",
       "text": "On the moon fixture of the putnami observe detector, with moon on PATH, putnami init --from moon --mode delegate --apply then putnami test --impacted after a change to one project runs moon run <project>:<task> at the workspace root on that project and each project that depends on it, never on one it depends on, records delegatedTo moon, and neither looks up nor stores a Putnami cache entry."
     },
@@ -139,6 +143,10 @@
         "On the Rush fixture of the putnami observe detector, an import writes each Rush project as a TypeScript project whose dependencies are the edges putnami observe reads, keeps a script whose tool @putnami/typescript does not run on rushx and lists it, then putnami lint,test,build passes and no task runs rush.",
         "A command-line.json bulk command whose name is not build, test or lint appears as unmapped, and validate fails with rush.sync_stale once a script changes."
       ]
+    },
+    {
+      "id": "rush-import-keeps-the-edges-the-sync-writes",
+      "text": "On the Rush fixture of the putnami observe detector in import mode, with web linting with Biome only, so every script moves to @putnami/typescript, and a devDependencies entry on pricing that no source of web imports: after projects sync, putnami deps prune --dry-run lists no edge, putnami deps prune leaves web's putnami.json unchanged, and the next sync writes nothing back."
     },
     {
       "id": "rush-impact-runs-through-rush",

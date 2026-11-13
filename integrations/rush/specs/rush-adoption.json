@@ -23,6 +23,10 @@
       ]
     },
     {
+      "id": "import-attributes-the-edges-it-writes",
+      "text": "In import mode, a bare rush.json project keeps the edges the observe Rush detector reads, which the sync writes into its putnami.json, attributed build-graph: the probe vouches for them without claiming the project, so workspace.declared_edge does not report them and putnami deps prune leaves them in place."
+    },
+    {
       "id": "sync-writes-the-project-graph",
       "text": [
         "The sync task writes in each project's putnami.json the extension of the mode, the mode param or else the recorded mode, import by default, an unknown one failing, and the project IDs it depends on, and removes the other mode's extension.",

@@ -69,7 +69,8 @@ func Mode(root string) (string, error) {
 // package.json depends on. In import mode a project whose putnami.json names
 // the extension keeps a target on Rush (ADR 0017 of tooling/stacks) and is a
 // component; every other one is bare, a member whose targets the TypeScript
-// extension runs.
+// extension runs, with the edges the sync writes into its putnami.json
+// attributed to Rush's graph.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	detection := detect.Detect(root)
 	if len(detection.Projects) == 0 && len(detection.Diagnostics) == 0 {
@@ -93,7 +94,7 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 			continue
 		}
 		if mode == ModeImport && !keepsTargets(root, dir) {
-			out = append(out, stacks.Component{Path: dir, Bare: true})
+			out = append(out, stacks.Component{Path: dir, Bare: true, Dependencies: p.DependsOn, EdgeSource: wsproto.DependencySourceBuildGraph})
 			continue
 		}
 		out = append(out, stacks.Component{

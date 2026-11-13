@@ -88,9 +88,11 @@ func ExtensionFor(mode string, p detect.Project) string {
 // with the workspace root for stack root and moon's edges. A project the mode
 // imports into a language extension is bare, a member whose tasks that
 // extension runs, unless its putnami.json names @putnami/moon too: it keeps a
-// task on moon (ADR 0017 of tooling/stacks). A project the TypeScript
-// extension names carries no name of its own: the package name wins, and moon
-// run still receives the moon project id. A candidate that is no moon
+// task on moon (ADR 0017 of tooling/stacks). A bare project keeps moon's
+// edges, which the sync writes into its putnami.json, attributed to moon's
+// graph. A project the TypeScript extension names carries no name of its
+// own: the package name wins, and moon run still receives the moon project
+// id. A candidate that is no moon
 // project, such as a test fixture that holds a package.json, is not answered.
 func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []diag.Diagnostic) {
 	if !detect.IsWorkspace(root) {
@@ -112,15 +114,15 @@ func Detect(root string, request wsproto.ProbeRequest) ([]stacks.Component, []di
 		if !ok {
 			continue
 		}
-		if ExtensionFor(mode, p) != ExtensionName && !keepsTasks(root, dir) {
-			out = append(out, stacks.Component{Path: dir, Bare: true})
-			continue
-		}
 		var deps []string
 		for _, d := range p.DependsOn {
 			if d != wsproto.ProbeRootPath {
 				deps = append(deps, d)
 			}
+		}
+		if ExtensionFor(mode, p) != ExtensionName && !keepsTasks(root, dir) {
+			out = append(out, stacks.Component{Path: dir, Bare: true, Dependencies: deps, EdgeSource: wsproto.DependencySourceBuildGraph})
+			continue
 		}
 		// The TypeScript extension names a project with a named package.json;
 		// moon run still receives the moon project id.

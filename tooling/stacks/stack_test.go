@@ -954,6 +954,21 @@ func TestProbeNamesABareDirectoryAndADelegatedStackServesTheGraphJob(t *testing.
 		t.Errorf("a bare directory gets its name alone: %+v", result.Projects)
 	}
 
+	// A bare member whose edges the stack's sync writes keeps them, attributed
+	// to their source, and still claims nothing.
+	s.Detect = func(string, wsproto.ProbeRequest) ([]Component, []diag.Diagnostic) {
+		return []Component{{Path: "apps/web", Bare: true, Dependencies: []string{"libs/pricing"}, EdgeSource: wsproto.DependencySourceBuildGraph}}, nil
+	}
+	result, err = s.Probe(t.TempDir(), wsproto.ProbeRequest{Version: wsproto.ProbeProtocolVersion, Extension: s.Extension, Paths: []string{"apps/web"}, DependencySources: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want = wsproto.ProbeProject{Path: "apps/web", Dependencies: []string{"libs/pricing"},
+		DependencySources: map[string]wsproto.DependencySource{"libs/pricing": wsproto.DependencySourceBuildGraph}}
+	if len(result.Projects) != 1 || !reflect.DeepEqual(result.Projects[0], want) {
+		t.Errorf("a bare member answers its edges and their source alone: %+v", result.Projects)
+	}
+
 	if _, ok := s.Jobs()[TaskGraph]; ok {
 		t.Error("a stack that keeps Putnami's cache serves no graph job")
 	}
