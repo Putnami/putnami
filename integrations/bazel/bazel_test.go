@@ -101,9 +101,20 @@ func coverageOf(report, dir string) string {
 // demo's export for query, and for test or coverage //<pkg>:all writes the
 // build-event file of that package's test runs, whose outputs lie in an
 // output tree outside the workspace, as Bazel's do; a coverage output only
-// for coverage, or for test with --collect_code_coverage. It logs each call,
-// with its working directory, to $STUB_LOG, and returns the output tree's
-// testlogs directory.
+// for coverage, or for test with --collect_code_coverage on its command line
+// or in a test, build or common line of .bazelrc. It logs each call, with its
+// working directory, to $STUB_LOG, and returns the output tree's testlogs
+// directory.
+//
+// Like Bazel, a build, test or coverage call that collects coverage without
+// an --instrumentation_filter derives one from its target pattern,
+// ^//<pkg>[/:], and a call that collects none keeps the flag's default. Each
+// such call logs "<command> collect=<0|1> filter=<value>" to
+// $STUB_OPTIONS: Bazel discards its analysis cache whenever either value
+// differs from the previous call's. The coverage a call writes holds the
+// records of the sources its filter instruments: the package's for a derived
+// filter, every source of the main repository for ^//, or the file
+// $STUB_COVERAGE names when set.
 func stubBazel(t *testing.T, d demo) string {
 	t.Helper()
 	bin, ci, outBase := t.TempDir(), t.TempDir(), t.TempDir()
@@ -119,6 +130,8 @@ func stubBazel(t *testing.T, d demo) string {
 		pkg, target := filepath.Dir(logDir), filepath.Base(logDir)
 		stackstest.WriteFile(t, testlogs, logRel, content)
 		stackstest.WriteFile(t, testlogs, logDir+"/coverage.dat", coverageOf(d["bazel"]["out/_coverage/_coverage_report.dat"], pkg))
+		stackstest.WriteFile(t, ci, "coverage/package/"+logDir+"/coverage.dat", coverageOf(d["bazel"]["out/_coverage/_coverage_report.dat"], pkg))
+		stackstest.WriteFile(t, ci, "coverage/all/"+logDir+"/coverage.dat", d["bazel"]["out/_coverage/_coverage_report.dat"])
 		uri := func(name string) string { return "file://" + filepath.ToSlash(filepath.Join(testlogs, logDir, name)) }
 		event := func(outputs ...string) string {
 			var listed []map[string]string
@@ -150,10 +163,30 @@ case "$1" in --version) echo "bazel ${STUB_VERSION:-` + version + `}"; exit 0;; 
 for a in "$@"; do last="$a"; done
 case "$1" in
   query) cat '` + ci + `/bazel-graph.json'; exit 0;;
+esac
+pkg="${last#//}"; pkg="${pkg%:all}"; flat="$(echo "$pkg" | tr / _)"
+collect=0; filter=""
+[ "$1" = coverage ] && collect=1
+rc="build|common"; [ "$1" = build ] || rc="test|build|common"
+if [ -f .bazelrc ] && grep -Eq "^($rc)[[:space:]].*--collect_code_coverage" .bazelrc; then collect=1; fi
+for a in "$@"; do case "$a" in
+  --build_event_json_file=*) bep="${a#--build_event_json_file=}";;
+  --collect_code_coverage) collect=1;;
+  --instrumentation_filter=*) filter="${a#--instrumentation_filter=}";;
+esac; done
+if [ -z "$filter" ]; then
+  if [ "$collect" = 1 ]; then filter="^//$pkg[/:]"; else filter='-/javatests[/:],-/test/java[/:]'; fi
+fi
+case "$1" in build|test|coverage) echo "$1 collect=$collect filter=$filter" >> "${STUB_OPTIONS:-/dev/null}";; esac
+case "$1" in
   test|coverage)
-    pkg="${last#//}"; pkg="${pkg%:all}"; flat="$(echo "$pkg" | tr / _)"
-    kind=".uncovered"; [ "$1" = coverage ] && kind=""
-    for a in "$@"; do case "$a" in --build_event_json_file=*) bep="${a#--build_event_json_file=}";; --collect_code_coverage) kind="";; esac; done
+    kind=".uncovered"; [ "$collect" = 1 ] && kind=""
+    if [ "$collect" = 1 ] && [ -d '` + ci + `'/coverage/package/"$pkg" ]; then
+      variant=all; [ "$filter" = "^//$pkg[/:]" ] && variant=package
+      for f in $(cd '` + ci + `'/coverage/"$variant" && find "$pkg" -name coverage.dat); do
+        if [ -n "$STUB_COVERAGE" ]; then cp "$STUB_COVERAGE" '` + testlogs + `'/"$f"; else cp '` + ci + `'/coverage/"$variant"/"$f" '` + testlogs + `'/"$f"; fi
+      done
+    fi
     if [ -e '` + ci + `'/events/"$flat".json ]; then cp '` + ci + `'/events/"$flat$kind".json "$bep"; else echo '{"id":{"started":{}}}' > "$bep"; fi
     exit "${STUB_TEST_EXIT:-0}";;
 esac
@@ -507,8 +540,8 @@ func TestATaskRunsBazelOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 	out := filepath.Join(root, ".putnami/out/pricing/test")
 
 	for task, want := range map[string]string{
-		stacks.TaskBuild: "bazel build //pricing:all",
-		stacks.TaskTest:  "bazel test --build_event_json_file=" + out + "/build-events.json //pricing:all",
+		stacks.TaskBuild: "bazel build --instrumentation_filter=^// //pricing:all",
+		stacks.TaskTest:  "bazel test --instrumentation_filter=^// --build_event_json_file=" + out + "/build-events.json //pricing:all",
 	} {
 		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
 		status, data, events := runJob(t, root, "pricing", task)
@@ -599,6 +632,16 @@ func TestCollectReportsReadsTheBuildEventFile(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(into, rel)); err != nil {
 			t.Errorf("%s was not collected: %v", rel, err)
 		}
+	}
+
+	// With --package, a coverage copy keeps the records of that package's
+	// sources alone.
+	stackstest.WriteFile(t, root, "bazel-testlogs/api/api_test/coverage.dat", "TN:\nSF:api/api.go\nDA:1,1\nend_of_record\nTN:\nSF:pricing/pricing.go\nDA:2,1\nend_of_record\nSF:apiv2/v.go\nDA:3,1\nend_of_record\n")
+	if err := CollectReports([]string{"--events", events, "--root", root, "--package", "api", "--into", into}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if got, _ := os.ReadFile(filepath.Join(into, "api/api_test/coverage.dat")); string(got) != "TN:\nSF:api/api.go\nDA:1,1\nend_of_record\n" {
+		t.Errorf("api's coverage = %q, want api's record alone", got)
 	}
 
 	// A missing build-event file collects nothing; a malformed one and a
@@ -703,10 +746,11 @@ func TestTheSyncDisablesTheTestOfAPackageWhoseTestsAreAllManual(t *testing.T) {
 }
 
 // optIntoCoverage overrides the test steps of the package dir with bazel
-// coverage, the way a project opts into coverage.
+// coverage, the way a project opts into coverage, with the filter of the
+// default steps.
 func optIntoCoverage(t *testing.T, root, dir string) {
 	t.Helper()
-	stackstest.WriteFile(t, root, dir+"/putnami.json", `{"options": {"`+ExtensionName+`": {"tasks": {"test": {"steps": [["bazel", "coverage", "--build_event_json_file={output}/build-events.json", "//{component}:all"]]}}}}}`+"\n")
+	stackstest.WriteFile(t, root, dir+"/putnami.json", `{"options": {"`+ExtensionName+`": {"tasks": {"test": {"steps": [["bazel", "coverage", "--instrumentation_filter=^//", "--build_event_json_file={output}/build-events.json", "//{component}:all"]]}}}}}`+"\n")
 }
 
 // bazel coverage can fail where bazel test passes, as on a C++ test whose
@@ -722,7 +766,7 @@ func TestTheTestTaskRunsBazelTestAndReadsOnlyAnLCOVCoverage(t *testing.T) {
 	out := filepath.Join(root, ".putnami/out/pricing/test")
 
 	status, data, events := runJob(t, root, "pricing", stacks.TaskTest)
-	if want := rootReal + " bazel test --build_event_json_file=" + out + "/build-events.json //pricing:all"; status != "OK" || !slices.Contains(stubLog(t), want) {
+	if want := rootReal + " bazel test --instrumentation_filter=^// --build_event_json_file=" + out + "/build-events.json //pricing:all"; status != "OK" || !slices.Contains(stubLog(t), want) {
 		t.Fatalf("status %s, calls %q, want %q: %s", status, stubLog(t), want, events)
 	}
 	if got := data["testSummary"].(map[string]any); got["total"] != 3 || got["passed"] != 3 {
@@ -735,7 +779,8 @@ func TestTheTestTaskRunsBazelTestAndReadsOnlyAnLCOVCoverage(t *testing.T) {
 	// A project opts into coverage; a coverage file that is no LCOV
 	// tracefile is skipped with a warning, and the tests still count.
 	optIntoCoverage(t, root, "pricing")
-	stackstest.WriteFile(t, testlogs, "pricing/pricing_test/coverage.dat", "\xfflprofi\x81\x00\x00\x00\x0a\x00\x00\x00")
+	stackstest.WriteFile(t, testlogs, "raw.profraw", "\xfflprofi\x81\x00\x00\x00\x0a\x00\x00\x00")
+	t.Setenv("STUB_COVERAGE", filepath.Join(testlogs, "raw.profraw"))
 	status, data, events = runJob(t, root, "pricing", stacks.TaskTest)
 	if status != "OK" {
 		t.Fatalf("a run with a coverage file that is not LCOV: status %s: %s", status, events)
@@ -764,5 +809,59 @@ func TestTheTestTaskRunsBazelTestAndReadsOnlyAnLCOVCoverage(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(into, "pricing/pricing_test/test.xml")); err != nil {
 		t.Errorf("the JUnit report of a run with no LCOV coverage was not collected: %v", err)
+	}
+}
+
+// Bazel discards its analysis cache whenever a call's
+// --collect_code_coverage or --instrumentation_filter differs from the
+// previous call's. A call that collects coverage without a filter derives
+// one from its target pattern, so each package's call would have its own,
+// and a second run would analyze every package again. Every call passes the
+// same filter, and a package's coverage still holds its own sources alone.
+func TestEveryBazelCallKeepsOneInstrumentationFilter(t *testing.T) {
+	spectest.Proves(t, feature, "tasks-delegate-to-bazel", "a-task-runs-bazel-on-its-package-and-records-the-delegation")
+	d := readDemo(t)
+	stubBazel(t, d)
+	setRuntime(t)
+	root := repository(t, d, true)
+	stackstest.WriteFile(t, root, ".bazelrc", d["base"][".bazelrc"]+"build --collect_code_coverage\n")
+	options := filepath.Join(t.TempDir(), "options")
+	t.Setenv("STUB_OPTIONS", options)
+
+	coverage := map[string]any{}
+	for _, dir := range []string{"pricing", "api"} {
+		for _, task := range []string{stacks.TaskTest, stacks.TaskBuild} {
+			status, data, events := runJob(t, root, dir, task)
+			if status != "OK" {
+				t.Fatalf("%s %s: status %s: %s", dir, task, status, events)
+			}
+			if task == stacks.TaskTest {
+				coverage[dir] = data["coverageSummary"]
+			}
+		}
+	}
+	data, err := os.ReadFile(options)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(calls) != 4 {
+		t.Fatalf("calls = %q, want two tests and two builds", calls)
+	}
+	for _, call := range calls[1:] {
+		_, got, _ := strings.Cut(call, " ")
+		_, want, _ := strings.Cut(calls[0], " ")
+		if got != want {
+			t.Errorf("calls = %q: Bazel discards its analysis cache between calls whose options differ", calls)
+			break
+		}
+	}
+	// The filter instruments every source of the main repository: api's
+	// tests run pricing's code, whose lines stay out of api's coverage.
+	for dir, want := range map[string]int{"pricing": 4, "api": 1} {
+		got, _ := coverage[dir].(map[string]any)
+		if got["covered"] != want || got["total"] != want {
+			t.Errorf("%s coverageSummary = %v, want its own %v lines alone", dir, coverage[dir], want)
+		}
 	}
 }

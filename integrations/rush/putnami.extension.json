@@ -97,7 +97,7 @@
   },
   "commands": {
     "lint": {
-      "description": "Lint each Rush project with rush lint --to <package> at the workspace root; Rush keeps its own build cache.",
+      "description": "Lint each Rush project alone with rush lint --only <package> at the workspace root; Rush keeps its own build cache.",
       "run": [
         {
           "id": "graph",
@@ -117,7 +117,7 @@
       ]
     },
     "test": {
-      "description": "Test each Rush project with rush test --to <package> at the workspace root, and read the JUnit and coverage reports the project's options name; Rush keeps its own build cache.",
+      "description": "Test each Rush project alone with rush test --only <package> at the workspace root, and read the JUnit and coverage reports the project's options name; Rush keeps its own build cache.",
       "run": [
         {
           "id": "graph",
@@ -201,7 +201,7 @@
       }
     },
     "lint-run": {
-      "description": "Run rush lint --to <package> at the workspace root for one project, after the Rush version check, when command-line.json declares a lint command; the sync disables lint otherwise. Putnami's cache is off.",
+      "description": "Run rush lint --only <package> at the workspace root for one project, and for no project upstream of it, after the Rush version check, when command-line.json declares a lint command; the sync disables lint otherwise. Putnami's cache is off.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -253,7 +253,7 @@
       }
     },
     "test-run": {
-      "description": "Run rush test --to <package> at the workspace root for one project, after the Rush version check; then read the JUnit and coverage reports the project's options.@putnami/rush.tasks.test.reports name. A step that exits non-zero, or a failed case, fails the task; without reports the result is the exit code. Putnami's cache is off: Rush's build cache decides what reruns.",
+      "description": "Run rush test --only <package> at the workspace root for one project, and for no project upstream of it, after the Rush version check; then read the JUnit and coverage reports the project's options.@putnami/rush.tasks.test.reports name. A step that exits non-zero, or a failed case, fails the task; without reports the result is the exit code. Putnami's cache is off: Rush's build cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

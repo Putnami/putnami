@@ -16,14 +16,14 @@
   "tasks": {
     "lint": {
       "steps": [
-        ["rush", "lint", "--to", "{component}"]
+        ["rush", "lint", "--only", "{component}"]
       ],
       "inputs": ["sources"],
       "dir": "root"
     },
     "test": {
       "steps": [
-        ["rush", "test", "--to", "{component}"]
+        ["rush", "test", "--only", "{component}"]
       ],
       "inputs": ["sources"],
       "dir": "root"

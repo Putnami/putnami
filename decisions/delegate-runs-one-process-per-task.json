@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "delegate-runs-one-process-per-task",
+  "statement": "a delegated task runs one tool process on its own project: rush lint and test take --only, only rush build takes --to, and every bazel command passes the same --instrumentation_filter; one tool command per verb waits for the orchestrator rework",
+  "settled": "2026-11-12",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}
