@@ -112,7 +112,7 @@ After expanding all pipelines, the planner resolves external dependency referenc
 
 | Reference | Meaning | Resolution |
 |-----------|---------|------------|
-| `^stepId` | Same step in upstream dependency projects | Resolves to `{depProject}:{command}~{stepId}` for each dependency |
+| `^stepId` | Same step in upstream dependency projects | Resolves to `{depProject}:{command}~{stepId}` for each dependency outside the project's dependency cycle, over every project of that cycle (`UpstreamOf`) |
 | `/stepId` | Same step at workspace level | Resolves to `{workspaceName}:{command}~{stepId}` |
 | `*stepId` | Same step in all other projects | Resolves to all matching jobs across the plan |
 

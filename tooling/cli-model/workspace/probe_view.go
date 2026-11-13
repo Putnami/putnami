@@ -118,10 +118,10 @@ func (ws *Workspace) currentProbeView() map[string]wsproto.MergedProject {
 // produces is one core can load; otherwise the previous view is restored and the
 // reason is returned.
 //
-// A candidate that resolves two projects to one name, or introduces a cycle, is
-// refused: every later Load adopts the RECORDED view before its own fatal
-// checks, so a persisted bad view would stop the workspace loading and block
-// every command that could repair it. Validating BEFORE adoption or persistence
+// A candidate that resolves two projects to one name, or introduces a cycle
+// CycleError refuses, is refused: every later Load adopts the RECORDED view
+// before its own fatal checks, so a persisted bad view would stop the workspace
+// loading and block every command that could repair it. Validating BEFORE adoption or persistence
 // makes Load fall back to the un-adopted resolution with a warning, and the
 // creating run refuses to write it.
 //
@@ -150,10 +150,7 @@ func (ws *Workspace) probeViewIntegrityError() error {
 	if err := CheckDuplicateNames(ws.Projects); err != nil {
 		return err
 	}
-	if cycle := ws.Graph.FindCycle(); cycle != nil {
-		return fmt.Errorf("dependency cycle detected: %s", strings.Join(cycle, " → "))
-	}
-	return nil
+	return ws.CycleError()
 }
 
 // AdoptProbeViewUnvalidated is the unguarded half: record the view, re-resolve

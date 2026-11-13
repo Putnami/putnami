@@ -55,6 +55,12 @@ type DependencyGraph struct {
 	// cannot: whether the build really reads that project, or whether a
 	// declaration merely says so.
 	edgeSources map[string]map[string]wsproto.DependencySource
+	// component maps each project ID to the index, in components, of its
+	// strongly connected component: the projects that all reach each other
+	// over deps. A project in no cycle is a component of its own.
+	component map[string]int
+	// components lists every component's members, sorted.
+	components [][]string
 }
 
 // BuildGraph constructs a dependency graph from discovered projects.
@@ -155,7 +161,75 @@ func BuildGraph(projects []*Project) *DependencyGraph {
 	}
 
 	g.deriveContractEdges(projects)
+	g.components, g.component = stronglyConnectedComponents(g.nodes, g.deps)
 	return g
+}
+
+// stronglyConnectedComponents partitions nodes into the groups of nodes that
+// all reach each other over deps (Tarjan's algorithm). Members are sorted and
+// components are ordered by their first member, so one graph gives one answer.
+func stronglyConnectedComponents(nodes map[string]bool, deps map[string][]string) ([][]string, map[string]int) {
+	ids := make([]string, 0, len(nodes))
+	for id := range nodes {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+
+	index := make(map[string]int, len(ids))
+	low := make(map[string]int, len(ids))
+	onStack := make(map[string]bool, len(ids))
+	var stack []string
+	var components [][]string
+	next := 0
+
+	var visit func(id string)
+	visit = func(id string) {
+		index[id] = next
+		low[id] = next
+		next++
+		stack = append(stack, id)
+		onStack[id] = true
+		for _, dep := range deps[id] {
+			if !nodes[dep] {
+				continue
+			}
+			if _, seen := index[dep]; !seen {
+				visit(dep)
+				low[id] = min(low[id], low[dep])
+			} else if onStack[dep] {
+				low[id] = min(low[id], index[dep])
+			}
+		}
+		if low[id] != index[id] {
+			return
+		}
+		var members []string
+		for {
+			top := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+			onStack[top] = false
+			members = append(members, top)
+			if top == id {
+				break
+			}
+		}
+		sort.Strings(members)
+		components = append(components, members)
+	}
+	for _, id := range ids {
+		if _, seen := index[id]; !seen {
+			visit(id)
+		}
+	}
+
+	sort.Slice(components, func(i, j int) bool { return components[i][0] < components[j][0] })
+	component := make(map[string]int, len(ids))
+	for i, members := range components {
+		for _, id := range members {
+			component[id] = i
+		}
+	}
+	return components, component
 }
 
 // deriveContractEdges resolves each generated client onto the provider whose
@@ -347,6 +421,77 @@ func findCycle(nodes map[string]bool, deps map[string][]string) []string {
 	}
 	path = append(path, cycleStart)
 	return path
+}
+
+// ComponentOf returns the strongly connected component that holds a project:
+// the projects that all reach each other over dependency edges, sorted. A
+// project in no cycle is its own component. Nil for an unknown project.
+func (g *DependencyGraph) ComponentOf(id string) []string {
+	if g == nil {
+		return nil
+	}
+	i, ok := g.component[id]
+	if !ok {
+		return nil
+	}
+	return slices.Clone(g.components[i])
+}
+
+// CyclicComponents returns every component that closes a cycle: more than one
+// project, or one project that depends on itself. Each is sorted, and they are
+// ordered by their first member.
+func (g *DependencyGraph) CyclicComponents() [][]string {
+	if g == nil {
+		return nil
+	}
+	var cyclic [][]string
+	for _, members := range g.components {
+		if len(members) > 1 || slices.Contains(g.deps[members[0]], members[0]) {
+			cyclic = append(cyclic, slices.Clone(members))
+		}
+	}
+	return cyclic
+}
+
+// componentCycle returns one cycle through the members of a cyclic component,
+// starting and ending at the same project, for a message.
+func (g *DependencyGraph) componentCycle(members []string) []string {
+	nodes := make(map[string]bool, len(members))
+	for _, id := range members {
+		nodes[id] = true
+	}
+	return findCycle(nodes, g.deps)
+}
+
+// UpstreamOf returns the projects whose work a project's work waits for: its
+// direct dependencies outside its own component, over every member of that
+// component. For a project in no cycle it is DependenciesOf. Inside a cycle no
+// member waits for another, since a build tool that orders the members' targets
+// itself runs them, and the whole component waits for what any member depends
+// on outside it.
+func (g *DependencyGraph) UpstreamOf(id string) []string {
+	if g == nil {
+		return nil
+	}
+	i, ok := g.component[id]
+	if !ok || len(g.components[i]) == 1 {
+		return slices.DeleteFunc(slices.Clone(g.deps[id]), func(dep string) bool { return dep == id })
+	}
+	var upstream []string
+	seen := make(map[string]bool)
+	for _, member := range g.components[i] {
+		for _, dep := range g.deps[member] {
+			if seen[dep] {
+				continue
+			}
+			seen[dep] = true
+			if j, known := g.component[dep]; known && j == i {
+				continue
+			}
+			upstream = append(upstream, dep)
+		}
+	}
+	return upstream
 }
 
 // DependenciesOf returns the direct dependencies of a project.

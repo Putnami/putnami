@@ -259,11 +259,35 @@ name) for declared ones. Graph construction translates both to IDs.
 | `DependentsOf(id)` | Direct lookup | Projects that depend on `id` — the ordering family, implicit include→scope-self edges included |
 | `ImpactDependentsOf(id)` | Direct lookup | `DependentsOf(id)` minus the implicit include→scope-self edges of activated scopes; what a change to `id` reaches through one declared or provider-derived edge. `--impacted` and `putnami projects why` walk this family |
 | `TransitiveDependentsOf(ids)` | BFS | All projects transitively downstream of `ids` in the ordering family |
+| `ComponentOf(id)` | Tarjan's algorithm | The strongly connected component that holds `id`: the projects that all reach each other. A project in no cycle is its own component |
+| `UpstreamOf(id)` | Direct lookup | The projects `id`'s work waits for: the dependencies of every member of its component, outside the component. For a project in no cycle, `DependenciesOf(id)` |
 | `TopologicalSort()` | Kahn's algorithm | Deterministic ordered list respecting dependencies; detects cycles |
 
 ### Deterministic Ordering
 
 `TopologicalSort()` uses Kahn's algorithm with sorted queues: when multiple projects are freed in the same iteration (i.e. all their dependencies have been processed), they are sorted alphabetically by ID before processing. This ensures consistent, reproducible ordering across runs — important for CI/CD reliability and debugging.
+
+### Dependency Cycles
+
+A load fails on a dependency cycle unless a build tool runs every task of the
+cycle's projects. A Pants or Bazel sync makes one project per BUILD directory,
+and a package and its subpackages import each other, so the directories close
+cycles the tool's targets do not.
+
+A cycle loads when every project of its component names at least one
+extension, and each extension it names declares `workspace.buildGraphEdges`.
+Then:
+
+- Selection follows every edge: a change to one member selects the whole
+  component and what depends on it.
+- The scheduler orders components. A `^` dependency binds what the component
+  depends on outside it, never a member; the build tool orders the members'
+  targets.
+- The plan fails when it holds, in a member, a task of an extension that does
+  not declare `workspace.buildGraphEdges`.
+
+Any other cycle fails the load with the cycle and each project that keeps it
+from loading. See [ADR 0088](adr/0088-a-cycle-among-delegated-projects-loads.md).
 
 ### Transitive Propagation
 

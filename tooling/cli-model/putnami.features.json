@@ -54,7 +54,8 @@
             "kind": "acceptance",
             "checks": [
               "transitive-closures-are-deterministic",
-              "a-declared-cycle-is-reported"
+              "a-declared-cycle-is-reported",
+              "a-cycle-among-delegated-projects-loads"
             ]
           }
         },

@@ -13,6 +13,7 @@ import (
 
 	diag "go.putnami.dev/protocol/diagnostic"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
 // loadCache memoizes Load results per absolute root path. A single CLI
@@ -153,6 +154,7 @@ func loadUncached(root string) (*Workspace, error) {
 		return nil, err
 	}
 	ws := NewWorkspace(root, cfg, projects)
+	ws.SetDelegatingExtensions(func() map[string]bool { return delegatingExtensions(root, cfg, ws.ProjectPaths()) })
 
 	// An authored `jobs` block is parsed and then dropped on the floor.
 	// Project-level job definitions were never wired into planning, and they are
@@ -236,12 +238,14 @@ func loadUncached(root string) (*Workspace, error) {
 	}
 
 	// Cycles surface here regardless of source (declared deps, provider-derived
-	// edges, or implicit activated-scope edges). They're not recoverable
-	// downstream so we fail the load. Since the recorded view is validated
+	// edges, or implicit activated-scope edges). A cycle among projects whose
+	// every task a build tool runs loads: the tool orders its own targets, and
+	// the scheduler orders the components. Any other cycle is not recoverable
+	// downstream, so it fails the load. Since the recorded view is validated
 	// before adoption, reaching this is an AUTHORED cycle — one an operator can
 	// fix by editing a putnami.json, without deleting anything.
-	if cycle := ws.Graph.FindCycle(); cycle != nil {
-		return nil, fmt.Errorf("dependency cycle detected: %s", strings.Join(cycle, " → "))
+	if err := ws.CycleError(); err != nil {
+		return nil, err
 	}
 
 	// Detect name divergence: manifest identity vs scope-resolved name.
@@ -430,4 +434,28 @@ func checkProjectConfigDiagnostics(root string, projects []*Project) error {
 func fileExists(path string) bool {
 	_, err := os.Stat(path)
 	return err == nil
+}
+
+// delegatingExtensions names the extensions whose every task runs a build tool
+// that orders its own targets: those whose manifest declares
+// workspace.buildGraphEdges. A workspace-path extension is named by its
+// project ID too, as a project may name it. It reads the extension manifests,
+// which only a workspace holding a dependency cycle asks for; a discovery
+// error delegates nothing, so the cycle fails as before.
+func delegatingExtensions(root string, cfg *wsproto.Config, projectPaths []string) map[string]bool {
+	discovered, err := extension.DiscoverExtensions(root, cfg, projectPaths)
+	if err != nil {
+		return nil
+	}
+	names := make(map[string]bool)
+	for _, ext := range discovered {
+		if ext == nil || ext.Workspace == nil || !ext.Workspace.BuildGraphEdges {
+			continue
+		}
+		names[ext.Name] = true
+		if ext.RelPath != "" {
+			names[wsproto.ProjectIDFromPath(ext.RelPath)] = true
+		}
+	}
+	return names
 }
