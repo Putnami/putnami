@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 
 	protocolcli "go.putnami.dev/protocol/cli"
@@ -75,6 +76,9 @@ func (c Command) Run(ctx context.Context, args []string) int {
 	merged := result.State == collab.ProposalStateMerged
 	if merged {
 		fmt.Fprintf(c.Stderr, "change finalize: proposal %s/%s is already merged; nothing was published\n", result.ProposalRef.Source, result.ProposalRef.ID)
+	}
+	if strings.HasPrefix(result.Gate, queueGatePrefix) {
+		fmt.Fprintf(c.Stderr, "change finalize: the gate is the %s: the run waited for no check on the head\n", result.Gate)
 	}
 	if result.AutoMerge != nil && !result.AutoMerge.Enabled {
 		fmt.Fprintf(c.Stderr, "change finalize: auto-merge is not on: %s; the proposal stays ready for review\n", result.AutoMerge.Refusal)

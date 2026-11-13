@@ -51,6 +51,15 @@
       ]
     },
     {
+      "id": "merge-queue-gate",
+      "text": [
+        "verification.ciGate.mergeQueue lists the bases that merge through a queue; another value, or an empty or repeated name, stops the run before any write.",
+        "Toward a listed base, --gate ci waits for no head check and names that queue as its gate.",
+        "The comment, transition and auto-merge request follow, each after reading the open proposal back at the pushed head.",
+        "The queue promotes no unit and writes no receipt; toward other bases, --gate ci waits for the named checks."
+      ]
+    },
+    {
       "id": "native-workflow-validation",
       "text": [
         "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance.",
@@ -104,6 +113,7 @@
   "decisions": [
     "tooling/contributor/doc/adr/0002-build-and-versioned-workflow-record.md",
     "tooling/contributor/doc/adr/0005-the-contributor-executable-serves-the-change-noun.md",
-    "tooling/contributor/doc/adr/0006-the-contributor-executable-serves-change-finalize.md"
+    "tooling/contributor/doc/adr/0006-the-contributor-executable-serves-change-finalize.md",
+    "tooling/contributor/doc/adr/0013-a-merge-queue-can-stand-for-the-hosted-gate.md"
   ]
 }

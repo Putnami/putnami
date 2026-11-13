@@ -150,7 +150,11 @@ How the pieces combine for one delivery:
   except a partial delivery whose changed paths all belong to projects that declare
   `featureAuthority.none` and author no feature;
   native finalization waits for that check on the pushed commit. It never
-  runs a local gate itself.
+  runs a local gate itself. The block sets no `ciGate.mergeQueue`: a
+  repository lists there the bases that merge through a merge queue, such as
+  `["main"]`, and `--gate ci` toward one of them takes the queue as its gate
+  instead of waiting for a check on the head
+  ([Publish a proposal](06-change-finalize.md)).
 
 ## A minimal repository
 

@@ -32,7 +32,11 @@ exists; never invent a task to use it.
   command pushes, marks the proposal ready, waits for the named checks on the
   pushed commit, and returns it to draft when one fails. It can wait up to
   `verification.ciGate.timeoutMinutes`: run it in the background where the
-  host bounds a command's duration; invoking it again keeps waiting.
+  host bounds a command's duration; invoking it again keeps waiting. Toward a base
+  the policy's `verification.ciGate.mergeQueue` lists, it waits for no check:
+  the merge queue is the gate, and the end report names it. The queue
+  promotes no unit: each unit stays at `candidate` with its local proof, and
+  the merged proposal is its next record.
 - Hosted ready that completes a task: the hosted checks never stand for the
   workflow's native proof. After the last commit, run one `--projects` gate on
   the committed tree, over the projects of the current requirements' specs.

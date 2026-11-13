@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "contributor-a-merge-queue-can-stand-for-the-hosted-gate",
+  "statement": "when verification.ciGate.mergeQueue names the --base, change finalize --gate ci waits for no check on the head, names that base's merge queue as its gate and goes on to auto-merge; the queue promotes no workflow unit",
+  "settled": "2026-11-13",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0013-a-merge-queue-can-stand-for-the-hosted-gate.md",
+  "reviewOnly": true
+}

@@ -61,6 +61,12 @@ func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verifi
 	return verified, nil
 }
 
+// queueGate reports whether the base's merge queue is the hosted gate: --gate
+// ci toward a base that verification.ciGate.mergeQueue names.
+func (c *publicationCandidate) queueGate() bool {
+	return c.opts.Gate == "ci" && slices.Contains(c.policy.Verification.CIGate.MergeQueue, c.opts.Base)
+}
+
 func (c *publicationCandidate) workflowRequest(status *collab.ProposalStatusResult) HostedWorkflowRequest {
 	return HostedWorkflowRequest{File: c.opts.WorkflowFile, SHA256: c.workflowSHA, BaseSHA: c.baseSHA,
 		HeadSHA: c.head, Fingerprint: c.fingerprint, RequiredChecks: c.policy.Verification.CIGate.Checks, Status: status}
@@ -551,8 +557,9 @@ func (f Finalizer) publish(ctx context.Context, c *publicationCandidate) (Result
 
 // requestAutoMerge asks the proposals provider, once, to turn auto-merge on
 // for the ready proposal at the published head. The run reaches it only after
-// the ready upsert and its gate: the local dossier, or the hosted checks that
-// confirmHostedReady reads again. Whatever happens is reported, never
+// the ready upsert and its gate: the local dossier, the hosted checks that
+// confirmHostedReady reads again, or the merge queue, which gates the merge
+// once auto-merge enters the proposal into it. Whatever happens is reported, never
 // returned: the proposal stays published and ready.
 func (f Finalizer) requestAutoMerge(ctx context.Context, c *publicationCandidate, result Result) *AutoMergeReport {
 	report := &AutoMergeReport{Method: collab.MergeMethod(c.policy.Publication.AutoMerge)}
@@ -616,6 +623,16 @@ func (f Finalizer) upsertAndReadback(ctx context.Context, c *publicationCandidat
 }
 
 func (f Finalizer) publicationEvidence(ctx context.Context, c *publicationCandidate, request collab.ProposalUpsertInput, result *Result) error {
+	if c.queueGate() {
+		// The queue runs the hosted checks on its own commit: no unit is
+		// promoted and no hosted receipt is written.
+		if err := f.confirmQueued(ctx, c, result.ProposalRef); err != nil {
+			return err
+		}
+		result.Gate = queueGatePrefix + c.opts.Base
+		result.WorkflowSHA256 = c.workflowSHA
+		return nil
+	}
 	if c.opts.Gate == "ci" {
 		status, err := f.waitHosted(ctx, c, request, result.ProposalRef)
 		if err != nil {
@@ -711,6 +728,9 @@ func (f Finalizer) confirmHostedReady(ctx context.Context, c *publicationCandida
 	if c.opts.Gate != "ci" {
 		return nil
 	}
+	if c.queueGate() {
+		return f.confirmQueued(ctx, c, ref)
+	}
 	if _, err := c.recheck(ctx, f); err != nil {
 		return err
 	}
@@ -726,6 +746,23 @@ func (f Finalizer) confirmHostedReady(ctx context.Context, c *publicationCandida
 		return nil
 	}
 	return c.promoteHosted(ctx, f, &status)
+}
+
+// confirmQueued reads the proposal again under a queue gate: the same
+// proposal, open, at the pushed head. It reads no check state, since the merge
+// queue runs the hosted checks on its own commit.
+func (f Finalizer) confirmQueued(ctx context.Context, c *publicationCandidate, ref collab.Ref) error {
+	if _, err := c.recheck(ctx, f); err != nil {
+		return err
+	}
+	var status collab.ProposalStatusResult
+	if err := f.call(ctx, collab.ContractProposals, collab.OperationStatus, collab.ProposalRefInput{Ref: ref}, &status); err != nil {
+		return err
+	}
+	if status.Proposal.Ref != ref || status.Proposal.Change.HeadCommit != c.head || status.Proposal.State != collab.ProposalStateOpen {
+		return errors.New("queued proposal identity, head or open state changed before dependent publication")
+	}
+	return nil
 }
 
 // truncateUTF8 cuts text to at most limit bytes without splitting a character.

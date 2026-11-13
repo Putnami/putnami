@@ -521,3 +521,25 @@ func TestFinalizeReportsAutoMerge(t *testing.T) {
 		}
 	}
 }
+
+// TestFinalizeNamesTheMergeQueueGate runs a hosted ready publication in a
+// workspace whose base merges through a queue. The run turns auto-merge on,
+// prints AUTO_MERGE and names the queue as its gate on standard error.
+func TestFinalizeNamesTheMergeQueueGate(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, languageFeature, "merge-queue-gate", "a-queue-gate-turns-auto-merge-on-without-head-checks")
+	executable := languageExecutable(t)
+	repo := newFinalizeRepo(t, true)
+	repo.write(t, "putnami.workspace.json", `{"name":"finalize-fixture","options":{"@putnami/contributor":{"version":1,`+
+		`"verification":{"ciGate":{"checks":["Putnami CI"],"pollSeconds":1,"mergeQueue":["main"]}},"publication":{"autoMerge":"squash"}}}}`+"\n")
+	repo.git(t, repo.root, "commit", "-q", "-am", "chore: merge through a queue")
+	host := newProviderHost(t, nil)
+	host.autoMerge = true
+	got := repo.launch(t, executable, `{"params":{}}`, []string{"--base", "main", "--branch", "topic",
+		"--title", "feat: change the fixture", "--body-file", repo.body(t), "--gate", "ci"}, host.env()...)
+	want := "PROPOSAL_REF={\"source\":\"local:fixture\",\"id\":\"P-1\"}\nAUTO_MERGE=squash\n"
+	stderr := "change finalize: the gate is the merge queue of main: the run waited for no check on the head\n"
+	if got.code != 0 || got.stdout != want || got.stderr != stderr {
+		t.Fatalf("exit %d, stdout %q, stderr %q; want 0, %q and %q", got.code, got.stdout, got.stderr, want, stderr)
+	}
+}

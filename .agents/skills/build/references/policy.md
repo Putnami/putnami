@@ -29,6 +29,7 @@ jq '.options["@putnami/contributor"] // {}' putnami.workspace.json
 | `verification.ciGate.load` | `0.7` | build | Load ratio (one-minute load average divided by CPUs) above which build selects the hosted gate. |
 | `verification.ciGate.timeoutMinutes` | `60` | change finalize | How long the command waits for the hosted checks before it stops; invoking it again keeps waiting. |
 | `verification.ciGate.pollSeconds` | `30` | change finalize | Interval between two reads of the hosted checks. |
+| `verification.ciGate.mergeQueue` | `[]` | change finalize | Base branches that merge through a merge queue: `--gate ci` toward one of them waits for no check on the head and takes the queue as its gate, so auto-merge can enter the proposal into it. |
 | `publication.draft` | `false` | change finalize | Keep proposals as drafts at finalization. Every proposal opens as a draft (`--draft`) whatever this says. |
 | `publication.autoMerge` | `false` | change finalize | `"squash"` or `false`. With `"squash"`, a ready publication of a complete outcome asks the proposals provider to turn auto-merge on once its gate passed: the repository's rules then merge it, or enter it into the merge queue. Never for a draft or a partial delivery. A refusal is reported and leaves the proposal ready. |
 | `publication.bodyMaxBytes` | none | change finalize | Largest proposal body the command publishes; the body becomes the squash commit message. Absent, only the contract's 65536 bytes apply. |

@@ -22,6 +22,7 @@
     "tooling/contributor-executable#change-language-parity",
     "tooling/contributor-executable#change-verify-parity",
     "tooling/contributor-executable#local-evidence-verification",
+    "tooling/contributor-executable#merge-queue-gate",
     "tooling/contributor-executable#native-workflow-validation",
     "tooling/contributor-executable#provider-neutral-publication",
     "tooling/contributor-executable#repository-policy",

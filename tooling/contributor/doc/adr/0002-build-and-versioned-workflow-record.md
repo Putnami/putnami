@@ -121,6 +121,11 @@ The native result retains a typed hosted receipt referencing the original
 workflow and raw provider status. A new workflow revision can replay that
 receipt; rewriting the original makes it stale. Standalone planning validation
 cannot mint this receipt or promote a unit.
+Amended 2026-11-13: [ADR 0013](0013-a-merge-queue-can-stand-for-the-hosted-gate.md)
+lets the policy name the bases that merge through a merge queue. Toward such
+a base, the hosted gate is the queue: no check is read on the head, no unit
+advances and no receipt is emitted, while completion eligibility is still
+required before every write.
 Amended 2026-11-02: [ADR 0010](0010-an-epic-session-runs-issues-in-waves.md)
 adds an `epic` skill that plans issues and launches one `build` session per
 issue. It is not a second controller: it never codes, and `build` remains the

@@ -103,6 +103,10 @@ type Finalizer struct {
 	Now      func() time.Time
 }
 
+// queueGatePrefix begins the gate of a publication whose hosted gate is the
+// base's merge queue; the base name follows.
+const queueGatePrefix = "merge queue of "
+
 type Result struct {
 	ProposalRef           collab.Ref             `json:"proposalRef"`
 	ProposalURL           string                 `json:"proposalUrl,omitempty"`

@@ -31,6 +31,10 @@ type Policy struct {
 			Checks         []string `json:"checks"`
 			TimeoutMinutes int      `json:"timeoutMinutes"`
 			PollSeconds    int      `json:"pollSeconds"`
+			// MergeQueue lists the base branches that merge through a merge
+			// queue whose run is the hosted gate: --gate ci toward one of
+			// them waits for no check on the head.
+			MergeQueue MergeQueueBases `json:"mergeQueue"`
 		} `json:"ciGate"`
 	} `json:"verification"`
 	Publication struct {
@@ -58,6 +62,32 @@ func (a *AutoMerge) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 	return fmt.Errorf(`publication.autoMerge must be "squash" or false, not %s`, data)
+}
+
+// MergeQueueBases is verification.ciGate.mergeQueue: the base branches that
+// merge through a merge queue. Absent, null or empty names none.
+type MergeQueueBases []string
+
+// UnmarshalJSON accepts null or a list of distinct nonempty branch names with
+// no surrounding space, and refuses any other value.
+func (m *MergeQueueBases) UnmarshalJSON(data []byte) error {
+	if strings.TrimSpace(string(data)) == "null" {
+		*m = nil
+		return nil
+	}
+	var names []string
+	if err := json.Unmarshal(data, &names); err != nil {
+		return fmt.Errorf("verification.ciGate.mergeQueue must list base branch names, not %s", data)
+	}
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		if name == "" || name != strings.TrimSpace(name) || seen[name] {
+			return fmt.Errorf("verification.ciGate.mergeQueue must list distinct nonempty base branch names, not %s", data)
+		}
+		seen[name] = true
+	}
+	*m = names
+	return nil
 }
 
 func ReadPolicy(root string) (Policy, error) {

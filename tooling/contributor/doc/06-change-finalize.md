@@ -48,6 +48,18 @@ branch only fast-forwards.
   still pending after `verification.ciGate.timeoutMinutes` fail the run, and
   running the command again keeps waiting. The policy must name distinct
   checks and set `publication.draft` to `false`.
+- **Merge queue.** `verification.ciGate.mergeQueue` lists the base branches
+  that merge through a merge queue, such as `["main"]`. Toward a listed
+  `--base`, `--gate ci` takes that branch's queue as its gate. The queue runs
+  the checks on its own commit, and the head's gating check stays pending
+  until the proposal enters the queue, so the command waits for no check on
+  the head. It marks the proposal ready, reads it back open at the pushed
+  head, reports `merge queue of <base>` as its gate (on stderr, and as `gate`
+  in the result document), and goes on to the verification comment, the
+  task's transition and the auto-merge request. A failing queue run removes
+  the proposal from the queue; the command does not see it, and the proposal
+  stays ready. Absent, `null` or empty, the list names no base; any other
+  value, an empty name or a repeated one stops the run before any write.
 
 A ready publication takes exactly one of `--verification-file` and `--gate ci`.
 `--proof <text>` adds the local proof to the verification comment.
@@ -59,7 +71,9 @@ asking the proposals provider to turn auto-merge on, once, through the
 optional `proposals.automerge` operation. The request names the published
 head, so a head that moved since is refused. It comes last: after the ready
 upsert, the gate (the dossier, or the named hosted checks read again), the
-verification comment and the task's delivered transition. The provider then
+verification comment and the task's delivered transition. Under a merge-queue
+gate, the gate is the queue itself, which runs once auto-merge enters the
+proposal into it. The provider then
 merges the proposal, or enters it into the merge queue, once the repository's
 rules allow; the command merges nothing. For `@putnami/github-collaboration`,
 this is what `gh pr merge --auto --squash <number>` does.
@@ -114,7 +128,10 @@ title, the body and every nonempty branch commit must hold no closing
 directive.
 
 `--gate ci` with a task needs `--workflow-file <workflow.json>`, an immutable
-workflow record. The hosted checks never stand for a unit's native proof.
+workflow record. The hosted checks never stand for a unit's native proof, and
+neither does a merge queue: a queue gate promotes no unit and writes no
+receipt, and a complete delivery still needs a record that the native
+verifier finds complete once ready.
 
 Without `--partial-delivery`, the command publishes only when that record
 makes the outcome eligible. Each current unit must be at `candidate`, or at a

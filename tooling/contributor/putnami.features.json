@@ -79,6 +79,22 @@
           }
         },
         {
+          "id": "merge-queue-gate",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-policy-lists-the-merge-queue-bases",
+              "a-queue-gate-turns-auto-merge-on-without-head-checks",
+              "a-queue-gate-promotes-no-unit",
+              "without-a-queue-the-hosted-gate-waits-for-the-head"
+            ]
+          }
+        },
+        {
           "id": "native-workflow-validation",
           "stage": "coded",
           "evidenceKinds": [

@@ -143,7 +143,11 @@ delivery whose workflow has no eligible unit still publishes, with no ready
 unit and no receipt; record that unit at its current stage. A current unit
 with no requirement, for a change that carries no feature requirement, has no
 native proof to supply: the hosted checks advance it, it gets a receipt, and a
-complete delivery closes its task.
+complete delivery closes its task. Toward a base whose merge queue is the
+gate (`verification.ciGate.mergeQueue`), the publisher reads no check and
+emits no receipt: each unit stays at `candidate` with its local proof, the
+merged proposal is its next record, and the end report says that the queue
+runs the hosted gate.
 
 Keep the original workflow file immutable and create a new revision when
 recording `stage: "ready"` with the publisher result as the unit receipt. The
