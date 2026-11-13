@@ -37,6 +37,8 @@ func fakeNode(t *testing.T, log string) string {
 	return path
 }
 
+// readStarts returns the starts written to log, one per complete line: an
+// empty file and a last line without its newline count for no start.
 func readStarts(t *testing.T, log string) []string {
 	t.Helper()
 	data, err := os.ReadFile(log)
@@ -46,7 +48,31 @@ func readStarts(t *testing.T, log string) []string {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return strings.Split(strings.TrimSpace(string(data)), "\n")
+	lines := strings.Split(string(data), "\n")
+	return lines[:len(lines)-1]
+}
+
+func TestReadStartsCountsOnlyCompleteLines(t *testing.T) {
+	log := filepath.Join(t.TempDir(), "starts.log")
+	for _, c := range []struct {
+		name, content string
+		want          []string
+	}{
+		{"an empty file", "", nil},
+		{"a line without its newline", "start a", nil},
+		{"one complete line", "start a\n", []string{"start a"}},
+		{"a complete line then a partial one", "start a\nstart b", []string{"start a"}},
+		{"two complete lines", "start a\nstart b\n", []string{"start a", "start b"}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			if err := os.WriteFile(log, []byte(c.content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			if got := readStarts(t, log); !slices.Equal(got, c.want) {
+				t.Errorf("readStarts = %q, want %q", got, c.want)
+			}
+		})
+	}
 }
 
 func waitFor(t *testing.T, what string, cond func() bool) {
