@@ -5,6 +5,7 @@
     "monorepo/moon-adoption#a-moved-task-does-what-its-script-did",
     "monorepo/moon-adoption#an-import-declares-only-what-moves",
     "monorepo/moon-adoption#import-adopts-typescript-conventions",
+    "monorepo/moon-adoption#import-attributes-the-edges-it-writes",
     "monorepo/moon-adoption#import-keeps-the-tool-that-checks-the-code",
     "monorepo/moon-adoption#import-maps-to-language-extensions",
     "monorepo/moon-adoption#inferred-tasks-are-read",

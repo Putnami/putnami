@@ -6,6 +6,7 @@
     "monorepo/rush-adoption#an-import-declares-only-what-moves",
     "monorepo/rush-adoption#build-cache-warning",
     "monorepo/rush-adoption#import-adopts-typescript-conventions",
+    "monorepo/rush-adoption#import-attributes-the-edges-it-writes",
     "monorepo/rush-adoption#import-keeps-the-tool-that-checks-the-code",
     "monorepo/rush-adoption#manifest-follows-the-profile",
     "monorepo/rush-adoption#projects-become-projects",

@@ -168,6 +168,19 @@
         }
       },
       {
+        "id": "moon-import-keeps-the-edges-the-sync-writes",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-edge-the-moon-sync-writes-is-no-phantom"
+          ]
+        }
+      },
+      {
         "id": "moon-delegate-runs-through-moon",
         "stage": "coded",
         "evidenceKinds": [
@@ -282,6 +295,19 @@
           "kind": "acceptance",
           "checks": [
             "an-imported-rush-repository-passes-lint-test-build-with-the-graph-observe-reads"
+          ]
+        }
+      },
+      {
+        "id": "rush-import-keeps-the-edges-the-sync-writes",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-edge-the-rush-sync-writes-is-no-phantom"
           ]
         }
       },

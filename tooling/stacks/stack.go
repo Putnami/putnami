@@ -61,7 +61,9 @@ type Component struct {
 	ReleaseMembers []releaseset.MemberDeclaration
 	// Bare marks a directory whose markers make it a workspace member but
 	// that holds no component: the probe answers its name alone, with no
-	// extension, tag or metadata, so it runs no task.
+	// extension, tag or metadata, so it runs no task. Its Dependencies are
+	// still answered, attributed to EdgeSource, when the stack's sync writes
+	// them: the probe vouches for the edges without claiming the project.
 	Bare bool
 	// Tasks are the profile tasks the component runs; nil runs every task.
 	// A task outside it passes with no step run. A component whose list
@@ -235,7 +237,12 @@ func (s Stack) Probe(root string, request wsproto.ProbeRequest) (wsproto.ProbeRe
 	deps, leftOut := rootEdges(components)
 	for _, c := range components {
 		if c.Bare {
-			result.Projects = append(result.Projects, wsproto.ProbeProject{Path: c.Path, SourceName: c.Name, SourceFile: c.SourceFile})
+			project := wsproto.ProbeProject{Path: c.Path, SourceName: c.Name, SourceFile: c.SourceFile}
+			if len(c.Dependencies) > 0 {
+				project.Dependencies = slices.Clone(c.Dependencies)
+				project.DependencySources = edgeSources(request, c.EdgeSource, project.Dependencies)
+			}
+			result.Projects = append(result.Projects, project)
 			continue
 		}
 		if reason, out := leftOut[c.Path]; out {
@@ -354,7 +361,8 @@ func firstPerPath(components []Component) (kept, dropped []Component) {
 	return kept, dropped
 }
 
-// rootEdges returns the dependencies the probe answers for each component:
+// rootEdges returns the dependencies the probe answers for each component
+// that is not bare:
 // the detector's, and for a component whose stack root is neither the
 // workspace root nor its own directory, the project at that root, whose
 // selector answers the root's files. A component whose root is no component
@@ -370,6 +378,9 @@ func rootEdges(components []Component) (map[string][]string, map[string]string) 
 	leftOut := map[string]string{}
 	var nested []Component
 	for _, c := range components {
+		if c.Bare {
+			continue
+		}
 		deps[c.Path] = slices.Clone(c.Dependencies)
 		if c.Root == wsproto.ProbeRootPath || c.Root == c.Path {
 			continue

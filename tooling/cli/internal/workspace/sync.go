@@ -853,5 +853,14 @@ func explicitProjects(ws *Workspace) map[string]wsproto.ExplicitProject {
 			Extensions:   project.Config.Extensions,
 		}
 	}
+	// The workspace root is always a probe candidate and never a project. The
+	// name and type of the putnami.json at the root decide its scalars, so two
+	// providers that read two root manifests are resolved where the conflict
+	// says.
+	if _, ok := explicit[wsproto.ProbeRootPath]; !ok {
+		if root := wsproto.LoadProjectConfig(ws.Root); root != nil && (root.Name != "" || root.Type != "") {
+			explicit[wsproto.ProbeRootPath] = wsproto.ExplicitProject{Name: root.Name, Type: root.Type}
+		}
+	}
 	return explicit
 }

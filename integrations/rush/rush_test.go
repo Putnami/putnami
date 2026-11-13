@@ -197,6 +197,22 @@ func TestTheRushProjectsBecomeProjectsWithTheirEdges(t *testing.T) {
 	}
 }
 
+func TestABareImportMemberKeepsTheEdgesTheSyncWrites(t *testing.T) {
+	spectest.Proves(t, feature, "import-attributes-the-edges-it-writes", "a-bare-import-member-keeps-the-edges-the-sync-writes")
+	root := repository(t, readDemo(t), ModeImport, false)
+	// Each project is a bare member, and api keeps its edge to pricing,
+	// attributed to Rush's graph, with no extension.
+	for _, p := range probe(t, root).Projects {
+		var want map[string]wsproto.DependencySource
+		if p.Path == "apps/api" {
+			want = map[string]wsproto.DependencySource{"libs/pricing": wsproto.DependencySourceBuildGraph}
+		}
+		if len(p.Extensions) != 0 || len(p.Dependencies) != len(want) || !reflect.DeepEqual(p.DependencySources, want) {
+			t.Errorf("%s = %+v, want a bare member with the edges %v", p.Path, p, want)
+		}
+	}
+}
+
 func TestTheSyncWritesEachProjectPutnamiJSONFromRushJSON(t *testing.T) {
 	spectest.Proves(t, feature, "sync-writes-the-project-graph", "the-sync-writes-each-project-putnami-json-from-rush-json")
 	d := readDemo(t)

@@ -29,10 +29,14 @@ the sync declares `@putnami/typescript` only when a script moves to it, and
 `init` then installs it. When no script moves, `init` installs nothing more,
 leaves Rush's lockfile as it was, and says that `--mode delegate` gives the
 same result. The sync reads that mode, `import` when it is absent. A value other than `import` or `delegate` fails the sync and the probe with
-`stacks.adoption_mode_invalid`. In delegate mode,
-each edge the probe reports is attributed to Rush's project graph
+`stacks.adoption_mode_invalid`. In both modes,
+each edge the sync writes is attributed to Rush's project graph
 (`build-graph`), as a delegated stack's are, so `workspace.declared_edge` does
-not warn about them.
+not warn about it and `putnami deps prune` leaves it in place. In import mode
+the probe attributes the edges of a project whose scripts all move to
+`@putnami/typescript` without claiming the project, so an edge to a
+`devDependencies` package no source imports, such as a build tool, keeps
+ordering the build.
 
 Run again in the adopted workspace, `putnami init --from rush` writes nothing:
 it prints the diff of each file the sync would change. `--apply` writes them.

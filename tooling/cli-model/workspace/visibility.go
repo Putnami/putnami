@@ -3,6 +3,7 @@ package workspace
 import (
 	"path"
 	"sort"
+	"strings"
 
 	wsproto "go.putnami.dev/protocol/workspace"
 )
@@ -44,6 +45,18 @@ func sameScope(a, b *Project) bool {
 	return ScopeKeyOf(a) == ScopeKeyOf(b)
 }
 
+// encloses reports whether the directory of outer holds inner. The workspace
+// root project holds every other project.
+func encloses(outer, inner *Project) bool {
+	if outer == nil || inner == nil || outer.Path == inner.Path {
+		return false
+	}
+	if outer.Path == "" || outer.Path == "." {
+		return true
+	}
+	return strings.HasPrefix(inner.Path, strings.TrimSuffix(outer.Path, "/")+"/")
+}
+
 // VisibilityViolation is one import edge a project's declared boundary refuses.
 type VisibilityViolation struct {
 	// Importer is the ID of the project that performs the import.
@@ -78,6 +91,10 @@ type VisibilityViolation struct {
 //     in. A client that declares `scope` keeps it, and a client whose
 //     `generatedFrom` no provider backs opens nothing.
 //   - An import inside one scope is always allowed.
+//   - An import of the project whose directory holds the importer is always
+//     allowed: a test fixture or an example nested in a package reads that
+//     package from inside it, and crosses no boundary. The enclosing project's
+//     putnami.json still makes it the nested project's scope.
 //   - An import that leaves the imported project's scope is allowed only when
 //     that project declares wsproto.VisibilityPublic.
 //
@@ -101,7 +118,7 @@ func VisibilityViolations(ws *Workspace) []VisibilityViolation {
 			if effectiveVisibility(imported) == wsproto.VisibilityPublic || publishedClient(ws, imported) {
 				continue
 			}
-			if sameScope(importer, imported) {
+			if sameScope(importer, imported) || encloses(imported, importer) {
 				continue
 			}
 			violations = append(violations, VisibilityViolation{

@@ -231,6 +231,26 @@ func TestVisibilityViolationsSeparatesNestedScopes(t *testing.T) {
 	}
 }
 
+func TestVisibilityViolationsAllowsAnImportOfTheEnclosingProject(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-model", "import-visibility", "a-project-nested-in-the-project-it-imports-crosses-no-boundary")
+	// An end-to-end fixture nested in a package depends on that package. The
+	// package's putnami.json names its extensions, which makes it the scope
+	// of the fixture, while the package itself sits in the root scope.
+	ws := NewWorkspace("/ws", nil, []*Project{
+		scoped("/packages/rsc", "@ai-sdk/rsc", "packages/rsc"),
+		imports(scoped("/packages/rsc/tests/e2e/next-server", "next-server", "packages/rsc/tests/e2e/next-server",
+			"packages/rsc/putnami.json"),
+			wsproto.DependencySourcePackageJSON, "@ai-sdk/rsc"),
+		imports(scoped("/packages/rsc-next", "rsc-next", "packages/rsc-next", "packages/putnami.json"),
+			wsproto.DependencySourcePackageJSON, "@ai-sdk/rsc"),
+	})
+
+	got := VisibilityViolations(ws)
+	if len(got) != 1 || got[0].Importer != "/packages/rsc-next" {
+		t.Fatalf("violations = %+v, want only the sibling that shares a path prefix", got)
+	}
+}
+
 func TestVisibilityViolationsIgnoresAnImplicitScopeOrderingEdge(t *testing.T) {
 	scope := scoped("/tooling", "tooling-scope", "tooling")
 	scope.ActivatedScope = true

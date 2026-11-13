@@ -52,6 +52,10 @@
       ]
     },
     {
+      "id": "import-attributes-the-edges-it-writes",
+      "text": "In import mode, a bare project keeps moon's edges, which the sync writes into its putnami.json, attributed build-graph: the probe vouches for them without claiming the project, so workspace.declared_edge does not report them and putnami deps prune leaves them in place."
+    },
+    {
       "id": "import-keeps-the-tool-that-checks-the-code",
       "text": [
         "In import mode, a moon task moves to its language extension only when that extension runs its program, with no argument it would drop: for TypeScript the shared rule, with the test runner and the ESLint linter recorded;",

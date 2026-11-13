@@ -13,6 +13,10 @@ project with its edges, in the mode `putnami init --from nx` records.
   target, a jest test or an Nx executor for example, keeps running through
   Nx.
 
+`options["@putnami/nx"].targets` maps a target named by variant, such as
+`test:lib`, to `build`, `test` or `lint`, and that task then runs it through
+`nx run` on each project that has it and no target named after the task.
+
 It is a delegated stack extension: a manifest, the Nx stack profile
 (`profile.json`), the entrypoint of the stack core,
 [`tooling/stacks`](../../tooling/stacks/doc/01-design.md#delegated-stacks),

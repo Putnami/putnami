@@ -124,6 +124,23 @@
           }
         },
         {
+          "id": "named-targets-run-as-tasks",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-mapped-target-runs-as-its-task",
+              "a-target-with-no-mapping-keeps-the-summary-line",
+              "a-target-named-after-the-task-outranks-a-mapped-one",
+              "the-sync-owns-the-steps-it-writes",
+              "an-unmatched-or-invalid-mapping-is-reported"
+            ]
+          }
+        },
+        {
           "id": "validate-fails-on-a-stale-graph",
           "stage": "coded",
           "evidenceKinds": [

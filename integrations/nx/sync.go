@@ -142,6 +142,9 @@ type SyncResult struct {
 	Imported []string
 	// Unmatched are the entries of the import list that select no project.
 	Unmatched []string
+	// UnmatchedTargets are the entries of the targets mapping that name a
+	// target no project has, sorted.
+	UnmatchedTargets []string
 	// Conventions list each file an import rewrote to adopt Putnami's
 	// TypeScript conventions, and each manifest it did not (D-066).
 	Conventions []string
@@ -152,8 +155,9 @@ type SyncResult struct {
 
 // Sync writes the project graph of the Nx workspace at root into each
 // project's putnami.json: the extension, the projects it depends on as
-// project IDs, and in disable.jobs each build, test or lint task the project
-// does not run through the extension that owns it. A root with neither
+// project IDs, in disable.jobs each build, test or lint task the project
+// does not run through the extension that owns it, and the steps of each
+// task that runs targets the workspace maps to it. A root with neither
 // nx.json nor the graph export is no Nx workspace and gets an empty result.
 func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error) {
 	var result SyncResult
@@ -165,6 +169,10 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 		return result, err
 	}
 	result.Mode = mode
+	mapping, err := WorkspaceTargets(root)
+	if err != nil {
+		return SyncResult{}, err
+	}
 	graph, err := resolveGraph(ctx, root)
 	if err != nil {
 		return SyncResult{}, err
@@ -209,14 +217,18 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	// every project with a package.json, so the projects plan again once a
 	// move declares it.
 	declared := slices.Contains(opts.Declared, TypeScriptExtension) || stacks.DeclaresExtension(root, TypeScriptExtension)
-	plans := planProjects(root, detection.Projects, mode, imports, declared)
+	plans := planProjects(root, detection.Projects, mode, imports, declared, mapping)
 	if !declared && slices.ContainsFunc(plans, func(plan projectPlan) bool { return plan.typeScript }) {
 		declared = true
-		plans = planProjects(root, detection.Projects, mode, imports, declared)
+		plans = planProjects(root, detection.Projects, mode, imports, declared, mapping)
 	}
 	var conventions []stacks.ConventionProject
 	lintMoved := false
+	present := map[string]bool{}
 	for i, p := range detection.Projects {
+		for _, t := range p.Targets {
+			present[t.Name] = true
+		}
 		projectMode := mode
 		if imports.Selects(p.Path) {
 			projectMode = ModeImport
@@ -258,6 +270,7 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 	}
 	slices.Sort(result.Imported)
 	result.Unmatched = imports.Unmatched()
+	result.UnmatchedTargets = unmatchedTargets(mapping, present)
 	writes, warnings, err := stacks.ImportConventions(root, conventions)
 	if err != nil {
 		return SyncResult{}, err
@@ -386,6 +399,9 @@ type projectPlan struct {
 	deps       []string
 	disabled   []string
 	reports    map[string]any
+	// steps are, by task, the steps of a task that runs the targets the
+	// workspace maps to it.
+	steps map[string][][]string
 	// runner is the test runner the sync records for @putnami/typescript:
 	// vitest or jest, or "" when it records none.
 	runner   string
@@ -412,22 +428,23 @@ type projectPlan struct {
 // that the workspace declares @putnami/typescript, or that the sync declares
 // it because a target moves: the extension then claims every project with a
 // package.json.
-func planProjects(root string, projects []detect.Project, mode string, imports *stacks.ImportList, declared bool) []projectPlan {
+func planProjects(root string, projects []detect.Project, mode string, imports *stacks.ImportList, declared bool, mapping map[string]string) []projectPlan {
 	plans := make([]projectPlan, len(projects))
 	for i, p := range projects {
 		projectMode := mode
 		if imports.Selects(p.Path) {
 			projectMode = ModeImport
 		}
-		plans[i] = planProject(root, p, projectMode, declared)
+		plans[i] = planProject(root, p, projectMode, declared, mapping)
 	}
 	return plans
 }
 
-// planProject maps the targets of one project in the mode. An imported
-// TypeScript project names @putnami/typescript only when one of its targets
-// moves to it.
-func planProject(root string, p detect.Project, mode string, declared bool) projectPlan {
+// planProject maps the targets of one project in the mode. A task runs the
+// target named after it; on a project with none, it runs the targets mapping
+// gives it, through Nx in both modes. An imported TypeScript project names
+// @putnami/typescript only when one of its targets moves to it.
+func planProject(root string, p detect.Project, mode string, declared bool, mapping map[string]string) projectPlan {
 	var plan projectPlan
 	for _, d := range p.Dependencies {
 		plan.deps = append(plan.deps, wsproto.ProjectIDFromPath(d))
@@ -435,10 +452,27 @@ func planProject(root string, p detect.Project, mode string, declared bool) proj
 	targets := map[string]detect.Target{}
 	for _, t := range p.Targets {
 		targets[t.Name] = t
-		if !slices.Contains(lifecycleTasks, t.Name) {
+	}
+	named := map[string][]string{}
+	for _, t := range p.Targets {
+		if slices.Contains(lifecycleTasks, t.Name) {
+			continue
+		}
+		task := mapping[t.Name]
+		_, own := targets[task]
+		switch {
+		case task == "":
 			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: t.Name, Reason: unrunReason(p.Name, t.Name)})
+		case own:
+			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: t.Name, Reason: shadowedReason(p.Name, t.Name, task)})
+		default:
+			named[task] = append(named[task], t.Name)
 		}
 	}
+	for _, list := range named {
+		slices.Sort(list)
+	}
+	plan.steps = mappedSteps(named)
 	isTS := mode == ModeImport && isTypeScriptProject(root, p.Path)
 	for _, task := range lifecycleTasks {
 		target, ok := targets[task]
@@ -463,6 +497,11 @@ func planProject(root string, p detect.Project, mode string, declared bool) proj
 			reason = importReason(root, p.Path, isTS, task, target)
 		}
 		switch {
+		case !ok && len(named[task]) > 0:
+			// The targets mapped to the task run through Nx alone.
+			if declared && hasManifest(root, p.Path) {
+				plan.disabled = append(plan.disabled, TypeScriptExtension+":"+task)
+			}
 		case !ok:
 			plan.disabled = append(plan.disabled, task)
 		case covered:
@@ -487,10 +526,14 @@ func planProject(root string, p detect.Project, mode string, declared bool) proj
 			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: task, Reason: reason})
 		}
 	}
-	if test, ok := targets["test"]; ok && !slices.Contains(plan.disabled, ExtensionName+":test") {
+	test, tested := targets["test"]
+	if !tested && len(named["test"]) > 0 {
+		test, tested = targets[named["test"][0]], true
+	}
+	if tested && !slices.Contains(plan.disabled, ExtensionName+":test") {
 		plan.reports = testReports(root, p.Path, test)
 		if plan.reports == nil {
-			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: "test",
+			plan.unmapped = append(plan.unmapped, Unmapped{Project: p.Name, Target: test.Name,
 				Reason: "its test configuration names no JUnit or coverage report: the result is the exit code alone"})
 		}
 	}
@@ -955,7 +998,8 @@ func ownedJobs() []string {
 // workspace-relative file and writes it when a member the sync owns changes:
 // the extension, @putnami/typescript for an imported TypeScript project, the
 // dependencies on Nx projects, the entries of disable.jobs it owns,
-// options["@putnami/nx"].tasks.test.reports,
+// options["@putnami/nx"].tasks.test.reports, the steps of
+// options["@putnami/nx"].tasks.<task> as nxSteps owns them,
 // options["@putnami/typescript:test"].runner, an eslint
 // options["@putnami/typescript"].lint.linter, and
 // options["@putnami/typescript"].compiler as setCompiler owns it. Every other
@@ -990,6 +1034,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 
 	setDisabled(doc, plan.disabled)
 	setReports(doc, plan.reports)
+	nxSteps.Apply(doc, plan.steps)
 	stacks.SetTypeScriptRunner(doc, plan.runner)
 	setCompiler(doc, plan.typeScript && plan.compiler)
 	stacks.SetTypeScriptLinter(doc, plan.eslint)
@@ -1006,7 +1051,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 
 // retractProject removes from the putnami.json of a former project the
 // extension, @putnami/typescript, its Nx edges, the disable.jobs entries, the
-// reports, the test runner and the eslint linter the sync owns.
+// reports, the steps, the test runner and the eslint linter the sync owns.
 func retractProject(root, file string, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)
@@ -1018,6 +1063,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	setList(doc, "dependencies", slices.DeleteFunc(stringList(doc["dependencies"]), func(d string) bool { return !keepDependency(root, d, components) }))
 	setDisabled(doc, nil)
 	setReports(doc, nil)
+	nxSteps.Apply(doc, nil)
 	stacks.SetTypeScriptRunner(doc, "")
 	setCompiler(doc, false)
 	stacks.SetTypeScriptLinter(doc, false)
@@ -1302,40 +1348,63 @@ func reportWarnings(emit *jsonl.Emitter, result SyncResult) {
 	}
 }
 
-// unmappedLines words the unmapped targets: a target name no Putnami task
-// runs is one line for every project that has it, and every other target a
+// unmappedLines words the unmapped targets: a target several projects list
+// for one shared reason is one line for all of them, and every other target a
 // line of its own, with its project and reason.
 func unmappedLines(unmapped []Unmapped) []string {
-	projects := map[string][]string{}
-	var names []string
+	type group struct {
+		target   string
+		projects []string
+	}
+	groups := map[string]*group{}
+	var reasons []string
 	for _, u := range unmapped {
-		if u.Reason != unrunReason(u.Project, u.Target) {
+		reason := sharedReason(u)
+		if reason == "" {
 			continue
 		}
-		if projects[u.Target] == nil {
-			names = append(names, u.Target)
+		if groups[reason] == nil {
+			groups[reason] = &group{target: u.Target}
+			reasons = append(reasons, reason)
 		}
-		projects[u.Target] = append(projects[u.Target], u.Project)
+		groups[reason].projects = append(groups[reason].projects, u.Project)
 	}
 	var lines []string
 	for _, u := range unmapped {
-		if list := projects[u.Target]; u.Reason != unrunReason(u.Project, u.Target) || len(list) == 1 {
+		if g := groups[sharedReason(u)]; g == nil || len(g.projects) == 1 {
 			lines = append(lines, fmt.Sprintf("%s:%s %s", u.Project, u.Target, u.Reason))
 		}
 	}
-	for _, name := range names {
-		list := projects[name]
-		if len(list) == 1 {
+	for _, reason := range reasons {
+		g := groups[reason]
+		if len(g.projects) == 1 {
 			continue
 		}
+		list := g.projects
 		slices.Sort(list)
 		shown := strings.Join(list, ", ")
 		if len(list) > 3 {
 			shown = fmt.Sprintf("%s and %d more", strings.Join(list[:3], ", "), len(list)-3)
 		}
-		lines = append(lines, fmt.Sprintf("target %s of %d projects (%s): %s", name, len(list), shown, unrunReason("<project>", name)))
+		lines = append(lines, fmt.Sprintf("target %s of %d projects (%s): %s", g.target, len(list), shown, reason))
 	}
 	return lines
+}
+
+// sharedReason is the reason of an unmapped target as every project that
+// lists the target for it states it, with <project> in place of the
+// project's name: a target no Putnami task runs, or a mapped target the
+// task's own target outranks. It is empty for a reason of the project's own.
+func sharedReason(u Unmapped) string {
+	if u.Reason == unrunReason(u.Project, u.Target) {
+		return unrunReason("<project>", u.Target)
+	}
+	for _, task := range lifecycleTasks {
+		if u.Reason == shadowedReason(u.Project, u.Target, task) {
+			return shadowedReason("<project>", u.Target, task)
+		}
+	}
+	return ""
 }
 
 // unrunReason is the reason of a target no Putnami task runs.
@@ -1344,10 +1413,14 @@ func unrunReason(project, target string) string {
 }
 
 // reportUnmatched warns of each entry of the import list that selects no
-// project: a typo, or a project not created yet.
+// project, and of each entry of the targets mapping that names a target no
+// project has: a typo, or a project not created yet.
 func reportUnmatched(emit *jsonl.Emitter, result SyncResult) {
 	for _, entry := range result.Unmatched {
 		emit.DiagnosticWithCode("warning", fmt.Sprintf("options[%q].%s lists %q, which selects no Nx project of %s", ExtensionName, stacks.ImportOption, entry, result.Source), wsproto.WorkspaceConfigFilename, 0, 0, CodeImportUnmatched)
+	}
+	for _, entry := range result.UnmatchedTargets {
+		emit.DiagnosticWithCode("warning", fmt.Sprintf("options[%q].%s maps %q, a target no Nx project of %s has", ExtensionName, TargetsOption, entry, result.Source), wsproto.WorkspaceConfigFilename, 0, 0, CodeTargetUnmatched)
 	}
 }
 

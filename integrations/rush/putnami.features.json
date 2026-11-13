@@ -25,6 +25,19 @@
           }
         },
         {
+          "id": "import-attributes-the-edges-it-writes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bare-import-member-keeps-the-edges-the-sync-writes"
+            ]
+          }
+        },
+        {
           "id": "sync-writes-the-project-graph",
           "stage": "coded",
           "evidenceKinds": [
