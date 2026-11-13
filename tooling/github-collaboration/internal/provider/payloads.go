@@ -76,20 +76,22 @@ type ghBranch struct {
 }
 
 type ghPull struct {
-	Number    int       `json:"number"`
-	NodeID    string    `json:"node_id"`
-	Title     string    `json:"title"`
-	Body      *string   `json:"body"`
-	State     string    `json:"state"`
-	Draft     bool      `json:"draft"`
-	MergedAt  *string   `json:"merged_at"`
-	HTMLURL   string    `json:"html_url"`
-	UpdatedAt string    `json:"updated_at"`
-	User      *ghUser   `json:"user"`
-	Labels    []ghLabel `json:"labels"`
-	Assignees []ghUser  `json:"assignees"`
-	Base      ghBranch  `json:"base"`
-	Head      ghBranch  `json:"head"`
+	Number   int     `json:"number"`
+	NodeID   string  `json:"node_id"`
+	Title    string  `json:"title"`
+	Body     *string `json:"body"`
+	State    string  `json:"state"`
+	Draft    bool    `json:"draft"`
+	MergedAt *string `json:"merged_at"`
+	// AutoMerge is null until auto-merge is turned on for the pull request.
+	AutoMerge *ghAutoMerge `json:"auto_merge"`
+	HTMLURL   string       `json:"html_url"`
+	UpdatedAt string       `json:"updated_at"`
+	User      *ghUser      `json:"user"`
+	Labels    []ghLabel    `json:"labels"`
+	Assignees []ghUser     `json:"assignees"`
+	Base      ghBranch     `json:"base"`
+	Head      ghBranch     `json:"head"`
 }
 
 type ghReview struct {
@@ -153,6 +155,13 @@ type ghCombinedStatus struct {
 		State     string `json:"state"`
 		TargetURL string `json:"target_url"`
 	} `json:"statuses"`
+}
+
+// ghAutoMerge is the auto-merge request of a pull request: GitHub merges it
+// with MergeMethod, or adds it to the merge queue, once the branch's rules
+// allow.
+type ghAutoMerge struct {
+	MergeMethod string `json:"merge_method"`
 }
 
 type ghMerge struct {

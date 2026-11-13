@@ -17,8 +17,9 @@ The block holds conventions only:
 
 A workspace without the block gets the defaults: claimed and delivered state
 `in_progress`, the shipped default workflow profile, no language rule,
-no hosted gate, proposals ready at finalization, no body limit beyond the
-contract's, no task reference line, no integration, the default estimate table,
+no hosted gate, proposals ready at finalization and left for a person to
+merge, no body limit beyond the contract's, no task reference line, no
+integration, the default estimate table,
 and epics that run 3 children at once in local workspaces.
 
 ## Reference: this repository's configuration
@@ -127,6 +128,16 @@ How the pieces combine for one delivery:
   a proposal comment instead of appending it.
 - Every authorized proposal opens as a draft when work starts (`putnami change finalize --draft`).
   Putnami CI holds runs on a draft, so checkpoint pushes cost no runner time.
+- The block sets no `publication.autoMerge`, so a build run ends with its
+  proposal ready for review, and a maintainer turns auto-merge on. A
+  repository that sets `"autoMerge": "squash"` has `change finalize` ask the
+  proposals provider to turn auto-merge on once a ready, complete-outcome
+  publication passed its gate. On a branch that merges through a queue, that
+  is the request to enter the queue. The setting grants no authority: only a
+  run the user authorized to publish sends it, never for a draft or a partial
+  delivery, and the repository's own rules (required reviews and checks)
+  still decide when the proposal merges. A refusal, for example a repository
+  that does not allow auto-merge, is reported and leaves the proposal ready.
 - The block sets no `estimate`, so `putnami change estimate` sizes plans with
   the contributor's default table
   ([Estimate a change plan](07-change-estimate.md)).

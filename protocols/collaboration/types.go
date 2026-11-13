@@ -528,9 +528,25 @@ type ProposalMergeInput struct {
 	Method MergeMethod `json:"method,omitempty"`
 }
 
+// ProposalAutoMergeInput is the proposals.automerge request.
+// ExpectedHeadCommit is required: a head that moved is a conflict, never a
+// request to merge it.
+type ProposalAutoMergeInput struct {
+	// Ref identifies the proposal to merge once the repository's rules allow.
+	Ref Ref `json:"ref"`
+	// ExpectedHeadCommit is the head commit the caller expects; a head that
+	// moved is a conflict, never a request to merge it.
+	ExpectedHeadCommit string `json:"expectedHeadCommit"`
+	// Method names how the eventual merge combines the proposal's commits;
+	// defaults to the provider's own default.
+	Method MergeMethod `json:"method,omitempty"`
+}
+
 // ProposalResult carries one proposal.
 type ProposalResult struct {
-	// Proposal is the merged (or otherwise resulting) proposal.
+	// Proposal is the merged (or otherwise resulting) proposal: for
+	// proposals.automerge, the open proposal auto-merge is now on for, or the
+	// proposal already merged.
 	Proposal Proposal `json:"proposal"`
 }
 

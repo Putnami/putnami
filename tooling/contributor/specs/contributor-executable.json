@@ -42,6 +42,15 @@
       ]
     },
     {
+      "id": "authorized-auto-merge",
+      "text": [
+        "publication.autoMerge is \"squash\" or false, false by default; any other value stops the run before any write.",
+        "With \"squash\", a ready complete-outcome publication whose gate passed asks the bound proposals provider, once, to turn auto-merge on at the published head, after the proposal is marked ready.",
+        "A draft, a policy that keeps proposals drafts and a partial delivery send no request.",
+        "A refusal, or a provider that offers no automerge, is reported in the result and leaves the delivery published."
+      ]
+    },
+    {
       "id": "native-workflow-validation",
       "text": [
         "The native verifier checks tracked, safe feature/spec sources, complete requirement/check coverage, units, stage entry/exit contracts, preserved challenges and native producer provenance.",

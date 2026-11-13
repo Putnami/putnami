@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://putnami.dev/schemas/putnami-collaboration-proposals.v1.json",
   "title": "Putnami change proposals contract, version 1",
-  "description": "Request (<operation>Input) and result (<operation>Result) documents of every proposals v1 operation. Required: find, upsert, status, review. Optional: comments, merge.",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every proposals v1 operation. Required: find, upsert, status, review. Optional: automerge, comments, merge.",
   "$defs": {
     "proposalState": {
       "type": "string",
@@ -214,6 +214,24 @@
       }
     },
     "mergeResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal"],
+      "properties": {
+        "proposal": { "$ref": "#/$defs/proposal" }
+      }
+    },
+    "automergeInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "expectedHeadCommit"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "expectedHeadCommit": { "$ref": "collaboration.json#/$defs/commit" },
+        "method": { "type": "string", "enum": ["merge", "rebase", "squash"] }
+      }
+    },
+    "automergeResult": {
       "type": "object",
       "additionalProperties": false,
       "required": ["proposal"],

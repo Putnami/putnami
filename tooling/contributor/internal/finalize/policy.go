@@ -34,10 +34,30 @@ type Policy struct {
 		} `json:"ciGate"`
 	} `json:"verification"`
 	Publication struct {
-		Draft         bool   `json:"draft"`
-		TaskReference string `json:"taskReference"`
-		BodyMaxBytes  int    `json:"bodyMaxBytes"`
+		Draft         bool      `json:"draft"`
+		TaskReference string    `json:"taskReference"`
+		BodyMaxBytes  int       `json:"bodyMaxBytes"`
+		AutoMerge     AutoMerge `json:"autoMerge"`
 	} `json:"publication"`
+}
+
+// AutoMerge is publication.autoMerge: the merge method a ready publication
+// asks the proposals provider to turn auto-merge on with, or empty, written
+// false, for none. It never grants the authority to publish: only a run that
+// already publishes a ready proposal sends the request.
+type AutoMerge collab.MergeMethod
+
+// UnmarshalJSON accepts "squash" and false, and refuses any other value.
+func (a *AutoMerge) UnmarshalJSON(data []byte) error {
+	switch strings.TrimSpace(string(data)) {
+	case "false", "null":
+		*a = ""
+		return nil
+	case `"squash"`:
+		*a = AutoMerge(collab.MergeMethodSquash)
+		return nil
+	}
+	return fmt.Errorf(`publication.autoMerge must be "squash" or false, not %s`, data)
 }
 
 func ReadPolicy(root string) (Policy, error) {

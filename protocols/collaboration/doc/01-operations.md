@@ -76,6 +76,7 @@ enforces it.
 | `review` | mutating | yes | no | — | `ref`, `verdict`, `body`, `commit`, `idempotencyKey` | `review`, `created` |
 | `comments` | read | no | — | — | `ref`, `page` | `items: [comment]`, `page` |
 | `merge` | mutating | no | yes | — | `ref`, `expectedHeadCommit`, `method` | `proposal` (state `merged`) |
+| `automerge` | mutating | no | yes | — | `ref`, `expectedHeadCommit`, `method` | `proposal` (state `open` or `merged`) |
 
 A proposal is `ref`, `revision`, `url`, `change` (`repository`, `base`,
 `head`, `headCommit`), `title`, `body`, `state` (`draft`, `open`, `merged`,
@@ -100,6 +101,14 @@ so, and no check is listed). A review is `ref`, `url`, `verdict` (`approve`,
 `comment`, `request_changes`), `commit`, `author`, `submittedAt`. `merge`
 refuses a head that moved from `expectedHeadCommit`; offering it authorizes
 nobody to merge.
+
+`automerge` turns auto-merge on for an open proposal: the backend merges it,
+or enters it into its merge queue, once the repository's own rules allow
+(required reviews and checks). It merges nothing itself. Like `merge`, it
+refuses a head that moved from `expectedHeadCommit`, and offering it
+authorizes nobody to turn it on. Repeating it changes nothing. A repository
+that does not allow auto-merge, or a proposal the backend would merge at once,
+is a refusal the caller reports.
 
 `comments` lists what people wrote on one proposal. A comment is `ref` and
 `body`, plus, when known, `url`, `author`, `submittedAt`, `review` (the ref of

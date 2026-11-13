@@ -292,9 +292,11 @@ func ValidateInput(input any) []diag.Diagnostic {
 	case *ProposalMergeInput:
 		c.ref("ref", in.Ref)
 		c.commit("expectedHeadCommit", in.ExpectedHeadCommit)
-		if in.Method != "" && !slices.Contains(ValidMergeMethods, in.Method) {
-			c.errorf(ErrorCodeInvalidValue, "method", "unknown merge method %q", in.Method)
-		}
+		c.mergeMethod(in.Method)
+	case *ProposalAutoMergeInput:
+		c.ref("ref", in.Ref)
+		c.commit("expectedHeadCommit", in.ExpectedHeadCommit)
+		c.mergeMethod(in.Method)
 	case *MemoryContextInput:
 		c.identity("identity", in.Identity)
 		c.memoryKinds("kinds", in.Kinds)
@@ -708,6 +710,13 @@ func (c *checker) memoryKinds(field string, kinds []MemoryKind) {
 func (c *checker) reviewVerdict(field string, verdict ReviewVerdict) {
 	if !slices.Contains(ValidReviewVerdicts, verdict) {
 		c.errorf(ErrorCodeInvalidValue, field, "unknown review verdict %q", verdict)
+	}
+}
+
+// mergeMethod checks an optional merge method.
+func (c *checker) mergeMethod(method MergeMethod) {
+	if method != "" && !slices.Contains(ValidMergeMethods, method) {
+		c.errorf(ErrorCodeInvalidValue, "method", "unknown merge method %q", method)
 	}
 }
 

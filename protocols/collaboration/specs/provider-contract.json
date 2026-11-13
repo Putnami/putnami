@@ -17,8 +17,8 @@
     {
       "id": "one-closed-catalog",
       "text": [
-        "Each contract speaks only version 1, an unknown one none. tasks requires find, get, create, update and transition and offers assign, claim and link;",
-        "proposals requires find, review, status and upsert and offers comments and merge;",
+        "Each contract speaks only version 1. tasks requires find, get, create, update and transition and offers assign, claim and link;",
+        "proposals requires find, review, status and upsert and offers automerge, comments and merge;",
         "memory requires checkpoint, context and mission and offers search;",
         "missions requires ask, reply and sync and offers status. tasks.create, proposals.review, memory.checkpoint and missions.ask take an idempotencyKey.",
         "Only missions.sync is host-only, and only a mutation can be."
@@ -199,8 +199,8 @@
     {
       "id": "exact-identity",
       "text": [
-        "The CLI answers unavailable with provider.identity_mismatch a read that answers for another task, proposal, head or mission, or with a state or kind outside its filter;",
-        "and unresolved, not retryable, with a reconcile, a mutation that does: an update or upsert for another item, head or head commit, a transition to another state, a claim for another holder or still held after release, a review of another commit, a merge that did not merge, or a checkpoint that kept its revision."
+        "The CLI answers unavailable with provider.identity_mismatch a read for another task, proposal, head or mission, or with a state or kind outside its filter;",
+        "and unresolved, not retryable, with a reconcile, a mutation that does: an update or upsert for another item, head or head commit, a transition to another state, a claim for another holder or still held after release, a review of another commit, a merge that did not merge, an automerge answering a closed proposal, or a checkpoint that kept its revision."
       ]
     },
     {

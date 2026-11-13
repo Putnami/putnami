@@ -73,19 +73,20 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 		return collab.OperationKey{Contract: contract, Version: 1, Operation: operation}
 	}
 	return map[collab.OperationKey]collab.Handler{
-		key(collab.ContractTasks, collab.OperationFind):         p.taskHandler((*taskSession).find),
-		key(collab.ContractTasks, collab.OperationGet):          p.taskHandler((*taskSession).get),
-		key(collab.ContractTasks, collab.OperationCreate):       p.taskHandler((*taskSession).create),
-		key(collab.ContractTasks, collab.OperationUpdate):       p.taskHandler((*taskSession).update),
-		key(collab.ContractTasks, collab.OperationTransition):   p.taskHandler((*taskSession).transition),
-		key(collab.ContractTasks, collab.OperationAssign):       p.taskHandler((*taskSession).assign),
-		key(collab.ContractTasks, collab.OperationLink):         p.taskHandler((*taskSession).link),
-		key(collab.ContractProposals, collab.OperationFind):     p.proposalHandler((*proposalSession).find),
-		key(collab.ContractProposals, collab.OperationUpsert):   p.proposalHandler((*proposalSession).upsert),
-		key(collab.ContractProposals, collab.OperationStatus):   p.proposalHandler((*proposalSession).status),
-		key(collab.ContractProposals, collab.OperationReview):   p.proposalHandler((*proposalSession).publish),
-		key(collab.ContractProposals, collab.OperationComments): p.proposalHandler((*proposalSession).comments),
-		key(collab.ContractProposals, collab.OperationMerge):    p.proposalHandler((*proposalSession).merge),
+		key(collab.ContractTasks, collab.OperationFind):          p.taskHandler((*taskSession).find),
+		key(collab.ContractTasks, collab.OperationGet):           p.taskHandler((*taskSession).get),
+		key(collab.ContractTasks, collab.OperationCreate):        p.taskHandler((*taskSession).create),
+		key(collab.ContractTasks, collab.OperationUpdate):        p.taskHandler((*taskSession).update),
+		key(collab.ContractTasks, collab.OperationTransition):    p.taskHandler((*taskSession).transition),
+		key(collab.ContractTasks, collab.OperationAssign):        p.taskHandler((*taskSession).assign),
+		key(collab.ContractTasks, collab.OperationLink):          p.taskHandler((*taskSession).link),
+		key(collab.ContractProposals, collab.OperationFind):      p.proposalHandler((*proposalSession).find),
+		key(collab.ContractProposals, collab.OperationUpsert):    p.proposalHandler((*proposalSession).upsert),
+		key(collab.ContractProposals, collab.OperationStatus):    p.proposalHandler((*proposalSession).status),
+		key(collab.ContractProposals, collab.OperationReview):    p.proposalHandler((*proposalSession).publish),
+		key(collab.ContractProposals, collab.OperationComments):  p.proposalHandler((*proposalSession).comments),
+		key(collab.ContractProposals, collab.OperationMerge):     p.proposalHandler((*proposalSession).merge),
+		key(collab.ContractProposals, collab.OperationAutoMerge): p.proposalHandler((*proposalSession).automerge),
 	}
 }
 
@@ -159,29 +160,31 @@ func (p *Provider) budget(ctx context.Context) (context.Context, context.CancelF
 
 // Reasons this provider reports, beside the contract's own.
 const (
-	reasonSettings        = "settings.invalid"
-	reasonUnauthenticated = "github.unauthenticated"
-	reasonUnreachable     = "github.unreachable"
-	reasonUnavailable     = "github.unavailable"
-	reasonRateLimited     = "github.rate_limited"
-	reasonUnauthorized    = "github.unauthorized"
-	reasonForbidden       = "github.forbidden"
-	reasonNotFound        = "github.not_found"
-	reasonGitHubConflict  = "github.conflict"
-	reasonRejected        = "github.rejected"
-	reasonUncertain       = "github.uncertain"
-	reasonIncomplete      = "github.incomplete"
-	reasonStateUnmapped   = "state.unmapped"
-	reasonStateLabel      = "label.state"
-	reasonHeadMoved       = "head.moved"
-	reasonHeadLagging     = "head.lagging"
-	reasonHeadMissing     = "head.missing"
-	reasonNotMergeable    = "merge.not_mergeable"
-	reasonMergeDisabled   = "merge.disabled"
-	reasonRepository      = "repository.other"
-	reasonPullRequest     = "task.is_pull_request"
-	reasonTooManyReviews  = "reviews.unbounded"
-	reasonKeyUnverifiable = "idempotency.unverifiable"
+	reasonSettings         = "settings.invalid"
+	reasonUnauthenticated  = "github.unauthenticated"
+	reasonUnreachable      = "github.unreachable"
+	reasonUnavailable      = "github.unavailable"
+	reasonRateLimited      = "github.rate_limited"
+	reasonUnauthorized     = "github.unauthorized"
+	reasonForbidden        = "github.forbidden"
+	reasonNotFound         = "github.not_found"
+	reasonGitHubConflict   = "github.conflict"
+	reasonRejected         = "github.rejected"
+	reasonUncertain        = "github.uncertain"
+	reasonIncomplete       = "github.incomplete"
+	reasonStateUnmapped    = "state.unmapped"
+	reasonStateLabel       = "label.state"
+	reasonHeadMoved        = "head.moved"
+	reasonHeadLagging      = "head.lagging"
+	reasonHeadMissing      = "head.missing"
+	reasonNotMergeable     = "merge.not_mergeable"
+	reasonMergeDisabled    = "merge.disabled"
+	reasonAutoMergeOn      = "automerge.other_method"
+	reasonAutoMergeRefused = "automerge.refused"
+	reasonRepository       = "repository.other"
+	reasonPullRequest      = "task.is_pull_request"
+	reasonTooManyReviews   = "reviews.unbounded"
+	reasonKeyUnverifiable  = "idempotency.unverifiable"
 )
 
 // fail renders a failed request as the contract outcome it proves. A request

@@ -618,6 +618,75 @@ func TestMergeIsRefusedUnlessAllowed(t *testing.T) {
 	h.fails("proposals", "merge", `{"ref":`+refJSON(other.Ref)+`,"expectedHeadCommit":"ccccccc"}`, collab.OutcomeConflict)
 }
 
+func TestAutoMergeAsksGitHubToMergeOnceTheRulesAllow(t *testing.T) {
+	spectest.Proves(t, feature, "honest-failures", "automerge-asks-github-and-reports-its-refusal")
+	h := newHarness(t)
+	proposal := h.openProposal("Merge me later")
+	ref := refJSON(proposal.Ref)
+	graphql := func() int { return h.fake.count("POST", `^/graphql$`) }
+
+	if failure := h.fails("proposals", "automerge", `{"ref":`+ref+`,"expectedHeadCommit":"1234567"}`, collab.OutcomeConflict); failure.Reason != reasonHeadMoved || graphql() != 0 {
+		t.Fatalf("a moved head: %+v", failure)
+	}
+	h.fake.mu.Lock()
+	h.fake.autoMergeOff = true
+	h.fake.mu.Unlock()
+	failure := h.fails("proposals", "automerge", `{"ref":`+ref+`,"expectedHeadCommit":"bbbbbbb","method":"squash"}`, collab.OutcomeConflict)
+	if failure.Reason != reasonAutoMergeRefused || failure.Retryable {
+		t.Fatalf("a repository without auto-merge: %+v", failure)
+	}
+	mustContain(t, failure.Message, "Auto merge is not allowed for this repository")
+	h.fake.mu.Lock()
+	h.fake.autoMergeOff = false
+	h.fake.mu.Unlock()
+
+	var queued collab.ProposalResult
+	h.ok("proposals", "automerge", `{"ref":`+ref+`,"expectedHeadCommit":"bbbbbbb","method":"squash"}`, &queued)
+	if queued.Proposal.State != collab.ProposalStateOpen || queued.Proposal.Ref != proposal.Ref {
+		t.Fatalf("auto-merge on: %+v", queued.Proposal)
+	}
+	h.fake.mu.Lock()
+	method := h.fake.pulls[number(t, proposal.Ref)].autoMerge
+	h.fake.mu.Unlock()
+	if method != "squash" || graphql() != 2 {
+		t.Fatalf("auto-merge method %q after %d mutations", method, graphql())
+	}
+	h.ok("proposals", "automerge", `{"ref":`+ref+`,"expectedHeadCommit":"bbbbbbb","method":"squash"}`, &queued)
+	if graphql() != 2 {
+		t.Fatalf("a repeat sent another mutation: %d", graphql())
+	}
+	if failure := h.fails("proposals", "automerge", `{"ref":`+ref+`,"expectedHeadCommit":"bbbbbbb","method":"rebase"}`, collab.OutcomeConflict); failure.Reason != reasonAutoMergeOn || graphql() != 2 {
+		t.Fatalf("another method: %+v", failure)
+	}
+
+	draft := h.openProposalOn("topic-b")
+	var seeded collab.ProposalUpsertResult
+	h.ok("proposals", "upsert", `{"change":{"base":"main","head":"topic-b"},"title":"On topic-b","draft":true}`, &seeded)
+	if failure := h.fails("proposals", "automerge", `{"ref":`+refJSON(draft.Ref)+`,"expectedHeadCommit":"`+seeded.Proposal.Change.HeadCommit+`"}`, collab.OutcomeConflict); failure.Reason != reasonNotMergeable {
+		t.Fatalf("a draft: %+v", failure)
+	}
+}
+
+func TestAutoMergeWhoseAnswerWasLostIsReadBack(t *testing.T) {
+	spectest.Proves(t, feature, "reconciled-writes", "a-lost-automerge-response-is-read-back")
+	h := newHarness(t)
+	proposal := h.openProposal("Merge me later")
+	ref := refJSON(proposal.Ref)
+	h.fake.fail("POST", `^/graphql$`, fault{drop: true})
+	var queued collab.ProposalResult
+	h.ok("proposals", "automerge", `{"ref":`+ref+`,"expectedHeadCommit":"bbbbbbb"}`, &queued)
+	if queued.Proposal.State != collab.ProposalStateOpen || h.fake.count("POST", `^/graphql$`) != 1 {
+		t.Fatalf("a lost answer: %+v after %d mutations", queued.Proposal, h.fake.count("POST", `^/graphql$`))
+	}
+
+	other := h.openProposalOn("topic-b")
+	h.fake.fail("POST", `^/graphql$`, fault{drop: true, before: true})
+	failure := h.fails("proposals", "automerge", `{"ref":`+refJSON(other.Ref)+`,"expectedHeadCommit":"`+other.Change.HeadCommit+`"}`, collab.OutcomeUnresolved)
+	if failure.Retryable || failure.Reconcile == "" {
+		t.Fatalf("an unestablished auto-merge: %+v", failure)
+	}
+}
+
 func (h *harness) openProposalOn(branch string) collab.Proposal {
 	h.t.Helper()
 	var created collab.ProposalUpsertResult

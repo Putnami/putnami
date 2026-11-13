@@ -74,6 +74,9 @@ type fakeGitHub struct {
 	// request on REST routes under pulls/{number}/ccr/. Without it, those
 	// routes answer 404, as GitHub does.
 	sessionProxy bool
+	// autoMergeOff is a repository that does not allow auto-merge:
+	// enablePullRequestAutoMerge answers UNPROCESSABLE.
+	autoMergeOff bool
 }
 
 type fakeIssue struct {
@@ -111,6 +114,8 @@ type fakePull struct {
 	shas      []string
 	draft     bool
 	merged    *time.Time
+	// autoMerge is the merge method auto-merge is on with; empty is off.
+	autoMerge string
 	// listed is when the pull request enters the pull request list.
 	listed time.Time
 }
@@ -415,6 +420,10 @@ func (f *fakeGitHub) pullJSON(number int) map[string]any {
 	document["merged_at"] = nil
 	if pull.merged != nil {
 		document["merged_at"] = pull.merged.Format(time.RFC3339)
+	}
+	document["auto_merge"] = nil
+	if pull.autoMerge != "" {
+		document["auto_merge"] = map[string]any{"merge_method": pull.autoMerge, "enabled_by": map[string]any{"login": f.login}}
 	}
 	document["base"] = map[string]any{"ref": pull.base, "label": f.owner + ":" + pull.base, "sha": f.branches[pull.base],
 		"repo": map[string]any{"full_name": f.owner + "/" + f.name}}
@@ -1066,6 +1075,10 @@ func (f *fakeGitHub) graphql(w http.ResponseWriter, r *http.Request, _ []string)
 		return
 	}
 	id, _ := request.Variables["id"].(string)
+	if strings.Contains(request.Query, "enablePullRequestAutoMerge") {
+		f.enableAutoMerge(w, id, request.Variables)
+		return
+	}
 	for number, pull := range f.pulls {
 		if pull.nodeID != id {
 			continue
@@ -1073,6 +1086,41 @@ func (f *fakeGitHub) graphql(w http.ResponseWriter, r *http.Request, _ []string)
 		pull.draft = strings.Contains(request.Query, "convertPullRequestToDraft")
 		f.issues[number].updated = f.tick()
 		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"pullRequest": map[string]any{"isDraft": pull.draft}}})
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"errors": []any{map[string]any{"type": "NOT_FOUND", "message": "Could not resolve to a node with the global id of '" + id + "'"}}})
+}
+
+// enableAutoMerge answers enablePullRequestAutoMerge the way GitHub does: a
+// repository that does not allow it, a draft and a head other than
+// expectedHeadOid are UNPROCESSABLE; otherwise the pull request keeps the
+// method, MERGE when none is given.
+func (f *fakeGitHub) enableAutoMerge(w http.ResponseWriter, id string, variables map[string]any) {
+	refuse := func(message string) {
+		writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"enablePullRequestAutoMerge": nil},
+			"errors": []any{map[string]any{"type": "UNPROCESSABLE", "message": message}}})
+	}
+	for number, pull := range f.pulls {
+		if pull.nodeID != id {
+			continue
+		}
+		head, _ := variables["head"].(string)
+		switch {
+		case f.autoMergeOff:
+			refuse("Pull request Auto merge is not allowed for this repository")
+		case pull.draft:
+			refuse("Pull request is in draft state")
+		case head != pull.sha:
+			refuse("Head ref was modified")
+		default:
+			method, _ := variables["method"].(string)
+			if method == "" {
+				method = "MERGE"
+			}
+			pull.autoMerge = strings.ToLower(method)
+			f.issues[number].updated = f.tick()
+			writeJSON(w, http.StatusOK, map[string]any{"data": map[string]any{"enablePullRequestAutoMerge": map[string]any{"pullRequest": map[string]any{"number": number}}}})
+		}
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"errors": []any{map[string]any{"type": "NOT_FOUND", "message": "Could not resolve to a node with the global id of '" + id + "'"}}})

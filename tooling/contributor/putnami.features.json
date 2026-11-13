@@ -61,6 +61,24 @@
           }
         },
         {
+          "id": "authorized-auto-merge",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-policy-takes-squash-or-false",
+              "auto-merge-follows-the-ready-publication",
+              "no-auto-merge-without-the-setting",
+              "no-auto-merge-for-a-draft-or-a-partial",
+              "a-refused-auto-merge-is-reported-and-the-delivery-stands",
+              "change-finalize-reports-auto-merge"
+            ]
+          }
+        },
+        {
           "id": "native-workflow-validation",
           "stage": "coded",
           "evidenceKinds": [

@@ -297,6 +297,8 @@ func ReconcileHint(contract, operation string) string {
 		return "repeat proposals.review with the same idempotencyKey: the provider returns the review that key published, or publishes it once"
 	case "proposals.merge":
 		return "read the proposal with proposals.status before any retry"
+	case "proposals.automerge":
+		return "read the proposal with proposals.status before any retry; repeating proposals.automerge changes nothing"
 	case "memory.checkpoint":
 		return "read the mission with memory.mission; repeat the checkpoint with the same idempotencyKey and precondition, which replays a write that landed"
 	case "missions.sync":
@@ -528,6 +530,18 @@ func proposalMismatch(input, result any) (string, bool) {
 		}
 		if merged.Proposal.State != collab.ProposalStateMerged {
 			return fmt.Sprintf("a merge answered state %s", merged.Proposal.State), true
+		}
+		return "", true
+	case *collab.ProposalAutoMergeInput:
+		queued, wrong := resultAs[*collab.ProposalResult](result)
+		if wrong != "" {
+			return wrong, true
+		}
+		if mismatch := sameRef("proposal", queued.Proposal.Ref, in.Ref); mismatch != "" {
+			return mismatch, true
+		}
+		if state := queued.Proposal.State; state != collab.ProposalStateOpen && state != collab.ProposalStateMerged {
+			return fmt.Sprintf("an automerge answered state %s", state), true
 		}
 		return "", true
 	}

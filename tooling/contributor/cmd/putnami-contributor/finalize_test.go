@@ -72,6 +72,13 @@ type providerHost struct {
 	connections int
 	requests    []wire.Request
 	proposal    *collab.Proposal
+	// autoMerge adds automerge to the proposals capabilities, and
+	// autoMergeRefusal is the error the provider answers it with.
+	autoMerge        bool
+	autoMergeRefusal *collab.Error
+	// operations lists the collaboration operations called, in order, but
+	// capabilities.
+	operations []string
 }
 
 func newProviderHost(t *testing.T, owners map[string][]wire.OwningProject) *providerHost {
@@ -187,6 +194,9 @@ func (h *providerHost) collaboration(params wire.CollaborationCallParams) collab
 	}
 	if params.Operation == collab.OperationCapabilities {
 		names := []string{collab.OperationFind, collab.OperationUpsert, collab.OperationStatus}
+		if h.autoMerge {
+			names = append(names, collab.OperationAutoMerge)
+		}
 		if params.Contract == collab.ContractTasks {
 			names = []string{collab.OperationGet}
 		}
@@ -196,7 +206,13 @@ func (h *providerHost) collaboration(params wire.CollaborationCallParams) collab
 		}
 		return answer(collab.Capabilities{Status: collab.BindingStatusBound, Operations: operations})
 	}
+	h.operations = append(h.operations, params.Contract+"."+params.Operation)
 	switch params.Contract + "." + params.Operation {
+	case "proposals.automerge":
+		if h.autoMergeRefusal != nil {
+			return collab.Envelope{Contract: params.Contract, Operation: params.Operation, Outcome: collab.OutcomeConflict, Error: h.autoMergeRefusal}
+		}
+		return answer(collab.ProposalResult{Proposal: *h.proposal})
 	case "tasks.get":
 		return answer(collab.TaskResult{Task: fixtureTask})
 	case "proposals.find":
@@ -458,5 +474,50 @@ func TestFinalizeWithoutAChannelNamesTheLaunch(t *testing.T) {
 	}
 	if refs := repo.git(t, repo.origin, "for-each-ref", "--format=%(refname)"); refs != "refs/heads/main" {
 		t.Errorf("origin refs %q, want only main", refs)
+	}
+}
+
+// TestFinalizeReportsAutoMerge runs a hosted ready publication in a workspace
+// whose policy sets publication.autoMerge to "squash". The run asks the
+// provider once, after the ready upsert, and prints AUTO_MERGE. A refusal is
+// reported on standard error and the run still exits 0.
+func TestFinalizeReportsAutoMerge(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, languageFeature, "authorized-auto-merge", "change-finalize-reports-auto-merge")
+	executable := languageExecutable(t)
+	for _, refused := range []bool{false, true} {
+		repo := newFinalizeRepo(t, true)
+		repo.write(t, "putnami.workspace.json", `{"name":"finalize-fixture","options":{"@putnami/contributor":{"version":1,`+
+			`"verification":{"ciGate":{"checks":["Putnami CI"],"pollSeconds":1}},"publication":{"autoMerge":"squash"}}}}`+"\n")
+		repo.git(t, repo.root, "commit", "-q", "-am", "chore: turn auto-merge on")
+		host := newProviderHost(t, nil)
+		host.autoMerge = true
+		if refused {
+			host.autoMergeRefusal = &collab.Error{Reason: "automerge.refused", Message: "Pull request Auto merge is not allowed for this repository"}
+		}
+		got := repo.launch(t, executable, `{"params":{}}`, []string{"--base", "main", "--branch", "topic",
+			"--title", "feat: change the fixture", "--body-file", repo.body(t), "--gate", "ci"}, host.env()...)
+		want, stderr := "PROPOSAL_REF={\"source\":\"local:fixture\",\"id\":\"P-1\"}\nAUTO_MERGE=squash\n", ""
+		if refused {
+			want = "PROPOSAL_REF={\"source\":\"local:fixture\",\"id\":\"P-1\"}\nAUTO_MERGE=off\n"
+			stderr = "change finalize: auto-merge is not on: proposals.automerge answered conflict (automerge.refused): " +
+				"Pull request Auto merge is not allowed for this repository; the proposal stays ready for review\n"
+		}
+		if got.code != 0 || got.stdout != want || got.stderr != stderr {
+			t.Fatalf("refused=%v: exit %d, stdout %q, stderr %q; want 0, %q and %q", refused, got.code, got.stdout, got.stderr, want, stderr)
+		}
+		host.mu.Lock()
+		operations := slices.Clone(host.operations)
+		host.mu.Unlock()
+		upsert, automerge := slices.Index(operations, "proposals.upsert"), slices.Index(operations, "proposals.automerge")
+		requests := 0
+		for _, operation := range operations {
+			if operation == "proposals.automerge" {
+				requests++
+			}
+		}
+		if upsert < 0 || automerge != len(operations)-1 || requests != 1 {
+			t.Fatalf("refused=%v: operations %v, want one automerge last, after the ready upsert", refused, operations)
+		}
 	}
 }

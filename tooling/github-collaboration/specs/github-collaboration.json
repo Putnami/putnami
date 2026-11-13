@@ -11,7 +11,7 @@
   "nonGoals": [
     "Exclusive claims: GitHub cannot hold an issue for one agent, so an assignee is information only",
     "Detecting a concurrent writer between the read and the write of a checked precondition, or two concurrent creates with one idempotency key",
-    "Authorizing merges: merge is refused unless the binding allows it, and binding the provider authorizes nobody",
+    "Authorizing merges: merge is refused unless the binding allows it, automerge leaves the merge to the branch's rules, and binding the provider authorizes nobody",
     "Serving several repositories from one binding, or any tracker other than GitHub issues and pull requests",
     "Running the live proof in the ordinary gate: it mutates a real repository and runs only on request"
   ],
@@ -60,7 +60,7 @@
     },
     {
       "id": "honest-failures",
-      "text": "Failures keep their meaning: pages cover every item present throughout a traversal exactly once, a search traversal ends at the 1,000 results GitHub's search serves, a missing item or a pull request read as a task is not found, an outage is unavailable and writes nothing, a rate limit is retryable and never repeated, merge is denied unless the binding allows it, and exclusive claims are not offered because GitHub cannot enforce them."
+      "text": "Failures keep their meaning: pages cover every item present throughout a traversal exactly once, a search traversal ends at the 1,000 results GitHub's search serves, a missing item or a pull request read as a task is not found, an outage is unavailable and writes nothing, a rate limit is retryable and never repeated, merge is denied unless the binding allows it, an automerge GitHub refuses is a conflict, and exclusive claims are not offered because GitHub cannot enforce them."
     },
     {
       "id": "credential-safety",

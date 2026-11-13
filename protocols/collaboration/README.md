@@ -28,7 +28,7 @@ describes every operation.
 | Contract | Required | Optional |
 |---|---|---|
 | `tasks` v1 | `find`, `get`, `create`, `update`, `transition` | `assign`, `link`, `claim` |
-| `proposals` v1 | `find`, `upsert`, `status`, `review` | `comments`, `merge` |
+| `proposals` v1 | `find`, `upsert`, `status`, `review` | `automerge`, `comments`, `merge` |
 | `memory` v1 | `context`, `mission`, `checkpoint` | `search` |
 | `missions` v1 | `sync`, `ask`, `reply` | `status` |
 

@@ -114,6 +114,22 @@ type Result struct {
 	HostedWorkflowReceipt *HostedWorkflowReceipt `json:"hostedWorkflowReceipt,omitempty"`
 	LabelsVerified        bool                   `json:"labelsVerified"`
 	AssigneesVerified     bool                   `json:"assigneesVerified"`
+	// AutoMerge reports the auto-merge request publication.autoMerge made;
+	// nil when the run sent none.
+	AutoMerge *AutoMergeReport `json:"autoMerge,omitempty"`
+}
+
+// AutoMergeReport is what became of the request to turn auto-merge on. A
+// refusal leaves the proposal published and ready: it never fails the run.
+type AutoMergeReport struct {
+	// Method is the merge method requested.
+	Method collab.MergeMethod `json:"method"`
+	// Enabled is true once the provider answered that auto-merge is on, or
+	// that the proposal is already merged.
+	Enabled bool `json:"enabled"`
+	// Refusal says why auto-merge is not on: the provider's refusal, or why
+	// the request was not sent.
+	Refusal string `json:"refusal,omitempty"`
 }
 
 func (f Finalizer) call(ctx context.Context, contract, operation string, input any, output any) error {

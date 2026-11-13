@@ -87,6 +87,7 @@
             "checks": [
               "a-lookup-that-cannot-finish-says-whether-a-retry-can-succeed",
               "a-lookup-that-cannot-tell-a-discussion-from-a-number-not-given-creates-nothing",
+              "a-lost-automerge-response-is-read-back",
               "a-lost-create-response-returns-the-issue-without-a-duplicate",
               "a-lost-review-response-returns-the-review-without-a-duplicate",
               "a-lost-transition-response-is-read-back",
@@ -113,6 +114,7 @@
               "a-rate-limit-is-retryable-and-never-repeated",
               "a-search-traversal-ends-at-its-thousand-results",
               "an-outage-is-unavailable-and-writes-nothing",
+              "automerge-asks-github-and-reports-its-refusal",
               "merge-is-refused-unless-allowed",
               "no-claim-is-offered",
               "pages-follow-github-pagination-exactly-once"

@@ -1099,3 +1099,74 @@ func (s *proposalSession) merge(input any) (any, *collab.Failure) {
 	return nil, unresolved("read the proposal with proposals.status before any retry",
 		"merging pull request #%d may have happened (%s), and reading it back did not show it merged", pull.Number, message)
 }
+
+// enableAutoMerge is the GraphQL mutation `gh pr merge --auto` sends. GitHub
+// refuses it when the head moved from expectedHeadOid.
+const enableAutoMerge = "mutation($id: ID!, $head: GitObjectID!, $method: PullRequestMergeMethod) " +
+	"{ enablePullRequestAutoMerge(input: {pullRequestId: $id, expectedHeadOid: $head, mergeMethod: $method}) { pullRequest { number } } }"
+
+// automerge turns auto-merge on for an open pull request whose head is still
+// the expected commit, as `gh pr merge --auto` does: GitHub merges it, or adds
+// it to the merge queue, once the branch's rules allow. It merges nothing
+// itself, and needs no settings.allowMerge: the repository's rules still
+// decide. A pull request already merged, or already set to auto-merge with the
+// requested method, answers without a write.
+func (s *proposalSession) automerge(input any) (any, *collab.Failure) {
+	in, failure := inputOf[*collab.ProposalAutoMergeInput](input)
+	if failure != nil {
+		return nil, failure
+	}
+	pull, failure := s.pull(in.Ref)
+	if failure != nil {
+		return nil, failure
+	}
+	answer := func(current *ghPull) (any, *collab.Failure) {
+		return &collab.ProposalResult{Proposal: s.proposal(current, s.repo.display, s.canonicalHead(current))}, nil
+	}
+	if !sameCommit(pull.Head.SHA, in.ExpectedHeadCommit) {
+		return nil, collab.Fail(collab.OutcomeConflict, reasonHeadMoved, "pull request #%d is at head %s, not %s", pull.Number, pull.Head.SHA, in.ExpectedHeadCommit)
+	}
+	if pull.MergedAt != nil {
+		return answer(pull)
+	}
+	if pull.State != "open" {
+		return nil, collab.Fail(collab.OutcomeConflict, reasonNotMergeable, "pull request #%d is closed", pull.Number)
+	}
+	if pull.Draft {
+		return nil, collab.Fail(collab.OutcomeConflict, reasonNotMergeable, "pull request #%d is a draft", pull.Number)
+	}
+	if pull.AutoMerge != nil {
+		if in.Method == "" || strings.EqualFold(pull.AutoMerge.MergeMethod, string(in.Method)) {
+			return answer(pull)
+		}
+		return nil, collab.Fail(collab.OutcomeConflict, reasonAutoMergeOn, "pull request #%d already has auto-merge on with method %s, not %s; nothing was sent",
+			pull.Number, pull.AutoMerge.MergeMethod, in.Method)
+	}
+	variables := map[string]any{"id": pull.NodeID, "head": pull.Head.SHA}
+	if in.Method != "" {
+		variables["method"] = strings.ToUpper(string(in.Method))
+	}
+	err := s.client.GraphQL(s.ctx, enableAutoMerge, variables, nil)
+	if err != nil && err.Kind == github.Answered && err.Status == http.StatusUnprocessableEntity && !err.RateLimited {
+		// GitHub answers this when the repository does not allow auto-merge,
+		// when the pull request could merge at once, or when its head moved.
+		return nil, collab.Fail(collab.OutcomeConflict, reasonAutoMergeRefused, "auto-merge of pull request #%d: %s", pull.Number, err.Message)
+	}
+	if err != nil && err.Kind != github.Uncertain {
+		return nil, fail(err, "turn auto-merge on for pull request #%d", pull.Number)
+	}
+	var current *ghPull
+	if s.reconcile(func() (bool, *collab.Failure) {
+		read, failure := s.pull(in.Ref)
+		current = read
+		return failure == nil && (read.AutoMerge != nil || read.MergedAt != nil), failure
+	}) {
+		return answer(current)
+	}
+	message := "GitHub acknowledged the request"
+	if err != nil {
+		message = err.Message
+	}
+	return nil, unresolved("read the proposal with proposals.status before any retry; repeating proposals.automerge changes nothing",
+		"auto-merge of pull request #%d may be on (%s), and reading it back did not show it", pull.Number, message)
+}

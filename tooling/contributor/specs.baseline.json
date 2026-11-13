@@ -17,6 +17,7 @@
     "tooling/change-estimate#estimate-determinism",
     "tooling/change-estimate#estimate-policy",
     "tooling/change-estimate#plan-validation",
+    "tooling/contributor-executable#authorized-auto-merge",
     "tooling/contributor-executable#change-finalize-parity",
     "tooling/contributor-executable#change-language-parity",
     "tooling/contributor-executable#change-verify-parity",

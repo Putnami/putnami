@@ -1,6 +1,6 @@
 # ADR 0003 — Build publishes its proposal by default
 
-- **Status**: accepted
+- **Status**: accepted, extended by [ADR 0012](0012-an-authorized-ready-publication-can-turn-auto-merge-on.md)
 - **Scope**: `@putnami/contributor` `build` skill and its loop
 - **Supersedes in part**: [ADR 0002](0002-build-and-versioned-workflow-record.md), on publication authority
 

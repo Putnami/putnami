@@ -141,6 +141,10 @@
         "merge": {
           "description": "Merge a pull request whose head is still the expected commit. Refused before anything is sent unless settings.allowMerge is true; binding this provider authorizes nobody to merge.",
           "openWorld": true
+        },
+        "automerge": {
+          "description": "Turn auto-merge on for an open, ready pull request whose head is still the expected commit, as gh pr merge --auto does: GitHub merges it, or adds it to the merge queue, once the branch's rules allow. It merges nothing itself and needs no settings.allowMerge. A repository that does not allow auto-merge, or a pull request GitHub could merge at once, is a conflict. Binding this provider authorizes nobody to turn it on.",
+          "openWorld": true
         }
       }
     }

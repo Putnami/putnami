@@ -52,6 +52,30 @@ branch only fast-forwards.
 A ready publication takes exactly one of `--verification-file` and `--gate ci`.
 `--proof <text>` adds the local proof to the verification comment.
 
+## Auto-merge
+
+With `publication.autoMerge` set to `"squash"`, a ready publication ends by
+asking the proposals provider to turn auto-merge on, once, through the
+optional `proposals.automerge` operation. The request names the published
+head, so a head that moved since is refused. It comes last: after the ready
+upsert, the gate (the dossier, or the named hosted checks read again), the
+verification comment and the task's delivered transition. The provider then
+merges the proposal, or enters it into the merge queue, once the repository's
+rules allow; the command merges nothing. For `@putnami/github-collaboration`,
+this is what `gh pr merge --auto --squash <number>` does.
+
+The command sends no request for `--draft`, for a policy with
+`publication.draft: true`, for `--partial-delivery`, or for a proposal the
+branch already merged. The value is `"squash"` or `false`, and `false` by
+default; any other value stops the run before any write. The setting grants no
+authority: the run publishes only because the user authorized it, and
+auto-merge follows from that publication.
+
+A refusal never fails the run. When the provider refuses (the repository does
+not allow auto-merge, the credential lacks permission, or the proposal could
+merge at once), or offers no `automerge`, the command reports it, leaves the
+proposal ready, and exits 0.
+
 ## Existing proposals
 
 Before it seeds, pushes or writes, the command reads the branch's proposals in
@@ -140,14 +164,18 @@ from a local session.
 ## Output and exit codes
 
 The command prints `PROPOSAL_REF=<json>`, then `PROPOSAL_URL=<url>` when the
-proposal has a URL. With `--output=json`, `jsonl` or `cloud-logging`, it
+proposal has a URL. When the policy sets `publication.autoMerge` and the run
+sent the request, it adds `AUTO_MERGE=squash` when auto-merge is on, or
+`AUTO_MERGE=off` with the reason on stderr. With `--output=json`, `jsonl` or `cloud-logging`, it
 prints the result document on one line instead: the proposal reference and
 URL, the head commit, the proposal state, the gate, whether the labels and
-assignees read back, and for a hosted workflow, its digest, ready units and
-receipt. For a proposal already merged, the state is `merged`, the text output
+assignees read back, for a hosted workflow, its digest, ready units and
+receipt, and `autoMerge` (`method`, `enabled` and the `refusal`) when the run
+sent the request. For a proposal already merged, the state is `merged`, the text output
 adds `PROPOSAL_STATE=merged`, and stderr says that nothing was published.
 
-It exits 0 when the proposal is published or already merged, 1 when the run
+It exits 0 when the proposal is published or already merged, auto-merge on or
+refused, 1 when the run
 fails, and 2 for a usage error. A failure prints `change finalize: <error>` on
 stderr. `Ctrl-C` stops the run, and putnami exits 130. The run has a 90-minute
 deadline: when it passes, the run fails with `context canceled`, a proposal

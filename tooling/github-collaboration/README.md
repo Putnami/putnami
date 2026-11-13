@@ -88,7 +88,7 @@ credential never leaves its own host or this machine.
 | Contract | Offered | Not offered |
 |---|---|---|
 | tasks v1 | `find`, `get`, `create`, `update`, `transition`, `assign`, `link` | `claim` |
-| proposals v1 | `find`, `upsert`, `status`, `review`, `comments`, `merge` (with `allowMerge`) | — |
+| proposals v1 | `find`, `upsert`, `status`, `review`, `comments`, `merge` (with `allowMerge`), `automerge` | — |
 
 - **States.** An open issue is `blocked`, `in_progress` or `open` by the first
   of those states whose label it carries, and `open` without one. A closed
@@ -147,6 +147,15 @@ credential never leaves its own host or this machine.
   older identifier it got then.
 - **Merge** needs `allowMerge` and an `expectedHeadCommit` that is still the
   head. Binding the provider authorizes nobody to merge.
+- **Auto-merge** (`automerge`) sends the `enablePullRequestAutoMerge` mutation
+  that `gh pr merge --auto` sends, with the expected head. GitHub merges the
+  pull request, or adds it to the merge queue, once the branch's rules allow;
+  the provider merges nothing itself, so it needs no `allowMerge`. A draft, a
+  closed pull request, auto-merge already on with another method, and GitHub's
+  refusal (the repository does not allow auto-merge, or the pull request could
+  merge at once) are conflicts. Auto-merge already on with the same method, or
+  a merged pull request, answers without a write. GraphQL is required: a
+  session proxy that refuses it answers `denied`.
 
 ### References, revisions and pages
 
@@ -202,6 +211,7 @@ repeats one itself.
 | `proposals upsert` | The base and head: GitHub keeps one open pull request per pair | Finds the open pull request of the pair: found is `ok`, not found is `unresolved` |
 | `proposals review` | The idempotency key, recorded in the review body as a hidden comment | Lists the pull request's reviews for the key: found is `ok`, not found is `unresolved` |
 | `proposals merge` | The pull request number and expected head | Reads the pull request: merged is `ok`, otherwise `unresolved` |
+| `proposals automerge` | The pull request number and expected head | Reads the pull request: auto-merge on or merged is `ok`, otherwise `unresolved` |
 
 The read-back is tried 3 times, 1 then 2 seconds apart. `unresolved` is never
 retryable; its `reconcile` names the read, or the keyed repeat, that settles

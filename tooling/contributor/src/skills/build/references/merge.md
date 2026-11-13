@@ -51,6 +51,13 @@ exists; never invent a task to use it.
 Neither mode runs a local gate. Once the outcome is complete and verified,
 run the ready finalization in the same run; do not wait to be asked. Keep the
 proposal a draft when the policy's `publication.draft` or the mandate says so.
+
+With the policy's `publication.autoMerge` set to `"squash"`, the ready
+finalization of a complete outcome also asks the proposals provider to turn
+auto-merge on. Do not turn it on another way. A draft, a partial delivery and
+a mandate that keeps the proposal a draft send no request. The command prints
+`AUTO_MERGE=squash` or `AUTO_MERGE=off` with the provider's reason; a refusal
+does not fail the delivery. Report which one in the end report.
 A failed or `unresolved` external write leaves a resumable state, not a reason
 to bypass a check or to repeat the write blindly. A local run ends with local
 evidence and names the finalization it did not run.
@@ -94,7 +101,8 @@ session.
 
 A merge or a deployment needs the mandate's authority; then go through the
 normal required checks and provider operations, and re-evaluate after a head
-or base change. A provider that offers no `merge` leaves it to the
+or base change. Auto-merge that `publication.autoMerge` turned on is not a
+merge by the run: the repository's rules decide when it lands. A provider that offers no `merge` leaves it to the
 repository's own controls: say so. Ready, merged, published, deployed and
 adopted are separate receipts; upstream merged is not downstream adopted.
 

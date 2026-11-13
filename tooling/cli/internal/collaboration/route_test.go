@@ -200,7 +200,7 @@ func TestResolve_BindsOnlyTheNamedAvailableProvider(t *testing.T) {
 func collabBoundCall(t *testing.T, contract, operation, arguments string) *providerCall {
 	t.Helper()
 	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"`+contract+`":{"provider":"@a/one","version":1}}}}`)
-	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, contract, "claim", "comments", "merge", "search", "assign", "link", "status"))}, nil)
+	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, contract, "automerge", "claim", "comments", "merge", "search", "assign", "link", "status"))}, nil)
 	call, answer := prepareCall(read, resolution, operation, json.RawMessage(arguments))
 	if answer != nil {
 		t.Fatalf("prepareCall refused: %+v", answer.Error)
@@ -316,6 +316,14 @@ func TestInterpret_RefusesWhatTheContractRefuses(t *testing.T) {
 		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
 		{"a merge that did not merge", "merge", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"expectedHeadCommit":"abcdef1"}`, func(t *testing.T) []byte {
 			return collabOK(t, &collab.ProposalResult{Proposal: collab.Proposal{Ref: collab.Ref{Source: "local:x", ID: "P-1"}, Revision: "r", Title: "t",
+				State: collab.ProposalStateOpen, Change: collab.Change{Repository: "r", Base: "main", Head: "h"}}})
+		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
+		{"an automerge that answered a closed proposal", "automerge", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"expectedHeadCommit":"abcdef1","method":"squash"}`, func(t *testing.T) []byte {
+			return collabOK(t, &collab.ProposalResult{Proposal: collab.Proposal{Ref: collab.Ref{Source: "local:x", ID: "P-1"}, Revision: "r", Title: "t",
+				State: collab.ProposalStateClosed, Change: collab.Change{Repository: "r", Base: "main", Head: "h"}}})
+		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
+		{"an automerge for another proposal", "automerge", "proposals", `{"ref":{"source":"local:x","id":"P-1"},"expectedHeadCommit":"abcdef1"}`, func(t *testing.T) []byte {
+			return collabOK(t, &collab.ProposalResult{Proposal: collab.Proposal{Ref: collab.Ref{Source: "local:x", ID: "P-2"}, Revision: "r", Title: "t",
 				State: collab.ProposalStateOpen, Change: collab.Change{Repository: "r", Base: "main", Head: "h"}}})
 		}, collab.OutcomeUnresolved, collab.ReasonProviderIdentity},
 		{"an upsert on another head commit", "upsert", "proposals", `{"change":{"base":"main","head":"h","headCommit":"abcdef1"},"title":"t"}`, func(t *testing.T) []byte {

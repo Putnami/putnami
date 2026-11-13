@@ -543,7 +543,47 @@ func (f Finalizer) publish(ctx context.Context, c *publicationCandidate) (Result
 			return result, err
 		}
 	}
+	if !draft && !c.opts.PartialDelivery && c.policy.Publication.AutoMerge != "" {
+		result.AutoMerge = f.requestAutoMerge(ctx, c, result)
+	}
 	return result, nil
+}
+
+// requestAutoMerge asks the proposals provider, once, to turn auto-merge on
+// for the ready proposal at the published head. The run reaches it only after
+// the ready upsert and its gate: the local dossier, or the hosted checks that
+// confirmHostedReady reads again. Whatever happens is reported, never
+// returned: the proposal stays published and ready.
+func (f Finalizer) requestAutoMerge(ctx context.Context, c *publicationCandidate, result Result) *AutoMergeReport {
+	report := &AutoMergeReport{Method: collab.MergeMethod(c.policy.Publication.AutoMerge)}
+	if result.State != collab.ProposalStateOpen {
+		report.Refusal = fmt.Sprintf("not sent: the proposal is %s, not open", result.State)
+		return report
+	}
+	if !operationSupported(c.proposalCaps, collab.OperationAutoMerge) {
+		report.Refusal = "not sent: the proposals provider does not offer automerge"
+		return report
+	}
+	if err := f.confirmHostedReady(ctx, c, result.ProposalRef); err != nil {
+		report.Refusal = "not sent: " + err.Error()
+		return report
+	}
+	if _, err := c.recheck(ctx, f); err != nil {
+		report.Refusal = "not sent: " + err.Error()
+		return report
+	}
+	request := collab.ProposalAutoMergeInput{Ref: result.ProposalRef, ExpectedHeadCommit: c.head, Method: report.Method}
+	var answer collab.ProposalResult
+	if err := f.call(ctx, collab.ContractProposals, collab.OperationAutoMerge, request, &answer); err != nil {
+		report.Refusal = err.Error()
+		return report
+	}
+	if answer.Proposal.Ref != result.ProposalRef {
+		report.Refusal = "proposals.automerge answered another proposal"
+		return report
+	}
+	report.Enabled = true
+	return report
 }
 
 func (f Finalizer) upsertAndReadback(ctx context.Context, c *publicationCandidate, request collab.ProposalUpsertInput, draft bool) (Result, error) {

@@ -43,7 +43,8 @@ type Command struct {
 
 // Run runs the command with args, the flags after `change finalize`, and
 // returns the exit code: 2 for a usage error, 1 for a failure, 0 for a
-// published proposal or one the branch already merged.
+// published proposal or one the branch already merged. A refused auto-merge
+// request is reported on standard error and still exits 0.
 func (c Command) Run(ctx context.Context, args []string) int {
 	output := ""
 	if c.ContextFile != "" {
@@ -75,6 +76,9 @@ func (c Command) Run(ctx context.Context, args []string) int {
 	if merged {
 		fmt.Fprintf(c.Stderr, "change finalize: proposal %s/%s is already merged; nothing was published\n", result.ProposalRef.Source, result.ProposalRef.ID)
 	}
+	if result.AutoMerge != nil && !result.AutoMerge.Enabled {
+		fmt.Fprintf(c.Stderr, "change finalize: auto-merge is not on: %s; the proposal stays ready for review\n", result.AutoMerge.Refusal)
+	}
 	if protocolcli.OutputMode(output).IsMachineReadable() {
 		data, err := json.Marshal(result)
 		if err != nil {
@@ -91,6 +95,14 @@ func (c Command) Run(ctx context.Context, args []string) int {
 	}
 	if merged {
 		fmt.Fprintf(c.Stdout, "PROPOSAL_STATE=%s\n", result.State)
+	}
+	if result.AutoMerge != nil {
+		// AUTO_MERGE names the method auto-merge is on with, or off.
+		state := "off"
+		if result.AutoMerge.Enabled {
+			state = string(result.AutoMerge.Method)
+		}
+		fmt.Fprintf(c.Stdout, "AUTO_MERGE=%s\n", state)
 	}
 	return 0
 }

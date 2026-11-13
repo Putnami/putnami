@@ -154,7 +154,8 @@ Neither backend needs an account or a hosted service.
 implements **tasks** and **proposals** on GitHub issues and pull requests. It
 reads the credential the way `gh` does, maps task states to labels through its
 binding settings, lists what people wrote on a pull request through
-`proposals comments`, and offers merge only as an optional capability.
+`proposals comments`, and offers merge and `automerge` only as optional
+capabilities.
 
 [`@putnami/gitlab-collaboration`](../../gitlab-collaboration/README.md)
 implements **tasks** and **proposals** on the issues and merge requests of one

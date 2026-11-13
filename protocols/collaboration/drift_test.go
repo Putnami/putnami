@@ -216,6 +216,7 @@ func TestDrift_EnumsMatchGoVocabularies(t *testing.T) {
 		{"check.state", proposals.Defs["check"].Properties["state"].Enum, stringsOf(ValidCheckStates)},
 		{"reviewVerdict", proposals.Defs["reviewVerdict"].Enum, stringsOf(ValidReviewVerdicts)},
 		{"mergeInput.method", proposals.Defs["mergeInput"].Properties["method"].Enum, stringsOf(ValidMergeMethods)},
+		{"automergeInput.method", proposals.Defs["automergeInput"].Properties["method"].Enum, stringsOf(ValidMergeMethods)},
 		{"memory kind", memory.Defs["kind"].Enum, stringsOf(ValidMemoryKinds)},
 		{"evidence kind", memory.Defs["evidence"].Properties["kind"].Enum, stringsOf(ValidEvidenceKinds)},
 		{"sessionState", missions.Defs["sessionState"].Enum, stringsOf(ValidSessionStates)},

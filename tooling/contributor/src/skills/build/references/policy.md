@@ -30,6 +30,7 @@ jq '.options["@putnami/contributor"] // {}' putnami.workspace.json
 | `verification.ciGate.timeoutMinutes` | `60` | change finalize | How long the command waits for the hosted checks before it stops; invoking it again keeps waiting. |
 | `verification.ciGate.pollSeconds` | `30` | change finalize | Interval between two reads of the hosted checks. |
 | `publication.draft` | `false` | change finalize | Keep proposals as drafts at finalization. Every proposal opens as a draft (`--draft`) whatever this says. |
+| `publication.autoMerge` | `false` | change finalize | `"squash"` or `false`. With `"squash"`, a ready publication of a complete outcome asks the proposals provider to turn auto-merge on once its gate passed: the repository's rules then merge it, or enter it into the merge queue. Never for a draft or a partial delivery. A refusal is reported and leaves the proposal ready. |
 | `publication.bodyMaxBytes` | none | change finalize | Largest proposal body the command publishes; the body becomes the squash commit message. Absent, only the contract's 65536 bytes apply. |
 | `publication.taskReference` | none | change finalize | Line that links a complete outcome's proposal to its task, with `{url}` replaced by the task URL or `{id}` by the task reference id (for example a closing keyword the provider understands). `{id}` needs the proposals binding to be bound to the task's provider and to locate the same place as the tasks binding, on any code host; otherwise use `{url}`. The command adds it to the commit message and proposal body only for normal delivery; `--partial-delivery` uses a non-closing parent reference and skips the delivered transition. |
 | `estimate` | the committed table | change estimate | Coefficients that size a change plan: `files` buckets, `endpointFiles`, `screenFiles` and `sizeMinutes`. Each member set replaces the default one whole. |
@@ -86,6 +87,8 @@ access and credentials stay with the workspace and the host.
 ## What the policy cannot do
 
 It cannot grant authority: publication, merge and deployment still need the
-current mandate and the repository's normal controls. It cannot change a
+current mandate and the repository's normal controls. `publication.autoMerge`
+acts only inside a publication the mandate already authorized, and leaves the
+merge to the repository's rules. It cannot change a
 provider's behavior: a state that has no label on the provider side, or a
 capability the provider lacks, is reported as the provider answers it.

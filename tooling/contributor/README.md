@@ -216,6 +216,7 @@ session:
 - [ADR 0009](doc/adr/0009-one-contribution-loop-from-talk-to-merge.md)
 - [ADR 0010](doc/adr/0010-an-epic-session-runs-issues-in-waves.md)
 - [ADR 0011](doc/adr/0011-the-epic-session-publishes-a-cloud-child.md)
+- [ADR 0012](doc/adr/0012-an-authorized-ready-publication-can-turn-auto-merge-on.md)
 
 ## Publication
 

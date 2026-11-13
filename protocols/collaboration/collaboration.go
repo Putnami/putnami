@@ -29,8 +29,8 @@ const (
 	// ContractTasks finds, reads, creates, updates and transitions work items.
 	ContractTasks = "tasks"
 	// ContractProposals finds or creates the change proposal for an exact
-	// repository/base/head, reads its status, checks and comments, and
-	// publishes reviews.
+	// repository/base/head, reads its status, checks and comments, publishes
+	// reviews, and merges or turns auto-merge on where a provider offers it.
 	ContractProposals = "proposals"
 	// ContractMemory loads contextual records, reads a mission and saves a
 	// checkpoint against an expected revision.
@@ -66,11 +66,12 @@ const (
 	OperationLink       = "link"
 	OperationClaim      = "claim"
 
-	OperationUpsert   = "upsert"
-	OperationStatus   = "status"
-	OperationReview   = "review"
-	OperationMerge    = "merge"
-	OperationComments = "comments"
+	OperationUpsert    = "upsert"
+	OperationStatus    = "status"
+	OperationReview    = "review"
+	OperationMerge     = "merge"
+	OperationAutoMerge = "automerge"
+	OperationComments  = "comments"
 
 	OperationContext    = "context"
 	OperationMission    = "mission"
@@ -312,6 +313,14 @@ var catalog = []ContractSpec{
 		Name:    ContractProposals,
 		Version: 1,
 		Operations: []OperationSpec{
+			{
+				Name: OperationAutoMerge, Access: AccessMutating, Destructive: true,
+				Summary: "Turn auto-merge on for an open proposal whose head is still the expected commit: the backend " +
+					"merges it, or enters it into its merge queue, once the repository's own rules allow. Repeating the " +
+					"call changes nothing. Optional capability; binding a provider that supports it authorizes nobody to " +
+					"turn it on.",
+				newInput: alloc[ProposalAutoMergeInput](), newResult: alloc[ProposalResult](),
+			},
 			{
 				Name: OperationComments, Access: AccessRead,
 				Summary: "List what people wrote on a proposal: review bodies, comments on a file line and conversation " +

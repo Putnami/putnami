@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "contributor-auto-merge-follows-an-authorized-ready-publication",
+  "statement": "with publication.autoMerge \"squash\", a ready change finalize of a complete outcome asks the provider to turn auto-merge on through proposals.automerge; never for a draft or partial delivery, and a refusal does not fail the run",
+  "settled": "2026-11-13",
+  "settledBy": "fdumay",
+  "adr": "tooling/contributor/doc/adr/0012-an-authorized-ready-publication-can-turn-auto-merge-on.md",
+  "reviewOnly": true
+}

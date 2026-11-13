@@ -72,6 +72,13 @@ type finalizerProvider struct {
 	unresolved                                 bool
 	dropLabels                                 bool
 	statusHook                                 func(*collab.Proposal)
+	// autoMergeOffered adds automerge to the proposals capabilities, and
+	// autoMergeRefusal is the error the provider answers it with.
+	autoMergeOffered bool
+	autoMergeRefusal *collab.Error
+	autoMerges       []collab.ProposalAutoMergeInput
+	// log lists every contract operation called, in order, but capabilities.
+	log []string
 }
 
 // call is a Provider: every operation reaches the fake provider.
@@ -86,6 +93,9 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 	}
 	if operation == collab.OperationCapabilities {
 		names := []string{collab.OperationFind, collab.OperationUpsert, collab.OperationStatus, collab.OperationGet, collab.OperationTransition}
+		if p.autoMergeOffered && contract == collab.ContractProposals {
+			names = append(names, collab.OperationAutoMerge)
+		}
 		operations := make([]collab.OperationCapability, 0, len(names))
 		for _, name := range names {
 			operations = append(operations, collab.OperationCapability{Name: name, Supported: true, Preconditions: collab.PreconditionsChecked})
@@ -105,7 +115,16 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		}
 		return answer(capabilities)
 	}
+	p.log = append(p.log, contract+"."+operation)
 	switch contract + "." + operation {
+	case "proposals.automerge":
+		var request collab.ProposalAutoMergeInput
+		_ = json.Unmarshal(input, &request)
+		p.autoMerges = append(p.autoMerges, request)
+		if p.autoMergeRefusal != nil {
+			return collab.Envelope{Outcome: collab.OutcomeConflict, Error: p.autoMergeRefusal}
+		}
+		return answer(collab.ProposalResult{Proposal: p.proposal})
 	case "tasks.get":
 		return answer(collab.TaskResult{Task: p.task})
 	case "tasks.transition":
