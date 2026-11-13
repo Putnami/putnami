@@ -252,7 +252,13 @@ A failed call, a rejected or error answer, an unlisted selector, a listed file
 that cannot be read, or a selection that combines a selector with `git:`
 patterns Git cannot enumerate fails the task before cache restore or
 execution, including when caching is disabled; other cache errors keep the
-normal unkeyed fallback. A portable run binds each listed file and refuses one
+normal unkeyed fallback. A listed file that no longer exists when the key
+stats or reads it was removed after the extension listed it, as a write
+through a temporary file and a rename removes one: the list is stale, so the
+core asks for it again, a bounded number of times, and the key hashes a list
+every file of which was there. It never hashes a list less the file that vanished,
+and a file the last answer still lists and that is still missing fails the
+task. A portable run binds each listed file and refuses one
 that Git ignores beneath `.gen`, `node_modules`, `.putnami` or a declared
 generated output, naming its task and path. Change impact and planned-write
 reach read the listed files and the paths the basis selects. Change impact
