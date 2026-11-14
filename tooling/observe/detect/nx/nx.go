@@ -876,6 +876,7 @@ func (d *detector) metadata(name, source, root string, targets map[string]nxTarg
 func withDefaults(targetName string, target nxTarget, defaults map[string]nxTarget) nxTarget {
 	entry, ok := defaultsFor(targetName, target.Executor, defaults)
 	if !ok {
+		target.DependsOn = spread(nil, target.DependsOn)
 		return target
 	}
 	merged := target
@@ -931,7 +932,7 @@ const spreadEntry = `"..."`
 
 // spread answers the dependsOn of a target laid over its targetDefaults
 // entry's: the target's list when it states one, with "..." replaced by the
-// entry's, else the entry's.
+// entry's, which is none for a target no entry applies to, else the entry's.
 func spread(base, top []json.RawMessage) []json.RawMessage {
 	if top == nil {
 		return base

@@ -1032,8 +1032,9 @@ func ownedJobs() []string {
 // options["@putnami/nx"].tasks.test.reports, the steps of
 // options["@putnami/nx"].tasks.<task> as nxSteps owns them,
 // options["@putnami/typescript:test"].runner, an eslint
-// options["@putnami/typescript"].lint.linter, and
-// options["@putnami/typescript"].compiler as setCompiler owns it. Every other
+// options["@putnami/typescript"].lint.linter,
+// options["@putnami/typescript"].compiler as setCompiler owns it, and the
+// commands.<task>.dependsOn of build, test and lint. Every other
 // member is kept as it is. It returns the change, or nil when the file is
 // current.
 func writeProject(root, file string, plan projectPlan, components map[string]bool, dry bool) (*Change, error) {
@@ -1084,7 +1085,8 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 
 // retractProject removes from the putnami.json of a former project the
 // extension, @putnami/typescript, its Nx edges, the disable.jobs entries, the
-// reports, the steps, the test runner and the eslint linter the sync owns.
+// reports, the steps, the test runner, the eslint linter and the
+// commands.<task>.dependsOn of build, test and lint the sync owns.
 func retractProject(root, file string, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)

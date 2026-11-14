@@ -866,7 +866,7 @@ func TestDetectResolvesTheDependsOnOfATargetAsNxDoes(t *testing.T) {
 		}}`,
 		"package.json":        `{"name": "ws", "workspaces": ["libs/*"]}`,
 		"libs/a/package.json": `{"name": "a", "scripts": {"build": "tsc", "test": "jest", "lint": "eslint .", "e2e": "playwright test"}, "nx": {"targets": {"e2e": {"dependsOn": ["codegen", {"target": "build", "projects": ["b"]}, {"target": "serve", "dependencies": true, "params": "forward"}]}}}}`,
-		"libs/a/project.json": `{"name": "a", "targets": {"build": {"dependsOn": []}, "test": {"dependsOn": ["...", "^lint"]}}}`,
+		"libs/a/project.json": `{"name": "a", "targets": {"build": {"dependsOn": []}, "test": {"dependsOn": ["...", "^lint"]}, "deploy": {"dependsOn": ["...", "build"]}}}`,
 	})
 	detection := Detect(root, Options{})
 	if len(detection.Projects) != 1 {
@@ -883,6 +883,8 @@ func TestDetectResolvesTheDependsOnOfATargetAsNxDoes(t *testing.T) {
 		"test": {"^build", "build", "^lint"},
 		// An object naming the projects it depends on reads ^<target>.
 		"lint": {"^build"},
+		// With no entry, "..." stands for nothing.
+		"deploy": {"build"},
 		// One naming a list of projects is kept as its JSON.
 		"e2e": {"codegen", `{"target":"build","projects":["b"]}`, "^serve"},
 	}
