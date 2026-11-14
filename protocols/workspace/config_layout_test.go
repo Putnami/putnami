@@ -63,7 +63,7 @@ func TestRenderConfigFile_ANewFileTakesTheFormattersLayout(t *testing.T) {
 	// settings, Biome given two-space indentation: an object that breaks after
 	// its brace stays one member per line, and an array of scalars fits on one
 	// line of 80 columns when it can. oxfmt, whose default line is 100
-	// columns, keeps every line but joins includes, 82 columns on one line.
+	// columns, keeps every line but joins includes, 86 columns on one line.
 	want := `{
   "$schema": "https://putnami.dev/schemas/putnami-project.json",
   "dependencies": ["/packages/pricing", "/packages/ui"],
@@ -288,5 +288,43 @@ func TestRenderConfigFile_AFileThatIsNotAnObjectIsReplacedAsNew(t *testing.T) {
 	}
 	if _, err := RenderConfigFile([]string{"a"}, nil); err == nil {
 		t.Error("an array rendered as a configuration file")
+	}
+}
+
+func TestRenderConfigFile_AShrunkArrayStaysExpandedInAnExpandedFile(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-written-file-keeps-the-repository-layout", "an-expanded-file-stays-expanded")
+	existing := "{\n" +
+		"  \"dependencies\": [\n" +
+		"    \"/packages/analytics-dashboard\",\n" +
+		"    \"/packages/pricing-engine\",\n" +
+		"    \"/packages/ui-components\"\n" +
+		"  ],\n" +
+		"  \"tags\": [\n" +
+		"    \"turbo\"\n" +
+		"  ]\n" +
+		"}\n"
+	doc := decodeConfig(t, existing)
+	doc["dependencies"] = []string{"/packages/pricing-engine"}
+	want := "{\n" +
+		"  \"dependencies\": [\n" +
+		"    \"/packages/pricing-engine\"\n" +
+		"  ],\n" +
+		"  \"tags\": [\n" +
+		"    \"turbo\"\n" +
+		"  ]\n" +
+		"}\n"
+	if got := renderConfig(t, doc, existing); got != want {
+		t.Fatalf("rendered =\n%s\nwant\n%s", got, want)
+	}
+}
+
+func TestRenderConfigFile_AJoinedArrayKeepsTheEscapesOfItsItems(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-written-file-keeps-the-repository-layout", "an-update-changes-only-the-values-it-changes")
+	existing := "{\n  \"commands\": [\"a \\u0026\\u0026 b\"]\n}\n"
+	doc := decodeConfig(t, existing)
+	doc["commands"] = []string{"a && b", "c"}
+	want := "{\n  \"commands\": [\"a \\u0026\\u0026 b\", \"c\"]\n}\n"
+	if got := renderConfig(t, doc, existing); got != want {
+		t.Fatalf("rendered = %q\nwant %q", got, want)
 	}
 }

@@ -402,7 +402,9 @@ func nameMember(wsRoot, member, name string, replace bool) (bool, error) {
 		return false, fmt.Errorf("read %s: %w", file, err)
 	}
 	if err == nil {
-		if err := json.Unmarshal(data, &doc); err != nil {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.UseNumber()
+		if err := dec.Decode(&doc); err != nil {
 			return false, fmt.Errorf("read %s: %w", file, err)
 		}
 	}
@@ -413,6 +415,9 @@ func nameMember(wsRoot, member, name string, replace bool) (bool, error) {
 	out, err := wsproto.RenderConfigFileAt(file, doc, data)
 	if err != nil {
 		return false, fmt.Errorf("write %s: %w", file, err)
+	}
+	if bytes.Equal(out, data) {
+		return false, nil
 	}
 	if err := os.WriteFile(file, out, 0o644); err != nil { //nolint:gosec // a tracked project file
 		return false, fmt.Errorf("write %s: %w", file, err)
@@ -971,7 +976,9 @@ func updateScopeProjects(wsRoot, scopePath string, added, removed []string) erro
 		return err
 	}
 	var raw map[string]any
-	if err := json.Unmarshal(data, &raw); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode(&raw); err != nil {
 		return err
 	}
 

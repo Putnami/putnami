@@ -628,7 +628,8 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	}
 
 	cfgPath := filepath.Join(cwd, wsproto.WorkspaceConfigFilename)
-	data, err := wsproto.RenderConfigFileAt(cfgPath, cfg, nil)
+	existing, _ := os.ReadFile(cfgPath)
+	data, err := wsproto.RenderConfigFileAt(cfgPath, cfg, existing)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}

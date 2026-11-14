@@ -288,8 +288,8 @@ func indentUnit(data []byte) string {
 }
 
 // expandsShortArrays reports whether the file writes an array of scalars that
-// would fit on one line one item per line, and writes no array of several
-// items on one line.
+// would fit on one line one item per line, and writes no array of scalars on
+// one line.
 func expandsShortArrays(root *layoutNode, l layout) bool {
 	expanded, inline := false, false
 	var walk func(n *layoutNode)
@@ -312,10 +312,10 @@ func expandsShortArrays(root *layoutNode, l layout) bool {
 
 // keepsExpanded reports whether an existing array stays one item per line.
 func (l layout) keepsExpanded(have *layoutNode) bool {
-	if have == nil || len(have.vals) == 0 {
-		return l.expandsShortArrays
+	if l.expandsShortArrays {
+		return true
 	}
-	if have.kind != '[' || !have.expanded || len(have.vals) == 0 || !scalars(have) {
+	if have == nil || have.kind != '[' || !have.expanded || len(have.vals) == 0 || !scalars(have) {
 		return false
 	}
 	return have.col+width(flatArray(have))+boolInt(have.comma) <= l.width
@@ -331,9 +331,18 @@ func scalars(n *layoutNode) bool {
 }
 
 func flatArray(n *layoutNode) string {
+	return flatItems(n, nil)
+}
+
+// flatItems writes the items of n on one line, each item with the bytes of
+// the item of haves it replaces when their content is the same.
+func flatItems(n *layoutNode, haves []*layoutNode) string {
 	parts := make([]string, len(n.vals))
 	for i, v := range n.vals {
 		parts[i] = string(v.raw)
+		if i < len(haves) && haves[i] != nil && sameContent(v, haves[i]) {
+			parts[i] = string(haves[i].raw)
+		}
 		if v.kind == '{' || v.kind == '[' {
 			parts[i] = string(v.kind) + string(closer(v.kind))
 		}
@@ -468,7 +477,7 @@ func (l layout) renderArray(out *bytes.Buffer, want, have *layoutNode, depth, co
 	}
 	haves := matchItems(want, have)
 	if scalars(want) && !l.keepsExpanded(have) {
-		flat := flatArray(want)
+		flat := flatItems(want, haves)
 		if col+width(flat)+boolInt(comma) <= l.width {
 			out.WriteString(flat)
 			return

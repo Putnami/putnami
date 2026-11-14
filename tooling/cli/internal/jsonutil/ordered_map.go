@@ -116,7 +116,9 @@ func (m *OrderedMap) UnmarshalJSON(data []byte) error {
 			m.values[key] = nested
 		} else {
 			var v any
-			if err := json.Unmarshal(raw, &v); err != nil {
+			valueDec := json.NewDecoder(bytes.NewReader(raw))
+			valueDec.UseNumber()
+			if err := valueDec.Decode(&v); err != nil {
 				return err
 			}
 			m.values[key] = v
