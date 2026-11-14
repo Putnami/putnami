@@ -9,6 +9,7 @@
 package nx
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"io/fs"
@@ -143,6 +144,13 @@ type Target struct {
 	// in each string. Executor is the one the entry gives a target that names
 	// none.
 	Options map[string]any `json:"options,omitempty"`
+	// DependsOn are the targets Nx runs before this one, in order: the
+	// target's own dependsOn, else that of its nx.json targetDefaults entry,
+	// with "..." in the target's list standing for the entry's. A target of
+	// the projects it depends on reads ^<target>, one of the project itself
+	// <target>; any other entry, such as an object naming projects, is kept
+	// as its compact JSON.
+	DependsOn []string `json:"dependsOn,omitempty"`
 }
 
 // Project is one Nx project with its targets.
@@ -358,6 +366,9 @@ type nxTarget struct {
 	Options              map[string]any            `json:"options"`
 	Configurations       map[string]map[string]any `json:"configurations"`
 	DefaultConfiguration string                    `json:"defaultConfiguration"`
+	// DependsOn is nil when the target states none, and empty when it states
+	// an empty list.
+	DependsOn []json.RawMessage `json:"dependsOn"`
 }
 
 type projectJSON struct {
@@ -559,6 +570,9 @@ func mergeTargets(into, from map[string]nxTarget) {
 		}
 		if target.DefaultConfiguration == "" {
 			target.DefaultConfiguration = earlier.DefaultConfiguration
+		}
+		if target.DependsOn == nil {
+			target.DependsOn = earlier.DependsOn
 		}
 		into[name] = target
 	}
@@ -829,7 +843,7 @@ func (d *detector) metadata(name, source, root string, targets map[string]nxTarg
 		effective := withDefaults(targetName, target, defaults)
 		test := isTestTarget(targetName, effective)
 		described := Target{Name: targetName, Executor: effective.Executor, Command: targetCommand(target), Test: test,
-			Options: effectiveOptions(effective, root, name)}
+			Options: effectiveOptions(effective, root, name), DependsOn: dependsOn(effective.DependsOn)}
 		if script, ok := target.Options["script"].(string); ok && described.Command == "" && target.Executor == "nx:run-script" {
 			described.Command = d.script(root, script)
 		}
@@ -872,6 +886,7 @@ func withDefaults(targetName string, target nxTarget, defaults map[string]nxTarg
 		merged.DefaultConfiguration = entry.DefaultConfiguration
 	}
 	merged.Options = overlay(entry.Options, target.Options)
+	merged.DependsOn = spread(entry.DependsOn, target.DependsOn)
 	if len(entry.Configurations) > 0 {
 		merged.Configurations = map[string]map[string]any{}
 		for name, options := range entry.Configurations {
@@ -908,6 +923,78 @@ func defaultsFor(targetName, executor string, defaults map[string]nxTarget) (nxT
 		}
 	}
 	return nxTarget{}, false
+}
+
+// spreadEntry is the entry of a target's dependsOn that stands for the list
+// of its targetDefaults entry.
+const spreadEntry = `"..."`
+
+// spread answers the dependsOn of a target laid over its targetDefaults
+// entry's: the target's list when it states one, with "..." replaced by the
+// entry's, else the entry's.
+func spread(base, top []json.RawMessage) []json.RawMessage {
+	if top == nil {
+		return base
+	}
+	out := make([]json.RawMessage, 0, len(top))
+	for _, entry := range top {
+		if string(entry) == spreadEntry {
+			out = append(out, base...)
+			continue
+		}
+		out = append(out, entry)
+	}
+	return out
+}
+
+// dependsOn names each entry of a resolved dependsOn: a string as it is, an
+// object naming a target of the projects the project depends on as
+// ^<target>, one naming a target of the project itself as <target>, and any
+// other entry as its compact JSON.
+func dependsOn(entries []json.RawMessage) []string {
+	out := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		var name string
+		if json.Unmarshal(entry, &name) == nil {
+			out = append(out, name)
+			continue
+		}
+		var object struct {
+			Target       string          `json:"target"`
+			Projects     json.RawMessage `json:"projects"`
+			Dependencies bool            `json:"dependencies"`
+			Params       json.RawMessage `json:"params"`
+		}
+		decoder := json.NewDecoder(bytes.NewReader(entry))
+		decoder.DisallowUnknownFields()
+		if decoder.Decode(&object) == nil && object.Target != "" {
+			projects := ""
+			if len(object.Projects) > 0 && json.Unmarshal(object.Projects, &projects) != nil {
+				projects = "list"
+			}
+			switch {
+			case object.Dependencies && projects == "":
+				out = append(out, "^"+object.Target)
+				continue
+			case !object.Dependencies && projects == "dependencies":
+				out = append(out, "^"+object.Target)
+				continue
+			case !object.Dependencies && (projects == "" || projects == "self"):
+				out = append(out, object.Target)
+				continue
+			}
+		}
+		var compact bytes.Buffer
+		if err := json.Compact(&compact, entry); err != nil {
+			out = append(out, string(entry))
+			continue
+		}
+		out = append(out, compact.String())
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // overlay returns the keys of base replaced by those of top, or nil when
