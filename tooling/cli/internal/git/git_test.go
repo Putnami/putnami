@@ -843,6 +843,31 @@ func TestResolveTrunk_OriginMainFallback(t *testing.T) {
 	}
 }
 
+// A clone of one branch of a repository whose default branch is master has
+// origin/master and neither origin/HEAD nor a local master.
+func TestResolveTrunk_OriginMasterFallback(t *testing.T) {
+	t.Parallel()
+	dir := initGitRepo(t)
+	runGit(t, dir, "update-ref", "refs/remotes/origin/master", "HEAD")
+	runGit(t, dir, "checkout", "-b", "feature")
+	runGit(t, dir, "branch", "-D", "main")
+
+	got, err := ResolveTrunk(dir)
+	if err != nil {
+		t.Fatalf("ResolveTrunk: %v", err)
+	}
+	if got != "origin/master" {
+		t.Errorf("ResolveTrunk = %q, want origin/master", got)
+	}
+	resolved, err := ResolveBaselineDetailed(dir, "", nil)
+	if err != nil {
+		t.Fatalf("ResolveBaselineDetailed: %v", err)
+	}
+	if resolved.Ref != "origin/master" || resolved.Source != BaselineSourceTrunk {
+		t.Errorf("ResolveBaselineDetailed = %q (%s), want origin/master (trunk)", resolved.Ref, resolved.Source)
+	}
+}
+
 func TestResolveTrunk_LocalMainFallback(t *testing.T) {
 	t.Parallel()
 	dir := initGitRepo(t)

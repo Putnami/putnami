@@ -22,7 +22,7 @@ func TestResolveBaselineReturnsAnExplicitRefUnchanged(t *testing.T) {
 }
 
 // TestResolveBaselineFallsBackToTheLocalTrunk pins the trunk tier. The fixture
-// has no remote, so origin/HEAD and origin/main are absent and the local `main`
+// has no remote, so origin/HEAD, origin/main and origin/master are absent and the local `main`
 // is the answer.
 func TestResolveBaselineFallsBackToTheLocalTrunk(t *testing.T) {
 	repo := initGitRepo(t)

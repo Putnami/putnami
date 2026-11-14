@@ -12,7 +12,7 @@ import (
 // or an intentionally unusual ref surfaces from the later read rather than from
 // a silent substitution.
 //
-// Order: explicit → trunk (origin/HEAD, origin/main, local main/master) →
+// Order: explicit → trunk (origin/HEAD, origin/main, origin/master, local main/master) →
 // upstream tracking ref (skipped when it is this branch's own remote
 // counterpart) → error.
 //
@@ -31,5 +31,5 @@ func ResolveBaseline(repoRoot, explicit string) (string, error) {
 	if ref := sdkgit.UpstreamRef(repoRoot); ref != "" && !sdkgit.UpstreamIsSelfCounterpart(repoRoot, ref, currentBranch) {
 		return ref, nil
 	}
-	return "", fmt.Errorf("resolve git baseline: no explicit baseline, origin/HEAD, origin/main, local main/master, or usable upstream tracking ref was found (a branch is never measured against itself) — pass --baseline or set the workspace config baseline")
+	return "", fmt.Errorf("resolve git baseline: no explicit baseline, origin/HEAD, origin/main, origin/master, local main/master, or usable upstream tracking ref was found (a branch is never measured against itself) — pass --baseline or set the workspace config baseline")
 }

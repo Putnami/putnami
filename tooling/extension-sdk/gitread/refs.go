@@ -26,16 +26,15 @@ func CurrentBranchName(repoRoot string) string {
 	return branch
 }
 
-// TrunkRef finds the repository trunk: origin/HEAD, origin/main, then a local
-// main or master. It returns "" when none of them names a commit.
+// TrunkRef finds the repository trunk: origin/HEAD, origin/main, origin/master,
+// then a local main or master. A clone of one branch, as most CI checkouts are,
+// has the remote-tracking branch and no origin/HEAD. It returns "" when none of
+// them names a commit.
 func TrunkRef(repoRoot string) string {
 	if ref := OriginHeadRef(repoRoot); ref != "" {
 		return ref
 	}
-	if RefExists(repoRoot, "origin/main") {
-		return "origin/main"
-	}
-	for _, ref := range []string{"main", "master"} {
+	for _, ref := range []string{"origin/main", "origin/master", "main", "master"} {
 		if RefExists(repoRoot, ref) {
 			return ref
 		}
