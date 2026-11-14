@@ -12,6 +12,7 @@
   "inputs": {
     "sources": ["**"]
   },
+  "excludes": ["node_modules", "dist", "target"],
   "tasks": {
     "lint": {
       "steps": [

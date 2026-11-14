@@ -277,7 +277,8 @@ func TestMergeTaskAppendsArgsAndTagsUnlessTheUpperLayerSaysOtherwise(t *testing.
 }
 
 // A task's deps are read as targets, from the export as from a moon.yml: a
-// target string, or an object with a target.
+// target string, or an object with a target. A project's deps append to
+// those it inherits, as moon merges them by default.
 func TestDetectReadsTheDepsOfATask(t *testing.T) {
 	export := map[string]string{
 		"moon-graph.json": `{"graph": {"nodes": [
@@ -287,6 +288,7 @@ func TestDetectReadsTheDepsOfATask(t *testing.T) {
 	}
 	yml := map[string]string{
 		".moon/workspace.yml":      "projects:\n  - 'packages/*'\n",
+		".moon/tasks.yml":          "tasks:\n  test:\n    deps: ['~:codegen']\n",
 		"packages/report/moon.yml": "dependsOn: ['types']\ntasks:\n  test:\n    command: 'vitest'\n    deps: ['^:build', {target: 'types:build'}]\n",
 		"packages/types/moon.yml":  "tasks:\n  build:\n    command: 'tsc'\n",
 	}
@@ -300,7 +302,7 @@ func TestDetectReadsTheDepsOfATask(t *testing.T) {
 				}
 			}
 		}
-		want := map[string][]string{"export": {"types:build", "~:build"}, "moon.yml": {"^:build", "types:build"}}[name]
+		want := map[string][]string{"export": {"types:build", "~:build"}, "moon.yml": {"~:codegen", "^:build", "types:build"}}[name]
 		if !reflect.DeepEqual(deps, want) {
 			t.Errorf("%s: report:test deps = %v, want %v", name, deps, want)
 		}

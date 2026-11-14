@@ -682,16 +682,19 @@ what the extension manifests declare:
 An entry takes one of two forms of a manifest command's `dependsOn`: `build`
 waits for the project's own build, and `^build` for the build of every project
 it depends on, directly or transitively. The planner plans each prerequisite
-and orders the command's first steps after its last ones, for this project's
-jobs alone; a prerequisite the project runs no job of adds no edge. Any other
-form, such as `!build` or `build~tsc`, and any other member are refused when
-the file loads. `putnami test` on such a project plans its build too.
+and orders the command's root steps after the prerequisite's leaf steps, for
+this project's jobs alone; a prerequisite the project runs no job of adds no
+edge. Any other form, such as `!build` or `build~tsc`, a command that waits
+for itself, and any other member are refused when the file loads. Impact
+selection reads the entry in the same project: a change that reaches an
+upstream build selects the test of the project whose file names `^build`. `putnami test` on such a project plans its build too.
 
 The order is a functional dependency, so it reaches the cache key: a cacheable
-task folds the key of each prerequisite job, and, when a prerequisite job in
-another project has its cache off, as a task delegated to a monorepo tool
-does, the key that job would have. A change to the inputs of such a build
-moves the key of the test that waits for it.
+task folds the key of each prerequisite job. A prerequisite job in another
+project whose cache is off, as a task delegated to a monorepo tool is,
+contributes the key it would have; one in the task's own project contributes
+what reaches it from other projects. A change to the inputs of an upstream
+build moves the key of the test that waits for it.
 
 The adoption syncs of `@putnami/rush`, `@putnami/turbo` and `@putnami/moon`
 write these entries for `build`, `test` and `lint` from the order the tool

@@ -342,16 +342,15 @@ func Sync(root string, opts Options) (Result, error) {
 // movedOrder adds to order what the task of the package named name waits for,
 // once it moved to @putnami/typescript: the dependsOn turbo.json gives it, the
 // package's own turbo.json first, then the root's name#task, then the root's
-// task. ^build, ^test and ^lint keep their form, and build, test or lint of
-// the package itself are its own. Every other entry, a package task, another
-// task or an input, is noted and not written.
+// task, the first that states one giving it and $TURBO_EXTENDS$ standing for
+// the next one's (resolveOrder). ^build, ^test and ^lint keep their form, and
+// build, test or lint of the package itself are its own. Every other entry, a
+// package task, another task or an input, is noted and not written.
 func movedOrder(order map[string][]string, task, name string, rootOrder, ownOrder TaskOrder, notes *[]string) map[string][]string {
-	deps, ok := ownOrder[task]
-	if !ok {
-		if deps, ok = rootOrder[name+"#"+task]; !ok {
-			deps = rootOrder[task]
-		}
-	}
+	own, ownStated := ownOrder[task]
+	specific, specificStated := rootOrder[name+"#"+task]
+	shared, sharedStated := rootOrder[task]
+	deps := resolveOrder([][]string{own, specific, shared}, []bool{ownStated, specificStated, sharedStated})
 	for _, dep := range deps {
 		target := strings.TrimPrefix(dep, "^")
 		if !slices.Contains(MappedTasks, target) || (target == task && !strings.HasPrefix(dep, "^")) {

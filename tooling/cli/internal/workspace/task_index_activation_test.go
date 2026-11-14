@@ -305,8 +305,9 @@ func TestTraceChangeImpact_AClosureDependencyCarriesThePrerequisiteToTheDependen
 }
 
 // A `^command` a project names under commands.<command>.dependsOn of its
-// putnami.json reaches the dependent command as a manifest's does: a build the
-// tool runs in a dependency carries a change to the test that waits for it.
+// putnami.json reaches the dependent command in that project: a build the tool
+// runs in a dependency carries a change to the test that waits for it, and not
+// to the test of a project whose file names no such entry.
 func TestTaskIndex_AProjectCommandDependencyReachesTheDependentCommand(t *testing.T) {
 	toolExt := &extension.ExtensionDescription{
 		Name: "@fixture/tool", RelPath: "tool/extension",
@@ -332,6 +333,7 @@ func TestTaskIndex_AProjectCommandDependencyReachesTheDependentCommand(t *testin
 			{ID: "/ts/extension", Name: "@fixture/ts", Path: "ts/extension"},
 			{ID: "/libs/types", Name: "types", Path: "libs/types", Extensions: []string{"/tool/extension"}},
 			{ID: "/apps/report", Name: "report", Path: "apps/report", Extensions: []string{"/ts/extension"}, Dependencies: []string{"/libs/types"}, Config: config},
+			{ID: "/apps/other", Name: "other", Path: "apps/other", Extensions: []string{"/ts/extension"}, Dependencies: []string{"/libs/types"}},
 		}
 		ws := NewWorkspace(t.TempDir(), nil, projects)
 		ws.Graph = BuildGraph(projects)
@@ -346,7 +348,14 @@ func TestTaskIndex_AProjectCommandDependencyReachesTheDependentCommand(t *testin
 		t.Fatalf("without the project's entry the test is reached: %v", got)
 	}
 	waits := &wsproto.ProjectConfig{Commands: map[string]wsproto.ProjectCommand{"test": {DependsOn: []string{"^build"}}}}
-	if got := index(waits).TasksReachedIn("/apps/report", moved); !slices.Contains(got, "test~test") {
+	waiting := index(waits)
+	if got := waiting.TasksReachedIn("/apps/report", moved); !slices.Contains(got, "test~test") {
 		t.Errorf("a test that waits for ^build runs %v when the dependency's build moved, want test~test", got)
+	}
+	if got := waiting.TasksReachedIn("/apps/other", moved); slices.Contains(got, "test~test") {
+		t.Errorf("a project whose putnami.json names no entry runs %v, want no test~test: the entry is read in its own project alone", got)
+	}
+	if got := waiting.TasksReachedFrom(moved); !slices.Contains(got, "test~test") {
+		t.Errorf("an unknown project carries %v, want test~test", got)
 	}
 }

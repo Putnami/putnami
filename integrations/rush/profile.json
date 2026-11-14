@@ -12,7 +12,7 @@
   "inputs": {
     "sources": ["**"]
   },
-  "excludes": ["node_modules", "lib", "dist", "temp"],
+  "excludes": ["node_modules", "lib", "lib-commonjs", "lib-esm", "lib-dts", "dist", "temp", ".heft"],
   "tasks": {
     "lint": {
       "steps": [

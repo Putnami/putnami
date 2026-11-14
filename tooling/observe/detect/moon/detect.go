@@ -389,6 +389,21 @@ func mergeTask(base, own map[string]any) map[string]any {
 			merged[key] = value
 		}
 	}
+	// deps merge as moon merges them: appended by default, or as
+	// options.mergeDeps says.
+	if ownDeps, set := own["deps"]; set {
+		options, _ := own["options"].(map[string]any)
+		inherited, _ := base["deps"].([]any)
+		mine, _ := ownDeps.([]any)
+		switch options["mergeDeps"] {
+		case "replace":
+			merged["deps"] = mine
+		case "prepend":
+			merged["deps"] = append(slices.Clone(mine), inherited...)
+		default:
+			merged["deps"] = append(slices.Clone(inherited), mine...)
+		}
+	}
 	if _, ok := own["command"]; ok {
 		// A project's command replaces the inherited script.
 		if _, scripted := own["script"]; !scripted {

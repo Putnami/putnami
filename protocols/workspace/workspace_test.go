@@ -864,6 +864,10 @@ func TestLoadProjectConfigWithDiagnostics_ProjectCommands(t *testing.T) {
 	if got := cfg.Commands["test"].DependsOn; !slices.Equal(got, []string{"build", "^build"}) {
 		t.Fatalf("commands.test.dependsOn = %v, want [build ^build]", got)
 	}
+	writeFile(t, filepath.Join(root, ConfigFilename), `{"name":"app","commands":null}`)
+	if cfg, diags := LoadProjectConfigWithDiagnostics(root); cfg == nil || len(diags) != 0 || cfg.Commands != nil {
+		t.Fatalf("a null commands block: cfg=%#v diags=%v, want a config with none", cfg, diags)
+	}
 
 	for _, tc := range []struct {
 		name   string
@@ -878,6 +882,7 @@ func TestLoadProjectConfigWithDiagnostics_ProjectCommands(t *testing.T) {
 		{"one step", `{"name":"app","commands":{"test":{"dependsOn":["build~tsc"]}}}`, "commands.test.dependsOn[0]", "not command or ^command"},
 		{"empty closure", `{"name":"app","commands":{"test":{"dependsOn":["^"]}}}`, "commands.test.dependsOn[0]", "not command or ^command"},
 		{"empty command name", `{"name":"app","commands":{"":{"dependsOn":["build"]}}}`, "commands", "must not be empty"},
+		{"a command waits for itself", `{"name":"app","commands":{"test":{"dependsOn":["test"]}}}`, "commands.test.dependsOn[0]", "waits for itself"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			root := t.TempDir()

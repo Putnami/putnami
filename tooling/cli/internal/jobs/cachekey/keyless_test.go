@@ -72,3 +72,55 @@ func TestPrecomputeKeys_AKeylessDependencyMovesTheKeyOfItsDependent(t *testing.T
 		t.Errorf("precomputed key %s, want the execution key %s", after["/test-proj:test"], want)
 	}
 }
+
+// Through a keyless dependency of its own project, such as its build kept on
+// moon behind ~:build, a cacheable job folds what reaches that dependency from
+// other projects: an edit upstream moves its key. A keyless dependency of its
+// own project that nothing reaches from another project, such as a fixer,
+// contributes nothing.
+func TestPrecomputeKeys_AnUpstreamEditBehindAKeylessOwnBuildMovesTheKey(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "cli/job-planning-execution", "a-key-reads-a-dependency-that-publishes-none", "a-keyless-dependency-moves-the-key-of-its-dependent")
+	ws := makeExecutorTestWorkspace(t)
+	upstream := cacheableJob("graph", "/proj", "proj", "proj")
+	upstream.JobDef.Cache = false
+	build := cacheableJob("build", "/test-proj", "test-proj", "test-proj", "/proj:graph")
+	build.JobDef.Cache = false
+	fixer := cacheableJob("fix", "/test-proj", "test-proj", "test-proj")
+	fixer.JobDef.Cache = false
+	test := cacheableJob("test", "/test-proj", "test-proj", "test-proj", "/test-proj:build", "/test-proj:fix")
+	planned := []*jobmodel.ScheduledJob{upstream, build, fixer, test}
+
+	if got := KeylessIdentities(planned); !got["/proj:graph"] || got["/test-proj:build"] || got["/test-proj:fix"] {
+		t.Fatalf("KeylessIdentities = %v, want the upstream graph step alone", got)
+	}
+	precompute := func() map[string]string {
+		cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
+		keys, err := PrecomputeKeys(ws, planned, nil, nil, cache, CacheBypass{})
+		if err != nil {
+			t.Fatalf("PrecomputeKeys: %v", err)
+		}
+		return keys
+	}
+	before := precompute()
+	if err := os.WriteFile(filepath.Join(ws.Root, "proj", "src.txt"), []byte("upstream edit"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if after := precompute(); before["/test-proj:test"] == after["/test-proj:test"] {
+		t.Errorf("an upstream edit behind the keyless own build left the key %s", before["/test-proj:test"])
+	}
+
+	alone := []*jobmodel.ScheduledJob{fixer, cacheableJob("test", "/test-proj", "test-proj", "test-proj", "/test-proj:fix")}
+	cache := store.NewCacheManager(store.NewLocalStore(filepath.Join(ws.Root, ".putnami", "store")))
+	keys, err := PrecomputeKeys(ws, alone, nil, nil, cache, CacheBypass{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want, err := ComputeJobCacheHash(ws, alone[1], nil, nil, cache, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if keys["/test-proj:test"] != want {
+		t.Errorf("a keyless fixer of the job's own project moved its key: %s, want %s", keys["/test-proj:test"], want)
+	}
+}

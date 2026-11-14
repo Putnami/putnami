@@ -319,7 +319,8 @@ func ValidateProjectTaskTuning(c *ProjectConfig) []diag.Diagnostic {
 
 // ValidateProjectCommands validates the commands block: a command name is
 // not empty, and each dependsOn entry is `command` or `^command`, with a
-// command name that holds no step separator and no other prefix. A project
+// command name that holds no step separator and no other prefix, and a
+// command does not wait for itself in its own project. A project
 // names neither a session barrier nor one step of a command.
 func ValidateProjectCommands(c *ProjectConfig) []diag.Diagnostic {
 	if c == nil {
@@ -337,12 +338,15 @@ func ValidateProjectCommands(c *ProjectConfig) []diag.Diagnostic {
 			continue
 		}
 		for i, entry := range c.Commands[name].DependsOn {
-			if ProjectCommandDependencyValid(entry) {
-				continue
+			field := fmt.Sprintf("commands.%s.dependsOn[%d]", name, i)
+			switch {
+			case !ProjectCommandDependencyValid(entry):
+				diags = append(diags, diag.Errorf("invalid-project-command-dependency", field,
+					"dependency %q is not command or ^command", entry))
+			case entry == name:
+				diags = append(diags, diag.Errorf("invalid-project-command-dependency", field,
+					"command %q waits for itself; ^%s names the command of the projects it depends on", name, name))
 			}
-			diags = append(diags, diag.Errorf("invalid-project-command-dependency",
-				fmt.Sprintf("commands.%s.dependsOn[%d]", name, i),
-				"dependency %q is not command or ^command", entry))
 		}
 	}
 	return diags

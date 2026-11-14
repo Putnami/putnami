@@ -887,9 +887,9 @@ func (s *Scheduler) lookupRestoreOrClaim(
 		return "", nil, noop
 	}
 
-	// cachekey.ComputeJobCacheHash only mixes in the cache keys of this job's direct
-	// dependencies, so copy just those entries under the lock rather than the
-	// whole (growing) hashes map, keeping the critical section short.
+	// cachekey.ComputeJobCacheHash only mixes in the keys of this job's direct
+	// dependencies, and what a keyless one stands for, so dependencyKeys
+	// reads just those entries rather than the whole (growing) hashes map.
 	hashCopy := s.dependencyKeys(job, mu, hashes)
 
 	// A BYPASSED task (--no-cache, or --no-cache-projects over its closure) is
@@ -911,6 +911,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 				s.renderer.JobStart(job)
 				return "", &JobResult{Status: string(TaskStatusFailed), Error: &JobError{Message: err.Error()}}, noop
 			}
+			s.memoizeKeylessIdentity(job, mu, hashes)
 			return "", nil, noop
 		}
 		hash, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)

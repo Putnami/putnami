@@ -6,37 +6,45 @@ import (
 	"go.putnami.dev/tooling/cli/internal/jobs/cachekey"
 )
 
-// dependencyKeys copies, under mu, the keys of job's cache-key dependencies
-// (cachekey.CacheKeyDependencies) that this run published into hashes, then
-// adds the identity of each one whose cache is off by contract and whose key
-// job folds (cachekey.KeylessIdentities, cachekey.FoldsKeyless). That identity is
-// computed when a dependent first asks for it, whether the keyless job ran,
-// was pruned or has not finished, as PrecomputeKeys computes it, and is never
-// published as the job's own key: it addresses no lookup, restore or store. An
-// identity that cannot be computed is left out, as PrecomputeKeys leaves it.
+// dependencyKeys answers the map job's key reads its dependencies' keys from:
+// the keys this run published into hashes, read under mu, and for each
+// keyless dependency what it stands for (cachekey.KeylessResolver). A keyless
+// identity is the one memoized when its job started (memoizeKeylessIdentity),
+// else, for a job pruned or not started yet, computed when a dependent first
+// asks, as PrecomputeKeys computes it before anything runs.
 func (s *Scheduler) dependencyKeys(job *ScheduledJob, mu *sync.Mutex, hashes map[string]string) map[string]string {
-	dependencies := cachekey.CacheKeyDependencies(job)
-	keys := make(map[string]string, len(dependencies))
-	var keyless []string
-	mu.Lock()
-	for _, depKey := range dependencies {
-		if value, ok := hashes[depKey]; ok {
-			keys[depKey] = value
-		} else if s.keyless[depKey] && cachekey.FoldsKeyless(job, s.byKey[depKey]) {
-			keyless = append(keyless, depKey)
-		}
+	return s.keylessResolver(mu, hashes).View(job)
+}
+
+func (s *Scheduler) keylessResolver(mu *sync.Mutex, hashes map[string]string) cachekey.KeylessResolver {
+	return cachekey.KeylessResolver{
+		ByKey: s.byKey,
+		Published: func(key string) (string, bool) {
+			mu.Lock()
+			defer mu.Unlock()
+			value, ok := hashes[key]
+			return value, ok
+		},
+		Identity: func(key string) (string, bool) {
+			if !s.keyless[key] {
+				return "", false
+			}
+			return s.keylessIdentity(key, mu, hashes)
+		},
 	}
-	mu.Unlock()
-	for _, depKey := range keyless {
-		if identity, ok := s.keylessIdentity(depKey, mu, hashes); ok {
-			keys[depKey] = identity
-		}
+}
+
+// memoizeKeylessIdentity computes, as a keyless job a cacheable key reads
+// starts, its identity from the bytes it reads before it writes any output,
+// the state PrecomputeKeys keyed.
+func (s *Scheduler) memoizeKeylessIdentity(job *ScheduledJob, mu *sync.Mutex, hashes map[string]string) {
+	if s.keyless[job.Key()] {
+		s.keylessIdentity(job.Key(), mu, hashes)
 	}
-	return keys
 }
 
 // keylessIdentity is the identity of the keyless job at key, computed once
-// per run from its own dependencies' keys.
+// per run.
 func (s *Scheduler) keylessIdentity(key string, mu *sync.Mutex, hashes map[string]string) (string, bool) {
 	s.keylessMu.Lock()
 	identity, ok := s.keylessMemo[key]
@@ -53,7 +61,11 @@ func (s *Scheduler) keylessIdentity(key string, mu *sync.Mutex, hashes map[strin
 		identity = ""
 	}
 	s.keylessMu.Lock()
-	s.keylessMemo[key] = identity
+	if memo, ok := s.keylessMemo[key]; ok {
+		identity = memo
+	} else {
+		s.keylessMemo[key] = identity
+	}
 	s.keylessMu.Unlock()
 	return identity, identity != ""
 }

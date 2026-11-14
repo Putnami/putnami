@@ -410,7 +410,7 @@ func LoadProjectConfigWithDiagnostics(projectDir string) (*ProjectConfig, []diag
 // block is: an unknown member or a value of another type is an error, while
 // the rest of putnami.json stays lenient.
 func decodeProjectCommands(raw json.RawMessage) (map[string]ProjectCommand, []diag.Diagnostic) {
-	if raw == nil {
+	if raw == nil || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
 		return nil, nil
 	}
 	var entries map[string]json.RawMessage

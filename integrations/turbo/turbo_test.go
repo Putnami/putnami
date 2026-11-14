@@ -1092,3 +1092,23 @@ func TestAMovedTestWaitsForTheBuildsTurboJSONNames(t *testing.T) {
 		}
 	}
 }
+
+// A package configuration that states no dependsOn for a task inherits the
+// root's, and $TURBO_EXTENDS$ splices the inherited list where it stands.
+func TestAMovedTaskInheritsTheDependsOnItsPackageConfigurationDoesNotState(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-task-keeps-its-depends-on", "a-moved-test-waits-for-the-builds-turbo-json-names")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, "turbo.json", `{"tasks": {"build": {"dependsOn": ["^build"]}, "test": {"dependsOn": ["^build"]}}}`)
+	writeFile(t, root, "apps/api/turbo.json", `{"extends": ["//"], "tasks": {"build": {"outputs": ["dist/**"]}, "test": {"dependsOn": ["build", "$TURBO_EXTENDS$"]}}}`)
+	if _, err := Sync(root, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{
+		"build": map[string]any{"dependsOn": []any{"^build"}},
+		"test":  map[string]any{"dependsOn": []any{"build", "^build"}},
+	}
+	if got := readProjectFile(t, root, "apps/api")["commands"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("api commands = %v, want %v", got, want)
+	}
+}
