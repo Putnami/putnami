@@ -358,8 +358,8 @@
     {
       "id": "a-key-reads-a-dependency-that-publishes-none",
       "text": [
-        "A cacheable task's key folds, for each direct dependency whose cache is off and which therefore publishes no key, the key that dependency would have: so a change to the inputs of a delegated build moves the key of a task that waits for it, and a stored result is not replayed against a rebuilt dependency.",
-        "A dependency that publishes a key contributes that key, as before."
+        "A cacheable task's key folds, for each direct dependency in another project whose cache is off and which therefore publishes no key, the key that dependency would have, itself folding its own dependencies': a change to the inputs of a delegated build moves the key of a task that waits for it.",
+        "That identity addresses no entry. A dependency that publishes a key contributes it as before."
       ]
     }
   ],

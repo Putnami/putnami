@@ -34,10 +34,15 @@ per task. Three adoptions lost the order their tool kept (#1152):
   them to that project's jobs of the command, and plans and orders them as it
   does a manifest's dependency. A project that runs no job of a prerequisite
   gets no edge.
-- A cacheable task's key folds, for each direct dependency that publishes no
-  key because its cache is off, the key that dependency would have: the same
-  computation an invocation-scoped producer already contributes to its
-  consumer. The dependency still reads and writes no entry.
+- A cacheable task's key folds, for each direct dependency in another project
+  that publishes no key because its cache is off, the key that dependency
+  would have, which folds its own dependencies' in turn: the same computation
+  an invocation-scoped producer already contributes to its consumer. The
+  dependency still reads and writes no entry, and its identity is computed
+  when a dependent asks for it, whether it ran or was pruned. A dependency of
+  the task's own project is left out: the key already reads that project's
+  files, and a keyless fixer that rewrites them would move the key between a
+  run and the next.
 - The adoption syncs write these entries from what the tool declares: Rush's
   build order and phased commands, `turbo.json`'s `dependsOn`, moon's
   resolved `deps`. A delegated task keeps one tool process on its own project
