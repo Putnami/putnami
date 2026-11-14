@@ -192,6 +192,32 @@
               "an-import-that-moves-no-script-declares-nothing"
             ]
           }
+        },
+        {
+          "id": "an-import-keeps-rush-build-order",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-imported-build-waits-for-the-upstream-builds"
+            ]
+          }
+        },
+        {
+          "id": "a-phased-test-waits-for-its-build",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-phased-test-waits-for-the-build-rush-runs-before-it"
+            ]
+          }
         }
       ]
     }

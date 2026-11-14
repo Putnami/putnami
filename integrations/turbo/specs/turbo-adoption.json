@@ -125,6 +125,14 @@
         "In import mode, a package names @putnami/typescript only when one of its tasks moves to it; a package none of whose tasks moves runs on Turborepo alone.",
         "The sync declares a language extension in putnami.workspace.json only when a package names it: an import that moves no task leaves the workspace config, every manifest and the lockfile as they were."
       ]
+    },
+    {
+      "id": "a-moved-task-keeps-its-depends-on",
+      "text": [
+        "In import mode, a build, test or lint task that moves to @putnami/typescript keeps the dependsOn turbo.json gives it, under commands.<task>.dependsOn of the package's putnami.json: ^build, ^test or ^lint as such, and build, test or lint for a task of the package itself.",
+        "An entry naming another task, a package task or an input is listed and not written.",
+        "The sync removes an entry turbo.json no longer gives."
+      ]
     }
   ],
   "decisions": [

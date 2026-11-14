@@ -211,6 +211,13 @@
         "A project's putnami.json may declare generatedFrom: the provider's service id, required and non-empty, the language, go or ts, and for go the packageName, clientName and omitOperations.",
         "An unknown member, a missing service, an unknown language or a go option on a ts client is refused with the field named."
       ]
+    },
+    {
+      "id": "a-project-names-what-a-command-waits-for",
+      "text": [
+        "A project file may name, under commands.<command>.dependsOn, the commands that command waits for in that project: command for the project's own, ^command for every project it depends on, directly or transitively.",
+        "Parsing is strict there: an unknown member, an empty command name, or an entry of another form, such as !command or command~step, is refused, and the rest of the project file stays lenient."
+      ]
     }
   ],
   "decisions": [

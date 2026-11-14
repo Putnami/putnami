@@ -4,6 +4,7 @@
   "executableRequirements": [
     "monorepo/turbo-adoption#a-moved-lint-only-checks",
     "monorepo/turbo-adoption#a-moved-task-does-what-its-script-did",
+    "monorepo/turbo-adoption#a-moved-task-keeps-its-depends-on",
     "monorepo/turbo-adoption#an-import-declares-only-what-moves",
     "monorepo/turbo-adoption#delegate-imports-listed-packages",
     "monorepo/turbo-adoption#import-adopts-typescript-conventions",
