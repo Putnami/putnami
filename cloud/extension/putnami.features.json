@@ -537,6 +537,19 @@
           }
         },
         {
+          "id": "keeps-the-outcome-of-a-refusal",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-refusal-outcomes"
+            ]
+          }
+        },
+        {
           "id": "answers-unsupported-without-a-call",
           "stage": "coded",
           "evidenceKinds": [

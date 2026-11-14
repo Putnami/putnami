@@ -336,7 +336,7 @@ func TestEachServedOperationCallsSourceOnce(t *testing.T) {
 // TestRefusalsKeepTheirOutcome maps each refusal Source answers to the
 // outcome that says nothing was written.
 func TestRefusalsKeepTheirOutcome(t *testing.T) {
-	spectest.Proves(t, feature, "calls-source-for-each-served-operation", "collab-provider-routes-each-operation")
+	spectest.Proves(t, feature, "keeps-the-outcome-of-a-refusal", "collab-provider-refusal-outcomes")
 	root, env := linkedWorkspace(t)
 	signIn(t, env)
 	cases := []struct {

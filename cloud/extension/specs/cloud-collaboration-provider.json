@@ -22,7 +22,13 @@
     {
       "id": "calls-source-for-each-served-operation",
       "text": [
-        "proposals.find, upsert, status, comments, review and automerge, and tasks.get, transition and assign, each send one request to the matching route of Putnami Source under /v1/workspaces/{workspace}/source/, for the workspace putnami cloud setup linked, and answer the collaboration document Source answers.",
+        "proposals.find, upsert, status, comments, review and automerge, and tasks.get, transition and assign, each send one request to the matching route of Putnami Source under /v1/workspaces/{workspace}/source/, for the workspace putnami cloud setup linked.",
+        "Each answers the collaboration document Source answers."
+      ]
+    },
+    {
+      "id": "keeps-the-outcome-of-a-refusal",
+      "text": [
         "Source's refusals keep their outcome: a missing item is not_found, a stale revision or a moved head is a conflict with the current revision when Source names it, a refused credential or permission is denied, and an invalid request is invalid.",
         "A binding whose settings carry any member is invalid, and a workspace with no Cloud link answers unavailable and names putnami cloud setup."
       ]
