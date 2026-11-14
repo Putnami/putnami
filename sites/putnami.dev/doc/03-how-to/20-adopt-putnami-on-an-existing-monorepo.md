@@ -52,6 +52,11 @@ tool:
   extends the root's. The sync lists each file it rewrites.
 - `putnami validate` fails with `<tool>.sync_stale` in both modes when a
   `putnami.json` no longer matches the tool's graph or the scripts.
+- A `putnami.json` the sync writes passes the repository's formatter: a new
+  file is indented as the `package.json` beside it and writes a short array on
+  one line, as Biome and Prettier do. Once the formatter has rewritten the
+  file, the sync keeps that layout: a new dependency changes one line, and a
+  sync with nothing to change writes nothing.
 
 Each tool's section below gives how a kept target runs.
 

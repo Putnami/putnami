@@ -8,9 +8,12 @@ package jsonutil
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
+
+	wsproto "go.putnami.dev/protocol/workspace"
 )
 
 // OrderedMap is a JSON object that preserves insertion order of keys.
@@ -227,13 +230,27 @@ func ReadFile(path string) (*OrderedMap, error) {
 	return m, nil
 }
 
-// WriteFile writes an OrderedMap as 2-space indented JSON with a trailing newline.
+// WriteFile writes an OrderedMap as the configuration file at path, in the
+// layout of the file it replaces, and leaves a file whose bytes would not
+// change as it is. A new file is two-space indented, or indented as the
+// package.json beside it.
 func WriteFile(path string, m *OrderedMap) error {
 	data, err := m.Bytes()
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	existing, err := os.ReadFile(path)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+	rendered, err := wsproto.RenderConfigFileAt(path, json.RawMessage(data), existing)
+	if err != nil {
+		return err
+	}
+	if bytes.Equal(rendered, existing) {
+		return nil
+	}
+	return os.WriteFile(path, rendered, 0o644)
 }
 
 // Bytes renders an OrderedMap as two-space indented JSON with a trailing

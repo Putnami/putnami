@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -23,6 +25,16 @@ const ConfigLineWidth = 80
 // file, or one that is not a JSON object, it renders a new file.
 func RenderConfigFile(doc any, existing []byte) ([]byte, error) {
 	return RenderConfigFileBeside(doc, existing, nil)
+}
+
+// RenderConfigFileAt is RenderConfigFile for the file at path, which holds
+// existing: a new file is indented as the package.json beside it.
+func RenderConfigFileAt(path string, doc any, existing []byte) ([]byte, error) {
+	var beside []byte
+	if len(existing) == 0 {
+		beside, _ = os.ReadFile(filepath.Join(filepath.Dir(path), "package.json"))
+	}
+	return RenderConfigFileBeside(doc, existing, beside)
 }
 
 // RenderConfigFileBeside is RenderConfigFile where a new file is indented as

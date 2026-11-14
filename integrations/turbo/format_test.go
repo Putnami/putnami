@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -54,5 +55,48 @@ func TestTheSyncKeepsAFormattedPutnamiJSONWhoseContentIsEqual(t *testing.T) {
 	}
 	if got, _ := os.ReadFile(file); string(got) != formatted {
 		t.Errorf("apps/api/putnami.json =\n%s\nwant it kept as formatted", got)
+	}
+}
+
+// A formatted putnami.json that gains a dependency changes on that line
+// alone: the sync renders it in the layout of the file it replaces.
+func TestTheSyncChangesOnlyTheLineOfANewDependencyInAFormattedPutnamiJSON(t *testing.T) {
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "demo", "options": {"@putnami/turbo": {"mode": "delegate"}}}`)
+	if _, err := Sync(root, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	// Biome's default layout: tab indentation, short arrays on one line.
+	formatted := "{\n" +
+		"\t\"$schema\": \"" + ProjectSchema + "\",\n" +
+		"\t\"dependencies\": [\"/packages/pricing\"],\n" +
+		"\t\"disable\": { \"jobs\": [\"lint\"] },\n" +
+		"\t\"extensions\": [\"" + ExtensionName + "\"],\n" +
+		"\t\"tags\": [\"turbo\"]\n" +
+		"}\n"
+	writeFile(t, root, "apps/api/putnami.json", formatted)
+	writeFile(t, root, "packages/ui/package.json", "{\n  \"name\": \"@demo/ui\",\n  \"version\": \"1.0.0\"\n}\n")
+	api := filepath.Join(root, "apps/api/package.json")
+	pkg, err := os.ReadFile(api)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, root, "apps/api/package.json", strings.Replace(string(pkg), `"@demo/pricing": "workspace:*"`, `"@demo/pricing": "workspace:*",`+"\n"+`    "@demo/ui": "workspace:*"`, 1))
+
+	result, err := Sync(root, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(result.Written, "apps/api/putnami.json") {
+		t.Fatalf("written = %v, want apps/api/putnami.json", result.Written)
+	}
+	got, err := os.ReadFile(filepath.Join(root, "apps/api", wsproto.ConfigFilename))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := strings.Replace(formatted, `["/packages/pricing"]`, `["/packages/pricing", "/packages/ui"]`, 1)
+	if string(got) != want {
+		t.Errorf("apps/api/putnami.json =\n%s\nwant only its dependencies line changed:\n%s", got, want)
 	}
 }
