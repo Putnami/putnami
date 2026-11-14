@@ -241,6 +241,7 @@ func Sync(ctx context.Context, root string, opts SyncOptions) (SyncResult, error
 			conventions = append(conventions, stacks.ConventionProject{Dir: p.Path, Name: p.Name, BunBuild: plan.bunBuild, PublishedBy: stacks.PackagePublished(root, p.Path), BiomeLint: plan.lintMoved && !plan.eslint})
 		}
 		result.Unmapped = append(result.Unmapped, plan.unmapped...)
+		result.Notes = append(result.Notes, plan.notes...)
 		lintMoved = lintMoved || plan.lintMoved
 		file := path.Join(p.Path, wsproto.ConfigFilename)
 		change, err := writeProject(root, file, plan, components, opts.DryRun)
@@ -424,6 +425,11 @@ type projectPlan struct {
 	// lintChecks reports a lint target the TypeScript extension takes over
 	// whose command passes no write flag.
 	lintChecks bool
+	// order is what each task that moved waits for, from the dependsOn Nx
+	// resolves for its target (movedOrder); notes list the entries it does
+	// not write.
+	order map[string][]string
+	notes []string
 }
 
 // planProjects maps the targets of each project, in the order of projects:
@@ -510,6 +516,7 @@ func planProject(root string, p detect.Project, mode string, declared bool, mapp
 		case covered:
 			plan.typeScript = true
 			plan.disabled = append(plan.disabled, ExtensionName+":"+task)
+			plan.order = movedOrder(plan.order, task, p.Name, target.DependsOn, &plan.notes)
 			if task == "test" {
 				plan.runner = testRunner(target)
 				plan.testMoved = true
@@ -544,6 +551,26 @@ func planProject(root string, p detect.Project, mode string, declared bool, mapp
 	plan.nodeRuntime = plan.typeScript && (targets["serve"].Executor == nodeExecutor || startScriptRunsNode(filepath.Join(root, filepath.FromSlash(p.Path))))
 	slices.Sort(plan.disabled)
 	return plan
+}
+
+// movedOrder adds to order what the target task of the project named name
+// waits for once it moved to @putnami/typescript: the dependsOn Nx resolves
+// for it. ^build, ^test and ^lint keep their form, and build, test or lint of
+// the project itself are its own. Every other entry, such as another target,
+// a project's target or an object naming projects, is noted and not written.
+func movedOrder(order map[string][]string, task, name string, deps []string, notes *[]string) map[string][]string {
+	for _, dep := range deps {
+		target := strings.TrimPrefix(dep, "^")
+		if !slices.Contains(stacks.CommandOrderTasks, target) || (target == task && !strings.HasPrefix(dep, "^")) {
+			*notes = append(*notes, fmt.Sprintf("not written: %s:%s depends on %s in Nx, which no Putnami command of the project maps; the task that moved to %s does not wait for it", name, task, dep, TypeScriptExtension))
+			continue
+		}
+		if order == nil {
+			order = map[string][]string{}
+		}
+		stacks.AddCommandOrder(order, task, dep)
+	}
+	return order
 }
 
 func importReason(root, dir string, isTS bool, task string, target detect.Target) string {
@@ -1005,8 +1032,9 @@ func ownedJobs() []string {
 // options["@putnami/nx"].tasks.test.reports, the steps of
 // options["@putnami/nx"].tasks.<task> as nxSteps owns them,
 // options["@putnami/typescript:test"].runner, an eslint
-// options["@putnami/typescript"].lint.linter, and
-// options["@putnami/typescript"].compiler as setCompiler owns it. Every other
+// options["@putnami/typescript"].lint.linter,
+// options["@putnami/typescript"].compiler as setCompiler owns it, and the
+// commands.<task>.dependsOn of build, test and lint. Every other
 // member is kept as it is. It returns the change, or nil when the file is
 // current.
 func writeProject(root, file string, plan projectPlan, components map[string]bool, dry bool) (*Change, error) {
@@ -1044,6 +1072,7 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 	stacks.SetTypeScriptLinter(doc, plan.eslint)
 	stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
 	stacks.SetTypeScriptLintFixOff(doc, plan.lintChecks)
+	stacks.SetCommandOrder(doc, plan.order)
 	if plan.nodeRuntime {
 		markNodeRuntime(doc)
 	}
@@ -1056,7 +1085,8 @@ func writeProject(root, file string, plan projectPlan, components map[string]boo
 
 // retractProject removes from the putnami.json of a former project the
 // extension, @putnami/typescript, its Nx edges, the disable.jobs entries, the
-// reports, the steps, the test runner and the eslint linter the sync owns.
+// reports, the steps, the test runner, the eslint linter and the
+// commands.<task>.dependsOn of build, test and lint the sync owns.
 func retractProject(root, file string, components map[string]bool, dry bool) (*Change, error) {
 	abs := filepath.Join(root, filepath.FromSlash(file))
 	doc, existing, err := readProject(abs)
@@ -1074,6 +1104,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 	stacks.SetTypeScriptLinter(doc, false)
 	stacks.SetTypeScriptTestTypesOff(doc, false)
 	stacks.SetTypeScriptLintFixOff(doc, false)
+	stacks.SetCommandOrder(doc, nil)
 	if reflect.DeepEqual(clone(doc), before) {
 		return nil, nil
 	}

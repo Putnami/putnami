@@ -166,6 +166,14 @@
         "In import mode, a project names @putnami/typescript only when one of its targets moves to it; a project none of whose targets moves runs on Nx alone.",
         "The sync declares a language extension in putnami.workspace.json only when a project names it: an import that moves no target leaves the workspace config, every manifest and the lockfile as they were."
       ]
+    },
+    {
+      "id": "a-moved-task-keeps-its-depends-on",
+      "text": [
+        "In import mode, a build, test or lint target that moves to @putnami/typescript keeps the dependsOn Nx resolves for it under commands.<task>.dependsOn of its putnami.json: ^build, ^test or ^lint as such, and build, test or lint for the project's own target.",
+        "Any other entry is listed and not written.",
+        "A target that stays on nx run writes none, and the sync removes an entry Nx no longer resolves."
+      ]
     }
   ],
   "decisions": [

@@ -1489,3 +1489,50 @@ func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
 		t.Errorf("a second import changes %v", again.Changes)
 	}
 }
+
+// In import mode a target that moves to @putnami/typescript keeps the
+// dependsOn Nx resolves for it, its own over the targetDefaults of nx.json
+// with "..." standing for theirs; an entry no Putnami command maps is noted
+// and not written; a target that stays on Nx writes none, and a later sync in
+// delegate mode removes what the import wrote.
+func TestAMovedTestWaitsForTheBuildsNxResolves(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-task-keeps-its-depends-on", "a-moved-test-waits-for-the-builds-nx-resolves")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, TypeScriptExtension)
+	// nx.json gives build and test dependsOn ["^build"]. pricing's targets
+	// move; the api's jest test moves and its webpack build stays on Nx.
+	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "bun build src/index.ts --outdir dist", "test": "bun test", "lint": "biome check ."}}`)
+	writeFile(t, root, "apps/api/project.json", `{"name": "@demo/api", "targets": {
+		"build": {"executor": "@nx/webpack:webpack"},
+		"test": {"dependsOn": ["...", "build", "codegen", {"target": "build", "projects": ["@demo/pricing"]}]}
+	}}`)
+	result := sync(t, root, SyncOptions{})
+	commands := func(dir string) any { return readProjectFile(t, root, dir)["commands"] }
+	if got, want := commands("packages/pricing"), map[string]any{
+		"build": map[string]any{"dependsOn": []any{"^build"}},
+		"test":  map[string]any{"dependsOn": []any{"^build"}},
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing commands = %v, want %v: its lint has no dependsOn", got, want)
+	}
+	if got, want := commands("apps/api"), map[string]any{
+		"test": map[string]any{"dependsOn": []any{"^build", "build"}},
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("api commands = %v, want %v: its build stays on Nx", got, want)
+	}
+	notes := strings.Join(result.Notes, "\n")
+	for _, entry := range []string{"codegen", `{"target":"build","projects":["@demo/pricing"]}`} {
+		if !strings.Contains(notes, "@demo/api:test depends on "+entry+" in Nx") {
+			t.Errorf("notes do not list %s:\n%s", entry, notes)
+		}
+	}
+	if stale, err := Stale(context.Background(), root); err != nil || len(stale.Written) != 0 {
+		t.Errorf("a rerun would change %v (%v)", stale.Written, err)
+	}
+
+	sync(t, root, SyncOptions{Mode: ModeDelegate})
+	for _, dir := range []string{"apps/api", "packages/pricing"} {
+		if got := commands(dir); got != nil {
+			t.Errorf("%s keeps commands %v in delegate mode, where nx run follows dependsOn itself", dir, got)
+		}
+	}
+}
