@@ -38,7 +38,8 @@
         "Publication consumes a current dossier or awaits named hosted checks, runs no local gate and rechecks proof per boundary.",
         "A hosted parent needs an immutable workflow and completion eligibility;",
         "incomplete parents need partial delivery, with no workflow if only featureAuthority.none projects own its paths.",
-        "Hosted checks advance only natively proven units to a replayable receipt, keeping later obligations; a partial with none has no receipt."
+        "Hosted checks advance only natively proven units to a replayable receipt, keeping later obligations; a partial with none has no receipt.",
+        "Before any write, each body line naming an agent is removed and reported; a title, proof or branch commit naming one stops the run."
       ]
     },
     {

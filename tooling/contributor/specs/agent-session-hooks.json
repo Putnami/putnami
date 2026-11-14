@@ -17,7 +17,8 @@
       "text": [
         "SessionStart syncs the session, reads the mission's checkpoint through memory.mission when memory is bound, and prints the mission sheet: the repository and key putnami agent ask takes, the title, the plan, the open decisions and the checkpoint, within 4 KiB, with every agent or owner text quoted with \"> \".",
         "Waiting messages follow whole while the context stays within 9,500 bytes.",
-        "A sheet the provider did not refresh says its date; a workspace without missions gets none."
+        "A sheet the provider did not refresh says its date; a workspace without missions gets none.",
+        "A sync refused for want of a signed-in session shows the user one line: reporting is off, run putnami cloud login."
       ]
     },
     {

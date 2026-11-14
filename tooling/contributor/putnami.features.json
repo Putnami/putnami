@@ -53,6 +53,7 @@
               "a-draft-opens-before-the-first-edit",
               "the-body-is-the-squash-message",
               "no-publication-names-an-agent",
+              "a-signed-body-is-published-without-its-signature",
               "an-explicit-hosted-gate-waits-without-local-execution",
               "hosted-parent-workflow-completeness",
               "a-featureless-partial-needs-no-workflow",
@@ -213,7 +214,8 @@
               "session-start-syncs-and-prints-the-mission-sheet",
               "the-sheet-quotes-agent-text-within-4-kib",
               "the-sheet-carries-the-mission-checkpoint",
-              "waiting-messages-arrive-whole-within-the-context-bound"
+              "waiting-messages-arrive-whole-within-the-context-bound",
+              "a-session-start-without-a-signed-in-session-says-reporting-is-off"
             ]
           }
         },
