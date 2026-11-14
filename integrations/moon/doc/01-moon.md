@@ -176,6 +176,14 @@ claims. The sync names it and the tasks that keep running through
   `"exports": { ".": "./src/index.ts" }` when its build moves to the Bun
   build, its `package.json` is private and its `main` names a build output.
   A `bun build` task whose entry the sync does not rewrite stays on moon.
+- in import mode, for each `build`, `test` or `lint` task that moved to its
+  language extension, the `deps` moon gives it under
+  `commands.<command>.dependsOn`: a task of a project it depends on
+  (`^:build`, or `types:build` when it depends on `types`) as `^build`, and
+  one of its own (`~:build`, `build`) as `build`. A moved test then waits for
+  the build moon runs before it, and its key folds that build's would-be key,
+  so an edit to `types` moves it. A dep on a tag, on another task or on a
+  project outside its dependencies is listed and not written.
 
 It keeps every other member, the project's own steps included: it writes a
 step only where none is set or where it wrote the one there. It retracts a

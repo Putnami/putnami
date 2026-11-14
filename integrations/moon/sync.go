@@ -136,6 +136,10 @@ func synchronize(ctx context.Context, root string, dry bool, given string) (Sync
 	var packages []stacks.GraphPackage
 	var conventions []stacks.ConventionProject
 	lintMoved := false
+	byID := map[string]detect.Project{}
+	for _, p := range detection.Projects {
+		byID[p.ID] = p
+	}
 	for _, p := range detection.Projects {
 		if p.Dir == wsproto.ProbeRootPath {
 			notes = append(notes, rootProjectNote(p))
@@ -165,7 +169,7 @@ func synchronize(ctx context.Context, root string, dry bool, given string) (Sync
 			DependsOn: p.DependsOn,
 			Extension: extension,
 			Disabled:  disabled,
-			Edit:      editSteps(mapped, delegated, typeScriptOptions(p, importPlan{})),
+			Edit:      withOrder(editSteps(mapped, delegated, typeScriptOptions(p, importPlan{})), nil),
 		}
 		if delegated {
 			pkg.Inputs = rootInputs(root, p.Dir)
@@ -177,12 +181,13 @@ func synchronize(ctx context.Context, root string, dry bool, given string) (Sync
 		// The workspace declares a language extension only when a task moves
 		// to it.
 		plan := planImport(root, p, mapped)
+		plan.order, notes = movedOrder(p, plan, mapped, byID, notes)
 		moved := plan.extension != ExtensionName || len(plan.also) > 0
 		if moved {
 			extensions[extension] = true
 		}
 		pkg.Extension, pkg.Also, pkg.Disabled = plan.extension, plan.also, plan.disabled
-		pkg.Edit = editSteps(plan.kept, true, typeScriptOptions(p, plan))
+		pkg.Edit = withOrder(editSteps(plan.kept, true, typeScriptOptions(p, plan)), plan.order)
 		lintMoved = lintMoved || plan.lintMoved
 		if len(plan.kept) > 0 {
 			pkg.Inputs = rootInputs(root, p.Dir)
@@ -297,6 +302,71 @@ func typeScriptOptions(p detect.Project, plan importPlan) func(map[string]any) {
 // project's putnami.json.
 func retractSteps(doc map[string]any) {
 	moonSteps.Apply(doc, nil)
+	stacks.SetCommandOrder(doc, nil)
+}
+
+// withOrder runs edit, then writes the order of the project's tasks that
+// moved (CLI ADR 0097), and removes it where order names none.
+func withOrder(edit func(map[string]any), order map[string][]string) func(map[string]any) {
+	return func(doc map[string]any) {
+		edit(doc)
+		stacks.SetCommandOrder(doc, order)
+	}
+}
+
+// movedOrder answers what each command whose task moved waits for: the deps
+// moon resolves for that task, a task of the project itself (~:task, task or
+// <its id>:task) as its command, and a task of a project it depends on
+// (^:task, or <id>:task of a dependency) as ^command. A dep it cannot map, on
+// another task, a tag or a project outside its dependencies, is noted.
+func movedOrder(p detect.Project, plan importPlan, mapped map[string]string, byID map[string]detect.Project, notes []string) (map[string][]string, []string) {
+	order := map[string][]string{}
+	commandOf := func(project detect.Project, task string) string {
+		for _, command := range Commands {
+			if TaskFor(project, command) == task {
+				return command
+			}
+		}
+		return ""
+	}
+	tasks := map[string]detect.Task{}
+	for _, t := range p.Tasks {
+		tasks[t.Name] = t
+	}
+	for _, command := range Commands {
+		task, ok := mapped[command]
+		if _, kept := plan.kept[command]; !ok || kept {
+			continue
+		}
+		for _, target := range tasks[task].Deps {
+			scope, name, scoped := strings.Cut(target, ":")
+			if !scoped {
+				scope, name = "~", target
+			}
+			dep := ""
+			switch {
+			case scope == "^":
+				if slices.Contains(Commands, name) {
+					dep = "^" + name
+				}
+			case scope == "~" || scope == p.ID:
+				if c := commandOf(p, name); c != "" && c != command {
+					dep = c
+				}
+			default:
+				upstream, known := byID[scope]
+				if c := commandOf(upstream, name); known && c != "" && slices.Contains(p.DependsOn, upstream.Dir) {
+					dep = "^" + c
+				}
+			}
+			if dep == "" {
+				notes = append(notes, fmt.Sprintf("not written: %s:%s depends on %s, which no Putnami command of %s or of the projects it depends on maps; the task that moved does not wait for it", p.ID, task, target, p.ID))
+				continue
+			}
+			stacks.AddCommandOrder(order, command, dep)
+		}
+	}
+	return order, notes
 }
 
 // moonSteps are the steps overrides the sync owns: moon run on the task a

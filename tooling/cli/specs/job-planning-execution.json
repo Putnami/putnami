@@ -347,6 +347,20 @@
         "A run's cache record holds remote only when the run looked a remote cache up: answered is true when every lookup got an answer, a hit or a miss, so a cold cache answers.",
         "Otherwise the record counts the failed lookups and gives one reason from a closed set, refused over unreachable over timeout, and every lookup failure maps into that set."
       ]
+    },
+    {
+      "id": "a-project-adds-what-a-command-waits-for",
+      "text": [
+        "The commands a project file names under commands.<command>.dependsOn join, for that project's jobs of the command alone, the dependsOn the extension manifests declare: the planner plans each prerequisite and orders the command's root steps after its leaves, as it does a manifest's command or ^command dependency.",
+        "A prerequisite the project runs no job of adds no edge."
+      ]
+    },
+    {
+      "id": "a-key-reads-a-dependency-that-publishes-none",
+      "text": [
+        "A cacheable task's key folds, for a direct dependency in another project whose cache is off, the key it would have, and for one in its own project, the digest of the keys and would-be keys that reach it from other projects: a change to the inputs of a delegated upstream build moves the key of a task that waits for it.",
+        "Neither addresses an entry, and a dependency that publishes a key contributes it as before."
+      ]
     }
   ],
   "decisions": [
@@ -379,6 +393,7 @@
     "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md",
     "protocols/extension/doc/adr/0015-a-step-reads-the-changed-files-from-contract-16.md",
     "tooling/cli/doc/adr/0082-putnami-serves-no-mcp-server.md",
-    "tooling/cli/doc/adr/0089-a-step-may-read-no-command-option-layer.md"
+    "tooling/cli/doc/adr/0089-a-step-may-read-no-command-option-layer.md",
+    "tooling/cli/doc/adr/0097-a-project-names-what-a-command-waits-for.md"
   ]
 }

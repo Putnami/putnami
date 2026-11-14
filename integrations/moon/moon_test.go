@@ -959,3 +959,43 @@ func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
 		t.Errorf("a second import changes %v %v, %v", again.Written, again.Changes, err)
 	}
 }
+
+// In import mode a task that moves keeps the deps moon gives it: a task of a
+// project it depends on as ^command, one of its own as command. A dep on a
+// project outside its dependencies, a tag or a task no command maps is noted
+// and not written, and a delegated workspace writes none.
+func TestAMovedTestWaitsForTheBuildMoonRunsBeforeIt(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-task-keeps-its-deps", "a-moved-test-waits-for-the-build-moon-runs-before-it")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, false)
+	stackstest.WriteFile(t, root, "apps/api/moon.yml", "language: 'typescript'\ndependsOn: ['pricing']\ntasks:\n"+
+		"  build:\n    command: 'tsup'\n"+
+		"  codegen:\n    command: 'gen'\n"+
+		"  test:\n    command: 'vitest'\n    deps: ['^:build', '~:build', 'pricing:build', {target: 'web:build'}, '#ui:build', 'codegen']\n")
+	stackstest.WriteFile(t, root, "packages/pricing/moon.yml", "language: 'rust'\ntasks:\n  build:\n    command: 'cargo build'\n")
+	result, err := Sync(context.Background(), root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]any{"test": map[string]any{"dependsOn": []any{"^build", "build"}}}
+	if got := readProjectFile(t, root, "apps/api")["commands"]; !reflect.DeepEqual(got, want) {
+		t.Errorf("api commands = %v, want %v", got, want)
+	}
+	warnings := strings.Join(result.Warnings, "\n")
+	for _, target := range []string{"web:build", "#ui:build", "codegen"} {
+		if !strings.Contains(warnings, "api:test depends on "+target+",") {
+			t.Errorf("warnings do not list %s:\n%s", target, warnings)
+		}
+	}
+	if again, err := Stale(context.Background(), root); err != nil || len(again.Written) != 0 {
+		t.Errorf("a rerun would change %v (%v)", again.Written, err)
+	}
+
+	stackstest.WriteFile(t, root, wsproto.WorkspaceConfigFilename, `{"name": "shop", "extensions": ["@putnami/moon"], "options": {"@putnami/moon": {"mode": "delegate"}}}`)
+	if _, err := Sync(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	if got := readProjectFile(t, root, "apps/api")["commands"]; got != nil {
+		t.Errorf("api keeps commands %v in delegate mode, where moon runs deps itself", got)
+	}
+}

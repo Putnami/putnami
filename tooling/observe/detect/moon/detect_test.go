@@ -275,3 +275,54 @@ func TestMergeTaskAppendsArgsAndTagsUnlessTheUpperLayerSaysOtherwise(t *testing.
 		}
 	}
 }
+
+// A task's deps are read as targets, from the export as from a moon.yml: a
+// target string, or an object with a target. A project's deps append to
+// those it inherits, as moon merges them by default.
+func TestDetectReadsTheDepsOfATask(t *testing.T) {
+	export := map[string]string{
+		"moon-graph.json": `{"graph": {"nodes": [
+  {"id": "report", "source": "packages/report", "tasks": {"test": {"command": "vitest", "deps": [{"target": "types:build", "optional": false}, "~:build", 7]}}},
+  {"id": "types", "source": "packages/types", "tasks": {"build": {"command": "tsc"}}}
+], "edges": [[0, 1, "production"]]}}`,
+	}
+	yml := map[string]string{
+		".moon/workspace.yml":      "projects:\n  - 'packages/*'\n",
+		".moon/tasks.yml":          "tasks:\n  test:\n    deps: ['~:codegen']\n",
+		"packages/report/moon.yml": "dependsOn: ['types']\ntasks:\n  test:\n    command: 'vitest'\n    deps: ['^:build', {target: 'types:build'}]\n",
+		"packages/types/moon.yml":  "tasks:\n  build:\n    command: 'tsc'\n",
+	}
+	for name, files := range map[string]map[string]string{"export": export, "moon.yml": yml} {
+		got := Detect(tree(t, files), Options{})
+		var deps []string
+		for _, p := range got.Projects {
+			for _, task := range p.Tasks {
+				if p.ID == "report" && task.Name == "test" {
+					deps = task.Deps
+				}
+			}
+		}
+		want := map[string][]string{"export": {"types:build", "~:build"}, "moon.yml": {"~:codegen", "^:build", "types:build"}}[name]
+		if !reflect.DeepEqual(deps, want) {
+			t.Errorf("%s: report:test deps = %v, want %v", name, deps, want)
+		}
+	}
+}
+
+func TestMergeTaskMergesDepsAsArgsAndTags(t *testing.T) {
+	base := map[string]any{"deps": []any{"~:codegen"}}
+	target := map[string]any{"target": "types:build"}
+	for _, c := range []struct {
+		own  map[string]any
+		want []any
+	}{
+		{map[string]any{"deps": []any{target}}, []any{"~:codegen", target}},
+		{map[string]any{"deps": []any{target}, "options": map[string]any{"mergeDeps": "prepend"}}, []any{target, "~:codegen"}},
+		{map[string]any{"deps": []any{target}, "options": map[string]any{"merge": "replace"}}, []any{target}},
+		{map[string]any{"deps": []any{target}, "options": map[string]any{"merge": "replace", "mergeDeps": "append"}}, []any{"~:codegen", target}},
+	} {
+		if got := mergeTask(base, c.own)["deps"]; !reflect.DeepEqual(got, c.want) {
+			t.Errorf("mergeTask over %v: deps %v, want %v", c.own, got, c.want)
+		}
+	}
+}

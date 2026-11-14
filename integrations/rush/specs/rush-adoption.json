@@ -42,8 +42,8 @@
     {
       "id": "tasks-delegate-to-rush",
       "text": [
-        "Each task compares the version the banner of rush --help states with the rushVersion of rush.json, then runs at the workspace root rush build --to <package>, which builds the projects upstream of it too, or rush test or rush lint --only <package>, which runs on that project alone.",
-        "Each task depends only on its project's graph step, which runs no rush.",
+        "Each task checks the banner of rush --help against the rushVersion of rush.json, then runs at the workspace root rush build --to <package>, which builds the upstream projects too, or rush test or rush lint --only <package>, on that project alone.",
+        "Each task depends on its project's graph step, which runs no rush, and on the commands its putnami.json names.",
         "Putnami's cache is off for every task, and the result records delegatedTo rush.",
         "A failing step fails with stacks.step_failed."
       ]
@@ -105,6 +105,20 @@
       "text": [
         "In import mode, a project names @putnami/typescript only when one of its scripts moves to it; a project none of whose scripts moves runs on Rush alone.",
         "The sync declares a language extension in putnami.workspace.json only when a project names it: an import that moves no script leaves the workspace config, every manifest and the lockfile as they were."
+      ]
+    },
+    {
+      "id": "an-import-keeps-rush-build-order",
+      "text": [
+        "In import mode, the sync writes commands.build.dependsOn [\"^build\"] in the putnami.json of each project that builds: its build waits for the build of each project it depends on, as rush build orders them, whether it runs with rushx or moved to @putnami/typescript.",
+        "The sync removes an entry the rule no longer gives and keeps every other command's."
+      ]
+    },
+    {
+      "id": "a-phased-test-waits-for-its-build",
+      "text": [
+        "When command-line.json declares test or lint as a phased command with a phase that depends, directly or through its own project's phases, on an upstream phase, the sync writes commands.<command>.dependsOn build, with ^build too in import mode.",
+        "The task then waits for the builds rush would run before it, which --only skips."
       ]
     }
   ],

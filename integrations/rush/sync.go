@@ -105,11 +105,13 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 			pkg.Extension = ExtensionName
 			pkg.Inputs = delegateInputs(root, p.Folder, detection.Lockfile)
 			for _, job := range []string{stacks.TaskTest, stacks.TaskLint} {
-				if _, ok := commands[job]; !ok {
+				if _, ok := commands.commands[job]; !ok {
 					pkg.Disabled = append(pkg.Disabled, job)
 				}
 			}
-			pkg.Edit = retractEdit
+			pkg.Edit = importPlan{order: commands.commandOrder(mode, func(task string) bool {
+				return !slices.Contains(pkg.Disabled, task)
+			})}.edit
 			packages = append(packages, pkg)
 			continue
 		}
@@ -118,6 +120,9 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 			convention.PublishedBy = detect.Config
 		}
 		plan := planImport(root, p, scripts(root, p.Folder), convention.PublishedBy)
+		plan.order = commands.commandOrder(mode, func(task string) bool {
+			return !slices.Contains(plan.disabled, task)
+		})
 		pkg.Extension, pkg.Also, pkg.Disabled = plan.extension, plan.also, plan.disabled
 		pkg.Edit = plan.edit
 		kept = append(kept, plan.notes...)
@@ -135,7 +140,7 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 		return SyncResult{}, err
 	}
 	result.Export = detect.Config
-	result.Warnings = unmappedCommands(commands)
+	result.Warnings = unmappedCommands(commands.commands)
 	if mode == ModeImport {
 		writes, warnings, err := stacks.ImportConventions(root, conventions)
 		if err != nil {
@@ -169,7 +174,7 @@ func synchronizeIn(_ context.Context, root string, _ io.Writer, mode string, dry
 		}
 		return result, nil
 	}
-	if _, ok := commands[stacks.TaskTest]; ok {
+	if _, ok := commands.commands[stacks.TaskTest]; ok {
 		if note := unreportedProjects(root, detection.Projects); note != "" {
 			result.Warnings = append(result.Warnings, note)
 		}
@@ -204,6 +209,8 @@ type importPlan struct {
 	// lintChecks reports a lint script that moved and passes no write flag;
 	// biomeLint one that moved and runs Biome.
 	lintChecks, biomeLint bool
+	// order is what each task waits for (rushCommandLine.commandOrder).
+	order map[string][]string
 }
 
 // edit writes the steps of the tasks that stay on Rush and the options of
@@ -212,10 +219,12 @@ func (plan importPlan) edit(doc map[string]any) {
 	rushxSteps.edit(plan.kept)(doc)
 	stacks.SetTypeScriptTestTypesOff(doc, plan.testMoved)
 	stacks.SetTypeScriptLintFixOff(doc, plan.lintChecks)
+	stacks.SetCommandOrder(doc, plan.order)
 }
 
-// retractEdit removes from a delegated or former project what an import
-// wrote: the rushx steps and the options of the tasks that moved.
+// retractEdit removes from a former project what an import or a delegation
+// wrote: the rushx steps, the options of the tasks that moved and the order of
+// its tasks.
 func retractEdit(doc map[string]any) {
 	importPlan{}.edit(doc)
 }
@@ -368,33 +377,110 @@ func delegateInputs(root, folder, lockfile string) []string {
 
 // command is one custom command of command-line.json.
 type command struct {
-	Kind string `json:"commandKind"`
-	Name string `json:"name"`
+	Kind   string   `json:"commandKind"`
+	Name   string   `json:"name"`
+	Phases []string `json:"phases"`
 }
 
-// readCommands reads the custom commands of command-line.json by name. A
-// missing file declares none.
-func readCommands(root string) (map[string]command, error) {
+// phase is one phase of command-line.json, with the phases it runs after:
+// in its own project (self) and in each project it depends on (upstream).
+type phase struct {
+	Name         string `json:"name"`
+	Dependencies struct {
+		Self     []string `json:"self"`
+		Upstream []string `json:"upstream"`
+	} `json:"dependencies"`
+}
+
+// rushCommandLine is what the sync reads of command-line.json: its commands and
+// its phases, by name.
+type rushCommandLine struct {
+	commands map[string]command
+	phases   map[string]phase
+}
+
+// waitsForUpstream reports whether the command named name is a phased command
+// one of whose phases depends on an upstream phase, directly or through the
+// phases of its own project: rush runs those upstream phases first, which
+// rush <name> --only skips, so the task waits for the project's build.
+func (c rushCommandLine) waitsForUpstream(name string) bool {
+	cmd, ok := c.commands[name]
+	if !ok || cmd.Kind != "phased" {
+		return false
+	}
+	seen := map[string]bool{}
+	queue := slices.Clone(cmd.Phases)
+	for len(queue) > 0 {
+		current := queue[0]
+		queue = queue[1:]
+		if seen[current] {
+			continue
+		}
+		seen[current] = true
+		p, ok := c.phases[current]
+		if !ok {
+			continue
+		}
+		if len(p.Dependencies.Upstream) > 0 {
+			return true
+		}
+		queue = append(queue, p.Dependencies.Self...)
+	}
+	return false
+}
+
+// commandOrder is the order of the tasks of one project (CLI ADR 0097): in
+// import mode its build waits for the build of each project it depends on,
+// as rush build orders them, and in both modes a test or lint whose phased
+// command reaches an upstream phase waits for the project's build, and in
+// import mode for the upstream builds too. runs reports the tasks the project
+// runs at all.
+func (c rushCommandLine) commandOrder(mode string, runs func(task string) bool) map[string][]string {
+	order := map[string][]string{}
+	if mode == ModeImport && runs(stacks.TaskBuild) {
+		stacks.AddCommandOrder(order, stacks.TaskBuild, "^"+stacks.TaskBuild)
+	}
+	for _, task := range []string{stacks.TaskTest, stacks.TaskLint} {
+		if !runs(task) || !c.waitsForUpstream(task) {
+			continue
+		}
+		stacks.AddCommandOrder(order, task, stacks.TaskBuild)
+		if mode == ModeImport {
+			stacks.AddCommandOrder(order, task, "^"+stacks.TaskBuild)
+		}
+	}
+	return order
+}
+
+// readCommands reads the custom commands and the phases of command-line.json
+// by name. A missing file declares none.
+func readCommands(root string) (rushCommandLine, error) {
+	line := rushCommandLine{commands: map[string]command{}, phases: map[string]phase{}}
 	data, err := os.ReadFile(filepath.Join(root, filepath.FromSlash(CommandLineFile))) //nolint:gosec // a file under the workspace root
 	if errors.Is(err, fs.ErrNotExist) {
-		return map[string]command{}, nil
+		return line, nil
 	}
 	if err != nil {
-		return nil, err
+		return rushCommandLine{}, err
 	}
 	var file struct {
 		Commands []command `json:"commands"`
+		Phases   []phase   `json:"phases"`
 	}
 	if err := json.Unmarshal(detect.StripComments(data), &file); err != nil {
-		return nil, fmt.Errorf("%s cannot be parsed: %w", CommandLineFile, err)
+		return rushCommandLine{}, fmt.Errorf("%s cannot be parsed: %w", CommandLineFile, err)
 	}
-	out := map[string]command{}
 	for _, c := range file.Commands {
 		if c.Name != "" {
-			out[c.Name] = c
+			line.commands[c.Name] = c
 		}
 	}
-	return out, nil
+	for _, p := range file.Phases {
+		if p.Name != "" {
+			line.phases[p.Name] = p
+		}
+	}
+	return line, nil
 }
 
 // runsPerProject reports whether a command kind runs on each selected

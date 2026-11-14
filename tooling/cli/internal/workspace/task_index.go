@@ -100,6 +100,13 @@ type taskIndex struct {
 	// it reaches every dependent, whatever that dependent plans, and travels on
 	// (TasksReachedIn).
 	travelsOn map[string]bool
+	// projectReachedVia is reachedVia for the `^command` dependencies a
+	// project names under commands.<command>.dependsOn of its putnami.json
+	// (CLI ADR 0097): by upstream task scope, the dependent task scopes and
+	// the projects whose entry links them, read in those projects alone. The
+	// prerequisite's scopes travel on (travelsOn), as a manifest's do, since
+	// the entry reads the whole dependency closure.
+	projectReachedVia map[string]map[string]map[string]bool
 	// byCommand maps a command name to its task scopes, sorted.
 	byCommand map[string][]string
 	// byExtension maps an extension's name and its workspace-relative path to
@@ -227,6 +234,7 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 		reachedBy:         make(map[string][]string),
 		reachedVia:        make(map[string]map[string][]*extension.JobDefinition),
 		travelsOn:         make(map[string]bool),
+		projectReachedVia: make(map[string]map[string]map[string]bool),
 		byCommand:         make(map[string][]string),
 		byExtension:       make(map[string][]string),
 		extensionProjects: make(map[string][]string),
@@ -246,11 +254,13 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 	for _, ext := range extensions {
 		idx.addExtension(ext, successors, commandDeps)
 	}
+	projectLinks := addProjectCommandDeps(ws, commandDeps)
 	if !idx.attributes() {
 		return nil
 	}
 	idx.every = sortedTaskKeys(idx.tasks)
 	idx.linkCommandDeps(successors, commandDeps)
+	idx.linkProjectCommandDeps(projectLinks)
 	idx.buildClosure(successors)
 	idx.bindExtensionProjects(extensions)
 	idx.assets = CollectProjectAssetPaths(ws)
@@ -326,6 +336,74 @@ func (idx *taskIndex) addExtension(
 			}
 			if !slices.Contains(commandDeps[key][prerequisite.Command], job) {
 				commandDeps[key][prerequisite.Command] = append(commandDeps[key][prerequisite.Command], job)
+			}
+		}
+	}
+}
+
+// projectCommandLink is one `^command` dependency a project names under
+// commands.<command>.dependsOn of its putnami.json.
+type projectCommandLink struct {
+	project, dependent, prerequisite string
+}
+
+// addProjectCommandDeps folds into commandDeps the same-project prerequisites
+// projects name under commands.<command>.dependsOn of their putnami.json (CLI
+// ADR 0097), which link a command's tasks after the prerequisite's in every
+// project, as an intra-project link does, and returns the `^command` ones,
+// which linkProjectCommandDeps links for the projects that name them alone.
+func addProjectCommandDeps(ws *Workspace, commandDeps map[string]map[string][]*extension.JobDefinition) []projectCommandLink {
+	if ws == nil {
+		return nil
+	}
+	var links []projectCommandLink
+	for _, project := range ws.Projects {
+		if project == nil || project.Config == nil {
+			continue
+		}
+		for command, declared := range project.Config.Commands {
+			for _, rawPrerequisite := range declared.DependsOn {
+				prerequisite := extension.ParseCommandDependency(rawPrerequisite)
+				if prerequisite.Session || prerequisite.Command == "" {
+					continue
+				}
+				if prerequisite.Dependencies {
+					links = append(links, projectCommandLink{project: project.ID, dependent: command, prerequisite: prerequisite.Command})
+					continue
+				}
+				if commandDeps[command] == nil {
+					commandDeps[command] = make(map[string][]*extension.JobDefinition)
+				}
+				if _, ok := commandDeps[command][prerequisite.Command]; !ok {
+					commandDeps[command][prerequisite.Command] = nil
+				}
+			}
+		}
+	}
+	return links
+}
+
+// linkProjectCommandDeps links each project's `^command` dependency: the
+// prerequisite's task scopes travel on through every dependent, so a project
+// further up the closure still reaches them, and reach the dependent
+// command's scopes in that project alone, and in the answer for an unknown
+// project (TasksReachedFrom), which reads every link.
+func (idx *taskIndex) linkProjectCommandDeps(links []projectCommandLink) {
+	for _, link := range links {
+		for _, before := range idx.byCommand[link.prerequisite] {
+			register(idx.reachedBy, before, before)
+			idx.travelsOn[before] = true
+			for _, after := range idx.byCommand[link.dependent] {
+				register(idx.reachedBy, before, after)
+				via := idx.projectReachedVia[before]
+				if via == nil {
+					via = make(map[string]map[string]bool)
+					idx.projectReachedVia[before] = via
+				}
+				if via[after] == nil {
+					via[after] = make(map[string]bool)
+				}
+				via[after][link.project] = true
 			}
 		}
 	}
@@ -919,6 +997,13 @@ func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string 
 				}
 			}
 		}
+		for scope, projects := range idx.projectReachedVia[upstream] {
+			if projects[project.ID] {
+				for _, next := range idx.closureOf([]string{scope}) {
+					reached[next] = true
+				}
+			}
+		}
 	}
 	travel := func(scope string) {
 		reached[closureScopePrefix+scope] = true
@@ -931,6 +1016,9 @@ func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string 
 			through(upstream)
 		}
 		for upstream := range idx.travelsOn {
+			through(upstream)
+		}
+		for upstream := range idx.projectReachedVia {
 			through(upstream)
 		}
 		for scope, task := range idx.tasks {

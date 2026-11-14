@@ -1364,6 +1364,32 @@
             "a-lookup-failure-is-a-closed-reason"
           ]
         }
+      },
+      {
+        "id": "a-project-adds-what-a-command-waits-for",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-project-command-dependency-plans-and-orders-the-prerequisite"
+          ]
+        }
+      },
+      {
+        "id": "a-key-reads-a-dependency-that-publishes-none",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-keyless-dependency-moves-the-key-of-its-dependent"
+          ]
+        }
       }
     ]
   }

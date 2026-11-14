@@ -1,0 +1,10 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "a-project-names-what-a-command-waits-for",
+  "statement": "a project names under commands.<command>.dependsOn of putnami.json, as command or ^command, what a command waits for; adoption syncs write the order the tool keeps, and a key folds the would-be key of a keyless dependency",
+  "settled": "2026-11-14",
+  "settledBy": "fdumay",
+  "adr": "tooling/cli/doc/adr/0097-a-project-names-what-a-command-waits-for.md",
+  "reviewOnly": true
+}
