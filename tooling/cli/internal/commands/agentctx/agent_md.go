@@ -45,7 +45,7 @@ func writeAgentEntrypoints(wsRoot string, force bool) (guidanceWriteReport, erro
 	// One read of the workspace's CI document serves both entrypoints. Putnami
 	// owns one delimited block inside each; every other byte belongs to whoever
 	// wrote it.
-	gate := gateTasksForWorkspace(wsRoot)
+	gate := gateCommandForWorkspace(wsRoot)
 	// The line that names where the decisions are travels with the gate: both
 	// are derived from committed documents, both are read once, and both are
 	// guidance about THIS workspace rather than a hardcoded sentence.
@@ -121,7 +121,7 @@ const (
 
 const guidanceBlockTemplate = "This is a Putnami workspace.\n" +
 	"- Build, test, lint, install, add dependencies, and generate with `./putnamiw` when present, otherwise `putnami`. Never call npm, bun, go, pip, or cargo directly for those.\n" +
-	"- While iterating, select the projects you changed with `--projects <a>,<b>`; unlike `--impacted`, it skips every project that depends on them. Before declaring work complete, run `putnami {{GATE_TASKS}} --impacted --enforce-coverage` once, when feasible.\n" +
+	"- While iterating, select the projects you changed with `--projects <a>,<b>`; unlike `--impacted`, it skips every project that depends on them. Before declaring work complete, run `putnami {{GATE_COMMAND}}` once, when feasible.\n" +
 	"- Discover code through the CLI, then grep: `putnami projects list|describe|owner|deps|why` for the project graph, `putnami context map|pack` to orient on the workspace or a project, and `putnami <verb> --impacted --dry-run` for what a change affects. Use grep for literal text.\n" +
 	"- Skills and agents that an extension's agent content installs under `.agents/`, `.claude/` and `.codex/` are managed by Putnami. To customize one, copy it under another name; edited managed files are preserved and reported, never overwritten.\n" +
 	"- Read `.agents/constraints.md` when it exists.\n" +
@@ -248,11 +248,12 @@ func importsAgentsEntrypoint(content string) bool {
 	return false
 }
 
-// gatePlaceholder is replaced with the workspace's derived gate task list
-// wherever the generated guidance names the verification command.
-const gatePlaceholder = "{{GATE_TASKS}}"
+// gatePlaceholder is replaced with the workspace's derived gate command, its
+// tasks and flags, wherever the generated guidance names the verification
+// command.
+const gatePlaceholder = "{{GATE_COMMAND}}"
 
-// applyGate substitutes the derived gate task list into a guidance template.
+// applyGate substitutes the derived gate command into a guidance template.
 func applyGate(template string, gate string) string {
 	return strings.ReplaceAll(template, gatePlaceholder, gate)
 }

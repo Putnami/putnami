@@ -563,7 +563,7 @@ func TestGeneratedGuidanceMatchesRepositoryCIDocument(t *testing.T) {
 	// Putnami owns one block inside each entrypoint, so that block is what is
 	// compared: the repository may keep its own text around it. CLAUDE.md may
 	// instead import AGENTS.md, which then carries the block for both.
-	want := guidanceBlock(gate, decisionsGuidanceForWorkspace(root))
+	want := guidanceBlock(gateCommandForWorkspace(root), decisionsGuidanceForWorkspace(root))
 	for _, path := range []string{agentEntrypointPath, ClaudeEntrypointPath} {
 		got, readErr := repositoryGuidanceBytes(root, path)
 		if readErr != nil {
@@ -577,5 +577,78 @@ func TestGeneratedGuidanceMatchesRepositoryCIDocument(t *testing.T) {
 		if !found || !intact || end < 0 || content[start:end] != want {
 			t.Errorf("committed %s does not carry the block `putnami context generate` produces; run it and commit the result.\n--- committed ---\n%s\n--- generated block ---\n%s", path, got, want)
 		}
+	}
+}
+
+// withCommandFlag returns the manifest with the flag declared on one of its
+// commands, as an extension that reads it declares it.
+func withCommandFlag(t *testing.T, manifest []byte, command, flag string) []byte {
+	t.Helper()
+	var decoded extproto.Manifest
+	if err := json.Unmarshal(manifest, &decoded); err != nil {
+		t.Fatalf("decode manifest: %v", err)
+	}
+	definition := decoded.Commands[command]
+	definition.Flags = map[string]extproto.FlagDefinition{flag: {Type: "boolean"}}
+	decoded.Commands[command] = definition
+	decoded.CLIContract = extproto.RequiredCLIContract(&decoded)
+	data, err := json.Marshal(decoded)
+	if err != nil {
+		t.Fatalf("marshal manifest: %v", err)
+	}
+	return data
+}
+
+// The gate the guidance names carries --enforce-coverage only when a gate
+// task a loaded extension declares accepts it: the engine refuses a flag no
+// selected task declares, so a Bazel or Pants workspace is told the gate
+// without it. When no extension loads, nothing says which flags the tasks
+// accept, and the flag stays. The CI document decides the tasks, never the
+// flag.
+func TestGateCommandNamesOnlyDeclaredFlags(t *testing.T) {
+	spectest.Proves(t, "cli/ci-document", "gate-runs-as-written", "the-gate-names-only-declared-flags")
+	t.Parallel()
+	bazel := extensionManifest(t, "@example/bazel", "test", "build")
+	covered := withCommandFlag(t, extensionManifest(t, "@example/lang", "lint", "test", "build"), "test", coverageFlag)
+	cases := []struct {
+		name     string
+		document []string
+		manifest []byte
+		want     string
+	}{
+		{"no extension loads", nil, nil, defaultGate() + " --impacted --enforce-coverage"},
+		{"no gate task declares the flag", nil, bazel, "test,build --impacted"},
+		{"a gate task declares the flag", nil, covered, "lint,test,build --impacted --enforce-coverage"},
+		{"the document names the tasks, the extensions the flag", []string{"build", "test"}, bazel, "build,test --impacted"},
+		{"the document names a task that declares the flag", []string{"lint", "test"}, covered, "lint,test --impacted --enforce-coverage"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			dir := t.TempDir()
+			if tc.manifest != nil {
+				writeWorkspaceExtensions(t, dir, "/ext")
+				writeExtension(t, dir, "/ext", tc.manifest)
+			}
+			if tc.document != nil {
+				writeCIDocument(t, dir, tc.document...)
+			}
+			if got := gateCommandForWorkspace(dir); got != tc.want {
+				t.Fatalf("gate command = %q, want %q", got, tc.want)
+			}
+			if got := GateCommand(dir); got != tc.want {
+				t.Fatalf("GateCommand = %q, want the same derivation %q", got, tc.want)
+			}
+			if err := WriteAgentEntrypoints(dir); err != nil {
+				t.Fatalf("WriteAgentEntrypoints: %v", err)
+			}
+			data, err := os.ReadFile(filepath.Join(dir, agentEntrypointPath))
+			if err != nil {
+				t.Fatalf("read %s: %v", agentEntrypointPath, err)
+			}
+			if want := "run `putnami " + tc.want + "` once"; !strings.Contains(string(data), want) {
+				t.Fatalf("%s does not name the gate %q:\n%s", agentEntrypointPath, want, data)
+			}
+		})
 	}
 }

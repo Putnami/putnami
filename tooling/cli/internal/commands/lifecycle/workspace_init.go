@@ -753,22 +753,34 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 	iox.Fprintln(os.Stdout)
 
 	iox.Fprintln(os.Stdout, "  Next:")
-	switch {
-	case flags.project != "":
-		iox.Fprintf(os.Stdout, "    putnami lint,test,build %s\n", flags.project)
-		iox.Fprintf(os.Stdout, "    putnami serve %s\n", flags.project)
-	case flags.from != "" || len(adopted) > 0:
-		iox.Fprintln(os.Stdout, "    putnami projects list")
-		iox.Fprintln(os.Stdout, "    putnami lint,test,build --impacted")
-	case extConfig.template != "":
-		iox.Fprintf(os.Stdout, "    putnami projects create my-app --template %s\n", extConfig.template)
-		iox.Fprintln(os.Stdout, "    putnami build --all")
-	default:
-		iox.Fprintf(os.Stdout, "    putnami projects sync    # once the repository holds a %s\n", plan.languages[0].Markers[0])
-		iox.Fprintln(os.Stdout, "    putnami lint,test,build --impacted")
+	marker := ""
+	if len(plan.languages) > 0 && len(plan.languages[0].Markers) > 0 {
+		marker = plan.languages[0].Markers[0]
+	}
+	for _, line := range initNextSteps(cwd, flags.project, flags.from != "" || len(adopted) > 0, extConfig.template, marker) {
+		iox.Fprintf(os.Stdout, "    %s\n", line)
 	}
 
 	return nil
+}
+
+// initNextSteps returns the commands init's summary names next: for the
+// requested project, for the projects the sync recorded, for a starter
+// template, or for a workspace that holds no project yet. Its gate tasks are
+// the ones the generated guidance names (agentctx.GateTasks), so each command
+// it names is one the workspace's extensions declare.
+func initNextSteps(cwd, project string, synced bool, template, marker string) []string {
+	gate := agentctx.GateTasks(cwd)
+	switch {
+	case project != "":
+		return []string{"putnami " + gate + " " + project, "putnami serve " + project}
+	case synced:
+		return []string{"putnami projects list", "putnami " + gate + " --impacted"}
+	case template != "":
+		return []string{"putnami projects create my-app --template " + template, "putnami build --all"}
+	default:
+		return []string{"putnami projects sync    # once the repository holds a " + marker, "putnami " + gate + " --impacted"}
+	}
 }
 
 // installInitWorkspace is init's first install: the toolchain pins phase,
