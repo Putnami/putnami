@@ -594,8 +594,9 @@ Turborepo adopts in either mode:
 - `turbo.json` lies at the root of the repository, which becomes the
   workspace root, beside the npm, pnpm or yarn workspace that lists the
   packages.
-- In delegate mode, `turbo` is on `PATH`: a global install defers to the
-  repository's own version.
+- In delegate mode, the repository's install has put `turbo` in
+  `node_modules/.bin`, as a root `devDependencies` entry does, or `turbo` is
+  on `PATH`.
 - In import mode, the package manager the repository declares, in the
   `packageManager` field of the root `package.json` or by its root lockfile,
   is on `PATH`: npm, or pnpm or Yarn through Corepack or a global install.

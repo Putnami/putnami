@@ -441,3 +441,43 @@ func TestProgramFindsAToolOnTheSelectionPath(t *testing.T) {
 		t.Errorf("a relative PATH entry is no place to find a tool: %s", got)
 	}
 }
+
+func TestTaskEnvPutsTheExistingPathDirectoriesFirst(t *testing.T) {
+	root := t.TempDir()
+	for _, dir := range []string{"node_modules/.bin", "tools/bin"} {
+		if err := os.MkdirAll(filepath.Join(root, filepath.FromSlash(dir)), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	tc := Toolchain{Command: []string{"stubtool"}, Path: []string{"node_modules/.bin", "missing/bin", "tools/bin"}}
+	got := environmentValue(tc.TaskEnv(root, []string{"HOME=/h", "PATH=/usr/bin"}), "PATH")
+	want := strings.Join([]string{filepath.Join(root, "node_modules", ".bin"), filepath.Join(root, "tools", "bin"), "/usr/bin"}, string(os.PathListSeparator))
+	if got != want {
+		t.Errorf("PATH = %q, want %q: the existing directories first, in order", got, want)
+	}
+	if env := (Toolchain{}).TaskEnv(root, []string{"PATH=/usr/bin"}); !slices.Equal(env, []string{"PATH=/usr/bin"}) {
+		t.Errorf("a toolchain with no path keeps the environment: %v", env)
+	}
+}
+
+func TestMachineVersionRunsTheToolchainTheTaskPathFinds(t *testing.T) {
+	local, global := t.TempDir(), t.TempDir()
+	stubVersionTool(t, local, "stubtool", "2.9.3")
+	t.Setenv("PATH", global)
+	tc := Toolchain{Command: []string{"stubtool", "--version"}, Pattern: `^tool (?<version>[0-9.]+)`}
+	ctx := context.Background()
+	got, err := tc.MachineVersion(ctx, local, []string{"PATH=" + local + string(os.PathListSeparator) + global})
+	if err != nil || got != "2.9.3" {
+		t.Fatalf("a toolchain only on the task's PATH: %q, %v", got, err)
+	}
+	if _, err := tc.MachineVersion(ctx, local, os.Environ()); !errors.Is(err, ErrToolchainMissing) {
+		t.Errorf("a toolchain on no PATH of the task is missing: %v", err)
+	}
+	stubVersionTool(t, global, "stubtool", "2.5.0")
+	if got, err := tc.MachineVersion(ctx, local, []string{"HOME=/h"}); err != nil || got != "2.5.0" {
+		t.Errorf("an environment with no PATH reads the process's: %q, %v", got, err)
+	}
+	if versions, err := tc.MachineVersions(ctx, local, []string{"PATH=" + local}); err != nil || !slices.Equal(versions, []string{"2.9.3"}) {
+		t.Errorf("MachineVersions reads the task's PATH too: %v, %v", versions, err)
+	}
+}

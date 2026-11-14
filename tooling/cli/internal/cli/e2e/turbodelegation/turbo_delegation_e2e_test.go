@@ -165,16 +165,36 @@ func stubTurbo(t *testing.T) string {
 	t.Helper()
 	bin := t.TempDir()
 	log := filepath.Join(t.TempDir(), "turbo.log")
-	clitest.WriteFile(t, filepath.Join(bin, "turbo"), `#!/bin/sh
+	writeTurboStub(t, bin, log)
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	return log
+}
+
+// stubRepositoryTurbo puts the stub turbo, which logs to log, in place of the
+// one the repository's install put in node_modules/.bin, which a delegated
+// task runs before the turbo on PATH.
+func stubRepositoryTurbo(t *testing.T, root, log string) {
+	t.Helper()
+	bin := filepath.Join(root, "node_modules", ".bin")
+	if err := os.Remove(filepath.Join(bin, "turbo")); err != nil && !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+	writeTurboStub(t, bin, log)
+}
+
+// writeTurboStub writes into dir a turbo that prints the version the demo's
+// root package.json allows, and logs each call with its working directory
+// to log.
+func writeTurboStub(t *testing.T, dir, log string) {
+	t.Helper()
+	clitest.WriteFile(t, filepath.Join(dir, "turbo"), `#!/bin/sh
 set -e
 echo "$(pwd) turbo $*" >> '`+log+`'
 case "$1" in --version) echo 2.11.10;; esac
 `)
-	if err := os.Chmod(filepath.Join(bin, "turbo"), 0o755); err != nil {
+	if err := os.Chmod(filepath.Join(dir, "turbo"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	return log
 }
 
 // turboTests runs putnami test --impacted from base and returns the packages

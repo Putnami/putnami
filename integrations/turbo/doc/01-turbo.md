@@ -182,9 +182,14 @@ runs one command at the workspace root, with no shell:
 | `test` | `turbo run test --filter=<package>` |
 | `build` | `turbo run build --filter=<package>` |
 
-`turbo` must be on `PATH`: a global install defers to the repository's own
-version. Turborepo's `dependsOn` runs the upstream tasks, such as `^build`, and
-its cache answers them.
+Both the check and the command run the repository's own `turbo`, which the
+package manager's install puts in `node_modules/.bin` at the workspace root
+when the root `package.json` lists it in `devDependencies`: Putnami puts that
+directory first on `PATH`, as `npm run` does for a script. A repository with
+no such install runs the `turbo` on `PATH`. When a package delegates a task
+and neither holds a `turbo`, the sync, and so `putnami init --from turbo`,
+warns with `stacks.toolchain_missing`. Turborepo's `dependsOn` runs the
+upstream tasks, such as `^build`, and its cache answers them.
 
 Every task sets `cache.enabled` to `false`: Putnami stores no entry and replays
 none, and each task result records `delegatedTo: turbo`. Impact selection is

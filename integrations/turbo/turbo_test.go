@@ -475,7 +475,16 @@ func TestAStalePackageGraphFailsValidate(t *testing.T) {
 // demo's JUnit and coverage reports of the filtered package.
 func stubTurbo(t *testing.T, d demo) {
 	t.Helper()
-	bin, reports := t.TempDir(), t.TempDir()
+	bin := t.TempDir()
+	writeTurboStub(t, d, bin)
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
+}
+
+// writeTurboStub writes into bin the turbo stubTurbo puts on PATH.
+func writeTurboStub(t *testing.T, d demo, bin string) {
+	t.Helper()
+	reports := t.TempDir()
 	for rel, content := range d["ci"] {
 		writeFile(t, reports, rel, content)
 	}
@@ -497,8 +506,6 @@ exit "${STUB_TEST_EXIT:-0}"
 	if err := os.Chmod(filepath.Join(bin, "turbo"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
-	t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
 }
 
 func stubLog(t *testing.T) []string {
@@ -557,6 +564,68 @@ func TestATaskRunsTurboOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 	t.Setenv("STUB_TEST_EXIT", "1")
 	if status, _, events := runJob(t, root, "apps/api", stacks.TaskTest); status != "FAILED" || !strings.Contains(events, stacks.CodeStepFailed) {
 		t.Errorf("a failing turbo run fails the task: %s %s", status, events)
+	}
+}
+
+func TestATaskRunsTheRepositoryTurboFromNodeModulesBin(t *testing.T) {
+	spectest.Proves(t, feature, "tasks-delegate-to-turbo", "a-task-runs-the-repository-turbo-from-node-modules-bin")
+	d := readDemo(t)
+	root := repository(t, d)
+	rootReal, _ := filepath.EvalSymlinks(root)
+	// The package manager's install put turbo in node_modules/.bin, and the
+	// machine's PATH, left as it is, holds none.
+	writeTurboStub(t, d, filepath.Join(root, "node_modules", ".bin"))
+	t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
+
+	status, data, events := runJob(t, root, "apps/api", stacks.TaskBuild)
+	if status != "OK" || data["delegatedTo"] != "turbo" {
+		t.Fatalf("status %s, data %v, events %s", status, data, events)
+	}
+	log := stubLog(t)
+	want := rootReal + " turbo run build --filter=@demo/api"
+	if len(log) != 2 || !strings.HasSuffix(log[0], " turbo --version") || log[1] != want {
+		t.Errorf("ran %q, want the repository's turbo: the version check then %q", log, want)
+	}
+
+	// A turbo on PATH runs when the repository holds none.
+	if err := os.RemoveAll(filepath.Join(root, "node_modules")); err != nil {
+		t.Fatal(err)
+	}
+	stubTurbo(t, d)
+	if status, _, events := runJob(t, root, "apps/api", stacks.TaskBuild); status != "OK" || len(stubLog(t)) != 2 {
+		t.Errorf("the turbo on PATH: status %s, log %q, events %s", status, stubLog(t), events)
+	}
+}
+
+func TestTheSyncWarnsWhenNoTurboIsReachable(t *testing.T) {
+	spectest.Proves(t, feature, "tasks-delegate-to-turbo", "the-sync-warns-when-no-turbo-is-reachable")
+	d := readDemo(t)
+	root := repository(t, d)
+	t.Setenv("PATH", t.TempDir())
+
+	result, err := Sync(root, Options{Mode: ModeDelegate})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !result.TurboMissing || !slices.Contains(Report(result, false), TurboMissingMessage) {
+		t.Errorf("a delegated package and no turbo: %+v", result)
+	}
+
+	// In import mode, the demo's packages delegate no task: no warning.
+	if result, err := Sync(root, Options{Mode: ModeImport, DryRun: true}); err != nil || result.TurboMissing {
+		t.Errorf("no delegated task needs turbo: %+v %v", result, err)
+	}
+
+	writeTurboStub(t, d, filepath.Join(root, "node_modules", ".bin"))
+	if result, err := Sync(root, Options{Mode: ModeDelegate}); err != nil || result.TurboMissing || slices.Contains(Report(result, false), TurboMissingMessage) {
+		t.Errorf("the repository's turbo in node_modules/.bin: %+v %v", result, err)
+	}
+	if err := os.RemoveAll(filepath.Join(root, "node_modules")); err != nil {
+		t.Fatal(err)
+	}
+	stubTurbo(t, d)
+	if result, err := Sync(root, Options{Mode: ModeDelegate}); err != nil || result.TurboMissing {
+		t.Errorf("a turbo on PATH: %+v %v", result, err)
 	}
 }
 

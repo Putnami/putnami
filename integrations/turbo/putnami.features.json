@@ -114,7 +114,9 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-task-runs-turbo-on-its-package-and-records-the-delegation"
+              "a-task-runs-turbo-on-its-package-and-records-the-delegation",
+              "a-task-runs-the-repository-turbo-from-node-modules-bin",
+              "the-sync-warns-when-no-turbo-is-reachable"
             ]
           }
         },

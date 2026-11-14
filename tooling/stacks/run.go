@@ -180,7 +180,7 @@ func (s Stack) selectToolchain(ctx context.Context, in runInput, meta Metadata, 
 		pinned = pinned || expectedAll[i].Version != ""
 	}
 	expected := expectedAll[0]
-	env := os.Environ()
+	env := profile.Toolchain.TaskEnv(filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root)), os.Environ())
 	matches := versionMatches
 	if s.MatchVersion != nil {
 		matches = func(e, m string) bool {
@@ -486,7 +486,8 @@ func (s Stack) toolchainMissing(ctx context.Context, in runInput) bool {
 	if s.provides(profile) && os.Getenv(extensionproto.OfflineDependenciesEnv) != "1" {
 		return false
 	}
-	_, err = profile.Toolchain.Select(ctx, in.projectAbs, Expected{}, os.Environ())
+	env := profile.Toolchain.TaskEnv(filepath.Join(in.workspaceRoot, filepath.FromSlash(meta.Root)), os.Environ())
+	_, err = profile.Toolchain.Select(ctx, in.projectAbs, Expected{}, env)
 	return errors.Is(err, ErrToolchainMissing)
 }
 

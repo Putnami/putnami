@@ -81,6 +81,10 @@ type Result struct {
 	// Notes say how Putnami runs a task that moved differently from
 	// Turborepo, such as the projects --impacted lints.
 	Notes []string
+	// TurboMissing reports a package that delegates a task while no turbo
+	// is reachable, in node_modules/.bin at the workspace root or on PATH:
+	// that task fails with stacks.toolchain_missing.
+	TurboMissing bool
 }
 
 // Stale reports the files a sync would change.
@@ -243,6 +247,7 @@ func Sync(root string, opts Options) (Result, error) {
 		owned[wsproto.ProjectIDFromPath(dir)] = true
 	}
 
+	delegates := false
 	for _, m := range members {
 		rel := path.Join(m.dir, wsproto.ConfigFilename)
 		doc, existing, err := readProject(filepath.Join(root, filepath.FromSlash(rel)))
@@ -254,6 +259,7 @@ func Sync(root string, opts Options) (Result, error) {
 		}
 		before := clone(doc)
 		applyMember(root, doc, m, owned)
+		delegates = delegates || m.delegates()
 		if !slices.Contains(m.disabled, stacks.TaskTest) && !slices.Contains(m.disabled, ExtensionName+":"+stacks.TaskTest) && len(junitReports(doc)) == 0 {
 			result.Unreported = append(result.Unreported, m.dir)
 		}
@@ -303,6 +309,7 @@ func Sync(root string, opts Options) (Result, error) {
 		result.Diffs = append(result.Diffs, UnifiedDiff(w.File, w.Before, w.After))
 	}
 	result.Conventions = append(append(result.Conventions, notes...), warnings...)
+	result.TurboMissing = delegates && !turboReachable(root)
 	// The workspace declares @putnami/typescript only when a task moves to
 	// it, so an import that moves none installs nothing.
 	if declare {
@@ -437,6 +444,26 @@ func commit(root, rel string, doc map[string]any, existing []byte, dryRun bool, 
 		return false, fmt.Errorf("%s: %w", rel, err)
 	}
 	return true, nil
+}
+
+// delegates reports whether the package runs one of build, lint and test
+// through Turborepo: its job is neither disabled nor moved.
+func (m member) delegates() bool {
+	return slices.ContainsFunc(MappedTasks, func(task string) bool {
+		return !slices.Contains(m.disabled, task) && !slices.Contains(m.disabled, ExtensionName+":"+task)
+	})
+}
+
+// turboReachable reports whether a delegated task finds turbo where it looks
+// (ADR 0018 of the stack core): in the directories the profile's
+// toolchain.path names under the workspace root, then on PATH.
+func turboReachable(root string) bool {
+	profile, err := stacks.Decode(profileJSON)
+	if err != nil {
+		return true
+	}
+	_, ok := stacks.LookPathIn(profile.Toolchain.TaskEnv(root, os.Environ()), profile.Toolchain.Command[0])
+	return ok
 }
 
 // ownedJob reports whether the sync owns a disable.jobs entry: build, lint

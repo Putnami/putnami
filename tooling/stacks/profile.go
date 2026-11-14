@@ -109,6 +109,11 @@ type Toolchain struct {
 	// pinned toolchain when it runs it: the parent of the directory that holds
 	// its command, such as JAVA_HOME. Build tools read the home before PATH.
 	Home string `json:"home,omitempty"`
+	// Path lists directories, relative to the component's stack root, that
+	// a task puts first on PATH, in this order, before its toolchain check:
+	// the tools the repository installs for itself, such as node_modules/.bin
+	// (ADR 0018). A directory that does not exist is left out.
+	Path []string `json:"path,omitempty"`
 	// Ranges names the rules a range a file states follows: "" for Composer's
 	// syntax (ADR 0002), "pub-sdk" for a Dart SDK constraint and
 	// "pub-flutter" for a Flutter SDK constraint, as pub reads them for a
@@ -316,6 +321,9 @@ func (p Profile) Validate() error {
 		if len(a.Also) > 0 {
 			return fmt.Errorf("toolchain.also[%d].also: a further check names no checks of its own", i)
 		}
+		if len(a.Path) > 0 {
+			return fmt.Errorf("toolchain.also[%d].path: a further check reads the task's PATH, which toolchain.path sets", i)
+		}
 		if err := a.validate(); err != nil {
 			return fmt.Errorf("toolchain.also[%d].%w", i, err)
 		}
@@ -425,6 +433,11 @@ func (t Toolchain) validate() error {
 	}
 	if t.Home != "" && (t.Provisioned == "" || !environmentName.MatchString(t.Home)) {
 		return fmt.Errorf("home: %q is not an environment variable name beside a provisioned toolchain", t.Home)
+	}
+	for i, dir := range t.Path {
+		if dir == "" || strings.Contains(dir, `\`) || path.IsAbs(dir) || path.Clean(dir) != dir || dir == "." || dir == ".." || strings.HasPrefix(dir, "../") {
+			return fmt.Errorf("path[%d]: %q is not a relative directory inside the stack root", i, dir)
+		}
 	}
 	switch t.Ranges {
 	case "", RangesPubSDK, RangesPubFlutter:

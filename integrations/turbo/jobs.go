@@ -36,6 +36,10 @@ const (
 	CodeImportUnmatched = "turbo.import_unmatched"
 )
 
+// TurboMissingMessage says that the delegated tasks find no turbo, and how
+// to give them one.
+const TurboMissingMessage = "No turbo in node_modules/.bin or on PATH: every delegated task fails with stacks.toolchain_missing; add turbo to the devDependencies of the root package.json and run the package manager's install"
+
 // RunSync is the job of the workspace sync task. The dry-run parameter
 // prints the diff of each file and writes nothing; the mode and import
 // parameters stand for the mode and the import list the workspace config
@@ -63,6 +67,9 @@ func RunSync(ctx *pctx.Context, emit *jsonl.Emitter, _ []string) (string, map[st
 		emit.DiagnosticWithCode("info", fmt.Sprintf("%s names no JUnit report: its test result is the exit code of turbo run test alone; name its reports in options[%q].tasks.test.reports of its putnami.json", dir, ExtensionName), dir+"/putnami.json", 0, 0, CodeReportsUnnamed)
 	}
 	reportUnmatched(emit, result)
+	if result.TurboMissing {
+		emit.DiagnosticWithCode("warning", TurboMissingMessage, "package.json", 0, 0, stacks.CodeToolchainMissing)
+	}
 	return "OK", map[string]any{
 		"mode": result.Mode, "dryRun": opts.DryRun, "written": result.Written, "retracted": result.Retracted,
 		"unmapped": result.Unmapped, "unreported": result.Unreported, "imported": result.Imported,
@@ -105,6 +112,9 @@ func Report(r Result, dryRun bool) []string {
 		}
 	}
 	lines = append(lines, r.Notes...)
+	if r.TurboMissing {
+		lines = append(lines, TurboMissingMessage)
+	}
 	if len(r.Unreported) > 0 {
 		lines = append(lines, fmt.Sprintf("Test result from the exit code alone, no JUnit report named: %s", strings.Join(r.Unreported, ", ")))
 	}

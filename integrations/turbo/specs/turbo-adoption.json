@@ -11,7 +11,7 @@
   "nonGoals": [
     "Caching a Turborepo result in Putnami's cache, or putting Putnami's cache over Turborepo's",
     "Mapping a turbo.json task other than build, test and lint: it keeps running through Turborepo",
-    "Installing or switching a Turborepo version: turbo must be on PATH",
+    "Installing or switching a Turborepo version: the repository's own turbo, in node_modules/.bin at the workspace root after its install, or a turbo on PATH runs",
     "Rewriting turbo.json, or a package.json beyond the exports an import adds (D-066), or changing the tool that checks a task: a prettier task or an eslint task with arguments stays on Turborepo, and a build that runs tsc moves only with that tsc"
   ],
   "requirements": [
@@ -64,9 +64,10 @@
     {
       "id": "tasks-delegate-to-turbo",
       "text": [
-        "Each lint, test and build task of a @putnami/turbo package runs turbo run <task> --filter=<package name> at the workspace root, after the toolchain check of turbo --version.",
+        "Each lint, test and build task of a @putnami/turbo package runs turbo run <task> --filter=<package name> at the workspace root, after turbo --version, both with the root node_modules/.bin first on PATH.",
+        "With no turbo there or on PATH, the sync warns with stacks.toolchain_missing.",
         "Turborepo's dependsOn runs the upstream tasks and its cache answers them.",
-        "Each task depends only on its package's graph step, which runs nothing; Putnami's cache is off for every task, and the result records delegatedTo turbo."
+        "Each task depends only on its package's graph step, which runs nothing; Putnami's cache is off, and the result records delegatedTo turbo."
       ]
     },
     {

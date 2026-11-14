@@ -479,6 +479,44 @@ func (p *flowParser) plain() string {
 	return strings.Join(strings.Fields(p.s[start:p.i]), " ")
 }
 
+// command is the toolchain command, found on the PATH of env, the task's,
+// which may hold directories the process's PATH does not, such as the
+// toolchain.path of the profile (ADR 0018). An env with no PATH, and a command
+// that names a path, resolve as the process does. A command no PATH holds is
+// ErrToolchainMissing.
+func (t Toolchain) command(ctx context.Context, env []string) (*exec.Cmd, error) {
+	name := t.Command[0]
+	program, err := exec.LookPath(name)
+	if pathValue(env) != "" && !strings.ContainsAny(name, `/\`) {
+		found, ok := LookPathIn(env, name)
+		program, err = found, nil
+		if !ok {
+			err = exec.ErrNotFound
+		}
+	}
+	if err != nil {
+		return nil, fmt.Errorf("%w: %s", ErrToolchainMissing, name)
+	}
+	cmd := exec.CommandContext(ctx, name, t.Command[1:]...) //nolint:gosec // the profile's own toolchain command
+	// Args[0] stays the name the profile states, as a proxy such as rustup's
+	// reads it; the program is the one the task's PATH finds.
+	cmd.Path, cmd.Err = program, nil
+	return cmd, nil
+}
+
+// TaskEnv returns env with each directory of the toolchain's Path that
+// exists under stackRoot, an absolute directory, first on its PATH, in the
+// order Path lists them.
+func (t Toolchain) TaskEnv(stackRoot string, env []string) []string {
+	for i := len(t.Path) - 1; i >= 0; i-- {
+		dir := filepath.Join(stackRoot, filepath.FromSlash(t.Path[i]))
+		if info, err := os.Stat(dir); err == nil && info.IsDir() {
+			env = prependPath(env, dir)
+		}
+	}
+	return env
+}
+
 // MachineVersions runs the toolchain command in dir and returns every version
 // its output states, in order: every match of the pattern in the standard
 // output, or in the standard error when the standard output has none. A
@@ -488,10 +526,10 @@ func (t Toolchain) MachineVersions(ctx context.Context, dir string, env []string
 	if err != nil {
 		return nil, err
 	}
-	if _, err := exec.LookPath(t.Command[0]); err != nil {
-		return nil, fmt.Errorf("%w: %s", ErrToolchainMissing, t.Command[0])
+	cmd, err := t.command(ctx, env)
+	if err != nil {
+		return nil, err
 	}
-	cmd := exec.CommandContext(ctx, t.Command[0], t.Command[1:]...) //nolint:gosec // the profile's own toolchain command
 	cmd.Dir = dir
 	cmd.Env = env
 	var stdout, stderr bytes.Buffer
@@ -521,10 +559,10 @@ func (t Toolchain) MachineVersion(ctx context.Context, dir string, env []string)
 	if err != nil {
 		return "", err
 	}
-	if _, err := exec.LookPath(t.Command[0]); err != nil {
-		return "", fmt.Errorf("%w: %s", ErrToolchainMissing, t.Command[0])
+	cmd, err := t.command(ctx, env)
+	if err != nil {
+		return "", err
 	}
-	cmd := exec.CommandContext(ctx, t.Command[0], t.Command[1:]...) //nolint:gosec // the profile's own toolchain command
 	cmd.Dir = dir
 	cmd.Env = env
 	var stdout, stderr bytes.Buffer

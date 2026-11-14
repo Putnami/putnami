@@ -109,6 +109,9 @@ func TestADelegatedTurborepoImportsPricingAndPassesLintTestBuild(t *testing.T) {
 		t.Fatalf("install exit %d:\n%s", code, out)
 	}
 	clitest.PinToolchains(t, repoRoot, root, "go")
+	// The install put the repository's turbo in node_modules/.bin, which a
+	// delegated task runs first: the stub takes its place.
+	stubRepositoryTurbo(t, root, log)
 	_ = os.Remove(log)
 	code, out = clitest.RunGateArgs(t, root, "lint,test,build", "--all")
 	if code != 0 {
