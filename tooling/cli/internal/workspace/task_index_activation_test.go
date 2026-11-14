@@ -227,7 +227,7 @@ func TestTaskIndex_AnUpstreamStepIsReadWhereADependentMayRunIt(t *testing.T) {
 // Go `build~compile` scope. The TypeScript dependent still takes its `tsc`
 // steps, and the Go dependent takes nothing.
 func TestTaskIndex_APortOnlyADependentReadsClaimsNoStepOfTheProject(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-impact-index-answers-for-the-tasks-a-project-runs",
+	spectest.Proves(t, "cli/job-planning-execution", "a-task-only-a-dependent-runs-claims-no-step-of-the-project",
 		"a-port-only-a-dependent-reads-claims-no-step-of-the-project")
 	goExt := &extension.ExtensionDescription{
 		Name: "@fixture/go", RelPath: "go/extension",
@@ -308,7 +308,7 @@ func TestTaskIndex_APortOnlyADependentReadsClaimsNoStepOfTheProject(t *testing.T
 // only relays the scope, so its runtime does not move and its consumers are
 // not selected.
 func TestTraceChangeImpact_AClosureScopeClaimsItsTaskOnlyWhereItsPortMayBePlanned(t *testing.T) {
-	spectest.Proves(t, "cli/job-planning-execution", "the-impact-index-answers-for-the-tasks-a-project-runs",
+	spectest.Proves(t, "cli/job-planning-execution", "a-task-only-a-dependent-runs-claims-no-step-of-the-project",
 		"a-closure-scope-claims-its-task-only-where-its-port-may-be-planned")
 	goExt := &extension.ExtensionDescription{
 		Name: "@fixture/go", RelPath: "go/extension",
