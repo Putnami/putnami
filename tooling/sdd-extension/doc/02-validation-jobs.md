@@ -243,9 +243,9 @@ the verdict.
   | `co-author-trailer` | a `Co-Authored-By:` trailer whose name or address is an agent's | a human co-author |
   | `session-link` | a link to an agent's session, or a `<agent>-session:` trailer | a path such as `.claude/` or `.agents/` |
 
-  The agent names are the `agentNames` list of
-  `internal/sdd/agent_attribution.go`, matched as whole words regardless of
-  case.
+  The forms and the agent names live in the `attribution` package of the
+  extension SDK, which `change finalize` of `@putnami/contributor` also reads.
+  The names match as whole words regardless of case.
 
   | Situation | Result |
   |---|---|

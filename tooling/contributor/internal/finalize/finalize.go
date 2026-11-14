@@ -303,7 +303,6 @@ func (f Finalizer) Run(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, err
 	}
 	if settled != nil {
-		settled.Stripped = candidate.stripped
 		return *settled, nil
 	}
 	result, err := f.publish(ctx, &candidate)

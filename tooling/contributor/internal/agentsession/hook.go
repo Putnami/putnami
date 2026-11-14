@@ -129,8 +129,9 @@ type hookOutput struct {
 // missions provider refuses the sync for want of a signed-in session.
 const reportingOffNotice = "Putnami mission reporting is off: no signed-in session. Run `putnami cloud login`, then start a new session."
 
-// signInReasons are the error reasons of a sync refused for want of a
-// signed-in session.
+// signInReasons are the error reasons the Putnami missions provider answers
+// a sync with when no Putnami cloud session is signed in: auth.unavailable
+// when no credential is found, auth.denied when the cloud refuses it.
 var signInReasons = []string{"auth.unavailable", "auth.denied"}
 
 // reportingOff reports whether err holds a sync refused for want of a
