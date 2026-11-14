@@ -13,10 +13,10 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	collab "go.putnami.dev/protocol/collaboration"
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
-	collab "go.putnami.dev/protocol/collaboration"
 )
 
 const (

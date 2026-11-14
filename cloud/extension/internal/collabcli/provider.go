@@ -124,7 +124,7 @@ func served[I, R any](p *Provider, reconcile string, send func(Source, context.C
 			return nil, failureOf(err, reconcile)
 		}
 		if result == nil {
-			return nil, failureOf(errors.New("Putnami Source answered no document"), reconcile)
+			return nil, failureOf(errors.New("no document in the answer of Putnami Source"), reconcile)
 		}
 		return result, nil
 	}

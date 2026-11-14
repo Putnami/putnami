@@ -308,6 +308,59 @@ workspace, nothing is sent and the run's result does not change.
 [Local mode](internal/deliverycli/README.md#local-mode) describes the route,
 the credential rules and the refusals.
 
+## Collaborate through Putnami Source
+
+`@putnami/cloud` also provides the **tasks** and **proposals**
+collaboration contracts
+([`protocols/collaboration`](../../protocols/collaboration/README.md)). It
+publishes, reviews, readies and auto-merges pull requests, and reads, assigns
+and closes issues, through Putnami Source and the Putnami GitHub App of the
+repository connected to the linked workspace. No GitHub token is needed on
+the machine: every call presents your Putnami session.
+
+It needs three things:
+
+1. `putnami cloud login`, so a session is stored.
+2. `putnami cloud setup --workspace <id>`, so the workspace is linked.
+3. The Putnami GitHub App installed on the repository and connected to the
+   workspace (`putnami cloud source connect`, then
+   `putnami cloud source status`).
+
+The core binds one provider per contract and never falls back from one to
+another. To use this one, bind it in `putnami.workspace.json` instead of
+`@putnami/github-collaboration`. It takes no settings:
+
+```json
+{
+  "options": {
+    "collaboration": {
+      "tasks": { "provider": "@putnami/cloud", "version": 1 },
+      "proposals": { "provider": "@putnami/cloud", "version": 1 }
+    }
+  }
+}
+```
+
+`putnami proposals capabilities` and `putnami tasks capabilities` list what
+it serves:
+
+| Contract | Served | Answers unsupported |
+| --- | --- | --- |
+| proposals | find, upsert (open, update, draft or ready), status, comments, review, automerge (squash) | merge |
+| tasks | get, transition, assign (your own login only) | find, create, update, link |
+
+An operation Source does not serve answers `unsupported` and sends nothing.
+
+- **Credential.** A stored session always wins. `PUTNAMI_CLOUD_TOKEN` is used
+  only when no session can give a workspace bearer. Without either, an
+  operation answers `denied` and names `putnami cloud login`.
+- **Writes.** A write is sent once, with the caller's idempotency key when
+  the operation takes one. If its outcome is unknown, the operation answers
+  `unresolved` and names the read that settles it, such as
+  `proposals.find` or `tasks.get`. It never sends the write again.
+- **Redaction.** No answer carries the bearer the provider presented or the
+  value of `PUTNAMI_CLOUD_TOKEN`.
+
 ## Upload a change evidence document
 
 `@putnami/cloud` is the default evidence reporter of `putnami observe
