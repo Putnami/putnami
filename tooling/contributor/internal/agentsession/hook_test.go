@@ -865,7 +865,7 @@ func sum(durations []time.Duration) time.Duration {
 }
 
 func TestASessionStartWithoutASignedInSessionSaysReportingIsOff(t *testing.T) {
-	spectest.Proves(t, sessionFeature, startRequirement, "a-session-start-without-a-signed-in-session-says-reporting-is-off")
+	spectest.Proves(t, sessionFeature, failOpenRequirement, "a-session-start-without-a-signed-in-session-says-reporting-is-off")
 	for _, engine := range []string{claude, codex} {
 		for _, reason := range signInReasons {
 			h := newHarness(t)

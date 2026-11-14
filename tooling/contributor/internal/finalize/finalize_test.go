@@ -978,7 +978,7 @@ func TestPolicyAndTaskReferenceAuthority(t *testing.T) {
 	}
 	spectest.Proves(t, "tooling/contributor-executable", "repository-policy", "the-policy-selects-the-delivered-state-reference-and-language")
 	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "the-body-is-the-squash-message")
-	spectest.Proves(t, "tooling/contributor-executable", "squash-ready-publication", "no-publication-names-an-agent")
+	spectest.Proves(t, "tooling/contributor-executable", "signature-free-publication", "no-publication-names-an-agent")
 	f, _, provider, opts := finalizerFixture(t)
 	opts.TaskSource, opts.TaskID = provider.task.Ref.Source, provider.task.Ref.ID
 	if _, err := f.Run(context.Background(), opts); err != nil {
