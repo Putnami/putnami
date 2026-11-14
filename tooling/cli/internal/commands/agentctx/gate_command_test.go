@@ -602,8 +602,8 @@ func withCommandFlag(t *testing.T, manifest []byte, command, flag string) []byte
 // The gate the guidance names carries --enforce-coverage only when a gate
 // task a loaded extension declares accepts it: the engine refuses a flag no
 // selected task declares, so a Bazel or Pants workspace is told the gate
-// without it. When no extension loads, nothing says which flags the tasks
-// accept, and the flag stays. The CI document decides the tasks, never the
+// without it. When no loaded extension declares a gate task, nothing says
+// which flags the tasks accept, and the flag stays. The CI document decides the tasks, never the
 // flag.
 func TestGateCommandNamesOnlyDeclaredFlags(t *testing.T) {
 	spectest.Proves(t, "cli/ci-document", "gate-runs-as-written", "the-gate-names-only-declared-flags")
@@ -617,6 +617,7 @@ func TestGateCommandNamesOnlyDeclaredFlags(t *testing.T) {
 		want     string
 	}{
 		{"no extension loads", nil, nil, defaultGate() + " --impacted --enforce-coverage"},
+		{"no loaded extension declares a gate task", nil, extensionManifest(t, "@example/checks", "validate"), defaultGate() + " --impacted --enforce-coverage"},
 		{"no gate task declares the flag", nil, bazel, "test,build --impacted"},
 		{"a gate task declares the flag", nil, covered, "lint,test,build --impacted --enforce-coverage"},
 		{"the document names the tasks, the extensions the flag", []string{"build", "test"}, bazel, "build,test --impacted"},

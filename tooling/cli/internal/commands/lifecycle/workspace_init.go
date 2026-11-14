@@ -739,6 +739,15 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		}
 	}
 
+	// The sync can declare extensions the context generation above did not
+	// load, so the guidance block is written again: its gate names what the
+	// workspace's extensions declare once the sync installed them.
+	if flags.from != "" || len(adopted) > 0 {
+		if err := agentctx.WriteAgentEntrypoints(cwd); err != nil {
+			iox.Fprintf(os.Stderr, "  AI context generation failed: %v\n", err)
+		}
+	}
+
 	// End with the lock metadata refresh `putnami install` ends with.
 	if _, err := refreshInitLockMetadata(ctx, cwd, env.CLIVersion); err != nil {
 		return protocolcli.WithNext(fmt.Errorf("refresh lock metadata: %w", err), "putnami install")

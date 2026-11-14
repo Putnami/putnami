@@ -16,7 +16,7 @@ import (
 )
 
 // testBuildOnlyExtension declares test and build and no flag, the surface
-// @putnami/bazel and @putnami/pants declare: no lint, no --enforce-coverage.
+// @putnami/bazel declares: no lint, no --enforce-coverage.
 const testBuildOnlyExtension = `{
   "name": "@example/bazel",
   "version": "0.1.0",
