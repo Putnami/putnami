@@ -300,6 +300,87 @@ func TestTaskIndex_APortOnlyADependentReadsClaimsNoStepOfTheProject(t *testing.T
 	}
 }
 
+// A closure port reads the files of every project in its dependency closure,
+// so its scope travels through every dependent, but it claims its task only
+// where a command that declares the port may be planned. A fixture of a Go
+// library that a Python application packages claims the application's
+// packaging and its publishing; the Go extension that depends on the library
+// only relays the scope, so its runtime does not move and its consumers are
+// not selected.
+func TestTraceChangeImpact_AClosureScopeClaimsItsTaskOnlyWhereItsPortMayBePlanned(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "the-impact-index-answers-for-the-tasks-a-project-runs",
+		"a-closure-scope-claims-its-task-only-where-its-port-may-be-planned")
+	goExt := &extension.ExtensionDescription{
+		Name: "@fixture/go", RelPath: "go/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"go-compile": {Inputs: map[string]extproto.TaskInputPort{
+				"sources": {From: extproto.TaskInputFromProject, Files: []string{"**/*.go", "!**/*_test.go"}},
+			}},
+			"go-docker": {Inputs: map[string]extproto.TaskInputPort{
+				"binary": {From: extproto.TaskInputFromProject, Files: []string{"Dockerfile"}},
+			}},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"build": {
+				CommandName: "build", Name: "build", ExtensionName: "@fixture/go", ExtensionPath: "go/extension",
+				PipelineSteps: []extproto.PipelineStep{{ID: "compile", Task: "go-compile", DependsOn: []string{"^compile"}}},
+			},
+			"package": {
+				CommandName: "package", Name: "package", ExtensionName: "@fixture/go", ExtensionPath: "go/extension",
+				PipelineSteps: []extproto.PipelineStep{{ID: "docker", Task: "go-docker"}},
+			},
+		},
+	}
+	pyExt := &extension.ExtensionDescription{
+		Name: "@fixture/python", RelPath: "python/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"py-docker": {Inputs: map[string]extproto.TaskInputPort{
+				"application":      {From: extproto.TaskInputFromProject, Files: []string{"**/*.py"}},
+				"pathDependencies": {From: extproto.TaskInputFromClosure, Files: []string{"git:**/*", "!../**"}},
+			}},
+			"py-publish": {},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"package": {
+				CommandName: "package", Name: "package", ExtensionName: "@fixture/python", ExtensionPath: "python/extension",
+				PipelineSteps: []extproto.PipelineStep{
+					{ID: "docker", Task: "py-docker"},
+					{ID: "publish", Task: "py-publish", DependsOn: []string{"docker"}},
+				},
+			},
+		},
+	}
+	projects := []*Project{
+		{ID: "/go/extension", Name: "@fixture/go", Path: "go/extension", Dependencies: []string{"/libs/features"}},
+		{ID: "/python/extension", Name: "@fixture/python", Path: "python/extension"},
+		{ID: "/libs/features", Name: "features", Path: "libs/features", Extensions: []string{"/go/extension"}},
+		{ID: "/libs/api", Name: "api", Path: "libs/api", Extensions: []string{"/go/extension"}},
+		{ID: "/apps/py", Name: "py", Path: "apps/py", Extensions: []string{"/python/extension"}, Dependencies: []string{"/go/extension"}},
+	}
+	ws := NewWorkspace(t.TempDir(), nil, projects)
+	ws.Graph = BuildGraph(projects)
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{goExt, pyExt}, nil)
+	ti := idx.(*taskIndex)
+	moved := []string{closureScopePrefix + "package~docker"}
+	if got, want := ti.TasksReachedIn("/go/extension", moved), moved; !slices.Equal(got, want) {
+		t.Errorf("the Go extension takes %v, want the closure scope alone %v", got, want)
+	}
+	if got, want := ti.TasksReachedIn("/apps/py", moved), []string{closureScopePrefix + "package~docker", "package~docker", "package~publish"}; !slices.Equal(got, want) {
+		t.Errorf("the Python application takes %v, want %v", got, want)
+	}
+	if got := idx.TasksBuildingRuntime(moved); len(got) != 0 {
+		t.Errorf("a closure scope carried alone builds %v, want nothing", got)
+	}
+
+	got := traceChangeImpact(ws, []string{"libs/features/fixtures/tasks.golden.json"}, ChangeImpactOptions{Tasks: idx})
+	if ids := impactProjectIDs(got.Projects); slices.Contains(ids, "/libs/api") {
+		t.Errorf("a fixture the Go extension only relays selects %v, want no consumer of the extension", ids)
+	}
+	if scope := got.Trace.ScopeOf("/apps/py"); !slices.Contains(scope, "package~docker") {
+		t.Errorf("the Python application's scope is %v, want its packaging", scope)
+	}
+}
+
 // A workspace-once command reads for no project, so manifests whose only file
 // declarations are workspace-once attribute nothing: the index is nil and the
 // selection keeps the project-level mapping instead of selecting nothing.

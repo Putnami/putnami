@@ -922,8 +922,12 @@ func (idx *taskIndex) TasksReachedFrom(tasks []string) []string {
 // reference or a `^command` dependency reaches the project only when a
 // command that declares it may be planned there, so one stack's `^test`
 // carries no other stack's test step. A closure scope, and the prerequisite
-// of a `^command` dependency, travel as they do in TasksReachedFrom. A nil
-// list stands for every task; an unknown project gets TasksReachedFrom.
+// of a `^command` dependency, travel as they do in TasksReachedFrom, but a
+// closure scope claims its task and the tasks that follow it only where a
+// command that declares its closure port may be planned (closurePlannedIn):
+// elsewhere it travels on alone, so a dependent that only relays it to the
+// project that packages its closure runs nothing for it. A nil list stands
+// for every task; an unknown project gets TasksReachedFrom.
 func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string {
 	project := idx.ws.ProjectByID(projectID)
 	if project == nil {
@@ -946,6 +950,9 @@ func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string 
 	}
 	travel := func(scope string) {
 		reached[closureScopePrefix+scope] = true
+		if !idx.closurePlannedIn(scope, project) {
+			return
+		}
 		for _, next := range idx.closure[scope] {
 			reached[next] = true
 		}
@@ -972,6 +979,21 @@ func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string 
 		through(task)
 	}
 	return sortedSet(reached)
+}
+
+// closurePlannedIn reports whether a command that declares a closure port of
+// scope answers for projects and may be planned in project.
+func (idx *taskIndex) closurePlannedIn(scope string, project *Project) bool {
+	task := idx.tasks[scope]
+	if task == nil {
+		return false
+	}
+	for _, declared := range task.declarations {
+		if len(declared.closureFiles) > 0 && answersForProjects(declared.job) && idx.mayPlan(declared.job, project) {
+			return true
+		}
+	}
+	return false
 }
 
 // registerReachedVia records that job's step of scope names upstream through
@@ -1008,12 +1030,17 @@ var checkingKinds = []string{
 
 // TasksBuildingRuntime returns the entries of tasks that may build what an
 // extension's consumers execute: it drops an entry when every command that
-// declares it is of a checking kind. A qualified entry is answered by the
-// commands of its extension, a closure entry by the task it reads for. An
-// entry the index attributes to no command stays.
+// declares it is of a checking kind, and a closure entry: it marks the files
+// the project's dependents read for a task of their own, and builds nothing
+// in the project that carries it, which takes the task itself where it runs
+// it (TasksReachedIn). A qualified entry is answered by the commands of its
+// extension. An entry the index attributes to no command stays.
 func (idx *taskIndex) TasksBuildingRuntime(tasks []string) []string {
 	building := make([]string, 0, len(tasks))
 	for _, task := range tasks {
+		if strings.HasPrefix(task, closureScopePrefix) {
+			continue
+		}
 		if !idx.checksOnly(task) {
 			building = append(building, task)
 		}

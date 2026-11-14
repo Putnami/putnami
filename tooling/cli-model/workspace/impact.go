@@ -72,10 +72,12 @@ type TaskImpactIndex interface {
 
 	// TasksBuildingRuntime returns the entries of tasks that may build what an
 	// extension's consumers execute: every entry but one that only commands
-	// of a checking kind declare. A verification, a check against criteria
-	// and a tally of diagnostics report on the project; none of them produces
-	// the extension's runtime, even when a dependent's step of the same
-	// command reads its output. An entry the index attributes to no command
+	// of a checking kind declare, or a closure entry. A verification, a check
+	// against criteria and a tally of diagnostics report on the project; none
+	// of them produces the extension's runtime, even when a dependent's step
+	// of the same command reads its output. A closure entry marks the files
+	// the project's dependents read for a task of their own and builds
+	// nothing in the project. An entry the index attributes to no command
 	// stays.
 	TasksBuildingRuntime(tasks []string) []string
 
