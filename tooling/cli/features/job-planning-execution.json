@@ -1348,7 +1348,8 @@
           "checks": [
             "a-layer-claims-no-task-of-a-command-the-project-does-not-run",
             "a-step-reference-reaches-only-a-dependent-that-may-run-its-command",
-            "a-port-only-a-dependent-reads-claims-no-step-of-the-project"
+            "a-port-only-a-dependent-reads-claims-no-step-of-the-project",
+            "a-closure-scope-claims-its-task-only-where-its-port-may-be-planned"
           ]
         }
       },
