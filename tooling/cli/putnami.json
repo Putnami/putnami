@@ -11,6 +11,9 @@
   "publish": [
     "archives"
   ],
+  "featureAuthority": {
+    "owner": "tooling/cross-language-rest-clients"
+  },
   "tasks": {
     "test~test": {
       "timeoutMs": 1200000
