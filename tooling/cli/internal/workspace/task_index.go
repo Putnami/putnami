@@ -40,7 +40,11 @@ import (
 // closure, so it is read where the command may run in the project or in any
 // project that depends on it. So is a step a dependent's step names through
 // `^`: the dependent's toolchain may read the sources of a project that runs
-// no such step, which the index cannot see, so it errs wide there too. A
+// no such step, which the index cannot see, so it errs wide there too. Such a
+// step is credited to the project alone, never closed over the project's own
+// steps: the project runs none of them after a step it does not run, and
+// another stack's step of the same name, closed over, would carry the change
+// to every dependent that stack plans it in. A
 // command the workspace-once activation plans reads no path for a project: the
 // engine plans it on every impacted run, whatever the selection, so crediting
 // it to a project would only add that project's own tasks. An input selector
@@ -646,7 +650,9 @@ func (idx *taskIndex) ReadsAsExtensionRuntime(projectID, path string) bool {
 }
 
 // TasksReadingPath returns the tasks of a project whose declared inputs select
-// a workspace-relative path, closed under the tasks that depend on them.
+// a workspace-relative path, closed under the tasks that depend on them, but
+// for a task read there only because a dependent may run its command, which
+// claims itself alone (credit).
 //
 // Three declarations answer, and they are the three the cache hasher reads for
 // the same job: the task's own input ports, the project's option layers
@@ -687,6 +693,7 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 	}
 	inProject := relative && !isParentRelative(rel)
 	reading := make(map[string]bool)
+	carried := make(map[string]bool)
 	dir := filepath.Join(idx.ws.Root, project.Path)
 	for _, scope := range idx.every {
 		task := idx.tasks[scope]
@@ -698,16 +705,14 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 				continue
 			}
 			if inProject && wsproto.SelectsPath(rel, declared.files) {
-				if idx.readsWhere(scope, declared.job, project) {
-					reading[scope] = true
-				}
+				idx.credit(scope, declared.job, project, reading, carried)
 				if wsproto.SelectsPath(rel, declared.closureFiles) && idx.mayPlanInClosureOf(declared.job, project) {
 					reading[closureScopePrefix+scope] = true
 				}
 				continue
 			}
-			if wsproto.SelectsPath(lookup, declared.workspaceFiles) && idx.readsWhere(scope, declared.job, project) {
-				reading[scope] = true
+			if wsproto.SelectsPath(lookup, declared.workspaceFiles) {
+				idx.credit(scope, declared.job, project, reading, carried)
 			}
 		}
 	}
@@ -721,10 +726,29 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 			}
 		}
 	}
-	if len(reading) == 0 {
+	if len(reading) == 0 && len(carried) == 0 {
 		return nil
 	}
-	return idx.closureOf(sortedSet(reading))
+	for _, scope := range idx.closureOf(sortedSet(reading)) {
+		carried[scope] = true
+	}
+	return sortedSet(carried)
+}
+
+// credit records a port of scope, which job declares, as read in project:
+// into reading where the planner may run job there, so the project's steps
+// that follow it read the change too, and into carried where only a project
+// that depends on it may run it through a `^` reference (readsWhere). The
+// project runs none of its own steps after a step it does not run, so a
+// carried task claims itself alone, and a dependent takes it through
+// TasksReachedIn.
+func (idx *taskIndex) credit(scope string, job *extension.JobDefinition, project *Project, reading, carried map[string]bool) {
+	switch {
+	case idx.mayPlan(job, project):
+		reading[scope] = true
+	case idx.readsWhere(scope, job, project):
+		carried[scope] = true
+	}
 }
 
 // selectorsRead reports whether an input selector the task names reads rel in
