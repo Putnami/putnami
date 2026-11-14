@@ -3,6 +3,7 @@ package agentctx
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	ciproto "go.putnami.dev/protocol/ci"
@@ -35,14 +36,19 @@ import (
 // follows the committed lock: context generation materializes the
 // lock-pinned extensions before it writes.
 func gateTasksForWorkspace(wsRoot string) string {
+	return gateTasks(wsRoot, loadedJobs(wsRoot))
+}
+
+// gateTasks is gateTasksForWorkspace over the jobs the workspace's loaded
+// extensions declare, read once by the caller.
+func gateTasks(wsRoot string, jobs map[string][]*extension.JobDefinition) string {
 	if tasks := gateCommandNames(readCIDocument(wsRoot)); len(tasks) > 0 {
 		return strings.Join(tasks, ",")
 	}
 	defaults := gateCommandNames(ciproto.DefaultDocument())
-	declared := declaredJobs(wsRoot)
 	kept := make([]string, 0, len(defaults))
 	for _, name := range defaults {
-		if declared[name] {
+		if len(jobs[name]) > 0 {
 			kept = append(kept, name)
 		}
 	}
@@ -52,11 +58,45 @@ func gateTasksForWorkspace(wsRoot string) string {
 	return strings.Join(kept, ",")
 }
 
-// declaredJobs returns the job names the workspace's loaded extensions
-// declare, discovered as a job run discovers them: from the workspace
-// projects and the workspace extensions list. A workspace that does not load
-// declares nothing.
-func declaredJobs(wsRoot string) map[string]bool {
+// coverageFlag is the flag the gate adds so the run fails below the projects'
+// coverage thresholds.
+const coverageFlag = "enforce-coverage"
+
+// gateCommandForWorkspace is the argument list of the gate the generated
+// guidance tells an agent to run: the gate tasks, over the impacted projects,
+// with --enforce-coverage when a gate task a loaded extension declares
+// accepts it. The engine refuses a flag no selected task declares, so a
+// workspace whose extensions declare no coverage flag, as Bazel's and Pants'
+// do not, is told the gate without it. When no loaded extension declares a
+// gate task, nothing says which flags the tasks accept, and the flag stays, as
+// the whole default stays in gateTasksForWorkspace.
+func gateCommandForWorkspace(wsRoot string) string {
+	jobs := loadedJobs(wsRoot)
+	tasks := strings.Split(gateTasks(wsRoot, jobs), ",")
+	command := strings.Join(tasks, ",") + " --impacted"
+	if !slices.ContainsFunc(tasks, func(task string) bool { return len(jobs[task]) > 0 }) ||
+		gateDeclaresFlag(tasks, jobs, coverageFlag) {
+		command += " --" + coverageFlag
+	}
+	return command
+}
+
+// gateDeclaresFlag reports whether a gate task declares the flag, the
+// surface a run of those tasks validates its flags against.
+func gateDeclaresFlag(tasks []string, jobs map[string][]*extension.JobDefinition, flag string) bool {
+	for _, task := range tasks {
+		if _, ok := extension.CollectCommandFlags(jobs[task])[flag]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+// loadedJobs returns the jobs the workspace's loaded extensions declare, by
+// name, discovered as a job run discovers them: from the workspace projects
+// and the workspace extensions list. A workspace that does not load declares
+// nothing.
+func loadedJobs(wsRoot string) map[string][]*extension.JobDefinition {
 	var projectPaths []string
 	if ws, err := workspace.Load(wsRoot); err == nil && ws != nil {
 		projectPaths = ws.ProjectPaths()
@@ -65,11 +105,7 @@ func declaredJobs(wsRoot string) map[string]bool {
 	if err != nil {
 		return nil
 	}
-	declared := make(map[string]bool)
-	for name := range extension.BuildJobMap(extensions) {
-		declared[name] = true
-	}
-	return declared
+	return extension.BuildJobMap(extensions)
 }
 
 // readCIDocument returns the workspace's CI document, or the zero document
@@ -104,4 +140,10 @@ func gateCommandNames(document ciproto.Document) []string {
 // and the documented contributor recipe is compared against them.
 func GateTasks(wsRoot string) string {
 	return gateTasksForWorkspace(wsRoot)
+}
+
+// GateCommand is the argument list of the gate the generated guidance names,
+// after `putnami`, such as "lint,test,build --impacted --enforce-coverage".
+func GateCommand(wsRoot string) string {
+	return gateCommandForWorkspace(wsRoot)
 }

@@ -26,7 +26,11 @@ verified change. It uses public CLI surfaces only.
    the CI protocol's default document (`lint,test,build`) that a loaded
    extension declares, in that order: a Bazel workspace gets `test,build`. No
    other verb joins it, and a workspace whose extensions declare none of them
-   keeps all three. In a repository that provides
+   keeps all three. The gate adds `--enforce-coverage` only when a gate task
+   a loaded extension declares accepts it, or when no loaded extension
+   declares a gate task: a Bazel workspace gets `test,build --impacted`, a
+   Pants workspace `lint,test,build --impacted`. The `Next:` hint `init`
+   prints names the same gate tasks. In a repository that provides
    `./putnamiw`, use that pinned wrapper for build, test, lint, dependency, and
    generation workflows.
 5. Diagnose with `putnami doctor`, structured `--output=jsonl`,

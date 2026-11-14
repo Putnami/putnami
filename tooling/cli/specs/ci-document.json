@@ -19,6 +19,13 @@
         "The generated agent guidance and cache verify use the blocking commands of putnami.ci.json in its order.",
         "Without a usable document they use the blocking commands of the protocol's default document that a loaded extension declares, in that order, or all of them when no extension declares one."
       ]
+    },
+    {
+      "id": "gate-runs-as-written",
+      "text": [
+        "The gate the generated agent guidance names adds --enforce-coverage only when a gate command a loaded extension declares accepts that flag, or when no loaded extension declares a gate command.",
+        "The closing hint of init names the same gate commands, so each command the guidance and the hint write runs on the workspace they describe."
+      ]
     }
   ],
   "decisions": [
