@@ -38,8 +38,15 @@
         "Publication consumes a current dossier or awaits named hosted checks, runs no local gate and rechecks proof per boundary.",
         "A hosted parent needs an immutable workflow and completion eligibility;",
         "incomplete parents need partial delivery, with no workflow if only featureAuthority.none projects own its paths.",
-        "Hosted checks advance only natively proven units to a replayable receipt, keeping later obligations; a partial with none has no receipt.",
-        "Before any write, each body line naming an agent is removed and reported; a title, proof or branch commit naming one stops the run."
+        "Hosted checks advance only natively proven units to a replayable receipt, keeping later obligations; a partial with none has no receipt."
+      ]
+    },
+    {
+      "id": "signature-free-publication",
+      "text": [
+        "No title, body, proof or branch commit of a publication names an agent, in the forms the agent-attribution step of validate refuses.",
+        "Before any write, the finalizer removes each line of the body that names one and reports it on stderr and in the result; the body file stays as written.",
+        "A title, a proof or a branch commit that names one, or a body left empty, stops the run; the body read back after the write stays exact."
       ]
     },
     {

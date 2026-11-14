@@ -17,8 +17,7 @@
       "text": [
         "SessionStart syncs the session, reads the mission's checkpoint through memory.mission when memory is bound, and prints the mission sheet: the repository and key putnami agent ask takes, the title, the plan, the open decisions and the checkpoint, within 4 KiB, with every agent or owner text quoted with \"> \".",
         "Waiting messages follow whole while the context stays within 9,500 bytes.",
-        "A sheet the provider did not refresh says its date; a workspace without missions gets none.",
-        "A sync refused for want of a signed-in session shows the user one line: reporting is off, run putnami cloud login."
+        "A sheet the provider did not refresh says its date; a workspace without missions gets none."
       ]
     },
     {
@@ -59,7 +58,8 @@
         "Every hook path other than a waking idle wake exits 0.",
         "A failure, a missing host channel, a bad payload or an outcome other than ok prints no error and leaves one line in hook.log, which rotates at 1 MiB.",
         "A failed call closes the channel so the next one dials again, and what the sync did not deliver stays queued.",
-        "A plan the provider refuses goes once without it."
+        "A plan the provider refuses goes once without it.",
+        "A SessionStart sync refused for want of a signed-in session also shows the user one line: reporting is off, run putnami cloud login."
       ]
     },
     {
