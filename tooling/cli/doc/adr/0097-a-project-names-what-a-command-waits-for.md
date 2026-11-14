@@ -48,10 +48,12 @@ per task. Three adoptions lost the order their tool kept (#1152):
   when a dependent first asks for a job that was pruned, as the plan-time
   keys take it before anything runs; the Rush and moon profiles exclude the
   tools' outputs and `node_modules` from a delegated task's inputs.
-- Impact selection reads a project's `^command` entry in that project alone,
-  as `impact-reads-only-what-a-project-runs` requires; a same-project
-  `command` entry links the two commands' tasks in every project, as a
-  manifest's does.
+- Impact selection carries a project's `^command` entry into the dependent
+  command of that project alone, as `impact-reads-only-what-a-project-runs`
+  requires, and lets the prerequisite's tasks travel on through every
+  dependent, as a manifest's do, since the entry reads the whole dependency
+  closure. A same-project `command` entry links the two commands' tasks in
+  every project, as a manifest's does.
 - The adoption syncs write these entries from what the tool declares: Rush's
   build order and phased commands, `turbo.json`'s `dependsOn`, moon's
   resolved `deps`. A delegated task keeps one tool process on its own project
