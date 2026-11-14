@@ -49,4 +49,10 @@ session that could answer them was stored.
 ## Consequences
 
 - A CI job or a runner with no stored session behaves exactly as before.
+- Two commands keep a bearer of their own and stay out of this rule:
+  `cloud evidence-report` (`putnami observe --upload`) sends
+  `PUTNAMI_CLOUD_TOKEN` when it is set, because the token carries the
+  `delivery.ingest` scope the upload needs, and `cloud config drift` sends it
+  as an explicit bearer override. Neither goes through `WorkspaceAuth`, so a
+  refusal they meet is not annotated with the session.
 - A machine that holds both credentials uses the person's.
