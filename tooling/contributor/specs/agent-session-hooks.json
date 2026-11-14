@@ -58,7 +58,8 @@
         "Every hook path other than a waking idle wake exits 0.",
         "A failure, a missing host channel, a bad payload or an outcome other than ok prints no error and leaves one line in hook.log, which rotates at 1 MiB.",
         "A failed call closes the channel so the next one dials again, and what the sync did not deliver stays queued.",
-        "A plan the provider refuses goes once without it."
+        "A plan the provider refuses goes once without it.",
+        "A SessionStart sync refused for want of a signed-in session also shows the user one line: reporting is off, run putnami cloud login."
       ]
     },
     {

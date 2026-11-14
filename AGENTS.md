@@ -9,3 +9,5 @@ This is a Putnami workspace.
 - Read `.agents/constraints.md` when it exists.
 - Settled decisions are recorded one per file in `decisions/<id>.json`: the root `decisions/` binds every project, a project's own binds that project. Read the decision before you change a settled choice, and never re-decide one: to change a settled value, change its file in the same pull request. Record a new decision in a new file named by a slug id.
 <!-- putnami:guidance v2 end -->
+
+No commit, pull request, comment or document names an agent, a model or a session link.

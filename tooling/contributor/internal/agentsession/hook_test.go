@@ -3,6 +3,7 @@ package agentsession
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -861,4 +862,42 @@ func sum(durations []time.Duration) time.Duration {
 		total += d
 	}
 	return total
+}
+
+func TestASessionStartWithoutASignedInSessionSaysReportingIsOff(t *testing.T) {
+	spectest.Proves(t, sessionFeature, failOpenRequirement, "a-session-start-without-a-signed-in-session-says-reporting-is-off")
+	for _, engine := range []string{claude, codex} {
+		for _, reason := range signInReasons {
+			h := newHarness(t)
+			denied := h.provider.envelope(collab.ContractMissions, collab.OperationSync, collab.OutcomeDenied, nil, &collab.Error{Message: "no signed-in session", Reason: reason})
+			h.provider.failSync = &denied
+			code, stdout, stderr := h.run([]string{"--engine", engine}, h.payload(engine, "session-start", claudeSession, nil))
+			if code != 0 || stderr != "" {
+				t.Fatalf("%s %s: exit %d, stderr %q", engine, reason, code, stderr)
+			}
+			var out hookOutput
+			if err := json.Unmarshal([]byte(stdout), &out); err != nil {
+				t.Fatalf("%s %s: stdout %q: %v", engine, reason, stdout, err)
+			}
+			if out.SystemMessage != reportingOffNotice || strings.Count(out.SystemMessage, "\n") != 0 || !strings.Contains(out.SystemMessage, "putnami cloud login") {
+				t.Errorf("%s %s: system message %q", engine, reason, out.SystemMessage)
+			}
+			if !logSays(h.hookLog(), "missions.sync answered denied ("+reason+")") {
+				t.Errorf("%s %s: hook.log %v", engine, reason, h.hookLog())
+			}
+		}
+	}
+	// Another failure keeps the notice off: the provider is down, not the
+	// sign-in.
+	h := newHarness(t)
+	unavailable := h.provider.envelope(collab.ContractMissions, collab.OperationSync, collab.OutcomeUnavailable, nil, &collab.Error{Message: "down", Reason: collab.ReasonProviderUnavailable, Retryable: true})
+	h.provider.failSync = &unavailable
+	if out := h.hook(claude, "session-start", claudeSession, nil); out != nil && out.SystemMessage != "" {
+		t.Errorf("system message %q on an unavailable provider", out.SystemMessage)
+	}
+	// Neither does a refusal for another reason, nor a failure that is no
+	// provider answer.
+	if reportingOff(errors.New("transport closed")) || reportingOff(outcomeError(collab.Envelope{Outcome: collab.OutcomeDenied, Error: &collab.Error{Reason: "scope.missing"}})) {
+		t.Error("reportingOff answered true for another failure")
+	}
 }

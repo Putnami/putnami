@@ -52,11 +52,24 @@
             "checks": [
               "a-draft-opens-before-the-first-edit",
               "the-body-is-the-squash-message",
-              "no-publication-names-an-agent",
               "an-explicit-hosted-gate-waits-without-local-execution",
               "hosted-parent-workflow-completeness",
               "a-featureless-partial-needs-no-workflow",
               "a-partial-without-an-eligible-unit-publishes-without-a-receipt"
+            ]
+          }
+        },
+        {
+          "id": "signature-free-publication",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "no-publication-names-an-agent",
+              "a-signed-body-is-published-without-its-signature"
             ]
           }
         },
@@ -290,7 +303,8 @@
             "checks": [
               "every-failure-exits-0-with-a-log-line",
               "a-run-without-a-channel-exits-0",
-              "a-transport-error-redials-and-keeps-the-queue"
+              "a-transport-error-redials-and-keeps-the-queue",
+              "a-session-start-without-a-signed-in-session-says-reporting-is-off"
             ]
           }
         },

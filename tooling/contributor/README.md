@@ -165,7 +165,10 @@ to the session; the input is a `missions.ask` document without its `mission`.
 `putnami agent reply --message <id> --reply <text>` records a reply through
 `missions.reply`, and the session's next Stop then sends no `[ack <id>]` line
 for that message. A hook never fails a turn: a failure leaves one line in
-`hook.log` under `<Putnami home>/contributor/sessions`.
+`hook.log` under `<Putnami home>/contributor/sessions`. When the missions
+provider refuses the SessionStart sync for want of a signed-in session, the
+hook also shows the user one line, as the host's system message: reporting is
+off, run `putnami cloud login`.
 
 Codex needs three things from the workspace before these hooks report a
 session:
