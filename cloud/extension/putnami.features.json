@@ -501,6 +501,94 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/collaboration-provider",
+      "type": "feature",
+      "name": "Collaboration through Putnami Source",
+      "outcome": "A workspace that binds @putnami/cloud to the tasks and proposals contracts publishes, reviews, readies and auto-merges its pull requests and reads and closes its issues through Putnami Source and the Putnami GitHub App, under the signed-in Putnami session, with no GitHub token on the machine",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "declares-the-source-operations",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-manifest-offer"
+            ]
+          }
+        },
+        {
+          "id": "calls-source-for-each-served-operation",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-routes-each-operation"
+            ]
+          }
+        },
+        {
+          "id": "answers-unsupported-without-a-call",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-unsupported-sends-nothing"
+            ]
+          }
+        },
+        {
+          "id": "signed-in-session-wins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-credential-precedence"
+            ]
+          }
+        },
+        {
+          "id": "never-repeats-an-uncertain-write",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-uncertain-write-unresolved"
+            ]
+          }
+        },
+        {
+          "id": "keeps-the-bearer-out-of-the-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-redacts-the-bearer"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

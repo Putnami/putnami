@@ -1,0 +1,55 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/collaboration-provider",
+  "outcomes": [
+    "A workspace that binds @putnami/cloud to the tasks and proposals contracts publishes, reviews, readies and auto-merges its pull requests and reads and closes its issues through Putnami Source and the Putnami GitHub App, under the signed-in Putnami session, with no GitHub token on the machine"
+  ],
+  "nonGoals": [
+    "Falling back from @putnami/github-collaboration to Putnami Source: the core binds one provider per contract, and a workspace chooses this one in options.collaboration",
+    "Finding, creating, updating or linking issues, and merging a pull request at once: Putnami Source does not serve them, so they answer unsupported",
+    "Installing the Putnami GitHub App or linking the workspace: putnami cloud source connect and putnami cloud setup do both"
+  ],
+  "requirements": [
+    {
+      "id": "declares-the-source-operations",
+      "text": [
+        "The @putnami/cloud manifest declares version 1 of the tasks and proposals contracts, run by its own runtime with the provider argument, and every operation each version requires.",
+        "The proposals contract also declares comments and automerge; the tasks contract also declares assign.",
+        "upsert, transition and assign declare checked preconditions: Source compares the expected revision with what it read before it writes."
+      ]
+    },
+    {
+      "id": "calls-source-for-each-served-operation",
+      "text": [
+        "proposals.find, upsert, status, comments, review and automerge, and tasks.get, transition and assign, each send one request to the matching route of Putnami Source under /v1/workspaces/{workspace}/source/, for the workspace putnami cloud setup linked, and answer the collaboration document Source answers.",
+        "Source's refusals keep their outcome: a missing item is not_found, a stale revision or a moved head is a conflict with the current revision when Source names it, a refused credential or permission is denied, and an invalid request is invalid.",
+        "A binding whose settings carry any member is invalid, and a workspace with no Cloud link answers unavailable and names putnami cloud setup."
+      ]
+    },
+    {
+      "id": "answers-unsupported-without-a-call",
+      "text": "tasks.find, create, update and link, and proposals.merge, answer unsupported with reason operation.unsupported and send no request: Source serves none of them."
+    },
+    {
+      "id": "signed-in-session-wins",
+      "text": [
+        "Every call presents the workspace-scoped bearer of the session putnami cloud login stored, refreshed when it expired.",
+        "PUTNAMI_CLOUD_TOKEN is used only when no stored session can give one, and a valid session wins over it.",
+        "Without either, the operation sends nothing and answers denied, naming putnami cloud login."
+      ]
+    },
+    {
+      "id": "never-repeats-an-uncertain-write",
+      "text": [
+        "A write is sent once, with the caller's idempotency key when the operation takes one.",
+        "When its outcome is unknown, because the connection broke after the request left, the deadline passed or Source answered a server error, the operation answers unresolved, names the read that settles it (proposals.find or proposals.status for a proposal write, tasks.get for a task write), and never sends it again.",
+        "A read that fails the same way answers unavailable and is retryable."
+      ]
+    },
+    {
+      "id": "keeps-the-bearer-out-of-the-answer",
+      "text": "No answer, message or result the provider writes contains the bearer it presented or the value of PUTNAMI_CLOUD_TOKEN: each is replaced before the answer leaves the process."
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
-  "cliContract": 18,
+  "cliContract": 19,
   "name": "@putnami/cloud",
   "version": "0.1.0",
   "ecosystems": [
@@ -2933,6 +2933,90 @@
       "cache": false,
       "description": "Query a workspace app's metric series.",
       "timeoutMs": 120000
+    }
+  },
+  "providers": {
+    "tasks": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "operations": {
+        "find": {
+          "description": "Not served. Putnami Source does not serve it: the operation answers unsupported and sends nothing.",
+          "openWorld": true
+        },
+        "get": {
+          "description": "Read one issue of the repository connected to the linked Putnami workspace through Putnami Source and the Putnami GitHub App, under the signed-in Putnami session.",
+          "openWorld": true
+        },
+        "create": {
+          "description": "Not served. Putnami Source does not serve it: the operation answers unsupported and sends nothing.",
+          "openWorld": true
+        },
+        "update": {
+          "description": "Not served. Putnami Source does not serve it: the operation answers unsupported and sends nothing.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "transition": {
+          "description": "Reopen an issue, or close it as completed when an open or merged pull request of the signed-in person closes it, through Putnami Source. Source compares expectedRevision with the issue it read just before the write. A write whose outcome is unknown is never sent again: it answers unresolved.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "assign": {
+          "description": "Assign an issue to the signed-in person's own GitHub login through Putnami Source; Source refuses any other login. An assignee is information, never an exclusive claim.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "link": {
+          "description": "Not served. Putnami Source does not serve it: the operation answers unsupported and sends nothing.",
+          "openWorld": true
+        }
+      }
+    },
+    "proposals": {
+      "version": 1,
+      "command": "{extensionRuntime}",
+      "args": [
+        "provider"
+      ],
+      "cwd": "{workspaceRoot}",
+      "timeoutMs": 120000,
+      "operations": {
+        "find": {
+          "description": "Find the pull requests of an exact base and head in the repository connected to the linked Putnami workspace, through Putnami Source and the Putnami GitHub App.",
+          "openWorld": true
+        },
+        "upsert": {
+          "description": "Update the open pull request of an exact base and head, or open it, through Putnami Source and the Putnami GitHub App: draft or ready, at a requested headCommit. Source compares expectedRevision with the pull request it read just before the write. A write whose outcome is unknown is never sent again: it answers unresolved.",
+          "openWorld": true,
+          "preconditions": "checked"
+        },
+        "status": {
+          "description": "Read a pull request, the checks of its head commit and its submitted reviews through Putnami Source.",
+          "openWorld": true
+        },
+        "review": {
+          "description": "Submit a comment-only review of a pull request through Putnami Source; the idempotency key makes a repeated review return the one it published. A review whose outcome is unknown answers unresolved and is never sent again.",
+          "openWorld": true
+        },
+        "comments": {
+          "description": "List what people wrote on a pull request, oldest first, through Putnami Source.",
+          "openWorld": true
+        },
+        "merge": {
+          "description": "Not served. Putnami Source does not serve it: the operation answers unsupported and sends nothing.",
+          "openWorld": true
+        },
+        "automerge": {
+          "description": "Turn squash auto-merge on for an open, ready pull request whose head is still the expected commit, through Putnami Source and the Putnami GitHub App. Source refuses a draft, a closed pull request and a moved head. Binding this provider authorizes nobody to turn it on.",
+          "openWorld": true
+        }
+      }
     }
   }
 }
