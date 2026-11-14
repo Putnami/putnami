@@ -74,5 +74,10 @@ runs.**
   machine's release, as it records the default Bun of the TypeScript
   extension.
 - A repository whose machine cannot reach go.dev and holds no pin record still
-  gets no pin; declaring the release in `go.work` and installing with network
-  access pins it.
+  gets no pin, and the answer reports nothing: the next Go job names
+  `putnami install` as before. Declaring the release in `go.work` and
+  installing with network access pins it.
+- The extension asks only a `go` in an absolute PATH directory. The core's
+  candidate lookup also reads relative PATH entries, so a relative `go` that
+  runs another release does not block the pinned one; the core provisions the
+  pinned release when no candidate runs it.
