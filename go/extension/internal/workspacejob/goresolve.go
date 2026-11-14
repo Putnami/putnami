@@ -2,6 +2,7 @@ package workspacejob
 
 import (
 	"bufio"
+	"context"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -12,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strings"
 	"time"
@@ -61,7 +63,11 @@ const (
 //   - Otherwise the declared release is resolved: from its pin record, else,
 //     unless the request is offline, from the go.dev release index, whose
 //     answer is then written as the record.
-//   - With no declaration and no committed pin, the answer omits Go.
+//   - With no declaration and no committed pin, the release of the machine's
+//     go command (machineGoRelease) is resolved as a declared release is,
+//     except that an offline request with no pin record for it omits Go.
+//   - With no declaration, no committed pin and no go command that runs a Go
+//     release, the answer omits Go.
 //   - A pin that has no archive for the request's platform is answered as a
 //     problem.
 //
@@ -87,7 +93,8 @@ func AnswerToolchainResolve(root string, request wsproto.ToolchainResolveRequest
 }
 
 // resolveGoPin answers for GoLockIdentity. It reports false when go.work
-// declares no Go release and the lock pins none, so the lock keeps no Go pin.
+// declares no Go release, the lock pins none and the machine offers no Go
+// release to pin, so the lock keeps no Go pin.
 func resolveGoPin(root string, request wsproto.ToolchainResolveRequest, lookup func(string) string) (wsproto.ToolchainResolution, bool, error) {
 	declared, err := GoWorkDeclaration(root)
 	if err != nil {
@@ -100,20 +107,127 @@ func resolveGoPin(root string, request wsproto.ToolchainResolveRequest, lookup f
 		return committedGoPin(committed, request.Platform), true, nil
 	}
 	if declared == "" {
-		return wsproto.ToolchainResolution{}, false, nil
+		return resolveMachineGoPin(root, request, lookup)
 	}
 	lock, problem := resolveDeclaredGo(root, declared, request.Offline, lookup)
 	if problem != nil {
 		return wsproto.ToolchainResolution{Problem: problem}, true, nil
 	}
-	pin := goArchivesPin(lock)
-	if !pinCoversPlatform(pin, request.Platform) {
-		return toolchainProblem(
-			fmt.Sprintf("Go %s publishes no archive Putnami pins for %s", lock.Version, request.Platform),
-			"Putnami pins Go for darwin, linux and windows on amd64 and arm64. Declare in go.work a Go release that publishes an archive for "+
-				request.Platform+", or install on a platform the release serves."), true, nil
+	return releasePin(lock, request.Platform), true, nil
+}
+
+// resolveMachineGoPin answers for GoLockIdentity when go.work declares no
+// release and the lock pins none: the release machineGoRelease finds, from its
+// pin record, else, unless the request is offline, from the go.dev release
+// index, whose answer is then written as the record. It reports false when no
+// go command runs a Go release, and when the request is offline and no pin
+// record holds that release.
+func resolveMachineGoPin(root string, request wsproto.ToolchainResolveRequest, lookup func(string) string) (wsproto.ToolchainResolution, bool, error) {
+	binary, version := machineGoRelease(lookup)
+	if version == "" {
+		return wsproto.ToolchainResolution{}, false, nil
 	}
-	return wsproto.ToolchainResolution{Pin: &pin}, true, nil
+	toolchainRoot := toolchain.ResolveGoToolchainRoot(lookup, root)
+	if lock, ok := readGoPinRecord(toolchainRoot, version); ok {
+		return releasePin(lock, request.Platform), true, nil
+	}
+	if request.Offline {
+		return wsproto.ToolchainResolution{}, false, nil
+	}
+	integrities, err := fetchGoReleaseIntegrities(version)
+	if err != nil {
+		return toolchainProblem(
+			fmt.Sprintf("cannot resolve Go %s, which the go command at %s runs and go.work does not override: %v", version, binary, err),
+			"Declare a published Go release in go.work at the workspace root, and run `putnami install` with network access to go.dev."), true, nil
+	}
+	lock := GoLock{Version: version, Integrities: integrities, Source: goReleaseSource}
+	_ = writeGoPinRecord(toolchainRoot, lock)
+	return releasePin(lock, request.Platform), true, nil
+}
+
+// releasePin is the resolution of lock's Go release for platform: its lock
+// version 5 entry, or a problem when the release publishes no archive Putnami
+// pins for platform.
+func releasePin(lock GoLock, platform string) wsproto.ToolchainResolution {
+	pin := goArchivesPin(lock)
+	if !pinCoversPlatform(pin, platform) {
+		return toolchainProblem(
+			fmt.Sprintf("Go %s publishes no archive Putnami pins for %s", lock.Version, platform),
+			"Putnami pins Go for darwin, linux and windows on amd64 and arm64. Declare in go.work a Go release that publishes an archive for "+
+				platform+", or install on a platform the release serves.")
+	}
+	return wsproto.ToolchainResolution{Pin: &pin}
+}
+
+// machineGoRelease returns the go command the extension's runtime compiler
+// candidates find first, GOROOT/bin/go when GOROOT names one, else the first
+// go on PATH, and the Go release it runs, or two empty strings when there is
+// no such go command or it runs no Go release, such as a development build.
+// The command is asked as the manifest's probe asks it: `go env GOVERSION`
+// with GOROOT unset and GOTOOLCHAIN=local, so the release is the one it runs,
+// not one it would switch to. lookup reads GOROOT and PATH.
+func machineGoRelease(lookup func(string) string) (binary, version string) {
+	binary = machineGoBinary(lookup)
+	if binary == "" {
+		return "", ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), machineGoProbeTimeout)
+	defer cancel()
+	probe := &Job{
+		Ctx:    ctx,
+		Env:    NewEnv(withoutEnv(os.Environ(), "GOROOT", "GOTOOLCHAIN")),
+		Stdout: io.Discard,
+		Stderr: io.Discard,
+	}
+	out, err := probe.Output([]string{"GOTOOLCHAIN=local"}, binary, "env", "GOVERSION")
+	if err != nil {
+		return "", ""
+	}
+	reported := strings.TrimSpace(out)
+	if !strings.HasPrefix(reported, "go") {
+		return "", ""
+	}
+	version = strings.TrimPrefix(reported, "go")
+	if !isPlainGoRelease(version) {
+		return "", ""
+	}
+	return binary, version
+}
+
+// machineGoProbeTimeout bounds the `go env GOVERSION` call of
+// machineGoRelease.
+const machineGoProbeTimeout = 30 * time.Second
+
+// machineGoBinary returns GOROOT/bin/go when GOROOT is set and names an
+// executable one, else the first executable go in a PATH directory, or "".
+func machineGoBinary(lookup func(string) string) string {
+	name := pkgmeta.ExecutableName(runtime.GOOS, "go")
+	if goroot := strings.TrimSpace(lookup("GOROOT")); goroot != "" {
+		if candidate := filepath.Join(goroot, "bin", name); isExecutable(candidate) {
+			return candidate
+		}
+	}
+	for _, dir := range filepath.SplitList(lookup("PATH")) {
+		if dir == "" {
+			continue
+		}
+		if candidate := filepath.Join(dir, name); isExecutable(candidate) {
+			return candidate
+		}
+	}
+	return ""
+}
+
+// withoutEnv returns env without the entries of the named variables.
+func withoutEnv(env []string, names ...string) []string {
+	kept := make([]string, 0, len(env))
+	for _, entry := range env {
+		name, _, _ := strings.Cut(entry, "=")
+		if !slices.Contains(names, name) {
+			kept = append(kept, entry)
+		}
+	}
+	return kept
 }
 
 // committedGoPin keeps the lock's Go pin. A lock version 5 entry, which has

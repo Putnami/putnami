@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -460,18 +461,160 @@ func TestAnswerFailedLookupIsAProblem(t *testing.T) {
 	}
 }
 
-// Rule d: with no declaration and no committed pin, the answer omits Go, so
-// the lock keeps no Go pin.
-func TestAnswerOmitsGoWithoutDeclarationOrPin(t *testing.T) {
+// machineGo makes PATH a fresh directory that holds a go command, and clears
+// GOROOT. The go command prints goVersion for `go env GOVERSION` when it runs
+// as the runtime compiler's probe runs it, GOTOOLCHAIN=local and GOROOT
+// unset, and another release otherwise. An empty goVersion leaves PATH with
+// no go command. It returns the PATH directory.
+func machineGo(t *testing.T, goVersion string) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("GOROOT", "")
+	t.Setenv("PATH", dir)
+	if goVersion != "" {
+		writeFakeGo(t, dir, goVersion)
+	}
+	return dir
+}
+
+// writeFakeGo writes in dir a go command that prints goVersion for
+// `go env GOVERSION` under GOTOOLCHAIN=local with GOROOT unset, go1.99.9
+// otherwise, and fails for any other argument. A goVersion of "fail" makes
+// it fail every call.
+func writeFakeGo(t *testing.T, dir, goVersion string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("the fake go command is a shell script")
+	}
+	script := `#!/bin/sh
+[ "$1 $2" = "env GOVERSION" ] || exit 2
+[ "` + goVersion + `" = fail ] && exit 1
+if [ "$GOTOOLCHAIN" = local ] && [ -z "${GOROOT+set}" ]; then echo '` + goVersion + `'; else echo go1.99.9; fi
+`
+	if err := os.WriteFile(filepath.Join(dir, "go"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+}
+
+// Rule d: with no declaration and no committed pin, the release the go
+// command on PATH runs, asked as the runtime compiler's probe asks it, is
+// resolved from the release index and recorded, and then from its record.
+func TestAnswerPinsTheReleaseOfTheMachineGo(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
-		"no-declaration-and-no-committed-pin-pins-no-go")
+		"without-a-declaration-the-release-of-the-machine-go-is-pinned")
 	for _, tc := range []struct{ name, goWork string }{
 		{"no go.work", ""},
 		{"go.work without a release", "use ./app\n"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			records := isolatedPutnamiHome(t)
+			machineGo(t, "go1.27.0")
+			t.Setenv("GOTOOLCHAIN", "auto")
+			requests := serveReleaseIndex(t, singleReleaseIndex("1.27.0", digestOf('7')))
+			root := goWorkspace(t, tc.goWork)
+			want := goDotDevPin("1.27.0", map[string]string{"linux/amd64": digestOf('7')})
+			if pin := goPinOf(t, answerGo(t, root, goResolveRequest("linux/amd64", false, nil))); !reflect.DeepEqual(pin, want) {
+				t.Fatalf("pin = %+v, want %+v", pin, want)
+			}
+			if _, ok := readGoPinRecord(records, "1.27.0"); !ok {
+				t.Fatal("the answer recorded no pin record of the machine's release")
+			}
+			if pin := goPinOf(t, answerGo(t, root, goResolveRequest("linux/amd64", false, nil))); !reflect.DeepEqual(pin, want) {
+				t.Fatalf("second pin = %+v, want %+v", pin, want)
+			}
+			if got := requests.Load(); got != 1 {
+				t.Fatalf("the release index was requested %d times, want once", got)
+			}
+		})
+	}
+}
+
+// Rule d: the go command asked is the runtime compiler's first candidate:
+// GOROOT/bin/go when GOROOT holds one, else the first go on PATH.
+func TestAnswerAsksTheGorootGoBeforeThePathGo(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
+		"the-goroot-go-is-asked-before-the-go-on-path")
+	records := isolatedPutnamiHome(t)
+	forbidReleaseIndex(t)
+	for _, version := range []string{"1.27.0", "1.27.1"} {
+		if err := writeGoPinRecord(records, GoLock{Version: version, Integrities: map[string]string{"linux/amd64": digestOf('a')}, Source: goReleaseSource}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	path := machineGo(t, "go1.27.0")
+	later := t.TempDir()
+	writeFakeGo(t, later, "go1.26.0")
+	t.Setenv("PATH", path+string(os.PathListSeparator)+later)
+	root := goWorkspace(t, "")
+
+	goroot := t.TempDir()
+	t.Setenv("GOROOT", goroot)
+	if pin := goPinOf(t, answerGo(t, root, goResolveRequest("linux/amd64", false, nil))); pin.Version != "1.27.0" {
+		t.Fatalf("with a GOROOT that holds no go, pin = %s, want the first go on PATH's 1.27.0", pin.Version)
+	}
+	if err := os.MkdirAll(filepath.Join(goroot, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFakeGo(t, filepath.Join(goroot, "bin"), "go1.27.1")
+	if pin := goPinOf(t, answerGo(t, root, goResolveRequest("linux/amd64", false, nil))); pin.Version != "1.27.1" {
+		t.Fatalf("pin = %s, want GOROOT's 1.27.1", pin.Version)
+	}
+}
+
+// Rule d: offline, the machine's release is pinned from its record, and with
+// no record the answer omits Go rather than report a problem, so a hosted run
+// goes on as it did without a pin.
+func TestAnswerOfflineWithoutARecordOfTheMachineGoPinsNoGo(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
+		"an-offline-request-without-a-record-of-the-machine-go-pins-no-go")
+	records := isolatedPutnamiHome(t)
+	forbidReleaseIndex(t)
+	machineGo(t, "go1.27.0")
+	root := goWorkspace(t, "")
+	if resolution, ok := answerGo(t, root, goResolveRequest("linux/amd64", true, nil)).Toolchains[GoLockIdentity]; ok {
+		t.Fatalf("offline with no record, the answer resolves Go: %+v", resolution)
+	}
+	integrities := map[string]string{"linux/amd64": digestOf('b')}
+	if err := writeGoPinRecord(records, GoLock{Version: "1.27.0", Integrities: integrities, Source: goReleaseSource}); err != nil {
+		t.Fatal(err)
+	}
+	if pin, want := goPinOf(t, answerGo(t, root, goResolveRequest("linux/amd64", true, nil))), goDotDevPin("1.27.0", integrities); !reflect.DeepEqual(pin, want) {
+		t.Fatalf("offline with a record, pin = %+v, want %+v", pin, want)
+	}
+}
+
+// Rule d: a lookup of the machine's release that fails is a problem whose
+// remedy names go.work.
+func TestAnswerFailedLookupOfTheMachineGoIsAProblem(t *testing.T) {
+	isolatedPutnamiHome(t)
+	machineGo(t, "go1.27.0")
+	serveReleaseIndex(t, func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "down", http.StatusInternalServerError)
+	})
+	problem := goProblemOf(t, answerGo(t, goWorkspace(t, ""), goResolveRequest("linux/amd64", false, nil)))
+	if !strings.Contains(problem.Message, "cannot resolve Go 1.27.0") || !strings.Contains(problem.Message, "HTTP 500") {
+		t.Errorf("message = %q, want the machine's release and the error", problem.Message)
+	}
+	if !strings.Contains(problem.Remedy, "go.work") {
+		t.Errorf("remedy = %q, want a go.work declaration", problem.Remedy)
+	}
+}
+
+// Rule d: with no declaration, no committed pin and no go command that runs a
+// Go release, the answer omits Go, so the lock keeps no Go pin.
+func TestAnswerOmitsGoWithoutDeclarationPinOrMachineGo(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "go-answers-its-toolchain-pin",
+		"no-declaration-no-committed-pin-and-no-go-command-pins-no-go")
+	for _, tc := range []struct{ name, goWork, machine string }{
+		{"no go.work and no go command", "", ""},
+		{"go.work without a release and no go command", "use ./app\n", ""},
+		{"a development build", "", "devel go1.28-abcdef"},
+		{"a go command that fails", "", "fail"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
 			isolatedPutnamiHome(t)
 			forbidReleaseIndex(t)
+			machineGo(t, tc.machine)
 			result := answerGo(t, goWorkspace(t, tc.goWork), goResolveRequest("linux/amd64", false, nil))
 			if resolution, ok := result.Toolchains[GoLockIdentity]; ok {
 				t.Fatalf("the answer resolves Go: %+v", resolution)

@@ -1226,8 +1226,9 @@ answers for `go` from `go.work`, the TypeScript extension for `bun` from
 `package.json#packageManager`, and the Python extension for `uv` from the
 `[tool.uv]` table of the root `pyproject.toml`. The TypeScript and Python
 extensions pin their default release when the workspace declares none. The Go
-extension keeps a committed pin, and pins nothing until `go.work` declares a
-release. Each extension's documentation describes its answer.
+extension keeps a committed pin, otherwise pins the release `go.work` declares,
+and otherwise the release of the Go the machine runs. Each extension's
+documentation describes its answer.
 
 `putnami install`, `putnami init`, `putnami projects create` and the implicit
 install run a toolchain pins phase before any `workspace-install`. The phase

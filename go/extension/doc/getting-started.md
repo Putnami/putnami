@@ -277,7 +277,14 @@ committed pin of the release `go.work` declares (the higher of its `go` and
 declared release the lock does not pin comes from the machine's pin record,
 `toolchains/go/go-{version}.pin.json` under the Putnami home, else from the
 go.dev release index, which the answer then records; an offline call with no
-record reports a problem. A record that does not hold the index's answer for
+record reports a problem. When `go.work` declares no release and the lock pins
+none, as in a repository that keeps its Go modules without a `go.work`, the
+answer pins the release of the Go the machine runs: `GOROOT/bin/go` when
+`GOROOT` names one, else the first `go` on `PATH`, asked `go env GOVERSION`
+under `GOTOOLCHAIN=local`. That release resolves the same way, except that an
+offline call with no record pins no Go. With no such go command, or one that
+runs a development build, the answer pins no Go; declare the release in
+`go.work` to choose it. A record that does not hold the index's answer for
 that release is ignored and replaced, and a Putnami home the answer cannot
 write in still yields the pin. Each pin names, per platform, the archive the
 CLI provisions (a `.zip` on Windows, a `.tar.gz` elsewhere), its SHA-256, and
