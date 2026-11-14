@@ -256,11 +256,18 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 			diags = append(diags, diag.Warningf(CodeGraphUnreadable, graphFile, "target %s lies outside the repository and is skipped", t.Address))
 			continue
 		}
-		// Pants lists the targets of a symlinked directory under the link and
-		// under the directory it resolves to: the resolved one carries them.
-		if g.canonical(dir) != dir {
+		// A symlinked directory is the one it resolves to. Pants lists its
+		// targets under both paths when it lists that directory too: the
+		// resolved path carries them once.
+		resolved, inside := g.resolve(dir)
+		if !inside {
+			diags = append(diags, diag.Warningf(CodeGraphUnreadable, graphFile, "target %s lies outside the repository through a symbolic link and is skipped", t.Address))
 			continue
 		}
+		if resolved != dir && g.listed[resolved] {
+			continue
+		}
+		dir = resolved
 		if edges[dir] == nil {
 			edges[dir] = map[string]bool{}
 		}
@@ -322,7 +329,8 @@ type graph struct {
 	// realRoot is root with its symbolic links resolved.
 	realRoot string
 	targets  map[string]target
-	// listed holds the directory of each target the export lists.
+	// listed holds the directory of each first-party target the export
+	// lists.
 	listed map[string]bool
 	// resolved caches resolve by directory.
 	resolved map[string]resolution
@@ -340,7 +348,10 @@ func newGraph(root string, targets map[string]target) graph {
 		realRoot = root
 	}
 	g := graph{root: root, realRoot: realRoot, targets: targets, listed: map[string]bool{}, resolved: map[string]resolution{}}
-	for address := range targets {
+	for address, t := range targets {
+		if !firstParty(t.TargetType) {
+			continue
+		}
 		if dir, ok := g.dir(address); ok {
 			g.listed[dir] = true
 		}
@@ -349,23 +360,14 @@ func newGraph(root string, targets map[string]target) graph {
 }
 
 // component returns the directory of the component an address belongs to:
-// the canonical directory of its BUILD file directory.
+// the directory its BUILD file directory resolves to through its symbolic
+// links, and false when that lies outside the repository.
 func (g graph) component(address string) (string, bool) {
 	dir, ok := g.dir(address)
 	if !ok {
 		return "", false
 	}
-	return g.canonical(dir), true
-}
-
-// canonical returns the directory that carries the targets of dir: the
-// directory dir resolves to through its symbolic links, when it lies inside
-// the repository and the export lists targets there, and dir otherwise.
-func (g graph) canonical(dir string) string {
-	if resolved, inside := g.resolve(dir); inside && g.listed[resolved] {
-		return resolved
-	}
-	return dir
+	return g.resolve(dir)
 }
 
 // resolve returns the repository-relative directory dir resolves to through
@@ -462,7 +464,7 @@ func (g graph) isFile(address, p, name string) bool {
 }
 
 // thirdPartyFiles adds to files the sources of a third-party target and of the
-// third-party targets it depends on, each in its canonical directory: a
+// third-party targets it depends on, each in the directory it resolves to: a
 // generated requirement's source is the requirements file target it depends
 // on.
 func (g graph) thirdPartyFiles(address string, files, seen map[string]bool) {
@@ -476,7 +478,9 @@ func (g graph) thirdPartyFiles(address string, files, seen map[string]bool) {
 		if !ok {
 			continue
 		}
-		files[path.Join(g.canonical(path.Dir(clean)), path.Base(clean))] = true
+		if dir, inside := g.resolve(path.Dir(clean)); inside {
+			files[path.Join(dir, path.Base(clean))] = true
+		}
 	}
 	for _, dep := range t.Dependencies {
 		g.thirdPartyFiles(dep, files, seen)

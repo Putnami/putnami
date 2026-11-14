@@ -792,6 +792,30 @@ func TestTheSyncWritesASymlinkedPackageOnceAndValidatePassesRightAfter(t *testin
 	if want := []any{"../../BUILD", "../../requirements.txt"}; !reflect.DeepEqual(inputs, want) {
 		t.Errorf("contrib/core filePatterns = %v, want %v, relative to contrib/core", inputs, want)
 	}
+
+	// An export that lists the linked tree under the link alone, as when
+	// Pants ignores contrib/core, writes it under contrib/core too, where the
+	// sync finds it again: the next check finds nothing stale.
+	root = symlinkedRepository(t)
+	stackstest.WriteFile(t, root, "pants-graph.json", `[
+  {"address": "st2tests/fixtures/core/actions.py", "target_type": "python_source", "dependencies": [], "sources": ["st2tests/fixtures/core/actions.py"]},
+  {"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/test_packs.py"]}
+]`)
+	result, err = Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil || !reflect.DeepEqual(result.Written, []string{"contrib/core/putnami.json", "st2tests/putnami.json"}) {
+		t.Fatalf("link-only export: result %+v, err %v", result, err)
+	}
+	for range 2 {
+		if stale, err := Stale(context.Background(), root, &bytes.Buffer{}); err != nil || len(stale.Written) != 0 || len(stale.Retracted) != 0 {
+			t.Errorf("a link-only export is stale right after the sync: %+v %v", stale, err)
+		}
+		if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if deps := readProjectFile(t, root, "st2tests")["dependencies"]; !reflect.DeepEqual(deps, []any{"/contrib/core"}) {
+		t.Errorf("link-only export: st2tests dependencies = %v", deps)
+	}
 }
 
 // scriptPants puts first on PATH a pants that runs the shell script body.
