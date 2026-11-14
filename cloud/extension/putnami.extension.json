@@ -114,13 +114,6 @@
   "commandGroups": {
     "cloud": {
       "description": "Putnami Cloud: sign-in, workspace setup, registries, packages, CI, configuration, databases, environments and deploys.",
-      "flags": {
-        "credential": {
-          "type": "string",
-          "choices": ["session", "machine"],
-          "description": "Credential of workspace commands: session (the signed-in session) or machine (PUTNAMI_CLOUD_TOKEN). Defaults to the signed-in session when one is stored, else PUTNAMI_CLOUD_TOKEN; PUTNAMI_CLOUD_CREDENTIAL sets it for the process."
-        }
-      },
       "subcommands": {
         "login": {
           "description": "Sign in to Putnami Cloud with OAuth device authorization.",

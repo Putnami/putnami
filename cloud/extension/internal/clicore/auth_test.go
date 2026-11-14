@@ -109,8 +109,4 @@ func TestMachineTokenOnlyNeedsATokenAndNoStoredSession(t *testing.T) {
 	if MachineTokenOnly(machine) {
 		t.Fatal("stored user session: MachineTokenOnly = true")
 	}
-	machine[CloudCredentialEnv] = CredentialMachine
-	if !MachineTokenOnly(machine) {
-		t.Fatal("PUTNAMI_CLOUD_CREDENTIAL=machine: MachineTokenOnly = false")
-	}
 }

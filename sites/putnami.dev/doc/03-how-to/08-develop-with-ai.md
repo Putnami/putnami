@@ -165,8 +165,8 @@ The command writes one record before it waits, with `user_code`,
 `verification_uri`, `verification_uri_complete` and `expires_in`, so the host
 can hand the code to an approver. It exits 0 once the code is approved. From
 then on the signed-in session wins over `PUTNAMI_CLOUD_TOKEN` for every
-`putnami cloud` command; `--credential=machine` chooses the token, and
-`putnami cloud whoami` names the credential in use. `whoami`, `status`,
+`putnami cloud` command, and `putnami cloud whoami` names the credential in
+use. `whoami`, `status`,
 `login` and `logout` start no job, and a build whose cache credential cannot
 write says so once instead of warning on every task.
 

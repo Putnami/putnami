@@ -276,12 +276,6 @@ func TestWhoAmINamesTheCredentialAndWhy(t *testing.T) {
 		t.Fatalf("session and token: node = %+v", node)
 	}
 
-	// --credential=machine: whoami reports the machine token and the choice.
-	node = WhoamiStatusNode(map[string]any{"credential": "machine"}, root, env, ioctx)
-	if node.State != clicore.StatusOK || !strings.Contains(node.Children[0].Detail, "chosen with --credential=machine") {
-		t.Fatalf("--credential=machine: node = %+v", node)
-	}
-
 	// No stored session: the machine token, and why.
 	bare := t.TempDir()
 	ioctx, env, _, _ = captureIO(t, srv.srv, bare)

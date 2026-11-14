@@ -296,7 +296,7 @@ func RunCommand(command string, ioctx IO, args []string) (err error) {
 	// machine that holds both a session and PUTNAMI_CLOUD_TOKEN. Signing in
 	// and out are about the session alone.
 	if command != "login" && command != "logout" {
-		defer func() { err = clicore.NameCredential(err, params, env, ioctx.Now()) }()
+		defer func() { err = clicore.NameCredential(err, env, ioctx.Now()) }()
 	}
 
 	switch command {

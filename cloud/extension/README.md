@@ -144,17 +144,14 @@ putnami cloud setup --workspace <workspace-id>
 A machine can hold two credentials: the signed-in session in
 `~/.putnami/auth.json`, and a workspace machine token in `PUTNAMI_CLOUD_TOKEN`
 (a CI job, a runner, a hosted agent session). A usable session (a fresh access
-token, or a refresh token that renews it) wins: every workspace command sends
-it, even when `PUTNAMI_CLOUD_TOKEN` is set. The machine token serves a command
-only when no usable session is stored, or when the command passes
-`--credential=machine`, or `PUTNAMI_CLOUD_CREDENTIAL=machine` chooses it for
-the process. `--credential=session` refuses the machine token. A CI job or a
-runner with no stored session behaves as before.
+token, or a refresh token that renews it) always wins: every workspace command
+sends it, even when `PUTNAMI_CLOUD_TOKEN` is set. The machine token serves a
+command only when no usable session is stored; no flag chooses it over a
+session. A CI job or a runner with no stored session behaves as before.
 
 `putnami cloud whoami` and `putnami cloud status` name the credential and why,
 `--verbose` prints one `credential:` line, and an authentication error or an
-HTTP 403 names the credential the server refused and how to choose the other
-one.
+HTTP 403 names the credential the server refused.
 
 ### Intelligence
 
@@ -1388,8 +1385,7 @@ provider sends `PUTNAMI_CLOUD_TOKEN` to the cache server instead. It does so
 only when all of these hold:
 
 - `PUTNAMI_CACHE_TOKEN` is not set.
-- No usable user session is stored in `~/.putnami/auth.json`, or
-  `PUTNAMI_CLOUD_CREDENTIAL=machine` chooses the machine token. A signed-in
+- No usable user session is stored in `~/.putnami/auth.json`. A signed-in
   user keeps the token command.
 - No hosted Putnami CI launcher started the run.
 - The token source is absent or is `putnami cloud token --for cache`. A custom

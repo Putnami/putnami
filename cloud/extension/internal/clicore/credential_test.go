@@ -59,9 +59,9 @@ func TestWorkspaceAuthPrefersAUsableSession(t *testing.T) {
 	if auth.AccessToken != scoped {
 		t.Fatalf("WorkspaceAuth sent %q, want the session's scoped token over PUTNAMI_CLOUD_TOKEN", auth.AccessToken)
 	}
-	cred, err := ResolveCredential(nil, env, now)
-	if err != nil || cred.Machine || !cred.TokenSet || cred.Explicit {
-		t.Fatalf("ResolveCredential = %+v, %v; want the session with the token set", cred, err)
+	cred := ResolveCredential(env, now)
+	if cred.Machine || !cred.TokenSet {
+		t.Fatalf("ResolveCredential = %+v; want the session with the token set", cred)
 	}
 	if got := cred.String(); got != "the signed-in session, which wins over PUTNAMI_CLOUD_TOKEN" {
 		t.Fatalf("credential = %q", got)
@@ -85,7 +85,7 @@ func TestWorkspaceAuthFallsBackToTheMachineTokenWithoutAUsableSession(t *testing
 	if err != nil || auth.AccessToken != env[CloudTokenEnv] {
 		t.Fatalf("expired session: WorkspaceAuth = %+v, %v; want PUTNAMI_CLOUD_TOKEN", auth, err)
 	}
-	cred, _ := ResolveCredential(nil, env, now)
+	cred := ResolveCredential(env, now)
 	if got := cred.String(); got != "PUTNAMI_CLOUD_TOKEN, the workspace machine token: no signed-in session is stored on this machine" {
 		t.Fatalf("credential = %q", got)
 	}
@@ -94,58 +94,6 @@ func TestWorkspaceAuthFallsBackToTheMachineTokenWithoutAUsableSession(t *testing
 	delete(env, CloudTokenEnv)
 	if _, err := WorkspaceAuth(nil, env, io, credentialTestWorkspace); ExitCode(err) != ExitAuth {
 		t.Fatalf("no credential: err = %v, want an auth error", err)
-	}
-}
-
-func TestTheMachineCredentialIsExplicit(t *testing.T) {
-	spectest.Proves(t, "cloud/agent-session", "the-signed-in-session-wins", "the-machine-credential-is-explicit")
-	env, scoped, now := credentialTestEnv(t, true)
-	io := IO{Now: func() time.Time { return now }}
-
-	auth, err := WorkspaceAuth(map[string]any{"credential": "machine"}, env, io, credentialTestWorkspace)
-	if err != nil || auth.AccessToken != env[CloudTokenEnv] {
-		t.Fatalf("--credential=machine: WorkspaceAuth = %+v, %v; want PUTNAMI_CLOUD_TOKEN", auth, err)
-	}
-	env[CloudCredentialEnv] = CredentialMachine
-	auth, err = WorkspaceAuth(nil, env, io, credentialTestWorkspace)
-	if err != nil || auth.AccessToken != env[CloudTokenEnv] {
-		t.Fatalf("PUTNAMI_CLOUD_CREDENTIAL=machine: WorkspaceAuth = %+v, %v; want PUTNAMI_CLOUD_TOKEN", auth, err)
-	}
-	// The flag wins over the variable.
-	auth, err = WorkspaceAuth(map[string]any{"credential": "session"}, env, io, credentialTestWorkspace)
-	if err != nil || auth.AccessToken != scoped {
-		t.Fatalf("--credential=session over the variable: WorkspaceAuth = %+v, %v; want the session", auth, err)
-	}
-	cred, _ := ResolveCredential(map[string]any{"credential": "machine"}, env, now)
-	if !strings.Contains(cred.String(), "--credential=machine") {
-		t.Fatalf("credential = %q, want it to name the choice", cred)
-	}
-
-	// --credential=session never falls back to the machine token.
-	bare, _, _ := credentialTestEnv(t, false)
-	if _, err := WorkspaceAuth(map[string]any{"credential": "session"}, bare, io, credentialTestWorkspace); ExitCode(err) != ExitAuth {
-		t.Fatalf("--credential=session without a session: err = %v, want an auth error", err)
-	}
-	// --credential=machine needs the token.
-	delete(bare, CloudTokenEnv)
-	if _, err := WorkspaceAuth(map[string]any{"credential": "machine"}, bare, io, credentialTestWorkspace); ExitCode(err) != ExitAuth ||
-		!strings.Contains(err.Error(), "PUTNAMI_CLOUD_TOKEN") {
-		t.Fatalf("--credential=machine without the token: err = %v", err)
-	}
-}
-
-func TestAnUnknownCredentialIsAUsageError(t *testing.T) {
-	spectest.Proves(t, "cloud/agent-session", "the-signed-in-session-wins", "an-unknown-credential-is-a-usage-error")
-	env, _, now := credentialTestEnv(t, true)
-	if _, err := ResolveCredential(map[string]any{"credential": "robot"}, env, now); ExitCode(err) != ExitUsage || !strings.Contains(err.Error(), `"robot"`) {
-		t.Fatalf("--credential=robot: err = %v, want a usage error naming the value", err)
-	}
-	env[CloudCredentialEnv] = "both"
-	if _, err := ResolveCredential(nil, env, now); ExitCode(err) != ExitUsage || !strings.Contains(err.Error(), CloudCredentialEnv) {
-		t.Fatalf("PUTNAMI_CLOUD_CREDENTIAL=both: err = %v, want a usage error naming the variable", err)
-	}
-	if MachineTokenOnly(env) {
-		t.Fatal("an invalid choice selected the machine token")
 	}
 }
 
@@ -174,39 +122,36 @@ func TestNameCredentialNamesTheRefusedCredential(t *testing.T) {
 	spectest.Proves(t, "cloud/agent-session", "the-command-names-its-credential", "an-auth-error-names-the-refused-credential")
 	env, _, now := credentialTestEnv(t, true)
 	refused := NewError("request failed: 401 Unauthorized", ExitAuth)
-	err := NameCredential(refused, nil, env, now)
+	err := NameCredential(refused, env, now)
 	if ExitCode(err) != ExitAuth || !errors.Is(err, refused) {
 		t.Fatalf("named error %v lost its exit code or cause", err)
 	}
-	if !strings.Contains(err.Error(), "credential: the signed-in session") || !strings.Contains(err.Error(), "--credential=machine") {
-		t.Fatalf("message %q does not name the session and the other choice", err)
-	}
-
-	forbidden := &APIError{StatusCode: http.StatusForbidden, Message: "Insufficient permissions", exit: newExitError("Insufficient permissions", ExitAPI)}
-	err = NameCredential(forbidden, map[string]any{"credential": "machine"}, env, now)
-	if ExitCode(err) != ExitAPI || !strings.Contains(err.Error(), "PUTNAMI_CLOUD_TOKEN, the workspace machine token, chosen with --credential=machine") ||
-		!strings.Contains(err.Error(), "drop --credential=machine") {
-		t.Fatalf("403 on the machine token = %v", err)
-	}
-	statusLine := NewError("cloud logs: "+StatusLine(http.StatusForbidden), ExitAPI)
-	if err := NameCredential(statusLine, nil, env, now); !strings.Contains(err.Error(), "credential:") {
-		t.Fatalf("a 403 status line was not named: %v", err)
+	if !strings.Contains(err.Error(), "credential: the signed-in session, which wins over PUTNAMI_CLOUD_TOKEN") ||
+		!strings.Contains(err.Error(), "renew the session") {
+		t.Fatalf("message %q does not name the session", err)
 	}
 
 	bare, _, _ := credentialTestEnv(t, false)
-	if err := NameCredential(refused, nil, bare, now); !strings.Contains(err.Error(), "run putnami cloud login") {
-		t.Fatalf("machine token without a session = %v, want the login hint", err)
+	forbidden := &APIError{StatusCode: http.StatusForbidden, Message: "Insufficient permissions", exit: newExitError("Insufficient permissions", ExitAPI)}
+	err = NameCredential(forbidden, bare, now)
+	if ExitCode(err) != ExitAPI || !strings.Contains(err.Error(), "credential: PUTNAMI_CLOUD_TOKEN, the workspace machine token") ||
+		!strings.Contains(err.Error(), "run putnami cloud login to use a signed-in session") {
+		t.Fatalf("403 on the machine token = %v", err)
+	}
+	statusLine := NewError("cloud logs: "+StatusLine(http.StatusForbidden), ExitAPI)
+	if err := NameCredential(statusLine, env, now); !strings.Contains(err.Error(), "credential:") {
+		t.Fatalf("a 403 status line was not named: %v", err)
 	}
 
 	other := NewError("boom", ExitAPI)
-	if err := NameCredential(other, nil, env, now); !errors.Is(err, other) {
+	if err := NameCredential(other, env, now); !errors.Is(err, other) {
 		t.Fatalf("a non-refusal changed: %v", err)
 	}
 	delete(env, CloudTokenEnv)
-	if err := NameCredential(refused, nil, env, now); !errors.Is(err, refused) {
+	if err := NameCredential(refused, env, now); !errors.Is(err, refused) {
 		t.Fatalf("one credential only: %v, want the error unchanged", err)
 	}
-	if err := NameCredential(nil, nil, env, now); err != nil {
+	if err := NameCredential(nil, env, now); err != nil {
 		t.Fatalf("nil = %v", err)
 	}
 }

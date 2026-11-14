@@ -13,8 +13,7 @@ import (
 
 // TestReadSubcommandsDeclareNoWorkspaceState pins the cloud subcommands that
 // read no installed workspace state, so the CLI answers them on a fresh
-// checkout without the install and the client restore, and the group flag
-// that chooses the credential of workspace commands.
+// checkout without the install and the client restore.
 func TestReadSubcommandsDeclareNoWorkspaceState(t *testing.T) {
 	spectest.Proves(t, "cloud/agent-session", "read-commands-start-no-job", "read-subcommands-declare-no-workspace-state")
 	data, err := os.ReadFile(filepath.Join("..", "..", "putnami.extension.json"))
@@ -35,9 +34,5 @@ func TestReadSubcommandsDeclareNoWorkspaceState(t *testing.T) {
 	sort.Strings(none)
 	if want := []string{"login", "logout", "status", "whoami"}; !slices.Equal(none, want) {
 		t.Fatalf("subcommands with workspaceState none = %v, want %v", none, want)
-	}
-	flag, ok := group.Flags["credential"]
-	if !ok || flag.Type != "string" || !slices.Equal(flag.Choices, []string{"session", "machine"}) {
-		t.Fatalf("cloud --credential = %+v, want a string flag with the choices session and machine", flag)
 	}
 }

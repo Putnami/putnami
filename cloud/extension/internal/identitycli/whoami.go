@@ -25,8 +25,7 @@ type WhoamiSession struct {
 	// claims.
 	User User
 	// CIToken reports that PUTNAMI_CLOUD_TOKEN stands in for a session on the
-	// workspace calls: no usable session is stored, or --credential=machine
-	// chose it.
+	// workspace calls: no usable session is stored.
 	CIToken bool
 	// Credential is the credential the workspace commands send, and why
 	// (clicore.ResolveCredential). It is zero when it could not be resolved.
@@ -156,10 +155,7 @@ const SignedOutMessage = "Signed out of Putnami Cloud."
 // session; one that does not answer falls back to the token claims, since the
 // session still works.
 func readWhoamiSession(params map[string]any, env map[string]string, ioctx clicore.IO) WhoamiSession {
-	cred, err := clicore.ResolveCredential(params, env, now(ioctx))
-	if err != nil {
-		return WhoamiSession{Err: err}
-	}
+	cred := clicore.ResolveCredential(env, now(ioctx))
 	if cred.Machine {
 		return WhoamiSession{CIToken: true, Credential: cred}
 	}

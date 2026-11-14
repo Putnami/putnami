@@ -86,20 +86,18 @@ func UserSessionStatus(id, title string, err error, env map[string]string) Statu
 }
 
 // MachineTokenOnly reports whether the process runs on PUTNAMI_CLOUD_TOKEN:
-// the variable is set, and no usable session is stored or
-// PUTNAMI_CLOUD_CREDENTIAL=machine chooses the token (ResolveCredential with
-// no flag). The build cache provider uses it too: it reads the cache with that
+// the variable is set and no usable session is stored (ResolveCredential).
+// The build cache provider uses it too: it reads the cache with that
 // token only when no signed-in user can mint one.
 func MachineTokenOnly(env map[string]string) bool {
-	cred, err := ResolveCredential(nil, env, time.Now())
-	return err == nil && cred.Machine
+	return ResolveCredential(env, time.Now()).Machine
 }
 
 // WorkspaceAuth returns an access token scoped to workspaceID, reusing the
 // per-workspace cache and refreshing/exchanging as needed. The credential is
 // the one ResolveCredential picks: a usable stored session wins, and
 // PUTNAMI_CLOUD_TOKEN serves a non-interactive workspace operation only when
-// no usable session is stored or --credential=machine chooses it. That bearer
+// no usable session is stored. That bearer
 // is never accepted by ActiveAuth, persisted, refreshed, or exposed to
 // machine/operator management paths. Under --verbose the command says once
 // which credential it sends. An empty workspaceID falls back to ActiveAuth.
@@ -107,10 +105,7 @@ func WorkspaceAuth(params map[string]any, env map[string]string, ioctx IO, works
 	if workspaceID == "" {
 		return ActiveAuth(params, env, ioctx)
 	}
-	cred, err := ResolveCredential(params, env, ioctxNow(ioctx))
-	if err != nil {
-		return nil, err
-	}
+	cred := ResolveCredential(env, ioctxNow(ioctx))
 	announceCredential(params, ioctx, cred)
 	if cred.Machine {
 		token := EnvGet(env, CloudTokenEnv)
