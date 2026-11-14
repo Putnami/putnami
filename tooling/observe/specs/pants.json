@@ -33,7 +33,8 @@
       "id": "pants-inferred-edges",
       "text": [
         "Each address in a target entry's dependencies, which Pants expands from the explicit and the inferred dependencies, is an edge from the target's component to the dependency's component, when the two differ.",
-        "A dependency on a third-party or internal target, on an address outside the repository and on the component itself is no edge."
+        "A dependency on a third-party or internal target, on an address outside the repository and on the component itself is no edge.",
+        "A symlinked directory is the one it resolves to, which carries its targets once and their edges; a link that leaves the repository is a warning and no edge."
       ]
     },
     {

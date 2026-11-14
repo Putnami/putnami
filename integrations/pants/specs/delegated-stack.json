@@ -24,21 +24,21 @@
     {
       "id": "sync-writes-the-package-graph",
       "text": [
-        "The workspace sync task reads pants-graph.json at the root, or runs pants peek ::, and writes in each component's putnami.json the extension, the project IDs it depends on, the lockfiles and third-party declaration files it uses as filePatterns, and test in disable.jobs without a test target.",
-        "It retracts a former package, rewrites a file only when a member it owns changes, and warns and writes nothing without the export and pants, or with an export that lists no package."
+        "The workspace sync task reads pants-graph.json at the root, or runs pants list :: then pants peek on the listed addresses, 1000 at most per call, and writes in each component's putnami.json the extension, the project IDs it depends on, the lockfiles and declaration files it uses as filePatterns, and test in disable.jobs without a test target.",
+        "It retracts a former package, rewrites a file only when an owned member changes, and warns and writes nothing without the export and pants, or with an empty export."
       ]
     },
     {
       "id": "validate-fails-on-a-stale-graph",
       "text": [
-        "putnami validate compares each package's putnami.json with the export, or pants peek ::, writes nothing, and fails with pants.sync_stale when a sync would change one, so an import that changes the edges Pants infers cannot pass the gate.",
+        "putnami validate compares each package's putnami.json with the export, or the batched peek, writes nothing, and fails with pants.sync_stale when a sync would change one, so an import that changes the edges Pants infers cannot pass the gate.",
         "Without the export and pants it warns and passes."
       ]
     },
     {
       "id": "tasks-delegate-to-pants",
       "text": [
-        "Each task compares pants --version with GLOBAL.pants_version, then runs at the workspace root pants lint <dir>:, pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>:, or pants package <dir>:, where <dir>: names one directory's targets.",
+        "Each task compares pants --version with GLOBAL.pants_version, then runs at the workspace root pants lint <dir>:, pants --test-report --test-use-coverage --coverage-py-report=[\"xml\"] test <dir>:, or pants package <dir>:, where <dir>: names one directory's targets.",
         "Each task depends only on its package's graph step, which runs no pants.",
         "Putnami's cache is off for every task, and the result records delegatedTo pants.",
         "A failing step fails with stacks.step_failed."
@@ -48,6 +48,7 @@
       "id": "reports-become-the-summary",
       "text": [
         "After its steps, the test task reads the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml, removed before the steps so another package's run is never read as this one's, into the test and coverage summary.",
+        "The coverage flag replaces the report list of pants.toml, so a repository that already lists xml gets its one report.",
         "A failed case fails the task with stacks.test_failed; a report pattern that matches no report fails it with stacks.report_missing."
       ]
     },

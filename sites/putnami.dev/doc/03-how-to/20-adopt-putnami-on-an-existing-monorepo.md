@@ -87,8 +87,9 @@ putnami init --from pants
 ```
 
 `init` declares `@putnami/pants`, installs it, and synchronizes the projects.
-The sync runs `pants peek ::` and writes, in each package's `putnami.json`,
-the extension and the packages it depends on:
+The sync runs `pants list ::`, then `pants peek` on the listed targets, 1000 at
+a time, and writes, in each package's `putnami.json`, the extension and the
+packages it depends on:
 
 ```json
 {
@@ -125,8 +126,8 @@ After a change to `src/python/pricing`, Putnami runs `pricing` and the
 packages that depend on it, `api` here, each with one command at the root:
 
 ```text
-pants --test-report --test-use-coverage --coverage-py-report=xml test src/python/pricing:
-pants --test-report --test-use-coverage --coverage-py-report=xml test src/python/api:
+pants --test-report --test-use-coverage --coverage-py-report=["xml"] test src/python/pricing:
+pants --test-report --test-use-coverage --coverage-py-report=["xml"] test src/python/api:
 ```
 
 A change to `api` alone runs `api` alone: Putnami never runs Pants on the

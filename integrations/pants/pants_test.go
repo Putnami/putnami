@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -79,23 +80,38 @@ func repository(t *testing.T, d demo, withExport bool) string {
 }
 
 // stubPants puts first on PATH a pants that prints the demo's version, prints
-// the demo's export for peek ::, and for test <dir>: writes the demo's JUnit
-// reports of that directory and its coverage report under dist/. It logs each
-// call, with its working directory, to $STUB_LOG.
+// the address of each target of the demo's export for list ::, those targets
+// of the export that peek names, as a JSON array, and for test <dir>: writes
+// the demo's JUnit reports of that directory and its coverage report under
+// dist/; like Pants, its test fails when --coverage-py-report=xml appends xml
+// to a [coverage-py] report list of pants.toml that already holds it. It logs
+// each call, with its working directory, to $STUB_LOG.
 func stubPants(t *testing.T, d demo) {
 	t.Helper()
 	bin, reports := t.TempDir(), t.TempDir()
 	for rel, content := range d["ci"] {
 		stackstest.WriteFile(t, reports, rel, content)
 	}
+	peekTargets(t, reports, d["ci"]["pants-graph.json"])
 	script := `#!/bin/sh
 set -e
 echo "$(pwd) pants $*" >> "$STUB_LOG"
 case "$1" in --version) echo "${STUB_VERSION:-2.25.0}"; exit 0;; esac
 for a in "$@"; do last="$a"; done
 case " $* " in
-  *" peek :: "*) cat "` + reports + `/pants-graph.json"; exit 0;;
+  *" list :: "*) cat "` + reports + `/addresses.txt"; exit 0;;
+  *" peek "*)
+    printf '['; sep=''; named=''
+    for a in "$@"; do
+      if [ -z "$named" ]; then [ "$a" = peek ] && named=1; continue; fi
+      i=$(awk -F '\t' -v a="$a" '$1 == a { print $2; exit }' "` + reports + `/index.tsv")
+      [ -n "$i" ] || { echo "no target $a" >&2; exit 1; }
+      printf '%s' "$sep"; cat "` + reports + `/targets/$i.json"; sep=','
+    done
+    echo ']'; exit 0;;
   *" test "*)
+    case " $* " in *" --coverage-py-report=xml "*)
+      if grep -q '^report *= *\[.*"xml"' pants.toml; then echo "[ERROR] Duplicate enum values specified in list" >&2; exit 1; fi;; esac
     dir="${last%:}"
     prefix="$(echo "$dir" | tr / .)."
     mkdir -p dist/test/reports dist/coverage/python
@@ -110,6 +126,31 @@ esac
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
+}
+
+// peekTargets writes under dir what the stub pants serves from an export:
+// addresses.txt lists its addresses, targets/<i>.json holds its target i, and
+// index.tsv maps each address to its i.
+func peekTargets(t *testing.T, dir, export string) {
+	t.Helper()
+	var targets []json.RawMessage
+	if err := json.Unmarshal([]byte(export), &targets); err != nil {
+		t.Fatal(err)
+	}
+	var addresses, index strings.Builder
+	for i, raw := range targets {
+		var target struct {
+			Address string `json:"address"`
+		}
+		if err := json.Unmarshal(raw, &target); err != nil {
+			t.Fatal(err)
+		}
+		addresses.WriteString(target.Address + "\n")
+		fmt.Fprintf(&index, "%s\t%d\n", target.Address, i)
+		stackstest.WriteFile(t, dir, fmt.Sprintf("targets/%d.json", i), string(raw))
+	}
+	stackstest.WriteFile(t, dir, "addresses.txt", addresses.String())
+	stackstest.WriteFile(t, dir, "index.tsv", index.String())
 }
 
 func stubLog(t *testing.T) []string {
@@ -349,15 +390,35 @@ func TestTheSyncRunsPantsPeekWithoutAnExport(t *testing.T) {
 	d := readDemo(t)
 	stubPants(t, d)
 	root := repository(t, d, false)
+	// One peek reads at most peekBatch addresses: the demo's export takes
+	// several.
+	defer func(batch int) { peekBatch = batch }(peekBatch)
+	peekBatch = 4
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
-	if err != nil || result.Export != "pants peek ::" || len(result.Written) != 3 {
+	if err != nil || result.Export != exportName || len(result.Written) != 3 {
 		t.Fatalf("result %+v, err %v", result, err)
 	}
 	if deps := readProjectFile(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/3rdparty/python", "/src/python/pricing"}) {
 		t.Errorf("api dependencies = %v", deps)
 	}
-	if log := stubLog(t); len(log) != 1 || !strings.HasSuffix(log[0], " pants peek ::") {
-		t.Errorf("pants calls = %v", log)
+	log := stubLog(t)
+	var targets []json.RawMessage
+	if err := json.Unmarshal([]byte(d["ci"]["pants-graph.json"]), &targets); err != nil {
+		t.Fatal(err)
+	}
+	if want := 1 + (len(targets)+peekBatch-1)/peekBatch; len(log) != want || !strings.HasSuffix(log[0], " pants list ::") {
+		t.Errorf("pants calls = %v, want list :: then %d peeks", log, want-1)
+	}
+	peeked := 0
+	for _, call := range log[1:] {
+		_, args, _ := strings.Cut(call, " pants peek ")
+		if n := len(strings.Fields(args)); n == 0 || n > peekBatch {
+			t.Errorf("a peek read %d addresses, want 1 to %d: %s", n, peekBatch, call)
+		}
+		peeked += len(strings.Fields(args))
+	}
+	if peeked != len(targets) {
+		t.Errorf("the peeks read %d addresses, want each of the %d listed once", peeked, len(targets))
 	}
 
 	// A package that uses third-party targets is selected by what declares
@@ -444,7 +505,7 @@ func TestATaskRunsPantsOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 	for task, want := range map[string]string{
 		stacks.TaskLint:  "pants lint src/python/pricing:",
 		stacks.TaskBuild: "pants package src/python/pricing:",
-		stacks.TaskTest:  "pants --test-report --test-use-coverage --coverage-py-report=xml test src/python/pricing:",
+		stacks.TaskTest:  `pants --test-report --test-use-coverage --coverage-py-report=["xml"] test src/python/pricing:`,
 	} {
 		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
 		status, data, events := runJob(t, root, "src/python/pricing", task)
@@ -456,6 +517,29 @@ func TestATaskRunsPantsOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 			t.Errorf("%s ran %q, want the version check then %q in %s", task, log, want, rootReal)
 		}
 	}
+
+	// A repository whose [coverage-py] report already lists xml runs its
+	// tests: the flag replaces that list, where the append form fails.
+	config, err := os.ReadFile(filepath.Join(root, "pants.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := strings.Replace(string(config), "report = [\"xml\"]", "report = [\"xml\", \"console\"]", 1)
+	if listed == string(config) {
+		t.Fatal("the demo's pants.toml holds no [coverage-py] report list")
+	}
+	stackstest.WriteFile(t, root, "pants.toml", listed)
+	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskTest); status != "OK" {
+		t.Errorf("a repository that lists xml runs a delegated test: %s %s", status, events)
+	}
+	stackstest.WriteFile(t, root, "src/python/pricing/putnami.json", `{"options": {"@putnami/pants": {"tasks": {"test": {"steps": [["pants", "--test-report", "--test-use-coverage", "--coverage-py-report=xml", "test", "{component}:"]]}}}}}`)
+	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskTest); status != "FAILED" || !strings.Contains(events, stacks.CodeStepFailed) {
+		t.Errorf("the append form fails on that repository, as Pants does: %s %s", status, events)
+	}
+	if err := os.Remove(filepath.Join(root, "src/python/pricing/putnami.json")); err != nil {
+		t.Fatal(err)
+	}
+	stackstest.WriteFile(t, root, "pants.toml", string(config))
 
 	t.Setenv("STUB_VERSION", "2.24.1")
 	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskLint); status != "FAILED" || !strings.Contains(events, stacks.CodeToolchainMismatch) {
@@ -643,5 +727,168 @@ func TestTheSyncTakesAProjectDirectoryFromTheBuildFileNotATargetName(t *testing.
 	}
 	if deps := readProjectFile(t, root, "src/python/app")["dependencies"]; !reflect.DeepEqual(deps, []any{"/packaging/deb/systemd"}) {
 		t.Errorf("app dependencies = %v, want the directory of the BUILD file", deps)
+	}
+}
+
+// symlinkedRepository is a repository where st2tests/fixtures/core links to
+// contrib/core, so its export lists the targets of contrib/core under both
+// paths.
+func symlinkedRepository(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for rel, content := range map[string]string{
+		"pants.toml":                         "[GLOBAL]\npants_version = \"2.25.0\"\n",
+		"BUILD":                              "python_requirements(name=\"reqs\")\n",
+		"requirements.txt":                   "six\n",
+		"contrib/core/BUILD":                 "python_sources()\n",
+		"contrib/core/actions.py":            "import six\n",
+		"contrib/core/tests/BUILD":           "python_tests()\n",
+		"contrib/core/tests/test_actions.py": "",
+		"st2tests/BUILD":                     "python_tests()\n",
+		"st2tests/test_packs.py":             "",
+		"pants-graph.json": `[
+  {"address": "//:reqs#six", "target_type": "python_requirement", "dependencies": ["requirements.txt:reqs"]},
+  {"address": "requirements.txt:reqs", "target_type": "_python_requirements_file", "dependencies": [], "sources": ["requirements.txt"]},
+  {"address": "contrib/core/actions.py", "target_type": "python_source", "dependencies": ["//:reqs#six"], "sources": ["contrib/core/actions.py"]},
+  {"address": "contrib/core/tests/test_actions.py", "target_type": "python_test", "dependencies": ["contrib/core/actions.py"], "sources": ["contrib/core/tests/test_actions.py"]},
+  {"address": "st2tests/fixtures/core/actions.py", "target_type": "python_source", "dependencies": ["//:reqs#six"], "sources": ["st2tests/fixtures/core/actions.py"]},
+  {"address": "st2tests/fixtures/core/tests/test_actions.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/fixtures/core/tests/test_actions.py"]},
+  {"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/test_packs.py"]}
+]`,
+	} {
+		stackstest.WriteFile(t, root, rel, content)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "st2tests/fixtures"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../../contrib/core", filepath.Join(root, "st2tests/fixtures/core")); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+	return root
+}
+
+// A symlinked directory is the directory it resolves to: the sync writes each
+// putnami.json once, under its own path, so the check right after it finds
+// nothing stale.
+func TestTheSyncWritesASymlinkedPackageOnceAndValidatePassesRightAfter(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-package-graph", "the-sync-writes-each-package-putnami-json-from-the-export")
+	spectest.Proves(t, feature, "validate-fails-on-a-stale-graph", "a-stale-package-graph-fails-validate")
+	t.Setenv("PATH", t.TempDir())
+	root := symlinkedRepository(t)
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"contrib/core/putnami.json", "contrib/core/tests/putnami.json", "st2tests/putnami.json"}; !reflect.DeepEqual(result.Written, want) {
+		t.Errorf("written = %v, want %v", result.Written, want)
+	}
+	if stale, err := Stale(context.Background(), root, &bytes.Buffer{}); err != nil || len(stale.Written) != 0 || len(stale.Retracted) != 0 {
+		t.Errorf("the graph is stale right after the sync: %+v %v", stale, err)
+	}
+	if deps := readProjectFile(t, root, "st2tests")["dependencies"]; !reflect.DeepEqual(deps, []any{"/contrib/core"}) {
+		t.Errorf("st2tests dependencies = %v, want the directory the link resolves to", deps)
+	}
+	inputs := readProjectFile(t, root, "contrib/core")["options"].(map[string]any)[ExtensionName].(map[string]any)["filePatterns"]
+	if want := []any{"../../BUILD", "../../requirements.txt"}; !reflect.DeepEqual(inputs, want) {
+		t.Errorf("contrib/core filePatterns = %v, want %v, relative to contrib/core", inputs, want)
+	}
+
+	// An export that lists the linked tree under the link alone, as when
+	// Pants ignores contrib/core, writes it under contrib/core too, where the
+	// sync finds it again: the next check finds nothing stale.
+	root = symlinkedRepository(t)
+	stackstest.WriteFile(t, root, "pants-graph.json", `[
+  {"address": "st2tests/fixtures/core/actions.py", "target_type": "python_source", "dependencies": [], "sources": ["st2tests/fixtures/core/actions.py"]},
+  {"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/test_packs.py"]}
+]`)
+	result, err = Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil || !reflect.DeepEqual(result.Written, []string{"contrib/core/putnami.json", "st2tests/putnami.json"}) {
+		t.Fatalf("link-only export: result %+v, err %v", result, err)
+	}
+	for range 2 {
+		if stale, err := Stale(context.Background(), root, &bytes.Buffer{}); err != nil || len(stale.Written) != 0 || len(stale.Retracted) != 0 {
+			t.Errorf("a link-only export is stale right after the sync: %+v %v", stale, err)
+		}
+		if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if deps := readProjectFile(t, root, "st2tests")["dependencies"]; !reflect.DeepEqual(deps, []any{"/contrib/core"}) {
+		t.Errorf("link-only export: st2tests dependencies = %v", deps)
+	}
+
+	// A tree behind a link that leaves the repository is no package, and the
+	// sync warns about each of its targets.
+	if err := os.Symlink(t.TempDir(), filepath.Join(root, "st2tests/vendor")); err != nil {
+		t.Fatal(err)
+	}
+	stackstest.WriteFile(t, root, "pants-graph.json", `[
+  {"address": "st2tests/vendor/lib.py", "target_type": "python_source", "dependencies": [], "sources": ["st2tests/vendor/lib.py"]},
+  {"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/vendor/lib.py"], "sources": ["st2tests/test_packs.py"]}
+]`)
+	result, err = Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil || len(result.Warnings) != 1 || !strings.Contains(result.Warnings[0], "st2tests/vendor/lib.py lies outside the repository") {
+		t.Errorf("an outside link: result %+v, err %v", result, err)
+	}
+	if deps := readProjectFile(t, root, "st2tests")["dependencies"]; deps != nil {
+		t.Errorf("an outside link: st2tests dependencies = %v, want none", deps)
+	}
+}
+
+// scriptPants puts first on PATH a pants that runs the shell script body.
+func scriptPants(t *testing.T, body string) {
+	t.Helper()
+	bin := t.TempDir()
+	stackstest.WriteFile(t, bin, "pants", "#!/bin/sh\n"+body)
+	if err := os.Chmod(filepath.Join(bin, "pants"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestTheSyncMergesTheBatchesAndFailsOnABrokenPeek(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-package-graph", "the-sync-writes-each-package-putnami-json-from-the-export")
+	defer func(batch int) { peekBatch = batch }(peekBatch)
+	peekBatch = 1
+	root := t.TempDir()
+	stackstest.WriteFile(t, root, "pants.toml", "[GLOBAL]\npants_version = \"2.25.0\"\n")
+	stackstest.WriteFile(t, root, "src/app/BUILD", "python_sources()\n")
+	stackstest.WriteFile(t, root, "src/lib/BUILD", "python_sources()\n")
+
+	// A target two batches return, as a file spec's owners can, is read
+	// once.
+	scriptPants(t, `case "$1" in
+  list) printf 'src/app/main.py\nsrc/lib/lib.py\n';;
+  peek) printf '[{"address": "src/lib/lib.py", "target_type": "python_source", "dependencies": [], "sources": ["src/lib/lib.py"], "fingerprint": "x"}'
+    [ "$2" = src/app/main.py ] && printf ', {"address": "src/app/main.py", "target_type": "python_source", "dependencies": ["src/lib/lib.py"], "sources": ["src/app/main.py"]}'
+    echo ']';;
+esac
+`)
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil || !reflect.DeepEqual(result.Written, []string{"src/app/putnami.json", "src/lib/putnami.json"}) {
+		t.Fatalf("result %+v, err %v", result, err)
+	}
+	if deps := readProjectFile(t, root, "src/app")["dependencies"]; !reflect.DeepEqual(deps, []any{"/src/lib"}) {
+		t.Errorf("app dependencies = %v", deps)
+	}
+
+	// A peek that prints no array, or a pants that fails, fails the sync,
+	// which writes nothing.
+	for name, body := range map[string]string{
+		"no array":    "case \"$1\" in list) echo src/app/main.py;; peek) echo 'not json';; esac\n",
+		"a truncated": "case \"$1\" in list) echo src/app/main.py;; peek) printf '[{\"address\": \"src/app/main.py\"}';; esac\n",
+		"failed list": "echo boom >&2; exit 1\n",
+		"failed peek": "case \"$1\" in list) echo src/app/main.py;; peek) exit 3;; esac\n",
+	} {
+		root := t.TempDir()
+		stackstest.WriteFile(t, root, "pants.toml", "[GLOBAL]\npants_version = \"2.25.0\"\n")
+		stackstest.WriteFile(t, root, "src/app/BUILD", "python_sources()\n")
+		scriptPants(t, body)
+		if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err == nil {
+			t.Errorf("%s: the sync passed", name)
+		}
+		if _, err := os.Stat(filepath.Join(root, "src/app/putnami.json")); !os.IsNotExist(err) {
+			t.Errorf("%s: a failed sync wrote a putnami.json: %v", name, err)
+		}
 	}
 }

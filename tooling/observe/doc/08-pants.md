@@ -32,6 +32,14 @@ target generated for a file in a subdirectory, such as
 BUILD file, `src/python/pricing`. `//` is the root. With the export, the
 component's source is `orchestrator`.
 
+A directory reached through a symbolic link is the directory it resolves to.
+When `st2tests/fixtures/packs/core` links to `contrib/core`, Pants lists the
+targets of `contrib/core` under both paths: `contrib/core` carries them once,
+and a dependency on one of them is an edge to `contrib/core`. When Pants lists
+them under the link alone, as when it ignores `contrib/core`, they still belong
+to `contrib/core`. A target reached through a link that leaves the repository
+is a warning, and no component or edge.
+
 A third-party target is no component: `python_requirement`,
 `python_requirements`, `uv_requirements`, `poetry_requirements`,
 `pipenv_requirements`, `pants_requirements`, `go_mod`,
