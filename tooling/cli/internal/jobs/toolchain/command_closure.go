@@ -14,6 +14,18 @@ func CommandDependencyClosure(
 	extensions []*extension.ExtensionDescription,
 	commands []string,
 ) map[string]bool {
+	return CommandDependencyClosureWith(extensions, commands, nil)
+}
+
+// CommandDependencyClosureWith is CommandDependencyClosure that also follows
+// projectDeps, the commands some project's putnami.json names under
+// commands.<command>.dependsOn, by the command that names them (CLI ADR
+// 0097).
+func CommandDependencyClosureWith(
+	extensions []*extension.ExtensionDescription,
+	commands []string,
+	projectDeps map[string][]string,
+) map[string]bool {
 	active := make(map[string]bool, len(commands))
 	for _, command := range commands {
 		active[command] = true
@@ -26,6 +38,11 @@ func CommandDependencyClosure(
 			if dependency != "" && !active[dependency] {
 				active[dependency] = true
 				changed = true
+			}
+		}
+		for command := range active {
+			for _, rawDependency := range projectDeps[command] {
+				addDependency(rawDependency)
 			}
 		}
 		for _, ext := range extensions {

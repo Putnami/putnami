@@ -32,14 +32,7 @@ func (s *Scheduler) cachedAtCurrentKey(job *ScheduledJob, mu *sync.Mutex, hashes
 	if s.cache == nil {
 		return false
 	}
-	mu.Lock()
-	hashCopy := make(map[string]string, len(job.DependsOn))
-	for _, depKey := range cachekey.CacheKeyDependencies(job) {
-		if value, ok := hashes[depKey]; ok {
-			hashCopy[depKey] = value
-		}
-	}
-	mu.Unlock()
+	hashCopy := s.dependencyKeys(job, mu, hashes)
 	hash, err := cachekey.ComputeJobCacheHash(s.ws, job, s.commandParams, s.cfg.VersionInfo, s.cache, hashCopy)
 	return err == nil && cachedEntryPresent(s.cache, job, hash)
 }

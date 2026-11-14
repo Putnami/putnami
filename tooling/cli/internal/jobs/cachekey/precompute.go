@@ -104,16 +104,30 @@ func PrecomputeKeys(
 	PrimePlanInputs(ws, planned, cache)
 
 	keys := make(map[string]string, len(planned))
+	// identities holds the identity of each keyless job a cacheable key folds
+	// (KeylessIdentities); each key reads its dependencies' keys and those
+	// identities through keylessView, as execution does.
+	identities := make(map[string]string)
+	keyless := KeylessIdentities(planned)
+	byKey := JobsByKey(planned)
 	for _, job := range order {
 		// Skip jobs that won't be cached: they contribute no key to the batch
 		// and no upstream hash to their dependents — matching execution, where
-		// only cacheable results populate the hash map.
+		// only cacheable results populate the hash map. A keyless job a
+		// cacheable key folds contributes its identity to its dependents
+		// alone; one whose identity cannot be computed contributes nothing,
+		// as at execution.
 		if !IsCacheEnabled(job, bypass) {
+			if keyless[job.Key()] {
+				if identity, err := ComputeJobCacheHash(ws, job, commandParams, versions, cache, keylessView(job, keys, identities, byKey)); err == nil {
+					identities[job.Key()] = identity
+				}
+			}
 			continue
 		}
 
 		started := time.Now()
-		hash, err := ComputeJobCacheHash(ws, job, commandParams, versions, cache, keys)
+		hash, err := ComputeJobCacheHash(ws, job, commandParams, versions, cache, keylessView(job, keys, identities, byKey))
 		cacheStats.RecordLocalKeys(started, time.Now())
 		if err != nil {
 			return nil, fmt.Errorf("precompute cache key for %s: %w", job.Key(), err)

@@ -126,6 +126,10 @@
       "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/tasks",
       "description": "Per-task execution tuning for the scope-self project. Only meaningful when activate is true."
     },
+    "commands": {
+      "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/commands",
+      "description": "What each command waits for in the scope-self project. Only meaningful when activate is true."
+    },
     "disable": {
       "$ref": "https://putnami.dev/schemas/putnami-project.json#/properties/disable",
       "description": "Opt-out configuration for the scope-self project. Only meaningful when activate is true."
@@ -191,6 +195,7 @@
       "options": false,
       "jobs": false,
       "tasks": false,
+      "commands": false,
       "disable": false
     }
   }

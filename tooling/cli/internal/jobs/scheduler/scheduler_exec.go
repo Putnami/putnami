@@ -890,14 +890,7 @@ func (s *Scheduler) lookupRestoreOrClaim(
 	// cachekey.ComputeJobCacheHash only mixes in the cache keys of this job's direct
 	// dependencies, so copy just those entries under the lock rather than the
 	// whole (growing) hashes map, keeping the critical section short.
-	mu.Lock()
-	hashCopy := make(map[string]string, len(job.DependsOn))
-	for _, depKey := range cachekey.CacheKeyDependencies(job) {
-		if value, ok := hashes[depKey]; ok {
-			hashCopy[depKey] = value
-		}
-	}
-	mu.Unlock()
+	hashCopy := s.dependencyKeys(job, mu, hashes)
 
 	// A BYPASSED task (--no-cache, or --no-cache-projects over its closure) is
 	// refused every entry, but it still has an IDENTITY, and this is where it

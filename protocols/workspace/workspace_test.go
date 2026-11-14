@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+
+	diag "go.putnami.dev/protocol/diagnostic"
 	"strings"
 	"testing"
 
@@ -849,5 +851,48 @@ func TestReadScopeConfig_LineOnlyIsScope(t *testing.T) {
 	}
 	if !sc.IsLine() || sc.Line.Tag != "ts/v{version}" {
 		t.Errorf("line = %+v, want tag ts/v{version}", sc.Line)
+	}
+}
+
+func TestLoadProjectConfigWithDiagnostics_ProjectCommands(t *testing.T) {
+	spectest.Proves(t, "workspace/workspace-contract", "a-project-names-what-a-command-waits-for", "a-project-command-dependency-is-a-command-or-its-closure")
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, ConfigFilename), `{"name":"app","commands":{"test":{"dependsOn":["build","^build"]}}}`)
+	cfg, diags := LoadProjectConfigWithDiagnostics(root)
+	if cfg == nil || len(diags) != 0 {
+		t.Fatalf("cfg=%#v diags=%v, want a config and no diagnostic", cfg, diags)
+	}
+	if got := cfg.Commands["test"].DependsOn; !slices.Equal(got, []string{"build", "^build"}) {
+		t.Fatalf("commands.test.dependsOn = %v, want [build ^build]", got)
+	}
+
+	for _, tc := range []struct {
+		name   string
+		config string
+		field  string
+		want   string
+	}{
+		{"unknown member", `{"name":"app","commands":{"test":{"dependOn":["build"]}}}`, "commands.test.dependOn", "unknown command field"},
+		{"not an object", `{"name":"app","commands":{"test":null}}`, "commands.test", "must be an object"},
+		{"not a list", `{"name":"app","commands":{"test":{"dependsOn":"build"}}}`, "commands.test.dependsOn", "failed to parse dependsOn"},
+		{"session barrier", `{"name":"app","commands":{"test":{"dependsOn":["!build"]}}}`, "commands.test.dependsOn[0]", "not command or ^command"},
+		{"one step", `{"name":"app","commands":{"test":{"dependsOn":["build~tsc"]}}}`, "commands.test.dependsOn[0]", "not command or ^command"},
+		{"empty closure", `{"name":"app","commands":{"test":{"dependsOn":["^"]}}}`, "commands.test.dependsOn[0]", "not command or ^command"},
+		{"empty command name", `{"name":"app","commands":{"":{"dependsOn":["build"]}}}`, "commands", "must not be empty"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := t.TempDir()
+			writeFile(t, filepath.Join(root, ConfigFilename), tc.config)
+			cfg, diags := LoadProjectConfigWithDiagnostics(root)
+			if cfg != nil || len(diags) != 1 {
+				t.Fatalf("cfg=%#v diags=%v, want no config and one diagnostic", cfg, diags)
+			}
+			if diags[0].Field != tc.field || !strings.Contains(diags[0].Message, tc.want) {
+				t.Fatalf("diagnostic = %+v, want field %q containing %q", diags[0], tc.field, tc.want)
+			}
+			if _, strict := ParseAndValidateProjectConfig([]byte(tc.config)); tc.name != "not an object" && !diag.HasErrors(strict) {
+				t.Fatalf("the strict parser accepted %s", tc.config)
+			}
+		})
 	}
 }

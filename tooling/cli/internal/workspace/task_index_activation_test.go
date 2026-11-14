@@ -8,6 +8,7 @@ import (
 
 	extproto "go.putnami.dev/protocol/extension"
 	"go.putnami.dev/protocol/features/spectest"
+	wsproto "go.putnami.dev/protocol/workspace"
 	"go.putnami.dev/tooling/cli/internal/extension"
 )
 
@@ -300,5 +301,52 @@ func TestTraceChangeImpact_AClosureDependencyCarriesThePrerequisiteToTheDependen
 	got := traceChangeImpact(ws, []string{"libs/api/clientgen.json"}, ChangeImpactOptions{Tasks: idx})
 	if scope := got.Trace.ScopeOf("/apps/web"); !slices.Contains(scope, "lint~lint") {
 		t.Errorf("the dependent two edges up runs %v, want lint~lint", scope)
+	}
+}
+
+// A `^command` a project names under commands.<command>.dependsOn of its
+// putnami.json reaches the dependent command as a manifest's does: a build the
+// tool runs in a dependency carries a change to the test that waits for it.
+func TestTaskIndex_AProjectCommandDependencyReachesTheDependentCommand(t *testing.T) {
+	toolExt := &extension.ExtensionDescription{
+		Name: "@fixture/tool", RelPath: "tool/extension",
+		Tasks: map[string]extproto.TaskDefinition{"build-exec": {Inputs: map[string]extproto.TaskInputPort{
+			"sources": {From: extproto.TaskInputFromProject, Files: []string{"src/**"}},
+		}}},
+		Jobs: map[string]*extension.JobDefinition{
+			"build": {CommandName: "build", PipelineSteps: []extproto.PipelineStep{{ID: "build", Task: "build-exec"}}},
+		},
+	}
+	tsExt := &extension.ExtensionDescription{
+		Name: "@fixture/ts", RelPath: "ts/extension",
+		Tasks: map[string]extproto.TaskDefinition{"test-exec": {Inputs: map[string]extproto.TaskInputPort{
+			"sources": {From: extproto.TaskInputFromProject, Files: []string{"test/**"}},
+		}}},
+		Jobs: map[string]*extension.JobDefinition{
+			"test": {CommandName: "test", PipelineSteps: []extproto.PipelineStep{{ID: "test", Task: "test-exec"}}},
+		},
+	}
+	index := func(config *wsproto.ProjectConfig) *taskIndex {
+		projects := []*Project{
+			{ID: "/tool/extension", Name: "@fixture/tool", Path: "tool/extension"},
+			{ID: "/ts/extension", Name: "@fixture/ts", Path: "ts/extension"},
+			{ID: "/libs/types", Name: "types", Path: "libs/types", Extensions: []string{"/tool/extension"}},
+			{ID: "/apps/report", Name: "report", Path: "apps/report", Extensions: []string{"/ts/extension"}, Dependencies: []string{"/libs/types"}, Config: config},
+		}
+		ws := NewWorkspace(t.TempDir(), nil, projects)
+		ws.Graph = BuildGraph(projects)
+		idx := NewTaskIndex(ws, []*extension.ExtensionDescription{toolExt, tsExt}, nil)
+		if idx == nil {
+			t.Fatal("NewTaskIndex returned nil")
+		}
+		return idx.(*taskIndex)
+	}
+	moved := []string{"build~build"}
+	if got := index(nil).TasksReachedIn("/apps/report", moved); slices.Contains(got, "test~test") {
+		t.Fatalf("without the project's entry the test is reached: %v", got)
+	}
+	waits := &wsproto.ProjectConfig{Commands: map[string]wsproto.ProjectCommand{"test": {DependsOn: []string{"^build"}}}}
+	if got := index(waits).TasksReachedIn("/apps/report", moved); !slices.Contains(got, "test~test") {
+		t.Errorf("a test that waits for ^build runs %v when the dependency's build moved, want test~test", got)
 	}
 }

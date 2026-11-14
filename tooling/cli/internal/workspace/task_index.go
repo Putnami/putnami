@@ -246,6 +246,7 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 	for _, ext := range extensions {
 		idx.addExtension(ext, successors, commandDeps)
 	}
+	addProjectCommandDeps(ws, extensions, commandDeps)
 	if !idx.attributes() {
 		return nil
 	}
@@ -326,6 +327,51 @@ func (idx *taskIndex) addExtension(
 			}
 			if !slices.Contains(commandDeps[key][prerequisite.Command], job) {
 				commandDeps[key][prerequisite.Command] = append(commandDeps[key][prerequisite.Command], job)
+			}
+		}
+	}
+}
+
+// addProjectCommandDeps folds into commandDeps the prerequisites projects
+// name under commands.<command>.dependsOn of their putnami.json (CLI ADR
+// 0097), as if every extension's job of the command declared them. The link
+// is then read wherever that command may be planned, not only in the projects
+// that name it, which widens the closure and never narrows it.
+func addProjectCommandDeps(ws *Workspace, extensions []*extension.ExtensionDescription, commandDeps map[string]map[string][]*extension.JobDefinition) {
+	for command, prerequisites := range ProjectCommandDependencies(ws) {
+		var declaring []*extension.JobDefinition
+		for _, ext := range extensions {
+			if ext == nil {
+				continue
+			}
+			for name, job := range ext.Jobs {
+				if job == nil {
+					continue
+				}
+				if job.CommandName != "" {
+					name = job.CommandName
+				}
+				if name == command {
+					declaring = append(declaring, withDeclaringExtension(job, ext))
+				}
+			}
+		}
+		for _, rawPrerequisite := range prerequisites {
+			prerequisite := extension.ParseCommandDependency(rawPrerequisite)
+			if prerequisite.Session || prerequisite.Command == "" {
+				continue
+			}
+			key := command
+			if prerequisite.Dependencies {
+				key = dependencyClosureKey + command
+			}
+			if commandDeps[key] == nil {
+				commandDeps[key] = make(map[string][]*extension.JobDefinition)
+			}
+			for _, job := range declaring {
+				if !slices.Contains(commandDeps[key][prerequisite.Command], job) {
+					commandDeps[key][prerequisite.Command] = append(commandDeps[key][prerequisite.Command], job)
+				}
 			}
 		}
 	}
