@@ -41,6 +41,12 @@ import (
 // These assertions read the REAL manifest. A guard that stops being planned,
 // gains a dependency, or loses its key would keep passing its own unit tests
 // while silently verifying the wrong tree or re-running on every invocation.
+//
+// They prove the planner rule, cli/job-planning-execution, and not the
+// clientgen requirement: this project is neither a dependency nor a direct
+// dependent of tooling/clientgen-extension, so the spec gate never reads its
+// evidence for that project (ADR 0026). The extension proves its declaration
+// half in manifest_contract_test.go.
 
 const clientgenExtensionName = "@putnami/clientgen"
 
@@ -103,6 +109,7 @@ func clientgenNodes(planned []*jobmodel.ScheduledJob) []*jobmodel.ScheduledJob {
 // invariant: one guard, whatever the selection contains, and even when no
 // selected project lists the extension.
 func TestNativeValidatePlansOneClientgenGuardForAnySelection(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-workspace-once-command-plans-one-job", "a-workspace-once-command-plans-one-job-for-any-selection")
 	command := loadClientgenExtension(t).Jobs["validate"]
 	if command == nil {
 		t.Fatal("the clientgen manifest contributes no validate command; `putnami validate` runs no guard at all")
@@ -132,7 +139,7 @@ func TestNativeValidatePlansOneClientgenGuardForAnySelection(t *testing.T) {
 // that holds a provider with an in-module target and a client project that
 // names its provider in generatedFrom.
 func TestNativeValidatePlansNoGeneration(t *testing.T) {
-	spectest.Proves(t, "tooling/cross-language-rest-clients", "native-validation-gate", "validate-plans-no-generation")
+	spectest.Proves(t, "cli/job-planning-execution", "a-workspace-once-command-plans-one-job", "a-workspace-once-command-that-depends-on-nothing-plans-nothing-else")
 	description := loadClientgenExtension(t)
 	command := description.Jobs["validate"]
 	if command == nil || len(command.CommandDependsOn) != 0 {
@@ -196,6 +203,7 @@ func TestNativeValidatePlansNoGeneration(t *testing.T) {
 // scoped: `build` and `lint` must not drag a whole-workspace verification
 // behind them.
 func TestNativeValidateGuardIsNotPlannedForAnotherCommand(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-workspace-once-command-plans-one-job", "another-command-plans-no-workspace-once-job")
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, 3)
 	for _, command := range []string{"build", "lint", "test"} {
@@ -214,6 +222,7 @@ func TestNativeValidateGuardIsNotPlannedForAnotherCommand(t *testing.T) {
 // one — a workspace that disables the extension or the job — rather than an
 // undocumented environment variable.
 func TestNativeValidateGuardIsDisableable(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-workspace-once-command-plans-one-job", "a-disabled-extension-plans-no-workspace-once-job")
 	description := loadClientgenExtension(t)
 	ws, selected := clientgenConsumerWorkspace(t, 3)
 	planned, err := Plan(ws, []string{"validate"}, selected,

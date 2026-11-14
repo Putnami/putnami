@@ -82,6 +82,10 @@
       "text": "A declared output may state readByDependents: the projects that depend on its project read it, such as a generated client they compile. The validate command names each output it refuses. Every planned job of a direct or transitive dependent runs after the writer over an ordering edge that never reaches a cache key. Finalizers and jobs already running before the writer take no edge, so the plan stays a DAG."
     },
     {
+      "id": "a-workspace-once-command-plans-one-job",
+      "text": "A command whose activation is workspace-once plans exactly one job per session, whatever the selection holds, without reading any selected project's extension list, so no project opts out by not declaring the extension. Only that command plans it, and a workspace that disables the extension plans none. When the command depends on no other command, its job depends on nothing and the session plans no other job of that extension, even for a selection that holds a provider and its client project."
+    },
+    {
       "id": "preview-no-effects",
       "text": "Plan-only previews do not execute subprocesses, update successful-run markers, or write generated workspace state; a command-level dry run executes only when its catalog or extension contract explicitly forwards a dry-run simulation. For --plan and plan-only --dry-run, explicit JSON output carries one typed plan envelope and JSONL carries one terminal plan:end record, including an explicit zero-task plan when empty; neither shape claims a run, session:end, or persisted session artifact."
     },
