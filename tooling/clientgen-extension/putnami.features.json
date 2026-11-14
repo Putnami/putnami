@@ -240,8 +240,7 @@
               "the-guard-reads-the-git-candidate-cut-and-keys-on-it",
               "the-guard-task-is-reachable-only-from-validate-and-the-explicit-check-command",
               "the-validate-command-declares-no-dependency",
-              "validate-contributes-exactly-one-workspace-guard-for-any-selection",
-              "validate-plans-no-generation"
+              "validate-contributes-exactly-one-workspace-guard-for-any-selection"
             ]
           }
         },

@@ -252,6 +252,22 @@
         }
       },
       {
+        "id": "a-workspace-once-command-plans-one-job",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-disabled-extension-plans-no-workspace-once-job",
+            "a-workspace-once-command-plans-one-job-for-any-selection",
+            "a-workspace-once-command-that-depends-on-nothing-plans-nothing-else",
+            "another-command-plans-no-workspace-once-job"
+          ]
+        }
+      },
+      {
         "id": "preview-no-effects",
         "stage": "coded",
         "evidenceKinds": [
