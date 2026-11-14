@@ -27,9 +27,10 @@ const typeScriptExtensionName = "@putnami/typescript"
 // (--types bun) on the project's tsconfig, which Bun and the compiler look for
 // up from the project when it holds none. test counts only for a member whose
 // test type-checks, and package only for a member whose build the extension
-// runs: the package steps type-check too, but a member whose build stays on
-// the repository's tool, as an import leaves it, packages with that tool, so
-// the install adds nothing for a package it does not build.
+// runs: the package steps type-check too, but the install adds nothing for
+// the package of a member whose build stays on the repository's tool, as an
+// import leaves it. Packaging such a member with Putnami needs typescript and
+// @types/bun added by hand.
 var typeCheckJobs = []string{"build", "package", "test"}
 
 // projectTSConfigs are the configurations the extension reads in a project
@@ -65,10 +66,10 @@ func devDependencyNeeds(ctx *pctx.Context) devDependencyNeed {
 		return devDependencyNeed{}
 	}
 	members := typeScriptMembers(ctx.WorkspaceRoot, ctx.WorkspaceProjects)
-	if len(members) == 0 {
-		// The root alone, as in a single-package workspace, is no member the
-		// membership describes: it needs what an unknown membership needs.
-		return devDependencyNeed{}
+	if len(members) == 0 && rootIsTypeScriptProject(ctx) {
+		// A single-package workspace: the root is its only TypeScript project,
+		// so its jobs are the ones the workspace runs.
+		members = []typeScriptMember{{Path: "."}}
 	}
 	need := devDependencyNeed{known: true, jobs: map[string]bool{}}
 	for _, member := range members {
@@ -115,6 +116,19 @@ func (n devDependencyNeed) needs(name string) bool {
 		return len(n.jobs) > 0
 	}
 	return slices.ContainsFunc(jobs, func(job string) bool { return n.jobs[job] })
+}
+
+// rootIsTypeScriptProject reports whether the job context lists the workspace
+// root as a project that holds a package.json.
+func rootIsTypeScriptProject(ctx *pctx.Context) bool {
+	if !slices.ContainsFunc(ctx.WorkspaceProjects, func(ref pctx.ProjectRef) bool {
+		rel := filepath.ToSlash(filepath.Clean(ref.Path))
+		return rel == "." || rel == "/"
+	}) {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(ctx.WorkspaceRoot, workspaceMarkerFile))
+	return err == nil
 }
 
 // needsBiomeConfig reports whether the workspace needs a root biome.json: a

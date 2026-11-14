@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -154,24 +155,47 @@ func TestAProjectWithItsOwnTSConfigReadsNoRootTSConfig(t *testing.T) {
 }
 
 // A workspace whose only TypeScript project is its root, as a single-package
-// repository, has no member to read jobs from: it gets the root tsconfig.json
-// and biome.json an unknown membership gets.
-func TestARootOnlyWorkspaceGetsTheRootConfigs(t *testing.T) {
+// repository, reads the jobs of its root: with no putnami.json it runs every
+// job, so it gets the root tsconfig.json it holds none of, and a root
+// biome.json only while its lint runs Biome.
+func TestARootOnlyWorkspaceReadsTheJobsOfItsRoot(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-writes-the-tsconfig-a-task-reads",
-		"a-root-only-workspace-gets-the-root-configs")
-	ctx, _ := devDepsWorkspace(t, "")
-	ctx.WorkspaceProjects = ctx.WorkspaceProjects[:1]
-	writeProbeFile(t, filepath.Join(ctx.Extension.Root, "config", "tsconfig.json"), `{"compilerOptions":{"strict":true}}`)
-	writeProbeFile(t, filepath.Join(ctx.Extension.Root, "config", "biome.json"), `{"root":false}`)
-	if err := ensureWorkspaceTsConfig(ctx, jsonl.New()); err != nil {
-		t.Fatal(err)
-	}
-	if err := ensureWorkspaceBiomeConfig(ctx, jsonl.New()); err != nil {
-		t.Fatal(err)
-	}
-	for _, file := range []string{"tsconfig.json", "biome.json"} {
-		if !exists(t, filepath.Join(ctx.WorkspaceRoot, file)) {
-			t.Errorf("the install wrote no root %s", file)
-		}
+		"a-root-only-workspace-reads-the-jobs-of-its-root")
+	for name, c := range map[string]struct {
+		scripts string
+		biome   bool
+	}{
+		"Biome":  {scripts: `{"lint":"biome check ."}`, biome: true},
+		"ESLint": {scripts: `{"lint":"eslint ."}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			ctx, _ := devDepsWorkspace(t, "")
+			ctx.WorkspaceProjects = ctx.WorkspaceProjects[:1]
+			writeProbeFile(t, filepath.Join(ctx.WorkspaceRoot, "package.json"), `{"name":"shop","private":true,"scripts":`+c.scripts+`}`)
+			writeProbeFile(t, filepath.Join(ctx.Extension.Root, "config", "tsconfig.json"), `{"compilerOptions":{"strict":true}}`)
+			writeProbeFile(t, filepath.Join(ctx.Extension.Root, "config", "biome.json"), `{"root":false}`)
+			for _, step := range []func() error{
+				func() error { return ensureWorkspaceDevDeps(ctx, jsonl.New()) },
+				func() error { return ensureWorkspaceTsConfig(ctx, jsonl.New()) },
+				func() error { return ensureWorkspaceBiomeConfig(ctx, jsonl.New()) },
+			} {
+				if err := step(); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if !exists(t, filepath.Join(ctx.WorkspaceRoot, "tsconfig.json")) {
+				t.Error("the install wrote no root tsconfig.json, which the root's build reads")
+			}
+			if got := exists(t, filepath.Join(ctx.WorkspaceRoot, "biome.json")); got != c.biome {
+				t.Errorf("root biome.json written = %v, want %v", got, c.biome)
+			}
+			pkg := readTextFile(t, filepath.Join(ctx.WorkspaceRoot, "package.json"))
+			if got := strings.Contains(pkg, `"@biomejs/biome"`); got != c.biome {
+				t.Errorf("@biomejs/biome added = %v, want %v:\n%s", got, c.biome, pkg)
+			}
+			if !strings.Contains(pkg, `"@types/bun"`) || !strings.Contains(pkg, `"typescript"`) {
+				t.Errorf("package.json lacks the compiler or Bun's types its build needs:\n%s", pkg)
+			}
+		})
 	}
 }
