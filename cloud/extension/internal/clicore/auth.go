@@ -85,28 +85,35 @@ func UserSessionStatus(id, title string, err error, env map[string]string) Statu
 	return UnknownStatus(id, title, UserSessionError(err, env), fix)
 }
 
-// MachineTokenOnly reports whether the command runs on PUTNAMI_CLOUD_TOKEN
-// with no stored user session. The build cache provider uses it too: it reads
-// the cache with that token only when no signed-in user can mint one.
+// MachineTokenOnly reports whether the process runs on PUTNAMI_CLOUD_TOKEN:
+// the variable is set, and no usable session is stored or
+// PUTNAMI_CLOUD_CREDENTIAL=machine chooses the token (ResolveCredential with
+// no flag). The build cache provider uses it too: it reads the cache with that
+// token only when no signed-in user can mint one.
 func MachineTokenOnly(env map[string]string) bool {
-	if EnvGet(env, "PUTNAMI_CLOUD_TOKEN") == "" {
-		return false
-	}
-	auth, err := ReadAuth(env, false)
-	return err != nil || auth == nil || auth.AccessToken == ""
+	cred, err := ResolveCredential(nil, env, time.Now())
+	return err == nil && cred.Machine
 }
 
 // WorkspaceAuth returns an access token scoped to workspaceID, reusing the
-// per-workspace cache and refreshing/exchanging as needed. A caller may provide
-// PUTNAMI_CLOUD_TOKEN explicitly for a target-bound, non-interactive workspace
-// operation. That bearer is never accepted by ActiveAuth, persisted, refreshed,
-// or exposed to machine/operator management paths. An empty workspaceID falls
-// back to ActiveAuth.
+// per-workspace cache and refreshing/exchanging as needed. The credential is
+// the one ResolveCredential picks: a usable stored session wins, and
+// PUTNAMI_CLOUD_TOKEN serves a non-interactive workspace operation only when
+// no usable session is stored or --credential=machine chooses it. That bearer
+// is never accepted by ActiveAuth, persisted, refreshed, or exposed to
+// machine/operator management paths. Under --verbose the command says once
+// which credential it sends. An empty workspaceID falls back to ActiveAuth.
 func WorkspaceAuth(params map[string]any, env map[string]string, ioctx IO, workspaceID string) (*StoredToken, error) {
 	if workspaceID == "" {
 		return ActiveAuth(params, env, ioctx)
 	}
-	if token := EnvGet(env, "PUTNAMI_CLOUD_TOKEN"); token != "" {
+	cred, err := ResolveCredential(params, env, ioctxNow(ioctx))
+	if err != nil {
+		return nil, err
+	}
+	announceCredential(params, ioctx, cred)
+	if cred.Machine {
+		token := EnvGet(env, CloudTokenEnv)
 		fields := strings.Fields(token)
 		if len(fields) != 1 || fields[0] != token {
 			return nil, NewError("PUTNAMI_CLOUD_TOKEN must contain exactly one bearer token", ExitAuth)

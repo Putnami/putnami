@@ -24,9 +24,13 @@ type WhoamiSession struct {
 	// User is the signed-in user, from the userinfo endpoint, then the token
 	// claims.
 	User User
-	// CIToken reports that no session is stored and PUTNAMI_CLOUD_TOKEN stands
-	// in for one on the workspace calls.
+	// CIToken reports that PUTNAMI_CLOUD_TOKEN stands in for a session on the
+	// workspace calls: no usable session is stored, or --credential=machine
+	// chose it.
 	CIToken bool
+	// Credential is the credential the workspace commands send, and why
+	// (clicore.ResolveCredential). It is zero when it could not be resolved.
+	Credential clicore.Credential
 	// ExpiresAt is when the session ends, zero when it is not known.
 	ExpiresAt time.Time
 	Err       error
@@ -99,10 +103,13 @@ func whoamiSessionNode(session WhoamiSession) clicore.StatusNode {
 	switch {
 	case session.Err == nil && session.CIToken:
 		node.State = clicore.StatusOK
-		node.Detail = "PUTNAMI_CLOUD_TOKEN is set; no session on this machine"
+		node.Detail = "workspace commands use " + session.Credential.String()
 	case session.Err == nil:
 		node.State = clicore.StatusOK
 		node.Detail = SignedInAs(userLabel(session.User))
+		if session.Credential.TokenSet {
+			node.Detail += "; workspace commands use " + session.Credential.String()
+		}
 	case clicore.ExitCode(session.Err) == clicore.ExitAuth:
 		node.State = clicore.StatusFailing
 		node.Detail = "not signed in"
@@ -142,20 +149,26 @@ func SignedInAs(identity string) string {
 // SignedOutMessage is what `putnami cloud logout` prints.
 const SignedOutMessage = "Signed out of Putnami Cloud."
 
-// readWhoamiSession reads the stored session, refreshing it when it expired,
-// and asks the userinfo endpoint who it belongs to. A userinfo endpoint that
-// refuses the token (401) ends the session; one that does not answer falls
-// back to the token claims, since the session still works.
+// readWhoamiSession reads the credential the workspace commands send
+// (clicore.ResolveCredential). For the session, it reads the stored session,
+// refreshing it when it expired, and asks the userinfo endpoint who it
+// belongs to. A userinfo endpoint that refuses the token (401) ends the
+// session; one that does not answer falls back to the token claims, since the
+// session still works.
 func readWhoamiSession(params map[string]any, env map[string]string, ioctx clicore.IO) WhoamiSession {
-	auth, err := clicore.ActiveAuth(params, env, ioctx)
+	cred, err := clicore.ResolveCredential(params, env, now(ioctx))
 	if err != nil {
-		if clicore.EnvGet(env, "PUTNAMI_CLOUD_TOKEN") != "" {
-			return WhoamiSession{CIToken: true}
-		}
 		return WhoamiSession{Err: err}
 	}
+	if cred.Machine {
+		return WhoamiSession{CIToken: true, Credential: cred}
+	}
+	auth, err := clicore.ActiveAuth(params, env, ioctx)
+	if err != nil {
+		return WhoamiSession{Err: err, Credential: cred}
+	}
 	claims := clicore.DecodeJWT(auth.AccessToken)
-	session := WhoamiSession{User: userIdentity(nil, claims), ExpiresAt: sessionExpiry(auth)}
+	session := WhoamiSession{User: userIdentity(nil, claims), ExpiresAt: sessionExpiry(auth), Credential: cred}
 	client := contextClient(ioctx)
 	endpoints := clicore.AuthEndpoints(params, env, client, auth.Issuer)
 	userinfo, err := fetchUserInfo(client, endpoints, auth.AccessToken)
@@ -163,7 +176,7 @@ func readWhoamiSession(params map[string]any, env map[string]string, ioctx clico
 	case err == nil:
 		session.User = userIdentity(userinfo, claims)
 	case clicore.ExitCode(err) == clicore.ExitAuth:
-		return WhoamiSession{Err: err}
+		return WhoamiSession{Err: err, Credential: cred}
 	}
 	return session
 }

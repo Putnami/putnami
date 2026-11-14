@@ -151,6 +151,25 @@ An assistant reaches the workspace through the CLI:
 
 An earlier Putnami wrote a `putnami` entry to `.mcp.json`. `putnami install` and `putnami upgrade` remove that entry when it is the one Putnami wrote, and delete the file when nothing else remains. An entry you changed stays as you wrote it, with a warning, and a file that does not parse stays untouched.
 
+### Putnami Cloud in a hosted agent session
+
+A hosted agent session (an ephemeral container with no browser) often holds a
+workspace machine token in `PUTNAMI_CLOUD_TOKEN`. Sign the person in as well,
+so the agent reads what only a person may read:
+
+```bash
+putnami cloud login --no-open --output=jsonl
+```
+
+The command writes one record before it waits, with `user_code`,
+`verification_uri`, `verification_uri_complete` and `expires_in`, so the host
+can hand the code to an approver. It exits 0 once the code is approved. From
+then on the signed-in session wins over `PUTNAMI_CLOUD_TOKEN` for every
+`putnami cloud` command; `--credential=machine` chooses the token, and
+`putnami cloud whoami` names the credential in use. `whoami`, `status`,
+`login` and `logout` start no job, and a build whose cache credential cannot
+write says so once instead of warning on every task.
+
 ## Polyglot workspaces
 
 If you add extensions after the initial setup, regenerate the guidance block and the managed skills:

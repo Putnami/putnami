@@ -11,6 +11,7 @@ import (
 	"time"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // storeFreshAuth persists a non-expired base credential whose access token
@@ -254,5 +255,46 @@ func TestSignedInWording(t *testing.T) {
 	}
 	if got := loginSuccessMessage(User{}); got != "Signed in." {
 		t.Fatalf("anonymous login message = %q", got)
+	}
+}
+
+func TestWhoAmINamesTheCredentialAndWhy(t *testing.T) {
+	spectest.Proves(t, "cloud/agent-session", "the-command-names-its-credential", "whoami-names-the-credential-and-why")
+	srv := newAuthServer(t)
+	root := linkWorkspace(t, "")
+
+	// A signed-in session and PUTNAMI_CLOUD_TOKEN: the session wins, and
+	// whoami says so.
+	home := t.TempDir()
+	ioctx, env, _, _ := captureIO(t, srv.srv, home)
+	env[clicore.CloudTokenEnv] = "pkt_workspace_machine"
+	storeFreshAuth(t, home, srv.srv.URL)
+	node := WhoamiStatusNode(map[string]any{}, root, env, ioctx)
+	session := node.Children[0]
+	if node.State != clicore.StatusOK || !strings.HasPrefix(session.Detail, "signed in as ") ||
+		!strings.Contains(session.Detail, "workspace commands use the signed-in session, which wins over PUTNAMI_CLOUD_TOKEN") {
+		t.Fatalf("session and token: node = %+v", node)
+	}
+
+	// --credential=machine: whoami reports the machine token and the choice.
+	node = WhoamiStatusNode(map[string]any{"credential": "machine"}, root, env, ioctx)
+	if node.State != clicore.StatusOK || !strings.Contains(node.Children[0].Detail, "chosen with --credential=machine") {
+		t.Fatalf("--credential=machine: node = %+v", node)
+	}
+
+	// No stored session: the machine token, and why.
+	bare := t.TempDir()
+	ioctx, env, _, _ = captureIO(t, srv.srv, bare)
+	env[clicore.CloudTokenEnv] = "pkt_workspace_machine"
+	node = WhoamiStatusNode(map[string]any{}, root, env, ioctx)
+	if node.State != clicore.StatusOK || !strings.Contains(node.Children[0].Detail, "no signed-in session is stored on this machine") {
+		t.Fatalf("machine token alone: node = %+v", node)
+	}
+
+	// A session alone says nothing about a token.
+	ioctx, env, _, _ = captureIO(t, srv.srv, home)
+	node = WhoamiStatusNode(map[string]any{}, root, env, ioctx)
+	if strings.Contains(node.Children[0].Detail, "PUTNAMI_CLOUD_TOKEN") {
+		t.Fatalf("session alone: node = %+v", node)
 	}
 }
