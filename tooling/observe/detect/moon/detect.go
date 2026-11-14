@@ -389,13 +389,18 @@ func mergeTask(base, own map[string]any) map[string]any {
 			merged[key] = value
 		}
 	}
-	// deps merge as moon merges them: appended by default, or as
-	// options.mergeDeps says.
+	// deps merge as args and tags do, by options.mergeDeps, else
+	// options.merge, else appended; an entry may be a target object, so the
+	// list keeps its values as they are.
 	if ownDeps, set := own["deps"]; set {
 		options, _ := own["options"].(map[string]any)
 		inherited, _ := base["deps"].([]any)
 		mine, _ := ownDeps.([]any)
-		switch options["mergeDeps"] {
+		strategy, stated := options["mergeDeps"]
+		if !stated {
+			strategy = options["merge"]
+		}
+		switch strategy {
 		case "replace":
 			merged["deps"] = mine
 		case "prepend":

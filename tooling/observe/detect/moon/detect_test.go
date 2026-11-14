@@ -308,3 +308,21 @@ func TestDetectReadsTheDepsOfATask(t *testing.T) {
 		}
 	}
 }
+
+func TestMergeTaskMergesDepsAsArgsAndTags(t *testing.T) {
+	base := map[string]any{"deps": []any{"~:codegen"}}
+	target := map[string]any{"target": "types:build"}
+	for _, c := range []struct {
+		own  map[string]any
+		want []any
+	}{
+		{map[string]any{"deps": []any{target}}, []any{"~:codegen", target}},
+		{map[string]any{"deps": []any{target}, "options": map[string]any{"mergeDeps": "prepend"}}, []any{target, "~:codegen"}},
+		{map[string]any{"deps": []any{target}, "options": map[string]any{"merge": "replace"}}, []any{target}},
+		{map[string]any{"deps": []any{target}, "options": map[string]any{"merge": "replace", "mergeDeps": "append"}}, []any{"~:codegen", target}},
+	} {
+		if got := mergeTask(base, c.own)["deps"]; !reflect.DeepEqual(got, c.want) {
+			t.Errorf("mergeTask over %v: deps %v, want %v", c.own, got, c.want)
+		}
+	}
+}
