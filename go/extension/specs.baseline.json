@@ -75,6 +75,7 @@
     "go/project-setup#create-holds-a-missing-credential-warning",
     "go/project-setup#create-resolves-the-go-framework-version",
     "go/project-setup#create-runs-the-pinned-go",
-    "go/project-setup#create-sets-up-a-go-project"
+    "go/project-setup#create-sets-up-a-go-project",
+    "go/project-setup#create-states-the-pinned-go"
   ]
 }

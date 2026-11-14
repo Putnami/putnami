@@ -185,10 +185,14 @@ func (s *setup) writeGoWork(goWork, path, goVersion string) bool {
 }
 
 // addToWorkspace adds the project to go.work, creating it when missing, and
-// gives go.work and the project's go.mod the workspace's go directive.
+// gives go.work and the project's go.mod the workspace's go directive. A
+// go.work it creates also states, as its toolchain directive, the release the
+// workspace lock pins when that release is newer than the go directive
+// (pinnedToolchain), so go.work declares the release the lock pins.
 func (s *setup) addToWorkspace(goWork, path, goVersion string) bool {
 	projectDir := filepath.Join(s.WorkspaceRoot, path)
-	if !workspacejob.FileExists(goWork) {
+	created := !workspacejob.FileExists(goWork)
+	if created {
 		if out, err := s.Combined(nil, s.GoBinary, "-C", s.WorkspaceRoot, "work", "init"); err != nil {
 			s.Emit.Diagnostic("error", "go work init: "+out, goWork, 0)
 			return false
@@ -209,8 +213,32 @@ func (s *setup) addToWorkspace(goWork, path, goVersion string) bool {
 			return false
 		}
 	}
+	if pinned := s.pinnedToolchain(goVersion); created && pinned != "" {
+		if out, err := s.Combined(nil, s.GoBinary, "-C", s.WorkspaceRoot, "work", "edit", "-toolchain=go"+pinned); err != nil {
+			s.Emit.Diagnostic("error", "go work edit: "+out, goWork, 0)
+			return false
+		}
+		s.Emit.Log("info", "go.work states the Go "+pinned+" the workspace lock pins")
+	}
 	s.Emit.Log("info", "Added "+path+" to go.work")
 	return true
+}
+
+// pinnedToolchain returns the Go release the workspace lock pins when it is
+// newer than goVersion, or "" when the lock pins none, pins goVersion itself,
+// pins an older release, or goVersion is empty.
+func (s *setup) pinnedToolchain(goVersion string) string {
+	if goVersion == "" {
+		return ""
+	}
+	lock, err := workspacejob.ReadGoLock(filepath.Join(s.WorkspaceRoot, workspacejob.LockFileName))
+	if err != nil {
+		return ""
+	}
+	if lock.Version == workspacejob.NormalizeGoVersion(goVersion) || !workspacejob.GoVersionSatisfies(lock.Version, goVersion) {
+		return ""
+	}
+	return lock.Version
 }
 
 // resolveFramework returns the version channel names for each framework

@@ -933,7 +933,11 @@
               "the-release-is-the-higher-go-work-directive",
               "each-platform-archive-and-digest-come-from-the-go-dev-index",
               "a-committed-format-5-pin-of-the-release-is-kept-as-committed",
-              "no-declaration-and-no-committed-pin-pins-no-go"
+              "without-a-declaration-the-release-of-the-machine-go-is-pinned",
+              "the-goroot-go-is-asked-before-the-go-on-path",
+              "an-offline-request-without-a-record-of-the-machine-go-pins-no-go",
+              "a-workspace-without-a-go-module-pins-no-machine-go",
+              "no-declaration-no-committed-pin-and-no-go-command-pins-no-go"
             ]
           }
         },
@@ -1107,6 +1111,20 @@
             "checks": [
               "setup-writes-go-work-and-names-putnami-install-without-go",
               "the-prepare-stage-writes-go-work-and-runs-no-go"
+            ]
+          }
+        },
+        {
+          "id": "create-states-the-pinned-go",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-created-go-work-states-a-newer-pinned-release-as-its-toolchain",
+              "a-pin-equal-to-the-go-directive-adds-no-toolchain"
             ]
           }
         }
