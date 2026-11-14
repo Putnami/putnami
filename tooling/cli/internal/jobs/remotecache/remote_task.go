@@ -26,6 +26,7 @@ package remotecache
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -269,7 +270,7 @@ func (r *RemoteCache) UploadTaskEntry(ctx context.Context, hash string, job *job
 		}
 		defer func() { <-r.uploadSem }()
 		sess, ready := r.ensureProvider(ctx, nil, cm)
-		if !ready {
+		if !ready || sess.ReadOnly() {
 			return
 		}
 		exchangeDir := r.providerExchangeDir()
@@ -286,13 +287,33 @@ func (r *RemoteCache) UploadTaskEntry(ctx context.Context, hash string, job *job
 			return
 		}
 		out, err := sess.Upload(ctx, &cache.UploadParams{Key: in.Key, Result: r.providerResult(in.Result), Manifest: in.Manifest})
-		if err != nil || out == nil || !out.Accepted {
+		switch {
+		case err != nil || out == nil:
 			r.stats.RecordUploadFailure()
 			slog.Warn("remote cache: provider upload failed",
-				"project", job.Project.Name, "job", job.JobDef.Name, "error", err)
+				"project", job.Project.Name, "job", job.JobDef.Name, "error", uploadError(err))
+		case !out.Accepted:
+			// The provider answered and chose not to share the entry, such as
+			// a session whose writes the server refused: a decline, not a
+			// failure, and it says why on its own.
+			slog.Debug("remote cache: provider declined upload",
+				"project", job.Project.Name, "job", job.JobDef.Name)
 		}
 	})
 }
+
+// uploadError is the error of an upload that failed: the call's own error, or
+// errNoUploadResult when the provider answered with no result.
+func uploadError(err error) error {
+	if err != nil {
+		return err
+	}
+	return errNoUploadResult
+}
+
+// errNoUploadResult is why an upload the provider answered with no result
+// failed.
+var errNoUploadResult = errors.New("the cache provider answered the upload with no result")
 
 // prepareTaskUpload turns a published task-owned entry into the input to share
 // with the provider: every entry is shared whatever its build duration or size, except the

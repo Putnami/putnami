@@ -7,6 +7,7 @@
     "extension/manifest-contract#a-dependency-name-follows-the-grammar",
     "extension/manifest-contract#a-manifest-names-itself",
     "extension/manifest-contract#a-registry-extension-dependency-requires-rung-8",
+    "extension/manifest-contract#a-subcommand-declares-the-workspace-state-it-reads",
     "extension/manifest-contract#an-additive-vocabulary-raises-the-contract-floor",
     "extension/manifest-contract#build-graph-edges-are-declared-by-the-adapter",
     "extension/manifest-contract#declared-paths-follow-one-rule",

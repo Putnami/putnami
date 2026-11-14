@@ -600,6 +600,12 @@ stdout is the bearer and nothing else. The CLI skips the install for that
 command, and the framework's credential children also set
 `PUTNAMI_NO_AUTO_INSTALL=1`. The invoking command owns workspace state.
 
+An extension subcommand that declares `workspaceState: "none"` reads no
+installed workspace state, and the CLI runs neither the first-use install nor
+the generated-client restore before it. `putnami cloud whoami`, `status`,
+`login` and `logout` declare it, so they answer on a fresh checkout without
+starting a job.
+
 The CLI binary download (`putnami upgrade --cli`) sends the host credential of
 the put registry; see
 [Version Management](14-version-management.md#binary-upgrading).

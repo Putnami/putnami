@@ -70,6 +70,13 @@
         "After the implicit install of a fresh worktree, the first-run pass runs client-generate for every project that declares it, as an ordinary cached engine run: a hit restores, a miss renders.",
         "When the workspace declares a generated client, install, init and upgrade write a core SessionStart handler that runs client-generate with auto-install on, and remove it when no client remains."
       ]
+    },
+    {
+      "id": "a-subcommand-that-reads-no-workspace-state-skips-the-bootstrap",
+      "text": [
+        "A command-group subcommand that declares workspaceState none runs without the implicit first-use install and without the generated-client restore, even in a fresh worktree.",
+        "Every other command keeps the bootstrap."
+      ]
     }
   ],
   "decisions": [

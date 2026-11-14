@@ -139,6 +139,22 @@ putnami cloud login
 putnami cloud setup --workspace <workspace-id>
 ```
 
+### Which credential a command sends
+
+A machine can hold two credentials: the signed-in session in
+`~/.putnami/auth.json`, and a workspace machine token in `PUTNAMI_CLOUD_TOKEN`
+(a CI job, a runner, a hosted agent session). A usable session (a fresh access
+token, or a refresh token that renews it) always wins: every workspace command
+sends it, even when `PUTNAMI_CLOUD_TOKEN` is set. The machine token serves a
+command only when no usable session is stored; no flag chooses it over a
+session. A CI job or a runner with no stored session behaves as before.
+
+`putnami cloud whoami` and `putnami cloud status` name the credential and why,
+`--verbose` prints one `credential:` line, and an authentication error or an
+HTTP 403 names the credential the server refused. `cloud evidence-report` and
+`cloud config drift` keep a bearer of their own and send `PUTNAMI_CLOUD_TOKEN`
+whenever it is set (see their sections).
+
 ### Intelligence
 
 The Intelligence commands ship with the
@@ -1038,7 +1054,13 @@ config and secrets workflows target apps positionally.
 
 `putnami cloud login` opens the verification link automatically and prints the
 device URL, code, and prefilled direct link. Use `--no-open` when you want those
-instructions printed without launching a browser. After authorization, the
+instructions printed without launching a browser. Under `--output=jsonl` it
+prints no instructions: it writes one record before it waits,
+`{"type":"device_authorization","user_code":…,"verification_uri":…,"verification_uri_complete":…,"expires_in":…}`,
+so a host with no terminal can hand the code to an approver, then the result
+record once the code is approved. The record never carries the device code.
+`login`, `logout`, `whoami` and `status` run no workspace install and no client
+generation first. After authorization, the
 command prints the active identity when `/userinfo` or token claims provide one
 and suggests `putnami cloud setup` when the current repository is not configured
 yet. `--workspace` on login is ignored; use
@@ -1365,8 +1387,8 @@ provider sends `PUTNAMI_CLOUD_TOKEN` to the cache server instead. It does so
 only when all of these hold:
 
 - `PUTNAMI_CACHE_TOKEN` is not set.
-- No user session is stored in `~/.putnami/auth.json`. A signed-in user keeps
-  the token command.
+- No usable user session is stored in `~/.putnami/auth.json`. A signed-in
+  user keeps the token command.
 - No hosted Putnami CI launcher started the run.
 - The token source is absent or is `putnami cloud token --for cache`. A custom
   command, a `url` source, and a metadata identity keep precedence.
@@ -1380,8 +1402,19 @@ The token is opaque, so the provider cannot read its scopes. It relies on the
 server rule above instead: a machine token never writes, whether it carries
 `cache.write` or not. A session that holds a machine token in `PUTNAMI_CLOUD_TOKEN`
 or `PUTNAMI_CACHE_TOKEN` therefore opens read-only, unless a hosted CI launcher
-started the run. It sends no write request and prints one line, `the remote cache is
-read-only for this run`, in place of an `auth refused` warning.
+started the run. It sends no write request and prints one line in place of an
+`auth refused` warning: the CLI prints `the remote cache is read-only for this
+credential` once the provider declares the session read-only at initialize,
+and an older CLI that does not list the `read-only` capability gets the
+provider's own line, `the remote cache is read-only for this run`.
+
+The signed-in user's token command (`putnami cloud token --for cache`) is a
+developer credential, which the server lets read and not write, so off a
+hosted run that session opens read-only too. The provider says so at
+initialize with the `read-only` capability: the CLI then exports no entry,
+sends no upload and no run marker, and prints the one line itself, `the remote
+cache is read-only for this credential`. Every other token source still learns
+from its first refused write.
 
 `putnami cloud cache status` names the
 variable on its identity line and does not read the last CI run, which needs a

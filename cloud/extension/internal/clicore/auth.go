@@ -67,7 +67,7 @@ func ActiveAuth(params map[string]any, env map[string]string, ioctx IO) (*Stored
 // machine token is valid, and ActiveAuth never accepts it. Any other error is
 // returned as is.
 func UserSessionError(err error, env map[string]string) error {
-	if err == nil || ExitCode(err) != ExitAuth || !MachineTokenOnly(env) {
+	if err == nil || ExitCode(err) != ExitAuth || !tokenWithoutSession(env) {
 		return err
 	}
 	return NewError("needs a signed-in user; PUTNAMI_CLOUD_TOKEN cannot read it", ExitAuth)
@@ -79,34 +79,45 @@ func UserSessionError(err error, env map[string]string) error {
 // fix to name.
 func UserSessionStatus(id, title string, err error, env map[string]string) StatusNode {
 	fix := ""
-	if ExitCode(err) == ExitAuth && !MachineTokenOnly(env) {
+	if ExitCode(err) == ExitAuth && !tokenWithoutSession(env) {
 		fix = "putnami cloud login"
 	}
 	return UnknownStatus(id, title, UserSessionError(err, env), fix)
 }
 
-// MachineTokenOnly reports whether the command runs on PUTNAMI_CLOUD_TOKEN
-// with no stored user session. The build cache provider uses it too: it reads
-// the cache with that token only when no signed-in user can mint one.
+// tokenWithoutSession reports whether the process holds PUTNAMI_CLOUD_TOKEN
+// and no stored session at all, so signing in again is not the fix. A stored
+// session that expired keeps the sign-in fix.
+func tokenWithoutSession(env map[string]string) bool {
+	cred := ResolveCredential(env, time.Now())
+	return cred.Machine && !cred.Stored
+}
+
+// MachineTokenOnly reports whether the process runs on PUTNAMI_CLOUD_TOKEN:
+// the variable is set and no usable session is stored (ResolveCredential).
+// The build cache provider uses it too: it reads the cache with that
+// token only when no signed-in user can mint one.
 func MachineTokenOnly(env map[string]string) bool {
-	if EnvGet(env, "PUTNAMI_CLOUD_TOKEN") == "" {
-		return false
-	}
-	auth, err := ReadAuth(env, false)
-	return err != nil || auth == nil || auth.AccessToken == ""
+	return ResolveCredential(env, time.Now()).Machine
 }
 
 // WorkspaceAuth returns an access token scoped to workspaceID, reusing the
-// per-workspace cache and refreshing/exchanging as needed. A caller may provide
-// PUTNAMI_CLOUD_TOKEN explicitly for a target-bound, non-interactive workspace
-// operation. That bearer is never accepted by ActiveAuth, persisted, refreshed,
-// or exposed to machine/operator management paths. An empty workspaceID falls
-// back to ActiveAuth.
+// per-workspace cache and refreshing/exchanging as needed. The credential is
+// the one ResolveCredential picks: a usable stored session wins, and
+// PUTNAMI_CLOUD_TOKEN serves a non-interactive workspace operation only when
+// no usable session is stored. That bearer
+// is never accepted by ActiveAuth, persisted, refreshed, or exposed to
+// machine/operator management paths. Under --verbose the command says once
+// which credential it sends. An empty workspaceID falls back to ActiveAuth.
 func WorkspaceAuth(params map[string]any, env map[string]string, ioctx IO, workspaceID string) (*StoredToken, error) {
 	if workspaceID == "" {
 		return ActiveAuth(params, env, ioctx)
 	}
-	if token := EnvGet(env, "PUTNAMI_CLOUD_TOKEN"); token != "" {
+	cred := ResolveCredential(env, ioctxNow(ioctx))
+	recordCredential(cred)
+	announceCredential(params, ioctx, cred)
+	if cred.Machine {
+		token := EnvGet(env, CloudTokenEnv)
 		fields := strings.Fields(token)
 		if len(fields) != 1 || fields[0] != token {
 			return nil, NewError("PUTNAMI_CLOUD_TOKEN must contain exactly one bearer token", ExitAuth)

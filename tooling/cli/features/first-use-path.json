@@ -112,6 +112,20 @@
             "install-removes-the-restore-hook-when-no-client-remains"
           ]
         }
+      },
+      {
+        "id": "a-subcommand-that-reads-no-workspace-state-skips-the-bootstrap",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-no-state-subcommand-runs-no-bootstrap",
+            "every-other-command-keeps-the-bootstrap"
+          ]
+        }
       }
     ]
   }

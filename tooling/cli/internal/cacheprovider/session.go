@@ -128,10 +128,13 @@ type Session struct {
 	// cache.CapabilityRestoreResultOnly. Until it does, Prefetch and Restore
 	// strip the result-only fields from every request.
 	restoreResultOnly bool
-	pending           map[int64]chan *cache.ProviderResponse
-	dead              bool
-	deadErr           error
-	closing           bool
+	// readOnly reports that the provider echoed cache.CapabilityReadOnly: its
+	// session cannot write, so the caller sends no upload and no marker write.
+	readOnly bool
+	pending  map[int64]chan *cache.ProviderResponse
+	dead     bool
+	deadErr  error
+	closing  bool
 
 	waitCh   chan error
 	readDone chan struct{}
@@ -369,6 +372,9 @@ func (s *Session) do(ctx context.Context, op cache.ProviderOp, params any) (*cac
 // The bootstrap always advertises cache.CapabilityProviderConfiguration too:
 // the core reads no remote cache configuration, so a provider that echoes it
 // returns the materialization mode it resolved in InitializeResult.Mode.
+//
+// The bootstrap always advertises cache.CapabilityReadOnly: a provider whose
+// session cannot write echoes it, and ReadOnly then reports true.
 func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*cache.InitializeResult, error) {
 	if p == nil {
 		return nil, errors.New("provider initialize params are nil")
@@ -397,6 +403,8 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 	// that carry them are sent only after the echo.
 	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityRestoreResultOnly)
 	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityProviderConfiguration)
+	// A provider that cannot write says so up front, so core sends it no write.
+	bootstrap.Capabilities = appendCapability(bootstrap.Capabilities, cache.CapabilityReadOnly)
 
 	resp, err := s.do(ctx, cache.OpInitialize, &bootstrap)
 	if err != nil {
@@ -410,6 +418,7 @@ func (s *Session) Initialize(ctx context.Context, p *cache.InitializeParams) (*c
 	s.mu.Lock()
 	s.objectCacheSocket = negotiatedObjectCacheSocket(result)
 	s.restoreResultOnly = containsCapability(result.Capabilities, cache.CapabilityRestoreResultOnly)
+	s.readOnly = containsCapability(result.Capabilities, cache.CapabilityReadOnly)
 	s.mu.Unlock()
 
 	if s.runCredential != "" && containsCapability(result.Capabilities, cache.CapabilityRunCredential) {
@@ -433,6 +442,18 @@ func (s *Session) authenticate(ctx context.Context) error {
 		opErr.Message = strings.ReplaceAll(opErr.Message, s.runCredential, "<redacted>")
 	}
 	return err
+}
+
+// ReadOnly reports whether the provider declared at initialize that this
+// session cannot write (cache.CapabilityReadOnly): the caller then exports no
+// blob and sends no upload and no marker write.
+func (s *Session) ReadOnly() bool {
+	if s == nil {
+		return false
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.readOnly
 }
 
 // ObjectCacheSocket returns the object-cache socket path negotiated for this

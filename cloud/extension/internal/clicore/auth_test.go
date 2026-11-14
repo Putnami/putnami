@@ -95,7 +95,15 @@ func TestMachineTokenOnlyNeedsATokenAndNoStoredSession(t *testing.T) {
 		t.Fatal("stored file without an access token: MachineTokenOnly = false")
 	}
 
+	// An expired session that cannot renew is not usable either.
 	if err := WriteAuth(&StoredToken{AccessToken: "user-session", TokenType: "Bearer"}, machine); err != nil {
+		t.Fatal(err)
+	}
+	if !MachineTokenOnly(machine) {
+		t.Fatal("stored session that cannot renew: MachineTokenOnly = false")
+	}
+
+	if err := WriteAuth(&StoredToken{AccessToken: "user-session", RefreshToken: "renew", TokenType: "Bearer"}, machine); err != nil {
 		t.Fatal(err)
 	}
 	if MachineTokenOnly(machine) {

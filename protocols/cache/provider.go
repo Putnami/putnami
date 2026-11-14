@@ -184,6 +184,17 @@ const CapabilityRestoreResultOnly = "restore-result-only"
 // core materializes in ModeFull.
 const CapabilityProviderConfiguration = "provider-configuration"
 
+// CapabilityReadOnly is listed in the InitializeParams.Capabilities by a core
+// that writes nothing to a read-only session, and echoed in
+// InitializeResult.Capabilities by a provider whose session cannot write: its
+// credential reads the remote cache and the server refuses its writes. A
+// provider echoes it only when core listed it. After the echo core exports no
+// blob, sends no OpUpload and no OpMarkerWrite for the session, and says once
+// that the remote cache is read-only for this credential; reads are unchanged.
+// The capability adds no field, so a strict parser that predates it reads the
+// same bytes.
+const CapabilityReadOnly = "read-only"
+
 // ObjectCacheSocketEnv is the environment variable core exports to every job
 // subprocess, carrying the absolute path of the provider's object-cache socket
 // (InitializeResult.ObjectCacheSocket). Its ABSENCE is the off switch: a job

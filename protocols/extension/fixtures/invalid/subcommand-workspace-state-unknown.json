@@ -1,0 +1,26 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-extension.json",
+  "name": "sample/subcommand-workspace-state-unknown",
+  "commandGroups": {
+    "audit": {
+      "subcommands": {
+        "run": {
+          "command": "audit-run",
+          "interactive": true,
+          "workspaceState": "installed"
+        }
+      }
+    }
+  },
+  "commands": {
+    "audit-run": {
+      "run": [{ "id": "run", "task": "audit-exec" }]
+    }
+  },
+  "tasks": {
+    "audit-exec": {
+      "kind": "command",
+      "command": "echo"
+    }
+  }
+}

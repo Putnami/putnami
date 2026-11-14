@@ -636,7 +636,11 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	cfg := built.cfg
 	s.readOnly = cfg.ReadOnly
 	s.hosted = hostedLaunch()
-	s.applyMachineToken(cfg)
+	// Core lists read-only when it prints the read-only line itself; the
+	// session then says nothing and echoes the capability below.
+	coreSaysReadOnly := slices.Contains(p.Capabilities, cache.CapabilityReadOnly)
+	s.applyMachineToken(cfg, coreSaysReadOnly)
+	s.applyDeveloperReadOnly(cfg, coreSaysReadOnly)
 
 	mode := resolveSessionMode(p.Mode, cfg.Mode, s.hosted)
 	s.mode = mode
@@ -688,6 +692,11 @@ func (s *providerSession) initialize(req *cache.ProviderRequest, p *cache.Initia
 	if slices.Contains(p.Capabilities, cache.CapabilityProviderConfiguration) {
 		result.Capabilities = append(result.Capabilities, cache.CapabilityProviderConfiguration)
 		result.Mode = mode
+	}
+	// A serving session that cannot write says so, when core listed the
+	// capability: core then sends no upload and no marker write.
+	if coreSaysReadOnly && s.serving() && s.readOnly {
+		result.Capabilities = append(result.Capabilities, cache.CapabilityReadOnly)
 	}
 	return providerOK(req, result)
 }
