@@ -37,12 +37,21 @@ per task. Three adoptions lost the order their tool kept (#1152):
 - A cacheable task's key folds, for each direct dependency in another project
   that publishes no key because its cache is off, the key that dependency
   would have, which folds its own dependencies' in turn: the same computation
-  an invocation-scoped producer already contributes to its consumer. The
-  dependency still reads and writes no entry, and its identity is computed
-  when a dependent asks for it, whether it ran or was pruned. A dependency of
-  the task's own project is left out: the key already reads that project's
-  files, and a keyless fixer that rewrites them would move the key between a
-  run and the next.
+  an invocation-scoped producer already contributes to its consumer. For such
+  a dependency in the task's own project, such as a build kept on moon behind
+  `~:build`, it folds the digest of what reaches that dependency from other
+  projects: the keys its dependencies publish and the would-be keys of its
+  keyless dependencies elsewhere. The project's own files are left out: the
+  key already reads them, and a keyless fixer that rewrites them would move
+  the key between a run and the next. An identity addresses no entry. It is
+  taken when its job starts, from the bytes it reads before it writes, or
+  when a dependent first asks for a job that was pruned, as the plan-time
+  keys take it before anything runs; the Rush and moon profiles exclude the
+  tools' outputs and `node_modules` from a delegated task's inputs.
+- Impact selection reads a project's `^command` entry in that project alone,
+  as `impact-reads-only-what-a-project-runs` requires; a same-project
+  `command` entry links the two commands' tasks in every project, as a
+  manifest's does.
 - The adoption syncs write these entries from what the tool declares: Rush's
   build order and phased commands, `turbo.json`'s `dependsOn`, moon's
   resolved `deps`. A delegated task keeps one tool process on its own project

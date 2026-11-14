@@ -216,7 +216,7 @@
       "id": "a-project-names-what-a-command-waits-for",
       "text": [
         "A project file may name, under commands.<command>.dependsOn, the commands that command waits for in that project: command for the project's own, ^command for every project it depends on, directly or transitively.",
-        "Parsing is strict there: an unknown member, an empty command name, or an entry of another form, such as !command or command~step, is refused, and the rest of the project file stays lenient."
+        "Parsing is strict there: an unknown member, an empty command name, a command that waits for itself, or an entry of another form, such as !command or command~step, is refused, and the rest of the project file stays lenient."
       ]
     }
   ],
