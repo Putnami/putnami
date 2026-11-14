@@ -455,7 +455,9 @@
             "kind": "acceptance",
             "checks": [
               "a-workspace-whose-jobs-read-no-tsconfig-gets-no-root-tsconfig",
-              "a-job-that-reads-the-tsconfig-gets-the-root-tsconfig"
+              "a-job-that-reads-the-tsconfig-gets-the-root-tsconfig",
+              "a-project-with-its-own-tsconfig-reads-no-root-tsconfig",
+              "a-root-only-workspace-gets-the-root-configs"
             ]
           }
         },
