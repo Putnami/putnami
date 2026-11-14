@@ -39,8 +39,12 @@ only when the repository has none.
 ## What the sync writes
 
 `putnami projects sync` runs the extension's sync task. It reads
-`pants-graph.json` at the root, or runs `pants peek ::` when there is none, and
-writes in each package's `putnami.json`:
+`pants-graph.json` at the root, or, when there is none, runs `pants list ::`
+and then `pants peek` on the listed addresses, 1000 at a time. It keeps of each
+target only its address, type, dependencies and sources, so no Pants call
+renders the whole repository, and `pantsd` can apply its
+`pantsd_max_memory_usage` between calls. It writes in each package's
+`putnami.json`:
 
 | Member | Value |
 |---|---|

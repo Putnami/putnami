@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -79,7 +80,8 @@ func repository(t *testing.T, d demo, withExport bool) string {
 }
 
 // stubPants puts first on PATH a pants that prints the demo's version, prints
-// the demo's export for peek ::, and for test <dir>: writes the demo's JUnit
+// the address of each target of the demo's export for list ::, those targets
+// of the export that peek names, as a JSON array, and for test <dir>: writes the demo's JUnit
 // reports of that directory and its coverage report under dist/; like Pants,
 // its test fails when --coverage-py-report=xml appends xml to a
 // [coverage-py] report list of pants.toml that already holds it. It logs each
@@ -90,13 +92,23 @@ func stubPants(t *testing.T, d demo) {
 	for rel, content := range d["ci"] {
 		stackstest.WriteFile(t, reports, rel, content)
 	}
+	peekTargets(t, reports, d["ci"]["pants-graph.json"])
 	script := `#!/bin/sh
 set -e
 echo "$(pwd) pants $*" >> "$STUB_LOG"
 case "$1" in --version) echo "${STUB_VERSION:-2.25.0}"; exit 0;; esac
 for a in "$@"; do last="$a"; done
 case " $* " in
-  *" peek :: "*) cat "` + reports + `/pants-graph.json"; exit 0;;
+  *" list :: "*) cat "` + reports + `/addresses.txt"; exit 0;;
+  *" peek "*)
+    printf '['; sep=''; named=''
+    for a in "$@"; do
+      if [ -z "$named" ]; then [ "$a" = peek ] && named=1; continue; fi
+      i=$(awk -F '\t' -v a="$a" '$1 == a { print $2; exit }' "` + reports + `/index.tsv")
+      [ -n "$i" ] || { echo "no target $a" >&2; exit 1; }
+      printf '%s' "$sep"; cat "` + reports + `/targets/$i.json"; sep=','
+    done
+    echo ']'; exit 0;;
   *" test "*)
     case " $* " in *" --coverage-py-report=xml "*)
       if grep -q '^report *= *\[.*"xml"' pants.toml; then echo "[ERROR] Duplicate enum values specified in list" >&2; exit 1; fi;; esac
@@ -114,6 +126,31 @@ esac
 	}
 	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
+}
+
+// peekTargets writes under dir what the stub pants serves from an export:
+// addresses.txt lists its addresses, targets/<i>.json holds its target i, and
+// index.tsv maps each address to its i.
+func peekTargets(t *testing.T, dir, export string) {
+	t.Helper()
+	var targets []json.RawMessage
+	if err := json.Unmarshal([]byte(export), &targets); err != nil {
+		t.Fatal(err)
+	}
+	var addresses, index strings.Builder
+	for i, raw := range targets {
+		var target struct {
+			Address string `json:"address"`
+		}
+		if err := json.Unmarshal(raw, &target); err != nil {
+			t.Fatal(err)
+		}
+		addresses.WriteString(target.Address + "\n")
+		fmt.Fprintf(&index, "%s\t%d\n", target.Address, i)
+		stackstest.WriteFile(t, dir, fmt.Sprintf("targets/%d.json", i), string(raw))
+	}
+	stackstest.WriteFile(t, dir, "addresses.txt", addresses.String())
+	stackstest.WriteFile(t, dir, "index.tsv", index.String())
 }
 
 func stubLog(t *testing.T) []string {
@@ -353,15 +390,35 @@ func TestTheSyncRunsPantsPeekWithoutAnExport(t *testing.T) {
 	d := readDemo(t)
 	stubPants(t, d)
 	root := repository(t, d, false)
+	// One peek reads at most peekBatch addresses: the demo's export takes
+	// several.
+	defer func(batch int) { peekBatch = batch }(peekBatch)
+	peekBatch = 4
 	result, err := Sync(context.Background(), root, &bytes.Buffer{})
-	if err != nil || result.Export != "pants peek ::" || len(result.Written) != 3 {
+	if err != nil || result.Export != exportName || len(result.Written) != 3 {
 		t.Fatalf("result %+v, err %v", result, err)
 	}
 	if deps := readProjectFile(t, root, "src/python/api")["dependencies"]; !reflect.DeepEqual(deps, []any{"/3rdparty/python", "/src/python/pricing"}) {
 		t.Errorf("api dependencies = %v", deps)
 	}
-	if log := stubLog(t); len(log) != 1 || !strings.HasSuffix(log[0], " pants peek ::") {
-		t.Errorf("pants calls = %v", log)
+	log := stubLog(t)
+	var targets []json.RawMessage
+	if err := json.Unmarshal([]byte(d["ci"]["pants-graph.json"]), &targets); err != nil {
+		t.Fatal(err)
+	}
+	if want := 1 + (len(targets)+peekBatch-1)/peekBatch; len(log) != want || !strings.HasSuffix(log[0], " pants list ::") {
+		t.Errorf("pants calls = %v, want list :: then %d peeks", log, want-1)
+	}
+	peeked := 0
+	for _, call := range log[1:] {
+		_, args, _ := strings.Cut(call, " pants peek ")
+		if n := len(strings.Fields(args)); n == 0 || n > peekBatch {
+			t.Errorf("a peek read %d addresses, want 1 to %d: %s", n, peekBatch, call)
+		}
+		peeked += len(strings.Fields(args))
+	}
+	if peeked != len(targets) {
+		t.Errorf("the peeks read %d addresses, want each of the %d listed once", peeked, len(targets))
 	}
 
 	// A package that uses third-party targets is selected by what declares
@@ -734,5 +791,63 @@ func TestTheSyncWritesASymlinkedPackageOnceAndValidatePassesRightAfter(t *testin
 	inputs := readProjectFile(t, root, "contrib/core")["options"].(map[string]any)[ExtensionName].(map[string]any)["filePatterns"]
 	if want := []any{"../../BUILD", "../../requirements.txt"}; !reflect.DeepEqual(inputs, want) {
 		t.Errorf("contrib/core filePatterns = %v, want %v, relative to contrib/core", inputs, want)
+	}
+}
+
+// scriptPants puts first on PATH a pants that runs the shell script body.
+func scriptPants(t *testing.T, body string) {
+	t.Helper()
+	bin := t.TempDir()
+	stackstest.WriteFile(t, bin, "pants", "#!/bin/sh\n"+body)
+	if err := os.Chmod(filepath.Join(bin, "pants"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin+string(os.PathListSeparator)+os.Getenv("PATH"))
+}
+
+func TestTheSyncMergesTheBatchesAndFailsOnABrokenPeek(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-package-graph", "the-sync-writes-each-package-putnami-json-from-the-export")
+	defer func(batch int) { peekBatch = batch }(peekBatch)
+	peekBatch = 1
+	root := t.TempDir()
+	stackstest.WriteFile(t, root, "pants.toml", "[GLOBAL]\npants_version = \"2.25.0\"\n")
+	stackstest.WriteFile(t, root, "src/app/BUILD", "python_sources()\n")
+	stackstest.WriteFile(t, root, "src/lib/BUILD", "python_sources()\n")
+
+	// A target two batches return, as a file spec's owners can, is read
+	// once.
+	scriptPants(t, `case "$1" in
+  list) printf 'src/app/main.py\nsrc/lib/lib.py\n';;
+  peek) printf '[{"address": "src/lib/lib.py", "target_type": "python_source", "dependencies": [], "sources": ["src/lib/lib.py"], "fingerprint": "x"}'
+    [ "$2" = src/app/main.py ] && printf ', {"address": "src/app/main.py", "target_type": "python_source", "dependencies": ["src/lib/lib.py"], "sources": ["src/app/main.py"]}'
+    echo ']';;
+esac
+`)
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil || !reflect.DeepEqual(result.Written, []string{"src/app/putnami.json", "src/lib/putnami.json"}) {
+		t.Fatalf("result %+v, err %v", result, err)
+	}
+	if deps := readProjectFile(t, root, "src/app")["dependencies"]; !reflect.DeepEqual(deps, []any{"/src/lib"}) {
+		t.Errorf("app dependencies = %v", deps)
+	}
+
+	// A peek that prints no array, or a pants that fails, fails the sync,
+	// which writes nothing.
+	for name, body := range map[string]string{
+		"no array":    "case \"$1\" in list) echo src/app/main.py;; peek) echo 'not json';; esac\n",
+		"a truncated": "case \"$1\" in list) echo src/app/main.py;; peek) printf '[{\"address\": \"src/app/main.py\"}';; esac\n",
+		"failed list": "echo boom >&2; exit 1\n",
+		"failed peek": "case \"$1\" in list) echo src/app/main.py;; peek) exit 3;; esac\n",
+	} {
+		root := t.TempDir()
+		stackstest.WriteFile(t, root, "pants.toml", "[GLOBAL]\npants_version = \"2.25.0\"\n")
+		stackstest.WriteFile(t, root, "src/app/BUILD", "python_sources()\n")
+		scriptPants(t, body)
+		if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err == nil {
+			t.Errorf("%s: the sync passed", name)
+		}
+		if _, err := os.Stat(filepath.Join(root, "src/app/putnami.json")); !os.IsNotExist(err) {
+			t.Errorf("%s: a failed sync wrote a putnami.json: %v", name, err)
+		}
 	}
 }

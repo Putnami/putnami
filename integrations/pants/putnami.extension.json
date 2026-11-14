@@ -154,7 +154,7 @@
       ]
     },
     "validate": {
-      "description": "Fail when a package's putnami.json no longer matches the pants peek :: export, such as after an import that changes the edges Pants infers.",
+      "description": "Fail when a package's putnami.json no longer matches the Pants export, such as after an import that changes the edges Pants infers.",
       "activation": "workspace-once",
       "run": [
         {
@@ -164,7 +164,7 @@
       ]
     },
     "workspace-sync": {
-      "description": "Write each Pants package's putnami.json from the pants peek :: export.",
+      "description": "Write each Pants package's putnami.json from the Pants export.",
       "visibility": "internal",
       "activation": "workspace-once",
       "run": [
@@ -354,7 +354,7 @@
       }
     },
     "pants-graph-check-exec": {
-      "description": "Compare each Pants package's putnami.json with the pants-graph.json export at the workspace root, or pants peek ::, and fail with pants.sync_stale when a sync would change one. Writes nothing, and warns when neither the export nor pants is available.",
+      "description": "Compare each Pants package's putnami.json with the pants-graph.json export at the workspace root, or pants peek on the targets pants list :: names, and fail with pants.sync_stale when a sync would change one. Writes nothing, and warns when neither the export nor pants is available.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -365,7 +365,7 @@
       "timeoutMs": 600000
     },
     "workspace-sync-exec": {
-      "description": "Write in each Pants package's putnami.json the extension, its dependencies as the project IDs of the packages the pants-graph.json export at the workspace root, or pants peek ::, says it depends on, and test in disable.jobs when it holds no test target. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
+      "description": "Write in each Pants package's putnami.json the extension, its dependencies as the project IDs of the packages the pants-graph.json export at the workspace root, or pants peek on the targets pants list :: names, says it depends on, and test in disable.jobs when it holds no test target. Declares no outputs: it rewrites tracked project files, which the workspace-files effect states.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [

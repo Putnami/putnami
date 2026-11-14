@@ -121,7 +121,8 @@ func pantsWorkspace(t *testing.T, demo map[string]map[string]string, runtime str
 }
 
 // stubPants puts first on PATH a pants that prints the demo's version, prints
-// its export for peek ::, and for test <dir>: writes the demo's JUnit reports
+// the addresses of its export for list ::, its export for peek, which the sync
+// reads once per address, and for test <dir>: writes the demo's JUnit reports
 // of that directory and its coverage report under dist/. It logs each call
 // with its working directory and returns the log.
 func stubPants(t *testing.T, demo map[string]map[string]string) string {
@@ -130,6 +131,17 @@ func stubPants(t *testing.T, demo map[string]map[string]string) string {
 	for rel, content := range demo["ci"] {
 		clitest.WriteFile(t, filepath.Join(ci, rel), content)
 	}
+	var targets []struct {
+		Address string `json:"address"`
+	}
+	if err := json.Unmarshal([]byte(demo["ci"]["pants-graph.json"]), &targets); err != nil {
+		t.Fatal(err)
+	}
+	var addresses strings.Builder
+	for _, target := range targets {
+		addresses.WriteString(target.Address + "\n")
+	}
+	clitest.WriteFile(t, filepath.Join(ci, "addresses.txt"), addresses.String())
 	log := filepath.Join(t.TempDir(), "pants.log")
 	clitest.WriteFile(t, filepath.Join(bin, "pants"), `#!/bin/sh
 set -e
@@ -137,7 +149,8 @@ echo "$(pwd) pants $*" >> '`+log+`'
 case "$1" in --version) echo 2.25.0; exit 0;; esac
 for a in "$@"; do last="$a"; done
 case " $* " in
-  *" peek :: "*) cat '`+ci+`/pants-graph.json';;
+  *" list :: "*) cat '`+ci+`/addresses.txt';;
+  *" peek "*) cat '`+ci+`/pants-graph.json';;
   *" test "*)
     prefix="$(echo "${last%:}" | tr / .)."
     mkdir -p dist/test/reports dist/coverage/python
@@ -209,7 +222,7 @@ func TestAChangeToOnePantsPackageRunsItAndItsDependentsThroughPants(t *testing.T
 	log := stubPants(t, demo)
 
 	// The sync records the packages and writes each one's edges from
-	// pants peek ::.
+	// pants peek on the targets pants list :: names.
 	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
 		t.Fatalf("projects sync exit %d:\n%s", code, out)
 	}
