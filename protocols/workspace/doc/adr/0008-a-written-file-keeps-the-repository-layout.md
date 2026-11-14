@@ -46,7 +46,7 @@ Each writer had its own encoder, and none of them read the bytes it replaced.
 - Adding one dependency to a formatted `putnami.json` changes that one line.
 - A sync whose content is unchanged writes nothing, so it touches no
   modification time and leaves no diff.
-- The renderer does not run the repository's formatter. A configuration that
-  sets a line width other than 80, or a JSON file with comments, can still
-  differ on a line the sync changed.
+- The renderer does not run the repository's formatter. A formatter whose
+  line width is not 80, such as oxfmt whose default is 100, can still join or
+  break an array the sync changed, between 81 and 100 columns for oxfmt.
 - A file that is not a JSON object falls back to the layout of a new file.
