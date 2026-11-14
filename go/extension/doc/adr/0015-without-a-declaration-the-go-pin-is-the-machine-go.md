@@ -51,6 +51,16 @@ runs.**
 5. A `go.work` declaration and a committed pin keep their precedence. Once
    pinned, the release is the committed pin, and a teammate whose go command
    runs another release gets the pinned one provisioned by `putnami install`.
+6. `putnami projects create` in such a workspace finds the pin resolved, so
+   its project-setup creates the missing `go.work` from the template's `go`
+   directive. When the lock pins a newer release, that `go.work` also states
+   the pinned release as its `toolchain` directive: `go.work` then declares
+   the release the lock pins, and the next `putnami install` keeps the pin
+   rather than re-pinning the template's older release. When the pin is older
+   than the template's directive, `go.work` declares the template's release,
+   which the next `putnami install` pins; without a go command that runs it,
+   the setup writes `go.work` and names `putnami install`, as it does on a
+   host without Go.
 
 ## Rejected alternatives
 
@@ -59,6 +69,10 @@ runs.**
   puts on PATH already reports the release.
 - **Pin the root `go.mod` directive.** It states a minimum, not a release the
   machine runs, and a repository with no root module has none.
+- **Let `projects create` run its prepare stage and a second pins pass
+  whenever the Go extension declares one.** The core would run a pins pass on
+  every create of every language to serve one extension's choice; the Go
+  setup states the pin in the `go.work` it writes instead.
 - **Answer a problem when nothing declares Go, or when the lookup fails.** A
   workspace that installs the extension before its first Go project, that
   plans no Go job, or whose machine cannot reach go.dev, would fail

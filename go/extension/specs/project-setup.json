@@ -56,6 +56,12 @@
         "Its prepare stage, params.stage prepare, only writes that missing go.work and runs no go command, so the core can pin and install that Go first.",
         "Any other stage is refused."
       ]
+    },
+    {
+      "id": "create-states-the-pinned-go",
+      "text": [
+        "A go.work project-setup creates in a workspace whose lock pins a Go release newer than the go directive it states also states that release as its toolchain directive, so go.work declares the release the lock pins and the next putnami install keeps the pin."
+      ]
     }
   ],
   "decisions": [

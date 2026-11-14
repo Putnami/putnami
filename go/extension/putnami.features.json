@@ -1113,6 +1113,20 @@
               "the-prepare-stage-writes-go-work-and-runs-no-go"
             ]
           }
+        },
+        {
+          "id": "create-states-the-pinned-go",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-created-go-work-states-a-newer-pinned-release-as-its-toolchain",
+              "a-pin-equal-to-the-go-directive-adds-no-toolchain"
+            ]
+          }
         }
       ]
     },
