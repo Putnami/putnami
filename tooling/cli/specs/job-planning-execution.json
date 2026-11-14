@@ -339,9 +339,11 @@
     },
     {
       "id": "the-impact-index-answers-for-the-tasks-a-project-runs",
+      "text": "A project's option layer claims only the tasks of commands the planner may run in that project, as a task's own input ports do. A `^` reference reaches a dependent only when a command that declares it may be planned there, so one stack's `^test` carries no other stack's test step to a dependent."
+    },
+    {
+      "id": "a-task-only-a-dependent-runs-claims-no-step-of-the-project",
       "text": [
-        "A project's option layer claims only the tasks of commands the planner may run in that project, as a task's own input ports do.",
-        "A `^` reference reaches a dependent only when a command that declares it may be planned there, so one stack's `^test` carries no other stack's test step to a dependent.",
         "A port read in a project only because a dependent may run its command claims that task alone there: the project runs none of its own steps after it, so another stack's step of the same name claims nothing.",
         "A `closure` port's scope travels through every dependent but claims its task there only where a command that declares the port may be planned; carried alone, it moves no extension's runtime."
       ]

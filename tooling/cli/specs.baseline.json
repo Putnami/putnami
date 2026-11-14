@@ -173,6 +173,7 @@
     "cli/job-planning-execution#a-short-alias-reaches-the-task-under-its-long-name",
     "cli/job-planning-execution#a-step-may-read-no-command-option-layer",
     "cli/job-planning-execution#a-step-reads-the-changed-files",
+    "cli/job-planning-execution#a-task-only-a-dependent-runs-claims-no-step-of-the-project",
     "cli/job-planning-execution#a-verdict-policy-is-no-build-input",
     "cli/job-planning-execution#an-extension-manifest-names-its-extension",
     "cli/job-planning-execution#an-interactive-command-stops-on-its-own-terms",

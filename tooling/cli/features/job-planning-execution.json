@@ -1347,7 +1347,19 @@
           "kind": "acceptance",
           "checks": [
             "a-layer-claims-no-task-of-a-command-the-project-does-not-run",
-            "a-step-reference-reaches-only-a-dependent-that-may-run-its-command",
+            "a-step-reference-reaches-only-a-dependent-that-may-run-its-command"
+          ]
+        }
+      },
+      {
+        "id": "a-task-only-a-dependent-runs-claims-no-step-of-the-project",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
             "a-port-only-a-dependent-reads-claims-no-step-of-the-project",
             "a-closure-scope-claims-its-task-only-where-its-port-may-be-planned"
           ]
