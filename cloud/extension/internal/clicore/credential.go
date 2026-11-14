@@ -21,11 +21,15 @@ type Credential struct {
 	Machine bool
 	// TokenSet reports that PUTNAMI_CLOUD_TOKEN is set, used or not.
 	TokenSet bool
+	// Stored reports that ~/.putnami/auth.json holds a session, usable or not.
+	Stored bool
 }
 
 // String names the credential and why, in the words every surface uses.
 func (c Credential) String() string {
 	switch {
+	case c.Machine && c.Stored:
+		return CloudTokenEnv + ", the workspace machine token: the stored session expired and cannot renew"
 	case c.Machine:
 		return CloudTokenEnv + ", the workspace machine token: no signed-in session is stored on this machine"
 	case c.TokenSet:
@@ -44,20 +48,31 @@ func SessionUsable(auth *StoredToken, now time.Time) bool {
 	return auth.RefreshToken != "" || AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, now)
 }
 
-// StoredSessionUsable reports whether ~/.putnami/auth.json holds a usable
-// session (SessionUsable).
-func StoredSessionUsable(env map[string]string, now time.Time) bool {
-	auth, err := ReadAuth(env, false)
-	return err == nil && SessionUsable(auth, now)
-}
-
 // ResolveCredential is the credential workspace commands send. A usable
 // stored session always wins; PUTNAMI_CLOUD_TOKEN is sent only when no usable
 // session is stored. No flag or variable chooses the machine token over a
 // usable session.
 func ResolveCredential(env map[string]string, now time.Time) Credential {
 	tokenSet := EnvGet(env, CloudTokenEnv) != ""
-	return Credential{Machine: tokenSet && !StoredSessionUsable(env, now), TokenSet: tokenSet}
+	auth, err := ReadAuth(env, false)
+	if err != nil {
+		auth = nil
+	}
+	return Credential{
+		Machine:  tokenSet && !SessionUsable(auth, now),
+		TokenSet: tokenSet,
+		Stored:   auth != nil && auth.AccessToken != "",
+	}
+}
+
+// usedCredential is the credential WorkspaceAuth last sent in this process,
+// nil before any. NameCredential reads it, so a note names what was sent,
+// never what a command that picks its own bearer might have sent.
+var usedCredential atomic.Pointer[Credential]
+
+// recordCredential records the credential a workspace command sends.
+func recordCredential(cred Credential) {
+	usedCredential.Store(&cred)
 }
 
 // ioctxNow is ioctx's clock, or the wall clock when it has none.
@@ -80,21 +95,18 @@ func announceCredential(params map[string]any, ioctx IO, cred Credential) {
 	ioctx.Stderr("credential: " + cred.String())
 }
 
-// NameCredential adds the credential to an authentication error of a
-// workspace command, when the machine holds both credentials, so the person
-// sees which one the server refused. A refusal is an ExitAuth error or an HTTP
-// 403. Any other error, and any error on a machine with only one credential,
-// is returned as is.
-func NameCredential(err error, env map[string]string, now time.Time) error {
-	if err == nil || EnvGet(env, CloudTokenEnv) == "" || !refusal(err) {
+// NameCredential adds to a refused request the credential WorkspaceAuth sent,
+// when the machine holds both a stored session and PUTNAMI_CLOUD_TOKEN, so
+// the person sees which one the server refused. A refusal is an ExitAuth
+// error or an HTTP 403. Any other error, an error of a command that sent no
+// credential through WorkspaceAuth, and any error on a machine with only one
+// credential (a CI job with the token alone) is returned as is.
+func NameCredential(err error) error {
+	cred := usedCredential.Load()
+	if err == nil || cred == nil || !cred.TokenSet || !cred.Stored || !refusal(err) {
 		return err
 	}
-	cred := ResolveCredential(env, now)
-	hint := "run putnami cloud login to renew the session"
-	if cred.Machine {
-		hint = "run putnami cloud login to use a signed-in session"
-	}
-	return &credentialError{err: err, note: fmt.Sprintf("%s (credential: %s; %s)", err.Error(), cred, hint)}
+	return &credentialError{err: err, note: fmt.Sprintf("%s (credential: %s; run putnami cloud login to renew the session)", err.Error(), *cred)}
 }
 
 // refusal reports whether err is a refused credential: an ExitAuth error, or

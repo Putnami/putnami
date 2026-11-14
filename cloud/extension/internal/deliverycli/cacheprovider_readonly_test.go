@@ -117,6 +117,38 @@ func TestAHostedOrOtherSessionIsNotDeclaredReadOnly(t *testing.T) {
 			t.Fatalf("capabilities = %v: a hosted run writes", result.Capabilities)
 		}
 	})
+	t.Run("a metadata identity", func(t *testing.T) {
+		home := machineTokenSession(t, "")
+		signIn(t, home)
+		srv, _ := writeRefusingCacheServer(t)
+		root := t.TempDir()
+		command, _ := canonicalRecipe(t)
+		writeCacheConfig(t, root, srv.URL, map[string]any{"command": command})
+		t.Setenv(remotecache.TokenSourceEnv, "metadata")
+		result, _, _ := readOnlyInit(t, root, true)
+		if slices.Contains(result.Capabilities, cache.CapabilityReadOnly) {
+			t.Fatalf("capabilities = %v: a metadata identity is the CI runner's", result.Capabilities)
+		}
+	})
+	t.Run("a run credential", func(t *testing.T) {
+		// Core lists run-credential only on a hosted run, whose launcher
+		// exports the ingest base: the session takes the run's token.
+		home := machineTokenSession(t, "")
+		signIn(t, home)
+		srv, _ := writeRefusingCacheServer(t)
+		root := t.TempDir()
+		command, _ := canonicalRecipe(t)
+		writeCacheConfig(t, root, srv.URL, map[string]any{"command": command})
+		t.Setenv(SessionReporterIngestURLEnv, "https://delivery.example/v1/delivery/records")
+		var logw bytes.Buffer
+		s := newProviderSession(root, &logw)
+		t.Cleanup(s.close)
+		result := mustInit(t, s, &cache.InitializeParams{ProtocolVersion: cache.ProviderProtocolMinVersion, BlobExchangeDir: t.TempDir(),
+			Capabilities: []string{cache.CapabilityReadOnly, cache.CapabilityRunCredential}})
+		if slices.Contains(result.Capabilities, cache.CapabilityReadOnly) {
+			t.Fatalf("capabilities = %v: a run credential writes", result.Capabilities)
+		}
+	})
 	t.Run("an unconfigured cache", func(t *testing.T) {
 		machineTokenSession(t, testMachineToken)
 		result, _, _ := readOnlyInit(t, t.TempDir(), true)

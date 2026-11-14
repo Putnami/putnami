@@ -151,7 +151,9 @@ session. A CI job or a runner with no stored session behaves as before.
 
 `putnami cloud whoami` and `putnami cloud status` name the credential and why,
 `--verbose` prints one `credential:` line, and an authentication error or an
-HTTP 403 names the credential the server refused.
+HTTP 403 names the credential the server refused. `cloud evidence-report` and
+`cloud config drift` keep a bearer of their own and send `PUTNAMI_CLOUD_TOKEN`
+whenever it is set (see their sections).
 
 ### Intelligence
 
@@ -1400,8 +1402,11 @@ The token is opaque, so the provider cannot read its scopes. It relies on the
 server rule above instead: a machine token never writes, whether it carries
 `cache.write` or not. A session that holds a machine token in `PUTNAMI_CLOUD_TOKEN`
 or `PUTNAMI_CACHE_TOKEN` therefore opens read-only, unless a hosted CI launcher
-started the run. It sends no write request and prints one line, `the remote cache is
-read-only for this run`, in place of an `auth refused` warning.
+started the run. It sends no write request and prints one line in place of an
+`auth refused` warning: the CLI prints `the remote cache is read-only for this
+credential` once the provider declares the session read-only at initialize,
+and an older CLI that does not list the `read-only` capability gets the
+provider's own line, `the remote cache is read-only for this run`.
 
 The signed-in user's token command (`putnami cloud token --for cache`) is a
 developer credential, which the server lets read and not write, so off a

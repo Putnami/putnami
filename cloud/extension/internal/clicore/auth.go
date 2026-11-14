@@ -67,7 +67,7 @@ func ActiveAuth(params map[string]any, env map[string]string, ioctx IO) (*Stored
 // machine token is valid, and ActiveAuth never accepts it. Any other error is
 // returned as is.
 func UserSessionError(err error, env map[string]string) error {
-	if err == nil || ExitCode(err) != ExitAuth || !MachineTokenOnly(env) {
+	if err == nil || ExitCode(err) != ExitAuth || !tokenWithoutSession(env) {
 		return err
 	}
 	return NewError("needs a signed-in user; PUTNAMI_CLOUD_TOKEN cannot read it", ExitAuth)
@@ -79,10 +79,18 @@ func UserSessionError(err error, env map[string]string) error {
 // fix to name.
 func UserSessionStatus(id, title string, err error, env map[string]string) StatusNode {
 	fix := ""
-	if ExitCode(err) == ExitAuth && !MachineTokenOnly(env) {
+	if ExitCode(err) == ExitAuth && !tokenWithoutSession(env) {
 		fix = "putnami cloud login"
 	}
 	return UnknownStatus(id, title, UserSessionError(err, env), fix)
+}
+
+// tokenWithoutSession reports whether the process holds PUTNAMI_CLOUD_TOKEN
+// and no stored session at all, so signing in again is not the fix. A stored
+// session that expired keeps the sign-in fix.
+func tokenWithoutSession(env map[string]string) bool {
+	cred := ResolveCredential(env, time.Now())
+	return cred.Machine && !cred.Stored
 }
 
 // MachineTokenOnly reports whether the process runs on PUTNAMI_CLOUD_TOKEN:
@@ -106,6 +114,7 @@ func WorkspaceAuth(params map[string]any, env map[string]string, ioctx IO, works
 		return ActiveAuth(params, env, ioctx)
 	}
 	cred := ResolveCredential(env, ioctxNow(ioctx))
+	recordCredential(cred)
 	announceCredential(params, ioctx, cred)
 	if cred.Machine {
 		token := EnvGet(env, CloudTokenEnv)

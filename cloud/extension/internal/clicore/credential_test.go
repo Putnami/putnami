@@ -86,7 +86,7 @@ func TestWorkspaceAuthFallsBackToTheMachineTokenWithoutAUsableSession(t *testing
 		t.Fatalf("expired session: WorkspaceAuth = %+v, %v; want PUTNAMI_CLOUD_TOKEN", auth, err)
 	}
 	cred := ResolveCredential(env, now)
-	if got := cred.String(); got != "PUTNAMI_CLOUD_TOKEN, the workspace machine token: no signed-in session is stored on this machine" {
+	if got := cred.String(); got != "PUTNAMI_CLOUD_TOKEN, the workspace machine token: the stored session expired and cannot renew" {
 		t.Fatalf("credential = %q", got)
 	}
 
@@ -120,38 +120,62 @@ func TestVerboseNamesTheCredentialOnce(t *testing.T) {
 
 func TestNameCredentialNamesTheRefusedCredential(t *testing.T) {
 	spectest.Proves(t, "cloud/agent-session", "the-command-names-its-credential", "an-auth-error-names-the-refused-credential")
-	env, _, now := credentialTestEnv(t, true)
+	t.Cleanup(func() { usedCredential.Store(nil) })
 	refused := NewError("request failed: 401 Unauthorized", ExitAuth)
-	err := NameCredential(refused, env, now)
+
+	// No workspace credential sent yet: a command that picks its own bearer
+	// gets no note.
+	usedCredential.Store(nil)
+	if err := NameCredential(refused); !errors.Is(err, refused) {
+		t.Fatalf("no credential sent: %v, want the error unchanged", err)
+	}
+
+	env, _, now := credentialTestEnv(t, true)
+	io := IO{Now: func() time.Time { return now }}
+	if _, err := WorkspaceAuth(nil, env, io, credentialTestWorkspace); err != nil {
+		t.Fatal(err)
+	}
+	err := NameCredential(refused)
 	if ExitCode(err) != ExitAuth || !errors.Is(err, refused) {
 		t.Fatalf("named error %v lost its exit code or cause", err)
 	}
-	if !strings.Contains(err.Error(), "credential: the signed-in session, which wins over PUTNAMI_CLOUD_TOKEN") ||
-		!strings.Contains(err.Error(), "renew the session") {
+	if !strings.Contains(err.Error(), "credential: the signed-in session, which wins over PUTNAMI_CLOUD_TOKEN") {
 		t.Fatalf("message %q does not name the session", err)
 	}
-
-	bare, _, _ := credentialTestEnv(t, false)
 	forbidden := &APIError{StatusCode: http.StatusForbidden, Message: "Insufficient permissions", exit: newExitError("Insufficient permissions", ExitAPI)}
-	err = NameCredential(forbidden, bare, now)
-	if ExitCode(err) != ExitAPI || !strings.Contains(err.Error(), "credential: PUTNAMI_CLOUD_TOKEN, the workspace machine token") ||
-		!strings.Contains(err.Error(), "run putnami cloud login to use a signed-in session") {
-		t.Fatalf("403 on the machine token = %v", err)
+	if err := NameCredential(forbidden); ExitCode(err) != ExitAPI || !strings.Contains(err.Error(), "credential:") {
+		t.Fatalf("403 = %v, want it named with its exit code", err)
 	}
 	statusLine := NewError("cloud logs: "+StatusLine(http.StatusForbidden), ExitAPI)
-	if err := NameCredential(statusLine, env, now); !strings.Contains(err.Error(), "credential:") {
+	if err := NameCredential(statusLine); !strings.Contains(err.Error(), "credential:") {
 		t.Fatalf("a 403 status line was not named: %v", err)
 	}
-
 	other := NewError("boom", ExitAPI)
-	if err := NameCredential(other, env, now); !errors.Is(err, other) {
+	if err := NameCredential(other); !errors.Is(err, other) {
 		t.Fatalf("a non-refusal changed: %v", err)
 	}
-	delete(env, CloudTokenEnv)
-	if err := NameCredential(refused, env, now); !errors.Is(err, refused) {
-		t.Fatalf("one credential only: %v, want the error unchanged", err)
+
+	// A stored session that expired: the machine token is sent, both are held,
+	// and the note says why.
+	if err := WriteAuth(&StoredToken{AccessToken: "old", TokenType: "Bearer", ExpiresAt: now.Add(-time.Hour).Format(time.RFC3339Nano)}, env); err != nil {
+		t.Fatal(err)
 	}
-	if err := NameCredential(nil, env, now); err != nil {
+	if _, err := WorkspaceAuth(nil, env, io, credentialTestWorkspace); err != nil {
+		t.Fatal(err)
+	}
+	if err := NameCredential(refused); !strings.Contains(err.Error(), "the stored session expired and cannot renew") {
+		t.Fatalf("expired session = %v", err)
+	}
+
+	// A CI job with the machine token alone keeps its message as before.
+	bare, _, _ := credentialTestEnv(t, false)
+	if _, err := WorkspaceAuth(nil, bare, io, credentialTestWorkspace); err != nil {
+		t.Fatal(err)
+	}
+	if err := NameCredential(refused); !errors.Is(err, refused) {
+		t.Fatalf("machine token alone: %v, want the error unchanged", err)
+	}
+	if err := NameCredential(nil); err != nil {
 		t.Fatalf("nil = %v", err)
 	}
 }
