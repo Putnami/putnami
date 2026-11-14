@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/attribution"
 )
 
 // publicationCandidate fixes the local bytes and provider binding used by all
@@ -30,6 +31,9 @@ type publicationCandidate struct {
 	expectedRevision        string
 	workflowSHA             string
 	readyUnits              []string
+	// stripped lists the lines that named an agent and that the body lost
+	// before publication.
+	stripped []StrippedLine
 }
 
 func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verified, error) {
@@ -194,7 +198,14 @@ func (f Finalizer) prepareLocal(c *publicationCandidate) error {
 	if len(strings.TrimSpace(string(c.originalBody))) == 0 {
 		return errors.New("body file is empty")
 	}
-	c.body = NormalizeBody(string(c.originalBody))
+	body, removed := attribution.Strip(string(c.originalBody))
+	for _, line := range removed {
+		c.stripped = append(c.stripped, StrippedLine{Field: "body", Line: line.Line, Kind: line.Kind, Text: line.Text})
+	}
+	if len(strings.TrimSpace(body)) == 0 {
+		return errors.New("body file holds nothing but lines that name an agent")
+	}
+	c.body = NormalizeBody(body)
 	if c.opts.PartialDelivery && (PartialClosing(c.opts.Title) || PartialClosing(c.body)) {
 		return errors.New("partial delivery refuses a closing directive in the title or body")
 	}
@@ -254,7 +265,7 @@ func (f Finalizer) checkBranchMessages(c *publicationCandidate) error {
 		}
 	}
 	for _, commit := range commits {
-		if agentMarker.MatchString(commit.Text) {
+		if attribution.Names(commit.Text) {
 			return errors.New("branch commit names an agent")
 		}
 	}

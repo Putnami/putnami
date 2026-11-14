@@ -116,11 +116,31 @@ type hookInput struct {
 }
 
 // hookOutput is what a hook prints. Claude Code and Codex read the same
-// shapes: additional context, or a block with a reason for Codex's Stop.
+// shapes: additional context, or a block with a reason for Codex's Stop. A
+// system message is shown to the user, not to the agent.
 type hookOutput struct {
 	HookSpecificOutput *hookContext `json:"hookSpecificOutput,omitempty"`
 	Decision           string       `json:"decision,omitempty"`
 	Reason             string       `json:"reason,omitempty"`
+	SystemMessage      string       `json:"systemMessage,omitempty"`
+}
+
+// reportingOffNotice is the line SessionStart shows the user when the
+// missions provider refuses the sync for want of a signed-in session.
+const reportingOffNotice = "Putnami mission reporting is off: no signed-in session. Run `putnami cloud login`, then start a new session."
+
+// signInReasons are the error reasons of a sync refused for want of a
+// signed-in session.
+var signInReasons = []string{"auth.unavailable", "auth.denied"}
+
+// reportingOff reports whether err holds a sync refused for want of a
+// signed-in session.
+func reportingOff(err error) bool {
+	var failure *outcomeFailure
+	if !errors.As(err, &failure) || failure.envelope.Error == nil {
+		return false
+	}
+	return slices.Contains(signInReasons, failure.envelope.Error.Reason)
 }
 
 type hookContext struct {
@@ -130,7 +150,9 @@ type hookContext struct {
 
 // Hook runs `agent hook`: it handles one event read on stdin and answers the
 // exit code. It never fails a turn: a failure, a missing channel and an
-// outcome other than ok print nothing, leave one line in hook.log and exit 0.
+// outcome other than ok print nothing for the agent, leave one line in
+// hook.log and exit 0. At SessionStart, a sync refused for want of a
+// signed-in session also shows the user the reporting-off notice.
 // The output is printed last, so a failure never leaves half a document on
 // stdout. Only an idle wake that brings a message exits ExitWake, with the
 // message on stderr. The messages the output holds count as delivered only
@@ -407,6 +429,8 @@ func setSessionState(cache *sessionCache, state collab.SessionState, event strin
 // and, in full, the waiting messages that fit after it (sessionStartText).
 // It syncs every time, and reads the mission's checkpoint when the workspace
 // binds memory; when the sync fails, the cached sheet answers with its date.
+// When the provider refuses the sync for want of a signed-in session, it also
+// shows the user one line that says reporting is off and how to turn it on.
 // The messages count as delivered once Hook wrote the text.
 func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	files := e.files(engine, input.SessionID)
@@ -432,10 +456,23 @@ func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInp
 		text, messages = sessionStartText(cache, missionSheet(cache, syncErr, now))
 		return cache, nil
 	})
-	if err != nil || text == "" {
+	if err != nil {
 		return nil, pendingDelivery{}, err
 	}
-	return contextOutput(hookEventSessionStart, text), pendingDelivery{files: files, messages: messages}, nil
+	var output *hookOutput
+	if text != "" {
+		output = contextOutput(hookEventSessionStart, text)
+	}
+	if reportingOff(syncErr) {
+		if output == nil {
+			output = &hookOutput{}
+		}
+		output.SystemMessage = reportingOffNotice
+	}
+	if output == nil {
+		return nil, pendingDelivery{}, nil
+	}
+	return output, pendingDelivery{files: files, messages: messages}, nil
 }
 
 // lockedUpdate reads the cache under the lock, applies change and writes

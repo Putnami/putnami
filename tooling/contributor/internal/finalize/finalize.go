@@ -16,6 +16,7 @@ import (
 	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/attribution"
 )
 
 type Options struct {
@@ -121,6 +122,21 @@ type Result struct {
 	// AutoMerge reports the auto-merge request publication.autoMerge made;
 	// nil when the run sent none.
 	AutoMerge *AutoMergeReport `json:"autoMerge,omitempty"`
+	// Stripped lists each line of the body file that named an agent and that
+	// the run removed before it published the body.
+	Stripped []StrippedLine `json:"stripped,omitempty"`
+}
+
+// StrippedLine is one line that named an agent, removed before publication.
+type StrippedLine struct {
+	// Field is the text the line came from: body.
+	Field string `json:"field"`
+	// Line is its 1-based number in the body file.
+	Line int `json:"line"`
+	// Kind is generated-footer, co-author-trailer or session-link.
+	Kind string `json:"kind"`
+	// Text is the line, trimmed.
+	Text string `json:"text"`
 }
 
 // AutoMergeReport is what became of the request to turn auto-merge on. A
@@ -287,9 +303,15 @@ func (f Finalizer) Run(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, err
 	}
 	if settled != nil {
+		settled.Stripped = candidate.stripped
 		return *settled, nil
 	}
-	return f.publish(ctx, &candidate)
+	result, err := f.publish(ctx, &candidate)
+	if err != nil {
+		return Result{}, err
+	}
+	result.Stripped = candidate.stripped
+	return result, nil
 }
 
 func operationSupported(c collab.Capabilities, name string) bool {
@@ -335,7 +357,7 @@ func bodyReadbackError(read, sent string) error {
 	if !ok || appended == "" {
 		return errors.New("proposal body readback failed")
 	}
-	if agentMarker.MatchString(appended) {
+	if attribution.Names(appended) {
 		return fmt.Errorf("proposal body readback failed: the provider or its host appended %q, which names an agent and would reach the squash commit; publish from a local session", truncateUTF8(appended, 512))
 	}
 	return fmt.Errorf("proposal body readback failed: the provider or its host appended %q", truncateUTF8(appended, 512))
