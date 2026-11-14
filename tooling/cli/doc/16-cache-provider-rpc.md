@@ -109,7 +109,7 @@ single build of `@putnami/cloud` speaks both.
 | `authenticate` | `AuthenticateParams` → `AuthenticateResult` | Hands the provider a hosted run's credential. Sent once, right after `initialize` and before any other op, only when the provider echoed `run-credential`. A refusal ends the session like a failed `initialize`. Not valid on the socket. |
 | `prefetch` | `PrefetchParams` → `PrefetchResult` | Speculatively pull keys' blobs into the exchange dir in the background. `resultOnlyKeys` (only after a `restore-result-only` echo) names the keys whose blobs core will not read. |
 | `restore` | `RestoreParams` → `RestoreResult` | `hit` (blobs in the exchange dir + manifest; core ingests them into its CAS), `miss`, or `error` — the **restore-failure signal**, distinct from a cold miss but both meaning "build locally". A `resultOnly` restore (only after a `restore-result-only` echo) answers the same statuses without placing any blob. |
-| `upload` | `UploadParams` → `UploadResult` | Store a freshly built entry whose blobs core has exported to the exchange dir. |
+| `upload` | `UploadParams` → `UploadResult` | Store a freshly built entry whose blobs core has exported to the exchange dir. `accepted: false` with no error is a decline, not a failure: core counts no upload error. Never sent after a `read-only` echo. |
 | `marker-lookup` | `MarkerLookupParams` → `MarkerLookupResult` | Read the last successful whole-target run marker. |
 | `marker-write` | `MarkerWriteParams` → `MarkerWriteResult` | Publish a run marker (compare-and-swap). |
 | `object-get` | `ObjectGetParams` → `ObjectGetResult` | Look up a batch of objects in one namespace; hits carry a digest whose bytes are in the exchange dir, misses are omitted. **Socket only.** |
@@ -248,6 +248,25 @@ and the task reports its cached status without writing to the workspace. A
 `hint` hit restored this way is a miss: there is no blob to warm. A later run
 that needs the files ignores the result-only entry and restores the full entry
 from the provider; if that fails, the task runs.
+
+## Read-only session
+
+A credential that reads the cache and cannot write is common: a workspace
+machine token, or a developer's own credential, which the cache server lets
+read and not write.
+
+**Negotiation.** Core lists `read-only` (`CapabilityReadOnly`) in
+`InitializeParams.Capabilities` of every session. A provider whose session
+cannot write echoes it, and only when core listed it. The capability adds no
+field.
+
+**What core does after the echo.** Core exports no blob and sends no `upload`
+and no `marker-write` for the session, and prints one line on stderr:
+`putnami: the remote cache is read-only for this credential; the tasks built
+here stay in the local cache`. Reads are unchanged. A provider that learns
+only later that it cannot write keeps answering `upload` with
+`accepted: false`; core logs that decline at debug level and does not count it
+as an upload error.
 
 ## Session lifecycle and fallback
 

@@ -286,6 +286,9 @@ func (r *RemoteCache) ensureProvider(ctx context.Context, ws *workspace.Workspac
 	}
 
 	r.actionEvents = slices.Contains(init.Capabilities, cache.CapabilityActionEvents)
+	if sess.ReadOnly() {
+		p.readOnlyNotice()
+	}
 	p.mode = providerMode(init)
 	// The session checked the socket the provider offered (echoed capability,
 	// absolute path, really a socket); record only what it accepted.
@@ -400,6 +403,18 @@ func (p *providerRemote) notice(ctx context.Context, what string, err error) {
 		w = os.Stderr
 	}
 	_, _ = fmt.Fprintf(w, "putnami: %s %s (%v); building locally\n", p.holder(), what, err)
+}
+
+// readOnlyNotice says, once per run, that the provider's credential cannot
+// write: the run reads the remote cache and shares nothing with it. The
+// provider declared it at initialize (cache.CapabilityReadOnly), which runs
+// once per session.
+func (p *providerRemote) readOnlyNotice() {
+	w := p.notices
+	if w == nil {
+		w = os.Stderr
+	}
+	_, _ = fmt.Fprintln(w, "putnami: the remote cache is read-only for this credential; the tasks built here stay in the local cache")
 }
 
 // holder names the provider process in a custody refusal.

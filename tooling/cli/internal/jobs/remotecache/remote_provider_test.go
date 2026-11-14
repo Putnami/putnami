@@ -85,6 +85,10 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 	providerMode := cache.Mode(getenv("FAKE_PROVIDER_MODE"))
 	initModeOut := getenv("FAKE_INIT_MODE_OUT")
 	notReady := getenv("FAKE_NOT_READY") == "1"
+	// FAKE_READ_ONLY_ECHO echoes read-only when core lists it; FAKE_UPLOAD_DECLINE
+	// answers every upload accepted false with no error.
+	readOnlyEcho := getenv("FAKE_READ_ONLY_ECHO") == "1"
+	uploadDecline := getenv("FAKE_UPLOAD_DECLINE") == "1"
 	initializeFail := getenv("FAKE_INITIALIZE_FAIL") == "1"
 	var objectServer *objectcachetest.Server
 	defer func() {
@@ -187,6 +191,9 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			if actionEventsEcho {
 				capabilities = append(capabilities, cache.CapabilityActionEvents)
 			}
+			if readOnlyEcho && p != nil && slices.Contains(p.Capabilities, cache.CapabilityReadOnly) {
+				capabilities = append(capabilities, cache.CapabilityReadOnly)
+			}
 			var mode cache.Mode
 			if providerMode != "" && p != nil && slices.Contains(p.Capabilities, cache.CapabilityProviderConfiguration) {
 				capabilities = append(capabilities, cache.CapabilityProviderConfiguration)
@@ -271,7 +278,7 @@ func serveJobsFakeProvider(stdin io.Reader, stdout io.Writer, getenv func(string
 			accepted := false
 			key := ""
 			fileCount := 0
-			if p, _ := cache.ParseAndValidateUploadParams(req.Payload); p != nil && p.Manifest != nil {
+			if p, _ := cache.ParseAndValidateUploadParams(req.Payload); p != nil && p.Manifest != nil && !uploadDecline {
 				accepted = true
 				key = p.Key
 				fileCount = len(p.Manifest.Files)
