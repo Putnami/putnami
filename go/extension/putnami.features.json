@@ -936,6 +936,7 @@
               "without-a-declaration-the-release-of-the-machine-go-is-pinned",
               "the-goroot-go-is-asked-before-the-go-on-path",
               "an-offline-request-without-a-record-of-the-machine-go-pins-no-go",
+              "a-workspace-without-a-go-module-pins-no-machine-go",
               "no-declaration-no-committed-pin-and-no-go-command-pins-no-go"
             ]
           }

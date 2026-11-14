@@ -24,23 +24,31 @@ each pins its default release when the workspace declares none.
 
 ## Decision
 
-**With no `go.work` declaration and no committed pin, the extension pins the
-release of the Go the machine runs.**
+**With no `go.work` declaration and no committed pin, in a workspace that
+holds a Go module, the extension pins the release of the Go the machine
+runs.**
 
-1. The go command asked is the one the `runtimeCompiler` candidates find
-   first: `GOROOT/bin/go` when `GOROOT` is set, else `go` on PATH. It is asked
-   as the manifest's probe asks it, `go env GOVERSION` with `GOROOT` unset and
+1. The workspace holds a Go module when a `go.mod` lies at its root or below
+   it, outside hidden, `node_modules`, `vendor` and `testdata` directories. A
+   workspace with none, such as one whose first Go project a template is
+   about to render, pins no Go: that project writes the `go.work` its release
+   comes from, and `putnami init` and `putnami projects create` pin it in one
+   pass, as CLI ADR 0019 states.
+2. The go command asked is the one the `runtimeCompiler` candidates find
+   first: `GOROOT/bin/go` when `GOROOT` names an executable one, else the
+   first `go` in an absolute PATH directory. It is asked as the manifest's
+   probe asks it, `go env GOVERSION` with `GOROOT` unset and
    `GOTOOLCHAIN=local`, so the answer is the release that go command runs, not
    one it would switch to.
-2. That release resolves as a declared release does: from the machine's pin
+3. That release resolves as a declared release does: from the machine's pin
    record, else from the go.dev release index, which the answer then records.
-   A failed lookup is a problem whose remedy names `go.work`.
-3. It pins no Go, as before, when no go command answers, when the go command
-   reports no Go release (a development build), or when the request is
-   offline and no pin record holds that release. A hosted run reads the
-   committed lock, and a run that plans no Go job still goes on without a pin
-   (CLI ADR 0019, decision 7).
-4. A `go.work` declaration and a committed pin keep their precedence. Once
+4. It pins no Go, as before, when no go command answers, when the go command
+   reports no Go release (a development build), when the request is offline
+   and no pin record holds that release, or when the lookup fails. Nothing
+   declares that release, so an install that cannot pin it goes on as one
+   with no Go: a hosted run reads the committed lock, and a run that plans no
+   Go job still goes on without a pin (CLI ADR 0019, decision 7).
+5. A `go.work` declaration and a committed pin keep their precedence. Once
    pinned, the release is the committed pin, and a teammate whose go command
    runs another release gets the pinned one provisioned by `putnami install`.
 
@@ -51,13 +59,20 @@ release of the Go the machine runs.**
   puts on PATH already reports the release.
 - **Pin the root `go.mod` directive.** It states a minimum, not a release the
   machine runs, and a repository with no root module has none.
-- **Answer a problem when nothing declares Go.** A workspace that installs the
-  extension before its first Go project, or that plans no Go job, would fail
-  `putnami install`.
+- **Answer a problem when nothing declares Go, or when the lookup fails.** A
+  workspace that installs the extension before its first Go project, that
+  plans no Go job, or whose machine cannot reach go.dev, would fail
+  `putnami install` where it passed before.
 
 ## Consequences
 
 - `putnami install` on a repository with Go on PATH and no `go.work` records
   an exact `go` pin, and the commands that need it run.
 - The pin depends on the machine that first installs; committing the lock
-  makes it the workspace's choice, and `go.work` overrides it.
+  makes it the workspace's choice, and `go.work` overrides it. The first-use
+  install of a checkout whose committed lock pins no Go also records the
+  machine's release, as it records the default Bun of the TypeScript
+  extension.
+- A repository whose machine cannot reach go.dev and holds no pin record still
+  gets no pin; declaring the release in `go.work` and installing with network
+  access pins it.
