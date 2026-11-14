@@ -539,7 +539,7 @@ func (g GraphSync) commit(file string, doc map[string]any, existing []byte, dry 
 		changed, err := writeJSON(file, doc, existing)
 		return changed, nil, err
 	}
-	after, err := renderJSON(doc)
+	after, err := wsproto.RenderConfigFileAt(file, doc, existing)
 	if err != nil {
 		return false, nil, err
 	}
@@ -549,24 +549,11 @@ func (g GraphSync) commit(file string, doc map[string]any, existing []byte, dry 
 	return true, &FileChange{Before: existing, After: after}, nil
 }
 
-// renderJSON is doc as the sync writes it: two-space indented, with sorted
-// keys and a final newline.
-func renderJSON(doc map[string]any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(doc); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
-}
-
-// writeJSON writes doc at file, two-space indented with sorted keys, when its
-// bytes differ from existing; it reports whether it wrote. The file is
-// replaced through a temporary file beside it.
+// writeJSON writes doc at file, in the layout of existing, when its bytes
+// differ from existing; it reports whether it wrote. The file is replaced
+// through a temporary file beside it.
 func writeJSON(file string, doc map[string]any, existing []byte) (bool, error) {
-	data, err := renderJSON(doc)
+	data, err := wsproto.RenderConfigFileAt(file, doc, existing)
 	if err != nil {
 		return false, err
 	}

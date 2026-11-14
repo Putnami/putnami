@@ -402,7 +402,9 @@ func nameMember(wsRoot, member, name string, replace bool) (bool, error) {
 		return false, fmt.Errorf("read %s: %w", file, err)
 	}
 	if err == nil {
-		if err := json.Unmarshal(data, &doc); err != nil {
+		dec := json.NewDecoder(bytes.NewReader(data))
+		dec.UseNumber()
+		if err := dec.Decode(&doc); err != nil {
 			return false, fmt.Errorf("read %s: %w", file, err)
 		}
 	}
@@ -410,9 +412,12 @@ func nameMember(wsRoot, member, name string, replace bool) (bool, error) {
 		return false, nil
 	}
 	doc["name"] = name
-	out, err := encodeConfigFile(doc)
+	out, err := wsproto.RenderConfigFileAt(file, doc, data)
 	if err != nil {
 		return false, fmt.Errorf("write %s: %w", file, err)
+	}
+	if bytes.Equal(out, data) {
+		return false, nil
 	}
 	if err := os.WriteFile(file, out, 0o644); err != nil { //nolint:gosec // a tracked project file
 		return false, fmt.Errorf("write %s: %w", file, err)
@@ -971,7 +976,9 @@ func updateScopeProjects(wsRoot, scopePath string, added, removed []string) erro
 		return err
 	}
 	var raw map[string]any
-	if err := json.Unmarshal(data, &raw); err != nil {
+	dec := json.NewDecoder(bytes.NewReader(data))
+	dec.UseNumber()
+	if err := dec.Decode(&raw); err != nil {
 		return err
 	}
 
@@ -1003,25 +1010,14 @@ func updateScopeProjects(wsRoot, scopePath string, added, removed []string) erro
 	sort.Strings(filtered)
 
 	raw["includes"] = filtered
-	out, err := encodeConfigFile(raw)
+	out, err := wsproto.RenderConfigFile(raw, data)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(cfgPath, out, 0o644)
-}
-
-// encodeConfigFile renders a configuration file the sync rewrites: two-space
-// indented, with a final newline, and without HTML escaping. json.MarshalIndent
-// would write the "&&" of a command the file holds as "\u0026\u0026".
-func encodeConfigFile(doc any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(doc); err != nil {
-		return nil, err
+	if bytes.Equal(out, data) {
+		return nil
 	}
-	return buf.Bytes(), nil
+	return os.WriteFile(cfgPath, out, 0o644)
 }
 
 func updateConfigMembership(wsRoot string, scopes, projects []string) error {

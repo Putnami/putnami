@@ -295,14 +295,14 @@ func TestADryRunSyncPrintsTheDiffAndWritesNothing(t *testing.T) {
 		t.Fatalf("result = %+v, %v", result, err)
 	}
 	if !strings.Contains(result.Diffs[0], "--- a/apps/api/putnami.json\n+++ b/apps/api/putnami.json\n") ||
-		!strings.Contains(result.Diffs[0], "-    \"@putnami/typescript\"\n+    \"@putnami/turbo\"\n") {
+		!changesLine(result.Diffs[0], "-", `"@putnami/typescript"`) || !changesLine(result.Diffs[0], "+", `"@putnami/turbo"`) {
 		t.Errorf("diff = %s", result.Diffs[0])
 	}
 	if after, _ := os.ReadFile(filepath.Join(root, "apps/api/putnami.json")); string(after) != string(before) {
 		t.Errorf("a dry run wrote the file")
 	}
 	lines := strings.Join(Report(result, true), "\n")
-	if !strings.Contains(lines, "delegate mode: 2 putnami.json to write") || !strings.Contains(lines, "+    \"@putnami/turbo\"") {
+	if !strings.Contains(lines, "delegate mode: 2 putnami.json to write") || !changesLine(lines, "+", `"@putnami/turbo"`) {
 		t.Errorf("report:\n%s", lines)
 	}
 
@@ -462,7 +462,7 @@ func TestAStalePackageGraphFailsValidate(t *testing.T) {
 	writeFile(t, root, "packages/pricing/package.json", `{"name": "@demo/pricing", "scripts": {"build": "tsc", "test": "vitest run"}, "dependencies": {"@demo/api": "workspace:*"}}`)
 	before, _ := os.ReadFile(filepath.Join(root, "packages/pricing/putnami.json"))
 	status, events := check()
-	if status != "FAILED" || !strings.Contains(events, CodeSyncStale) || !strings.Contains(events, "packages/pricing/putnami.json") || !strings.Contains(events, `+    "/apps/api"`) {
+	if status != "FAILED" || !strings.Contains(events, CodeSyncStale) || !strings.Contains(events, "packages/pricing/putnami.json") || !changesLine(events, "+", `"/apps/api"`) {
 		t.Errorf("a stale graph: %s %s", status, events)
 	}
 	if after, _ := os.ReadFile(filepath.Join(root, "packages/pricing/putnami.json")); string(after) != string(before) {
@@ -971,4 +971,15 @@ func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
 	if lines := strings.Join(Report(result, false), "\n"); !strings.Contains(lines, "biome.json: written with no setting") {
 		t.Errorf("report:\n%s", lines)
 	}
+}
+
+// changesLine reports whether a unified diff holds a line that sign, "+" or
+// "-", marks and that holds text, whatever the layout of the file it changes.
+func changesLine(diff, sign, text string) bool {
+	for line := range strings.Lines(diff) {
+		if strings.HasPrefix(line, sign) && !strings.HasPrefix(line, sign+sign+sign) && strings.Contains(line, text) {
+			return true
+		}
+	}
+	return false
 }

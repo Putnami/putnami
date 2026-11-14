@@ -320,7 +320,7 @@ func TestAnImportedTurborepoMovesOnlyTheTasksTypeScriptRunsAndListsTheOthers(t *
 	if code != 0 {
 		t.Fatalf("init rerun exit %d:\n%s", code, out)
 	}
-	for _, want := range []string{`options["@putnami/turbo"].mode delegate → import`, "--- a/apps/api/putnami.json", `+    "@putnami/typescript"`, "Nothing was written"} {
+	for _, want := range []string{`options["@putnami/turbo"].mode delegate → import`, "--- a/apps/api/putnami.json", `"@putnami/typescript"`, "Nothing was written"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the rerun prints %q:\n%s", want, out)
 		}

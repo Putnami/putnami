@@ -64,7 +64,11 @@ func DeclareExtensions(root string, extensions []string, dry bool) (bool, *FileC
 		keys = append(keys, "extensions")
 	}
 	members["extensions"] = value
-	after, err := renderObject(keys, members)
+	rendered, err := renderObject(keys, members)
+	if err != nil {
+		return false, nil, err
+	}
+	after, err := wsproto.RenderConfigFile(json.RawMessage(rendered), data)
 	if err != nil {
 		return false, nil, err
 	}

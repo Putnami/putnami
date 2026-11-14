@@ -1081,7 +1081,7 @@ func retractProject(root, file string, components map[string]bool, dry bool) (*C
 }
 
 func write(abs, file string, doc map[string]any, existing []byte, dry bool) (*Change, error) {
-	data, err := encode(doc)
+	data, err := wsproto.RenderConfigFileAt(abs, doc, existing)
 	if err != nil {
 		return nil, err
 	}
@@ -1199,18 +1199,6 @@ func clone(doc map[string]any) map[string]any {
 	dec.UseNumber()
 	_ = dec.Decode(&out)
 	return out
-}
-
-// encode is doc two-space indented with sorted keys.
-func encode(doc map[string]any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(doc); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
 }
 
 // replaceFile replaces file through a temporary file beside it.

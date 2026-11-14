@@ -313,7 +313,7 @@ func TestTheSyncWritesEachProjectPutnamiJSONInBothModes(t *testing.T) {
 	if after, _ := os.ReadFile(filepath.Join(root, "apps/api/putnami.json")); string(after) != string(before) {
 		t.Errorf("a dry run wrote %s", after)
 	}
-	if diff := Diff(dry.Changes[0].File, dry.Changes[0].Before, dry.Changes[0].After); !strings.Contains(diff, "+++ b/apps/api/putnami.json") || !strings.Contains(diff, `+      "@putnami/nx:build",`) {
+	if diff := Diff(dry.Changes[0].File, dry.Changes[0].Before, dry.Changes[0].After); !strings.Contains(diff, "+++ b/apps/api/putnami.json") || !addsLine(diff, `"@putnami/nx:build"`) {
 		t.Errorf("diff = %s", diff)
 	}
 
@@ -918,7 +918,7 @@ func TestTheDryRunOfASwitchToImportPreviewsWhatTheApplyWrites(t *testing.T) {
 			if err != nil || status != "OK" || !reflect.DeepEqual(data["written"], preview.Written) {
 				t.Fatalf("the job's dry run: status %s, data %v, err %v, want %v written\n%s", status, data, err, preview.Written, events.String())
 			}
-			if !strings.Contains(events.String(), `+      "@putnami/nx:build",`) || !strings.Contains(events.String(), `+    "@putnami/typescript"`) {
+			if !addsLine(events.String(), `"@putnami/nx:build"`) || !addsLine(events.String(), `"@putnami/typescript"`) {
 				t.Errorf("the preview moves pricing's build to @putnami/typescript and declares it:\n%s", events.String())
 			}
 			if after, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename)); string(after) != string(workspace) {
@@ -1488,4 +1488,15 @@ func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
 	if again := sync(t, root, SyncOptions{DryRun: true}); len(again.Changes) != 0 {
 		t.Errorf("a second import changes %v", again.Changes)
 	}
+}
+
+// addsLine reports whether a unified diff adds a line that holds text,
+// whatever the layout of the file it changes.
+func addsLine(diff, text string) bool {
+	for line := range strings.Lines(diff) {
+		if strings.HasPrefix(line, "+") && !strings.HasPrefix(line, "+++") && strings.Contains(line, text) {
+			return true
+		}
+	}
+	return false
 }

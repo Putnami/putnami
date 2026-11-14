@@ -627,13 +627,12 @@ func WorkspaceInit(ctx context.Context, wsRoot string, args []string, env Lifecy
 		Options:        options,
 	}
 
-	data, err := json.MarshalIndent(cfg, "", "  ")
+	cfgPath := filepath.Join(cwd, wsproto.WorkspaceConfigFilename)
+	existing, _ := os.ReadFile(cfgPath)
+	data, err := wsproto.RenderConfigFileAt(cfgPath, cfg, existing)
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	data = append(data, '\n')
-
-	cfgPath := filepath.Join(cwd, wsproto.WorkspaceConfigFilename)
 	if err := os.WriteFile(cfgPath, data, 0o644); err != nil {
 		return fmt.Errorf("write config: %w", err)
 	}

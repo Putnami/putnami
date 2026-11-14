@@ -422,7 +422,7 @@ func keepDependency(root, dep string, owned map[string]bool) bool {
 // commit writes doc at rel when its bytes differ from existing, or with
 // dryRun records the diff alone. It reports whether the file changes.
 func commit(root, rel string, doc map[string]any, existing []byte, dryRun bool, result *Result) (bool, error) {
-	data, err := encodeProject(doc)
+	data, err := encodeProject(filepath.Join(root, filepath.FromSlash(rel)), doc, existing)
 	if err != nil {
 		return false, fmt.Errorf("%s: %w", rel, err)
 	}

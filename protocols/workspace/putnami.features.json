@@ -61,6 +61,22 @@
           }
         },
         {
+          "id": "a-written-file-keeps-the-repository-layout",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-update-changes-only-the-values-it-changes",
+              "an-equal-file-keeps-its-bytes",
+              "a-new-file-takes-the-formatters-layout",
+              "an-expanded-file-stays-expanded"
+            ]
+          }
+        },
+        {
           "id": "scopes-resolve-through-one-chain",
           "stage": "coded",
           "evidenceKinds": [

@@ -41,6 +41,15 @@
       ]
     },
     {
+      "id": "a-written-file-keeps-the-repository-layout",
+      "text": [
+        "An updated configuration file keeps its layout: an unchanged value keeps its bytes, members their order, the file its indentation.",
+        "An unchanged file is not written.",
+        "A new file is indented as the package.json beside it, or with two spaces; a scalar array that fits in 80 columns stays on one line, as Biome, Prettier and oxfmt write it.",
+        "A changed array stays one item per line when the file writes its short arrays so."
+      ]
+    },
+    {
       "id": "scopes-resolve-through-one-chain",
       "text": [
         "LoadScopeChain merges the scope files above a project, shallowest first, and names the files it merged.",

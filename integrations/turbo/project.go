@@ -38,17 +38,10 @@ func readProject(file string) (map[string]any, []byte, error) {
 	return doc, existing, nil
 }
 
-// encodeProject renders doc as the sync writes it: two-space indented, with
-// sorted keys and a final newline.
-func encodeProject(doc map[string]any) ([]byte, error) {
-	var buf bytes.Buffer
-	enc := json.NewEncoder(&buf)
-	enc.SetEscapeHTML(false)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(doc); err != nil {
-		return nil, err
-	}
-	return buf.Bytes(), nil
+// encodeProject renders doc as the putnami.json at file that holds existing,
+// in the layout of existing (ADR 0008 of the workspace protocol).
+func encodeProject(file string, doc map[string]any, existing []byte) ([]byte, error) {
+	return wsproto.RenderConfigFileAt(file, doc, existing)
 }
 
 // replaceFile replaces file with data through a temporary file beside it.
