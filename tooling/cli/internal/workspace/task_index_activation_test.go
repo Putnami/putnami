@@ -371,6 +371,23 @@ func TestTraceChangeImpact_AClosureScopeClaimsItsTaskOnlyWhereItsPortMayBePlanne
 	if got := idx.TasksBuildingRuntime(moved); len(got) != 0 {
 		t.Errorf("a closure scope carried alone builds %v, want nothing", got)
 	}
+	// A whole upstream carries every task: the relay still takes the scope
+	// alone, the packaging project its task, and no project takes more than
+	// TasksReachedFrom answers for the edge.
+	if got := ti.TasksReachedIn("/go/extension", nil); !slices.Contains(got, moved[0]) || slices.Contains(got, "package~docker") {
+		t.Errorf("from a whole upstream the Go extension takes %v, want the closure scope and not package~docker", got)
+	}
+	if got := ti.TasksReachedIn("/apps/py", nil); !slices.Contains(got, "package~docker") || !slices.Contains(got, "package~publish") {
+		t.Errorf("from a whole upstream the Python application takes %v, want its packaging and publishing", got)
+	}
+	every := idx.TasksReachedFrom(nil)
+	for _, p := range projects {
+		for _, task := range ti.TasksReachedIn(p.ID, nil) {
+			if !slices.Contains(every, task) {
+				t.Errorf("%s takes %s from a whole upstream, which TasksReachedFrom does not carry", p.ID, task)
+			}
+		}
+	}
 
 	got := traceChangeImpact(ws, []string{"libs/features/fixtures/tasks.golden.json"}, ChangeImpactOptions{Tasks: idx})
 	if ids := impactProjectIDs(got.Projects); slices.Contains(ids, "/libs/api") {
