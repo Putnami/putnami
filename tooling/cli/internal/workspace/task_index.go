@@ -40,7 +40,11 @@ import (
 // closure, so it is read where the command may run in the project or in any
 // project that depends on it. So is a step a dependent's step names through
 // `^`: the dependent's toolchain may read the sources of a project that runs
-// no such step, which the index cannot see, so it errs wide there too. A
+// no such step, which the index cannot see, so it errs wide there too. Such a
+// step is credited to the project alone, never closed over the project's own
+// steps: the project runs none of them after a step it does not run, and
+// another stack's step of the same name, closed over, would carry the change
+// to every dependent that stack plans it in. A
 // command the workspace-once activation plans reads no path for a project: the
 // engine plans it on every impacted run, whatever the selection, so crediting
 // it to a project would only add that project's own tasks. An input selector
@@ -646,7 +650,9 @@ func (idx *taskIndex) ReadsAsExtensionRuntime(projectID, path string) bool {
 }
 
 // TasksReadingPath returns the tasks of a project whose declared inputs select
-// a workspace-relative path, closed under the tasks that depend on them.
+// a workspace-relative path, closed under the tasks that depend on them, but
+// for a task read there only because a dependent may run its command, which
+// claims itself alone (credit).
 //
 // Three declarations answer, and they are the three the cache hasher reads for
 // the same job: the task's own input ports, the project's option layers
@@ -687,6 +693,7 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 	}
 	inProject := relative && !isParentRelative(rel)
 	reading := make(map[string]bool)
+	carried := make(map[string]bool)
 	dir := filepath.Join(idx.ws.Root, project.Path)
 	for _, scope := range idx.every {
 		task := idx.tasks[scope]
@@ -698,16 +705,14 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 				continue
 			}
 			if inProject && wsproto.SelectsPath(rel, declared.files) {
-				if idx.readsWhere(scope, declared.job, project) {
-					reading[scope] = true
-				}
+				idx.credit(scope, declared.job, project, reading, carried)
 				if wsproto.SelectsPath(rel, declared.closureFiles) && idx.mayPlanInClosureOf(declared.job, project) {
 					reading[closureScopePrefix+scope] = true
 				}
 				continue
 			}
-			if wsproto.SelectsPath(lookup, declared.workspaceFiles) && idx.readsWhere(scope, declared.job, project) {
-				reading[scope] = true
+			if wsproto.SelectsPath(lookup, declared.workspaceFiles) {
+				idx.credit(scope, declared.job, project, reading, carried)
 			}
 		}
 	}
@@ -721,10 +726,29 @@ func (idx *taskIndex) TasksReadingPath(projectID, path string) []string {
 			}
 		}
 	}
-	if len(reading) == 0 {
+	if len(reading) == 0 && len(carried) == 0 {
 		return nil
 	}
-	return idx.closureOf(sortedSet(reading))
+	for _, scope := range idx.closureOf(sortedSet(reading)) {
+		carried[scope] = true
+	}
+	return sortedSet(carried)
+}
+
+// credit records a port of scope, which job declares, as read in project:
+// into reading where the planner may run job there, so the project's steps
+// that follow it read the change too, and into carried where only a project
+// that depends on it may run it through a `^` reference (readsWhere). The
+// project runs none of its own steps after a step it does not run, so a
+// carried task claims itself alone, and a dependent takes it through
+// TasksReachedIn.
+func (idx *taskIndex) credit(scope string, job *extension.JobDefinition, project *Project, reading, carried map[string]bool) {
+	switch {
+	case idx.mayPlan(job, project):
+		reading[scope] = true
+	case idx.readsWhere(scope, job, project):
+		carried[scope] = true
+	}
 }
 
 // selectorsRead reports whether an input selector the task names reads rel in
@@ -898,8 +922,12 @@ func (idx *taskIndex) TasksReachedFrom(tasks []string) []string {
 // reference or a `^command` dependency reaches the project only when a
 // command that declares it may be planned there, so one stack's `^test`
 // carries no other stack's test step. A closure scope, and the prerequisite
-// of a `^command` dependency, travel as they do in TasksReachedFrom. A nil
-// list stands for every task; an unknown project gets TasksReachedFrom.
+// of a `^command` dependency, travel as they do in TasksReachedFrom, but a
+// closure scope claims its task and the tasks that follow it only where a
+// command that declares its closure port may be planned (closurePlannedIn):
+// elsewhere it travels on alone, so a dependent that only relays it to the
+// project that packages its closure runs nothing for it. A nil list stands
+// for every task; an unknown project gets TasksReachedFrom.
 func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string {
 	project := idx.ws.ProjectByID(projectID)
 	if project == nil {
@@ -922,6 +950,9 @@ func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string 
 	}
 	travel := func(scope string) {
 		reached[closureScopePrefix+scope] = true
+		if !idx.closurePlannedIn(scope, project) {
+			return
+		}
 		for _, next := range idx.closure[scope] {
 			reached[next] = true
 		}
@@ -948,6 +979,21 @@ func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string 
 		through(task)
 	}
 	return sortedSet(reached)
+}
+
+// closurePlannedIn reports whether a command that declares a closure port of
+// scope answers for projects and may be planned in project.
+func (idx *taskIndex) closurePlannedIn(scope string, project *Project) bool {
+	task := idx.tasks[scope]
+	if task == nil {
+		return false
+	}
+	for _, declared := range task.declarations {
+		if len(declared.closureFiles) > 0 && answersForProjects(declared.job) && idx.mayPlan(declared.job, project) {
+			return true
+		}
+	}
+	return false
 }
 
 // registerReachedVia records that job's step of scope names upstream through
@@ -984,12 +1030,17 @@ var checkingKinds = []string{
 
 // TasksBuildingRuntime returns the entries of tasks that may build what an
 // extension's consumers execute: it drops an entry when every command that
-// declares it is of a checking kind. A qualified entry is answered by the
-// commands of its extension, a closure entry by the task it reads for. An
-// entry the index attributes to no command stays.
+// declares it is of a checking kind, and a closure entry: it marks the files
+// the project's dependents read for a task of their own, and builds nothing
+// in the project that carries it, which takes the task itself where it runs
+// it (TasksReachedIn). A qualified entry is answered by the commands of its
+// extension. An entry the index attributes to no command stays.
 func (idx *taskIndex) TasksBuildingRuntime(tasks []string) []string {
 	building := make([]string, 0, len(tasks))
 	for _, task := range tasks {
+		if strings.HasPrefix(task, closureScopePrefix) {
+			continue
+		}
 		if !idx.checksOnly(task) {
 			building = append(building, task)
 		}

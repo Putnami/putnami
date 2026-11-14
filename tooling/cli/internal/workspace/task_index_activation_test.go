@@ -220,6 +220,184 @@ func TestTaskIndex_AnUpstreamStepIsReadWhereADependentMayRunIt(t *testing.T) {
 	}
 }
 
+// A port read in a project only because a dependent may run its command, a
+// TypeScript `tsc` step that every dependent names through `^tsc`, claims that
+// step alone: a fixture of a Go library claims none of the Go library's own
+// steps, though the TypeScript `compile` step that follows `tsc` shares the
+// Go `build~compile` scope. The TypeScript dependent still takes its `tsc`
+// steps, and the Go dependent takes nothing.
+func TestTaskIndex_APortOnlyADependentReadsClaimsNoStepOfTheProject(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-task-only-a-dependent-runs-claims-no-step-of-the-project",
+		"a-port-only-a-dependent-reads-claims-no-step-of-the-project")
+	goExt := &extension.ExtensionDescription{
+		Name: "@fixture/go", RelPath: "go/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"go-compile": {Inputs: map[string]extproto.TaskInputPort{
+				"sources": {From: extproto.TaskInputFromProject, Files: []string{"**/*.go", "!**/*_test.go"}},
+			}},
+			"go-test": {Inputs: map[string]extproto.TaskInputPort{
+				"sources": {From: extproto.TaskInputFromProject, Files: []string{"**/*.go"}},
+			}},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"build": {
+				CommandName: "build", Name: "build", ExtensionName: "@fixture/go", ExtensionPath: "go/extension",
+				PipelineSteps: []extproto.PipelineStep{{ID: "compile", Task: "go-compile", DependsOn: []string{"^compile"}}},
+			},
+			"test": {
+				CommandName: "test", Name: "test", ExtensionName: "@fixture/go", ExtensionPath: "go/extension",
+				PipelineSteps: []extproto.PipelineStep{{ID: "test", Task: "go-test", DependsOn: []string{"^compile"}}},
+			},
+		},
+	}
+	tsExt := &extension.ExtensionDescription{
+		Name: "@fixture/typescript", RelPath: "typescript/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"build-tsc": {Inputs: map[string]extproto.TaskInputPort{
+				"sources": {From: extproto.TaskInputFromProject, Files: []string{"git:**/*", "!../**"}},
+			}},
+			"build-compile": {Inputs: map[string]extproto.TaskInputPort{
+				"sources": {From: extproto.TaskInputFromProject, Files: []string{"src/**/*.ts"}},
+			}},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"build": {
+				CommandName: "build", Name: "build", ExtensionName: "@fixture/typescript", ExtensionPath: "typescript/extension",
+				PipelineSteps: []extproto.PipelineStep{
+					{ID: "tsc", Task: "build-tsc", DependsOn: []string{"^tsc"}},
+					{ID: "compile", Task: "build-compile", DependsOn: []string{"tsc"}},
+				},
+			},
+		},
+	}
+	projects := []*Project{
+		{ID: "/go/extension", Name: "@fixture/go", Path: "go/extension"},
+		{ID: "/typescript/extension", Name: "@fixture/typescript", Path: "typescript/extension"},
+		{ID: "/libs/features", Name: "features", Path: "libs/features", Extensions: []string{"/go/extension"}},
+		{ID: "/libs/api", Name: "api", Path: "libs/api", Extensions: []string{"/go/extension"}, Dependencies: []string{"/libs/features"}},
+		{ID: "/apps/web", Name: "web", Path: "apps/web", Extensions: []string{"/typescript/extension"}, Dependencies: []string{"/libs/features"}},
+	}
+	ws := NewWorkspace(t.TempDir(), nil, projects)
+	ws.Graph = BuildGraph(projects)
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{goExt, tsExt}, nil)
+	for _, tc := range []struct {
+		path string
+		want []string
+	}{
+		{path: "libs/features/fixtures/tasks.golden.json", want: []string{"build~tsc"}},
+		{path: "libs/features/features.go", want: []string{"build~compile", "build~tsc", "test~test"}},
+	} {
+		if got := idx.TasksReadingPath("/libs/features", tc.path); !slices.Equal(got, tc.want) {
+			t.Errorf("%s is read by %v, want %v", tc.path, got, tc.want)
+		}
+	}
+	got := traceChangeImpact(ws, []string{"libs/features/fixtures/tasks.golden.json"}, ChangeImpactOptions{Tasks: idx})
+	if ids := impactProjectIDs(got.Projects); slices.Contains(ids, "/libs/api") {
+		t.Errorf("a fixture of a Go library selects %v, want no Go dependent", ids)
+	}
+	if scope := got.Trace.ScopeOf("/apps/web"); !slices.Contains(scope, "build~tsc") {
+		t.Errorf("the TypeScript dependent's scope is %v, want its tsc step", scope)
+	}
+}
+
+// A closure port reads the files of every project in its dependency closure,
+// so its scope travels through every dependent, but it claims its task only
+// where a command that declares the port may be planned. A fixture of a Go
+// library that a Python application packages claims the application's
+// packaging and its publishing; the Go extension that depends on the library
+// only relays the scope, so its runtime does not move and its consumers are
+// not selected.
+func TestTraceChangeImpact_AClosureScopeClaimsItsTaskOnlyWhereItsPortMayBePlanned(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "a-task-only-a-dependent-runs-claims-no-step-of-the-project",
+		"a-closure-scope-claims-its-task-only-where-its-port-may-be-planned")
+	goExt := &extension.ExtensionDescription{
+		Name: "@fixture/go", RelPath: "go/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"go-compile": {Inputs: map[string]extproto.TaskInputPort{
+				"sources": {From: extproto.TaskInputFromProject, Files: []string{"**/*.go", "!**/*_test.go"}},
+			}},
+			"go-docker": {Inputs: map[string]extproto.TaskInputPort{
+				"binary": {From: extproto.TaskInputFromProject, Files: []string{"Dockerfile"}},
+			}},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"build": {
+				CommandName: "build", Name: "build", ExtensionName: "@fixture/go", ExtensionPath: "go/extension",
+				PipelineSteps: []extproto.PipelineStep{{ID: "compile", Task: "go-compile", DependsOn: []string{"^compile"}}},
+			},
+			"package": {
+				CommandName: "package", Name: "package", ExtensionName: "@fixture/go", ExtensionPath: "go/extension",
+				PipelineSteps: []extproto.PipelineStep{{ID: "docker", Task: "go-docker"}},
+			},
+		},
+	}
+	pyExt := &extension.ExtensionDescription{
+		Name: "@fixture/python", RelPath: "python/extension",
+		Tasks: map[string]extproto.TaskDefinition{
+			"py-docker": {Inputs: map[string]extproto.TaskInputPort{
+				"application":      {From: extproto.TaskInputFromProject, Files: []string{"**/*.py"}},
+				"pathDependencies": {From: extproto.TaskInputFromClosure, Files: []string{"git:**/*", "!../**"}},
+			}},
+			"py-publish": {},
+		},
+		Jobs: map[string]*extension.JobDefinition{
+			"package": {
+				CommandName: "package", Name: "package", ExtensionName: "@fixture/python", ExtensionPath: "python/extension",
+				PipelineSteps: []extproto.PipelineStep{
+					{ID: "docker", Task: "py-docker"},
+					{ID: "publish", Task: "py-publish", DependsOn: []string{"docker"}},
+				},
+			},
+		},
+	}
+	projects := []*Project{
+		{ID: "/go/extension", Name: "@fixture/go", Path: "go/extension", Dependencies: []string{"/libs/features"}},
+		{ID: "/python/extension", Name: "@fixture/python", Path: "python/extension"},
+		{ID: "/libs/features", Name: "features", Path: "libs/features", Extensions: []string{"/go/extension"}},
+		{ID: "/libs/api", Name: "api", Path: "libs/api", Extensions: []string{"/go/extension"}},
+		{ID: "/apps/py", Name: "py", Path: "apps/py", Extensions: []string{"/python/extension"}, Dependencies: []string{"/go/extension"}},
+	}
+	ws := NewWorkspace(t.TempDir(), nil, projects)
+	ws.Graph = BuildGraph(projects)
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{goExt, pyExt}, nil)
+	ti := idx.(*taskIndex)
+	moved := []string{closureScopePrefix + "package~docker"}
+	if got, want := ti.TasksReachedIn("/go/extension", moved), moved; !slices.Equal(got, want) {
+		t.Errorf("the Go extension takes %v, want the closure scope alone %v", got, want)
+	}
+	if got, want := ti.TasksReachedIn("/apps/py", moved), []string{closureScopePrefix + "package~docker", "package~docker", "package~publish"}; !slices.Equal(got, want) {
+		t.Errorf("the Python application takes %v, want %v", got, want)
+	}
+	if got := idx.TasksBuildingRuntime(moved); len(got) != 0 {
+		t.Errorf("a closure scope carried alone builds %v, want nothing", got)
+	}
+	// A whole upstream carries every task: the relay still takes the scope
+	// alone, the packaging project its task, and no project takes more than
+	// TasksReachedFrom answers for the edge.
+	if got := ti.TasksReachedIn("/go/extension", nil); !slices.Contains(got, moved[0]) || slices.Contains(got, "package~docker") {
+		t.Errorf("from a whole upstream the Go extension takes %v, want the closure scope and not package~docker", got)
+	}
+	if got := ti.TasksReachedIn("/apps/py", nil); !slices.Contains(got, "package~docker") || !slices.Contains(got, "package~publish") {
+		t.Errorf("from a whole upstream the Python application takes %v, want its packaging and publishing", got)
+	}
+	every := idx.TasksReachedFrom(nil)
+	for _, p := range projects {
+		for _, task := range ti.TasksReachedIn(p.ID, nil) {
+			if !slices.Contains(every, task) {
+				t.Errorf("%s takes %s from a whole upstream, which TasksReachedFrom does not carry", p.ID, task)
+			}
+		}
+	}
+
+	got := traceChangeImpact(ws, []string{"libs/features/fixtures/tasks.golden.json"}, ChangeImpactOptions{Tasks: idx})
+	if ids := impactProjectIDs(got.Projects); slices.Contains(ids, "/libs/api") {
+		t.Errorf("a fixture the Go extension only relays selects %v, want no consumer of the extension", ids)
+	}
+	if scope := got.Trace.ScopeOf("/apps/py"); !slices.Contains(scope, "package~docker") {
+		t.Errorf("the Python application's scope is %v, want its packaging", scope)
+	}
+}
+
 // A workspace-once command reads for no project, so manifests whose only file
 // declarations are workspace-once attribute nothing: the index is nil and the
 // selection keeps the project-level mapping instead of selecting nothing.

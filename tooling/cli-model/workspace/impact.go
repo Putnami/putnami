@@ -48,9 +48,10 @@ type ChangeImpactOptions struct {
 type TaskImpactIndex interface {
 	// TasksReadingPath returns the tasks of a project whose declared inputs
 	// select the workspace-relative path — the same declarations the cache
-	// keys on — closed under the tasks that depend on them inside the project.
-	// Empty means no action of the project reads the file, and the file claims
-	// nothing there.
+	// keys on — closed under the tasks that depend on them inside the project,
+	// but for a task read there only because a dependent may run its command,
+	// which claims itself alone. Empty means no action of the project reads
+	// the file, and the file claims nothing there.
 	TasksReadingPath(projectID, path string) []string
 
 	// TasksReachedFrom returns the tasks a project runs because the listed
@@ -66,16 +67,20 @@ type TaskImpactIndex interface {
 	// reference or a `^command` dependency reaches it only when a command that
 	// declares the reference may be planned there, so one stack's `^test`
 	// carries no other stack's test step; the prerequisite of a `^command`
-	// dependency travels on whatever the dependent plans. The walk asks it on
-	// every dependency and contract edge.
+	// dependency travels on whatever the dependent plans. A closure scope
+	// travels through every dependent, but claims its task and the tasks
+	// after it only where a command that declares its closure port may be
+	// planned. The walk asks it on every dependency and contract edge.
 	TasksReachedIn(projectID string, tasks []string) []string
 
 	// TasksBuildingRuntime returns the entries of tasks that may build what an
 	// extension's consumers execute: every entry but one that only commands
-	// of a checking kind declare. A verification, a check against criteria
-	// and a tally of diagnostics report on the project; none of them produces
-	// the extension's runtime, even when a dependent's step of the same
-	// command reads its output. An entry the index attributes to no command
+	// of a checking kind declare, or a closure entry. A verification, a check
+	// against criteria and a tally of diagnostics report on the project; none
+	// of them produces the extension's runtime, even when a dependent's step
+	// of the same command reads its output. A closure entry marks the files
+	// the project's dependents read for a task of their own and builds
+	// nothing in the project. An entry the index attributes to no command
 	// stays.
 	TasksBuildingRuntime(tasks []string) []string
 

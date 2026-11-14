@@ -17,6 +17,11 @@
 - **Amended**: 2026-11-11, §1: a task's ports are read only where the planner
   may run the command that declares them; a `closure` port and a `^`-named
   step also where a dependent may, and a `workspace-once` command nowhere.
+- **Amended**: 2026-11-14, §1-§2: a step read in a project only because a
+  dependent may run its command claims itself alone there, never the steps
+  that follow it in the project; a `closure` scope travels through every
+  dependent but claims its task and the tasks after it only where a command
+  that declares the closure port may be planned.
 
 ## Context
 
