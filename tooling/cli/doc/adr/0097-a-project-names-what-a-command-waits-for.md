@@ -12,7 +12,7 @@ A command can wait for another: an extension manifest declares
 `dependsOn: ["build"]` for the project's own build, or `["^build"]` for the
 build of every project it depends on. The manifest is the same for every
 project and every adoption mode, so it cannot say what a monorepo tool says
-per task. Three adoptions lost the order their tool kept (#1152):
+per task. Three adoptions lost the order their tool kept:
 
 - A delegated `rush test --only <package>` waited for no build, so on a fresh
   clone it read upstream outputs that did not exist yet.
