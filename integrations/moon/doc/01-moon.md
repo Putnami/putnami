@@ -104,12 +104,25 @@ A workspace that infers tasks from `package.json` scripts
 `node` in `.moon/toolchain.yml`) states those tasks nowhere but in moon. With
 no `moon-graph.json`, the sync then runs `moon project-graph --json` at the
 root, with `node_modules/.bin/moon`, else the `moon` on `PATH`, and reads the
-tasks moon lists. A moon that fails fails the sync and `validate`. Without
-moon, the sync and `validate` warn with `moon.tasks_inferred`. A project's tasks are the export's, or its
-`moon.yml` tasks over the ones it inherits from `.moon/tasks.yml` and
-`.moon/tasks/*.yml`: by file name (`node`, `<language>`, `<stack>`,
-`<language>-<layer>`, `tag-<tag>`) or by `inheritedBy`, after its
-`workspace.inheritedTasks` include, exclude and rename.
+tasks moon lists. When the repository's moon fails, as in a repository that
+ships moon itself, the sync runs the `moon` on `PATH`. A moon that fails fails
+the sync and `validate`, and the error names each moon the sync ran. Without
+moon, the sync and `validate` warn with `moon.tasks_inferred`.
+
+A project's tasks are the export's, or its `moon.yml` tasks over the ones it
+inherits from `.moon/tasks.yml` and `.moon/tasks/*.yml`: by file name (`node`,
+`<language>`, `<stack>`, `<language>-<layer>`, `tag-<tag>`) or by
+`inheritedBy`, after its `workspace.inheritedTasks` include, exclude and
+rename. Without an export, an `inheritedBy` condition on languages, stacks,
+layers or tags decides, a tags clause matches no project, and one on
+toolchains or files constrains nothing. A task two files define takes the
+upper command whole, and its args and tags append to the lower ones unless
+the upper task's `mergeArgs`, `mergeTags` or `merge` says otherwise.
+moon 2.x writes no tasks in its
+export, only each project's `taskTargets` and the task files moon matched
+for it, under `inherited`: the targets name the project's tasks, each with
+the command and tags its `moon.yml` and those files state. A task moon infers
+from a script states no command, so it keeps running through `moon run`.
 
 The moon projects are the ones the workspace's `projects` setting or the
 export names. `putnami projects sync` asks the extension about the

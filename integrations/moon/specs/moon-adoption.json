@@ -16,16 +16,16 @@
     {
       "id": "projects-and-tasks-are-read",
       "text": [
-        "The extension reads the moon project graph from moon-graph.json, the moon project-graph --json export, at the workspace root when present, else from .moon/workspace.yml and each moon.yml.",
-        "A project's tasks, each with the command line it runs (its script, else its command and args), are its moon.yml tasks over those it inherits from .moon/tasks.yml and the .moon/tasks/*.yml files that match it, after its workspace.inheritedTasks.",
-        "An export's own tasks win."
+        "The extension reads the moon project graph from moon-graph.json, the moon project-graph --json export, at the root when present, else from .moon/workspace.yml and each moon.yml.",
+        "A project's tasks, each with its command line, are its moon.yml tasks over those it inherits from .moon/tasks.yml and the matching .moon/tasks/*.yml, after workspace.inheritedTasks.",
+        "An export's tasks win; a moon 2.x export's taskTargets name them, over the task files its inherited lists, and an inferred task has no command."
       ]
     },
     {
       "id": "inferred-tasks-are-read",
       "text": [
-        "When the workspace infers tasks from package.json scripts (inferTasksFromScripts under javascript or node in .moon/toolchains.yml or .moon/toolchain.yml) and the root holds no moon-graph.json, the sync reads what moon project-graph --json prints, run with node_modules/.bin/moon, else the moon on PATH.",
-        "A moon that fails fails the sync and validate.",
+        "When the workspace infers tasks from package.json scripts (inferTasksFromScripts under javascript or node in .moon/toolchains.yml or .moon/toolchain.yml) and the root holds no moon-graph.json, the sync reads what moon project-graph --json prints, run with node_modules/.bin/moon, else or when it fails the moon on PATH.",
+        "A moon that fails fails the sync and validate, naming each moon run.",
         "Without moon, the sync and validate warn with moon.tasks_inferred, naming the setting and the export command."
       ]
     },

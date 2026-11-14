@@ -44,9 +44,10 @@ type resolvedGraph struct {
 
 // resolveGraph answers the graph the sync reads at root: the export at the
 // root, else, when the workspace infers tasks from package.json scripts, the
-// graph moon prints, from the repository's moon or the one on PATH. A moon
-// that fails fails the sync. Without one, or when the workspace infers no
-// task, the sync reads the configuration, which then states every task.
+// graph moon prints, from the repository's moon or, when that one is missing
+// or fails, the one on PATH. When every moon fails, the sync fails, naming
+// each. Without one, or when the workspace infers no task, the sync reads
+// the configuration, which then states every task.
 func resolveGraph(ctx context.Context, root string) (resolvedGraph, error) {
 	none := resolvedGraph{cleanup: func() {}}
 	if fileExists(root, detect.DefaultGraphFile) {
@@ -56,19 +57,48 @@ func resolveGraph(ctx context.Context, root string) (resolvedGraph, error) {
 	if setting == "" {
 		return none, nil
 	}
-	program := filepath.Join(root, filepath.FromSlash(moonProgram))
-	if info, err := os.Stat(program); err != nil || info.IsDir() {
-		if program, err = lookPath("moon"); err != nil {
-			none.unresolved = fmt.Sprintf("%s infers tasks from package.json scripts, which only moon lists, and no moon is installed: the sync read the moon configuration, which states none of them; install moon or write the export with `%s`, then run putnami projects sync", setting, detect.ExportCommand)
-			return none, nil
+	programs := moonPrograms(root)
+	if len(programs) == 0 {
+		none.unresolved = fmt.Sprintf("%s infers tasks from package.json scripts, which only moon lists, and no moon is installed: the sync read the moon configuration, which states none of them; install moon or write the export with `%s`, then run putnami projects sync", setting, detect.ExportCommand)
+		return none, nil
+	}
+	failures := make([]string, 0, len(programs)+1)
+	for _, program := range programs {
+		if ctx.Err() != nil {
+			break
 		}
+		var output bytes.Buffer
+		file, cleanup, err := stacks.ExportGraph(ctx, root, profileID, program, exportArgs, detect.DefaultGraphFile, &output)
+		if err == nil {
+			return resolvedGraph{options: detect.Options{GraphFile: file}, cleanup: cleanup}, nil
+		}
+		failures = append(failures, err.Error()+tail(output.String()))
 	}
-	var output bytes.Buffer
-	file, cleanup, err := stacks.ExportGraph(ctx, root, profileID, program, exportArgs, detect.DefaultGraphFile, &output)
-	if err != nil {
-		return resolvedGraph{}, fmt.Errorf("%s failed, so no edge is written: %w%s", exportSource, err, tail(output.String()))
+	if len(programs) == 1 && programs[0] == filepath.Join(root, filepath.FromSlash(moonProgram)) {
+		failures = append(failures, "no other moon is on PATH")
 	}
-	return resolvedGraph{options: detect.Options{GraphFile: file}, cleanup: cleanup}, nil
+	return resolvedGraph{}, fmt.Errorf("%s failed, so no edge is written: %s", exportSource, strings.Join(failures, "\n"))
+}
+
+// moonPrograms are the moons the sync may run at root, in order: the
+// repository's own, then the one on PATH when it is another file.
+func moonPrograms(root string) []string {
+	var programs []string
+	program := filepath.Join(root, filepath.FromSlash(moonProgram))
+	if info, err := os.Stat(program); err == nil && !info.IsDir() {
+		programs = append(programs, program)
+	}
+	if onPath, err := lookPath("moon"); err == nil && (len(programs) == 0 || !sameFile(programs[0], onPath)) {
+		programs = append(programs, onPath)
+	}
+	return programs
+}
+
+// sameFile reports whether two paths name one file.
+func sameFile(a, b string) bool {
+	infoA, errA := os.Stat(a)
+	infoB, errB := os.Stat(b)
+	return errA == nil && errB == nil && os.SameFile(infoA, infoB)
 }
 
 // tail is the end of a command's error output, to quote in an error.

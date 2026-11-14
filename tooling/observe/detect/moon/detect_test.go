@@ -93,6 +93,59 @@ func TestDetectPrefersTheTasksOfTheExport(t *testing.T) {
 	}
 }
 
+// moon2Export is what moon 2.6 project-graph --json prints: graph.nodes
+// holds indices and data the projects, unexpanded, so each project lists its
+// tasks as taskTargets and writes no tasks key.
+const moon2Export = `{
+  "graph": {"nodes": [0, 1, 2], "node_holes": [], "edge_property": "directed", "edges": [[1, 2, "production"]]},
+  "data": {
+    "0": {"config": {"tasks": {"build-types": {"command": "tsc", "args": ["--build"]}}}, "id": "root", "language": "typescript", "layer": "unknown", "root": "/repo", "source": ".", "stack": "unknown",
+          "inherited": {"configs": {".moon/tasks/all.yml": {"tasks": {"format": {"command": "prettier", "args": ["--check", "."], "tags": ["lint"]}, "smoke": {"command": "echo"}}}}, "layers": {}},
+          "taskTargets": ["root:build-types", "root:format"], "toolchains": ["javascript"]},
+    "1": {"config": {"tags": ["ci"], "tasks": {"typecheck": {"command": "tsc"}}}, "dependencies": [{"id": "shared-ui", "scope": "production"}], "id": "website",
+          "inherited": {"configs": {
+            ".moon/tasks/all.yml": {"tasks": {"format": {"command": "prettier", "args": ["--check", "."], "tags": ["lint"]}, "smoke": {"command": "echo"}}},
+            ".moon/tasks/frontend.yml": {"inheritedBy": {"stack": "frontend", "order": 2}, "tasks": {"format": {"command": "prettier", "args": ["--check", "src"], "tags": ["lint"]}}}
+          }, "layers": {"format": [".moon/tasks/all.yml", ".moon/tasks/frontend.yml"], "smoke": [".moon/tasks/all.yml"]}},
+          "language": "typescript", "layer": "application", "root": "/repo/website", "source": "website", "stack": "frontend",
+          "taskTargets": ["website:build", "website:deploy", "website:format", "website:test", "website:typecheck"], "toolchains": ["javascript", "typescript"]},
+    "2": {"id": "shared-ui", "language": "typescript", "layer": "library", "root": "/repo/packages/shared-ui", "source": "packages/shared-ui", "stack": "unknown",
+          "taskTargets": ["shared-ui:build", "shared-ui:lint"], "toolchains": ["javascript"]}
+  }
+}`
+
+func TestDetectNamesTheTasksOfAMoon2ExportByTheirTargets(t *testing.T) {
+	files := map[string]string{
+		".moon/workspace.yml":             "projects:\n  - '.'\n  - 'website'\n  - 'packages/*'\n",
+		".moon/toolchains.yml":            "javascript:\n  inferTasksFromScripts: true\n",
+		".moon/tasks/all.yml":             "tasks:\n  format:\n    command: 'prettier --check .'\n    tags: ['lint']\n  smoke:\n    command: 'echo'\n",
+		".moon/tasks/frontend.yml":        "inheritedBy:\n  stack: 'frontend'\n  order: 2\ntasks:\n  format:\n    command: 'prettier --check src'\n    tags: ['lint']\n",
+		".moon/tasks/rust.yml":            "inheritedBy:\n  toolchain: 'rust'\ntasks:\n  test:\n    command: 'cargo nextest run'\n    tags: ['test']\n",
+		"moon.yml":                        "tasks:\n  build-types:\n    command: 'tsc'\n    args: ['--build']\n",
+		"website/moon.yml":                "tags: ['ci']\nworkspace:\n  inheritedTasks:\n    exclude: ['smoke']\ntasks:\n  typecheck:\n    command: 'tsc'\n",
+		"website/package.json":            `{"name": "website", "scripts": {"build": "astro build", "deploy": "wrangler deploy", "test": "vitest"}}`,
+		"packages/shared-ui/package.json": `{"name": "shared-ui", "scripts": {"build": "vite build", "lint": "eslint ."}}`,
+		"moon-graph.json":                 moon2Export,
+	}
+	got := Detect(tree(t, files), Options{})
+	if !got.FromExport || len(got.Diagnostics) != 0 {
+		t.Fatalf("FromExport %v, diagnostics %v", got.FromExport, got.Diagnostics)
+	}
+	want := map[string][]Task{
+		"root":      {{Name: "build-types", Command: "tsc --build"}, {Name: "format", Tags: []string{"lint"}, Command: "prettier --check ."}},
+		"website":   {{Name: "build"}, {Name: "deploy"}, {Name: "format", Tags: []string{"lint"}, Command: "prettier --check . --check src"}, {Name: "test"}, {Name: "typecheck", Command: "tsc"}},
+		"shared-ui": {{Name: "build"}, {Name: "lint"}},
+	}
+	if len(got.Projects) != len(want) {
+		t.Fatalf("projects %+v", got.Projects)
+	}
+	for _, p := range got.Projects {
+		if !reflect.DeepEqual(p.Tasks, want[p.ID]) {
+			t.Errorf("%s tasks %+v, want %+v", p.ID, p.Tasks, want[p.ID])
+		}
+	}
+}
+
 func TestDetectOutsideAMoonWorkspace(t *testing.T) {
 	root := tree(t, map[string]string{"README.md": "no moon\n"})
 	if IsWorkspace(root) {
@@ -183,5 +236,42 @@ func TestInfersTasksNamesTheSettingThatInfersTasksFromScripts(t *testing.T) {
 	}
 	if got := InfersTasks(t.TempDir()); got != "" {
 		t.Errorf("no toolchain file: %q", got)
+	}
+}
+
+func TestInheritedByReadsSingularFormsAndIgnoresAConditionItDoesNotEvaluate(t *testing.T) {
+	web := Project{Language: "typescript", Stack: "frontend", Layer: "application", Tags: []string{"ci"}}
+	for _, c := range []struct {
+		by   map[string]any
+		want bool
+	}{
+		{map[string]any{"stack": "frontend", "order": "2"}, true},
+		{map[string]any{"languages": []any{"typescript", "javascript"}, "tag": "ci"}, true},
+		{map[string]any{"layer": "library"}, false},
+		{map[string]any{"toolchain": "node"}, true},
+		{map[string]any{"files": []any{"Cargo.toml"}, "stack": "backend"}, false},
+		{map[string]any{"tags": map[string]any{"or": []any{"ci"}}}, false},
+	} {
+		if got := (taskFile{rel: ".moon/tasks/x.yml", name: "x", by: c.by}).inheritedBy(web); got != c.want {
+			t.Errorf("inheritedBy %v = %v, want %v", c.by, got, c.want)
+		}
+	}
+}
+
+func TestMergeTaskAppendsArgsAndTagsUnlessTheUpperLayerSaysOtherwise(t *testing.T) {
+	base := map[string]any{"command": "prettier", "args": []any{"--check", "."}, "tags": []any{"lint", "fmt"}}
+	for _, c := range []struct {
+		own        map[string]any
+		args, tags []any
+	}{
+		{map[string]any{"args": []any{"src"}, "tags": []any{"lint", "ci"}}, []any{"--check", ".", "src"}, []any{"ci", "fmt", "lint"}},
+		{map[string]any{"args": []any{"src"}, "tags": []any{"ci"}, "options": map[string]any{"mergeTags": "replace"}}, []any{"--check", ".", "src"}, []any{"ci"}},
+		{map[string]any{"args": []any{"src"}, "tags": []any{"ci"}, "options": map[string]any{"merge": "replace"}}, []any{"src"}, []any{"ci"}},
+		{map[string]any{"args": []any{"src"}, "options": map[string]any{"mergeArgs": "prepend"}}, []any{"src", "--check", "."}, []any{"lint", "fmt"}},
+	} {
+		got := mergeTask(base, c.own)
+		if !reflect.DeepEqual(got["args"], c.args) || !reflect.DeepEqual(got["tags"], c.tags) {
+			t.Errorf("mergeTask over %v: args %v tags %v, want %v and %v", c.own, got["args"], got["tags"], c.args, c.tags)
+		}
 	}
 }

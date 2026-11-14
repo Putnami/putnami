@@ -14,6 +14,7 @@
 package moon
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -188,8 +189,57 @@ type exportProject struct {
 		Tags []string `json:"tags"`
 	} `json:"config"`
 	// Tasks are the project's resolved tasks, inherited ones included; nil
-	// when the export omits them.
+	// when the export omits them, as moon 2.x does.
 	Tasks map[string]exportTask `json:"tasks"`
+	// TaskTargets are the targets of the project's tasks, <project>:<task>,
+	// inferred ones included: moon 2.x lists them in place of tasks.
+	TaskTargets []string `json:"taskTargets"`
+	// Inherited is what moon 2.x says the project inherits: configs holds
+	// each task file it matched, by path, in the order moon merges them.
+	Inherited json.RawMessage `json:"inherited"`
+}
+
+// inheritedFiles are the task files the export says the project inherits,
+// in moon's order; ok is false when the export does not say.
+func (e *exportProject) inheritedFiles() (files []taskFile, ok bool) {
+	var inherited struct {
+		Configs json.RawMessage `json:"configs"`
+	}
+	if len(e.Inherited) == 0 || json.Unmarshal(e.Inherited, &inherited) != nil || len(inherited.Configs) == 0 {
+		return nil, false
+	}
+	decoder := json.NewDecoder(bytes.NewReader(inherited.Configs))
+	if open, err := decoder.Token(); err != nil || open != json.Delim('{') {
+		return nil, false
+	}
+	for decoder.More() {
+		key, err := decoder.Token()
+		rel, isPath := key.(string)
+		if err != nil || !isPath {
+			return nil, false
+		}
+		var config struct {
+			Tasks map[string]any `json:"tasks"`
+		}
+		if decoder.Decode(&config) != nil {
+			return nil, false
+		}
+		files = append(files, taskFile{rel: rel, name: strings.TrimSuffix(path.Base(rel), path.Ext(rel)), tasks: taskMap(config.Tasks)})
+	}
+	return files, true
+}
+
+// taskNames are the task ids the project's task targets name, the part
+// after the last colon of each target.
+func (e *exportProject) taskNames() []string {
+	var names []string
+	for _, target := range e.TaskTargets {
+		name := target[strings.LastIndex(target, ":")+1:]
+		if name != "" && !slices.Contains(names, name) {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 // exportTask is one resolved task of the export: its tags and what it runs.

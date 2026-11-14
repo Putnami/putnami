@@ -107,7 +107,9 @@ func IsWorkspace(root string) bool {
 // export when there is a usable one, else from the moon configuration, with
 // each project's language, stack, layer, tags and tasks. The tasks of the
 // export win; without them a project's tasks are its moon.yml tasks over the
-// ones it inherits from .moon/tasks.yml and .moon/tasks/*.yml.
+// ones it inherits from .moon/tasks.yml and .moon/tasks/*.yml. A moon 2.x
+// export names which tasks the project has by their targets, and which task
+// files it inherits.
 func Detect(root string, opts Options) Detection {
 	d := &detector{root: root}
 	found, source, _ := d.projects(opts.GraphFile)
@@ -218,12 +220,25 @@ func (d *detector) describe(p *project, inherited []taskFile) Project {
 			tasks[name] = Task{Tags: t.Tags, Command: t.commandLine()}
 		}
 	} else {
-		settingsOf := map[string]map[string]any{}
+		// The task files moon 2.x says the project inherits win over the
+		// ones its inheritedBy conditions match here.
+		var files []taskFile
 		for _, f := range inherited {
-			if !f.inheritedBy(out) {
-				continue
+			if f.inheritedBy(out) {
+				files = append(files, f)
 			}
+		}
+		if p.export != nil {
+			if fromExport, ok := p.export.inheritedFiles(); ok {
+				files = fromExport
+			}
+		}
+		settingsOf := map[string]map[string]any{}
+		for _, f := range files {
 			for name, settings := range f.tasks {
+				if base, ok := settingsOf[name]; ok {
+					settings = mergeTask(base, settings)
+				}
 				settingsOf[name] = settings
 			}
 		}
@@ -233,6 +248,16 @@ func (d *detector) describe(p *project, inherited []taskFile) Project {
 				settings = mergeTask(base, settings)
 			}
 			settingsOf[name] = settings
+		}
+		// A moon 2.x export names the tasks by their targets: those the
+		// configuration states keep its settings, and one moon infers, from
+		// a package.json script, states none.
+		if p.export != nil && len(p.export.TaskTargets) > 0 {
+			named := make(map[string]map[string]any, len(p.export.TaskTargets))
+			for _, name := range p.export.taskNames() {
+				named[name] = settingsOf[name]
+			}
+			settingsOf = named
 		}
 		for name, settings := range settingsOf {
 			tasks[name] = Task{Tags: stringsOf(settings["tags"]), Command: commandLine(settings)}
@@ -345,17 +370,19 @@ func inherit[T any](in inheritance, tasks map[string]T) map[string]T {
 	return out
 }
 
-// mergeTask merges a project's settings of a task over the settings it
-// inherits, as moon merges them by default: the project's command, script
-// and tags win, and its args follow the inherited ones, unless its
-// options.mergeArgs says replace or prepend.
+// mergeTask merges the settings of a task over the settings of the layer
+// below, an inherited task file or the project's moon.yml over what it
+// inherits, as moon merges them by default: the upper command, script and
+// other settings win, and its args and tags follow the lower ones, unless its
+// options.mergeArgs, options.mergeTags or options.merge says replace or
+// prepend.
 func mergeTask(base, own map[string]any) map[string]any {
 	merged := map[string]any{}
 	for key, value := range base {
 		merged[key] = value
 	}
 	for key, value := range own {
-		if key != "args" {
+		if key != "args" && key != "tags" {
 			merged[key] = value
 		}
 	}
@@ -365,29 +392,42 @@ func mergeTask(base, own map[string]any) map[string]any {
 			delete(merged, "script")
 		}
 	}
-	ownArgs, set := own["args"]
-	if !set {
-		return merged
-	}
 	options, _ := own["options"].(map[string]any)
-	inheritedArgs := stringsOf(base["args"])
-	var args []string
-	switch options["mergeArgs"] {
-	case "replace":
-		args = stringsOf(ownArgs)
-	case "prepend":
-		args = stringsOf(ownArgs)
-		args = append(args, inheritedArgs...)
-	default:
-		args = inheritedArgs
-		args = append(args, stringsOf(ownArgs)...)
+	for key, option := range map[string]string{"args": "mergeArgs", "tags": "mergeTags"} {
+		ownValues, set := own[key]
+		if !set {
+			continue
+		}
+		strategy, stated := options[option]
+		if !stated {
+			strategy = options["merge"]
+		}
+		values := mergeList(stringsOf(base[key]), stringsOf(ownValues), strategy)
+		if key == "tags" {
+			slices.Sort(values)
+			values = slices.Compact(values)
+		}
+		list := make([]any, len(values))
+		for i, v := range values {
+			list[i] = v
+		}
+		merged[key] = list
 	}
-	list := make([]any, len(args))
-	for i, a := range args {
-		list[i] = a
-	}
-	merged["args"] = list
 	return merged
+}
+
+// mergeList merges the values of an upper layer with those below it: replace
+// keeps the upper ones, prepend puts them first, and anything else appends
+// them.
+func mergeList(base, own []string, strategy any) []string {
+	switch strategy {
+	case "replace":
+		return slices.Clone(own)
+	case "prepend":
+		return append(slices.Clone(own), base...)
+	default:
+		return append(slices.Clone(base), own...)
+	}
 }
 
 // commandLine is the command line a task's settings state: its script, else
@@ -406,19 +446,23 @@ func commandLine(settings map[string]any) string {
 
 // inheritedBy reports whether the project inherits the file's tasks. A file
 // with an inheritedBy condition, moon 2.x's, matches when each of its
-// languages, stacks, layers and tags lists that is set names the project's
-// value, one of its tags for tags. Without one, the file's name decides, as
+// languages, stacks, layers and tags lists that is set, or their singular
+// forms, names the project's value, one of its tags for tags; a tags clause
+// matches no project, and a condition this reader does not evaluate, such as
+// toolchains, files or order, constrains nothing. Without one, the file's
+// name decides, as
 // in moon 1.x: tasks.yml and all for every project, then the project's
 // language, its platform (node for JavaScript and TypeScript), its stack,
 // <language|stack|platform>-<layer>, and tag-<tag>.
 func (f taskFile) inheritedBy(p Project) bool {
 	if f.by != nil {
-		for key, value := range map[string][]string{"languages": {p.Language}, "stacks": {p.Stack}, "layers": {p.Layer}, "tags": p.Tags} {
-			wanted, set := f.by[key]
-			if !set {
-				continue
+		values := map[string][]string{"languages": {p.Language}, "stacks": {p.Stack}, "layers": {p.Layer}, "tags": p.Tags}
+		for key, wanted := range f.by {
+			value, known := values[key]
+			if !known {
+				value, known = values[key+"s"]
 			}
-			if !slices.ContainsFunc(stringsOf(wanted), func(w string) bool { return slices.Contains(value, w) }) {
+			if known && !slices.ContainsFunc(stringsOf(wanted), func(w string) bool { return slices.Contains(value, w) }) {
 				return false
 			}
 		}

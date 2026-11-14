@@ -29,12 +29,28 @@ func inferringWorkspace(t *testing.T) string {
 	return root
 }
 
-// inferredExport is moon project-graph --json for inferringWorkspace: moon
-// lists the build and lint tasks it infers from the scripts.
-const inferredExport = `{"graph": {"nodes": [
-  {"id": "shared-ui", "source": "packages/shared-ui", "language": "typescript",
-   "tasks": {"build": {"command": "pnpm", "args": ["run", "build"]}, "lint": {"command": "pnpm", "args": ["run", "lint"]}}}
-], "edges": []}}`
+// inferredExport is what moon 2.6 project-graph --json prints for
+// inferringWorkspace: graph.nodes holds indices, data the projects, and each
+// project lists its tasks, the ones moon infers from the scripts included,
+// as taskTargets, with no tasks key.
+const inferredExport = `{
+  "graph": {"nodes": [0], "node_holes": [], "edge_property": "directed", "edges": []},
+  "data": {
+    "0": {
+      "config": {"$schema": "../../.moon/cache/schemas/project.json", "language": "typescript"},
+      "fileGroups": {},
+      "id": "shared-ui",
+      "inherited": {"configs": {}, "layers": {}},
+      "language": "typescript",
+      "layer": "unknown",
+      "root": "/work/repo/packages/shared-ui",
+      "source": "packages/shared-ui",
+      "stack": "unknown",
+      "taskTargets": ["shared-ui:build", "shared-ui:lint"],
+      "toolchains": ["javascript", "node", "pnpm", "typescript"]
+    }
+  }
+}`
 
 // installMoon writes the repository's own moon, node_modules/.bin/moon, as
 // a stub that prints export for moon project-graph --json, and logs each
@@ -66,6 +82,7 @@ func withoutMoonOnPath(t *testing.T) {
 
 func TestTheSyncReadsTheTasksMoonInfers(t *testing.T) {
 	spectest.Proves(t, feature, "inferred-tasks-are-read", "the-sync-reads-the-tasks-moon-infers")
+	spectest.Proves(t, feature, "projects-and-tasks-are-read", "a-moon-2-export-names-the-tasks-by-their-targets")
 	withoutMoonOnPath(t)
 	root := inferringWorkspace(t)
 	installMoon(t, root, inferredExport)
@@ -84,7 +101,7 @@ func TestTheSyncReadsTheTasksMoonInfers(t *testing.T) {
 	}
 	// moon infers a test task from a new script: validate fails until the
 	// sync writes it.
-	installMoon(t, root, strings.Replace(inferredExport, `"lint": {`, `"test": {"command": "pnpm", "args": ["run", "test"]}, "lint": {`, 1))
+	installMoon(t, root, strings.Replace(inferredExport, `"shared-ui:lint"`, `"shared-ui:lint", "shared-ui:test"`, 1))
 	var events strings.Builder
 	emit := jsonl.New()
 	emit.Observe(func(message string) { events.WriteString(message + "\n") })
@@ -135,8 +152,49 @@ func TestAFailingMoonProjectGraphFailsTheSync(t *testing.T) {
 		t.Errorf("an unreadable export: %v", err)
 	}
 	stackstest.WriteFile(t, root, "node_modules/.bin/moon", "#!/bin/sh\necho 'moon: invalid workspace' >&2\nexit 1\n")
-	if _, err := Sync(context.Background(), root); err == nil || !strings.Contains(err.Error(), "moon project-graph --json") {
+	if _, err := Sync(context.Background(), root); err == nil || !strings.Contains(err.Error(), "moon project-graph --json") || !strings.Contains(err.Error(), "no other moon is on PATH") {
 		t.Errorf("a failing moon: %v", err)
+	}
+}
+
+func TestWhenTheRepositoryMoonFailsTheSyncRunsTheMoonOnPath(t *testing.T) {
+	spectest.Proves(t, feature, "inferred-tasks-are-read", "a-failing-repository-moon-falls-back-to-the-moon-on-path")
+	root := inferringWorkspace(t)
+	installMoon(t, root, inferredExport)
+	// The repository's moon is a package that ships moon itself, unbuilt.
+	stackstest.WriteFile(t, root, "node_modules/.bin/moon", "#!/bin/sh\necho \"$(pwd) repository moon $*\" >> \"$STUB_LOG\"\necho 'Error: moon executable \"packages/core-linux-x64-gnu/moon\" not found!' >&2\nexit 1\n")
+	onPath := filepath.Join(t.TempDir(), "moon")
+	data := filepath.Join(t.TempDir(), "export.json")
+	if err := os.WriteFile(data, []byte(inferredExport), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	stackstest.WriteFile(t, filepath.Dir(onPath), "moon", "#!/bin/sh\necho \"$(pwd) path moon $*\" >> \"$STUB_LOG\"\ncat '"+data+"'\n")
+	if err := os.Chmod(onPath, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	previous := lookPath
+	lookPath = func(string) (string, error) { return onPath, nil }
+	t.Cleanup(func() { lookPath = previous })
+	if _, err := Sync(context.Background(), root); err != nil {
+		t.Fatal(err)
+	}
+	if got := readProjectFile(t, root, "packages/shared-ui")["disable"]; !reflect.DeepEqual(got, map[string]any{"jobs": []any{"test"}}) {
+		t.Errorf("shared-ui disable = %v, want test alone: the moon on PATH lists build and lint", got)
+	}
+	want := []string{root + " repository moon project-graph --json", root + " path moon project-graph --json"}
+	if log := stubLog(t); !reflect.DeepEqual(log, want) {
+		t.Errorf("moon calls = %v, want %v", log, want)
+	}
+	// When every moon fails, the error names each.
+	stackstest.WriteFile(t, filepath.Dir(onPath), "moon", "#!/bin/sh\necho 'moon: invalid workspace' >&2\nexit 3\n")
+	_, err := Sync(context.Background(), root)
+	if err == nil {
+		t.Fatal("the sync passed when every moon failed")
+	}
+	for _, part := range []string{filepath.Join(root, "node_modules/.bin/moon"), "not found!", onPath, "invalid workspace"} {
+		if !strings.Contains(err.Error(), part) {
+			t.Errorf("error %q does not name %q", err, part)
+		}
 	}
 }
 

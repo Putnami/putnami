@@ -20,7 +20,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-moon-projects-and-their-inherited-tasks-are-read"
+              "the-moon-projects-and-their-inherited-tasks-are-read",
+              "a-moon-2-export-names-the-tasks-by-their-targets"
             ]
           }
         },
@@ -35,7 +36,8 @@
             "checks": [
               "the-sync-reads-the-tasks-moon-infers",
               "without-moon-the-sync-says-it-cannot-read-the-inferred-tasks",
-              "a-failing-moon-project-graph-fails-the-sync"
+              "a-failing-moon-project-graph-fails-the-sync",
+              "a-failing-repository-moon-falls-back-to-the-moon-on-path"
             ]
           }
         },
