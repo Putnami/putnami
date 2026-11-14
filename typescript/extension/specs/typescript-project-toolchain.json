@@ -119,7 +119,7 @@
     },
     {
       "id": "workspace-install-writes-the-tsconfig-a-task-reads",
-      "text": "Workspace install writes a root tsconfig.json extending the extension's when the root holds none and a member running the extension reads it: its tsconfig.json, tsconfig.app.json or tsconfig.lib.json extends the root's, or it holds none of them and runs a build, a package with that build or a test that type-checks. A lint or a validate reads none. A context without the membership, or whose only TypeScript project is the root, writes it. An existing file is never touched."
+      "text": "Workspace install writes a root tsconfig.json extending the extension's when the root holds none and a member running the extension reads it: its tsconfig.json, tsconfig.app.json or tsconfig.lib.json extends the root's, or it holds none of them and runs a build, a package with that build or a test that type-checks. A lint or a validate reads none. The root project counts as a member when no other TypeScript project does. A context without the membership writes it. An existing file is never touched."
     },
     {
       "id": "workspace-install-keeps-the-package-manager",
