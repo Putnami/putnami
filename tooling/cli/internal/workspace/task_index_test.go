@@ -395,8 +395,9 @@ func TestTaskIndex_TasksOfExtensionAreQualifiedByTheExtensionProject(t *testing.
 // A task builds what an extension's consumers execute unless every command that
 // declares it is of a checking kind. A task one kindless command declares
 // beside a checking one may, and so may a task the index attributes to no
-// command. A qualified task is answered by its extension's commands, a closure
-// read by the task it reads for.
+// command. A qualified task is answered by its extension's commands. A closure
+// read builds nothing in the project that carries it: it marks the files its
+// dependents read, and a project that runs the task takes the task itself.
 func TestTaskIndex_TasksBuildingRuntimeDropsWhatOnlyCheckingCommandsDeclare(t *testing.T) {
 	checked := taskIndexExtension()
 	checked.Jobs["build"].Traits.Kind = extproto.CommandKindFiles
@@ -417,7 +418,7 @@ func TestTaskIndex_TasksBuildingRuntimeDropsWhatOnlyCheckingCommandsDeclare(t *t
 	plain.Name, plain.RelPath = "@fixture/plain", "plain/extension"
 	idx = NewTaskIndex(taskIndexWorkspace(t, nil), []*extension.ExtensionDescription{checked, plain}, nil)
 	want = []string{
-		"/go/extension#build~compile", "build~describe", "closure:test~test", "lint~lint", "test~describe", "test~test", "unknown~step",
+		"/go/extension#build~compile", "build~describe", "lint~lint", "test~describe", "test~test", "unknown~step",
 	}
 	if got := idx.TasksBuildingRuntime(tasks); !slices.Equal(got, want) {
 		t.Errorf("with a kindless extension, building tasks = %v, want %v", got, want)

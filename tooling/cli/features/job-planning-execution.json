@@ -1352,6 +1352,20 @@
         }
       },
       {
+        "id": "a-task-only-a-dependent-runs-claims-no-step-of-the-project",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-port-only-a-dependent-reads-claims-no-step-of-the-project",
+            "a-closure-scope-claims-its-task-only-where-its-port-may-be-planned"
+          ]
+        }
+      },
+      {
         "id": "a-run-records-whether-the-remote-cache-answered",
         "stage": "coded",
         "evidenceKinds": [

@@ -13,6 +13,8 @@
 - **Amended**: 2026-11-13, §3: a task that only commands of a checking kind
   declare (verification, criteria, diagnostics) does not move the runtime,
   and the trace never names a file only such tasks read.
+- **Amended**: 2026-11-14, §3: a `closure` scope the extension only relays to
+  its dependents does not move the runtime.
 
 ## Context
 
