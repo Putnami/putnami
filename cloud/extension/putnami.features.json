@@ -501,6 +501,91 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/agent-session",
+      "type": "feature",
+      "name": "The Cloud CLI in a hosted agent session",
+      "outcome": "The Cloud CLI works in a hosted agent session: the signed-in session wins over the workspace machine token, login hands its code to a host without a terminal, read commands build nothing, and a read-only cache credential stays quiet",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-signed-in-session-wins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-usable-session-wins-over-the-machine-token",
+              "the-machine-token-serves-without-a-usable-session",
+              "the-machine-credential-is-explicit",
+              "an-unknown-credential-is-a-usage-error"
+            ]
+          }
+        },
+        {
+          "id": "the-command-names-its-credential",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "whoami-names-the-credential-and-why",
+              "verbose-names-the-credential",
+              "an-auth-error-names-the-refused-credential"
+            ]
+          }
+        },
+        {
+          "id": "login-hands-its-code-to-a-host",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "login-writes-the-code-record-before-it-waits",
+              "the-code-record-carries-no-device-code",
+              "structured-login-writes-no-human-lines"
+            ]
+          }
+        },
+        {
+          "id": "read-commands-start-no-job",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "read-subcommands-declare-no-workspace-state"
+            ]
+          }
+        },
+        {
+          "id": "a-read-only-cache-credential-is-declared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-machine-token-session-is-declared-read-only",
+              "a-developer-session-is-declared-read-only-off-a-hosted-run",
+              "a-hosted-or-other-session-is-not-declared-read-only",
+              "the-provider-leaves-the-read-only-line-to-core"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

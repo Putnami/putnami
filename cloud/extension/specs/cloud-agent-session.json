@@ -1,0 +1,53 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/agent-session",
+  "outcomes": [
+    "The Cloud CLI works in a hosted agent session: the signed-in session wins over the workspace machine token, login hands its code to a host without a terminal, read commands build nothing, and a read-only cache credential stays quiet"
+  ],
+  "nonGoals": [
+    "Approving a device code on behalf of a person: the host hands the code to an approver",
+    "Changing what a machine token may read or write on the server"
+  ],
+  "requirements": [
+    {
+      "id": "the-signed-in-session-wins",
+      "text": [
+        "When ~/.putnami/auth.json holds a usable session (a fresh access token, or a refresh token), every workspace command authenticates with it, even when PUTNAMI_CLOUD_TOKEN is set.",
+        "The workspace machine token is used only when no usable session is stored, or when the command passes --credential=machine or the environment sets PUTNAMI_CLOUD_CREDENTIAL=machine.",
+        "--credential=session refuses to fall back to the machine token, and any other value is a usage error.",
+        "A run with no stored session behaves as before."
+      ]
+    },
+    {
+      "id": "the-command-names-its-credential",
+      "text": [
+        "whoami and status name the credential the workspace commands use: the signed-in user, or PUTNAMI_CLOUD_TOKEN, and why.",
+        "--verbose prints one line naming the credential a workspace command used.",
+        "An authentication error of a workspace command names the credential that was refused."
+      ]
+    },
+    {
+      "id": "login-hands-its-code-to-a-host",
+      "text": [
+        "Under --output=jsonl, putnami cloud login writes one record with user_code, verification_uri, verification_uri_complete and expires_in before it waits for the approval, and the result record once the code is approved.",
+        "The record never carries the device code.",
+        "Under any structured output the human instructions are not written to stdout."
+      ]
+    },
+    {
+      "id": "read-commands-start-no-job",
+      "text": [
+        "The cloud whoami, status, login and logout subcommands declare workspaceState none, so they answer without the workspace install and without restoring generated clients."
+      ]
+    },
+    {
+      "id": "a-read-only-cache-credential-is-declared",
+      "text": [
+        "When core lists read-only at initialize, the cache provider echoes it for a session that cannot write: a workspace machine token, or the signed-in user's putnami cloud token --for cache recipe off a hosted run.",
+        "After the echo the provider prints no read-only line of its own, since core says it once.",
+        "A hosted run, a run credential, a metadata identity and every other token source are not declared read-only, and a refused write still closes the write path for the rest of the run."
+      ]
+    }
+  ]
+}

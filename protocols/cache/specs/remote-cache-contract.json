@@ -184,6 +184,15 @@
         "The extension that declares the reserved cache-provider command serves the remote cache, whatever its name, with no version floor: a provider named @acme/cache with a SHA-stamped version loads without a notice.",
         "Two extensions that declare it fail the load instead of one being picked."
       ]
+    },
+    {
+      "id": "a-read-only-session-is-declared",
+      "text": [
+        "Core lists read-only in initialize.",
+        "A provider whose credential cannot write echoes it only when core listed it; after the echo core exports no blob, sends no upload and publishes no run marker for the session, and says once that the remote cache is read-only for this credential.",
+        "Without the echo nothing changes.",
+        "An upload the provider answers with accepted false and no error is declined: core counts it as no upload error and logs no error."
+      ]
     }
   ],
   "decisions": [
