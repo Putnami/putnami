@@ -286,7 +286,10 @@ absolute `PATH` directory, asked `go env GOVERSION` under `GOTOOLCHAIN=local`.
 That release resolves the same way, except that an offline call with no
 record, or a failed lookup, pins no Go. With no such go command, or one that
 runs a development build, the answer pins no Go; declare the release in
-`go.work` to choose it. A record that does not hold the index's answer for
+`go.work` to choose it. A `go.work` that `putnami projects create` writes in a
+workspace whose lock pins a release newer than the template's `go` directive
+also states that release as its `toolchain` directive, so the next
+`putnami install` keeps the pin. A record that does not hold the index's answer for
 that release is ignored and replaced, and a Putnami home the answer cannot
 write in still yields the pin. Each pin names, per platform, the archive the
 CLI provisions (a `.zip` on Windows, a `.tar.gz` elsewhere), its SHA-256, and
