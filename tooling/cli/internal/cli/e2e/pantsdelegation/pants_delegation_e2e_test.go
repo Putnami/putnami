@@ -470,9 +470,9 @@ func symlinkDemo() map[string]map[string]string {
 	}
 }
 
-// A symlinked BUILD directory is the directory it resolves to: the sync that
-// init --from pants runs writes each package once, so validate passes right
-// after it.
+// A symlinked BUILD directory is the directory it resolves to: projects sync,
+// the step init --from pants ends with, writes each package once, so validate
+// passes right after it.
 func TestASymlinkedPantsDirectoryPassesValidateRightAfterTheSync(t *testing.T) {
 	clitest.RequireShell(t)
 	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")

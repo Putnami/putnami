@@ -258,7 +258,7 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 		}
 		// Pants lists the targets of a symlinked directory under the link and
 		// under the directory it resolves to: the resolved one carries them.
-		if resolved, inside := g.resolve(dir); !inside || resolved != dir {
+		if g.canonical(dir) != dir {
 			continue
 		}
 		if edges[dir] == nil {
@@ -322,6 +322,8 @@ type graph struct {
 	// realRoot is root with its symbolic links resolved.
 	realRoot string
 	targets  map[string]target
+	// listed holds the directory of each target the export lists.
+	listed map[string]bool
 	// resolved caches resolve by directory.
 	resolved map[string]resolution
 }
@@ -337,17 +339,33 @@ func newGraph(root string, targets map[string]target) graph {
 	if err != nil {
 		realRoot = root
 	}
-	return graph{root: root, realRoot: realRoot, targets: targets, resolved: map[string]resolution{}}
+	g := graph{root: root, realRoot: realRoot, targets: targets, listed: map[string]bool{}, resolved: map[string]resolution{}}
+	for address := range targets {
+		if dir, ok := g.dir(address); ok {
+			g.listed[dir] = true
+		}
+	}
+	return g
 }
 
 // component returns the directory of the component an address belongs to:
-// the directory of dir, resolved through its symbolic links.
+// the canonical directory of its BUILD file directory.
 func (g graph) component(address string) (string, bool) {
 	dir, ok := g.dir(address)
 	if !ok {
 		return "", false
 	}
-	return g.resolve(dir)
+	return g.canonical(dir), true
+}
+
+// canonical returns the directory that carries the targets of dir: the
+// directory dir resolves to through its symbolic links, when it lies inside
+// the repository and the export lists targets there, and dir otherwise.
+func (g graph) canonical(dir string) string {
+	if resolved, inside := g.resolve(dir); inside && g.listed[resolved] {
+		return resolved
+	}
+	return dir
 }
 
 // resolve returns the repository-relative directory dir resolves to through
@@ -444,7 +462,7 @@ func (g graph) isFile(address, p, name string) bool {
 }
 
 // thirdPartyFiles adds to files the sources of a third-party target and of the
-// third-party targets it depends on, each in the directory it resolves to: a
+// third-party targets it depends on, each in its canonical directory: a
 // generated requirement's source is the requirements file target it depends
 // on.
 func (g graph) thirdPartyFiles(address string, files, seen map[string]bool) {
@@ -458,9 +476,7 @@ func (g graph) thirdPartyFiles(address string, files, seen map[string]bool) {
 		if !ok {
 			continue
 		}
-		if dir, inside := g.resolve(path.Dir(clean)); inside {
-			files[path.Join(dir, path.Base(clean))] = true
-		}
+		files[path.Join(g.canonical(path.Dir(clean)), path.Base(clean))] = true
 	}
 	for _, dep := range t.Dependencies {
 		g.thirdPartyFiles(dep, files, seen)

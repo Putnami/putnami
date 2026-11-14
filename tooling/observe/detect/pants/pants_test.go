@@ -142,7 +142,8 @@ func TestPeekTargetsAreGroupedByDirectory(t *testing.T) {
 
 // symlinkExport is the export of a repository where st2tests/fixtures/core
 // links to contrib/core, so Pants lists the targets of contrib/core under
-// both paths, and vendor/ext links outside the repository.
+// both paths, and vendor/ext links outside the repository, where Pants lists
+// nothing.
 const symlinkExport = `[
   {"address": "contrib/core:reqs#six", "target_type": "python_requirement", "dependencies": ["contrib/core/requirements.txt:reqs"]},
   {"address": "contrib/core/requirements.txt:reqs", "target_type": "_python_requirements_file", "dependencies": [], "sources": ["contrib/core/requirements.txt"]},
@@ -188,7 +189,8 @@ func TestASymlinkedDirectoryIsItsTargetDirectory(t *testing.T) {
 	want := []Component{
 		{ID: "contrib/core", Source: evidence.SourceOrchestrator},
 		{ID: "contrib/core/tests", Source: evidence.SourceOrchestrator, DependsOn: []string{"contrib/core"}},
-		{ID: "st2tests", Source: evidence.SourceOrchestrator, DependsOn: []string{"contrib/core"}},
+		{ID: "st2tests", Source: evidence.SourceOrchestrator, DependsOn: []string{"contrib/core", "vendor/ext"}},
+		{ID: "vendor/ext", Source: evidence.SourceOrchestrator},
 	}
 	if !reflect.DeepEqual(got.Components, want) {
 		t.Errorf("components\n got %+v\nwant %+v", got.Components, want)
@@ -202,6 +204,24 @@ func TestASymlinkedDirectoryIsItsTargetDirectory(t *testing.T) {
 	}
 	if len(got.Diagnostics) != 0 {
 		t.Errorf("diagnostics %+v", got.Diagnostics)
+	}
+
+	// A link whose directory the export lists nothing in, such as one Pants
+	// ignores, keeps its own path.
+	only := strings.Join([]string{
+		`[{"address": "st2tests/fixtures/core/actions.py", "target_type": "python_source", "dependencies": [], "sources": ["st2tests/fixtures/core/actions.py"]},`,
+		`{"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/test_packs.py"]}]`,
+	}, "\n")
+	if err := os.WriteFile(filepath.Join(root, DefaultGraphFile), []byte(only), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got = Detect(root, Options{})
+	want = []Component{
+		{ID: "st2tests", Source: evidence.SourceOrchestrator, DependsOn: []string{"st2tests/fixtures/core"}},
+		{ID: "st2tests/fixtures/core", Source: evidence.SourceOrchestrator},
+	}
+	if !reflect.DeepEqual(got.Components, want) {
+		t.Errorf("a link whose target is unlisted\n got %+v\nwant %+v", got.Components, want)
 	}
 }
 

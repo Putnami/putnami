@@ -24,7 +24,7 @@ var listArgs = []string{"list", "::"}
 var peekBatch = 1000
 
 // exportName names the export the sync reads when it runs pants.
-const exportName = "pants peek of pants list ::"
+const exportName = "the Pants export (pants list :: and pants peek)"
 
 // peekTarget is what the export keeps of one target of a pants peek.
 type peekTarget struct {

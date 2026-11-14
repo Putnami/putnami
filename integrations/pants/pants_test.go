@@ -81,11 +81,11 @@ func repository(t *testing.T, d demo, withExport bool) string {
 
 // stubPants puts first on PATH a pants that prints the demo's version, prints
 // the address of each target of the demo's export for list ::, those targets
-// of the export that peek names, as a JSON array, and for test <dir>: writes the demo's JUnit
-// reports of that directory and its coverage report under dist/; like Pants,
-// its test fails when --coverage-py-report=xml appends xml to a
-// [coverage-py] report list of pants.toml that already holds it. It logs each
-// call, with its working directory, to $STUB_LOG.
+// of the export that peek names, as a JSON array, and for test <dir>: writes
+// the demo's JUnit reports of that directory and its coverage report under
+// dist/; like Pants, its test fails when --coverage-py-report=xml appends xml
+// to a [coverage-py] report list of pants.toml that already holds it. It logs
+// each call, with its working directory, to $STUB_LOG.
 func stubPants(t *testing.T, d demo) {
 	t.Helper()
 	bin, reports := t.TempDir(), t.TempDir()

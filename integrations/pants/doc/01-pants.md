@@ -53,10 +53,10 @@ renders the whole repository, and `pantsd` can apply its
 | `options.@putnami/pants.filePatterns` | The resolve lockfiles and the files that declare the package's third-party targets, relative to the package, and the root `BUILD` file when it uses a target of the root. A change to one selects the package, wherever the file lies. A package with no third-party target has none |
 | `disable.jobs` | `test` when none of the package's targets is a test target (a type that ends in `_test` or `_tests`, or a `go_package` with a `_test.go` source), so a package without tests runs no test task; the sync owns this entry and removes it from a package that has a test target |
 
-A directory reached through a symbolic link is the directory it resolves to:
-Pants lists a linked tree under both paths, and the sync writes its packages
-once, under their own paths, with each edge to the link pointing at the
-resolved directory.
+A directory reached through a symbolic link is the directory it resolves to,
+when the export lists targets there: Pants lists a linked tree under both
+paths, and the sync writes its packages once, under their own paths, with each
+edge to the link pointing at the resolved directory.
 
 It keeps every other member, and rewrites a file only when a member it owns
 changes, with two-space indentation and sorted keys. A package that left the

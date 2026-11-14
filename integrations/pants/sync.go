@@ -35,10 +35,10 @@ type SyncResult = stacks.GraphResult
 // targets it depends on, and test in disable.jobs when the component holds no
 // test target, and as its filePatterns the lockfiles and the files that declare
 // the third-party targets it uses, which no edge reaches when they lie outside
-// a member directory. The
-// edges come from the export pants-graph.json at the root, or, when there is
-// none, from pants peek on the targets pants list :: names, in batches. Without either it writes nothing: the result's
-// Export is empty. A root without pants.toml is no Pants repository and gets
+// a member directory. The edges come from the export pants-graph.json at the
+// root, or, when there is none, from pants peek on the targets pants list ::
+// names, in batches. Without either it writes nothing: the result's Export is
+// empty. A root without pants.toml is no Pants repository and gets
 // an empty result.
 func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error) {
 	return synchronize(ctx, root, stderr, false)
