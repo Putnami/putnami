@@ -266,7 +266,7 @@ putnami build /a,/b,-/c                      # Union and subtraction
 
 When no target is given:
 
-- **Feature branches** — targets projects impacted vs trunk (`origin/HEAD`, `origin/main`, then local `main`/`master`)
+- **Feature branches** — targets projects impacted vs trunk (`origin/HEAD`, `origin/main`, `origin/master`, then local `main`/`master`)
 - **`main`/`master` with a local same-command/params marker** — targets projects impacted vs that marker SHA
 - **`main`/`master` with no local marker and an active remote-cache run marker** — targets projects impacted vs the remote marker SHA, if that SHA resolves locally
 - **`main`/`master` with no usable marker** — targets all projects

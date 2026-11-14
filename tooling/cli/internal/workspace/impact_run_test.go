@@ -342,6 +342,62 @@ func TestImpactedProjects_ResolvesOriginHeadWithoutLocalMain(t *testing.T) {
 	}
 }
 
+// A clone of one branch, as most CI checkouts are, of a repository whose
+// default branch is master has origin/master, no origin/HEAD and no local
+// master. Both the bare auto-selection that validate runs and --impacted
+// measure the branch against origin/master.
+func TestImpactedProjects_SingleBranchCloneOfMasterUsesOriginMaster(t *testing.T) {
+	upstream := t.TempDir()
+	gitInitWithBaseline(t, upstream)
+	runGitForImpact(t, upstream, "branch", "-M", "master")
+
+	clone := filepath.Join(t.TempDir(), "clone")
+	runGitForImpact(t, upstream, "clone", "-q", "--single-branch", "--branch", "master", upstream, clone)
+	runGitForImpact(t, clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+	runGitForImpact(t, clone, "checkout", "-b", "feature")
+	runGitForImpact(t, clone, "branch", "-D", "master")
+
+	libFile := filepath.Join(clone, "packages", "lib", "lib.go")
+	if err := os.MkdirAll(filepath.Dir(libFile), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(libFile, []byte("package lib\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGitForImpact(t, clone, "add", "-A")
+	runGitForImpact(t, clone, "commit", "-m", "lib")
+
+	projects := []*Project{
+		{ID: "/packages/lib", Name: "lib", Path: "packages/lib"},
+		{ID: "/packages/other", Name: "other", Path: "packages/other"},
+	}
+	ws := &Workspace{Root: clone, Config: &wsproto.Config{}, Projects: projects, Graph: BuildGraph(projects)}
+
+	auto, err := ResolveAutoSelection(ws, []string{"validate"}, nil)
+	if err != nil {
+		t.Fatalf("ResolveAutoSelection: %v", err)
+	}
+	if auto.Mode != AutoSelectionImpacted || auto.Baseline != "origin/master" || auto.Reason != AutoSelectionReasonTrunk {
+		t.Errorf("auto selection = %+v, want impacted against origin/master (trunk)", auto)
+	}
+
+	resolved, err := ResolveImpactedBaselineDetailed(ws, "")
+	if err != nil {
+		t.Fatalf("ResolveImpactedBaselineDetailed: %v", err)
+	}
+	if resolved.Ref != "origin/master" || resolved.Source != git.BaselineSourceTrunk {
+		t.Errorf("baseline = %q (%s), want origin/master (trunk)", resolved.Ref, resolved.Source)
+	}
+
+	got, err := ImpactedProjects(ws, resolved.Ref)
+	if err != nil {
+		t.Fatalf("ImpactedProjects: %v", err)
+	}
+	if names := impactNameSet(got); !names["lib"] || names["other"] {
+		t.Errorf("impacted = %v, want lib only", names)
+	}
+}
+
 func TestImpactedProjects_AssetPathTriggersConsumer(t *testing.T) {
 	spectest.Proves(t, "cli/workspace-discovery-selection", "impacted-closure", "renames-and-assets-select-every-owner")
 	tmp := t.TempDir()
