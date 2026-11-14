@@ -125,8 +125,8 @@ After a change to `src/python/pricing`, Putnami runs `pricing` and the
 packages that depend on it, `api` here, each with one command at the root:
 
 ```text
-pants --test-report --test-use-coverage --coverage-py-report=xml test src/python/pricing:
-pants --test-report --test-use-coverage --coverage-py-report=xml test src/python/api:
+pants --test-report --test-use-coverage --coverage-py-report=["xml"] test src/python/pricing:
+pants --test-report --test-use-coverage --coverage-py-report=["xml"] test src/python/api:
 ```
 
 A change to `api` alone runs `api` alone: Putnami never runs Pants on the

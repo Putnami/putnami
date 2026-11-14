@@ -85,8 +85,12 @@ not those of the packages under it.
 | Task | Command |
 |---|---|
 | `lint` | `pants lint <dir>:` |
-| `test` | `pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>:` |
+| `test` | `pants --test-report --test-use-coverage --coverage-py-report=["xml"] test <dir>:` |
 | `build` | `pants package <dir>:` |
+
+The list form `["xml"]` replaces the `[coverage-py] report` list of
+`pants.toml` rather than appending to it, so a repository that already lists
+`xml` there still gets its one Cobertura report.
 
 The test task then reads the JUnit reports under `dist/test/reports/` and the
 Cobertura report `dist/coverage/python/coverage.xml` into the test and

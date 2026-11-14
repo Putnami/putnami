@@ -80,7 +80,9 @@ func repository(t *testing.T, d demo, withExport bool) string {
 
 // stubPants puts first on PATH a pants that prints the demo's version, prints
 // the demo's export for peek ::, and for test <dir>: writes the demo's JUnit
-// reports of that directory and its coverage report under dist/. It logs each
+// reports of that directory and its coverage report under dist/; like Pants,
+// its test fails when --coverage-py-report=xml appends xml to a
+// [coverage-py] report list of pants.toml that already holds it. It logs each
 // call, with its working directory, to $STUB_LOG.
 func stubPants(t *testing.T, d demo) {
 	t.Helper()
@@ -96,6 +98,8 @@ for a in "$@"; do last="$a"; done
 case " $* " in
   *" peek :: "*) cat "` + reports + `/pants-graph.json"; exit 0;;
   *" test "*)
+    case " $* " in *" --coverage-py-report=xml "*)
+      if grep -q '^report *= *\[.*"xml"' pants.toml; then echo "[ERROR] Duplicate enum values specified in list" >&2; exit 1; fi;; esac
     dir="${last%:}"
     prefix="$(echo "$dir" | tr / .)."
     mkdir -p dist/test/reports dist/coverage/python
@@ -444,7 +448,7 @@ func TestATaskRunsPantsOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 	for task, want := range map[string]string{
 		stacks.TaskLint:  "pants lint src/python/pricing:",
 		stacks.TaskBuild: "pants package src/python/pricing:",
-		stacks.TaskTest:  "pants --test-report --test-use-coverage --coverage-py-report=xml test src/python/pricing:",
+		stacks.TaskTest:  `pants --test-report --test-use-coverage --coverage-py-report=["xml"] test src/python/pricing:`,
 	} {
 		t.Setenv("STUB_LOG", filepath.Join(t.TempDir(), "log"))
 		status, data, events := runJob(t, root, "src/python/pricing", task)
@@ -456,6 +460,29 @@ func TestATaskRunsPantsOnItsPackageAndRecordsTheDelegation(t *testing.T) {
 			t.Errorf("%s ran %q, want the version check then %q in %s", task, log, want, rootReal)
 		}
 	}
+
+	// A repository whose [coverage-py] report already lists xml runs its
+	// tests: the flag replaces that list, where the append form fails.
+	config, err := os.ReadFile(filepath.Join(root, "pants.toml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := strings.Replace(string(config), "report = [\"xml\"]", "report = [\"xml\", \"console\"]", 1)
+	if listed == string(config) {
+		t.Fatal("the demo's pants.toml holds no [coverage-py] report list")
+	}
+	stackstest.WriteFile(t, root, "pants.toml", listed)
+	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskTest); status != "OK" {
+		t.Errorf("a repository that lists xml runs a delegated test: %s %s", status, events)
+	}
+	stackstest.WriteFile(t, root, "src/python/pricing/putnami.json", `{"options": {"@putnami/pants": {"tasks": {"test": {"steps": [["pants", "--test-report", "--test-use-coverage", "--coverage-py-report=xml", "test", "{component}:"]]}}}}}`)
+	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskTest); status != "FAILED" || !strings.Contains(events, stacks.CodeStepFailed) {
+		t.Errorf("the append form fails on that repository, as Pants does: %s %s", status, events)
+	}
+	if err := os.Remove(filepath.Join(root, "src/python/pricing/putnami.json")); err != nil {
+		t.Fatal(err)
+	}
+	stackstest.WriteFile(t, root, "pants.toml", string(config))
 
 	t.Setenv("STUB_VERSION", "2.24.1")
 	if status, _, events := runJob(t, root, "src/python/pricing", stacks.TaskLint); status != "FAILED" || !strings.Contains(events, stacks.CodeToolchainMismatch) {

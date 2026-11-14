@@ -250,7 +250,7 @@
       }
     },
     "test-run": {
-      "description": "Run pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>: in the workspace root for one package, after the Pants version check; then copy the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task. Putnami's cache is off: Pants's cache decides what reruns.",
+      "description": "Run pants --test-report --test-use-coverage --coverage-py-report=[\"xml\"] test <dir>: in the workspace root for one package, after the Pants version check; then copy the JUnit reports under dist/test/reports and the Cobertura report dist/coverage/python/coverage.xml into the command output and read them. A failed case, a step that exits non-zero, or a missing report fails the task. Putnami's cache is off: Pants's cache decides what reruns.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
