@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestParseAndValidateManifest_AcceptsSubcommandWorkspaceAndGroupDefault(t *testing.T) {
@@ -30,6 +31,58 @@ func TestParseAndValidateManifest_AcceptsSubcommandWorkspaceAndGroupDefault(t *t
 	report := group.Subcommands["report"]
 	if report.Workspace != SubcommandWorkspaceRequired || report.RunsWithoutWorkspace() {
 		t.Fatalf("report subcommand = %+v, want a required subcommand", report)
+	}
+	if !report.ReadsNoWorkspaceState() || run.ReadsNoWorkspaceState() {
+		t.Fatalf("workspace state: report = %q, run = %q, want none on report only", report.WorkspaceState, run.WorkspaceState)
+	}
+}
+
+func TestValidateManifest_WorkspaceStateIsAClosedVocabulary(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-subcommand-declares-the-workspace-state-it-reads", "workspace-state-is-a-closed-vocabulary")
+	diags := validateFixture(t, "fixtures/invalid/subcommand-workspace-state-unknown.json")
+	d := requireDiagnostic(t, diags, "invalid-enum", "commandGroups.audit.subcommands.run.workspaceState")
+	if !strings.Contains(d.Message, `"installed"`) || !strings.Contains(d.Message, `"none"`) {
+		t.Fatalf("message %q does not name the rejected and the accepted value", d.Message)
+	}
+	nested := &Manifest{
+		Name: "sample/nested-workspace-state",
+		Commands: map[string]CommandDefinition{
+			"audit-run": {Run: []PipelineStep{{ID: "run", Task: "audit-exec"}}},
+		},
+		CommandGroups: map[string]CommandGroupDefinition{
+			"audit": {Subcommands: map[string]SubcommandDefinition{
+				"run": {Command: "audit-run", Subcommands: map[string]SubcommandDefinition{
+					"deep": {WorkspaceState: "partial"},
+				}},
+			}},
+		},
+		Tasks: map[string]TaskDefinition{"audit-exec": {Kind: "command", Command: "echo"}},
+	}
+	requireDiagnostic(t, ValidateManifest(nested), "invalid-enum", "commandGroups.audit.subcommands.run.subcommands.deep.workspaceState")
+	for _, tc := range []struct {
+		value string
+		want  bool
+	}{{"", false}, {SubcommandWorkspaceStateNone, true}, {"installed", false}} {
+		if got := (SubcommandDefinition{WorkspaceState: tc.value}).ReadsNoWorkspaceState(); got != tc.want {
+			t.Errorf("ReadsNoWorkspaceState(%q) = %v, want %v", tc.value, got, tc.want)
+		}
+	}
+}
+
+func TestRequiredCLIContract_WorkspaceStateNeedsNoIncrement(t *testing.T) {
+	spectest.Proves(t, "extension/manifest-contract", "a-subcommand-declares-the-workspace-state-it-reads", "workspace-state-needs-no-contract-increment")
+	sub := SubcommandDefinition{Command: "audit-run"}
+	base := &Manifest{
+		Name:          "sample/workspace-state-contract",
+		Commands:      map[string]CommandDefinition{"audit-run": {Run: []PipelineStep{{ID: "run", Task: "audit-exec"}}}},
+		CommandGroups: map[string]CommandGroupDefinition{"audit": {Subcommands: map[string]SubcommandDefinition{"run": sub}}},
+		Tasks:         map[string]TaskDefinition{"audit-exec": {Kind: "command", Command: "echo"}},
+	}
+	before := RequiredCLIContract(base)
+	sub.WorkspaceState = SubcommandWorkspaceStateNone
+	base.CommandGroups["audit"] = CommandGroupDefinition{Subcommands: map[string]SubcommandDefinition{"run": sub}}
+	if after := RequiredCLIContract(base); after != before {
+		t.Fatalf("RequiredCLIContract with workspaceState none = %d, want %d as without it", after, before)
 	}
 }
 
@@ -112,6 +165,7 @@ func TestConformance_SubcommandWorkspaceSchemaMatchesStrictParser(t *testing.T) 
 	for _, fixture := range []string{
 		"fixtures/invalid/subcommand-workspace-optional-not-interactive.json",
 		"fixtures/invalid/subcommand-workspace-unknown.json",
+		"fixtures/invalid/subcommand-workspace-state-unknown.json",
 	} {
 		t.Run("reject "+filepath.Base(fixture), func(t *testing.T) {
 			rejected := false

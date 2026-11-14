@@ -327,7 +327,18 @@ launch carries the ones the user typed as job context params: `verbose` for
 Inside a workspace, `workspace` changes nothing: the workspace's own pin of the
 extension runs.
 
-The CLI reads `workspace`, `interactive` and `default` on the group and the
+A subcommand that reads no installed workspace state declares
+`workspaceState: "none"`. Before any other extension command, the CLI restores
+the workspace on first use: when the recorded install state is missing or
+stale it runs the implicit install, then restores the generated clients. It
+skips both for a subcommand that declares `none`, such as a command that reads
+one file and calls one endpoint. `none` is the member's one value; the strict
+parser and the schema refuse any other with `invalid-enum`. Absent, the
+subcommand may read any installed state, and the bootstrap runs. The
+declaration is the author's claim: a subcommand that does read installed state
+finds it missing on a fresh checkout.
+
+The CLI reads `workspace`, `workspaceState`, `interactive` and `default` on the group and the
 top-level subcommand it dispatches, and the `positionals` of the subcommand a
 group defaults to. A nested subcommand is validated with the
 same rules and carries no dispatch meaning.
@@ -350,6 +361,9 @@ that predates them ignores both: it prints the group help where a newer CLI
 runs the default, and it never runs a subcommand outside a workspace. Both
 readings fail safe, so no contract increment is needed (see
 [ADR 0008](adr/0008-workspace-requirement-and-group-default-need-no-contract.md)).
+`workspaceState` does not move it either: a CLI that drops the member runs
+the bootstrap, which is the behavior before the member (see
+[ADR 0019](adr/0019-a-subcommand-may-declare-it-reads-no-workspace-state.md)).
 A default that declares positionals is different: an older CLI answers
 "unknown subcommand" for the word the default takes, so that manifest requires
 contract 15 (see

@@ -717,6 +717,11 @@
           "description": "Whether the subcommand needs a workspace. `optional` also runs it outside any workspace, from an extension pinned in the user scope, and requires `interactive: true`. The CLI reads it on the top-level subcommand it dispatches.",
           "default": "required"
         },
+        "workspaceState": {
+          "type": "string",
+          "enum": ["none"],
+          "description": "The installed workspace state the subcommand reads. `none` declares that it reads none, so the CLI runs it without the first-use bootstrap (the implicit install and the generated-client restore). Absent, the subcommand may read any of it. The CLI reads it on the top-level subcommand it dispatches."
+        },
         "flags": {
           "type": "object",
           "description": "Flags accepted by this subcommand in addition to flags declared by the inherited command target.",

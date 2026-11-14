@@ -290,6 +290,14 @@ stream.
   echo, and refuses an unknown mode. Without the echo core materializes in
   `full`. A provider that answers `Ready=false` leaves the run building
   locally with no notice: that is the unconfigured default.
+- **Read-only session.** Core lists `read-only` in the bootstrap
+  `InitializeParams.Capabilities`. A provider whose session cannot write (its
+  credential reads the cache and the server refuses its writes) echoes it,
+  and only when core listed it. After the echo core exports no blob, sends no
+  `upload` and no `marker-write` for the session, and prints one line that the
+  remote cache is read-only for this credential; reads are unchanged. An
+  `upload` answered `accepted: false` with no error, by any provider, is a
+  decline, not an upload error. The capability adds no field (ADR 0003).
 - **Object cache (socket).** `object-get` / `object-put` are a generic,
   language-neutral object cache: small opaque payloads addressed by
   `(namespace, id)`, batched, with bytes travelling through the blob-exchange

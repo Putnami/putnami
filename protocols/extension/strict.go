@@ -871,6 +871,12 @@ func validateSubcommands(m *Manifest, subs map[string]SubcommandDefinition, fiel
 				"subcommand workspace %q is not one of %q, %q",
 				sub.Workspace, SubcommandWorkspaceRequired, SubcommandWorkspaceOptional))
 		}
+		switch sub.WorkspaceState {
+		case "", SubcommandWorkspaceStateNone:
+		default:
+			diags = append(diags, diag.Errorf("invalid-enum", subField+".workspaceState",
+				"subcommand workspaceState %q is not %q", sub.WorkspaceState, SubcommandWorkspaceStateNone))
+		}
 		for i, positional := range sub.Positionals {
 			if positional.Name == "" {
 				diags = append(diags, diag.Errorf("required-field", fmt.Sprintf("%s.positionals[%d].name", subField, i), "positional name is required"))
