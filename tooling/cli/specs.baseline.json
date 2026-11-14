@@ -34,6 +34,7 @@
     "cli/channels#tagged-publish-is-a-cohort",
     "cli/channels#visibility-is-carried-not-computed",
     "cli/ci-document#commands-not-gate",
+    "cli/ci-document#gate-runs-as-written",
     "cli/collaboration-providers#capability-discovery",
     "cli/collaboration-providers#contract-names-never-shadow-commands",
     "cli/collaboration-providers#explicit-binding",
