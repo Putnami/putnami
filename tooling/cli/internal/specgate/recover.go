@@ -292,41 +292,48 @@ func (source *evidenceSource) resolve(projectID string, owned map[string]bool) *
 // is bounded by the declarations, and a declaration naming a feature the owner
 // does not declare admits nothing.
 func (source *evidenceSource) candidates(projectID string, owned map[string]bool) []*workspace.Project {
-	if source.ws.Graph == nil {
-		return nil
-	}
-	seen := make(map[string]bool)
-	candidates := make([]*workspace.Project, 0, 8)
-	add := func(id string) {
-		if seen[id] || source.planned[id] {
-			return
-		}
-		seen[id] = true
-		if project := source.ws.ProjectByID(id); project != nil {
-			candidates = append(candidates, project)
-		}
-	}
-	for _, id := range source.ws.Graph.TransitiveDependenciesOf([]string{projectID}) {
-		add(id)
-	}
-	// DependentsOf is the DIRECT reverse edge and may repeat an id when a
-	// project declares the dependency more than once; add dedupes.
-	for _, id := range source.ws.Graph.DependentsOf(projectID) {
-		add(id)
-	}
-	for _, project := range source.ws.Projects {
-		if project == nil || project.ID == projectID || project.Config == nil ||
-			project.Config.FeatureAuthority == nil {
+	scope := evidenceScope(source.ws, projectID, owned)
+	candidates := make([]*workspace.Project, 0, len(scope))
+	for id := range scope {
+		if source.planned[id] {
 			continue
 		}
-		if owned[project.Config.FeatureAuthority.Owner] {
-			add(project.ID)
+		if project := source.ws.ProjectByID(id); project != nil {
+			candidates = append(candidates, project)
 		}
 	}
 	// The engine's lookup order — and therefore its diagnostics and the report
 	// references it produces — must not depend on graph insertion order.
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].ID < candidates[j].ID })
 	return candidates
+}
+
+// evidenceScope is the set of projects whose observations may attest a feature
+// projectID owns: projectID itself, its transitive dependency closure, its
+// direct dependents, and every project whose featureAuthority.owner names a
+// feature in owned (see candidates for why each belongs). It is nil when the
+// workspace carries no dependency graph, and then no reporter can be judged.
+func evidenceScope(ws *workspace.Workspace, projectID string, owned map[string]bool) map[string]bool {
+	if ws == nil || ws.Graph == nil {
+		return nil
+	}
+	// The closure holds projectID itself.
+	scope := make(map[string]bool)
+	for _, id := range ws.Graph.TransitiveDependenciesOf([]string{projectID}) {
+		scope[id] = true
+	}
+	for _, id := range ws.Graph.DependentsOf(projectID) {
+		scope[id] = true
+	}
+	for _, project := range ws.Projects {
+		if project == nil || project.Config == nil || project.Config.FeatureAuthority == nil {
+			continue
+		}
+		if owned[project.Config.FeatureAuthority.Owner] {
+			scope[project.ID] = true
+		}
+	}
+	return scope
 }
 
 // unresolvedInSession reports whether any verdict still needs evidence. It is

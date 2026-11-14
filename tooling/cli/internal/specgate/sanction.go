@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"go.putnami.dev/cli/model/workspace"
+	diag "go.putnami.dev/protocol/diagnostic"
 	features "go.putnami.dev/protocol/features"
 )
 
@@ -62,13 +63,13 @@ func Sanctions(record *features.SpecVerificationRecord) map[string]Sanction {
 	}
 	totals := make(map[string]features.SpecVerificationCounts)
 	duplicated := make(map[string]int)
-	duplicates := make(map[string][]string)
+	findings := make(map[string][]string)
 	for _, group := range record.Groups {
 		if !group.Blocked {
 			continue
 		}
 		duplicated[group.Project] += duplicatedRequirements(group.Requirements)
-		duplicates[group.Project] = append(duplicates[group.Project], duplicateFindings(group)...)
+		findings[group.Project] = append(findings[group.Project], repeatedFindings(group)...)
 		counts := totals[group.Project]
 		counts.SpecRequirements += group.Counts.SpecRequirements
 		counts.Executable += group.Counts.Executable
@@ -108,7 +109,7 @@ func Sanctions(record *features.SpecVerificationRecord) map[string]Sanction {
 			"spec verification: %d of %d textual requirement(s) unresolved under enforce (unmapped %d, unexecutable %d, missing %d%s, stale %d, contradicted %d)%s%s; run `putnami specs verify` for the audit report (docs: https://putnami.dev/docs/spec-driven-development/validation-jobs)",
 			unresolved, counts.SpecRequirements, counts.Unmapped, counts.Unexecutable,
 			counts.Missing-duplicated[project], duplicatedCount(duplicated[project]), counts.Stale, counts.Contradicted,
-			duplicatesClause(duplicates[project]), unobservedClause(counts.Unobserved))}
+			findingsClause(findings[project]), unobservedClause(counts.Unobserved))}
 	}
 	return sanctions
 }
@@ -145,12 +146,14 @@ func onlyDuplicated(checks []features.SpecCheckVerdict) bool {
 	return duplicate
 }
 
-// duplicateFindings returns the group's duplicated-check findings, which name
-// the requirement, the check and the reporting projects.
-func duplicateFindings(group features.SpecVerificationGroup) []string {
+// repeatedFindings returns the group findings its failure repeats: each
+// duplicated-check finding, which names the requirement, the check and the
+// reporting projects, and each error finding, which blocks the group on its own
+// whatever its requirement counts say.
+func repeatedFindings(group features.SpecVerificationGroup) []string {
 	var messages []string
 	for _, finding := range group.Diagnostics {
-		if finding.Code == features.ErrorCodeDuplicateObservation {
+		if finding.Code == features.ErrorCodeDuplicateObservation || finding.Severity == diag.Error {
 			messages = append(messages, finding.Message)
 		}
 	}
@@ -164,23 +167,23 @@ func duplicatedCount(duplicated int) string {
 	return fmt.Sprintf(", duplicated %d", duplicated)
 }
 
-// duplicateFindingsLimit bounds how many duplicated checks one failure spells
-// out. The record's group diagnostics carry every one, and the JSON audit
-// report prints them; its human rendering does not print group diagnostics.
-const duplicateFindingsLimit = 5
+// repeatedFindingsLimit bounds how many findings one failure spells out. The
+// record's group diagnostics carry every one, and the JSON audit report prints
+// them; its human rendering does not print group diagnostics.
+const repeatedFindingsLimit = 5
 
-// duplicatesClause repeats the duplicated-check findings in the failure, the
-// one message every surface prints, in deterministic order.
-func duplicatesClause(findings []string) string {
+// findingsClause repeats the repeated findings in the failure, the one message
+// every surface prints, in deterministic order.
+func findingsClause(findings []string) string {
 	if len(findings) == 0 {
 		return ""
 	}
 	sort.Strings(findings)
 	more := ""
-	if len(findings) > duplicateFindingsLimit {
-		more = fmt.Sprintf("; and %d more duplicated check(s), in the group diagnostics of `putnami specs verify --output=json`",
-			len(findings)-duplicateFindingsLimit)
-		findings = findings[:duplicateFindingsLimit]
+	if len(findings) > repeatedFindingsLimit {
+		more = fmt.Sprintf("; and %d more finding(s), in the group diagnostics of `putnami specs verify --output=json`",
+			len(findings)-repeatedFindingsLimit)
+		findings = findings[:repeatedFindingsLimit]
 	}
 	return ": " + strings.Join(findings, "; ") + more
 }
@@ -210,9 +213,10 @@ func WarningMessages(record *features.SpecVerificationRecord) map[string][]strin
 	messages := make(map[string][]string)
 	for _, group := range record.Groups {
 		for _, finding := range group.Diagnostics {
-			// A blocked group's duplicated checks are in its sanction already.
-			duplicate := finding.Code == features.ErrorCodeDuplicateObservation && !group.Blocked
-			if finding.Code != features.WarningCodeUnobservedRequirement && !duplicate {
+			// A blocked group's repeated findings are in its sanction already.
+			repeated := (finding.Code == features.ErrorCodeDuplicateObservation || finding.Severity == diag.Error) &&
+				!group.Blocked
+			if finding.Code != features.WarningCodeUnobservedRequirement && !repeated {
 				continue
 			}
 			messages[group.Project] = append(messages[group.Project], finding.Message)

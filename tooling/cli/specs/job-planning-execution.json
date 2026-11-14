@@ -138,6 +138,10 @@
       "text": "A selected project's requirements resolve from observations its transitive dependencies, its DIRECT dependents and the projects whose featureAuthority.owner is one of its features already published: an unplanned attester answers from its report producer's cache entry, provenance contained in the reporting project. Other projects stay out of scope. A consulted source that did not support a check, or an exhausted scope, still blocks under enforce; a check no reachable source could report is warned."
     },
     {
+      "id": "spec-gate-rejects-an-out-of-scope-proof",
+      "text": "A check is observed in-session only from the owning project, its transitive dependencies, its DIRECT dependents or a project whose featureAuthority.owner is one of its features. Another project's observation grants no support: the owner's group carries a features.invalid_observation error naming the check, both projects, the proof file and three fixes (move the spectest.Proves call, add a dependency edge, declare featureAuthority). It blocks under enforce, the failure repeats it, and report prints it."
+    },
+    {
       "id": "spec-gate-names-a-duplicated-proof",
       "text": "When the reports of two tasks carry the same check of a requirement, the group carries a features.duplicate_observation finding that names the feature, the requirement, the check and the reporting projects. The requirement still blocks under enforce; the failure counts it as duplicated, apart from the missing ones, and repeats the finding. Under report the run prints it as a warning."
     },

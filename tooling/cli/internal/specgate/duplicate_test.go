@@ -134,11 +134,11 @@ func TestTheFailureKeepsARequirementWithAnUnprovenCheckMissing(t *testing.T) {
 	}
 }
 
-func TestTheFailureBoundsTheDuplicatesItSpellsOut(t *testing.T) {
+func TestTheFailureBoundsTheFindingsItSpellsOut(t *testing.T) {
 	t.Parallel()
 	findings := []string{"g", "f", "e", "d", "c", "b", "a"}
-	clause := duplicatesClause(findings)
-	if clause != ": a; b; c; d; e; and 2 more duplicated check(s), in the group diagnostics of `putnami specs verify --output=json`" {
+	clause := findingsClause(findings)
+	if clause != ": a; b; c; d; e; and 2 more finding(s), in the group diagnostics of `putnami specs verify --output=json`" {
 		t.Errorf("clause = %q", clause)
 	}
 	if got := reportingProjects([]string{"/b", "/a", "/b"}); got != "/a, /b (2 reports)" {

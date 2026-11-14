@@ -368,8 +368,10 @@ The projection above says what a run is expected to prove. Core's post-session
 gate says what it observed, and it reads from two places.
 
 **The session.** Every `test` job planned in the run contributes the
-`putnami-feature-verification` report it declared. This is the ordinary path and
-it is unchanged.
+`putnami-feature-verification` report it declared. An observation counts for a
+feature only when the project that reported it is in the evidence scope of the
+project that owns the feature: see
+[When a proof is outside the scope](#when-a-proof-is-outside-the-scope).
 
 **An attester's cache entry, only when the session left something unresolved.**
 A `spectest.Proves` call lives where the code it protects lives, which is
@@ -479,6 +481,37 @@ scope was exhausted and that the fix is a `spectest.Proves` call rather than a
 wider selection, so a bare `check-not-observed` never reaches a reader on its
 own.
 
+## When a proof is outside the scope
+
+The evidence scope of a spec-owning project is the project itself plus the
+candidates above: its transitive dependency closure, its direct dependents and
+the projects whose feature authority is one of its features. A
+`spectest.Proves` call in any other project could resolve the requirement only
+on a run that happened to select both projects, so a narrowed run that selected
+only the owner would fail on a change that regressed nothing.
+
+So the gate rejects such a proof whenever it reads it. The observation grants no
+support, and the owner's group carries a `features.invalid_observation` error
+that names the check, the reporting project, the proof file, the owner and the
+three fixes:
+
+```text
+check "issue-check" of requirement "issue" of feature "billing/invoicing" is
+proven by /ledger in ledger/ledger_test.go, which is outside the evidence scope
+of /billing, the project that owns the feature: the spec gate reads that proof
+only on a run that selects both projects, so it grants no support. Move the
+spectest.Proves call into /billing, a project it depends on or a direct
+dependent; add a dependency edge between /billing and /ledger; or declare
+featureAuthority.owner "billing/invoicing" in the putnami.json of /ledger
+```
+
+The error blocks the group under `enforce`, even when an unconsulted candidate
+would turn the missing requirement into `unobserved`, and the project's failure
+repeats it, as it repeats every error finding of a blocked group. Under
+`report` the run prints it as a warning. A run that selects the
+owner alone cannot read the stray proof; its requirement then resolves as any
+other check no candidate reported.
+
 ## When two reports carry the same check
 
 A check has one proof. When the reports of two tasks carry the same check of a
@@ -509,9 +542,9 @@ reported 2 times, by /billing, /ledger: ...
 ```
 
 A requirement with a check that is neither satisfied nor duplicated stays
-counted as missing. The failure spells out five duplicated checks at most;
-`putnami specs verify --output=json` lists every finding in the diagnostics of
-its group. Under `report` the run prints the finding as a warning and
+counted as missing. The failure spells out five findings at most, duplicated
+checks and error findings together; `putnami specs verify --output=json` lists
+every finding in the diagnostics of its group. Under `report` the run prints the finding as a warning and
 does not fail. To fix it, keep the proof in the project that owns the behavior
 and remove the other call, or give each implementation a check of its own.
 

@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -64,7 +65,7 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 	}
 
 	ordered := orderedJobs(planned, results)
-	observations, reportsByFeature, reporters, reportDiagnostics := collectObservations(ws.Root, ordered, results)
+	observations, reportsByFeature, reportDiagnostics := collectObservations(ws.Root, ordered, results)
 	record.Diagnostics = append(record.Diagnostics, reportDiagnostics...)
 	// The candidate set is derived from the FULL plan, not from the jobs that
 	// produced results: a project whose test was planned owns its own silence,
@@ -111,9 +112,10 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 		for _, criteria := range projection.Groups {
 			owned[criteria.Feature] = true
 		}
+		scope := &scopeOf{ws: ws, projectID: projectID, owned: owned}
 		for _, criteria := range projection.Groups {
 			record.Groups = append(record.Groups, evaluateGroup(projectID, criteria, mode, source,
-				observations, reportsByFeature, reporters, at, evidence, owned))
+				observations, reportsByFeature, at, evidence, owned, scope))
 		}
 	}
 	// Nothing was projected and nothing was diagnosed. The record is empty when
@@ -132,11 +134,13 @@ func Collect(ws *workspace.Workspace, planned []*jobs.ScheduledJob, results map[
 // — only when that join leaves something unresolved — with the observations a
 // dependency's cache entry can still supply (recover.go). owned is the set of
 // features the project's projection declares, which decides the projects that
-// name one of them as their feature authority.
+// name one of them as their feature authority. scope admits the session's
+// observations of the group's feature: one a project outside the owner's
+// evidence scope reports grants no support and is an error of the group.
 func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode features.VerificationMode,
-	source features.VerificationModeSource, observations []features.VerificationObservation,
-	reportsByFeature map[string][]features.VerificationReportRef, reporters checkReporters, at time.Time,
-	evidence *evidenceSource, owned map[string]bool) features.SpecVerificationGroup {
+	source features.VerificationModeSource, session []sessionObservation,
+	reportsByFeature map[string][]features.VerificationReportRef, at time.Time,
+	evidence *evidenceSource, owned map[string]bool, scope *scopeOf) features.SpecVerificationGroup {
 	group := features.SpecVerificationGroup{
 		Project:    projectID,
 		Feature:    criteria.Feature,
@@ -153,12 +157,15 @@ func evaluateGroup(projectID string, criteria features.SpecCriteriaGroup, mode f
 	}
 	group.AutomaticEvaluation = true
 
+	observations, reporters, rejected := admitObservations(projectID, criteria, session, scope)
+	group.Diagnostics = append(group.Diagnostics, rejected...)
+
 	specRequirements := make([]features.SpecRequirement, 0, len(criteria.SpecRequirements))
 	for _, id := range criteria.SpecRequirements {
 		specRequirements = append(specRequirements, features.SpecRequirement{ID: id})
 	}
 	verdicts, unexpected := evaluateVerdicts(criteria, specRequirements, observations, at)
-	group.Reports = reportsByFeature[criteria.Feature]
+	group.Reports = admittedReports(reportsByFeature[criteria.Feature], scope)
 
 	// The lazy trigger. Everything below runs only for a group the ordinary
 	// in-session join could not close, which is what keeps a fully green run
@@ -319,6 +326,92 @@ func reportingProjects(projects []string) string {
 	return joinBounded(names)
 }
 
+// sessionObservation is one observation a report of this session carries, with
+// the project whose report task carried it: an observation states no project.
+type sessionObservation struct {
+	observation features.VerificationObservation
+	project     *workspace.Project
+}
+
+// scopeOf is one spec-owning project's evidence scope (evidenceScope), computed
+// on first use: a session whose observations of the owner's features all come
+// from the owner itself never walks the graph.
+type scopeOf struct {
+	ws        *workspace.Workspace
+	projectID string
+	owned     map[string]bool
+	computed  bool
+	projects  map[string]bool
+}
+
+// admits reports whether an observation reported by project may attest a
+// feature the owner declares. A workspace without a dependency graph admits
+// every reporter, because no scope can be derived.
+func (scope *scopeOf) admits(project string) bool {
+	if scope == nil || project == scope.projectID {
+		return true
+	}
+	if !scope.computed {
+		scope.projects = evidenceScope(scope.ws, scope.projectID, scope.owned)
+		scope.computed = true
+	}
+	return scope.projects == nil || scope.projects[project]
+}
+
+// admitObservations returns the session's observations that may join one
+// group's evaluation, the index of the projects that reported each, and an
+// error finding per observation of the group's feature that a project outside
+// the owner's evidence scope reported. Such an observation grants no support.
+func admitObservations(projectID string, criteria features.SpecCriteriaGroup, session []sessionObservation,
+	scope *scopeOf) ([]features.VerificationObservation, checkReporters, []diag.Diagnostic) {
+	observations := make([]features.VerificationObservation, 0, len(session))
+	reporters := make(checkReporters)
+	var rejected []diag.Diagnostic
+	for _, entry := range session {
+		observation := entry.observation
+		if observation.Feature == criteria.Feature && !scope.admits(entry.project.ID) {
+			rejected = append(rejected, outOfScopeDiagnostic(projectID, criteria, entry))
+			continue
+		}
+		observations = append(observations, observation)
+		reporters.add(observation, entry.project.ID)
+	}
+	return observations, reporters, rejected
+}
+
+// admittedReports returns the report references of the projects in the owner's
+// evidence scope: the group references a report whose observations of its
+// feature it may join, and every observation of a rejected project's report is
+// rejected.
+func admittedReports(reports []features.VerificationReportRef, scope *scopeOf) []features.VerificationReportRef {
+	admitted := make([]features.VerificationReportRef, 0, len(reports))
+	for _, report := range reports {
+		if scope.admits(report.Project) {
+			admitted = append(admitted, report)
+		}
+	}
+	if len(admitted) == 0 {
+		return nil
+	}
+	return admitted
+}
+
+// outOfScopeDiagnostic names a proof the owner's evidence scope does not
+// reach: the check, the reporting project and its proof file, the owner, and
+// the three ways to bring the proof into scope.
+func outOfScopeDiagnostic(projectID string, criteria features.SpecCriteriaGroup, entry sessionObservation) diag.Diagnostic {
+	observation := entry.observation
+	proof := path.Join(entry.project.Path, observation.Provenance.Path)
+	return diag.Errorf(features.ErrorCodeInvalidObservation, criteria.Spec,
+		"check %q of requirement %q of feature %q is proven by %s in %s, which is outside the evidence scope "+
+			"of %s, the project that owns the feature: the spec gate reads that proof only on a run that "+
+			"selects both projects, so it grants no support. Move the spectest.Proves call into %s, a project "+
+			"it depends on or a direct dependent; add a dependency edge between %s and %s; or declare "+
+			"featureAuthority.owner %q in the putnami.json of %s",
+		observation.Check, observation.Requirement, observation.Feature, entry.project.ID, proof,
+		projectID, projectID, projectID, entry.project.ID, observation.Feature, entry.project.ID)
+}
+
 // collectObservations reads every observation report the session's report
 // producers emitted (jobs.ProducesVerificationReport): the jobs of its
 // verification commands that can write the report. Observations survive only
@@ -326,11 +419,10 @@ func reportingProjects(projects []string) string {
 // contained file of the REPORTING task's own project, so a report can never
 // claim another project's source as its proof.
 func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results map[string]*jobs.JobResult) (
-	[]features.VerificationObservation, map[string][]features.VerificationReportRef, checkReporters, []diag.Diagnostic) {
-	var observations []features.VerificationObservation
+	[]sessionObservation, map[string][]features.VerificationReportRef, []diag.Diagnostic) {
+	var observations []sessionObservation
 	var diagnostics []diag.Diagnostic
 	reportsByFeature := make(map[string][]features.VerificationReportRef)
-	reporters := make(checkReporters)
 	readPaths := make(map[string]bool)
 
 	for _, job := range ordered {
@@ -374,8 +466,7 @@ func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results ma
 						observation.Provenance.Path, job.Project.ID))
 					continue
 				}
-				observations = append(observations, observation)
-				reporters.add(observation, job.Project.ID)
+				observations = append(observations, sessionObservation{observation: observation, project: job.Project})
 				if !seenFeature[observation.Feature] {
 					seenFeature[observation.Feature] = true
 					reportsByFeature[observation.Feature] = append(reportsByFeature[observation.Feature], reference)
@@ -383,7 +474,7 @@ func collectObservations(wsRoot string, ordered []*jobs.ScheduledJob, results ma
 			}
 		}
 	}
-	return observations, reportsByFeature, reporters, diagnostics
+	return observations, reportsByFeature, diagnostics
 }
 
 // readProjection finds and reads one job's declared criteria projection.

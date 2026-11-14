@@ -14,6 +14,8 @@
   [ADR 0095](0095-a-feature-authority-project-attests-for-the-spec-owner.md): a
   project whose `featureAuthority.owner` names a feature the owner declares is
   also a candidate.
+- **Amended**: 2026-11-14, §8: the scope also bounds the session's own
+  observations, so a proof from outside it is rejected on any selection.
 - **Scope**: `@putnami/cli` spec gate (`internal/specgate`, the observation
   recovery in `internal/engine`) and the verification record of
   `protocols/features`
@@ -147,6 +149,33 @@ asked, what an answer means. The engine owns the cache half behind the
 whole candidate set: a cache key mixes declared inputs and upstream keys, never
 the selection.
 
+### 8. The scope bounds in-session evidence too
+
+The candidate set of §2, plus the owner itself, is the owner's evidence scope.
+An observation the session's own reports carry counts for a feature only when
+the reporting project is in the scope of the project that owns that feature.
+Without this rule, a proof from outside the scope resolves the requirement
+only when the selection happens to plan both projects, and a narrowed run that
+plans only the owner fails on a change that regressed nothing.
+
+An observation from outside the scope grants no support. The owner's group
+carries a `features.invalid_observation` error per rejected observation. It names the
+check, the reporting project, the owner, the proof file and the three fixes:
+move the `spectest.Proves` call into the scope, add a dependency edge between
+the two projects, or declare the reporter's `featureAuthority`. The error, not
+the missing requirement, is what blocks: it blocks under `enforce` even when
+an unconsulted candidate would turn the missing requirement into `unobserved`.
+The project's failure repeats every error finding of its blocked groups, as it
+repeats duplicated checks, so the run says what blocked; under `report` the run
+prints the finding as a warning.
+
+The rejection fires whenever the session carries both the owner's projection
+and the reporter's observation, which every unnarrowed run does. A run that
+plans only the owner cannot see the stray proof, and its exhausted or
+unconsulted scope says so as before. Recovered observations need no check:
+they come from candidates only. The finding reuses an existing code, so the
+record's vocabulary is unchanged.
+
 ## Rejected alternatives
 
 - **Widen the plan by dependency.** A narrowed run would cost a full run.
@@ -154,6 +183,9 @@ the selection.
   `spectest.Proves` call already states; two declarations of one fact rot.
 - **The whole workspace, or all transitive dependents, as candidates.** A cache
   key per project, and no attester the direct set misses.
+- **Reading `spectest.Proves` calls from source at `validate`.** It needs a
+  parser per test language, and states again what the observation already
+  carries: its feature and its reporting project.
 - **Excusing an exhausted scope.** It turns "nobody wrote the test" into a
   warning on the run best placed to prove it.
 
@@ -167,6 +199,9 @@ the selection.
   references.
 - An attester two or more hops above its contract needs a new decision with its
   own bound.
+- A change that adds a proof outside its scope passes a run that selects only
+  the reporting project, and fails the next run that also selects the owner,
+  which every unnarrowed run does.
 
 ## How this is proven
 

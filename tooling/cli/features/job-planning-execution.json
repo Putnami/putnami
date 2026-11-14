@@ -502,6 +502,22 @@
         }
       },
       {
+        "id": "spec-gate-rejects-an-out-of-scope-proof",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-out-of-scope-observation-grants-no-support-and-names-both-projects",
+            "an-out-of-scope-observation-blocks-even-when-a-candidate-is-unconsulted",
+            "every-in-scope-reporter-is-admitted",
+            "the-failure-repeats-the-finding-and-report-prints-it"
+          ]
+        }
+      },
+      {
         "id": "spec-gate-names-a-duplicated-proof",
         "stage": "coded",
         "evidenceKinds": [
