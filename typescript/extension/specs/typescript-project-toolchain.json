@@ -91,7 +91,7 @@
     },
     {
       "id": "workspace-biome-default",
-      "text": "Workspace dependency installation materializes the extension's Biome rules as the workspace-root configuration when the workspace has none, preserves an existing one byte-for-byte, and fails explicitly when the extension default cannot be read or parsed. The Biome devDependency it adds is the exact release those rules' schema names. The rules keep every specs.baseline.json expanded, as `putnami specs baseline --update` writes it."
+      "text": "Workspace dependency installation materializes the extension's Biome rules as the workspace-root configuration when a member lints with Biome and the workspace has none, preserves an existing one byte-for-byte, and fails explicitly when the extension default cannot be read or parsed. The Biome devDependency it adds is the exact release those rules' schema names. The rules keep every specs.baseline.json expanded, as `putnami specs baseline --update` writes it."
     },
     {
       "id": "workspace-bun-pin",
@@ -115,7 +115,11 @@
     },
     {
       "id": "workspace-install-adds-what-a-task-needs",
-      "text": "Workspace install adds a devDependency of the extension to the root package.json only when a member runs a job that needs it: Biome for a lint with Biome, as the member's options choose, the TypeScript compiler and Bun's types for a build, package, validate or test. A member that does not run the extension or disables the job needs none; a context without the membership needs all. Each goes where it sorts, so a workspace whose tasks need no new package keeps its manifest and lockfile byte-identical."
+      "text": "Workspace install adds an extension devDependency to the root package.json only when a member runs a job that needs it: Biome for a lint with Biome, as its options choose; the TypeScript compiler and Bun's types for a build, a package with that build, and a test that type-checks; the compiler alone for validate. A member that does not run the job needs none, a context without the membership needs all. Each goes where it sorts; a workspace whose tasks need no new package keeps its manifest and lockfile."
+    },
+    {
+      "id": "workspace-install-writes-the-tsconfig-a-task-reads",
+      "text": "Workspace install writes a root tsconfig.json that extends the extension's when the root holds none and a member running the extension reads it: it runs a build, a package with that build or a test that type-checks, which resolve the project's tsconfig and fall back to the root's, or it holds a tsconfig.json that extends the root's. A lint or a validate reads none. A context without the membership writes it. An existing file is never touched."
     },
     {
       "id": "workspace-install-keeps-the-package-manager",

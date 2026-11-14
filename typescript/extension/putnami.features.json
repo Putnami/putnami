@@ -314,7 +314,8 @@
               "a-fresh-workspace-install-is-idempotent-and-lint-uses-the-root-config",
               "the-added-biome-is-the-release-the-rules-target",
               "the-installed-biome-is-the-release-the-shipped-rules-name",
-              "the-shipped-rules-keep-a-specs-baseline-expanded"
+              "the-shipped-rules-keep-a-specs-baseline-expanded",
+              "a-workspace-whose-lints-stay-on-the-tool-gets-no-biome-config"
             ]
           }
         },
@@ -439,7 +440,22 @@
             "kind": "acceptance",
             "checks": [
               "a-workspace-whose-tasks-need-no-package-keeps-its-manifest",
-              "a-devdependency-is-added-for-a-moved-task-only"
+              "a-devdependency-is-added-for-a-moved-task-only",
+              "a-member-that-only-lints-needs-no-bun-types"
+            ]
+          }
+        },
+        {
+          "id": "workspace-install-writes-the-tsconfig-a-task-reads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-workspace-whose-jobs-read-no-tsconfig-gets-no-root-tsconfig",
+              "a-job-that-reads-the-tsconfig-gets-the-root-tsconfig"
             ]
           }
         },

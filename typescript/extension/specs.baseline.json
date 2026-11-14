@@ -68,6 +68,7 @@
     "typescript/typescript-project-toolchain#workspace-install-keeps-the-package-manager",
     "typescript/typescript-project-toolchain#workspace-install-lists-the-members",
     "typescript/typescript-project-toolchain#workspace-install-reports-the-managers-error",
-    "typescript/typescript-project-toolchain#workspace-install-runs-rush-install"
+    "typescript/typescript-project-toolchain#workspace-install-runs-rush-install",
+    "typescript/typescript-project-toolchain#workspace-install-writes-the-tsconfig-a-task-reads"
   ]
 }
