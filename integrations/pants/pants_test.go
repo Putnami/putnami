@@ -672,3 +672,67 @@ func TestTheSyncTakesAProjectDirectoryFromTheBuildFileNotATargetName(t *testing.
 		t.Errorf("app dependencies = %v, want the directory of the BUILD file", deps)
 	}
 }
+
+// symlinkedRepository is a repository where st2tests/fixtures/core links to
+// contrib/core, so its export lists the targets of contrib/core under both
+// paths.
+func symlinkedRepository(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	for rel, content := range map[string]string{
+		"pants.toml":                         "[GLOBAL]\npants_version = \"2.25.0\"\n",
+		"BUILD":                              "python_requirements(name=\"reqs\")\n",
+		"requirements.txt":                   "six\n",
+		"contrib/core/BUILD":                 "python_sources()\n",
+		"contrib/core/actions.py":            "import six\n",
+		"contrib/core/tests/BUILD":           "python_tests()\n",
+		"contrib/core/tests/test_actions.py": "",
+		"st2tests/BUILD":                     "python_tests()\n",
+		"st2tests/test_packs.py":             "",
+		"pants-graph.json": `[
+  {"address": "//:reqs#six", "target_type": "python_requirement", "dependencies": ["requirements.txt:reqs"]},
+  {"address": "requirements.txt:reqs", "target_type": "_python_requirements_file", "dependencies": [], "sources": ["requirements.txt"]},
+  {"address": "contrib/core/actions.py", "target_type": "python_source", "dependencies": ["//:reqs#six"], "sources": ["contrib/core/actions.py"]},
+  {"address": "contrib/core/tests/test_actions.py", "target_type": "python_test", "dependencies": ["contrib/core/actions.py"], "sources": ["contrib/core/tests/test_actions.py"]},
+  {"address": "st2tests/fixtures/core/actions.py", "target_type": "python_source", "dependencies": ["//:reqs#six"], "sources": ["st2tests/fixtures/core/actions.py"]},
+  {"address": "st2tests/fixtures/core/tests/test_actions.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/fixtures/core/tests/test_actions.py"]},
+  {"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/test_packs.py"]}
+]`,
+	} {
+		stackstest.WriteFile(t, root, rel, content)
+	}
+	if err := os.MkdirAll(filepath.Join(root, "st2tests/fixtures"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../../contrib/core", filepath.Join(root, "st2tests/fixtures/core")); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+	return root
+}
+
+// A symlinked directory is the directory it resolves to: the sync writes each
+// putnami.json once, under its own path, so the check right after it finds
+// nothing stale.
+func TestTheSyncWritesASymlinkedPackageOnceAndValidatePassesRightAfter(t *testing.T) {
+	spectest.Proves(t, feature, "sync-writes-the-package-graph", "the-sync-writes-each-package-putnami-json-from-the-export")
+	spectest.Proves(t, feature, "validate-fails-on-a-stale-graph", "a-stale-package-graph-fails-validate")
+	t.Setenv("PATH", t.TempDir())
+	root := symlinkedRepository(t)
+	result, err := Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"contrib/core/putnami.json", "contrib/core/tests/putnami.json", "st2tests/putnami.json"}; !reflect.DeepEqual(result.Written, want) {
+		t.Errorf("written = %v, want %v", result.Written, want)
+	}
+	if stale, err := Stale(context.Background(), root, &bytes.Buffer{}); err != nil || len(stale.Written) != 0 || len(stale.Retracted) != 0 {
+		t.Errorf("the graph is stale right after the sync: %+v %v", stale, err)
+	}
+	if deps := readProjectFile(t, root, "st2tests")["dependencies"]; !reflect.DeepEqual(deps, []any{"/contrib/core"}) {
+		t.Errorf("st2tests dependencies = %v, want the directory the link resolves to", deps)
+	}
+	inputs := readProjectFile(t, root, "contrib/core")["options"].(map[string]any)[ExtensionName].(map[string]any)["filePatterns"]
+	if want := []any{"../../BUILD", "../../requirements.txt"}; !reflect.DeepEqual(inputs, want) {
+		t.Errorf("contrib/core filePatterns = %v, want %v, relative to contrib/core", inputs, want)
+	}
+}

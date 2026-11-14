@@ -140,6 +140,71 @@ func TestPeekTargetsAreGroupedByDirectory(t *testing.T) {
 	}
 }
 
+// symlinkExport is the export of a repository where st2tests/fixtures/core
+// links to contrib/core, so Pants lists the targets of contrib/core under
+// both paths, and vendor/ext links outside the repository.
+const symlinkExport = `[
+  {"address": "contrib/core:reqs#six", "target_type": "python_requirement", "dependencies": ["contrib/core/requirements.txt:reqs"]},
+  {"address": "contrib/core/requirements.txt:reqs", "target_type": "_python_requirements_file", "dependencies": [], "sources": ["contrib/core/requirements.txt"]},
+  {"address": "contrib/core/actions.py", "target_type": "python_source", "dependencies": ["contrib/core:reqs#six"], "sources": ["contrib/core/actions.py"]},
+  {"address": "contrib/core/tests/test_actions.py", "target_type": "python_test", "dependencies": ["contrib/core/actions.py"], "sources": ["contrib/core/tests/test_actions.py"]},
+  {"address": "st2tests/fixtures/core:reqs#six", "target_type": "python_requirement", "dependencies": ["st2tests/fixtures/core/requirements.txt:reqs"]},
+  {"address": "st2tests/fixtures/core/requirements.txt:reqs", "target_type": "_python_requirements_file", "dependencies": [], "sources": ["st2tests/fixtures/core/requirements.txt"]},
+  {"address": "st2tests/fixtures/core/actions.py", "target_type": "python_source", "dependencies": ["st2tests/fixtures/core:reqs#six", "st2tests/base.py"], "sources": ["st2tests/fixtures/core/actions.py"]},
+  {"address": "st2tests/fixtures/core/tests/test_actions.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/fixtures/core/tests/test_actions.py"]},
+  {"address": "st2tests/base.py", "target_type": "python_source", "dependencies": [], "sources": ["st2tests/base.py"]},
+  {"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py", "st2tests/fixtures/core:reqs#six", "vendor/ext/lib.py"], "sources": ["st2tests/test_packs.py"]},
+  {"address": "vendor/ext/lib.py", "target_type": "python_source", "dependencies": [], "sources": ["vendor/ext/lib.py"]}
+]`
+
+func TestASymlinkedDirectoryIsItsTargetDirectory(t *testing.T) {
+	spectest.Proves(t, feature, "pants-inferred-edges", "a-symlinked-directory-is-its-target-directory")
+	root := writeTree(t, map[string]string{
+		"pants.toml":                         pantsTOML,
+		DefaultGraphFile:                     symlinkExport,
+		"contrib/core/BUILD":                 "python_requirements(name=\"reqs\")\npython_sources()\n",
+		"contrib/core/requirements.txt":      "six\n",
+		"contrib/core/actions.py":            "",
+		"contrib/core/tests/BUILD":           "python_tests()\n",
+		"contrib/core/tests/test_actions.py": "",
+		"st2tests/BUILD":                     "python_sources()\npython_tests(name=\"tests\")\n",
+		"st2tests/base.py":                   "",
+		"st2tests/test_packs.py":             "",
+	})
+	outside := t.TempDir()
+	if err := os.WriteFile(filepath.Join(outside, "lib.py"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for link, target := range map[string]string{"st2tests/fixtures/core": "../../contrib/core", "vendor/ext": outside} {
+		file := filepath.Join(root, filepath.FromSlash(link))
+		if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Symlink(target, file); err != nil {
+			t.Skipf("symbolic links are unavailable: %v", err)
+		}
+	}
+	got := Detect(root, Options{})
+	want := []Component{
+		{ID: "contrib/core", Source: evidence.SourceOrchestrator},
+		{ID: "contrib/core/tests", Source: evidence.SourceOrchestrator, DependsOn: []string{"contrib/core"}},
+		{ID: "st2tests", Source: evidence.SourceOrchestrator, DependsOn: []string{"contrib/core"}},
+	}
+	if !reflect.DeepEqual(got.Components, want) {
+		t.Errorf("components\n got %+v\nwant %+v", got.Components, want)
+	}
+	if !reflect.DeepEqual(got.Tested, []string{"contrib/core/tests", "st2tests"}) {
+		t.Errorf("tested = %v", got.Tested)
+	}
+	// A requirement reached through the link is declared where it resolves.
+	if files := got.RequiredFiles["st2tests"]; !reflect.DeepEqual(files, []string{"contrib/core/requirements.txt"}) {
+		t.Errorf("st2tests required files = %v", files)
+	}
+	if len(got.Diagnostics) != 0 {
+		t.Errorf("diagnostics %+v", got.Diagnostics)
+	}
+}
+
 func TestAThirdPartyTargetIsNoComponent(t *testing.T) {
 	spectest.Proves(t, feature, "pants-third-party-targets", "a-third-party-target-is-no-component")
 	spectest.Proves(t, feature, "pants-inferred-edges", "a-third-party-dependency-is-no-edge")

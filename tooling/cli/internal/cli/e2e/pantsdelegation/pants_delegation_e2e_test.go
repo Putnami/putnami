@@ -430,3 +430,58 @@ func TestANestedPantsPackageRunsWithItsEdgesAcrossScopes(t *testing.T) {
 		t.Errorf("the run judged a Pants edge for visibility:\n%s", out)
 	}
 }
+
+// symlinkDemo is a repository where st2tests/fixtures/core links to
+// contrib/core, so its export lists the targets of contrib/core under both
+// paths; the test creates the link.
+func symlinkDemo() map[string]map[string]string {
+	return map[string]map[string]string{
+		"base": {
+			"pants.toml":                         "[GLOBAL]\npants_version = \"2.25.0\"\nbackend_packages = [\"pants.backend.python\"]\n",
+			"contrib/core/BUILD":                 "python_sources()\n",
+			"contrib/core/actions.py":            "def run():\n    pass\n",
+			"contrib/core/tests/BUILD":           "python_tests()\n",
+			"contrib/core/tests/test_actions.py": "def test_run():\n    pass\n",
+			"st2tests/BUILD":                     "python_tests()\n",
+			"st2tests/test_packs.py":             "def test_packs():\n    pass\n",
+		},
+		"ci": {
+			"pants-graph.json": `[
+  {"address": "contrib/core/actions.py", "target_type": "python_source", "dependencies": [], "sources": ["contrib/core/actions.py"]},
+  {"address": "contrib/core/tests/test_actions.py", "target_type": "python_test", "dependencies": ["contrib/core/actions.py"], "sources": ["contrib/core/tests/test_actions.py"]},
+  {"address": "st2tests/fixtures/core/actions.py", "target_type": "python_source", "dependencies": [], "sources": ["st2tests/fixtures/core/actions.py"]},
+  {"address": "st2tests/fixtures/core/tests/test_actions.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/fixtures/core/tests/test_actions.py"]},
+  {"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/fixtures/core/actions.py"], "sources": ["st2tests/test_packs.py"]}
+]`,
+		},
+	}
+}
+
+// A symlinked BUILD directory is the directory it resolves to: the sync that
+// init --from pants runs writes each package once, so validate passes right
+// after it.
+func TestASymlinkedPantsDirectoryPassesValidateRightAfterTheSync(t *testing.T) {
+	clitest.RequireShell(t)
+	t.Setenv("PUTNAMI_NO_AUTO_INSTALL", "1")
+	t.Setenv("PUTNAMI_STORE_DIR", filepath.Join(t.TempDir(), "store"))
+	demo := symlinkDemo()
+	root := pantsWorkspace(t, demo, buildRuntime(t))
+	stubPants(t, demo)
+	if err := os.MkdirAll(filepath.Join(root, "st2tests/fixtures"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../../contrib/core", filepath.Join(root, "st2tests/fixtures/core")); err != nil {
+		t.Skipf("symbolic links are unavailable: %v", err)
+	}
+
+	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {
+		t.Fatalf("projects sync exit %d:\n%s", code, out)
+	}
+	if code, out := clitest.RunGateArgs(t, root, "validate", "--all"); code != 0 || strings.Contains(out, "pants.sync_stale") {
+		t.Errorf("validate exit %d right after the sync:\n%s", code, out)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "st2tests/putnami.json"))
+	if err != nil || !strings.Contains(string(data), `"/contrib/core"`) {
+		t.Errorf("st2tests depends on the directory the link resolves to: %v\n%s", err, data)
+	}
+}
