@@ -5,11 +5,10 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
-
-	diag "go.putnami.dev/protocol/diagnostic"
 	"strings"
 	"testing"
 
+	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
