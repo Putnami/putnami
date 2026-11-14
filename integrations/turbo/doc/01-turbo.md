@@ -92,15 +92,21 @@ as `mode` does, so a preview reads the list it would record.
 Once a task moves, the sync declares `@putnami/typescript` in the workspace,
 and its own workspace setup then runs. It adds to the root `package.json`, in sorted
 order, only the devDependencies a moved task needs: `typescript` and
-`@types/bun`, which every type check reads, for a build, package, validate or
-test, and `@biomejs/biome` for a Biome lint. It adds to
+`@types/bun` for a moved build, `typescript` alone for `validate`, which reads
+the API with its parser, and `@biomejs/biome` for a Biome lint. A moved test
+type-checks nothing, so it adds neither, and a package whose build stays on
+Turborepo gets nothing for `putnami package`. It adds to
 the member list where the repository's package manager reads it
 (`pnpm-workspace.yaml` for pnpm, the root `package.json` `workspaces`
 otherwise) only a member no glob covers, and keeps every glob and exclusion.
 A repository that keeps no list, a `pnpm-workspace.yaml` without `packages`,
 no `pnpm-workspace.yaml` or a root `package.json` without `workspaces`, gains
 none. It writes a root
-`tsconfig.json` and `biome.json` when they are missing, and installs with that
+`tsconfig.json` when it is missing and a package reads it: the package's own
+`tsconfig.json`, such as the one the import writes, extends it, or a package
+with no `tsconfig` of its own moves its build. It writes a root `biome.json`
+only when a Biome lint moves, so a repository that lints with ESLint, oxlint
+or `ultracite` keeps its own configuration. It installs with that
 manager, which keeps its lockfile: no `bun.lock` is written, and a repository
 whose tasks need no new package keeps its lockfile unchanged. A failed install
 fails `init` with the manager's output. Delegate mode declares only `@putnami/turbo` and changes
