@@ -7,15 +7,15 @@
   ],
   "nonGoals": [
     "Approving a device code on behalf of a person: the host hands the code to an approver",
-    "Changing what a machine token may read or write on the server"
+    "Changing what a machine token may read or write on the server",
+    "Choosing PUTNAMI_CLOUD_TOKEN over a usable signed-in session"
   ],
   "requirements": [
     {
       "id": "the-signed-in-session-wins",
       "text": [
         "When ~/.putnami/auth.json holds a usable session (a fresh access token, or a refresh token), every workspace command authenticates with it, even when PUTNAMI_CLOUD_TOKEN is set.",
-        "The workspace machine token is used only when no usable session is stored, or when the command passes --credential=machine or the environment sets PUTNAMI_CLOUD_CREDENTIAL=machine.",
-        "--credential=session refuses to fall back to the machine token, and any other value is a usage error.",
+        "The workspace machine token is used only when no usable session is stored; no flag or variable chooses it over a usable session.",
         "A run with no stored session behaves as before."
       ]
     },
@@ -24,7 +24,7 @@
       "text": [
         "whoami and status name the credential the workspace commands use: the signed-in user, or PUTNAMI_CLOUD_TOKEN, and why.",
         "--verbose prints one line naming the credential a workspace command used.",
-        "An authentication error of a workspace command names the credential that was refused."
+        "An authentication error of a workspace command names the credential that was refused, on a machine that holds both."
       ]
     },
     {

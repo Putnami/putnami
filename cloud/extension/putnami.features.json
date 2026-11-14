@@ -520,9 +520,7 @@
             "kind": "acceptance",
             "checks": [
               "a-usable-session-wins-over-the-machine-token",
-              "the-machine-token-serves-without-a-usable-session",
-              "the-machine-credential-is-explicit",
-              "an-unknown-credential-is-a-usage-error"
+              "the-machine-token-serves-without-a-usable-session"
             ]
           }
         },

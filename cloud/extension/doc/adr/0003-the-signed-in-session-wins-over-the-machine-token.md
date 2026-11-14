@@ -25,15 +25,14 @@ session that could answer them was stored.
    one, every workspace command authenticates with it, and
    `PUTNAMI_CLOUD_TOKEN` is ignored.
 2. **The machine token serves the rest.** With no usable session, a command
-   sends the machine token as before. `--credential=machine`, or
-   `PUTNAMI_CLOUD_CREDENTIAL=machine`, chooses it explicitly;
-   `--credential=session` refuses it. Any other value is a usage error.
+   sends the machine token as before. No flag or variable chooses the machine
+   token over a usable session: the machine token is going away from hosted
+   sessions, and an opt-in would keep it there.
 3. **The choice is visible.** `whoami` and `status` name the credential and
    why, `--verbose` prints one line naming it, and an authentication error
    names the credential the server refused.
 4. **The build cache follows the same rule.** The cache provider reads with
-   the machine token only when no usable session is stored, or when the
-   environment chooses the machine credential.
+   the machine token only when no usable session is stored.
 
 ## Rejected alternatives
 
@@ -42,11 +41,12 @@ session that could answer them was stored.
   surprising answer. One rule is easier to state and to check.
 - **Fall back to the machine token when the session is refused.** A command
   would then answer with a different identity than the one the person expects,
-  silently. The error names the credential instead, and `--credential=machine`
-  is one flag away.
+  silently. The error names the credential instead.
+- **A `--credential=machine` opt-in.** It would keep the machine token in use
+  on hosted sessions, from which it is going away. A script that needs the
+  machine identity runs where no session is stored, as CI does.
 
 ## Consequences
 
 - A CI job or a runner with no stored session behaves exactly as before.
-- A machine that holds both credentials uses the person's; a script that needs
-  the machine identity there passes `--credential=machine`.
+- A machine that holds both credentials uses the person's.
