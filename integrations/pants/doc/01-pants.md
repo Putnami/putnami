@@ -57,7 +57,7 @@ A directory reached through a symbolic link is the directory it resolves to:
 Pants lists a linked tree under both paths, and the sync writes its packages
 once, under their own paths, with each edge to the link pointing at the
 resolved directory. A link that leaves the repository gives no package and no
-edge.
+edge, and the sync warns about each target behind it.
 
 It keeps every other member, and rewrites a file only when a member it owns
 changes, with two-space indentation and sorted keys. A package that left the

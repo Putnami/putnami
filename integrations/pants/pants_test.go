@@ -816,6 +816,23 @@ func TestTheSyncWritesASymlinkedPackageOnceAndValidatePassesRightAfter(t *testin
 	if deps := readProjectFile(t, root, "st2tests")["dependencies"]; !reflect.DeepEqual(deps, []any{"/contrib/core"}) {
 		t.Errorf("link-only export: st2tests dependencies = %v", deps)
 	}
+
+	// A tree behind a link that leaves the repository is no package, and the
+	// sync warns about each of its targets.
+	if err := os.Symlink(t.TempDir(), filepath.Join(root, "st2tests/vendor")); err != nil {
+		t.Fatal(err)
+	}
+	stackstest.WriteFile(t, root, "pants-graph.json", `[
+  {"address": "st2tests/vendor/lib.py", "target_type": "python_source", "dependencies": [], "sources": ["st2tests/vendor/lib.py"]},
+  {"address": "st2tests/test_packs.py", "target_type": "python_test", "dependencies": ["st2tests/vendor/lib.py"], "sources": ["st2tests/test_packs.py"]}
+]`)
+	result, err = Sync(context.Background(), root, &bytes.Buffer{})
+	if err != nil || len(result.Warnings) != 1 || !strings.Contains(result.Warnings[0], "st2tests/vendor/lib.py lies outside the repository") {
+		t.Errorf("an outside link: result %+v, err %v", result, err)
+	}
+	if deps := readProjectFile(t, root, "st2tests")["dependencies"]; deps != nil {
+		t.Errorf("an outside link: st2tests dependencies = %v, want none", deps)
+	}
 }
 
 // scriptPants puts first on PATH a pants that runs the shell script body.

@@ -98,6 +98,11 @@ func synchronize(ctx context.Context, root string, stderr io.Writer, dry bool) (
 		return SyncResult{}, err
 	}
 	applied.Export = result.Export
+	for _, d := range detection.Diagnostics {
+		if d.Severity == diag.Warning {
+			applied.Warnings = append(applied.Warnings, d.Message)
+		}
+	}
 	return applied, nil
 }
 
