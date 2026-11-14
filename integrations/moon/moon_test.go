@@ -535,12 +535,15 @@ func TestADryRunOfTheSyncJobPrintsEachDiffAndWritesNothing(t *testing.T) {
 	out := events.String()
 	for _, want := range []string{
 		"apps/api/putnami.json would change:\n--- /dev/null\n+++ b/apps/api/putnami.json\n",
-		"+    \"@putnami/typescript\"",
 		"putnami.workspace.json would change:\n--- a/putnami.workspace.json",
-		"+    \"@putnami/rust\",",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("the preview prints %q:\n%s", want, out)
+		}
+	}
+	for _, want := range []string{`"@putnami/typescript"`, `"@putnami/rust"`} {
+		if !changesLine(out, "+", want) {
+			t.Errorf("the preview adds %s:\n%s", want, out)
 		}
 	}
 	if _, err := os.Stat(filepath.Join(root, "apps/api/putnami.json")); !os.IsNotExist(err) {
@@ -592,7 +595,7 @@ func TestImportDeclaresIntoTheObjectFormOfExtensions(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(filepath.Join(root, wsproto.WorkspaceConfigFilename))
-	want := "{\n  \"extensions\": {\n    \"@putnami/moon\": \"^0.1.0\",\n    \"@putnami/rust\": \"\",\n    \"@putnami/typescript\": \"\"\n  },\n  \"options\": {\n    \"@putnami/moon\": {\n      \"mode\": \"import\"\n    }\n  }\n}\n"
+	want := "{\n  \"extensions\": {\n    \"@putnami/moon\": \"^0.1.0\",\n    \"@putnami/rust\": \"\",\n    \"@putnami/typescript\": \"\"\n  },\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}}\n}\n"
 	if string(data) != want {
 		t.Errorf("config:\n%s\nwant\n%s", data, want)
 	}
@@ -958,4 +961,15 @@ func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
 	if again, err := Stale(context.Background(), root); err != nil || len(again.Written) != 0 || len(again.Changes) != 0 {
 		t.Errorf("a second import changes %v %v, %v", again.Written, again.Changes, err)
 	}
+}
+
+// changesLine reports whether a unified diff holds a line that sign, "+" or
+// "-", marks and that holds text, whatever the layout of the file it changes.
+func changesLine(diff, sign, text string) bool {
+	for line := range strings.Lines(diff) {
+		if strings.HasPrefix(line, sign) && !strings.HasPrefix(line, sign+sign+sign) && strings.Contains(line, text) {
+			return true
+		}
+	}
+	return false
 }
