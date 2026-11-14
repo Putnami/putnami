@@ -31,10 +31,7 @@ func TestEnsureProjectExtensionAddsTheNameAndKeepsMemberOrder(t *testing.T) {
 	// on every patch produces a diff nobody can review.
 	want := `{
   "name": "@acme/api",
-  "extensions": [
-    "@putnami/go",
-    "@putnami/sdd"
-  ],
+  "extensions": ["@putnami/go", "@putnami/sdd"],
   "version": "1.0.0"
 }
 `
@@ -56,9 +53,7 @@ func TestEnsureProjectExtensionCreatesTheArrayWhenTheManifestHasNone(t *testing.
 
 	want := `{
   "name": "@acme/api",
-  "extensions": [
-    "@putnami/go"
-  ]
+  "extensions": ["@putnami/go"]
 }
 `
 	if got := readProjectManifest(t, dir); got != want {
@@ -134,9 +129,7 @@ func TestEnsureProjectExtensionReplacesANonArrayExtensionsMember(t *testing.T) {
 	}
 
 	want := `{
-  "extensions": [
-    "@putnami/sdd"
-  ]
+  "extensions": ["@putnami/sdd"]
 }
 `
 	if got := readProjectManifest(t, dir); got != want {
