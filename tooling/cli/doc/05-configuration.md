@@ -514,6 +514,7 @@ Each project can have its own `putnami.json`:
 | `build` | `BuildConfig` | Build configuration (assets, compile settings) |
 | `options` | `map[string]map[string]any` | Per-command/extension option overrides |
 | `tasks` | `map[string]ProjectTaskTuning` | Per-task execution tuning |
+| `commands` | `map[string]{ "dependsOn": string[] }` | What a command waits for in this project — see [Project command order](#project-command-order) |
 | `jobs` | `object` | Accepted but ignored — see [Project `jobs` is not implemented](#project-jobs-is-not-implemented) |
 | `disable` | `ProjectDisableConfig` | Disable specific jobs for this project |
 | `distribution` | `{ "visibility": "internal" \| "private" \| "public" }` | Who may pull what this project publishes. See [Distribution visibility](#distribution-visibility) |
@@ -664,6 +665,39 @@ process startup and result reporting; otherwise the scheduler can kill the task
 first and hide the tool's useful timeout diagnostic. The Go extension does this
 for golangci-lint when the user has not supplied `--timeout` explicitly.
 
+### Project command order
+
+A project can name, per command, the commands that command waits for, beside
+what the extension manifests declare:
+
+```json
+{
+  "commands": {
+    "build": { "dependsOn": ["^build"] },
+    "test": { "dependsOn": ["build", "^build"] }
+  }
+}
+```
+
+An entry takes one of two forms of a manifest command's `dependsOn`: `build`
+waits for the project's own build, and `^build` for the build of every project
+it depends on, directly or transitively. The planner plans each prerequisite
+and orders the command's first steps after its last ones, for this project's
+jobs alone; a prerequisite the project runs no job of adds no edge. Any other
+form, such as `!build` or `build~tsc`, and any other member are refused when
+the file loads. `putnami test` on such a project plans its build too.
+
+The order is a functional dependency, so it reaches the cache key: a cacheable
+task folds the key of each prerequisite job, and, when a prerequisite job in
+another project has its cache off, as a task delegated to a monorepo tool
+does, the key that job would have. A change to the inputs of such a build
+moves the key of the test that waits for it.
+
+The adoption syncs of `@putnami/rush`, `@putnami/turbo` and `@putnami/moon`
+write these entries for `build`, `test` and `lint` from the order the tool
+declares, and rewrite them on each sync. See
+[ADR 0097](adr/0097-a-project-names-what-a-command-waits-for.md).
+
 ### Project `jobs` is not implemented
 
 A project cannot define or override jobs. The `jobs` key is still accepted by the parser, so older configs keep loading, but it never reaches planning: the CLI prints a warning naming every project that declares one and then ignores it.
@@ -676,6 +710,7 @@ Jobs are provided by extensions. What a project controls is which of them run an
 
 - `disable.jobs` — opt out of an extension-provided job for this project (`"lint"` or `"@putnami/typescript:lint"`).
 - `tasks` — per-project execution tuning for a job that already exists (see [Project Task Tuning](#project-task-tuning)).
+- `commands` — what a command waits for in this project (see [Project command order](#project-command-order)).
 - `options` — per-command and per-extension parameter defaults.
 
 ## Build store settings

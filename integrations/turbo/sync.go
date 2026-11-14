@@ -104,6 +104,9 @@ type member struct {
 	// testMoved reports a test script that moved, which type-checked
 	// nothing; lintChecks a lint script that moved and passes no write flag.
 	testMoved, lintChecks bool
+	// order is what each task that moved waits for, from turbo.json's
+	// dependsOn (movedOrder).
+	order map[string][]string
 }
 
 // Sync writes the package graph of the Turborepo repository at root into each
@@ -141,6 +144,10 @@ func Sync(root string, opts Options) (Result, error) {
 	if err != nil {
 		return Result{}, err
 	}
+	rootOrder, err := readTaskOrder(root)
+	if err != nil {
+		return Result{}, err
+	}
 	unmapped := map[string]string{}
 	noteUnmapped(rootTasks, unmapped)
 
@@ -158,6 +165,10 @@ func Sync(root string, opts Options) (Result, error) {
 			return Result{}, err
 		}
 		noteUnmapped(own, unmapped)
+		ownOrder, err := readTaskOrder(dir)
+		if err != nil {
+			return Result{}, err
+		}
 		run, err := scripts(dir)
 		if err != nil {
 			return Result{}, err
@@ -194,6 +205,7 @@ func Sync(root string, opts Options) (Result, error) {
 				// task already runs what the script runs.
 				m.disabled = append(m.disabled, ExtensionName+":"+task)
 				moved = true
+				m.order = movedOrder(m.order, task, p.SourceName, rootOrder, ownOrder, &result.Notes)
 				bunBuild = bunBuild || (task == stacks.TaskBuild && stacks.TypeScriptBuildsWithBun(script))
 				m.testMoved = m.testMoved || task == stacks.TaskTest
 				if task == stacks.TaskLint {
@@ -327,6 +339,33 @@ func Sync(root string, opts Options) (Result, error) {
 	return result, nil
 }
 
+// movedOrder adds to order what the task of the package named name waits for,
+// once it moved to @putnami/typescript: the dependsOn turbo.json gives it, the
+// package's own turbo.json first, then the root's name#task, then the root's
+// task. ^build, ^test and ^lint keep their form, and build, test or lint of
+// the package itself are its own. Every other entry, a package task, another
+// task or an input, is noted and not written.
+func movedOrder(order map[string][]string, task, name string, rootOrder, ownOrder TaskOrder, notes *[]string) map[string][]string {
+	deps, ok := ownOrder[task]
+	if !ok {
+		if deps, ok = rootOrder[name+"#"+task]; !ok {
+			deps = rootOrder[task]
+		}
+	}
+	for _, dep := range deps {
+		target := strings.TrimPrefix(dep, "^")
+		if !slices.Contains(MappedTasks, target) || (target == task && !strings.HasPrefix(dep, "^")) {
+			*notes = append(*notes, fmt.Sprintf("not written: %s#%s depends on %s in turbo.json, which no Putnami command of the package maps; the task that moved to %s does not wait for it", name, task, dep, TypeScriptExtension))
+			continue
+		}
+		if order == nil {
+			order = map[string][]string{}
+		}
+		stacks.AddCommandOrder(order, task, dep)
+	}
+	return order
+}
+
 // importList is the import list of a delegated workspace: opts.Import when
 // given, else options["@putnami/turbo"].import. Import mode reads none.
 func importList(root, mode string, opts Options) (*stacks.ImportList, error) {
@@ -392,6 +431,7 @@ func applyMember(root string, doc map[string]any, m member, owned map[string]boo
 	}
 	stacks.SetTypeScriptTestTypesOff(doc, m.testMoved)
 	stacks.SetTypeScriptLintFixOff(doc, m.lintChecks)
+	stacks.SetCommandOrder(doc, m.order)
 }
 
 // retract removes from the putnami.json of a former package what the sync
@@ -403,6 +443,7 @@ func retract(root string, doc map[string]any, owned map[string]bool) {
 	setList(doc, "tags", slices.DeleteFunc(stringList(doc["tags"]), func(t string) bool { return t == Tag }))
 	stacks.SetTypeScriptTestTypesOff(doc, false)
 	stacks.SetTypeScriptLintFixOff(doc, false)
+	stacks.SetCommandOrder(doc, nil)
 	if disable, ok := doc["disable"].(map[string]any); ok {
 		setList(disable, "jobs", slices.DeleteFunc(stringList(disable["jobs"]), ownedJob))
 		if len(disable) == 0 {

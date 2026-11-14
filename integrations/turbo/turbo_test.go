@@ -179,6 +179,8 @@ func TestTheSyncWritesEachPackageInTheChosenMode(t *testing.T) {
 		"dependencies": []any{"/packages/pricing"},
 		"tags":         []any{"turbo"},
 		"disable":      map[string]any{"jobs": []any{"lint", "@putnami/turbo:test", "@putnami/turbo:build"}},
+		// Its build and test moved, and wait for the builds turbo.json names.
+		"commands": map[string]any{"build": map[string]any{"dependsOn": []any{"^build"}}, "test": map[string]any{"dependsOn": []any{"^build"}}},
 		// The api starts with node: it declares the node runtime. Its test
 		// script type-checked nothing, so the moved test runs no type check.
 		"options": map[string]any{TypeScriptExtension: map[string]any{"runtime": "node"}, stacks.TypeScriptRunnerLayer: map[string]any{"types": false}},
@@ -1039,5 +1041,54 @@ func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
 	}
 	if lines := strings.Join(Report(result, false), "\n"); !strings.Contains(lines, "biome.json: written with no setting") {
 		t.Errorf("report:\n%s", lines)
+	}
+}
+
+// In import mode a task that moves to @putnami/typescript keeps the dependsOn
+// turbo.json gives it, the package's own turbo.json before the root's
+// package#task and task; an entry no Putnami command maps is noted and not
+// written; a delegated package writes none, and a later sync in delegate mode
+// removes what an import wrote.
+func TestAMovedTestWaitsForTheBuildsTurboJSONNames(t *testing.T) {
+	spectest.Proves(t, feature, "a-moved-task-keeps-its-depends-on", "a-moved-test-waits-for-the-builds-turbo-json-names")
+	d := readDemo(t)
+	root := repository(t, d)
+	writeFile(t, root, "turbo.json", `{
+  "tasks": {
+    "build": {"dependsOn": ["^build"]},
+    "test": {"dependsOn": ["^build", "build", "codegen", "@demo/pricing#build", "$SECRET"]},
+    "@demo/pricing#test": {"dependsOn": ["^lint"]},
+  },
+}`)
+	writeFile(t, root, "apps/api/turbo.json", `{"extends": ["//"], "tasks": {"build": {"dependsOn": []}}}`)
+	result, err := Sync(root, Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := readProjectFile(t, root, "apps/api")["commands"], map[string]any{
+		"test": map[string]any{"dependsOn": []any{"^build", "build"}},
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("api commands = %v, want %v: its own turbo.json gives build no dependsOn", got, want)
+	}
+	if got, want := readProjectFile(t, root, "packages/pricing")["commands"], map[string]any{
+		"build": map[string]any{"dependsOn": []any{"^build"}},
+		"test":  map[string]any{"dependsOn": []any{"^lint"}},
+	}; !reflect.DeepEqual(got, want) {
+		t.Errorf("pricing commands = %v, want %v", got, want)
+	}
+	notes := strings.Join(result.Notes, "\n")
+	for _, entry := range []string{"codegen", "@demo/pricing#build", "$SECRET"} {
+		if !strings.Contains(notes, "@demo/api#test depends on "+entry) {
+			t.Errorf("notes do not list %s:\n%s", entry, notes)
+		}
+	}
+
+	if _, err := Sync(root, Options{Mode: ModeDelegate}); err != nil {
+		t.Fatal(err)
+	}
+	for _, dir := range []string{"apps/api", "packages/pricing"} {
+		if got := readProjectFile(t, root, dir)["commands"]; got != nil {
+			t.Errorf("%s keeps commands %v in delegate mode, where turbo runs dependsOn itself", dir, got)
+		}
 	}
 }

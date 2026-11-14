@@ -148,12 +148,13 @@ package, and writes in each package's `putnami.json`:
 | `dependencies` | The project ID of each workspace package it depends on, such as `/packages/pricing`; a dependency on a project that is no package is kept |
 | `tags` | `turbo`, which marks the packages the sync owns |
 | `disable.jobs` | Each of `build`, `lint` and `test` the package has no task for: no script of that name in its `package.json`, or no task of that name, or `<package>#<task>`, in `turbo.json`. In import mode, or for a TypeScript package on the import list, for each task the job of the extension that does not run it: `@putnami/turbo:<task>` when `@putnami/typescript` runs it, `@putnami/typescript:<task>` otherwise. The sync owns these entries, bare and qualified |
+| `commands.<task>.dependsOn` | For each `build`, `test` or `lint` that moved to `@putnami/typescript`, the `dependsOn` `turbo.json` gives it: the package's own `turbo.json`, else the root's `<package>#<task>`, else the root's `<task>`. `^build`, `^test` and `^lint` stay as they are, and `build`, `test` or `lint` name the package's own task, so a moved test waits for the builds Turborepo would have run first. Any other entry, such as `codegen`, `web#build` or an input, is listed and not written. A delegated task writes none: `turbo run` follows `dependsOn` itself |
 | `options.@putnami/typescript.runtime` | `node` for a TypeScript package in import mode or on the import list whose `package.json` `start` script runs `node`, so `putnami serve`, `run` and `package --docker` run it on Node. The sync writes it when the package declares no runtime and never changes one it declares |
 
 It keeps every other member, and rewrites a file only when a member it owns
 changes, with two-space indentation and sorted keys. A package that left the
-workspace loses the extension, the tag, its edges to packages and the
-disabled tasks.
+workspace loses the extension, the tag, its edges to packages, the
+disabled tasks and the order of its moved tasks.
 
 It then lists, with the reason, each `turbo.json` task other than `build`,
 `lint` and `test`, such as `dev` or `//#format`: no Putnami task maps it, and it

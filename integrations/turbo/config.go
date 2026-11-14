@@ -116,6 +116,40 @@ func readTasks(dir string) (TaskSet, error) {
 	return out, nil
 }
 
+// TaskOrder is what each task of a turbo.json depends on, by task name, such
+// as build, web#build or //#format: the dependsOn of its definition.
+type TaskOrder map[string][]string
+
+// readTaskOrder reads the dependsOn of each task of the turbo.json in dir, or
+// of its pipeline for Turborepo 1. A missing file declares none.
+func readTaskOrder(dir string) (TaskOrder, error) {
+	data, err := os.ReadFile(filepath.Join(dir, Marker)) //nolint:gosec // a file under the workspace root
+	if errors.Is(err, os.ErrNotExist) {
+		return TaskOrder{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	type task struct {
+		DependsOn []string `json:"dependsOn"`
+	}
+	var doc struct {
+		Tasks    map[string]task `json:"tasks"`
+		Pipeline map[string]task `json:"pipeline"`
+	}
+	if err := json.Unmarshal(StripJSONC(data), &doc); err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Join(dir, Marker), err)
+	}
+	out := TaskOrder{}
+	for name, t := range doc.Pipeline {
+		out[name] = t.DependsOn
+	}
+	for name, t := range doc.Tasks {
+		out[name] = t.DependsOn
+	}
+	return out, nil
+}
+
 // StripJSONC removes the comments and the trailing commas Turborepo accepts
 // in turbo.json, so the rest decodes as JSON.
 func StripJSONC(data []byte) []byte {

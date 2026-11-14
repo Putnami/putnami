@@ -811,6 +811,7 @@ func TestAnImportKeepsATargetThatRunsAnotherToolOnRush(t *testing.T) {
 		"$schema":      stacks.ProjectSchema,
 		"extensions":   []any{ExtensionName, TypeScriptExtension},
 		"dependencies": []any{"/libs/pricing"},
+		"commands":     map[string]any{"build": map[string]any{"dependsOn": []any{"^build"}}},
 		"disable":      map[string]any{"jobs": []any{"@putnami/rush:lint", "@putnami/typescript:test", "@putnami/typescript:build"}},
 		"options": map[string]any{
 			ExtensionName:              map[string]any{"tasks": map[string]any{"build": keptSteps("build"), "test": keptSteps("test")}},
@@ -979,5 +980,104 @@ func TestAMovedLintWithNoWriteFlagOnlyChecks(t *testing.T) {
 	}
 	if data, _ := os.ReadFile(filepath.Join(root, "biome.json")); string(data) != own {
 		t.Errorf("the import rewrote the repository's biome.json: %s", data)
+	}
+}
+
+// phasedCommandLine declares test as rushstack does: a phased command whose
+// build phase waits for the build phase upstream, and lint as a bulk command.
+const phasedCommandLine = `{
+  "phases": [
+    { "name": "_phase:build", "dependencies": { "upstream": ["_phase:build"] } },
+    { "name": "_phase:test", "dependencies": { "self": ["_phase:build"] } }
+  ],
+  "commands": [
+    { "commandKind": "phased", "name": "test", "summary": "Test", "phases": ["_phase:test"] },
+    { "commandKind": "bulk", "name": "lint", "summary": "Lint" }
+  ]
+}
+`
+
+// commandsOf answers the commands member of a project's putnami.json.
+func commandsOf(t *testing.T, root, dir string) any {
+	t.Helper()
+	return readProjectFile(t, root, dir)["commands"]
+}
+
+// In import mode, each project that builds waits for the build of each
+// project it depends on, as rush build orders them, whether its build stays
+// on rushx or moved to @putnami/typescript; a project with no build script
+// waits for nothing.
+func TestAnImportedBuildWaitsForTheUpstreamBuilds(t *testing.T) {
+	spectest.Proves(t, feature, "an-import-keeps-rush-build-order", "an-imported-build-waits-for-the-upstream-builds")
+	d := readDemo(t)
+	root := repository(t, d, ModeImport, false)
+	stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "private": true, "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"build": "webpack"}}`)
+	stackstest.WriteFile(t, root, "libs/pricing/package.json", `{"name": "@demo/pricing", "version": "1.2.0", "private": true, "scripts": {"build": "tsc"}}`)
+	stackstest.WriteFile(t, root, "apps/web/package.json", `{"name": "@demo/web", "version": "1.0.0", "private": true, "scripts": {"test": "jest"}}`)
+	if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	waitsUpstream := map[string]any{"build": map[string]any{"dependsOn": []any{"^build"}}}
+	for _, dir := range []string{"apps/api", "libs/pricing"} {
+		if got := commandsOf(t, root, dir); !reflect.DeepEqual(got, waitsUpstream) {
+			t.Errorf("%s commands = %v, want %v", dir, got, waitsUpstream)
+		}
+	}
+	if got := commandsOf(t, root, "apps/web"); got != nil {
+		t.Errorf("apps/web, with no build script, commands = %v, want none", got)
+	}
+	if result, err := Stale(context.Background(), root, &bytes.Buffer{}); err != nil || len(result.Written) != 0 {
+		t.Errorf("a rerun would change %v (%v)", result.Written, err)
+	}
+}
+
+// A test whose phased command reaches an upstream phase waits for the
+// project's build, which rush build --to runs in delegate mode, and for the
+// upstream builds too in import mode. A bulk lint waits for nothing, and the
+// sync removes the entries once test is no longer phased, keeping every other
+// command's.
+func TestAPhasedTestWaitsForTheBuildRushRunsBeforeIt(t *testing.T) {
+	spectest.Proves(t, feature, "a-phased-test-waits-for-its-build", "a-phased-test-waits-for-the-build-rush-runs-before-it")
+	d := readDemo(t)
+	for _, tc := range []struct {
+		mode string
+		want any
+	}{
+		{ModeDelegate, map[string]any{"test": map[string]any{"dependsOn": []any{"build"}}}},
+		{ModeImport, map[string]any{
+			"build": map[string]any{"dependsOn": []any{"^build"}},
+			"test":  map[string]any{"dependsOn": []any{"build", "^build"}},
+		}},
+	} {
+		t.Run(tc.mode, func(t *testing.T) {
+			root := repository(t, d, tc.mode, false)
+			stackstest.WriteFile(t, root, CommandLineFile, phasedCommandLine)
+			stackstest.WriteFile(t, root, "apps/api/package.json", `{"name": "@demo/api", "version": "1.0.0", "private": true, "dependencies": {"@demo/pricing": "workspace:*"}, "scripts": {"build": "heft build", "test": "heft test", "lint": "eslint ."}}`)
+			if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+				t.Fatal(err)
+			}
+			if got := commandsOf(t, root, "apps/api"); !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("apps/api commands = %v, want %v", got, tc.want)
+			}
+
+			doc := readProjectFile(t, root, "apps/api")
+			doc["commands"].(map[string]any)["deploy"] = map[string]any{"dependsOn": []any{"build"}}
+			data, err := json.Marshal(doc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			stackstest.WriteFile(t, root, "apps/api/"+wsproto.ConfigFilename, string(data))
+			stackstest.WriteFile(t, root, CommandLineFile, commandLine)
+			if _, err := Sync(context.Background(), root, &bytes.Buffer{}); err != nil {
+				t.Fatal(err)
+			}
+			want := map[string]any{"deploy": map[string]any{"dependsOn": []any{"build"}}}
+			if tc.mode == ModeImport {
+				want["build"] = map[string]any{"dependsOn": []any{"^build"}}
+			}
+			if got := commandsOf(t, root, "apps/api"); !reflect.DeepEqual(got, want) {
+				t.Errorf("after test became a bulk command, apps/api commands = %v, want %v", got, want)
+			}
+		})
 	}
 }
