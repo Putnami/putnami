@@ -580,8 +580,8 @@ Turborepo adopts in either mode:
   Turborepo: moving it would change the tool that checks the code. Once a task
   moves, the sync also declares `@putnami/typescript`, whose setup adds its devDependencies to the root `package.json`, lists the
   packages where the repository's package manager reads its members, writes a
-  root `tsconfig.json` when a moved task reads it and a root `biome.json` only
-  when a Biome lint moves, and installs
+  root `tsconfig.json` only when a moved task reads it and a root `biome.json`
+  only when a Biome lint moves, and installs
   with that manager, which keeps its lockfile. When a package's `build` moves to
   `@putnami/typescript`, a package that depends on it and still builds through
   Turborepo builds it again through `^build`.

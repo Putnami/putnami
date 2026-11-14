@@ -87,16 +87,16 @@ func TestAMemberThatOnlyLintsNeedsNoBunTypes(t *testing.T) {
 	}
 }
 
-// A member that builds on this extension, type-checks its tests or holds a
-// tsconfig.json that extends the root's, as an import writes it, reads the
-// root tsconfig.json, so the install writes it. A member that lints with
+// A member that holds no tsconfig of its own and builds on this extension or
+// type-checks its tests, or holds one that extends the root's, as an import
+// writes it, reads the root tsconfig.json, so the install writes it. A member that lints with
 // Biome gets the root biome.json.
 func TestAJobThatReadsTheTSConfigGetsTheRootTSConfig(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-writes-the-tsconfig-a-task-reads",
 		"a-job-that-reads-the-tsconfig-gets-the-root-tsconfig")
 	cases := []struct {
-		name, config, tsconfig string
-		biome                  bool
+		name, config, file, tsconfig string
+		biome                        bool
 	}{
 		{name: "build moved", config: `{"extensions":["@putnami/turbo","@putnami/typescript"],"disable":{"jobs":["lint","test","@putnami/turbo:build"]}}`},
 		{name: "test type-checks", config: `{"extensions":["@putnami/turbo","@putnami/typescript"],"disable":{"jobs":["lint","build","@putnami/turbo:test"]}}`},
@@ -111,12 +111,22 @@ func TestAJobThatReadsTheTSConfigGetsTheRootTSConfig(t *testing.T) {
 			config:   `{"extensions":["@putnami/turbo","@putnami/typescript"],"disable":{"jobs":["build","test","lint"]}}`,
 			tsconfig: `{"extends": ["../tsconfig"]}`,
 		},
+		{
+			name:     "a tsconfig.lib.json that extends the root's",
+			config:   `{"extensions":["@putnami/turbo","@putnami/typescript"],"disable":{"jobs":["build","test","lint"]}}`,
+			file:     "tsconfig.lib.json",
+			tsconfig: `{"extends": "../tsconfig.json"}`,
+		},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			root, install := importedConfigsWorkspace(t, c.config)
 			if c.tsconfig != "" {
-				writeProbeFile(t, filepath.Join(root, "web", "tsconfig.json"), c.tsconfig)
+				file := c.file
+				if file == "" {
+					file = "tsconfig.json"
+				}
+				writeProbeFile(t, filepath.Join(root, "web", file), c.tsconfig)
 			}
 			install()
 			if !exists(t, filepath.Join(root, "tsconfig.json")) {
@@ -126,5 +136,42 @@ func TestAJobThatReadsTheTSConfigGetsTheRootTSConfig(t *testing.T) {
 				t.Errorf("root biome.json written = %v, want %v", got, c.biome)
 			}
 		})
+	}
+}
+
+// A member that builds on this extension and type-checks its tests with its
+// own tsconfig.json, which extends no root configuration, reads no root
+// tsconfig.json, so the install writes none.
+func TestAProjectWithItsOwnTSConfigReadsNoRootTSConfig(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-writes-the-tsconfig-a-task-reads",
+		"a-project-with-its-own-tsconfig-reads-no-root-tsconfig")
+	root, install := importedConfigsWorkspace(t, `{"extensions":["@putnami/turbo","@putnami/typescript"],"disable":{"jobs":["lint","@putnami/turbo:build","@putnami/turbo:test"]}}`)
+	writeProbeFile(t, filepath.Join(root, "web", "tsconfig.json"), `{"extends": "@acme/tsconfig/base.json", "compilerOptions": {"strict": true}}`)
+	install()
+	if exists(t, filepath.Join(root, "tsconfig.json")) {
+		t.Error("the install wrote a root tsconfig.json, which the member's own configuration replaces")
+	}
+}
+
+// A workspace whose only TypeScript project is its root, as a single-package
+// repository, has no member to read jobs from: it gets the root tsconfig.json
+// and biome.json an unknown membership gets.
+func TestARootOnlyWorkspaceGetsTheRootConfigs(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-writes-the-tsconfig-a-task-reads",
+		"a-root-only-workspace-gets-the-root-configs")
+	ctx, _ := devDepsWorkspace(t, "")
+	ctx.WorkspaceProjects = ctx.WorkspaceProjects[:1]
+	writeProbeFile(t, filepath.Join(ctx.Extension.Root, "config", "tsconfig.json"), `{"compilerOptions":{"strict":true}}`)
+	writeProbeFile(t, filepath.Join(ctx.Extension.Root, "config", "biome.json"), `{"root":false}`)
+	if err := ensureWorkspaceTsConfig(ctx, jsonl.New()); err != nil {
+		t.Fatal(err)
+	}
+	if err := ensureWorkspaceBiomeConfig(ctx, jsonl.New()); err != nil {
+		t.Fatal(err)
+	}
+	for _, file := range []string{"tsconfig.json", "biome.json"} {
+		if !exists(t, filepath.Join(ctx.WorkspaceRoot, file)) {
+			t.Errorf("the install wrote no root %s", file)
+		}
 	}
 }

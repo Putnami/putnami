@@ -24,11 +24,17 @@ import (
 const typeScriptExtensionName = "@putnami/typescript"
 
 // typeCheckJobs are the jobs that run the TypeScript compiler with Bun's types
-// (--types bun) and resolve the project's tsconfig, else the workspace root's.
-// package counts only for a member whose build the extension runs, since it
-// builds with the build's own steps, and test only for a member whose test
-// type-checks.
+// (--types bun) on the project's tsconfig, which Bun and the compiler look for
+// up from the project when it holds none. test counts only for a member whose
+// test type-checks, and package only for a member whose build the extension
+// runs: the package steps type-check too, but a member whose build stays on
+// the repository's tool, as an import leaves it, packages with that tool, so
+// the install adds nothing for a package it does not build.
 var typeCheckJobs = []string{"build", "package", "test"}
+
+// projectTSConfigs are the configurations the extension reads in a project
+// before it looks up from it (project.ResolveTsConfig).
+var projectTSConfigs = []string{"tsconfig.app.json", "tsconfig.lib.json", "tsconfig.json"}
 
 // workspaceDevDependencyJobs names the jobs that need each workspace
 // devDependency. A devDependency it does not list is needed by every job.
@@ -48,8 +54,9 @@ type devDependencyNeed struct {
 	// that member lints with Biome, package only when it runs the build too,
 	// and test only when its test type-checks.
 	jobs map[string]bool
-	// rootTSConfig reports a member whose own tsconfig.json extends the
-	// workspace root's, as the one an import writes (D-066).
+	// rootTSConfig reports a member that reads the workspace root's
+	// tsconfig.json: one of its own configurations extends it, as the one an
+	// import writes does (D-066), or it holds none and runs a type-check job.
 	rootTSConfig bool
 }
 
@@ -57,13 +64,20 @@ func devDependencyNeeds(ctx *pctx.Context) devDependencyNeed {
 	if len(ctx.WorkspaceProjects) == 0 {
 		return devDependencyNeed{}
 	}
+	members := typeScriptMembers(ctx.WorkspaceRoot, ctx.WorkspaceProjects)
+	if len(members) == 0 {
+		// The root alone, as in a single-package workspace, is no member the
+		// membership describes: it needs what an unknown membership needs.
+		return devDependencyNeed{}
+	}
 	need := devDependencyNeed{known: true, jobs: map[string]bool{}}
-	for _, member := range typeScriptMembers(ctx.WorkspaceRoot, ctx.WorkspaceProjects) {
+	for _, member := range members {
 		dir := filepath.Join(ctx.WorkspaceRoot, filepath.FromSlash(member.Path))
 		config := readMemberConfig(dir)
 		if !config.runsOn(typeScriptExtensionName) {
 			continue
 		}
+		typeChecks := false
 		for _, job := range []string{"build", "lint", "package", "test", "validate"} {
 			if config.disables(typeScriptExtensionName, job) {
 				continue
@@ -83,8 +97,10 @@ func devDependencyNeeds(ctx *pctx.Context) devDependencyNeed {
 				}
 			}
 			need.jobs[job] = true
+			typeChecks = typeChecks || slices.Contains(typeCheckJobs, job)
 		}
-		need.rootTSConfig = need.rootTSConfig || extendsRootTSConfig(ctx.WorkspaceRoot, dir)
+		owns, extendsRoot := projectTSConfig(ctx.WorkspaceRoot, dir)
+		need.rootTSConfig = need.rootTSConfig || extendsRoot || (typeChecks && !owns)
 	}
 	return need
 }
@@ -108,11 +124,10 @@ func (n devDependencyNeed) needsBiomeConfig() bool {
 }
 
 // needsRootTSConfig reports whether the workspace needs a root tsconfig.json:
-// a member runs a job that resolves its tsconfig, which falls back to the
-// root's, or holds a tsconfig.json that extends the root's. A lint and a
-// validate read none.
+// a member reads it (devDependencyNeed.rootTSConfig). A lint and a validate
+// read none.
 func (n devDependencyNeed) needsRootTSConfig() bool {
-	return !n.known || n.rootTSConfig || slices.ContainsFunc(typeCheckJobs, func(job string) bool { return n.jobs[job] })
+	return !n.known || n.rootTSConfig
 }
 
 // memberConfig is what a member's putnami.json says about the extensions and
@@ -164,25 +179,29 @@ func (c memberConfig) testTypeChecks() bool {
 	return true
 }
 
-// extendsRootTSConfig reports whether the tsconfig.json of the member at dir
-// extends the tsconfig.json of the workspace root.
-func extendsRootTSConfig(root, dir string) bool {
-	data, err := os.ReadFile(filepath.Join(dir, "tsconfig.json")) //nolint:gosec // a member config under the workspace root
-	if err != nil {
-		return false
-	}
+// projectTSConfig reports whether the member at dir holds one of the
+// configurations the extension reads in a project (projectTSConfigs), and
+// whether one of them extends the tsconfig.json of the workspace root.
+func projectTSConfig(root, dir string) (owns, extendsRoot bool) {
 	want := filepath.Join(root, "tsconfig.json")
-	for _, specifier := range fileSpecifiers(data, true) {
-		if !strings.HasPrefix(specifier, ".") {
+	for _, name := range projectTSConfigs {
+		data, err := os.ReadFile(filepath.Join(dir, name)) //nolint:gosec // a member config under the workspace root
+		if err != nil {
 			continue
 		}
-		// TypeScript reads a relative specifier without an extension as the
-		// .json file of that name.
-		if resolved := filepath.Join(dir, filepath.FromSlash(specifier)); resolved == want || resolved+".json" == want {
-			return true
+		owns = true
+		for _, specifier := range fileSpecifiers(data, true) {
+			if !strings.HasPrefix(specifier, ".") {
+				continue
+			}
+			// TypeScript reads a relative specifier without an extension as
+			// the .json file of that name.
+			if resolved := filepath.Join(dir, filepath.FromSlash(specifier)); resolved == want || resolved+".json" == want {
+				extendsRoot = true
+			}
 		}
 	}
-	return false
+	return owns, extendsRoot
 }
 
 // linter returns the linter the member at dir lints with: the lint option of
