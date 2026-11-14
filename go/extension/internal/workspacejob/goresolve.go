@@ -21,6 +21,7 @@ import (
 
 	"go.putnami.dev/go/extension/internal/toolchain"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/sdk/extension/envkeys"
 	"go.putnami.dev/sdk/extension/pkgmeta"
 )
 
@@ -51,8 +52,9 @@ const (
 )
 
 // AnswerToolchainResolve answers a toolchain-resolve request for the workspace
-// rooted at root. lookup reads one environment variable: it locates the
-// Putnami home that holds the machine's Go pin records.
+// rooted at root. lookup reads the environment: the variables that locate the
+// Putnami home that holds the machine's Go pin records, and GOROOT and PATH,
+// which locate the machine's go command.
 //
 // The Go pin follows these rules, with the declaration read by
 // GoWorkDeclaration and the committed pin taken from request.Locked:
@@ -63,11 +65,12 @@ const (
 //   - Otherwise the declared release is resolved: from its pin record, else,
 //     unless the request is offline, from the go.dev release index, whose
 //     answer is then written as the record.
-//   - With no declaration and no committed pin, the release of the machine's
-//     go command (machineGoRelease) is resolved as a declared release is,
-//     except that an offline request with no pin record for it omits Go.
-//   - With no declaration, no committed pin and no go command that runs a Go
-//     release, the answer omits Go.
+//   - With no declaration and no committed pin, in a workspace that holds a
+//     go.mod (workspaceHoldsGoModule), the release of the machine's go command
+//     (machineGoRelease) is resolved as a declared release is, except that an
+//     offline request with no pin record for it, or a failed lookup, omits Go.
+//   - Otherwise, with no declaration and no committed pin, the answer omits
+//     Go.
 //   - A pin that has no archive for the request's platform is answered as a
 //     problem.
 //
@@ -119,11 +122,16 @@ func resolveGoPin(root string, request wsproto.ToolchainResolveRequest, lookup f
 // resolveMachineGoPin answers for GoLockIdentity when go.work declares no
 // release and the lock pins none: the release machineGoRelease finds, from its
 // pin record, else, unless the request is offline, from the go.dev release
-// index, whose answer is then written as the record. It reports false when no
-// go command runs a Go release, and when the request is offline and no pin
-// record holds that release.
+// index, whose answer is then written as the record. It reports false when the
+// workspace holds no go.mod, when no go command runs a Go release, when the
+// request is offline and no pin record holds that release, and when the
+// lookup fails: nothing declares that release, so an install that cannot pin
+// it goes on as one with no Go.
 func resolveMachineGoPin(root string, request wsproto.ToolchainResolveRequest, lookup func(string) string) (wsproto.ToolchainResolution, bool, error) {
-	binary, version := machineGoRelease(lookup)
+	if !workspaceHoldsGoModule(root) {
+		return wsproto.ToolchainResolution{}, false, nil
+	}
+	version := machineGoRelease(lookup)
 	if version == "" {
 		return wsproto.ToolchainResolution{}, false, nil
 	}
@@ -136,13 +144,41 @@ func resolveMachineGoPin(root string, request wsproto.ToolchainResolveRequest, l
 	}
 	integrities, err := fetchGoReleaseIntegrities(version)
 	if err != nil {
-		return toolchainProblem(
-			fmt.Sprintf("cannot resolve Go %s, which the go command at %s runs and go.work does not override: %v", version, binary, err),
-			"Declare a published Go release in go.work at the workspace root, and run `putnami install` with network access to go.dev."), true, nil
+		return wsproto.ToolchainResolution{}, false, nil
 	}
 	lock := GoLock{Version: version, Integrities: integrities, Source: goReleaseSource}
 	_ = writeGoPinRecord(toolchainRoot, lock)
 	return releasePin(lock, request.Platform), true, nil
+}
+
+// workspaceHoldsGoModule reports whether a go.mod lies at root or in a
+// directory below it, skipping hidden directories, node_modules, vendor and
+// testdata. A workspace that holds none yet, such as one whose first Go
+// project a template is about to render, takes its Go release from the go.work
+// that project writes.
+func workspaceHoldsGoModule(root string) bool {
+	found := false
+	_ = filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			if entry != nil && entry.IsDir() && path != root {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if entry.IsDir() {
+			name := entry.Name()
+			if path != root && (strings.HasPrefix(name, ".") || name == "node_modules" || name == "vendor" || name == "testdata") {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if entry.Name() == "go.mod" {
+			found = true
+			return fs.SkipAll
+		}
+		return nil
+	})
+	return found
 }
 
 // releasePin is the resolution of lock's Go release for platform: its lock
@@ -159,47 +195,48 @@ func releasePin(lock GoLock, platform string) wsproto.ToolchainResolution {
 	return wsproto.ToolchainResolution{Pin: &pin}
 }
 
-// machineGoRelease returns the go command the extension's runtime compiler
-// candidates find first, GOROOT/bin/go when GOROOT names one, else the first
-// go on PATH, and the Go release it runs, or two empty strings when there is
-// no such go command or it runs no Go release, such as a development build.
-// The command is asked as the manifest's probe asks it: `go env GOVERSION`
-// with GOROOT unset and GOTOOLCHAIN=local, so the release is the one it runs,
-// not one it would switch to. lookup reads GOROOT and PATH.
-func machineGoRelease(lookup func(string) string) (binary, version string) {
-	binary = machineGoBinary(lookup)
+// machineGoRelease returns the Go release of the go command the extension's
+// runtime compiler candidates find first, GOROOT/bin/go when GOROOT names one,
+// else the first go in an absolute PATH directory, or "" when there is no
+// such go command or it runs no Go release, such as a development build. The
+// command is asked as the manifest's probe asks it: `go env GOVERSION` with
+// GOROOT unset and GOTOOLCHAIN=local, so the release is the one it runs, not
+// one it would switch to. lookup reads GOROOT and PATH.
+func machineGoRelease(lookup func(string) string) string {
+	binary := machineGoBinary(lookup)
 	if binary == "" {
-		return "", ""
+		return ""
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), machineGoProbeTimeout)
 	defer cancel()
 	probe := &Job{
 		Ctx:    ctx,
-		Env:    NewEnv(withoutEnv(os.Environ(), "GOROOT", "GOTOOLCHAIN")),
+		Env:    NewEnv(envkeys.Host.Remove(envkeys.Host.Remove(os.Environ(), "GOROOT"), "GOTOOLCHAIN")),
 		Stdout: io.Discard,
 		Stderr: io.Discard,
 	}
 	out, err := probe.Output([]string{"GOTOOLCHAIN=local"}, binary, "env", "GOVERSION")
 	if err != nil {
-		return "", ""
+		return ""
 	}
 	reported := strings.TrimSpace(out)
 	if !strings.HasPrefix(reported, "go") {
-		return "", ""
+		return ""
 	}
-	version = strings.TrimPrefix(reported, "go")
+	version := strings.TrimPrefix(reported, "go")
 	if !isPlainGoRelease(version) {
-		return "", ""
+		return ""
 	}
-	return binary, version
+	return version
 }
 
 // machineGoProbeTimeout bounds the `go env GOVERSION` call of
 // machineGoRelease.
-const machineGoProbeTimeout = 30 * time.Second
+const machineGoProbeTimeout = 5 * time.Second
 
 // machineGoBinary returns GOROOT/bin/go when GOROOT is set and names an
-// executable one, else the first executable go in a PATH directory, or "".
+// executable one, else the first executable go in an absolute PATH
+// directory, or "".
 func machineGoBinary(lookup func(string) string) string {
 	name := pkgmeta.ExecutableName(runtime.GOOS, "go")
 	if goroot := strings.TrimSpace(lookup("GOROOT")); goroot != "" {
@@ -208,7 +245,7 @@ func machineGoBinary(lookup func(string) string) string {
 		}
 	}
 	for _, dir := range filepath.SplitList(lookup("PATH")) {
-		if dir == "" {
+		if !filepath.IsAbs(dir) {
 			continue
 		}
 		if candidate := filepath.Join(dir, name); isExecutable(candidate) {
@@ -216,18 +253,6 @@ func machineGoBinary(lookup func(string) string) string {
 		}
 	}
 	return ""
-}
-
-// withoutEnv returns env without the entries of the named variables.
-func withoutEnv(env []string, names ...string) []string {
-	kept := make([]string, 0, len(env))
-	for _, entry := range env {
-		name, _, _ := strings.Cut(entry, "=")
-		if !slices.Contains(names, name) {
-			kept = append(kept, entry)
-		}
-	}
-	return kept
 }
 
 // committedGoPin keeps the lock's Go pin. A lock version 5 entry, which has
