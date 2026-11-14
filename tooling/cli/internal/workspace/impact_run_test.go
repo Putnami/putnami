@@ -347,6 +347,7 @@ func TestImpactedProjects_ResolvesOriginHeadWithoutLocalMain(t *testing.T) {
 // master. Both the bare auto-selection that validate runs and --impacted
 // measure the branch against origin/master.
 func TestImpactedProjects_SingleBranchCloneOfMasterUsesOriginMaster(t *testing.T) {
+	spectest.Proves(t, "cli/workspace-discovery-selection", "safe-baseline", "a-feature-branch-compares-with-the-trunk")
 	upstream := t.TempDir()
 	gitInitWithBaseline(t, upstream)
 	runGitForImpact(t, upstream, "branch", "-M", "master")

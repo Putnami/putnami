@@ -214,7 +214,7 @@ putnami build --impacted
 putnami build --impacted --plan
 ```
 
-When `--baseline` is omitted, Putnami resolves the baseline from workspace `baseline`, the branch upstream, `origin/HEAD`, then local `main` or `master`. If none resolve, `--impacted` falls back to `--all`; use `--impacted-strict` to fail instead.
+When `--baseline` is omitted, Putnami resolves the baseline from workspace `baseline`, the nearest `epicBranches` branch, the trunk (`origin/HEAD`, `origin/main`, `origin/master`), local `main` or `master`, then the branch upstream unless it is the branch's own counterpart. If none resolve, `--impacted` falls back to `--all`; use `--impacted-strict` to fail instead.
 
 ## Aliases and groups
 
