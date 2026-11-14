@@ -100,13 +100,13 @@ type taskIndex struct {
 	// it reaches every dependent, whatever that dependent plans, and travels on
 	// (TasksReachedIn).
 	travelsOn map[string]bool
-	// projectReachedVia and projectTravelsOn are reachedVia and travelsOn for
-	// the `^command` dependencies a project names under commands.<command>.dependsOn
-	// of its putnami.json (CLI ADR 0097): by upstream task scope, the
-	// dependent task scopes and the projects whose entry links them, read in
-	// those projects alone.
+	// projectReachedVia is reachedVia for the `^command` dependencies a
+	// project names under commands.<command>.dependsOn of its putnami.json
+	// (CLI ADR 0097): by upstream task scope, the dependent task scopes and
+	// the projects whose entry links them, read in those projects alone. The
+	// prerequisite's scopes travel on (travelsOn), as a manifest's do, since
+	// the entry reads the whole dependency closure.
 	projectReachedVia map[string]map[string]map[string]bool
-	projectTravelsOn  map[string]map[string]bool
 	// byCommand maps a command name to its task scopes, sorted.
 	byCommand map[string][]string
 	// byExtension maps an extension's name and its workspace-relative path to
@@ -235,7 +235,6 @@ func NewTaskIndex(ws *Workspace, extensions []*extension.ExtensionDescription, i
 		reachedVia:        make(map[string]map[string][]*extension.JobDefinition),
 		travelsOn:         make(map[string]bool),
 		projectReachedVia: make(map[string]map[string]map[string]bool),
-		projectTravelsOn:  make(map[string]map[string]bool),
 		byCommand:         make(map[string][]string),
 		byExtension:       make(map[string][]string),
 		extensionProjects: make(map[string][]string),
@@ -385,17 +384,15 @@ func addProjectCommandDeps(ws *Workspace, commandDeps map[string]map[string][]*e
 }
 
 // linkProjectCommandDeps links each project's `^command` dependency: the
-// prerequisite's task scopes reach the dependent command's scopes, and travel
-// on, in that project, and in the answer for an unknown project
-// (TasksReachedFrom), which reads every link.
+// prerequisite's task scopes travel on through every dependent, so a project
+// further up the closure still reaches them, and reach the dependent
+// command's scopes in that project alone, and in the answer for an unknown
+// project (TasksReachedFrom), which reads every link.
 func (idx *taskIndex) linkProjectCommandDeps(links []projectCommandLink) {
 	for _, link := range links {
 		for _, before := range idx.byCommand[link.prerequisite] {
 			register(idx.reachedBy, before, before)
-			if idx.projectTravelsOn[before] == nil {
-				idx.projectTravelsOn[before] = make(map[string]bool)
-			}
-			idx.projectTravelsOn[before][link.project] = true
+			idx.travelsOn[before] = true
 			for _, after := range idx.byCommand[link.dependent] {
 				register(idx.reachedBy, before, after)
 				via := idx.projectReachedVia[before]
@@ -1000,11 +997,6 @@ func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string 
 				}
 			}
 		}
-		if idx.projectTravelsOn[upstream][project.ID] {
-			for _, next := range idx.closureOf([]string{upstream}) {
-				reached[next] = true
-			}
-		}
 		for scope, projects := range idx.projectReachedVia[upstream] {
 			if projects[project.ID] {
 				for _, next := range idx.closureOf([]string{scope}) {
@@ -1026,7 +1018,7 @@ func (idx *taskIndex) TasksReachedIn(projectID string, tasks []string) []string 
 		for upstream := range idx.travelsOn {
 			through(upstream)
 		}
-		for upstream := range idx.projectTravelsOn {
+		for upstream := range idx.projectReachedVia {
 			through(upstream)
 		}
 		for scope, task := range idx.tasks {

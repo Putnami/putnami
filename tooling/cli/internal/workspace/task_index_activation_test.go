@@ -359,3 +359,48 @@ func TestTaskIndex_AProjectCommandDependencyReachesTheDependentCommand(t *testin
 		t.Errorf("an unknown project carries %v, want test~test", got)
 	}
 }
+
+// A `^command` entry reads the whole dependency closure: a change to a build
+// the tool runs two edges below reaches the test that waits for it, through a
+// project whose file names no entry.
+func TestTraceChangeImpact_AProjectCommandDependencyReachesTwoEdgesUp(t *testing.T) {
+	toolExt := &extension.ExtensionDescription{
+		Name: "@fixture/tool", RelPath: "tool/extension",
+		Tasks: map[string]extproto.TaskDefinition{"build-exec": {Inputs: map[string]extproto.TaskInputPort{
+			"sources": {From: extproto.TaskInputFromProject, Files: []string{"src/**"}},
+		}}},
+		Jobs: map[string]*extension.JobDefinition{
+			"build": {CommandName: "build", PipelineSteps: []extproto.PipelineStep{{ID: "build", Task: "build-exec"}}},
+		},
+	}
+	tsExt := &extension.ExtensionDescription{
+		Name: "@fixture/ts", RelPath: "ts/extension",
+		Tasks: map[string]extproto.TaskDefinition{"test-exec": {Inputs: map[string]extproto.TaskInputPort{
+			"sources": {From: extproto.TaskInputFromProject, Files: []string{"test/**"}},
+		}}},
+		Jobs: map[string]*extension.JobDefinition{
+			"test": {CommandName: "test", PipelineSteps: []extproto.PipelineStep{{ID: "test", Task: "test-exec"}}},
+		},
+	}
+	waits := &wsproto.ProjectConfig{Commands: map[string]wsproto.ProjectCommand{"test": {DependsOn: []string{"^build"}}}}
+	projects := []*Project{
+		{ID: "/tool/extension", Name: "@fixture/tool", Path: "tool/extension"},
+		{ID: "/ts/extension", Name: "@fixture/ts", Path: "ts/extension"},
+		{ID: "/libs/types", Name: "types", Path: "libs/types", Extensions: []string{"/tool/extension"}},
+		{ID: "/libs/mid", Name: "mid", Path: "libs/mid", Extensions: []string{"/ts/extension"}, Dependencies: []string{"/libs/types"}},
+		{ID: "/apps/top", Name: "top", Path: "apps/top", Extensions: []string{"/ts/extension"}, Dependencies: []string{"/libs/mid"}, Config: waits},
+	}
+	ws := NewWorkspace(t.TempDir(), nil, projects)
+	ws.Graph = BuildGraph(projects)
+	idx := NewTaskIndex(ws, []*extension.ExtensionDescription{toolExt, tsExt}, nil)
+	if idx == nil {
+		t.Fatal("NewTaskIndex returned nil")
+	}
+	got := traceChangeImpact(ws, []string{"libs/types/src/common.ts"}, ChangeImpactOptions{Tasks: idx})
+	if scope := got.Trace.ScopeOf("/apps/top"); !slices.Contains(scope, "test~test") {
+		t.Errorf("the test two edges up runs %v, want test~test", scope)
+	}
+	if scope := got.Trace.ScopeOf("/libs/mid"); slices.Contains(scope, "test~test") {
+		t.Errorf("the project between, whose file names no entry, runs %v, want no test~test", scope)
+	}
+}

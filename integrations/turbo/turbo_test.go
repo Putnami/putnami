@@ -1111,4 +1111,15 @@ func TestAMovedTaskInheritsTheDependsOnItsPackageConfigurationDoesNotState(t *te
 	if got := readProjectFile(t, root, "apps/api")["commands"]; !reflect.DeepEqual(got, want) {
 		t.Errorf("api commands = %v, want %v", got, want)
 	}
+
+	// A root package#task replaces the root task whole: with no dependsOn,
+	// it waits for nothing.
+	writeFile(t, root, "turbo.json", `{"tasks": {"build": {"dependsOn": ["^build"]}, "test": {"dependsOn": ["^build"]}, "@demo/pricing#build": {"outputs": ["dist/**"]}}}`)
+	if _, err := Sync(root, Options{}); err != nil {
+		t.Fatal(err)
+	}
+	pricing, _ := readProjectFile(t, root, "packages/pricing")["commands"].(map[string]any)
+	if _, ok := pricing["build"]; ok {
+		t.Errorf("pricing build waits for %v, want nothing: its root package#task states no dependsOn", pricing["build"])
+	}
 }
