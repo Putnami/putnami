@@ -26,9 +26,6 @@ const SyncJob = "workspace-sync"
 // ProjectSchema is the schema a putnami.json the sync creates names.
 const ProjectSchema = stacks.ProjectSchema
 
-// peekArgs are the arguments of the command that writes the export.
-var peekArgs = []string{"peek", "::"}
-
 // SyncResult is what one sync did.
 type SyncResult = stacks.GraphResult
 
@@ -38,10 +35,10 @@ type SyncResult = stacks.GraphResult
 // targets it depends on, and test in disable.jobs when the component holds no
 // test target, and as its filePatterns the lockfiles and the files that declare
 // the third-party targets it uses, which no edge reaches when they lie outside
-// a member directory. The
-// edges come from the export pants-graph.json at the root, or from pants
-// peek :: when there is none. Without either it writes nothing: the result's
-// Export is empty. A root without pants.toml is no Pants repository and gets
+// a member directory. The edges come from the export pants-graph.json at the
+// root, or, when there is none, from pants peek on the targets pants list ::
+// names, in batches. Without either it writes nothing: the result's Export is
+// empty. A root without pants.toml is no Pants repository and gets
 // an empty result.
 func Sync(ctx context.Context, root string, stderr io.Writer) (SyncResult, error) {
 	return synchronize(ctx, root, stderr, false)
@@ -64,13 +61,13 @@ func synchronize(ctx context.Context, root string, stderr io.Writer, dry bool) (
 		if _, err := exec.LookPath("pants"); err != nil {
 			return SyncResult{}, nil
 		}
-		file, cleanup, err := stacks.ExportGraph(ctx, root, profileID, "pants", peekArgs, detect.DefaultGraphFile, stderr)
+		file, cleanup, err := exportGraph(ctx, root, stderr)
 		if err != nil {
 			return SyncResult{}, err
 		}
 		defer cleanup()
 		opts.GraphFile = file
-		result.Export = "pants " + strings.Join(peekArgs, " ")
+		result.Export = exportName
 	}
 	detection := detect.Detect(root, opts)
 	for _, c := range detection.Components {
@@ -101,6 +98,11 @@ func synchronize(ctx context.Context, root string, stderr io.Writer, dry bool) (
 		return SyncResult{}, err
 	}
 	applied.Export = result.Export
+	for _, d := range detection.Diagnostics {
+		if d.Severity == diag.Warning {
+			applied.Warnings = append(applied.Warnings, d.Message)
+		}
+	}
 	return applied, nil
 }
 

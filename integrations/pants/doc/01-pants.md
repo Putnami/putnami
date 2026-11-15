@@ -39,8 +39,12 @@ only when the repository has none.
 ## What the sync writes
 
 `putnami projects sync` runs the extension's sync task. It reads
-`pants-graph.json` at the root, or runs `pants peek ::` when there is none, and
-writes in each package's `putnami.json`:
+`pants-graph.json` at the root, or, when there is none, runs `pants list ::`
+and then `pants peek` on the listed addresses, 1000 at a time. It keeps of each
+target only its address, type, dependencies and sources, so no Pants call
+renders the whole repository, and `pantsd` can apply its
+`pantsd_max_memory_usage` between calls. It writes in each package's
+`putnami.json`:
 
 | Member | Value |
 |---|---|
@@ -48,6 +52,12 @@ writes in each package's `putnami.json`:
 | `dependencies` | The project ID of each package, and of each third-party directory, the export says it depends on, such as `/src/python/pricing` and `/3rdparty/python`; a dependency on a project with no `BUILD` file is kept |
 | `options.@putnami/pants.filePatterns` | The resolve lockfiles and the files that declare the package's third-party targets, relative to the package, and the root `BUILD` file when it uses a target of the root. A change to one selects the package, wherever the file lies. A package with no third-party target has none |
 | `disable.jobs` | `test` when none of the package's targets is a test target (a type that ends in `_test` or `_tests`, or a `go_package` with a `_test.go` source), so a package without tests runs no test task; the sync owns this entry and removes it from a package that has a test target |
+
+A directory reached through a symbolic link is the directory it resolves to:
+Pants lists a linked tree under both paths, and the sync writes its packages
+once, under their own paths, with each edge to the link pointing at the
+resolved directory. A link that leaves the repository gives no package and no
+edge, and the sync warns about each target behind it.
 
 It keeps every other member, and rewrites a file only when a member it owns
 changes, with two-space indentation and sorted keys. A package that left the
@@ -85,8 +95,12 @@ not those of the packages under it.
 | Task | Command |
 |---|---|
 | `lint` | `pants lint <dir>:` |
-| `test` | `pants --test-report --test-use-coverage --coverage-py-report=xml test <dir>:` |
+| `test` | `pants --test-report --test-use-coverage --coverage-py-report=["xml"] test <dir>:` |
 | `build` | `pants package <dir>:` |
+
+The list form `["xml"]` replaces the `[coverage-py] report` list of
+`pants.toml` rather than appending to it, so a repository that already lists
+`xml` there still gets its one Cobertura report.
 
 The test task then reads the JUnit reports under `dist/test/reports/` and the
 Cobertura report `dist/coverage/python/coverage.xml` into the test and

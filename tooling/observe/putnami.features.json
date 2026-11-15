@@ -803,6 +803,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-symlinked-directory-is-its-target-directory",
               "a-dependency-across-directories-is-an-edge",
               "a-third-party-dependency-is-no-edge"
             ]

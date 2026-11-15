@@ -432,7 +432,7 @@ putnami init --extension typescript,rust --project web  # A TypeScript web start
 
 | Tool | Marker | Extension | What the sync writes |
 |---|---|---|---|
-| `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from the `pants peek ::` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../../integrations/pants/doc/01-pants.md) |
+| `pants` | `pants.toml` | `@putnami/pants` | Each package's edges from `pants peek` on the targets `pants list ::` names, read in batches, or from a `pants-graph.json` export; Pants keeps its own cache. See [Run a Pants repository with Putnami](../../../integrations/pants/doc/01-pants.md) |
 | `bazel` | `MODULE.bazel`, `WORKSPACE` or `WORKSPACE.bazel` | `@putnami/bazel` | Each package's edges from `bazel query //...`, or from a `bazel-graph.json` export; Bazel keeps its own cache. See [Run a Bazel workspace with Putnami](../../../integrations/bazel/doc/01-bazel.md) |
 | `nx` | `nx.json` | `@putnami/nx`, and in import mode `@putnami/typescript` when the sync declares it | Each project's edges, and which extension runs its build, test and lint, from the graph Nx resolves: its export, else `nx graph` run with the repository's Nx, else its configuration. See [Run a Nx repository with Putnami](../../../integrations/nx/doc/01-nx.md) |
 | `moon` | `.moon/workspace.yml` | `@putnami/moon`, and in import mode the language extensions the sync declares | Each project's edges and the extension that runs it, from the moon project graph export, else from `moon project-graph --json` when the workspace infers tasks from scripts, else from its configuration. See [Run a moon workspace with Putnami](../../../integrations/moon/doc/01-moon.md) |

@@ -241,7 +241,7 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 		}
 		byAddress[t.Address] = t
 	}
-	g := graph{root: root, targets: byAddress}
+	g := newGraph(root, byAddress)
 	edges := map[string]map[string]bool{}
 	tested := map[string]bool{}
 	requires := map[string]map[string]bool{}
@@ -256,6 +256,18 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 			diags = append(diags, diag.Warningf(CodeGraphUnreadable, graphFile, "target %s lies outside the repository and is skipped", t.Address))
 			continue
 		}
+		// A symlinked directory is the one it resolves to. Pants lists its
+		// targets under both paths when it lists that directory too: the
+		// resolved path carries them once.
+		resolved, inside := g.resolve(dir)
+		if !inside {
+			diags = append(diags, diag.Warningf(CodeGraphUnreadable, graphFile, "target %s lies outside the repository through a symbolic link and is skipped", t.Address))
+			continue
+		}
+		if resolved != dir && g.listed[resolved] {
+			continue
+		}
+		dir = resolved
 		if edges[dir] == nil {
 			edges[dir] = map[string]bool{}
 		}
@@ -268,7 +280,7 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 					requiredFiles[dir] = map[string]bool{}
 				}
 				g.thirdPartyFiles(dep, requiredFiles[dir], map[string]bool{})
-				if target, ok := g.dir(dep); ok && target != dir {
+				if target, ok := g.component(dep); ok && target != dir {
 					if requires[dir] == nil {
 						requires[dir] = map[string]bool{}
 					}
@@ -276,7 +288,7 @@ func fromGraph(root, file, graphFile string, named bool) ([]Component, []string,
 				}
 				continue
 			}
-			if target, ok := g.dir(dep); ok && target != dir {
+			if target, ok := g.component(dep); ok && target != dir {
 				edges[dir][target] = true
 			}
 		}
@@ -313,8 +325,70 @@ func sortedKeys(set map[string]bool) []string {
 
 // graph resolves the addresses of one export.
 type graph struct {
-	root    string
-	targets map[string]target
+	root string
+	// realRoot is root with its symbolic links resolved.
+	realRoot string
+	targets  map[string]target
+	// listed holds the directory of each first-party target the export
+	// lists.
+	listed map[string]bool
+	// resolved caches resolve by directory.
+	resolved map[string]resolution
+}
+
+// resolution is a directory resolved through its symbolic links.
+type resolution struct {
+	dir    string
+	inside bool
+}
+
+func newGraph(root string, targets map[string]target) graph {
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		realRoot = root
+	}
+	g := graph{root: root, realRoot: realRoot, targets: targets, listed: map[string]bool{}, resolved: map[string]resolution{}}
+	for address, t := range targets {
+		if !firstParty(t.TargetType) {
+			continue
+		}
+		if dir, ok := g.dir(address); ok {
+			g.listed[dir] = true
+		}
+	}
+	return g
+}
+
+// component returns the directory of the component an address belongs to:
+// the directory its BUILD file directory resolves to through its symbolic
+// links, and false when that lies outside the repository.
+func (g graph) component(address string) (string, bool) {
+	dir, ok := g.dir(address)
+	if !ok {
+		return "", false
+	}
+	return g.resolve(dir)
+}
+
+// resolve returns the repository-relative directory dir resolves to through
+// its symbolic links, and whether it lies inside the repository. A directory
+// that cannot be resolved, such as one missing from the checkout, is itself.
+func (g graph) resolve(dir string) (string, bool) {
+	if dir == wsproto.ProbeRootPath {
+		return dir, true
+	}
+	if r, seen := g.resolved[dir]; seen {
+		return r.dir, r.inside
+	}
+	r := resolution{dir: dir, inside: true}
+	if real, err := filepath.EvalSymlinks(filepath.Join(g.root, filepath.FromSlash(dir))); err == nil {
+		r.dir, r.inside = "", false
+		if rel, err := filepath.Rel(g.realRoot, real); err == nil {
+			r.dir, r.inside = wsproto.NormalizeProbePath(filepath.ToSlash(rel))
+		}
+	}
+	g.resolved[dir] = r
+	return r.dir, r.inside
 }
 
 // dir returns the repository-relative directory an address belongs to: the
@@ -390,8 +464,9 @@ func (g graph) isFile(address, p, name string) bool {
 }
 
 // thirdPartyFiles adds to files the sources of a third-party target and of the
-// third-party targets it depends on: a generated requirement's source is the
-// requirements file target it depends on.
+// third-party targets it depends on, each in the directory it resolves to: a
+// generated requirement's source is the requirements file target it depends
+// on.
 func (g graph) thirdPartyFiles(address string, files, seen map[string]bool) {
 	t, listed := g.targets[address]
 	if !listed || seen[address] || firstParty(t.TargetType) {
@@ -399,8 +474,12 @@ func (g graph) thirdPartyFiles(address string, files, seen map[string]bool) {
 	}
 	seen[address] = true
 	for _, source := range t.Sources {
-		if clean, ok := wsproto.NormalizeProbePath(source); ok {
-			files[clean] = true
+		clean, ok := wsproto.NormalizeProbePath(source)
+		if !ok {
+			continue
+		}
+		if dir, inside := g.resolve(path.Dir(clean)); inside {
+			files[path.Join(dir, path.Base(clean))] = true
 		}
 	}
 	for _, dep := range t.Dependencies {

@@ -22,7 +22,7 @@
     },
     "test": {
       "steps": [
-        ["pants", "--test-report", "--test-use-coverage", "--coverage-py-report=xml", "test", "{component}:"]
+        ["pants", "--test-report", "--test-use-coverage", "--coverage-py-report=[\"xml\"]", "test", "{component}:"]
       ],
       "inputs": ["sources"],
       "dir": "root",
