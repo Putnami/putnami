@@ -1,5 +1,6 @@
 import {
   type AsyncSessionStore,
+  type Plugin,
   registerSessionStore,
   removeRequestSession,
   requestSessionData,
@@ -8,6 +9,41 @@ import {
 } from '@putnami/application';
 import { useConfig } from '@putnami/runtime';
 import { database } from '../factory';
+import { type Datasource, type SQLDefinition, type SQLSource, sqlSourceInline } from '../migrations/sql-source';
+
+/** The DDL of the `sessions` table, shared by {@link DatabaseSessionStore} and {@link sessionTableMigrations}. */
+export const SESSION_TABLE_SQL = `CREATE TABLE IF NOT EXISTS sessions (
+  session_id VARCHAR(255) PRIMARY KEY,
+  data JSONB NOT NULL DEFAULT '{}',
+  expires_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions (expires_at);`;
+
+/** The migration that creates the `sessions` table. */
+export const sessionTableMigrations: readonly SQLDefinition[] = [
+  {
+    name: '20261115000000_create_sessions',
+    sql: SESSION_TABLE_SQL,
+    down: 'DROP TABLE IF EXISTS sessions;',
+  },
+];
+
+/**
+ * A plugin that ships the `sessions` table as a migration of `datasource`.
+ *
+ * Mount it next to `sql({ datasource })` in a workload whose runtime role
+ * cannot create tables: the migration creates the table at deploy, and
+ * {@link DatabaseSessionStore} then runs no DDL.
+ */
+export function sessionMigrations(datasource: Datasource): Plugin & { migrationSources(): SQLSource[] } {
+  return {
+    migrationSources() {
+      return [sqlSourceInline({ namespace: 'sessions', datasource, definitions: sessionTableMigrations })];
+    },
+  };
+}
 
 interface SessionRow {
   session_id: string;
@@ -21,7 +57,8 @@ interface SessionRow {
  * Database-backed session store using PostgreSQL.
  *
  * Stores session data in a `sessions` table with JSONB data column.
- * Table is auto-created on first use.
+ * The table is created on first use when it does not exist. A workload whose
+ * runtime role cannot create tables ships it with {@link sessionMigrations}.
  *
  * **Characteristics:**
  * - Persistent - survives server restarts
@@ -77,20 +114,12 @@ export class DatabaseSessionStore implements AsyncSessionStore {
 
   private async initTable(): Promise<void> {
     const sql = await database(this.dbName);
-    await sql`
-      CREATE TABLE IF NOT EXISTS sessions (
-        session_id VARCHAR(255) PRIMARY KEY,
-        data JSONB NOT NULL DEFAULT '{}',
-        expires_at TIMESTAMPTZ NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      )
-    `;
-
-    // Create index for expired sessions cleanup
-    await sql`
-      CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions (expires_at)
-    `;
+    // A deployed workload's runtime role may read and write rows but not
+    // create tables, and PostgreSQL checks that right before it checks
+    // IF NOT EXISTS. When a migration already created the table, run no DDL.
+    const [{ present }] = await sql<{ present: boolean }[]>`SELECT to_regclass('sessions') IS NOT NULL AS present`;
+    if (present) return;
+    await sql.unsafe(SESSION_TABLE_SQL);
   }
 
   get<T>(sessionId: string, key: string): T | undefined {

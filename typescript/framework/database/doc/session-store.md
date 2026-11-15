@@ -137,6 +137,24 @@ const store = new DatabaseSessionStore();
 const store = new DatabaseSessionStore("sessions");
 ```
 
+### Deployed Workloads: Create the Table with a Migration
+
+A deployed workload often connects as a runtime role that may read and write rows but not create tables. Ship the `sessions` table as a migration of the workload's datasource, next to `sql()`:
+
+```typescript
+import { sessionMigrations, sql } from "@putnami/database";
+
+const datasource = { name: "app_sessions", schema: "app_sessions" };
+
+application()
+  .use(sql({ datasource }))
+  .use(sessionMigrations(datasource));
+```
+
+The migration creates the table at deploy. When the table exists, the store runs no DDL, so the runtime role needs only `SELECT`, `INSERT`, `UPDATE` and `DELETE` on it. Without the migration, the store creates the table on first use, which needs `CREATE` on the schema.
+
+`SESSION_TABLE_SQL` and `sessionTableMigrations` hold the same DDL for a workload that assembles its own migration source.
+
 ### TTL Configuration
 
 Configure session time-to-live:
@@ -261,7 +279,7 @@ new DatabaseSessionStore(dbName?: string)
 
 ##### `ensureTable(): Promise<void>`
 
-Ensures the `sessions` table exists. Called automatically on first use.
+Ensures the `sessions` table exists. Called automatically on first use. When the table exists, it runs no DDL.
 
 ##### `get`, `set`, `delete`, `getAll`, `setAll`, `deleteAll`, `exists`
 

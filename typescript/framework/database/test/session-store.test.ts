@@ -11,7 +11,9 @@ import {
 import { useConfig } from '@putnami/runtime';
 import { database } from '../src/factory';
 import { ensurePostgresContainer, isDockerAvailable, POSTGRES_SETUP_TIMEOUT_MS } from './utils/postgres-helper';
-import { DatabaseSessionStore } from '../src/session/database.store';
+import { PostgresConfig } from '../src/postgres/config';
+import { DATABASE_PROTOCOL_VERSION, resolveDatabaseBinding, setDatabaseBindingOverride } from '../src/postgres/binding';
+import { DatabaseSessionStore, SESSION_TABLE_SQL, sessionMigrations } from '../src/session/database.store';
 
 const DB_NAME = 'session-test';
 const dockerAvailable = await isDockerAvailable();
@@ -347,6 +349,67 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
         const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM sessions`;
         expect(count).toBe(0);
       });
+    });
+  });
+
+  describe('under a runtime role that may not create tables', () => {
+    const RUNTIME = 'session-runtime';
+
+    it('serves sessions from the table a migration created, without running DDL', async () => {
+      await sql.unsafe(SESSION_TABLE_SQL);
+      const [{ db, schema }] = await sql<{ db: string; schema: string }[]>`
+        SELECT current_database() AS db, current_schema() AS schema
+      `;
+      await sql.unsafe(`DO $$ BEGIN
+        IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'session_runtime') THEN
+          CREATE ROLE session_runtime LOGIN PASSWORD 'runtime';
+        END IF;
+      END $$`);
+      await sql.unsafe(`GRANT CONNECT ON DATABASE "${db}" TO session_runtime`);
+      await sql.unsafe(`GRANT USAGE ON SCHEMA "${schema}" TO session_runtime`);
+      await sql.unsafe(`REVOKE CREATE ON SCHEMA "${schema}" FROM session_runtime`);
+      await sql.unsafe('GRANT SELECT, INSERT, UPDATE, DELETE ON sessions TO session_runtime');
+      const [{ canCreate }] = await sql<{ canCreate: boolean }[]>`
+        SELECT has_schema_privilege('session_runtime', ${schema}, 'CREATE') AS "canCreate"
+      `;
+      expect(canCreate).toBe(false);
+
+      const admin =
+        resolveDatabaseBinding(DB_NAME)?.config ?? useConfig(PostgresConfig, { path: `database.${DB_NAME}` });
+      const previous = setDatabaseBindingOverride(
+        JSON.stringify({
+          protocolVersion: DATABASE_PROTOCOL_VERSION,
+          databases: {
+            [RUNTIME]: {
+              engine: 'postgres',
+              schema,
+              connection: {
+                host: admin.host,
+                port: admin.port,
+                database: db,
+                user: 'session_runtime',
+                password: 'runtime',
+                ssl: false,
+              },
+            },
+          },
+        }),
+      );
+      try {
+        const runtime = new DatabaseSessionStore(RUNTIME);
+        await runtime.ensureTable();
+        await runtime.setAllAsync('runtime-session', { userId: 'user-9' });
+        expect(await runtime.getAllAsync<Record<string, unknown>>('runtime-session')).toEqual({ userId: 'user-9' });
+        await runtime.deleteAllAsync('runtime-session');
+      } finally {
+        setDatabaseBindingOverride(previous);
+      }
+    });
+
+    it('ships the same table as a migration of the datasource it is given', () => {
+      const [source] = sessionMigrations({ name: 'app_sessions', schema: 'app_sessions' }).migrationSources();
+      expect([source.datasource, source.schema]).toEqual(['app_sessions', 'app_sessions']);
+      expect(source.definitions.map((definition) => definition.sql)).toEqual([SESSION_TABLE_SQL]);
     });
   });
 });
