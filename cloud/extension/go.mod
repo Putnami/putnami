@@ -59,6 +59,7 @@ require (
 	go.putnami.dev/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/codehost v0.0.0 // indirect
+	go.putnami.dev/protocol/collaboration v0.0.0
 	go.putnami.dev/protocol/database v0.0.0 // indirect
 	go.putnami.dev/protocol/events v0.0.0 // indirect
 	go.putnami.dev/protocol/gomod v0.0.0 // indirect
@@ -182,3 +183,5 @@ replace go.putnami.dev/schema => ../../go/framework/schema
 replace go.putnami.dev/sdk/extension => ../../tooling/extension-sdk
 
 replace go.putnami.dev/protocol/evidence => ../../protocols/evidence
+
+replace go.putnami.dev/protocol/collaboration => ../../protocols/collaboration
