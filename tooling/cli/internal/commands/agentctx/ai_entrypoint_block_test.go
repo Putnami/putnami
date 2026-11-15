@@ -43,7 +43,7 @@ func withoutBlock(t *testing.T, content string) string {
 }
 
 func TestGuidanceBlockRoundTrips(t *testing.T) {
-	block := guidanceBlock("lint,test", "")
+	block := guidanceBlock("lint,test --impacted --enforce-coverage", "")
 	start, end, intact, found := findGuidanceBlock(block)
 	if !found || !intact || start != 0 || end != len(block) {
 		t.Fatalf("find(block) = %d, %d, %v, %v", start, end, intact, found)
@@ -173,7 +173,7 @@ func TestWriteAgentEntrypointsClaudeEntrypointForms(t *testing.T) {
 	if got := readGuidance(t, dir, ClaudeEntrypointPath); got != "# CLAUDE.md\n\n@AGENTS.md\n" {
 		t.Fatalf("absent CLAUDE.md became %q", got)
 	}
-	if got := readGuidance(t, dir, agentEntrypointPath); got != generateAgentEntrypoint(gateTasksForWorkspace(dir), decisionsGuidanceForWorkspace(dir)) {
+	if got := readGuidance(t, dir, agentEntrypointPath); got != generateAgentEntrypoint(gateCommandForWorkspace(dir), decisionsGuidanceForWorkspace(dir)) {
 		t.Fatalf("absent AGENTS.md became %q", got)
 	}
 

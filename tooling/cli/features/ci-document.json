@@ -25,6 +25,20 @@
             "cache-verify-runs-the-gate"
           ]
         }
+      },
+      {
+        "id": "gate-runs-as-written",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-gate-names-only-declared-flags",
+            "the-init-hint-names-the-gate"
+          ]
+        }
       }
     ]
   }

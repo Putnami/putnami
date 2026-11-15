@@ -241,6 +241,12 @@ var verticalCrossImportExceptions = []verticalCrossImportException{
 			"install stages, which only a _test.go file inside lifecycle can do, so it " +
 			"lives in lifecycle and reaches agentctx through its exported seams",
 	},
+	{
+		file:    "internal/commands/lifecycle/gate_runs_as_written_test.go",
+		imports: "agentctx",
+		why: whyLifecycleAgentctx + ". workspace-init's Next: hint names the gate agentctx derives, " +
+			"and this file runs that hint and the AGENTS.md agentctx writes through the CLI on one workspace",
+	},
 	{file: "internal/commands/lifecycle/install.go", imports: "extensions", why: whyLifecycleExtensions},
 	{
 		file:    "internal/commands/lifecycle/extensions_install.go",
