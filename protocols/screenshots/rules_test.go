@@ -66,7 +66,11 @@ func TestAnUnknownDuplicateOrMissingMemberIsRefused(t *testing.T) {
 	spectest.Proves(t, feature, "a-manifest-parses-strictly", "an-unknown-duplicate-or-missing-member-is-refused")
 	cases := []struct{ fixture, code, field string }{
 		{"unknown-member.json", ErrorCodeUnknownField, "generatedAt"},
-		{"unknown-capture-member.json", ErrorCodeUnknownField, "width"},
+		{"unknown-capture-member.json", ErrorCodeUnknownField, "captures[0].width"},
+		{"unknown-page-member.json", ErrorCodeUnknownField, "pages[0].title"},
+		{"member-in-another-case.json", ErrorCodeUnknownField, "Project"},
+		{"member-twice-in-two-cases.json", ErrorCodeUnknownField, "PROJECT"},
+		{"nested-deeper.json", ErrorCodeParseError, "captures[0].url"},
 		{"duplicate-member.json", ErrorCodeDuplicateField, "project"},
 		{"missing-head-sha.json", ErrorCodeMissingField, "headSHA"},
 		{"missing-page-after.json", ErrorCodeMissingField, "pages[0].after"},
@@ -86,10 +90,15 @@ func TestAnUnknownDuplicateOrMissingMemberIsRefused(t *testing.T) {
 	if _, diags := Parse(nested); len(diags) != 1 || diags[0].Field != "pages[0].file" {
 		t.Errorf("a member listed twice in a page: %v", diags)
 	}
-	for _, text := range []string{`{"pages": [`, `{"pages"`, `{"pages": {"a": 1,`, ``} {
+	for _, text := range []string{`{"pages": [`, `{"pages"`, `{"pages": [{"file": 1,`, ``} {
 		if _, diags := Parse([]byte(text)); !hasCode(diags, ErrorCodeParseError) {
 			t.Errorf("%q: %v, want a parse error", text, diags)
 		}
+	}
+	// A file of brackets within the byte bound is refused at the fourth level.
+	deep := bytes.Repeat([]byte("["), MaxManifestBytes)
+	if _, diags := Parse(deep); len(diags) != 1 || diags[0].Code != ErrorCodeParseError || !strings.Contains(diags[0].Message, "nests deeper") {
+		t.Errorf("a file of brackets: %v", diags)
 	}
 	if diags := Validate(nil); !hasCode(diags, ErrorCodeParseError) {
 		t.Errorf("a nil manifest: %v", diags)
@@ -184,6 +193,7 @@ func TestEachCaptureRuleHasAStableCode(t *testing.T) {
 		"a url without host":         ErrorCodeInvalidURL,
 		"a url that does not parse":  ErrorCodeInvalidURL,
 		"a file url":                 ErrorCodeInvalidURL,
+		"an uppercase scheme":        ErrorCodeInvalidURL,
 		"a long url":                 ErrorCodeTextTooLong,
 	}
 	assertRules(t, map[string]func(*Manifest){
@@ -210,6 +220,7 @@ func TestEachCaptureRuleHasAStableCode(t *testing.T) {
 		"a url without host":        func(m *Manifest) { m.Captures[0].URL = "http:///p0" },
 		"a url that does not parse": func(m *Manifest) { m.Captures[0].URL = "http://127.0.0.1:port/" },
 		"a file url":                func(m *Manifest) { m.Captures[0].URL = "file:///srv/index.html" },
+		"an uppercase scheme":       func(m *Manifest) { m.Captures[0].URL = "HTTP://127.0.0.1/p0" },
 		"a long url":                func(m *Manifest) { m.Captures[0].URL = "http://127.0.0.1/" + strings.Repeat("a", MaxTextBytes) },
 	}, want)
 	for status := range map[int]bool{100: true, 200: true, 304: true, 404: true, 599: true} {

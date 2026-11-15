@@ -357,14 +357,28 @@ func captureFile(name string) bool {
 // absoluteURL reports whether text is an http or https URL with a host.
 func absoluteURL(text string) bool {
 	parsed, err := url.Parse(text)
-	return err == nil && (parsed.Scheme == "http" || parsed.Scheme == "https") && parsed.Host != ""
+	// The scheme is lowercase as written: net/url would fold HTTP to http.
+	return err == nil && (strings.HasPrefix(text, "http://") || strings.HasPrefix(text, "https://")) && parsed.Host != ""
 }
 
-// scan walks the token stream: encoding/json keeps the last occurrence of a
-// member listed twice, and reads one value where a file holds two.
+// The members of each object of a manifest, by their exact names.
+var (
+	manifestMembers = map[string]bool{"protocolVersion": true, "project": true, "baseSHA": true, "headSHA": true, "pages": true, "captures": true}
+	pageMembers     = map[string]bool{"file": true, "route": true, "path": true, "before": true, "after": true}
+	captureMembers  = map[string]bool{"file": true, "route": true, "side": true, "viewport": true, "scheme": true, "sha256": true, "status": true, "url": true}
+)
+
+// maxDepth is the nesting of a manifest: an object, a list, an object.
+const maxDepth = 3
+
+// scan walks the token stream before the typed decode, for what
+// encoding/json lets through: it keeps the last occurrence of a member
+// listed twice, matches a member name whatever its case, and reads one value
+// where a file holds two. It also bounds the nesting, so a file of brackets
+// costs nothing.
 func scan(data []byte) *diag.Diagnostic {
 	decoder := json.NewDecoder(bytes.NewReader(data))
-	if finding := scanValue(decoder, ""); finding != nil {
+	if finding := scanValue(decoder, "", 1, manifestMembers); finding != nil {
 		return finding
 	}
 	if _, err := decoder.Token(); err != io.EOF {
@@ -374,56 +388,66 @@ func scan(data []byte) *diag.Diagnostic {
 	return nil
 }
 
-func scanValue(decoder *json.Decoder, field string) *diag.Diagnostic {
-	syntax := func(err error) *diag.Diagnostic {
-		finding := diag.Errorf(ErrorCodeParseError, "", "the manifest is not JSON: %v", err)
+// scanValue reads one value at field. members are the names an object there
+// may hold; nil where the contract holds no object.
+func scanValue(decoder *json.Decoder, field string, depth int, members map[string]bool) *diag.Diagnostic {
+	refuse := func(code, at, format string, args ...any) *diag.Diagnostic {
+		finding := diag.Errorf(code, at, format, args...)
 		return &finding
 	}
 	token, err := decoder.Token()
 	if err != nil {
-		return syntax(err)
+		return refuse(ErrorCodeParseError, "", "the manifest is not JSON: %v", err)
 	}
-	switch token {
-	case json.Delim('{'):
+	delim, nested := token.(json.Delim)
+	if !nested {
+		return nil
+	}
+	if depth > maxDepth {
+		return refuse(ErrorCodeParseError, field, "%s nests deeper than a manifest does", field)
+	}
+	if delim == '[' {
+		for index := 0; decoder.More(); index++ {
+			if finding := scanValue(decoder, fmt.Sprintf("%s[%d]", field, index), depth+1, members); finding != nil {
+				return finding
+			}
+		}
+	} else {
 		seen := map[string]bool{}
 		for decoder.More() {
 			keyToken, err := decoder.Token()
 			if err != nil {
-				return syntax(err)
+				return refuse(ErrorCodeParseError, "", "the manifest is not JSON: %v", err)
 			}
 			key, _ := keyToken.(string)
 			member := key
 			if field != "" {
 				member = field + "." + key
 			}
+			if !members[key] {
+				return refuse(ErrorCodeUnknownField, member, "the member %s is unknown", member)
+			}
 			if seen[key] {
-				finding := diag.Errorf(ErrorCodeDuplicateField, member, "the member %s is listed twice", member)
-				return &finding
+				return refuse(ErrorCodeDuplicateField, member, "the member %s is listed twice", member)
 			}
 			seen[key] = true
-			if finding := scanValue(decoder, member); finding != nil {
+			var inner map[string]bool
+			if depth == 1 && key == "pages" {
+				inner = pageMembers
+			} else if depth == 1 && key == "captures" {
+				inner = captureMembers
+			}
+			if finding := scanValue(decoder, member, depth+1, inner); finding != nil {
 				return finding
 			}
 		}
-	case json.Delim('['):
-		for index := 0; decoder.More(); index++ {
-			if finding := scanValue(decoder, fmt.Sprintf("%s[%d]", field, index)); finding != nil {
-				return finding
-			}
-		}
-	default:
-		return nil
 	}
 	if _, err := decoder.Token(); err != nil {
-		return syntax(err)
+		return refuse(ErrorCodeParseError, "", "the manifest is not JSON: %v", err)
 	}
 	return nil
 }
 
 func decodeDiagnostic(err error) diag.Diagnostic {
-	message := err.Error()
-	if name, ok := strings.CutPrefix(message, "json: unknown field "); ok {
-		return diag.Errorf(ErrorCodeUnknownField, strings.Trim(name, `"`), "%s", message)
-	}
-	return diag.Errorf(ErrorCodeParseError, "", "not a screenshots manifest: %s", message)
+	return diag.Errorf(ErrorCodeParseError, "", "not a screenshots manifest: %s", err.Error())
 }

@@ -56,10 +56,13 @@ const (
 // Viewport is one of the sizes a page is captured at: a name of the closed
 // set, a size in CSS pixels and a device scale factor.
 type Viewport struct {
-	Name   string
+	// Name is the value a capture carries as viewport.
+	Name string
+	// Width and Height are the size of the viewport, in CSS pixels.
 	Width  int
 	Height int
-	Scale  int
+	// Scale is the device scale factor.
+	Scale int
 }
 
 // Sides returns the closed set of sides, before first.
@@ -80,14 +83,17 @@ func Schemes() []string { return []string{SchemeLight, SchemeDark} }
 // project, the two commits it compares, the pages the change touches and one
 // capture per page, side, viewport and scheme.
 type Manifest struct {
+	// ProtocolVersion is 1.
 	ProtocolVersion int `json:"protocolVersion"`
 	// Project is the project directory, relative to the workspace root.
 	Project string `json:"project"`
-	// BaseSHA and HeadSHA are the full lowercase shas of the merge base and
-	// of the head the captures were taken at.
-	BaseSHA  string    `json:"baseSHA"`
-	HeadSHA  string    `json:"headSHA"`
-	Pages    []Page    `json:"pages"`
+	// BaseSHA is the full lowercase sha of the merge base of the change.
+	BaseSHA string `json:"baseSHA"`
+	// HeadSHA is the full lowercase sha of the head the captures were taken at.
+	HeadSHA string `json:"headSHA"`
+	// Pages are the pages the change touches, no route twice.
+	Pages []Page `json:"pages"`
+	// Captures holds one capture per page, side, viewport and scheme.
 	Captures []Capture `json:"captures"`
 }
 
@@ -95,11 +101,17 @@ type Manifest struct {
 // route it is captured at, the path visited for that route, and the sides
 // that hold the page.
 type Page struct {
-	File   string `json:"file"`
-	Route  string `json:"route"`
-	Path   string `json:"path"`
-	Before bool   `json:"before"`
-	After  bool   `json:"after"`
+	// File is the page file, a normalized path relative to the project.
+	File string `json:"file"`
+	// Route is the route the page is captured at. It starts with a slash.
+	Route string `json:"route"`
+	// Path is the path visited for the route: the route, or a template with
+	// its parameters filled.
+	Path string `json:"path"`
+	// Before tells whether the base holds the page.
+	Before bool `json:"before"`
+	// After tells whether the head holds the page.
+	After bool `json:"after"`
 }
 
 // Capture is one PNG file in the manifest's directory.
@@ -107,10 +119,13 @@ type Capture struct {
 	// File is a .png file name, with no directory.
 	File string `json:"file"`
 	// Route is the route of one of the manifest's pages.
-	Route    string `json:"route"`
-	Side     string `json:"side"`
+	Route string `json:"route"`
+	// Side is before or after, a side that holds the page.
+	Side string `json:"side"`
+	// Viewport is desktop or mobile.
 	Viewport string `json:"viewport"`
-	Scheme   string `json:"scheme"`
+	// Scheme is light or dark, the preferred color scheme.
+	Scheme string `json:"scheme"`
 	// SHA256 is the lowercase hexadecimal sha256 of the file.
 	SHA256 string `json:"sha256"`
 	// Status is the HTTP status of the captured document.

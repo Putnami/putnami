@@ -69,7 +69,7 @@ required, and no other member is allowed.
 | `captures[].scheme` | `light` or `dark`, the preferred color scheme. |
 | `captures[].sha256` | The sha256 of the file, 64 lowercase hexadecimal characters. |
 | `captures[].status` | The HTTP status of the captured document, from 100 to 599. |
-| `captures[].url` | Where the page ended, after any redirect: an absolute `http` or `https` URL. |
+| `captures[].url` | Where the page ended, after any redirect: an absolute `http` or `https` URL, its scheme in lowercase. |
 
 A manifest holds exactly one capture per route, side, viewport and scheme,
 for each side that holds the page: four captures for a page one side holds,
@@ -106,7 +106,9 @@ if manifest == nil {
 `Decode` parses strictly, then validates. It returns the manifest only when no
 rule refuses it; otherwise each finding carries a stable code and the path of
 its member. `Parse` alone applies the shape: one JSON object, every member
-present, no unknown member, no member twice. `Marshal` validates before it
+present, no unknown member, no member twice. Member names match by their
+exact case, and a value that nests deeper than a manifest does is refused
+before it is read. `Marshal` validates before it
 serializes, so a writer that goes through the protocol cannot write a manifest
 the decoder refuses.
 

@@ -108,7 +108,7 @@ func TestAManifestTheProtocolRefusesIsNotWrittenOrRead(t *testing.T) {
 
 	// The reader refuses what the decoder refuses, and names the rule.
 	for name, c := range map[string]struct{ old, new, want string }{
-		"an unknown member":  {`"project":`, `"tool": "x", "project":`, `unknown field "tool" (screenshots.unknown_field)`},
+		"an unknown member":  {`"project":`, `"tool": "x", "project":`, "the member tool is unknown (screenshots.unknown_field)"},
 		"a missing capture":  {`"scheme": "dark"`, `"scheme": "light"`, "(screenshots.missing_capture)"},
 		"an abbreviated sha": {`"headSHA": "`, `"headSHA": "abc`, "(screenshots.invalid_sha)"},
 		"another version":    {`"protocolVersion": 1`, `"protocolVersion": 2`, "protocolVersion 2 is not supported (want 1) (screenshots.invalid_protocol_version)"},
