@@ -19,7 +19,7 @@ func TestDeclareExtensionsKeepsTheWorkspaceConfigOrder(t *testing.T) {
 		t.Fatalf("declare: %v %+v %v", changed, change, err)
 	}
 	data, _ := os.ReadFile(file)
-	want := "{\n  \"name\": \"demo\",\n  \"options\": {\n    \"@putnami/moon\": {\n      \"mode\": \"import\"\n    }\n  },\n  \"extensions\": [\n    \"@putnami/moon\",\n    \"@putnami/go\"\n  ]\n}\n"
+	want := "{\n  \"name\": \"demo\",\n  \"options\": {\"@putnami/moon\": {\"mode\": \"import\"}},\n  \"extensions\": [\"@putnami/moon\", \"@putnami/go\"]\n}\n"
 	if string(data) != want {
 		t.Errorf("config:\n%s\nwant\n%s", data, want)
 	}

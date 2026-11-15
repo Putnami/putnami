@@ -11,6 +11,7 @@
     "workspace/workspace-contract#a-project-names-what-a-command-waits-for",
     "workspace/workspace-contract#a-reserved-call-exchanges-one-bounded-document",
     "workspace/workspace-contract#a-toolchain-answer-pins-only-what-was-asked",
+    "workspace/workspace-contract#a-written-file-keeps-the-repository-layout",
     "workspace/workspace-contract#an-authored-form-survives-a-rewrite",
     "workspace/workspace-contract#an-input-answer-lists-files-and-their-basis",
     "workspace/workspace-contract#configuration-loads-in-a-fixed-precedence",

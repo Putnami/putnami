@@ -290,7 +290,7 @@ func TestAChangeToOneNxProjectRunsItAndItsDependentsThroughNx(t *testing.T) {
 	drifted := strings.Replace(synced, `"/packages/pricing"`, `"/elsewhere"`, 1)
 	clitest.WriteFile(t, filepath.Join(root, "apps/api/putnami.json"), drifted)
 	code, out = clitest.RunGateArgs(t, root, "init", "--from", "nx")
-	if code != 0 || !strings.Contains(out, "+++ b/apps/api/putnami.json") || !strings.Contains(out, `+    "/packages/pricing"`) || strings.Contains(out, "1) import") {
+	if code != 0 || !strings.Contains(out, "+++ b/apps/api/putnami.json") || !strings.Contains(out, `+  "dependencies": ["/packages/pricing"]`) || strings.Contains(out, "1) import") {
 		t.Errorf("init preview of a drifted file exit %d:\n%s", code, out)
 	}
 	if data, _ := os.ReadFile(filepath.Join(root, "apps/api/putnami.json")); string(data) != drifted {

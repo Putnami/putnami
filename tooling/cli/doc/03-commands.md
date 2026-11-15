@@ -260,6 +260,17 @@ under the same rules; `scopes list` and `workspace describe` also put it in
 their envelope. `projects sync` reports the state itself and writes no separate
 warning.
 
+A `putnami.json` or `putnami.workspace.json` that `projects sync`, `init` or
+an extension's sync task rewrites keeps the layout of the file it replaces: an
+unchanged value keeps its bytes, members keep their order, and the file keeps
+its indentation and line endings, so a formatted file that gains one
+dependency changes on that line. A file whose content does not change is not
+written. A new file is indented as the `package.json` beside it, or with two
+spaces, writes one member per line in each object, and writes an array of
+scalars that fits in 80 columns on one line, as Biome and Prettier do by
+default. A changed array stays one item per line in a file that writes its
+short arrays that way.
+
 A command that runs jobs (`build`, `test`, `lint`, `validate`, `run`, …) puts
 the load warnings in `workspaceWarnings` of its `--output=json` envelope too,
 under `--quiet` as well: the run's envelope and the plan-only envelope of

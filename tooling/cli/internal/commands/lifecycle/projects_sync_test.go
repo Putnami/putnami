@@ -515,3 +515,33 @@ func TestProjectsSync_RewritesAConfigWithoutEscapingHTML(t *testing.T) {
 		}
 	}
 }
+
+// A formatted putnami.workspace.json whose content the sync leaves equal
+// keeps its bytes, and a new member changes its includes line alone.
+func TestProjectsSync_KeepsTheLayoutOfAFormattedWorkspaceConfig(t *testing.T) {
+	ws := t.TempDir()
+	wsCfg := filepath.Join(ws, "putnami.workspace.json")
+	writeProjectFile(t, filepath.Join(ws, "svc-a", "putnami.json"), `{"name":"svc-a"}`)
+	formatted := "{\n" +
+		"\t\"name\": \"demo\",\n" +
+		"\t\"extensions\": [\"@putnami/go\"],\n" +
+		"\t\"includes\": [\"svc-a\"]\n" +
+		"}\n"
+	writeProjectFile(t, wsCfg, formatted)
+
+	if err := ProjectsSync(context.Background(), ws, wsproto.Load(ws), []string{"--skip-install"}, false, LifecycleEnv{}); err != nil {
+		t.Fatalf("ProjectsSync: %v", err)
+	}
+	if got := readText(t, wsCfg); got != formatted {
+		t.Fatalf("an unchanged sync rewrote putnami.workspace.json:\n%s\nwant it kept as formatted:\n%s", got, formatted)
+	}
+
+	writeProjectFile(t, filepath.Join(ws, "svc-b", "putnami.json"), `{"name":"svc-b"}`)
+	if err := ProjectsSync(context.Background(), ws, wsproto.Load(ws), []string{"--skip-install"}, false, LifecycleEnv{}); err != nil {
+		t.Fatalf("ProjectsSync: %v", err)
+	}
+	want := strings.Replace(formatted, `["svc-a"]`, `["svc-a", "svc-b"]`, 1)
+	if got := readText(t, wsCfg); got != want {
+		t.Errorf("putnami.workspace.json =\n%s\nwant only its includes line changed:\n%s", got, want)
+	}
+}

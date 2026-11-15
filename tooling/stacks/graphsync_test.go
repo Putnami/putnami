@@ -295,7 +295,7 @@ func TestADryGraphSyncAnswersEachChangeWithItsContent(t *testing.T) {
 	emit := jsonl.New()
 	emit.Observe(func(message string) { events.WriteString(message + "\n") })
 	EmitPreview(emit, "tool", result)
-	if !strings.Contains(events.String(), "--- /dev/null") || !strings.Contains(events.String(), "+    \"/pricing\"") {
+	if !strings.Contains(events.String(), "--- /dev/null") || !strings.Contains(events.String(), "+  \"dependencies\": [\"/pricing\"],") {
 		t.Errorf("preview:\n%s", events.String())
 	}
 }
