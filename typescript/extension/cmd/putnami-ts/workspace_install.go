@@ -109,7 +109,9 @@ func workspaceInstallArgs(force, hosted bool) []string {
 // reads to the state an install uses: the extension's devDependencies, the
 // member list, the catalog entries, the packageManager declaration of a Bun
 // workspace, tsconfig.json, biome.json and the .npmrc scope lines. Each step
-// writes only what is missing or stale, so a second call rewrites nothing. A
+// writes only what is missing or stale, and a configuration file or
+// devDependency only when a member runs a job that reads it, so a second call
+// rewrites nothing. A
 // Rush repository gets no root package.json, and only the files the tasks
 // read. A
 // failure to create the root package.json, to list the members or to
@@ -491,10 +493,14 @@ func managedScopePrefix(line string, wanted map[string]string) string {
 }
 
 // ensureWorkspaceTsConfig creates a workspace tsconfig.json that extends the
-// extension's default config if one does not already exist.
+// extension's default config if one does not already exist and a member reads
+// it (devDependencyNeed.needsRootTSConfig).
 func ensureWorkspaceTsConfig(ctx *pctx.Context, emit *jsonl.Emitter) error {
 	tsconfigPath := filepath.Join(ctx.WorkspaceRoot, "tsconfig.json")
 	if _, err := os.Stat(tsconfigPath); err == nil {
+		return nil
+	}
+	if !devDependencyNeeds(ctx).needsRootTSConfig() {
 		return nil
 	}
 
@@ -514,14 +520,20 @@ func ensureWorkspaceTsConfig(ctx *pctx.Context, emit *jsonl.Emitter) error {
 }
 
 // ensureWorkspaceBiomeConfig projects the extension-owned nested default into
-// a workspace-root configuration. A workspace-authored configuration is always
-// preserved.
+// a workspace-root configuration when a member lints with Biome
+// (devDependencyNeed.needsBiomeConfig). A workspace-authored configuration is
+// always preserved, and a workspace whose lints run another tool gets none:
+// a tool such as ultracite picks its linter from the first configuration it
+// finds.
 func ensureWorkspaceBiomeConfig(ctx *pctx.Context, emit *jsonl.Emitter) error {
 	workspaceConfig := filepath.Join(ctx.WorkspaceRoot, "biome.json")
 	if _, err := os.Stat(workspaceConfig); err == nil {
 		return nil
 	} else if !os.IsNotExist(err) {
 		return fmt.Errorf("stat workspace biome.json: %w", err)
+	}
+	if !devDependencyNeeds(ctx).needsBiomeConfig() {
+		return nil
 	}
 	extensionConfig := filepath.Join(ctx.Extension.Root, "config", "biome.json")
 	content, err := os.ReadFile(extensionConfig)

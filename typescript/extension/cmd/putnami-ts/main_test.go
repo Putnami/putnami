@@ -2805,9 +2805,11 @@ func TestEnsureWorkspaceDevDeps_AMemberWithoutConfigNeedsItsJobsTools(t *testing
 	}
 }
 
-// The validate and package jobs run the TypeScript compiler too, so a member
-// that keeps its build and test elsewhere still needs it and Bun's types. The linter is the
-// one the member's own putnami.json chooses, over what its lint script runs.
+// The validate job reads the API with the TypeScript parser, so a member that
+// keeps its build and test elsewhere still needs the compiler, and no Bun
+// types: its package builds with the build it does not run. The linter is
+// the one the member's own putnami.json chooses, over what its lint script
+// runs.
 func TestEnsureWorkspaceDevDeps_ReadsTheMembersJobsAndLinter(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "workspace-install-adds-what-a-task-needs",
 		"a-devdependency-is-added-for-a-moved-task-only")
@@ -2815,7 +2817,7 @@ func TestEnsureWorkspaceDevDeps_ReadsTheMembersJobsAndLinter(t *testing.T) {
 	if err := ensureWorkspaceDevDeps(ctx, jsonl.New()); err != nil {
 		t.Fatal(err)
 	}
-	want := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"devDependencies\": {\n    \"@biomejs/biome\": \"2.5.15\",\n    \"@types/bun\": \"^1.4.0\",\n    \"eslint\": \"^9.0.0\",\n    \"typescript\": \"^6.0.2\",\n    \"zod\": \"^3.0.0\"\n  }\n}\n"
+	want := "{\n  \"name\": \"shop\",\n  \"private\": true,\n  \"devDependencies\": {\n    \"@biomejs/biome\": \"2.5.15\",\n    \"eslint\": \"^9.0.0\",\n    \"typescript\": \"^6.0.2\",\n    \"zod\": \"^3.0.0\"\n  }\n}\n"
 	if got := readTextFile(t, filepath.Join(ctx.WorkspaceRoot, "package.json")); got != want {
 		t.Fatalf("package.json =\n%s\nwant\n%s", got, want)
 	}

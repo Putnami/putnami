@@ -111,13 +111,14 @@ the release on `PATH`.
 The command performs these steps:
 
 1. **Create the root `package.json`** — when the file is missing, writes `{"name": <workspace name>, "private": true, "workspaces": []}`, without `workspaces` for pnpm, which lists its members in `pnpm-workspace.yaml`. The name is the `name` in `putnami.workspace.json`, else the name of the workspace root directory. An existing file is never touched. `putnami projects sync` still creates no root `package.json`, so a Go-only or Python-only workspace gets none.
-2. **Ensure workspace devDependencies** — adds required devDependencies (`@biomejs/biome`, `@types/bun`, `typescript`) to the workspace root `package.json` if they are not already present. Existing versions are never overridden. Biome is added at the exact release that the `$schema` of the shipped Biome rules names, never as a range.
+2. **Ensure workspace devDependencies** — adds to the workspace root `package.json` each devDependency a project's job needs, when it is not already present: `@biomejs/biome` for a lint with Biome; `typescript` and `@types/bun` for a build, a package of a project whose build the extension runs (packaging a project whose build stays on another tool needs them added by hand), and a test that type-checks; `typescript` alone for `validate`, which reads the API with its parser. A project that disables a job, and a test with `types: false`, need nothing for it. Existing versions are never overridden. Biome is added at the exact release that the `$schema` of the shipped Biome rules names, never as a range.
 3. **List the workspace members** — writes the workspace membership where the package manager reads it, as `putnami projects sync` does: the `packages` list of `pnpm-workspace.yaml` for pnpm, keeping every other line of the file, and the root `package.json` `workspaces` otherwise. It lists every member with a `package.json`, the workspace root excluded, as exact paths in place of the patterns the file held: a workspace package that is no Putnami project leaves the manager's workspace, and the monorepo tool's, so every package of an imported repository is a Putnami project. A project created after the last `projects sync` is therefore installed, and a list that already matches is not rewritten. If the list cannot be read or written, the install fails before the package manager runs.
 4. **Seed catalog entries** — with Bun or pnpm, the managers that read the `catalog:` protocol, for any package a member references through it but that is missing from the catalog, an entry is added (pinned to `latest`) so the install can resolve it: in the root `package.json` for Bun, and in the `catalog` or `catalogs` of `pnpm-workspace.yaml` for pnpm. npm and Yarn read no catalog and get no entry. `@putnami/*` framework packages scaffolded by the templates are seeded this way; `putnami upgrade --deps` later pins them to an exact release. Existing catalog entries — Putnami or otherwise — are never overwritten.
    When the install receives a channel other than `latest` through the `putnami-channel` job option, which `putnami init` sets for the channel it resolves on, a missing `@putnami/*` entry is the exact version that channel's dist-tag names for the package on the registry the workspace declares, never the channel name. A package the channel does not name fails the install before the package manager runs; the seed does not read `latest` instead.
 5. **Declare the bun version** — in a workspace that installs with Bun, when the root `package.json` has no `packageManager` field, the command runs `bun --version` with the bun it runs (see [Which Bun runs](#which-bun-runs)) and writes `"packageManager": "bun@<version>"`. `putnami install` pins the lock's bun toolchain from that field, and TypeScript tasks then run only with a bun of that exact version. An existing field is never changed. A bun whose version is not a plain release, such as a canary build, is not declared.
-6. **Refresh the private-registry credential** — see below.
-7. **Install** — runs the package manager's install in the workspace root directory: `bun install`, `npm install`, `pnpm install` or `yarn install` (`--non-interactive` on Yarn 1). The manager resolves the `workspace:` and `catalog:` references, links the workspace packages, and writes its own lockfile; no other manager's lockfile is written.
+6. **Write the root configuration a job reads** — writes a root `tsconfig.json` that extends the extension's when the root holds none and a project reads it: its `tsconfig.json`, `tsconfig.app.json` or `tsconfig.lib.json` extends the root's, as the templates and an import write them, or it holds none of them and runs a build, a package with that build or a test that type-checks, whose compiler then looks up from the project. It writes a root `biome.json` from the shipped rules when the root holds none and a project lints with Biome. A lint with ESLint and `validate` read neither. In a workspace whose only TypeScript project is its root, the root's jobs decide, for these files and the devDependencies. An existing file is never touched.
+7. **Refresh the private-registry credential** — see below.
+8. **Install** — runs the package manager's install in the workspace root directory: `bun install`, `npm install`, `pnpm install` or `yarn install` (`--non-interactive` on Yarn 1). The manager resolves the `workspace:` and `catalog:` references, links the workspace packages, and writes its own lockfile; no other manager's lockfile is written.
 
 `--force` adds the manager's own reinstall flag: `--force` for Bun, npm, pnpm
 and Yarn 1. Yarn 2 and later has none and runs a plain install.
@@ -145,7 +146,7 @@ rather than `node_modules`.
 extension asks `@putnami/cloud` to write your npm credential for that registry:
 
 1. It reads the `@putnami:registry=` line from the workspace `.npmrc` — the line
-   step 6 above maintains — and takes its host.
+   the install writes from the workspace's `registries.npm.scopes` — and takes its host.
 2. It runs `putnami cloud registry-token --host <host> --materialize`, which
    writes the `//<host>/:_authToken=` line in your own `~/.npmrc`.
 
@@ -185,8 +186,8 @@ the install are two jobs:
 | Yarn 1 | `yarn install --non-interactive --frozen-lockfile --offline`, plus `--force` when asked |
 | Yarn 2 and later | `yarn install --immutable`, with `YARN_ENABLE_NETWORK=0` |
 
-On a hosted run, neither command shapes the workspace manifests (steps 1 to 5
-above, `tsconfig.json`, `biome.json` and the `.npmrc` scopes): both read the
+On a hosted run, neither command shapes the workspace manifests (steps 1 to 6
+above and the `.npmrc` scopes): both read the
 committed files as they are, so the install finds the manifests the fetch
 downloaded for, and no committed file changes. A manifest the committed
 lockfile does not match fails the frozen install; run `putnami install`

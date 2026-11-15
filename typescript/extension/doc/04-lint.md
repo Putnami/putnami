@@ -46,7 +46,7 @@ Each project lints with one linter, Biome or ESLint, chosen in this order:
 2. **The `lint` script** of the project's `package.json`: ESLint when its first command runs `eslint`, plainly, by a `node_modules/.bin` path, or through `npx`, `bunx`, `pnpm exec`, `yarn` or `npm exec`.
 3. **Biome** otherwise.
 
-A configuration file never chooses: `putnami deps install` writes a root `biome.json` whatever the projects lint with, and an `eslint.config.js` alone leaves a project on Biome. The `lint` script only names the linter: its arguments do not run, so a flag such as `--max-warnings 0` belongs in the ESLint configuration. An ESLint lint whose script carries arguments other than `.`, or chains another command, reports a `typescript.lint_script_arguments_ignored` warning that names them. [ADR 0009](./adr/0009-a-project-lints-with-biome-or-eslint.md) records the choice.
+A configuration file never chooses: an `eslint.config.js` alone leaves a project on Biome. `putnami deps install` writes a root `biome.json` only when a project lints with Biome, so a workspace whose projects all lint with ESLint, or keep their lint on another tool, gets none. The `lint` script only names the linter: its arguments do not run, so a flag such as `--max-warnings 0` belongs in the ESLint configuration. An ESLint lint whose script carries arguments other than `.`, or chains another command, reports a `typescript.lint_script_arguments_ignored` warning that names them. [ADR 0009](./adr/0009-a-project-lints-with-biome-or-eslint.md) records the choice.
 
 ## ESLint
 
@@ -262,7 +262,7 @@ Biome configuration is resolved in this order:
 
 The first `biome.json` found wins. To customize, place a `biome.json` in your project or workspace root.
 
-`putnami deps install` materializes a missing workspace `biome.json` with the rules shipped by the resolved TypeScript extension and marks it as the workspace-root configuration. It preserves an existing workspace configuration byte-for-byte and stops with an explicit error if the installed extension default cannot be read, so every project resolves one stable workspace configuration.
+When a project lints with Biome, `putnami deps install` materializes a missing workspace `biome.json` with the rules shipped by the resolved TypeScript extension and marks it as the workspace-root configuration. It preserves an existing workspace configuration byte-for-byte and stops with an explicit error if the installed extension default cannot be read, so every project resolves one stable workspace configuration.
 
 ## Biome Resolution
 
