@@ -1182,7 +1182,9 @@ func TestCommandsDeclareTheTraitsOfTheirVerb(t *testing.T) {
 // TestLifecycleCommandsWaitForClientGenerate pins that every command that
 // reads a project's sources runs after that project's client-generate, so a
 // generated client's src/ exists before anything builds, tests, lints, serves
-// or packages it (tooling/clientgen-extension ADR 0007). A project without the
+// or packages it (tooling/clientgen-extension ADR 0007). Each also depends on
+// client-generate across the dependency closure, so a consumer compiles a
+// current client of every dependency and keys on it. A project without the
 // command plans nothing more.
 func TestLifecycleCommandsWaitForClientGenerate(t *testing.T) {
 	m := loadExtensionManifest(t)
@@ -1193,6 +1195,9 @@ func TestLifecycleCommandsWaitForClientGenerate(t *testing.T) {
 		}
 		if !slices.Contains(command.DependsOn, "client-generate") {
 			t.Errorf("command %q dependsOn = %v, want it to hold client-generate", name, command.DependsOn)
+		}
+		if !slices.Contains(command.DependsOn, "^client-generate") {
+			t.Errorf("command %q dependsOn = %v, want it to hold ^client-generate", name, command.DependsOn)
 		}
 	}
 }

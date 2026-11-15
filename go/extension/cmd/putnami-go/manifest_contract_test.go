@@ -2939,8 +2939,10 @@ func TestWithCISetLintAndBuildScheduleNoStepThatWritesSources(t *testing.T) {
 // TestLifecycleCommandsWaitForClientGeneration pins that every command that
 // compiles, checks, serves or packages a project first runs that project's
 // client-generate: a generated client project builds its client from the
-// provider's contract before anything reads it. A project without the command
-// plans nothing more.
+// provider's contract before anything reads it. Each also depends on
+// client-generate across the dependency closure, so a consumer compiles a
+// current client of every dependency and keys on it. A project without the
+// command plans nothing more.
 func TestLifecycleCommandsWaitForClientGeneration(t *testing.T) {
 	m := loadExtensionManifest(t)
 	for _, name := range []string{"build", "test", "lint", "serve", "package"} {
@@ -2951,6 +2953,9 @@ func TestLifecycleCommandsWaitForClientGeneration(t *testing.T) {
 		}
 		if !slices.Contains(command.DependsOn, "client-generate") {
 			t.Errorf("command %q dependsOn = %v, want it to include client-generate", name, command.DependsOn)
+		}
+		if !slices.Contains(command.DependsOn, "^client-generate") {
+			t.Errorf("command %q dependsOn = %v, want it to include ^client-generate", name, command.DependsOn)
 		}
 	}
 }

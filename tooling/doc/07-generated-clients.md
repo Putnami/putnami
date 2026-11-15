@@ -89,8 +89,12 @@ No project writes into another, and no generation builds the provider. A
 contract with no first-party operation generates nothing.
 
 The `@putnami/go` and `@putnami/typescript` `build`, `test`, `lint`, `serve`
-and `package` commands depend on `client-generate`. Building a client, or a
-project that depends on one, generates the client first:
+and `package` commands depend on `client-generate`, in their own project and
+in every project it depends on, directly or transitively. Building or testing
+a client, or a project that depends on one, generates the client first, even
+when the selection names the consumer alone. The consumer's cache key follows
+the provider's committed contract: a contract change runs the consumer's
+tasks again, and no earlier result is replayed.
 
 ```bash
 putnami build --projects my-consumer

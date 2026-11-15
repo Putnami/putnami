@@ -15,11 +15,12 @@ Compiles Go packages and binaries **for the host platform**, with cross-compilat
 - Runs `go mod tidy` and syncs workspace dependencies before compiling
 - Runs the project's `client-generate` command first when it has one: a
   generated client project builds its client from its provider's committed
-  contract before anything compiles it. `test`, `lint`, `validate`, `serve` and
-  `package` depend on `client-generate` the same way; a project without the
-  command plans nothing more. `lint` and `validate` also run `client-generate`
-  in every project the project depends on, directly or transitively, since
-  they type-check those projects' generated clients without building them
+  contract before anything compiles it. It also runs `client-generate` in
+  every project the project depends on, directly or transitively, so a
+  consumer compiles a current client and its cache key follows the client's
+  contract. `test`, `lint`, `validate`, `serve` and `package` depend on
+  `client-generate` the same way; a project without the command plans nothing
+  more
 - Generates schema artifacts before compiling
 - Runs build-time describe mode for runtime plugin artifacts such as OpenAPI
 - Compiles the describe entrypoint with the compile step's own configuration

@@ -62,10 +62,11 @@ A provider that keeps a Go client inside its own module commits a
 `clientgen.json` whose `go.output` names that package's directory, and
 `client-generate` writes `client.gen.go` there from the provider's own
 committed contract. The `@putnami/go` and `@putnami/typescript` build, test,
-lint, validate, serve and package commands depend on `client-generate`, so
-building, linting or validating a client or a project that depends on one
-generates it first. `lint` and `validate` reach every client of the
-dependency closure through `^client-generate`, since they build nothing:
+lint, validate, serve and package commands depend on `client-generate`, in
+their own project and across the dependency closure (`^client-generate`), so
+building, testing, linting or validating a client or a project that depends on
+one generates it first, and the consumer's cache key follows the client's
+contract:
 
 ```bash
 putnami build --projects my-consumer

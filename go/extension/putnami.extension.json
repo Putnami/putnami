@@ -48,7 +48,7 @@
   },
   "commands": {
     "build": {
-      "dependsOn": ["client-generate"],
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Build Go project: refresh dependencies and compile for the host platform. Cross-compilation is opt-in via `platforms` / `--target`; the full release matrix belongs to `package`.",
       "activationFiles": ["**/*.go", "go.mod"],
       "flags": {
@@ -135,7 +135,7 @@
       ]
     },
     "test": {
-      "dependsOn": ["client-generate"],
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Run Go tests with coverage support.",
       "activationFiles": ["**/*_test.go", "go.mod"],
       "flags": {
@@ -295,7 +295,7 @@
       "run": [{ "id": "api", "task": "validate-api" }]
     },
     "serve": {
-      "dependsOn": ["client-generate"],
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Run Go application with hot-reload. Build-and-exec: the served process is compiled and run in one step, and no binary is emitted.",
       "traits": { "requiresRunnable": true, "workload": "serve" },
       "activationFiles": ["**/*.go", "go.mod"],
@@ -435,7 +435,7 @@
       "run": [{ "id": "deps-edit", "task": "deps-edit-exec" }]
     },
     "package": {
-      "dependsOn": ["client-generate"],
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Create distribution packages (archives, binaries, Docker images, Go modules).",
       "traits": { "injectPublishChannels": true },
       "sessionPrerequisites": [

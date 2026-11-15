@@ -341,12 +341,16 @@ func TestClientGenerateReadsCommittedFilesAndBuildsNoProvider(t *testing.T) {
 // a generated client exists before a compiler, a linter or a packager reads
 // it. The dependency is a plain command name, not a session barrier: it plans
 // the project's own client-generate, which plans nothing where no step
-// activates. Lint and validate build nothing, so they also depend on
-// client-generate across the dependency closure (`^client-generate`): the
-// clients they type-check in a dependency exist before they read them.
+// activates. Each also depends on client-generate across the dependency
+// closure (`^client-generate`): the clients a command compiles in a
+// dependency are generated before it reads them, whether or not another job of
+// the plan reaches the client project, and its key folds their generation
+// keys.
 func TestLanguageCommandsWaitForClientGenerate(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "language-commands-wait-for-generation", "go-and-typescript-lifecycle-commands-depend-on-client-generate")
 	spectest.Proves(t, clientgenFeature, "language-commands-wait-for-generation", "a-project-without-client-generate-plans-nothing-more")
+	spectest.Proves(t, clientgenFeature, "language-commands-wait-for-generation",
+		"the-lifecycle-commands-depend-on-client-generate-across-the-dependency-closure")
 	for _, manifestPath := range []string{"../../go/extension/putnami.extension.json", "../../typescript/extension/putnami.extension.json"} {
 		data, err := os.ReadFile(manifestPath)
 		if err != nil {
@@ -365,10 +369,9 @@ func TestLanguageCommandsWaitForClientGenerate(t *testing.T) {
 			if !slices.Contains(command.DependsOn, "client-generate") {
 				t.Errorf("%s %s dependsOn = %v, want client-generate", manifestPath, name, command.DependsOn)
 			}
-			typeChecksWithoutBuilding := name == "lint" || name == "validate"
-			if typeChecksWithoutBuilding != slices.Contains(command.DependsOn, "^client-generate") {
-				t.Errorf("%s %s dependsOn = %v; lint and validate alone depend on ^client-generate",
-					manifestPath, name, command.DependsOn)
+			if !slices.Contains(command.DependsOn, "^client-generate") {
+				t.Errorf("%s %s dependsOn = %v, want ^client-generate: the command reads the generated clients "+
+					"of its dependency closure", manifestPath, name, command.DependsOn)
 			}
 			for _, dependency := range command.DependsOn {
 				if strings.TrimLeft(dependency, "!^") == "client-generate" && dependency != "client-generate" &&
