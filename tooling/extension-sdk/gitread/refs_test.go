@@ -52,12 +52,17 @@ func TestRefNamesBranchStripsOnlyTheRemoteSegment(t *testing.T) {
 	}
 }
 
-// The trunk is origin/HEAD, then origin/main, then a local main or master.
+// The trunk is origin/HEAD, then origin/main, then origin/master, then a local
+// main or master.
 func TestTrunkRefPrefersTheRemoteDefaultBranch(t *testing.T) {
 	t.Parallel()
 	repo := initGitRepo(t)
 	if got := gitread.TrunkRef(repo); got != "main" {
 		t.Fatalf("TrunkRef(local main only) = %q, want main", got)
+	}
+	runGit(t, repo, "update-ref", "refs/remotes/origin/master", "HEAD")
+	if got := gitread.TrunkRef(repo); got != "origin/master" {
+		t.Fatalf("TrunkRef(origin/master) = %q, want origin/master", got)
 	}
 	runGit(t, repo, "update-ref", "refs/remotes/origin/main", "HEAD")
 	if got := gitread.TrunkRef(repo); got != "origin/main" {

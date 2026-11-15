@@ -339,7 +339,7 @@ const (
 	// nearer to HEAD than the trunk.
 	BaselineSourceEpic BaselineSource = "epic"
 	// BaselineSourceTrunk is the remote default branch (origin/HEAD, or
-	// origin/main when the symref is unset).
+	// origin/main, then origin/master, when the symref is unset).
 	BaselineSourceTrunk BaselineSource = "trunk"
 	// BaselineSourceLocalTrunk is a local main/master ref, reached only when no
 	// remote trunk ref exists; it can be stale relative to the remote.
@@ -369,7 +369,7 @@ type ResolvedBaseline struct {
 // review diff exists.
 //
 // Order: explicit → nearest of configured epic branches vs trunk → trunk
-// (origin/HEAD, origin/main) → local main/master → upstream tracking ref
+// (origin/HEAD, origin/main, origin/master) → local main/master → upstream tracking ref
 // (skipped when it is this branch's own remote counterpart) → error.
 func ResolveBaselineDetailed(repoRoot, explicit string, epicBranches []string) (ResolvedBaseline, error) {
 	if ref := strings.TrimSpace(explicit); ref != "" {
@@ -392,7 +392,7 @@ func ResolveBaselineDetailed(repoRoot, explicit string, epicBranches []string) (
 	if ref := gitread.UpstreamRef(repoRoot); ref != "" && !gitread.UpstreamIsSelfCounterpart(repoRoot, ref, currentBranch) {
 		return ResolvedBaseline{Ref: ref, Source: BaselineSourceUpstream}, nil
 	}
-	return ResolvedBaseline{}, fmt.Errorf("resolve git baseline: no explicit baseline, origin/HEAD, origin/main, local main/master, or usable upstream tracking ref was found (a branch is never measured against itself) — pass --baseline or set the workspace config baseline")
+	return ResolvedBaseline{}, fmt.Errorf("resolve git baseline: no explicit baseline, origin/HEAD, origin/main, origin/master, local main/master, or usable upstream tracking ref was found (a branch is never measured against itself) — pass --baseline or set the workspace config baseline")
 }
 
 // ResolveTrunk chooses the repository trunk ref for automatic bare job
@@ -402,7 +402,7 @@ func ResolveTrunk(repoRoot string) (string, error) {
 	if ref := gitread.TrunkRef(repoRoot); ref != "" {
 		return ref, nil
 	}
-	return "", fmt.Errorf("resolve git trunk: no origin/HEAD, origin/main, local main, or local master ref was found")
+	return "", fmt.Errorf("resolve git trunk: no origin/HEAD, origin/main, origin/master, local main, or local master ref was found")
 }
 
 // nearestEpicBaseline picks the candidate whose merge-base with HEAD is the

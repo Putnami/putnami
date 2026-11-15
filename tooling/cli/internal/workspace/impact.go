@@ -160,7 +160,7 @@ func (s ImpactedSelection) BaselineExplanation() string {
 	}
 	switch s.BaselineSource {
 	case git.BaselineSourceLocalTrunk:
-		return "  --impacted: baseline resolved to local '" + s.Baseline + "' — no origin/HEAD or origin/main ref exists; a stale local trunk under-selects."
+		return "  --impacted: baseline resolved to local '" + s.Baseline + "' — no origin/HEAD, origin/main or origin/master ref exists; a stale local trunk under-selects."
 	case git.BaselineSourceUpstream:
 		return "  --impacted: baseline resolved to the upstream tracking ref '" + s.Baseline + "' — no trunk ref exists. Set the workspace config baseline (or epicBranches) if this ref is not the merge target."
 	}
@@ -641,7 +641,7 @@ func excludeRunWrittenPaths(root string, diff *git.WorkingTreeDiff, runStart []s
 
 // ResolveImpactedBaselineDetailed applies Putnami's --impacted baseline
 // precedence: explicit flag, workspace config baseline, nearest configured epic
-// branch, trunk (origin/HEAD, origin/main), local main/master, then the upstream
+// branch, trunk (origin/HEAD, origin/main, origin/master), local main/master, then the upstream
 // tracking ref — never the current branch itself. It returns the resolution
 // tier too, for callers that explain fallback choices.
 func ResolveImpactedBaselineDetailed(ws *Workspace, explicit string) (git.ResolvedBaseline, error) {
