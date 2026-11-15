@@ -30,6 +30,10 @@ function slowNext(behavior: (attempt: number) => 'timeout' | ClientResponse) {
         reject(new Error('expected a per-attempt signal'));
         return;
       }
+      if (signal.aborted) {
+        reject(new DOMException('The operation timed out', 'TimeoutError'));
+        return;
+      }
       signal.addEventListener('abort', () => reject(new DOMException('The operation timed out', 'TimeoutError')), {
         once: true,
       });
@@ -179,24 +183,48 @@ describe('retryInterceptor overall deadline', () => {
       check: 'total-elapsed-time-is-bounded-by-the-timeout',
     },
     async () => {
-      // Each attempt stalls until its signal aborts; with the old per-attempt-only
-      // budget this would run for ~maxRetries × timeoutMs. The default overall
-      // deadline (= timeoutMs) must keep the whole sequence within one timeout.
-      const interceptor = retryInterceptor(
-        { maxRetries: 3, baseDelayMs: 1, jitter: false },
-        { timeoutMs: 40 }, // maxElapsedMs defaults to timeoutMs
-      );
+      // Each attempt stalls until its signal aborts; with a per-attempt-only
+      // budget this would run for ~(maxRetries + 1) × timeoutMs. The default
+      // overall deadline (= timeoutMs) must keep the whole sequence within one
+      // timeout. The clock advances only when a timeout fires, by its duration
+      // plus a fixed 2ms of scheduler delay, regardless of host load.
+      const realNow = Date.now;
+      const realTimeout = AbortSignal.timeout;
+      let now = 1000;
+      const attemptTimeouts: number[] = [];
+      try {
+        Date.now = () => now;
+        AbortSignal.timeout = (ms) => {
+          attemptTimeouts.push(ms);
+          const controller = new AbortController();
+          queueMicrotask(() => {
+            now += ms + 2;
+            controller.abort(new DOMException('The operation timed out', 'TimeoutError'));
+          });
+          return controller.signal;
+        };
 
-      const next = slowNext(() => 'timeout'); // every attempt times out
+        let calls = 0;
+        const interceptor = retryInterceptor(
+          { maxRetries: 3, baseDelayMs: 1, jitter: false },
+          { timeoutMs: 40 }, // maxElapsedMs defaults to timeoutMs
+        );
+        const next = slowNext((attempt) => {
+          calls = attempt + 1;
+          return 'timeout'; // every attempt times out
+        });
 
-      const start = Date.now();
-      await expect(interceptor(makeRequest(), next)).rejects.toThrow();
-      const elapsed = Date.now() - start;
+        await expect(interceptor(makeRequest(), next)).rejects.toThrow();
 
-      // A naive per-attempt timeout would allow up to 4 × 40ms = 160ms plus
-      // backoff. With the overall deadline the total stays close to a single
-      // timeoutMs; allow generous scheduler slack.
-      expect(elapsed).toBeLessThan(120);
+        // The first attempt spends the whole 40ms budget, so no retry fits
+        // before the deadline: the attempts together get one timeoutMs, not
+        // the 4 × 40ms = 160ms a per-attempt timeout alone would allow.
+        expect(attemptTimeouts).toEqual([40]);
+        expect(calls).toBe(1);
+      } finally {
+        Date.now = realNow;
+        AbortSignal.timeout = realTimeout;
+      }
     },
   );
 
