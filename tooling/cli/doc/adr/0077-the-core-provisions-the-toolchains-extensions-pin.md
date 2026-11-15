@@ -2,6 +2,7 @@
 
 - **Status**: accepted, amended by
   [workspace ADR 0006](../../../../protocols/workspace/doc/adr/0006-a-host-with-no-archive-keeps-the-committed-pin.md)
+  and [Go ADR 0015](../../../../go/extension/doc/adr/0015-without-a-declaration-the-go-pin-is-the-machine-go.md)
 - **Date**: 2026-10-22
 - **Scope**: `@putnami/cli` (`internal/jobs/toolchainpins`,
   `internal/jobs/toolchain`, `internal/lockfile`, `internal/commands/lifecycle`,
@@ -76,8 +77,9 @@ A runtime toolchain candidate may come from `provisioned`, under CLI contract
 6. **Each extension keeps its declaration and its default.** It reads its own
    declaration (`go.work`, `packageManager`, `[tool.uv]`). The TypeScript and
    Python extensions pin their default release when the workspace declares
-   none; the Go extension keeps a committed pin and otherwise pins nothing
-   until `go.work` declares a release. Each `workspace-install` still writes
+   none; the Go extension keeps a committed pin, otherwise pins the release
+   `go.work` declares, and otherwise, in a workspace that holds a Go module,
+   the release of the go command the machine runs (Go ADR 0015). Each `workspace-install` still writes
    a missing declaration, as ADR 0019 decision 4 states.
 
 ADR 0019 decisions 6 and 7 stand. Decision 3 still resolves an alias that only

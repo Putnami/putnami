@@ -532,3 +532,70 @@ func TestProjectSetupWithoutGoModSetsNothingUp(t *testing.T) {
 		t.Error("the setup wrote go.work for a project without go.mod")
 	}
 }
+
+// localGoRelease is the release the go command on PATH runs under
+// GOTOOLCHAIN=local.
+func localGoRelease(t *testing.T) string {
+	t.Helper()
+	cmd := exec.Command("go", "env", "GOVERSION")
+	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local")
+	out, err := cmd.Output()
+	if err != nil {
+		t.Fatalf("go env GOVERSION: %v", err)
+	}
+	return strings.TrimPrefix(strings.TrimSpace(string(out)), "go")
+}
+
+// A go.work the setup creates in a workspace whose lock pins a release newer
+// than the template's go directive states that release as its toolchain
+// directive, so go.work declares the pinned release; a pin equal to the go
+// directive adds no toolchain directive.
+func TestProjectSetupCreatedGoWorkStatesThePinnedGo(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "go/project-setup", "create-states-the-pinned-go",
+		"a-created-go-work-states-a-newer-pinned-release-as-its-toolchain")
+	spectest.Proves(t, "go/project-setup", "create-states-the-pinned-go",
+		"a-pin-equal-to-the-go-directive-adds-no-toolchain")
+	jobtest.RequireGo(t)
+	release := localGoRelease(t)
+	tests := []struct {
+		name, goDirective, wantToolchain string
+	}{
+		{"a pin newer than the template", "1.22", "go" + release},
+		{"a pin equal to the template", release, ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			ws := jobtest.RealTempDir(t)
+			jobtest.WriteFile(t, ws, projectPath+"/go.mod", strings.Replace(frameworkGoMod, "go 1.22", "go "+tt.goDirective, 1))
+			jobtest.WriteFile(t, ws, projectPath+"/main.go", frameworkMain)
+			jobtest.WriteFile(t, ws, "putnami.lock.json", `{"toolchains":{"go":{"version":"`+release+`"}}}`+"\n")
+
+			run := runSetup(t, ws, `{"path":"apps/api"}`, frameworkProxy(t, "v0.4.2"), nil)
+			run.requireStatus(t, statusOK)
+
+			work, err := modfile.ParseWork("go.work", []byte(jobtest.ReadFile(t, filepath.Join(ws, "go.work"))), nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if work.Go == nil || work.Go.Version != tt.goDirective {
+				t.Errorf("go.work states go %v, want the template's %s", work.Go, tt.goDirective)
+			}
+			toolchain := ""
+			if work.Toolchain != nil {
+				toolchain = work.Toolchain.Name
+			}
+			if toolchain != tt.wantToolchain {
+				t.Errorf("go.work states toolchain %q, want %q", toolchain, tt.wantToolchain)
+			}
+			declared, err := workspacejob.GoWorkDeclaration(ws)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if declared != release {
+				t.Errorf("go.work declares Go %s, want the pinned %s", declared, release)
+			}
+		})
+	}
+}
