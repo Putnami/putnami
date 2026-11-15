@@ -1,5 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-import { SessionConfig } from '@putnami/application';
+import {
+  application,
+  config,
+  deleteSessionAll,
+  http,
+  SessionConfig,
+  setSession,
+  useSession,
+} from '@putnami/application';
 import { useConfig } from '@putnami/runtime';
 import { database } from '../src/factory';
 import { ensurePostgresContainer, isDockerAvailable, POSTGRES_SETUP_TIMEOUT_MS } from './utils/postgres-helper';
@@ -280,6 +288,65 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       expect(user.id).toBe('user-123');
       expect(user.profile.name).toBe('John Doe');
       expect(user.profile.settings.theme).toBe('dark');
+    });
+  });
+
+  describe('behind the session API of an HTTP application', () => {
+    function cookieOf(res: Response): string {
+      return (res.headers.get('set-cookie') ?? '').split(';')[0];
+    }
+
+    async function withServer(run: (base: string) => Promise<void>): Promise<void> {
+      const hp = http({ port: 0 });
+      hp.route('GET', '/read', () => ({ cart: useSession<string[]>('cart') ?? null }));
+      hp.route('GET', '/write', () => {
+        setSession('cart', ['item-1']);
+        return { ok: true };
+      });
+      hp.route('GET', '/forget', () => {
+        deleteSessionAll();
+        return { ok: true };
+      });
+      const app = application().use(hp).use(config());
+      await app.start();
+      try {
+        await run(`http://localhost:${hp.getServer()?.port}`);
+      } finally {
+        await app.stop();
+      }
+    }
+
+    it('keeps what one request wrote for the next request, in PostgreSQL', async () => {
+      await sql`DELETE FROM sessions`;
+      await withServer(async (base) => {
+        const cookie = cookieOf(await fetch(`${base}/write`));
+        expect(cookie.startsWith('session_id=')).toBe(true);
+        const rows = await sql<{ data: { cart: string[] } }[]>`SELECT data FROM sessions`;
+        expect(rows.map((row) => row.data)).toEqual([{ cart: ['item-1'] }]);
+
+        const read = await fetch(`${base}/read`, { headers: { Cookie: cookie } });
+        expect(await read.json()).toEqual({ cart: ['item-1'] });
+      });
+    });
+
+    it('stores no row for a visitor whose request only reads the session', async () => {
+      await sql`DELETE FROM sessions`;
+      await withServer(async (base) => {
+        const read = await fetch(`${base}/read`);
+        expect(await read.json()).toEqual({ cart: null });
+        const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM sessions`;
+        expect(count).toBe(0);
+      });
+    });
+
+    it('deletes the row when a request empties the session', async () => {
+      await sql`DELETE FROM sessions`;
+      await withServer(async (base) => {
+        const cookie = cookieOf(await fetch(`${base}/write`));
+        await fetch(`${base}/forget`, { headers: { Cookie: cookie } });
+        const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM sessions`;
+        expect(count).toBe(0);
+      });
     });
   });
 });

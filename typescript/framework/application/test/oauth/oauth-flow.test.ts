@@ -6,6 +6,8 @@ import { config } from '../../src/config';
 import { http } from '../../src/http/http.plugin';
 import { oAuth2 } from '../../src/oauth/oauth.plugin';
 import { OAuthService } from '../../src/oauth/oauth.service';
+import { registerSessionStore, setActiveStoreService } from '../../src/session/session.store';
+import { AsyncMemorySessionStore } from '../session/async-memory-store';
 
 const loginRedirect = {
   feature: 'typescript/authentication-authorization',
@@ -736,6 +738,80 @@ describe('OAuth2 / OIDC end-to-end flow', () => {
     expect(results.every((r) => r?.access_token)).toBe(true);
     const tokenPosts = state.requests.filter((r) => r.url === `${AUTH_BASE}/token` && r.method === 'POST').length;
     expect(tokenPosts).toBe(1);
+  });
+
+  it('signs in, refreshes and shares the refreshed tokens on an asynchronous session store', async () => {
+    const store = new AsyncMemorySessionStore();
+    registerSessionStore('oauth-flow-async', () => store);
+    setActiveStoreService(undefined);
+    setConfig({
+      session: { store: 'oauth-flow-async', cookieName: 'oauth_flow_sid', cookieSecret: SESSION_SECRET, ttl: 300 },
+      oauth: {
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        discoveryUri: DISCOVERY_URI,
+        callbackRoute: '/auth/callback',
+        scopes: ['read'],
+        pkce: 'never',
+      },
+    });
+    const state: MockState = {
+      requests: [],
+      codes: new Map([['code-async', { subject: { sub: 'async-user', aud: 'test-client' } }]]),
+      refreshTokens: new Map(),
+      userInfo: {},
+      jwks: { keys: [publicJwk] },
+      clientId: 'test-client',
+    };
+    globalThis.fetch = makeFetch(state);
+
+    const hp = http({ port: 0 });
+    const { accessToken } = await import('../../src/oauth/oauth.utils');
+    const app = application().use(hp).use(config()).use(oAuth2());
+    await app.start();
+    try {
+      const port = hp.getServer()?.port ?? 0;
+      hp.route('GET', '/token', async () => ({ token: (await accessToken({ redirect: false })) ?? null }));
+
+      // The session ID cookie comes with the login redirect; the callback keeps the same session.
+      const loginRes = await fetch(`http://localhost:${port}/login`, { redirect: 'manual' });
+      const sessionCookie = (loginRes.headers.get('set-cookie') ?? '').split(';')[0];
+      const stateParam = new URL(loginRes.headers.get('location') ?? '').searchParams.get('state');
+      const entry = state.codes.get('code-async');
+      if (entry) entry.redirectUri = `http://localhost:${port}/auth/callback`;
+      await fetch(`http://localhost:${port}/auth/callback?code=code-async&state=${stateParam}`, {
+        headers: { Cookie: sessionCookie },
+        redirect: 'manual',
+      });
+      const [row] = [...store.rows.values()] as { oauth: { expireAt: number; refreshToken: string } }[];
+      expect(row.oauth.refreshToken).toBe('refresh-code-async');
+
+      // The access token expires; two later requests still carry the same session cookie.
+      row.oauth.expireAt = 0;
+      const first = (await (
+        await fetch(`http://localhost:${port}/token`, { headers: { Cookie: sessionCookie } })
+      ).json()) as {
+        token: string | null;
+      };
+      const second = (await (
+        await fetch(`http://localhost:${port}/token`, { headers: { Cookie: sessionCookie } })
+      ).json()) as {
+        token: string | null;
+      };
+
+      expect(first.token).not.toBeNull();
+      expect(second.token).toBe(first.token);
+      const refreshes = state.requests.filter(
+        (r) =>
+          r.url === `${AUTH_BASE}/token` && new URLSearchParams(r.body ?? '').get('grant_type') === 'refresh_token',
+      );
+      expect(refreshes).toHaveLength(1);
+      expect(([...store.rows.values()][0] as { oauth: { refreshToken: string } }).oauth.refreshToken).toBe(
+        'rotated-refresh',
+      );
+    } finally {
+      await app.stop();
+    }
   });
 
   // -----------------------------------------------------------------------

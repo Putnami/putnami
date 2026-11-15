@@ -1,4 +1,11 @@
-import { registerSessionStore, SessionConfig, type SessionStore } from '@putnami/application';
+import {
+  type AsyncSessionStore,
+  registerSessionStore,
+  removeRequestSession,
+  requestSessionData,
+  SessionConfig,
+  writeRequestSession,
+} from '@putnami/application';
 import { useConfig } from '@putnami/runtime';
 import { database } from '../factory';
 
@@ -33,9 +40,10 @@ interface SessionRow {
  * )
  * ```
  *
- * **Note:** The sync interface methods (`get`, `set`, etc.) are limited
- * for database operations. Use the async variants (`getAsync`, `setAllAsync`)
- * for full functionality when working directly with this store.
+ * The session API (`useSession`, `setSession`, ...) works unchanged: the HTTP
+ * plugin loads the row once before the middlewares and writes it once after
+ * the response, only when the request changed the session. The async methods
+ * (`getAllAsync`, `setAllAsync`, ...) read and write the table directly.
  *
  * @example Configuration
  * ```yaml
@@ -47,7 +55,8 @@ interface SessionRow {
  *   database: 'myapp'
  * ```
  */
-export class DatabaseSessionStore implements SessionStore {
+export class DatabaseSessionStore implements AsyncSessionStore {
+  readonly asyncSession = true as const;
   private initPromise?: Promise<void>;
   private dbName?: string;
 
@@ -84,32 +93,50 @@ export class DatabaseSessionStore implements SessionStore {
     `;
   }
 
-  get<T>(_sessionId: string, _key: string): T | undefined {
-    throw new Error('DatabaseSessionStore.get() is not supported synchronously. Use getAsync() instead.');
+  get<T>(sessionId: string, key: string): T | undefined {
+    return this.getAll<Record<string, unknown>>(sessionId)[key] as T | undefined;
   }
 
-  set<T>(_sessionId: string, _key: string, _value: T): void {
-    throw new Error('DatabaseSessionStore.set() is not supported synchronously. Use setAllAsync() instead.');
+  set<T>(sessionId: string, key: string, value: T): void {
+    this.setAll(sessionId, { ...this.getAll<Record<string, unknown>>(sessionId), [key]: value });
   }
 
-  delete(_sessionId: string, _key: string): void {
-    throw new Error('DatabaseSessionStore.delete() is not supported synchronously. Use deleteAllAsync() instead.');
+  delete(sessionId: string, key: string): void {
+    const session = this.getAll<Record<string, unknown>>(sessionId);
+    if (!(key in session)) return;
+    delete session[key];
+    this.setAll(sessionId, session);
   }
 
+  /** The request's copy of the session, loaded by the HTTP plugin before the middlewares. */
   getAll<S = Record<string, unknown>>(_sessionId: string): S {
-    throw new Error('DatabaseSessionStore.getAll() is not supported synchronously. Use getAllAsync() instead.');
+    return requestSessionData<S>();
   }
 
-  setAll<S>(_sessionId: string, _session: S): void {
-    throw new Error('DatabaseSessionStore.setAll() is not supported synchronously. Use setAllAsync() instead.');
+  /** Replaces the request's copy; the HTTP plugin writes it once the response is built. */
+  setAll<S>(sessionId: string, session: S): void {
+    writeRequestSession(sessionId, session as Record<string, unknown>);
   }
 
-  deleteAll(_sessionId: string): void {
-    throw new Error('DatabaseSessionStore.deleteAll() is not supported synchronously. Use deleteAllAsync() instead.');
+  /** Empties the request's copy; the HTTP plugin deletes the row once the response is built. */
+  deleteAll(sessionId: string): void {
+    removeRequestSession(sessionId);
   }
 
-  exists(_sessionId: string): boolean {
-    throw new Error('DatabaseSessionStore.exists() is not supported synchronously. Use existsAsync() instead.');
+  exists(sessionId: string): boolean {
+    return Object.keys(this.getAll(sessionId)).length > 0;
+  }
+
+  loadAsync(sessionId: string): Promise<Record<string, unknown>> {
+    return this.getAllAsync<Record<string, unknown>>(sessionId);
+  }
+
+  saveAsync(sessionId: string, data: Record<string, unknown>): Promise<void> {
+    return this.setAllAsync(sessionId, data);
+  }
+
+  removeAsync(sessionId: string): Promise<void> {
+    return this.deleteAllAsync(sessionId);
   }
 
   // Async implementations for actual DB operations

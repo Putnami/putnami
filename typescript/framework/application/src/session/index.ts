@@ -4,3 +4,4 @@ export * from './memory.store';
 export * from './session.config';
 export * from './session.store';
 export * from './session.utils';
+export * from './request-session';

@@ -31,6 +31,15 @@ The `DatabaseSessionStore` is a session store implementation that uses PostgreSQ
 - ✅ Indexed for performance
 - ✅ Manual cleanup support
 
+### How a request uses the table
+
+1. The browser keeps only the session ID, in the encrypted `<cookieName>_id` cookie.
+2. Before the handler runs, the HTTP plugin reads the row once.
+3. The handler reads and writes that copy through `useSession` and `setSession`.
+4. After the response, the plugin writes the row back if the handler changed it.
+
+Each request reads the row when it starts, so a value one request wrote, such as refreshed OAuth tokens, is what the next request of the same browser sees.
+
 ## Quick Start
 
 ### 1. Configure Session Store
@@ -254,33 +263,13 @@ new DatabaseSessionStore(dbName?: string)
 
 Ensures the `sessions` table exists. Called automatically on first use.
 
-##### `get<T>(sessionId: string, key: string): T | undefined`
+##### `get`, `set`, `delete`, `getAll`, `setAll`, `deleteAll`, `exists`
 
-Synchronous get (uses sync cache). For async operations, use `getAsync`.
+The synchronous methods behind `useSession`, `setSession` and `deleteSession`. They read and change the request's copy of the session. The HTTP plugin loads that copy from the `sessions` table once before the handler runs, and writes it back once after the response, even when the handler fails. A request that changed nothing writes nothing; a request that empties the session deletes its row. Calling them outside an HTTP request throws.
 
-##### `set<T>(sessionId: string, key: string, value: T): void`
+##### `loadAsync`, `saveAsync`, `removeAsync`
 
-Synchronous set (uses fire-and-forget async). For async operations, use `setAllAsync`.
-
-##### `delete(sessionId: string, key: string): void`
-
-Synchronous delete (uses fire-and-forget async).
-
-##### `getAll<S = Record<string, unknown>>(sessionId: string): S`
-
-Synchronous get all (uses sync cache). For async operations, use `getAllAsync`.
-
-##### `setAll<S>(sessionId: string, session: S): void`
-
-Synchronous set all (uses fire-and-forget async). For async operations, use `setAllAsync`.
-
-##### `deleteAll(sessionId: string): void`
-
-Synchronous delete all (uses fire-and-forget async).
-
-##### `exists(sessionId: string): boolean`
-
-Synchronous exists check. For async operations, use `existsAsync`.
+The `AsyncSessionStore` methods the HTTP plugin calls around each request. They map to `getAllAsync`, `setAllAsync` and `deleteAllAsync`.
 
 ##### `getAsync<T>(sessionId: string, key: string): Promise<T | undefined>`
 

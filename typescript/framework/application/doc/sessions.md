@@ -333,6 +333,59 @@ registerSessionStore('redis', () => new RedisSessionStore(redisClient));
 //   store: 'redis'
 ```
 
+### Asynchronous Stores
+
+A store whose backend answers asynchronously, such as a database, implements `AsyncSessionStore`. The session API stays synchronous:
+
+1. Before the handler runs, the HTTP plugin calls `loadAsync` once with the session ID from the `<cookieName>_id` cookie. A request without that cookie loads nothing.
+2. `useSession`, `setSession` and `deleteSession` read and change a copy of the session that belongs to the request. Implement the synchronous methods with `requestSessionData`, `writeRequestSession` and `removeRequestSession`.
+3. After the response, even a failed one, the plugin calls `saveAsync`, or `removeAsync` when the session is empty. A request that changed nothing writes nothing.
+
+Each request reads the stored session when it starts, so a value one request wrote is the value the next request sees. The cookie carries only the session ID.
+
+```typescript
+import {
+  type AsyncSessionStore,
+  registerSessionStore,
+  removeRequestSession,
+  requestSessionData,
+  writeRequestSession,
+} from '@putnami/application';
+
+class KeyValueSessionStore implements AsyncSessionStore {
+  readonly asyncSession = true as const;
+
+  get<T>(id: string, key: string): T | undefined {
+    return this.getAll<Record<string, unknown>>(id)[key] as T | undefined;
+  }
+  set<T>(id: string, key: string, value: T): void {
+    this.setAll(id, { ...this.getAll<Record<string, unknown>>(id), [key]: value });
+  }
+  delete(id: string, key: string): void {
+    const { [key]: _removed, ...rest } = this.getAll<Record<string, unknown>>(id);
+    this.setAll(id, rest);
+  }
+  getAll<S>(_id: string): S {
+    return requestSessionData<S>();
+  }
+  setAll<S>(id: string, session: S): void {
+    writeRequestSession(id, session as Record<string, unknown>);
+  }
+  deleteAll(id: string): void {
+    removeRequestSession(id);
+  }
+  exists(id: string): boolean {
+    return Object.keys(this.getAll(id)).length > 0;
+  }
+
+  async loadAsync(id: string) { return (await kv.get(id)) ?? {}; }
+  async saveAsync(id: string, data: Record<string, unknown>) { await kv.set(id, data); }
+  async removeAsync(id: string) { await kv.delete(id); }
+}
+
+registerSessionStore('kv', () => new KeyValueSessionStore());
+```
+
 ## Best Practices
 
 1. **Use secure secrets** - Generate strong random secrets for cookie encryption

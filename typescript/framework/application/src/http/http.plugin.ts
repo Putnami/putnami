@@ -6,6 +6,7 @@ import type { WsDataType } from '../api/ws-context.type';
 import { WebSocketDispatcher } from '../api/ws-dispatcher';
 import { Application, type GenerateResult, type Module, type Plugin } from '../application';
 import { PutnamiConfig } from '../application/putnami.config';
+import { commitRequestSession, loadRequestSession } from '../session/request-session';
 import { CompressionMiddleware } from './compression.middleware';
 import { CsrfMiddleware, isCsrfMiddleware } from './csrf.middleware';
 import { isDevHtmlRequest, renderDevErrorPage } from './dev-error-page';
@@ -384,7 +385,15 @@ export class HttpPlugin implements Plugin {
             // always has access to traceId / logContext.
             const res = await runInContext(context, async () => {
               try {
-                return await middlewareChain(context, dispatch);
+                // An asynchronous session store (database) is read before the
+                // middlewares and written after the response is built: the
+                // session API that handlers and middlewares call is synchronous.
+                await loadRequestSession();
+                try {
+                  return await middlewareChain(context, dispatch);
+                } finally {
+                  await commitRequestSession();
+                }
               } catch (e) {
                 if (requestTimedOut) {
                   return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
