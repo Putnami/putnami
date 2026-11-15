@@ -1,0 +1,112 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://putnami.dev/schemas/putnami-screenshots-v1.json",
+  "title": "Putnami screenshots manifest v1",
+  "description": "The manifest putnami change screenshots writes as screenshots.json beside its PNG captures. A schema cannot express these rules of the contract, which the decoder of go.putnami.dev/protocol/screenshots applies: no duplicate member; no trailing data; a manifest file of at most 4194304 bytes; a text member of at most 2048 bytes; no route listed twice; no capture file listed twice; a capture route that is one of the pages; a capture side that holds its page; exactly one capture per route, side, viewport and scheme. A capture file is at most 67108864 bytes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["protocolVersion", "project", "baseSHA", "headSHA", "pages", "captures"],
+  "properties": {
+    "protocolVersion": { "const": 1 },
+    "project": {
+      "description": "The project directory, relative to the workspace root.",
+      "anyOf": [{ "const": "." }, { "$ref": "#/$defs/relativePath" }]
+    },
+    "baseSHA": { "$ref": "#/$defs/commit" },
+    "headSHA": { "$ref": "#/$defs/commit" },
+    "pages": {
+      "type": "array",
+      "maxItems": 512,
+      "items": { "$ref": "#/$defs/page" }
+    },
+    "captures": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": { "$ref": "#/$defs/capture" }
+    }
+  },
+  "$defs": {
+    "commit": {
+      "description": "A full lowercase commit sha, SHA-1 or SHA-256.",
+      "type": "string",
+      "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"
+    },
+    "relativePath": {
+      "description": "A normalized slash-separated path that stays under its directory.",
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^[^/\\\\]+(/[^/\\\\]+)*$",
+      "not": { "pattern": "(^|/)\\.\\.?(/|$)" }
+    },
+    "page": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "route", "path", "before", "after"],
+      "properties": {
+        "file": {
+          "description": "The page file, relative to the project.",
+          "$ref": "#/$defs/relativePath"
+        },
+        "route": {
+          "description": "The route the page is captured at.",
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^/"
+        },
+        "path": {
+          "description": "The path visited for the route.",
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^/"
+        },
+        "before": { "type": "boolean" },
+        "after": { "type": "boolean" }
+      },
+      "anyOf": [
+        { "properties": { "before": { "const": true } } },
+        { "properties": { "after": { "const": true } } }
+      ]
+    },
+    "capture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["file", "route", "side", "viewport", "scheme", "sha256", "status", "url"],
+      "properties": {
+        "file": {
+          "description": "A .png file name in the manifest's directory.",
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^[^/\\\\]+\\.png$"
+        },
+        "route": {
+          "description": "The route of one of the pages.",
+          "type": "string",
+          "maxLength": 2048
+        },
+        "side": { "enum": ["before", "after"] },
+        "viewport": {
+          "description": "desktop is 1440x900 CSS pixels at scale 1, mobile 390x844 at scale 2.",
+          "enum": ["desktop", "mobile"]
+        },
+        "scheme": { "enum": ["light", "dark"] },
+        "sha256": {
+          "description": "The sha256 of the file.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "status": {
+          "description": "The HTTP status of the captured document.",
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "url": {
+          "description": "Where the page ended, after any redirect.",
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^https?://[^/?#]"
+        }
+      }
+    }
+  }
+}

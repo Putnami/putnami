@@ -197,6 +197,7 @@ validator built before this contract rejects it: upgrade the validator first.
 | [`contracts`](https://github.com/putnami/putnami/tree/main/protocols/contracts) | The canonical IR of a project's vocabulary, lowered by one compiler into Go and TypeScript types, JSON Schema, OpenAPI inputs, discovery metadata, and docs. |
 | [`doctor`](https://github.com/putnami/putnami/tree/main/protocols/doctor) | Production-readiness findings under a deployment profile, a frozen check-code taxonomy, and waivers you commit deliberately rather than forget silently. |
 | [`doccov`](https://github.com/putnami/putnami/tree/main/protocols/doccov) | No wire shape of its own: a ratchet that fails the build when too many wire fields cannot be explained from the types and schemas alone. |
+| [`screenshots`](https://github.com/putnami/putnami/tree/main/protocols/screenshots) | The manifest of the screenshots of a web change: the pages it touches and one hashed capture per page, side, viewport and color scheme, with the bounds a service that stores them may apply. |
 
 The reviewed support status of every protocol is published on
 [Support status](/docs/support), which is generated from the workspace catalog.
