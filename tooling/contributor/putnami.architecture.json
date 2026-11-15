@@ -172,6 +172,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/tooling/contributor",
+          "producerProject": "/protocols/screenshots"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/tooling/contributor",
           "producerProject": "/protocols/storage"
         },
         {

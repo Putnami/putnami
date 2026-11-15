@@ -1,0 +1,73 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "screenshots/manifest-contract",
+  "outcomes": [
+    "A consumer that stores or reads a screenshots manifest decodes it against the published schema or the Go decoder, not against a copy of the writer's types",
+    "The schema, the Go decoder and the fixture corpus accept and refuse the same manifests, except for the rules the schema names as ones it cannot express",
+    "A consumer knows the largest manifest and the largest capture file it has to accept"
+  ],
+  "nonGoals": [
+    "The PNG files: the manifest names and hashes them, and a reader checks the bytes it holds against sha256",
+    "How pages are selected, served and captured, which putnami change screenshots owns",
+    "Storing or showing the screenshots on a hosted change page",
+    "A TypeScript decoder: no TypeScript code reads the manifest"
+  ],
+  "requirements": [
+    {
+      "id": "the-identifiers-are-pinned",
+      "text": [
+        "The manifest is the file screenshots.json; its protocolVersion is 1 and its schema is published at https://putnami.dev/schemas/putnami-screenshots-v1.json.",
+        "The schema carries that $id and pins that version. Its members match the Go types, and its closed sets match the Go sets: the sides before and after, the viewports desktop (1440x900 at scale 1) and mobile (390x844 at scale 2), the schemes light and dark."
+      ]
+    },
+    {
+      "id": "a-manifest-parses-strictly",
+      "text": [
+        "A manifest fails as a whole, with stable codes, on an unknown, a duplicate or a missing member, and on trailing data.",
+        "It fails on another protocolVersion, on a project that is no normalized workspace-relative directory, and on a baseSHA or a headSHA that is no full lowercase commit sha of 40 or 64 hexadecimal characters."
+      ]
+    },
+    {
+      "id": "a-page-is-well-formed",
+      "text": [
+        "A page fails on a file that is no normalized relative path, on a route or a path that does not start with a slash, on a page that neither side holds, and on a route listed twice."
+      ]
+    },
+    {
+      "id": "a-capture-is-well-formed",
+      "text": [
+        "A capture fails on a file that is no .png name without a directory, on a file listed twice, and on a side, a viewport or a scheme outside its closed set.",
+        "It fails on a sha256 that is not 64 lowercase hexadecimal characters, on a status that is no HTTP status from 100 to 599, and on a url that is no absolute http or https URL."
+      ]
+    },
+    {
+      "id": "the-captures-cover-the-pages",
+      "text": [
+        "A manifest holds exactly one capture per route, side, viewport and scheme, for each side that holds the page: four captures for a page one side holds, eight for a page both hold.",
+        "A capture whose route is none of the pages, or whose side does not hold its page, is refused, and so is a missing or a repeated capture."
+      ]
+    },
+    {
+      "id": "the-corpus-is-the-contract",
+      "text": [
+        "Every valid fixture validates, every invalid fixture fails with its expected code, every expected code is registered, and every registered code but the three size bounds has a fixture.",
+        "The schema accepts every valid fixture and refuses every invalid one, except those whose rule its description names as one a schema cannot express."
+      ]
+    },
+    {
+      "id": "the-bounds-are-published",
+      "text": [
+        "A manifest holds at most 512 pages and 4096 captures, and its file is at most 4 MiB. A capture file is at most 64 MiB. A text member is at most 2048 bytes, and a capture file name at most 255.",
+        "The decoder refuses a manifest past a bound, and Marshal refuses to write one."
+      ]
+    },
+    {
+      "id": "a-written-manifest-reads-back",
+      "text": [
+        "Marshal validates a manifest before it serializes it, so a writer that goes through the protocol cannot write a manifest the decoder refuses.",
+        "A marshaled manifest is indented JSON with one trailing newline that parses back to the same value."
+      ]
+    }
+  ]
+}

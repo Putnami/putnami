@@ -32,6 +32,13 @@
       ]
     },
     {
+      "id": "the-manifest-is-a-protocol-document",
+      "text": [
+        "The manifest is a go.putnami.dev/protocol/screenshots document: the command writes it through the protocol types, and its output validates against the published schema.",
+        "change screenshots and change finalize read a manifest with the protocol decoder, which refuses one the contract does not allow."
+      ]
+    },
+    {
       "id": "finalize-asks-for-screenshots",
       "text": [
         "A ready publication of a change that touches a page of a web project needs a --screenshots manifest of the published head for that project, holding the after captures of every touched page with intact files, or --waive-screenshots <reason>.",

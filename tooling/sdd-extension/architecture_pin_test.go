@@ -155,6 +155,7 @@ func authoredProtocolsDomain() *arch.Builder {
 			"/protocols/registry",
 			"/protocols/runner",
 			"/protocols/runtime",
+			"/protocols/screenshots",
 			"/protocols/sitecontent",
 			"/protocols/storage",
 			"/protocols/support",

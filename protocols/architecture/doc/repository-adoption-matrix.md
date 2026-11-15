@@ -98,6 +98,7 @@ other project in the repository may reinterpret it.
 | `/protocols/registry` | `go.putnami.dev/protocol/registry` | The credential seam between publishers and the cloud. |
 | `/protocols/runner` | `go.putnami.dev/protocol/runner` | The credential-free runner wire: source manifest, execution request, provider RPC and session bundle. |
 | `/protocols/runtime` | `go.putnami.dev/protocol/runtime` | The runtime descriptor a built artifact carries. |
+| `/protocols/screenshots` | `go.putnami.dev/protocol/screenshots` | The manifest of the screenshots of a web change, which `putnami change screenshots` writes. |
 | `/protocols/sitecontent` | `go.putnami.dev/protocol/sitecontent` | `site-content-bundle/v1`: content produced in one repository, merged in another. |
 | `/protocols/storage` | `go.putnami.dev/protocol/storage` | The object/blob storage resource contract. |
 | `/protocols/support` | `go.putnami.dev/protocol/support` | `putnami.support.json`: the reviewed public support catalog. |
