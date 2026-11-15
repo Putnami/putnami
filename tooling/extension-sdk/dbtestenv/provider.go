@@ -1,8 +1,11 @@
 // The provider seam Up and Down act through, and the one rule that picks a
 // provider for a run.
 //
-// Two providers ship. The docker Provisioner (docker.go) STARTS a Postgres this
-// run owns, which is the local default. ProvidedServer (provided.go) consumes a
+// Three providers ship. The docker Provisioner (docker.go) STARTS a Postgres
+// container this run owns, and the NativeServer (native.go) starts one from the
+// PostgreSQL installed on the machine; the LocalServer (local.go), the local
+// default, uses Docker when its daemon answers and the native install
+// otherwise. ProvidedServer (provided.go) consumes a
 // Postgres the pipeline already started and named in PUTNAMI_TEST_PG_URL, which
 // is the only thing a CI runner can do — and the reason the task, not the
 // runner, stays the place the intelligence lives.
@@ -24,7 +27,7 @@ import (
 // Provider is the resource half of a test environment: something that hands
 // back a ready Postgres connection and a non-secret digest identifying it.
 //
-// The interface is SEALED — its policy members are unexported, so only the two
+// The interface is SEALED — its policy members are unexported, so only the
 // providers in this package can implement it. That is deliberate: `ownsServer`
 // steers the fail-closed gate that decides whether a run may create
 // infrastructure, and a gate whose answer can be supplied from outside is not a
@@ -79,7 +82,9 @@ type TestPolicy struct {
 //
 // PUTNAMI_TEST_PG_URL wins whenever it is set: naming a server is an explicit
 // instruction, it is cheaper than starting a container, and on CI it is the only
-// option. A blank value selects docker, the local default. An externally
+// option. A blank value selects the LocalServer, the local default: a Docker
+// container when a Docker daemon answers, the native install otherwise, chosen
+// inside Provision once the gate allowed starting a server. An externally
 // supplied DATABASE_TEST_BINDINGS still beats both — Up short-circuits before it
 // ever asks a provider for anything.
 //
@@ -91,7 +96,7 @@ func SelectProvider() Provider {
 	if strings.TrimSpace(os.Getenv(envProvidedServer)) != "" {
 		return NewProvidedServer()
 	}
-	return NewProvisioner()
+	return NewLocalServer()
 }
 
 // The docker Provisioner's half of the seam. Its own file stays exactly what it

@@ -389,17 +389,38 @@ resolves `DATABASE_TEST_BINDINGS` in this order:
 2. The binding this invocation provisioned. When the project commits an
    `infra/requirements.json` declaring a database, the `test` pipeline runs a
    `test-env-up` step that resolves the `--infra` policy (`auto` locally,
-   `require` on CI, `skip` to opt out) and, in `auto` mode with Docker
-   available, starts a throwaway Postgres container and writes the resolved
-   binding into a private, owner-only file for this run alone. A `runOn:
-   finally` `test-env-down` step closes the lifecycle; the container itself is
-   deliberately kept running so the next run reuses it, and `--infra-down`
-   tears every workspace-labeled container down. The credential never travels
+   `require` on CI, `skip` to opt out) and, in `auto` mode, starts a throwaway
+   Postgres and writes the resolved binding into a private, owner-only file
+   for this run alone. The server is a Docker container when a Docker daemon
+   answers; otherwise it is the PostgreSQL installed on the machine (`initdb`,
+   `pg_ctl` and `postgres` on `PATH` or in a usual install directory such as
+   `/usr/lib/postgresql/<version>/bin`), started on a loopback port in a data
+   directory under the temporary directory, as the `postgres` OS user when the
+   run is root. A `runOn: finally` `test-env-down` step closes the lifecycle;
+   the server itself is deliberately kept running so the next run reuses it,
+   and `--infra-down` stops every server it started. The credential never travels
    as an inherited environment variable and never reaches a cache key, a log
    line, a container label, or a session record.
 3. The project's test config (`conf/.env.test.yaml`, merged config under
    `.gen/conf/.env.test.yaml`, and adjacent secrets), when it declares a test
-   database.
+   database. When the config states no `mode`, the binding carries the run's:
+   `require` under `--require-test-db` or when `CI` is set, the `--infra` mode
+   otherwise (`auto` on a developer run).
+4. Under `--require-test-db` and none of the above, an empty binding in the
+   `require` mode, so a suite that asks for a test database fails.
+
+`--require-test-db` puts the `require` mode on whichever binding the run
+hands `go test`, the provisioned one included, while the run still starts the
+local server it may start. A suite that provisions through
+`testprovider.ForTest` then fails, naming the binding it tried, when its
+database does not answer; without the flag and off CI it is skipped. After the
+run, `putnami test` names the suites skipped that way in one warning (read
+from the `go test -json` transcript, so `--test-json=false` drops it; it shows
+with `--verbose` and in the run's JSON output and session):
+
+```text
+2 suite(s) skipped because their test database did not answer, so their SQL did not run: example.com/svc/store.TestRepo, example.com/svc/store.TestTx. Start the database, or pass --require-test-db to fail them.
+```
 
 Use the canonical test binding shape when you need full control:
 
@@ -458,6 +479,7 @@ from config.
 | `--race` | `false` | Enable race detector |
 | `--race-changed` | `true` | Run the race detector on the packages a change touched, in a step after the test run. Planned only when the run measured a diff and the project owns a changed Go or testdata file outside `.gen`; `--race` replaces it. `--no-race-changed` turns it off. See [Race detector on changed packages](#race-detector-on-changed-packages) |
 | `--timeout <duration>` | — | Test timeout (e.g. `30s`, `5m`) |
+| `--require-test-db` | `false` | Fail a suite whose test database does not answer instead of skipping it: the test binding carries the `require` mode. On CI the binding already carries it, and `testprovider.ForTest` fails a suite on CI that has no binding. See [Test database bindings](#test-database-bindings) |
 | `--short` | `false` | Run only tests that check `testing.Short()` |
 | `--run <pattern>` | — | Run only tests matching this regex pattern |
 | `--count <n>` | — | Run each test `n` times |

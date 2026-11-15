@@ -413,6 +413,14 @@
         "Its basis selects every path the answer read, so an unchanged basis digest keeps the answer exact.",
         "A read the digest cannot see, an unknown selector, and a git: or ../ pattern make the input an error."
       ]
+    },
+    {
+      "id": "test-database-binding",
+      "text": [
+        "When no binding was provisioned or supplied, the test subprocess receives the binding its committed test configuration declares, carrying the resolved mode when that configuration states none: require under --require-test-db or on CI, auto otherwise.",
+        "Under --require-test-db with no binding at all, the test subprocess receives an empty binding in the require mode, so a suite that asks for a test database fails.",
+        "The suites skipped because their test database did not answer are named in one summary line."
+      ]
     }
   ],
   "decisions": [

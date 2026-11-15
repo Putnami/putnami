@@ -48,6 +48,13 @@
         "A query on a context marked Autocommit runs on its own pooled connection, outside the request unit of work and every WithTx transaction the context carries;",
         "WithTx under such a context begins and owns its own transaction."
       ]
+    },
+    {
+      "id": "test-database-availability",
+      "text": [
+        "A suite that asks the test provider for its databases through ForTest fails, naming the binding without its password, when the database does not answer and the binding's mode is require or the run is on CI;",
+        "otherwise it is skipped with a message a test runner recognizes, and a provisioning failure that is not a connection failure always fails the suite."
+      ]
     }
   ],
   "decisions": [

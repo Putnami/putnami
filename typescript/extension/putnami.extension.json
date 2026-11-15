@@ -345,6 +345,11 @@
         "**/__tests__/**/*.tsx"
       ],
       "flags": {
+        "require-test-db": {
+          "type": "boolean",
+          "default": false,
+          "description": "Fail a suite whose test database does not answer instead of skipping it: the test binding carries the require mode, and a run without any binding hands an empty one in that mode. A binding provisioned on CI carries it already. The run still starts the local test database it may start."
+        },
         "runner": {
           "type": "string",
           "description": "Test runner: bun, vitest or jest. Default: the runner the project's package.json test script runs, else bun"
@@ -2309,7 +2314,7 @@
       }
     },
     "test-env-up": {
-      "description": "Provision the database test environment this project's tests run against, and write the resolved binding into the invocation-scoped sensitive artifact `test-run` reads. Extension-owned since an earlier migration — the CLI used to discover the datasources, run the container and inject the binding through a private env seam it then had to hide from its own cache key. Policy is unchanged: an externally supplied DATABASE_TEST_BINDINGS always wins, `--infra` (auto|require|skip) steers the mode with the CI default `require`, `--infra-down` tears every workspace-labeled container down and provisions nothing, and only a local `auto` run with docker on PATH ever touches the docker CLI. NEVER FAILS: an environment that could not be provisioned is reported by the test run itself, which skips its live cases when no binding is present.",
+      "description": "Provision the database test environment this project's tests run against, and write the resolved binding into the invocation-scoped sensitive artifact `test-run` reads. Extension-owned since an earlier migration — the CLI used to discover the datasources, run the container and inject the binding through a private env seam it then had to hide from its own cache key. Policy is unchanged: an externally supplied DATABASE_TEST_BINDINGS always wins, `--infra` (auto|require|skip) steers the mode with the CI default `require`, `--infra-down` stops every server it started and provisions nothing, and only a local `auto` run ever starts a server: a Docker container when a Docker daemon answers, the PostgreSQL installed on the machine otherwise. `--require-test-db` puts the require mode on the binding without changing what the run may start. NEVER FAILS: an environment that could not be provisioned is reported by the test run itself, which skips its live cases when no binding is present.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -2329,6 +2334,9 @@
           "from": "params"
         },
         "infra-down": {
+          "from": "params"
+        },
+        "require-test-db": {
           "from": "params"
         },
         "DATABASE_TEST_BINDINGS": {

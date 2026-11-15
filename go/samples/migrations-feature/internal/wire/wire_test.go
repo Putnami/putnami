@@ -3,7 +3,6 @@ package wire
 import (
 	"context"
 	"encoding/json"
-	stderrors "errors"
 	nethttp "net/http"
 	"net/http/httptest"
 	"os"
@@ -17,25 +16,11 @@ import (
 )
 
 // TestBuildAppAnswersHealth starts the production graph on an isolated,
-// provisioned database and requests GET /_/health on its server. It needs
-// DATABASE_TEST_BINDINGS, which the workspace test environment sets; without
-// it the test skips.
+// provisioned database and requests GET /_/health on its server. It
+// provisions through testprovider.ForTest: without a database that answers, it
+// fails on CI or under --require-test-db, and is skipped otherwise.
 func TestBuildAppAnswersHealth(t *testing.T) {
-	if os.Getenv(testprovider.EnvTestBinding) == "" {
-		t.Skipf("%s not set; skipping the started-application health check", testprovider.EnvTestBinding)
-	}
-	result, err := testprovider.Provision(context.Background(), testprovider.Options{})
-	if err != nil {
-		if stderrors.Is(err, testprovider.ErrSkip) {
-			t.Skipf("test provider mode=skip: %v", err)
-		}
-		t.Fatalf("provision a database: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := result.Cleanup(); err != nil {
-			t.Errorf("drop the provisioned database: %v", err)
-		}
-	})
+	result := testprovider.ForTest(t, testprovider.Options{})
 	if _, ok := result.Binding.Databases["default"]; !ok {
 		t.Fatalf("the provisioned binding has no %q datasource", "default")
 	}

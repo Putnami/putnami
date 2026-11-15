@@ -361,6 +361,47 @@ func TestUpProvisionsAndWritesBothArtifacts(t *testing.T) {
 	}
 }
 
+// `--require-test-db` keeps the run provisioning under its resolved auto mode
+// and stamps the require mode on the binding it hands the test process, so a
+// suite whose database does not answer fails instead of skipping. Without the
+// flag the binding carries the resolved mode.
+func TestUpStampsTheRequireModeWhenTheRunRequiresATestDatabase(t *testing.T) {
+	spectest.Proves(t, "tooling/extension-authoring", "test-environment-policy", "a-required-test-database-binding-carries-the-require-mode")
+	t.Setenv(EnvCI, "")
+	t.Setenv(EnvBindings, "")
+	for _, tc := range []struct {
+		name   string
+		params map[string]any
+		want   pdb.TestMode
+	}{
+		{"required", map[string]any{ParamRequireTestDB: true}, pdb.TestModeRequire},
+		{"not required", nil, pdb.TestModeAuto},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newFixture(t, tc.params)
+			f.declareDatabases(t, "svc", postgresRequirements)
+			result := Up(f.ctx, stubProvisioner(nil))
+			if result.Outcome != OutcomeProvisioned || result.Mode != pdb.TestModeAuto {
+				t.Fatalf("outcome %q mode %q, want a provisioned run under auto", result.Outcome, result.Mode)
+			}
+			binding, ok := BindingFrom(f.ctx)
+			if !ok {
+				t.Fatal("no bindings artifact was written")
+			}
+			tb, diags := pdb.ParseAndValidateTestBinding([]byte(binding))
+			if diag.HasErrors(diags) {
+				t.Fatalf("binding failed validation: %v", diags)
+			}
+			if tb.Mode != tc.want {
+				t.Errorf("binding mode = %q, want %q", tb.Mode, tc.want)
+			}
+		})
+	}
+	if got := BindingMode(nil, pdb.TestModeSkip); got != pdb.TestModeSkip {
+		t.Errorf("BindingMode without a context = %q, want the resolved skip", got)
+	}
+}
+
 // The credential reaches EXACTLY one file. Every other surface this task writes
 // — the lease, the result data, every diagnostic — must be free of it, and the
 // bindings artifact itself must be owner-only.

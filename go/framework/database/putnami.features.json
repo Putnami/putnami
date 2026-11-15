@@ -122,6 +122,21 @@
               "withtx-joins-ambient-unit-of-work"
             ]
           }
+        },
+        {
+          "id": "test-database-availability",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unreachable-required-database-fails-and-names-the-binding",
+              "an-unreachable-database-is-skipped-outside-require",
+              "a-provisioning-failure-that-is-not-a-connection-failure-fails"
+            ]
+          }
         }
       ]
     },

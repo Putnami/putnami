@@ -5,7 +5,6 @@ import (
 
 	"context"
 	stderrors "errors"
-	"os"
 	"sort"
 	"testing"
 	"time"
@@ -36,29 +35,14 @@ CREATE INDEX signing_keys_keyring_state ON signing_keys (keyring_id, state);
 `
 
 // provisionPool provisions an isolated Postgres via the shared test provider and
-// creates the signing_keys schema. It is gated behind DATABASE_TEST_BINDINGS
-// EXACTLY like go/samples/unit-of-work-proof/uow_test.go: with no binding it
-// SKIPS, so the local unit gate stays green with no Postgres. CI injects the
-// binding and runs the assertions for real.
+// creates the signing_keys schema. It provisions through testprovider.ForTest:
+// without a database that answers, the suite fails on CI or under
+// --require-test-db, and is skipped, and named in the putnami test summary,
+// otherwise.
 func provisionPool(t *testing.T) *database.Pool {
 	t.Helper()
-	if os.Getenv(testprovider.EnvTestBinding) == "" {
-		t.Skipf("%s not set; skipping keyringstore DB integration (set it to a postgres binding to run)", testprovider.EnvTestBinding)
-	}
-
 	ctx := context.Background()
-	result, err := testprovider.Provision(ctx, testprovider.Options{})
-	if err != nil {
-		if stderrors.Is(err, testprovider.ErrSkip) {
-			t.Skipf("test provider mode=skip: %v", err)
-		}
-		t.Fatalf("provision: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := result.Cleanup(); err != nil {
-			t.Errorf("cleanup: %v", err)
-		}
-	})
+	result := testprovider.ForTest(t, testprovider.Options{})
 
 	names := make([]string, 0, len(result.Binding.Databases))
 	for n := range result.Binding.Databases {

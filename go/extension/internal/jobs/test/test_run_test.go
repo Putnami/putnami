@@ -436,7 +436,7 @@ func TestLoadDatabaseTestBindingSupportsCanonicalSection(t *testing.T) {
         database: auth_test
 `)
 
-	raw, ok, err := loadDatabaseTestBinding(dir, "test")
+	raw, ok, err := loadDatabaseTestBinding(dir, "test", "auto")
 	if err != nil {
 		t.Fatalf("loadDatabaseTestBinding: %v", err)
 	}

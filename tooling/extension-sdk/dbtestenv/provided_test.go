@@ -88,8 +88,8 @@ func TestSelectProviderPrefersTheNamedServer(t *testing.T) {
 				t.Fatalf("selected %T, provided-server = %v, want %v", prov, isProvided, tc.provided)
 			}
 			if !tc.provided {
-				if _, isDocker := prov.(*Provisioner); !isDocker {
-					t.Errorf("selected %T, want the docker Provisioner as the local default", prov)
+				if _, isLocal := prov.(*LocalServer); !isLocal {
+					t.Errorf("selected %T, want the LocalServer as the local default", prov)
 				}
 			}
 		})

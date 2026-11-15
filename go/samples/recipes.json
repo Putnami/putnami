@@ -40,11 +40,12 @@
       "sample": "go/samples/unit-of-work-proof",
       "primitives": [
         "infra/requirements.json databases entry (putnami test provisions the binding)",
-        "go.putnami.dev/database/testprovider: Provision, EnvTestBinding",
+        "go.putnami.dev/database/testprovider: ForTest, Provision, EnvTestBinding",
         "go.putnami.dev/database: PoolConfigFromBinding, NewPool"
       ],
       "antiPatterns": [
         "A per-package dbtest.go that hardcodes a connection string or starts its own container",
+        "A helper that reads conf/.env.test.yaml into DATABASE_TEST_BINDINGS, or calls t.Skip when the database does not answer",
         "A shared long-lived test database that each test cleans up by hand"
       ],
       "since": "0.0.0-20260917065345-3cc91b658"

@@ -54,9 +54,12 @@ func isExpectedRollback(err error) bool {
 // (honoring concurrency groups with real goroutines) against the tx/CAS
 // primitives, and asserts the emitted Outcome and row post-conditions.
 //
-// It is gated behind DATABASE_TEST_BINDINGS exactly like
-// testprovider/integration_test.go: with no binding it SKIPS, so the local unit
-// gate stays green with no Postgres. CI injects the binding and runs it for real.
+// With no DATABASE_TEST_BINDINGS at all it SKIPS, as
+// testprovider/integration_test.go does, so a project whose run hands no
+// binding stays green with no Postgres. With one it provisions through
+// testprovider.ForTest: a database that does not answer fails the suite on CI
+// or under --require-test-db, and skips it, named in the putnami test summary,
+// otherwise.
 func Run(t *testing.T) {
 	t.Helper()
 	if os.Getenv(testprovider.EnvTestBinding) == "" {
@@ -69,18 +72,7 @@ func Run(t *testing.T) {
 	}
 
 	ctx := context.Background()
-	result, err := testprovider.Provision(ctx, testprovider.Options{})
-	if err != nil {
-		if stderrors.Is(err, testprovider.ErrSkip) {
-			t.Skipf("test provider mode=skip: %v", err)
-		}
-		t.Fatalf("provision: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := result.Cleanup(); err != nil {
-			t.Errorf("cleanup: %v", err)
-		}
-	})
+	result := testprovider.ForTest(t, testprovider.Options{})
 
 	names := make([]string, 0, len(result.Binding.Databases))
 	for n := range result.Binding.Databases {

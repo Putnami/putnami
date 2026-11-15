@@ -1027,6 +1027,21 @@
               "an-invalid-selection-is-an-error-answer"
             ]
           }
+        },
+        {
+          "id": "test-database-binding",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-conf-binding-carries-the-resolved-mode",
+              "require-test-db-without-a-binding-hands-an-empty-require-binding",
+              "suites-skipped-without-a-test-database-are-summarized"
+            ]
+          }
         }
       ]
     },

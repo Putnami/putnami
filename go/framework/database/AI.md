@@ -703,20 +703,30 @@ schema) per datasource, applies the published migration bundle, and returns a
 runtime `Binding` the adapter consumes through `database.PoolConfigFromBinding`.
 
 ```go
-res, err := testprovider.Provision(ctx, testprovider.Options{
+res := testprovider.ForTest(t, testprovider.Options{
     Bundle: os.DirFS(".gen/migration-bundle"), // applied when the binding sets applyMigrations
 })
-if errors.Is(err, testprovider.ErrSkip) {
-    t.Skip("no test database binding")
-}
-defer res.Cleanup() // drops the isolated databases/schemas
+// ForTest registers res.Cleanup with t.Cleanup: it drops the isolated databases/schemas.
 
 cfg, _ := database.PoolConfigFromBinding(res.Binding, "auth")
-pool, _ := database.NewPool(ctx, cfg) // connected to the isolated, migrated "auth" DB
+pool, _ := database.NewPool(t.Context(), cfg) // connected to the isolated, migrated "auth" DB
 ```
 
+`ForTest` decides what a suite does when its database does not answer — no
+binding names one, or the server refuses the connection. The suite fails when
+the binding's mode is `require` or `CI` is set, and the failure names the
+binding it tried (`default=user@host:port/database`, never the password).
+Otherwise it is skipped with a message that starts with
+`testprovider.SkipMarker`, and `putnami test` names those suites in one
+summary line. `putnami test` sets the mode: `require` under
+`--require-test-db` and on CI, `auto` on a developer run. Any other failure,
+such as a migration that does not apply, fails the suite. `Provision` is the
+same without a `testing.TB`: it returns the error and leaves the decision to
+the caller.
+
 Policy comes from the binding: `mode` (`require` fails loudly when no binding is
-present, `skip` returns `ErrSkip`, and `auto` currently has no Docker implementation),
+present, `skip` returns `ErrSkip`, and `auto` behaves as `require`: `putnami test`
+starts the server, the provider does not),
 `isolation` (`database` | `schema`), `applyMigrations`, `reuse`, and
 `keepDatabases` (skip the per-suite `DROP DATABASE` when the server's own
 lifetime is the cleanup — a DROP forces a cluster-wide checkpoint, so on a busy

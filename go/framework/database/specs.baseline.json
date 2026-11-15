@@ -7,6 +7,7 @@
     "go/persistence-transactions#multi-datasource-boundary",
     "go/persistence-transactions#pool-scoped-transaction",
     "go/persistence-transactions#secret-safe-telemetry",
+    "go/persistence-transactions#test-database-availability",
     "go/persistence-transactions#transaction-finalization",
     "go/persistence-transactions#unit-of-work",
     "go/shared-datasource-pooling#acquire-time-search-path",

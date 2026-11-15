@@ -5,7 +5,6 @@ import (
 
 	"context"
 	stderrors "errors"
-	"os"
 	"strings"
 	"testing"
 
@@ -157,32 +156,16 @@ func TestRetentionMigrationRollbackRestoresPriorContract(t *testing.T) {
 	}
 }
 
-// TestFlushRoundTrip is the live-DB integration test. It stays GATE-GREEN by
-// skipping whenever no test binding is injected: the normal gate case is
-// DATABASE_TEST_BINDINGS unset, and testprovider.Provision defaults to
-// mode=require (a loud error, not ErrSkip) when the env is blank, so the env
-// is checked FIRST. With a binding injected it provisions an isolated database,
+// TestFlushRoundTrip is the live-DB integration test. It provisions through
+// testprovider.ForTest: without a database that answers, it fails on CI or
+// under --require-test-db, and is skipped otherwise. It provisions an isolated database,
 // applies this feature's migrations, flushes a fixture accumulator, and reads
 // back to assert daily uniques, monthly uniques, counter values, and the
 // additive/idempotent upsert semantics.
 func TestFlushRoundTrip(t *testing.T) {
-	if strings.TrimSpace(os.Getenv(testprovider.EnvTestBinding)) == "" {
-		t.Skipf("%s unset; skipping live DB integration test", testprovider.EnvTestBinding)
-	}
 
 	ctx := context.Background()
-	res, err := testprovider.Provision(ctx, testprovider.Options{})
-	if err != nil {
-		if stderrors.Is(err, testprovider.ErrSkip) {
-			t.Skip("test binding mode=skip; skipping live DB integration test")
-		}
-		t.Fatalf("provision test database: %v", err)
-	}
-	defer func() {
-		if cerr := res.Cleanup(); cerr != nil {
-			t.Errorf("cleanup: %v", cerr)
-		}
-	}()
+	res := testprovider.ForTest(t, testprovider.Options{})
 
 	cfg, err := database.PoolConfigFromBinding(res.Binding, Datasource)
 	if err != nil {

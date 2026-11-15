@@ -7,7 +7,7 @@
       "id": "tooling/extension-authoring",
       "type": "feature",
       "name": "Extension authoring SDK",
-      "outcome": "Someone writing a Putnami extension gets the orchestrator-facing halves \u2014 the event stream, the job context, the manifest with its validated task declarations, subprocess execution, and the shared lifecycle primitives \u2014 as a library, so the extension only has to supply what its own ecosystem knows",
+      "outcome": "Someone writing a Putnami extension gets the orchestrator-facing halves — the event stream, the job context, the manifest with its validated task declarations, subprocess execution, and the shared lifecycle primitives — as a library, so the extension only has to supply what its own ecosystem knows",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -211,7 +211,9 @@
               "a-server-the-pipeline-named-is-used",
               "a-closure-declaring-no-database-is-a-no-op",
               "every-emitted-binding-bounds-the-test-pool",
-              "an-externally-supplied-binding-wins-over-any-provider"
+              "an-externally-supplied-binding-wins-over-any-provider",
+              "a-native-postgres-serves-when-no-docker-daemon-answers",
+              "a-required-test-database-binding-carries-the-require-mode"
             ]
           }
         },

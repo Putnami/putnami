@@ -15,8 +15,10 @@
 //     closure merge, the Postgres server's identity, its reuse and reaping, the
 //     synthesized binding, and the artifact contract the test task reads.
 //
-// Two providers implement the resource half (see provider.go). Docker starts a
-// container this run owns — the local default. The provided-server provider
+// Three providers implement the resource half (see provider.go). Docker starts
+// a container this run owns, and the native provider a PostgreSQL installed on
+// the machine; the local default uses Docker when its daemon answers and the
+// native install otherwise. The provided-server provider
 // consumes a Postgres the pipeline started and named in PUTNAMI_TEST_PG_URL,
 // which is what lets a CI run keep the per-project policy, closure merge,
 // artifact and lease it has locally instead of a runner reimplementing them
@@ -79,6 +81,12 @@ const (
 	ParamInfraDown = "infra-down"
 )
 
+// ParamRequireTestDB is the `--require-test-db` command parameter: the run
+// still provisions under its resolved mode, but every binding it hands a test
+// process carries the require mode, so a suite whose database does not answer
+// fails instead of skipping.
+const ParamRequireTestDB = "require-test-db"
+
 // Outcome is what one Up or Down did.
 type Outcome string
 
@@ -94,7 +102,8 @@ const (
 	// database, which is the zero-cost path for a unit-only project.
 	OutcomeNoDatabases Outcome = "no-databases"
 	// OutcomeNotProvisioned means the policy or the environment forbade
-	// provisioning: a non-auto mode, a CI run, or no docker binary.
+	// provisioning: a non-auto mode, a CI run, or neither docker nor a
+	// PostgreSQL install.
 	OutcomeNotProvisioned Outcome = "not-provisioned"
 	// OutcomeTornDown means `--infra-down` reaped every workspace-labeled
 	// container and this run provisioned nothing.
@@ -191,7 +200,7 @@ const providerID = "postgres-container"
 //  4. A closure declaring no database costs nothing: no provider call, no
 //     binding.
 //  5. FAIL CLOSED: no run may ever CREATE infrastructure outside the resolved
-//     `auto` mode, off CI, with a docker binary on PATH. A server the pipeline
+//     `auto` mode, off CI, with docker or a PostgreSQL install. A server the pipeline
 //     provided is not created by this run, so it is usable under `require` and
 //     on CI — which is the whole point of naming one — while `skip` still
 //     declines. See mayProvision.
@@ -270,9 +279,9 @@ func Up(ctx *pctx.Context, prov Provider) Result {
 	result.Digest = digest
 
 	// The provider chooses the isolation and reuse its binding carries; the run
-	// contributes the resolved mode.
+	// contributes the mode, require when it requires a test database.
 	policy := prov.bindingDefaults()
-	policy.Mode = mode
+	policy.Mode = BindingMode(ctx, mode)
 	binding, err := SynthesizeBinding(policy, databases, conn)
 	if err != nil {
 		result.Outcome = OutcomeNotProvisioned
@@ -376,11 +385,27 @@ func ResolveMode(ctx *pctx.Context, ci bool) pdb.TestMode {
 	return pdb.TestModeAuto
 }
 
+// BindingMode is the mode a binding handed to a test process carries: require
+// when the run passed `--require-test-db`, the resolved mode otherwise. It
+// steers the test process only: whether the run may start a server stays the
+// resolved mode's decision.
+func BindingMode(ctx *pctx.Context, resolved pdb.TestMode) pdb.TestMode {
+	if RequiresTestDatabase(ctx) {
+		return pdb.TestModeRequire
+	}
+	return resolved
+}
+
+// RequiresTestDatabase reports whether the run passed `--require-test-db`.
+func RequiresTestDatabase(ctx *pctx.Context) bool {
+	return ctx != nil && ctx.Params.Bool(ParamRequireTestDB, false, "requireTestDb")
+}
+
 // mayProvision reports whether this run may use its provider at all. Each
 // condition is cheap and none of them is a daemon or network call.
 //
 // The gate is fail-closed about ONE thing: CREATING infrastructure. Only the
-// resolved auto mode, off CI, with a docker binary on PATH, may start a server
+// resolved auto mode, off CI, with docker or a PostgreSQL install, may start a server
 // — that is what keeps a CI run from silently depending on a container someone
 // left running, and it is unchanged.
 //

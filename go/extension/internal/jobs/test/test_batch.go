@@ -353,6 +353,7 @@ func executeBatchGroup(
 	failed := make(map[string]bool, len(group.projects))
 	unattributedFailures := make(map[string]string, len(group.projects))
 	invocationTimedOut := make(map[string]bool, len(group.projects))
+	var transcripts []string
 	// Invocations run one after another: the batch holds one scheduler slot,
 	// and each `go test` already spreads its own packages over the CPUs.
 	for _, invocation := range invocations {
@@ -380,6 +381,7 @@ func executeBatchGroup(
 			}
 		}
 		emitBatchTestTranscript(emit, string(output), options.useJSON, options.verbose, invocation.projects)
+		transcripts = append(transcripts, string(output))
 
 		for _, project := range invocation.projects {
 			outputs[project.ref.ID] = runOutputs[project.ref.ID]
@@ -388,6 +390,8 @@ func executeBatchGroup(
 			invocationTimedOut[project.ref.ID] = timedOut
 		}
 	}
+
+	emitSkippedWithoutTestDatabase(emit, transcripts...)
 
 	var fragments []spectest.Fragment
 	if fragmentsDir != "" {

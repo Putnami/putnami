@@ -292,6 +292,7 @@ Unhandled errors between tests (module-level crashes) are extracted and reported
 | `--pass-with-no-tests` | `boolean` | `true` | Pass if no test files are found |
 | `--types` | `boolean` | `true` | Type-check every TypeScript file of the project, tests included, in the `types` step |
 | `--test-verbose` | `boolean` | `false` | Show the complete Bun transcript at info level; changes visibility only, never the invocation or verdict |
+| `--require-test-db` | `boolean` | `false` | Put the `require` mode on the database test binding `test-env-up` provisions, so a suite whose test database does not answer fails instead of skipping. A binding provisioned on CI carries it already. The run still starts the local test database it may start: a Docker container, or the PostgreSQL installed on the machine when no Docker daemon answers |
 
 ### Activation
 

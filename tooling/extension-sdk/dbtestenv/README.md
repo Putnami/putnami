@@ -14,17 +14,23 @@ the two jobs and supplies nothing else:
 The design decisions behind it are
 [ADR 0002 — a provisioned secret lives in exactly one artifact](../doc/adr/0002-a-secret-lives-in-one-artifact.md).
 
-## Two providers
+## Three providers
 
 | Provider | Server | Selected when | Owns the server |
 |----------|--------|---------------|-----------------|
-| docker (`docker.go`) | a digest-keyed `postgres:17` container this run starts | `PUTNAMI_TEST_PG_URL` is unset | yes — it starts, reuses, reaps and tears down |
+| docker (`docker.go`) | a digest-keyed `postgres:17` container this run starts | `PUTNAMI_TEST_PG_URL` is unset and a Docker daemon answers | yes — it starts, reuses, reaps and tears down |
+| native (`native.go`) | the PostgreSQL installed on the machine, started in a digest-keyed data directory | `PUTNAMI_TEST_PG_URL` is unset and no Docker daemon answers | yes — the same lifecycle as the container |
 | provided server (`provided.go`) | a Postgres the pipeline already started | `PUTNAMI_TEST_PG_URL` is set | no — it never creates or removes anything |
 
-Both run the same task. The policy, the closure merge, the provisioning, the
-0600 artifact and the lease are provider-independent; a provider answers only
-what it is, whether it can be used, whether it owns what it hands back, and what
-policy its binding carries.
+The first two sit behind one `LocalServer` (`local.go`), the local default. It
+asks the Docker daemon for its version, bounded, only once the gate allowed the
+run to start a server, and serves from Docker when the daemon answers and from
+the native install otherwise.
+
+All of them run the same task. The policy, the closure merge, the provisioning,
+the 0600 artifact and the lease are provider-independent; a provider answers
+only what it is, whether it can be used, whether it owns what it hands back, and
+what policy its binding carries.
 
 ## Precedence
 
@@ -40,7 +46,44 @@ Checked in this order, each one before the next can cost anything:
    the only option. The value is *not* parsed during selection — a malformed URL
    fails loudly, with a diagnostic naming it, instead of silently falling back to
    a container nobody asked for.
-3. **Otherwise docker**, under the unchanged fail-closed gate.
+3. **Otherwise the local server** — Docker when its daemon answers, the
+   native install otherwise — under the unchanged fail-closed gate.
+
+`--require-test-db` changes no step of the precedence. It puts the `require`
+mode on the binding the run hands the test process, while provisioning keeps
+the resolved mode, so a developer run still starts its local server and a suite
+whose database does not answer fails instead of skipping.
+
+## Native mode
+
+A container without a Docker daemon often has a PostgreSQL package installed.
+The native provider looks for `initdb`, `pg_ctl` and `postgres` beside the
+`pg_ctl` or `initdb` on `PATH`, then in the newest of
+`/usr/lib/postgresql/*/bin`, `/usr/pgsql-*/bin`,
+`/opt/homebrew/opt/postgresql@*/bin` and `/usr/local/opt/postgresql@*/bin`.
+
+- **Data directory.** `<state root>/putnami-test-pg-<digest>`, the digest
+  taken over the install directory, the role and the database. The state root
+  is the user's cache directory (`putnami/test-pg`), or, for root,
+  `$TMPDIR/putnami-test-pg-0`; it must be a real directory this user owns that
+  nobody else can write, or nothing is started. An advisory lock on it
+  serializes the test tasks of one run.
+- **Server.** `initdb` with the `putnami` superuser under a random password
+  (scram; passed in a 0600 file created exclusively and removed right after,
+  then kept in `putnami.password` inside the 0700 data directory), with
+  `fsync`, `synchronous_commit` and `full_page_writes` off; `pg_ctl start` in
+  its own session, on a free loopback port, with no Unix socket. The test
+  database `putnami_test` is created once.
+- **Environment.** The programs inherit only `PATH`, the locale variables and
+  `TZ`: the server outlives the run and must not carry its credentials.
+- **Root.** PostgreSQL refuses to run as root, so a root run starts `initdb`
+  and `pg_ctl` as the `postgres` OS user the distribution package created,
+  with that user's groups and home, and gives it the data directory. Without
+  that user the provider reports why.
+- **Lifetime.** Like the container: a running server whose digest matches is
+  reused, every other one is stopped and its directory removed first, and
+  `--infra-down` stops them all. `compose` isolates its databases on it through
+  the install's `psql`.
 
 ## Provided-server mode
 
@@ -66,7 +109,8 @@ instead of the default below. Anything else fails with a cause that never quotes
 the URL, because the URL carries a password.
 
 **Fail-closed, restated.** The gate is fail-closed about *creating*
-infrastructure: only `auto`, off CI, with docker on `PATH`, may start a server.
+infrastructure: only `auto`, off CI, with docker or a PostgreSQL install, may
+start a server.
 A provided server is not created by this run, so `require` — the CI default, and
 the mode whose whole meaning is "a database must be there" — uses it, and so does
 `auto`. `skip` declines in both modes.

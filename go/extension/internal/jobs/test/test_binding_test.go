@@ -1,6 +1,7 @@
 package test
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"slices"
@@ -12,6 +13,8 @@ import (
 	"go.putnami.dev/sdk/extension/dbtestenv"
 	"go.putnami.dev/sdk/extension/hostenv"
 
+	pdb "go.putnami.dev/protocol/database"
+	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -337,6 +340,121 @@ func TestBuildTestEnv_NoArtifactAddsNoBinding(t *testing.T) {
 	}
 	if vals := bindingValues(env); len(vals) != 0 {
 		t.Errorf("binding entries = %v, want none", vals)
+	}
+}
+
+// confProject writes a project whose committed test conf declares one
+// datasource without a mode.
+func confProject(t *testing.T) string {
+	t.Helper()
+	proj := filepath.Join(t.TempDir(), "svc")
+	if err := os.MkdirAll(filepath.Join(proj, "conf"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	mustWrite(t, filepath.Join(proj, "conf", ".env.test.yaml"), `database:
+  default:
+    host: 127.0.0.1
+    port: 5432
+    database: svc_test
+    user: svc
+    password: svc
+`)
+	return proj
+}
+
+// bindingMode reads the mode of the one binding env carries.
+func bindingMode(t *testing.T, env []string) string {
+	t.Helper()
+	vals := bindingValues(env)
+	if len(vals) != 1 {
+		t.Fatalf("binding entries = %v, want one", vals)
+	}
+	var tb struct {
+		Mode      string         `json:"mode"`
+		Databases map[string]any `json:"databases"`
+	}
+	if err := json.Unmarshal([]byte(vals[0]), &tb); err != nil {
+		t.Fatalf("binding %s: %v", vals[0], err)
+	}
+	return tb.Mode
+}
+
+// The binding the committed conf declares carries the run's mode when the conf
+// states none: require under --require-test-db or on CI, auto on a developer
+// run, the --infra mode when one is given. A mode the conf states is kept.
+func TestBuildTestEnv_TheConfBindingCarriesTheResolvedMode(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "test-database-binding", "the-conf-binding-carries-the-resolved-mode")
+	t.Setenv(dbtestenv.EnvBindings, "")
+	for _, tc := range []struct {
+		name   string
+		ci     string
+		params pctx.Params
+		want   string
+	}{
+		{"developer run", "", nil, "auto"},
+		{"CI", "true", nil, "require"},
+		{"require-test-db", "", pctx.Params{dbtestenv.ParamRequireTestDB: json.RawMessage("true")}, "require"},
+		{"infra skip", "", pctx.Params{dbtestenv.ParamInfra: json.RawMessage(`"skip"`)}, "skip"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv(dbtestenv.EnvCI, tc.ci)
+			env, err := buildTestEnv(&pctx.Context{Params: tc.params}, confProject(t), false, "")
+			if err != nil {
+				t.Fatalf("buildTestEnv: %v", err)
+			}
+			if got := bindingMode(t, env); got != tc.want {
+				t.Errorf("mode = %q, want %q", got, tc.want)
+			}
+		})
+	}
+
+	t.Run("a stated mode", func(t *testing.T) {
+		t.Setenv(dbtestenv.EnvCI, "true")
+		proj := filepath.Join(t.TempDir(), "svc")
+		if err := os.MkdirAll(filepath.Join(proj, "conf"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		mustWrite(t, filepath.Join(proj, "conf", ".env.test.yaml"), `databaseTest:
+  mode: skip
+database:
+  default:
+    host: 127.0.0.1
+    database: svc_test
+`)
+		env, err := buildTestEnv(&pctx.Context{}, proj, false, "")
+		if err != nil {
+			t.Fatalf("buildTestEnv: %v", err)
+		}
+		if got := bindingMode(t, env); got != "skip" {
+			t.Errorf("mode = %q, want the conf's skip", got)
+		}
+	})
+}
+
+// Under --require-test-db a test process with no binding at all receives an
+// empty one in the require mode, so a suite that asks for a test database
+// fails. Without the flag it receives none, as before.
+func TestBuildTestEnv_RequireTestDBWithoutABindingHandsAnEmptyRequireBinding(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "test-database-binding", "require-test-db-without-a-binding-hands-an-empty-require-binding")
+	t.Setenv(dbtestenv.EnvBindings, "")
+	t.Setenv(dbtestenv.EnvCI, "")
+	proj := filepath.Join(t.TempDir(), "svc")
+	if err := os.MkdirAll(proj, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	ctx := &pctx.Context{Params: pctx.Params{dbtestenv.ParamRequireTestDB: json.RawMessage("true")}}
+	env, err := buildTestEnv(ctx, proj, false, "")
+	if err != nil {
+		t.Fatalf("buildTestEnv: %v", err)
+	}
+	if got := bindingMode(t, env); got != "require" {
+		t.Errorf("mode = %q, want require", got)
+	}
+	if vals := bindingValues(env); vals[0] != requiredEmptyBinding {
+		t.Errorf("binding = %s, want %s", vals[0], requiredEmptyBinding)
+	}
+	if _, diags := pdb.ParseAndValidateTestBinding([]byte(requiredEmptyBinding)); diag.HasErrors(diags) {
+		t.Errorf("the empty require binding is invalid: %v", diags)
 	}
 }
 

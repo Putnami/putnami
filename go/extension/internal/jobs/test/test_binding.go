@@ -32,7 +32,12 @@ import (
 //	   environment variable, which every descendant process and `ps` can see.
 //	   The consuming job's cache key folds the PRODUCING ACTION's digest, so the
 //	   credential's bytes are never a cache input.
-//	3. The project's committed conf datasources, synthesized here as before.
+//	3. The project's committed conf datasources, synthesized here as before,
+//	   carrying the run's mode when the conf states none: require under
+//	   `--require-test-db` or on CI, the resolved `--infra` mode otherwise.
+//	4. Under `--require-test-db` with none of the above, an empty binding in
+//	   the require mode, so a suite that asks for a test database fails
+//	   instead of skipping.
 func buildTestEnv(ctx *pctx.Context, projectPath string, race bool, goBinary string) ([]string, error) {
 	// Base the test env on WorkspaceBuildEnv, not a raw os.Environ(): an
 	// inherited GOWORK=off is stripped and GOWORK points at the governing go.work.
@@ -63,15 +68,24 @@ func buildTestEnv(ctx *pctx.Context, projectPath string, race bool, goBinary str
 		return setEnv(env, envDatabaseTestBindings, provisioned), nil
 	}
 
-	binding, ok, err := loadDatabaseTestBinding(projectPath, envName)
+	mode := dbtestenv.BindingMode(ctx, dbtestenv.ResolveMode(ctx, os.Getenv(dbtestenv.EnvCI) != ""))
+	binding, ok, err := loadDatabaseTestBinding(projectPath, envName, mode)
 	if err != nil {
 		return nil, err
 	}
 	if ok {
-		env = setEnv(env, envDatabaseTestBindings, binding)
+		return setEnv(env, envDatabaseTestBindings, binding), nil
+	}
+	if dbtestenv.RequiresTestDatabase(ctx) {
+		return setEnv(env, envDatabaseTestBindings, requiredEmptyBinding), nil
 	}
 	return env, nil
 }
+
+// requiredEmptyBinding is the binding a `--require-test-db` run hands a test
+// process that has no other: no datasource, in the require mode, so the test
+// provider fails a suite that asks for one instead of skipping it.
+const requiredEmptyBinding = `{"protocolVersion":1,"mode":"require","databases":{}}`
 
 func testEnvironment() string {
 	if env := strings.TrimSpace(os.Getenv(envAppEnv)); env != "" {
@@ -80,7 +94,9 @@ func testEnvironment() string {
 	return defaultTestEnvironment
 }
 
-func loadDatabaseTestBinding(projectPath, envName string) (string, bool, error) {
+// loadDatabaseTestBinding synthesizes the binding the project's committed
+// conf declares. mode fills the binding's mode when the conf states none.
+func loadDatabaseTestBinding(projectPath, envName string, mode pdb.TestMode) (string, bool, error) {
 	config := make(map[string]any)
 	for _, rel := range []string{
 		filepath.Join("conf", ".env.yaml"),
@@ -103,6 +119,9 @@ func loadDatabaseTestBinding(projectPath, envName string) (string, bool, error) 
 	tb, ok, err := databaseTestBindingFromConfig(config)
 	if err != nil || !ok {
 		return "", ok, err
+	}
+	if tb.Mode == "" {
+		tb.Mode = mode
 	}
 	raw, err := json.Marshal(tb)
 	if err != nil {

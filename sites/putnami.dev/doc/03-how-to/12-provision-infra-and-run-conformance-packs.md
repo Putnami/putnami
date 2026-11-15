@@ -38,7 +38,7 @@ putnami test
 
 | mode | when | behavior |
 |---|---|---|
-| `auto` | local default | uses a Postgres named in `PUTNAMI_TEST_PG_URL` when present; otherwise provisions a throwaway Docker container and hands tests a `DATABASE_TEST_BINDINGS` binding. The container stays running for the next run to reuse |
+| `auto` | local default | uses a Postgres named in `PUTNAMI_TEST_PG_URL` when present; otherwise provisions a throwaway Docker container, or, when no Docker daemon answers, starts the PostgreSQL installed on the machine, and hands tests a `DATABASE_TEST_BINDINGS` binding. The server stays running for the next run to reuse |
 | `require` | CI default | uses a Postgres named in `PUTNAMI_TEST_PG_URL` to create each project's binding; otherwise consumes the `DATABASE_TEST_BINDINGS` your pipeline injects, and fails loudly if neither is present |
 | `skip` | opt out | injects nothing; tests gated on the binding skip |
 
@@ -47,8 +47,13 @@ Override the policy with the `--infra` flag or the `test.infra` config key (flag
 ```bash
 putnami test --infra require   # consume an external binding, fail if absent
 putnami test --infra skip       # never provision
-putnami test --infra-down       # tear down any leftover provisioned containers
+putnami test --infra-down       # stop any leftover provisioned server
+putnami test --require-test-db  # fail a suite whose database does not answer
 ```
+
+Without Docker, `putnami test` and `putnami compose` look for `initdb`, `pg_ctl` and `postgres` on `PATH`, then in the usual install directories (`/usr/lib/postgresql/<version>/bin`, `/usr/pgsql-<version>/bin`, Homebrew's `postgresql@<version>`). They start the newest one in a throwaway data directory under the temporary directory, on a loopback port, with the same role and database a Docker container would have. PostgreSQL does not run as root, so a root run starts it as the `postgres` OS user the package created.
+
+A suite whose database does not answer is skipped on a developer run and fails on CI or under `--require-test-db`, naming the binding it tried. `putnami test` names the skipped suites in one line, so code whose SQL never ran does not pass unseen. In Go, provision through `testprovider.ForTest(t, opts)` to get this behavior.
 
 An externally set `DATABASE_TEST_BINDINGS` always wins: when the variable is present, `putnami test` provisions nothing and your binding flows through untouched.
 

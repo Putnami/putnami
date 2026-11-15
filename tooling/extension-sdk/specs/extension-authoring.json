@@ -76,7 +76,10 @@
     },
     {
       "id": "test-environment-policy",
-      "text": "The database test-environment mode resolves by a fixed precedence, never creates infrastructure outside auto mode off CI, uses a server the pipeline provided when one is named, is a no-op when the dependency closure declares no database, bounds the connection pool of every binding it emits unless the provided server states otherwise, and lets an externally supplied binding win over any provider."
+      "text": [
+        "The test-environment mode resolves by a fixed precedence; no infrastructure is created outside auto mode off CI; a server the pipeline names is used, else Docker, else a native PostgreSQL found on the machine.",
+        "A closure declaring no database is a no-op; every emitted binding bounds its pool unless the provided server states otherwise and carries the require mode when the run requires a test database; an externally supplied binding wins."
+      ]
     },
     {
       "id": "infra-aggregation-neutrality",

@@ -221,6 +221,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 	outputStr := string(output)
 	testFailed := err != nil
 	emitTestTranscript(emit, outputStr, useJSON, verbose, "")
+	emitSkippedWithoutTestDatabase(emit, outputStr)
 
 	if testFailed {
 		emit.PhaseEnd("run", "failed")
