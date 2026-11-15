@@ -73,6 +73,9 @@ func (c Command) Run(ctx context.Context, args []string) int {
 		fmt.Fprintf(c.Stderr, "change finalize: %v\n", err)
 		return 1
 	}
+	for _, line := range result.Stripped {
+		fmt.Fprintf(c.Stderr, "change finalize: removed line %d of the %s, which names an agent (%s): %s\n", line.Line, line.Field, line.Kind, line.Text)
+	}
 	merged := result.State == collab.ProposalStateMerged
 	if merged {
 		fmt.Fprintf(c.Stderr, "change finalize: proposal %s/%s is already merged; nothing was published\n", result.ProposalRef.Source, result.ProposalRef.ID)

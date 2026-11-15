@@ -27,6 +27,7 @@
     "tooling/contributor-executable#provider-neutral-publication",
     "tooling/contributor-executable#repository-policy",
     "tooling/contributor-executable#requirementless-delivery",
+    "tooling/contributor-executable#signature-free-publication",
     "tooling/contributor-executable#squash-ready-publication",
     "tooling/epic#epic-cloud-child",
     "tooling/epic#epic-plan-validation",

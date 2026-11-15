@@ -42,6 +42,14 @@
       ]
     },
     {
+      "id": "signature-free-publication",
+      "text": [
+        "No title, body, proof or branch commit of a publication names an agent, in the forms the agent-attribution step of validate refuses.",
+        "Before any write, the finalizer removes each line of the body that names one and reports it on stderr and in the result; the body file stays as written.",
+        "A title, a proof or a branch commit that names one, or a body left empty, stops the run; the body read back after the write stays exact."
+      ]
+    },
+    {
       "id": "authorized-auto-merge",
       "text": [
         "publication.autoMerge is \"squash\" or false, false by default; any other value stops the run before any write.",

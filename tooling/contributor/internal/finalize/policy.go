@@ -12,6 +12,7 @@ import (
 
 	"go.putnami.dev/protocol/codehost"
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/sdk/extension/attribution"
 	"go.putnami.dev/sdk/extension/collabhelper"
 
 	"go.putnami.dev/tooling/contributor/internal/language"
@@ -146,7 +147,6 @@ var (
 	titlePattern     = regexp.MustCompile(`^(feat|fix|docs|test|refactor|perf|build|ci|chore|style)(\([^()]+\))?!?: .+`)
 	testPath         = regexp.MustCompile(`(^|/)(testdata|__tests__|tests?)/|_test\.(go|py)$|(^|/)test_[^/]*\.py$|\.(test|spec)\.[cm]?[jt]sx?$|\.test\.sh$`)
 	heading          = regexp.MustCompile(`(?m)^#{1,6}\s`)
-	agentMarker      = regexp.MustCompile(`(?im)^\s*co-authored-by:.*(anthropic|openai|claude|codex|gpt-[0-9])|generated (with|by) \[?(claude|codex|chatgpt|openai|anthropic)|claude\.ai/code/session_|^\s*claude-session:|chatgpt\.com/codex/`)
 	closingDirective = regexp.MustCompile(`(?im)(^|\s)(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[:,]?\s+(([^\s#]+/)?[^\s#]+#|#|https?://[^\s]+/issues/)[[:alnum:]_-]+`)
 )
 
@@ -166,7 +166,7 @@ func ValidateTitle(title string, paths []string) error {
 			return errors.New("every changed path is a test; use a test: title")
 		}
 	}
-	if agentMarker.MatchString(title) {
+	if attribution.Names(title) {
 		return errors.New("title names an agent")
 	}
 	return nil
@@ -246,7 +246,7 @@ func ValidatePublicationText(title, body, proof string, policy Policy) error {
 		return fmt.Errorf("proposal body is %d bytes; policy allows %d", len(body), policy.Publication.BodyMaxBytes)
 	}
 	combined := title + "\n\n" + body + "\n" + proof
-	if agentMarker.MatchString(combined) {
+	if attribution.Names(combined) {
 		return errors.New("proposal title, body or proof names an agent")
 	}
 	if policy.Verification.Language == "en" && language.EvaluateLanguage("proposal title, body and proof", combined) != nil {
