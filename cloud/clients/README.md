@@ -32,7 +32,11 @@ file. `delivery-api` comes from the later version
 `0.0.0-20261110144910-13ece114a`, published on 2026-11-10, archive digest
 `sha256:082572ded5b2acb20382e546b27da1694abc630ff83b6530988a5568052a3fed`. It
 adds the merge queue setting (`getV1_Workspaces_Workspace_Ci_Queue`,
-`putV1_Workspaces_Workspace_Ci_Queue`). `source-api` comes from the later
+`putV1_Workspaces_Workspace_Ci_Queue`). `delivery-api` now comes from version
+`0.0.0-20261115185420-e7a696606`, published on 2026-11-15, archive digest
+`sha256:cb521bf9521fdcc99c1cb1dd4a37f649ea4c5cdb0944d9aed4eac9497a1204c6`. It
+adds the merge queue entries (`getV1_Workspaces_Workspace_Ci_Queue_Entries`),
+and pause and resume in the queue setting. `source-api` comes from the later
 version `0.0.0-20261115110438-6cf844fba`, published on 2026-11-15, archive
 digest
 `sha256:7edc53105fab142c91a4c50d2b3aef6df3d8c6121a305c9013a0abf45a40bbf9`. It

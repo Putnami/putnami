@@ -17,7 +17,8 @@ The aggregator in [`internal/cloudcli`](../cloudcli) imports it.
   merge queue setting. `enable` reads and splits the branch's GitHub rulesets
   with the person's own GitHub credentials (`queue_rules.go`, the one call to
   GitHub's REST API, claimed in `clientgen.external.json`), then turns the
-  setting on.
+  setting on. `list`, `pause` and `resume` (`queue_line.go`) print the line
+  and the commit to rebase on, and pause and resume the queue.
 - `putnami cloud channels follow <namespace> <channel|rs_id>` (`subscription.go`):
   changes what the workspace's CI follows.
 - `putnami cloud cache` (`cache.go`), and the `cache-provider` and

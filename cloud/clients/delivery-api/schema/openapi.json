@@ -129,6 +129,42 @@
         ],
         "type": "object"
       },
+      "CIRunConflictResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "baseRef": {
+            "type": "string"
+          },
+          "baseSha": {
+            "type": "string"
+          },
+          "baseUrl": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "cut": {
+            "type": "boolean"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "more": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "CIRunDiskResponse": {
         "additionalProperties": false,
         "properties": {
@@ -236,6 +272,10 @@
       "CIRunFailureResponse": {
         "additionalProperties": false,
         "properties": {
+          "conflict": {
+            "$ref": "#/components/schemas/CIRunConflictResponse",
+            "nullable": true
+          },
           "detail": {
             "type": "string"
           },
@@ -735,6 +775,9 @@
           "verdict": {
             "$ref": "#/components/schemas/CIRunVerdictResponse",
             "nullable": true
+          },
+          "workspaceId": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -3186,6 +3229,215 @@
         },
         "type": "object"
       },
+      "QueueConflict": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "more": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "on": {
+            "type": "string"
+          },
+          "with": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "QueueEndedEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "author": {
+            "type": "string"
+          },
+          "dropDetail": {
+            "type": "string"
+          },
+          "dropReason": {
+            "type": "string"
+          },
+          "endedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "headSha": {
+            "type": "string"
+          },
+          "landedSha": {
+            "type": "string"
+          },
+          "landingNote": {
+            "type": "string"
+          },
+          "lostRuns": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "pullRequest": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "queueCommit": {
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "QueueEntries": {
+        "additionalProperties": false,
+        "properties": {
+          "branch": {
+            "type": "string"
+          },
+          "open": {
+            "items": {
+              "$ref": "#/components/schemas/QueueEntry"
+            },
+            "type": "array"
+          },
+          "rebaseOn": {
+            "$ref": "#/components/schemas/RebaseOn"
+          },
+          "recent": {
+            "items": {
+              "$ref": "#/components/schemas/QueueEndedEntry"
+            },
+            "type": "array"
+          },
+          "repository": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "QueueEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "author": {
+            "type": "string"
+          },
+          "builtOn": {
+            "type": "string"
+          },
+          "conflict": {
+            "$ref": "#/components/schemas/QueueConflict",
+            "nullable": true
+          },
+          "enteredAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "headSha": {
+            "type": "string"
+          },
+          "lostRuns": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "position": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "pullRequest": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "queueCommit": {
+            "type": "string"
+          },
+          "requestedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "runId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "waitingDetail": {
+            "type": "string"
+          },
+          "waitingFor": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "QueuePause": {
+        "additionalProperties": false,
+        "properties": {
+          "at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "by": {
+            "type": "string"
+          },
+          "byLogin": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "QueueRefusal": {
         "additionalProperties": false,
         "properties": {
@@ -3216,6 +3468,13 @@
           "enabled": {
             "type": "boolean"
           },
+          "pause": {
+            "$ref": "#/components/schemas/QueuePause",
+            "nullable": true
+          },
+          "paused": {
+            "type": "boolean"
+          },
           "repository": {
             "type": "string"
           },
@@ -3240,7 +3499,27 @@
             "type": "integer"
           },
           "enabled": {
+            "nullable": true,
             "type": "boolean"
+          },
+          "paused": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RebaseOn": {
+        "additionalProperties": false,
+        "properties": {
+          "ref": {
+            "type": "string"
+          },
+          "sha": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -5707,7 +5986,7 @@
         }
       },
       "put": {
-        "description": "Turn the merge queue of one branch on or off, and set its depth: the number of queue runs in flight at most, 1 to 16, 4 when zero or absent. Until the putnami CLI can cut a release set from the entry ahead (`putnami publish --inherit-channel`), a depth above 1 answers 400 with the reason, and the branch runs at depth 1. Turning it on first asks Source that the workspace's code host builds queue commits and that the branch's rules make the Putnami App the bypass actor of the pull request rule and of no other rule; otherwise it answers 409 with the reason, and changes nothing. Turning it off asks nothing. Requires platform.workspace.manage at the path workspace, and a person: the setting records the principal ID of who changed it.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Turn the merge queue of one branch on or off and set its depth, or pause and resume it. The body names enabled, paused, or both. enabled turns the queue on or off; turning it off empties it: every entry drops. depth goes with enabled: the number of queue runs in flight at most, 1 to 16, 4 when zero or absent. Until the putnami CLI can cut a release set from the entry ahead (`putnami publish --inherit-channel`), a depth above 1 answers 400 with the reason, and the branch runs at depth 1. Turning it on first asks Source that the workspace's code host builds queue commits and that the branch's rules make the Putnami App the bypass actor of the pull request rule and of no other rule; otherwise it answers 409 with the reason, and changes nothing. Turning it off asks nothing. paused true, with a reason of at most 500 bytes, pauses a queue that is on: nothing is built and nothing lands, a queue run already running finishes, new requests still enter in order, and every entry keeps its place. paused false resumes it: the queue moves again from its first entry. A pause or a resume of a queue that is off answers 409. Requires platform.workspace.manage at the path workspace, and a person: the setting records the principal ID of who changed it, and a pause also their code host login, when, and why.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "putV1_Workspaces_Workspace_Ci_Queue",
         "parameters": [
           {
@@ -5756,7 +6035,7 @@
                 }
               }
             },
-            "description": "Missing or malformed branch, body or depth, or a depth the queue cannot run yet"
+            "description": "Missing or malformed branch, body, depth or reason, or a depth the queue cannot run yet"
           },
           "401": {
             "description": "Authentication required"
@@ -5782,7 +6061,7 @@
                 }
               }
             },
-            "description": "The code host or the branch's rules keep the queue off"
+            "description": "The code host or the branch's rules keep the queue off, or a pause or resume names a queue that is off"
           },
           "500": {
             "content": {
@@ -5884,6 +6163,167 @@
             {
               "encoding": "json",
               "path": "/v1/workspaces/{workspace}/ci/queue",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/ci/queue/entries": {
+      "get": {
+        "description": "List the merge queue of one branch of the repository the workspace binds. open lists the entries in line order, position from 1, then the requests that wait outside the line, each with waitingFor: the entry condition that does not hold yet. A request whose head does not apply on the line ahead waits for conflict, and conflict names the pull request ahead (0 for the branch), the commit and the files, 20 at most. recent lists the entries that landed or dropped in the last 24 hours, 20 at most, newest first. rebaseOn is the commit a pull request rebases on: the queue commit of the last entry of the green front of the line (green or landing, with no entry ahead that is not), on its putnami-queue/<n> branch; otherwise the head of the branch. A running entry is never the answer: its run may fail. The list changes nothing. Requires platform.workspace.read at the path workspace. Responses are not cacheable.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Ci_Queue_Entries",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "branch",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueEntries"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "Missing or malformed branch"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "The workspace binds no repository, or the branch does not exist"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueueRefusal"
+                }
+              }
+            },
+            "description": "Source or the queue store is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/ci/queue/entries",
               "protocol": "rest-json"
             }
           ]
@@ -6718,7 +7158,7 @@
     },
     "/v1/workspaces/{workspace}/runs": {
       "get": {
-        "description": "List a workspace's CI runs newest-first with offset pagination and immutable subject references, optionally filtered by repository, branch, ref (a commit SHA prefix or a branch name), pull request, status or conclusion, phase, creation time and run id prefix. A filtered page carries a filter member naming the filters it applied; the caller applies any other one itself. With verdict=true each run carries its stored verdict in brief: answer, mark, gap count and revision. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
+        "description": "List a workspace's CI runs newest-first with offset pagination and immutable subject references, optionally filtered by repository, branch, ref (a commit SHA prefix or a branch name), pull request, status or conclusion, phase, creation time and run id prefix. A filtered page carries a filter member naming the filters it applied; the caller applies any other one itself. With verdict=true each run carries its stored verdict in brief: answer, mark, gap count and revision. With summary=true each run carries its timing and failure attribution, and, when its builds report can be read, its cache economics and its first failed tasks with the count of those left out. Requires delivery.run.read at the path workspace; workspace machine tokens remain denied.\n\nRequired scopes: delivery.run.read.",
         "operationId": "getV1_Workspaces_Workspace_Runs",
         "parameters": [
           {
@@ -6816,6 +7256,14 @@
             "required": false,
             "schema": {
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "summary",
+            "required": false,
+            "schema": {
+              "type": "boolean"
             }
           },
           {

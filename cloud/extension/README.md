@@ -272,6 +272,9 @@ putnami cloud ci queue                          # the setting of main, and wheth
 putnami cloud ci queue enable --dry-run         # what enable would change, without changing it
 putnami cloud ci queue enable                   # split the rulesets once you confirm, then turn the queue on
 putnami cloud ci queue disable                  # turn the queue off; the rulesets stay as they are
+putnami cloud ci queue list                     # the entries in line order, and the commit to rebase on
+putnami cloud ci queue pause --reason <why>     # stop the queue; every entry keeps its place
+putnami cloud ci queue resume                   # move the queue again from its first entry
 ```
 
 Every verb takes `--branch <branch>`, `main` by default.
@@ -320,6 +323,28 @@ carries the setting, the plan (`rules.create`, `rules.update`) and what
 entry with the reason `queue-off`, and GitHub's auto-merge then merges each
 pull request that still has it on. The rulesets stay split: the
 `pull_request` rule still applies to everyone but the App.
+
+`list` prints the line: each entry's position, pull request, state, the
+commit its queue commit is built on, the queue commit and its run. It then
+lists the requests that wait outside the line and the condition each waits
+for, such as `conflict` or `ready-for-review`, and the entries that landed or
+dropped in the last 24 hours. Last, it prints the commit a pull request of the
+branch rebases on: the queue commit of the last entry of the green front of
+the line, on its `putnami-queue/<n>` branch, or the head of the branch, with
+the command:
+
+```sh
+git fetch origin <ref> && git rebase FETCH_HEAD
+```
+
+`--output=json` carries the setting and the whole answer.
+
+`pause --reason <why>` stops a queue that is on, once you confirm or pass
+`--yes`: nothing is built and nothing lands, a queue run already running
+finishes, new requests still enter in order, and every entry keeps its place.
+The reason holds at most 500 bytes. `status` and `list` then name who paused
+the queue, when and why. `resume` moves the queue again from its first entry.
+Both take a person, like `enable`.
 
 ## Report local gate sessions
 
@@ -937,7 +962,7 @@ putnami cloud ci report --conclusion success       # report a delivery-run outco
 putnami cloud ci status                            # CI readiness checks, queue, last run reuse, runs and spend over 7 days
 putnami cloud ci view <run> [--output=json]        # one run: phases, timing, cache, failures, its verdict, and the release-set members it reused
 putnami cloud ci usage [--window <duration>]       # runs, spend, billed cost, merges by verdict, and deploys over the window
-putnami cloud ci queue [enable|disable] [--branch <b>]  # the merge queue: enable splits the rulesets with your GitHub credentials, then turns it on
+putnami cloud ci queue [enable|disable|list|pause|resume] [--branch <b>]  # the merge queue: enable splits the rulesets with your GitHub credentials, then turns it on; list shows the line and the commit to rebase on
 putnami cloud cache [status]                       # the build cache config, its identity, and the reuse of the last CI run
 putnami cloud cache disable [--remove]             # disable (enabled:false) or delete the cache config
 putnami cloud source connect [--repo owner/name] [--replace]  # browser-assisted GitHub authorization; structured mode requires --repo

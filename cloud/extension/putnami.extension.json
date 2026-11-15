@@ -370,6 +370,14 @@
             {
               "command": "putnami cloud ci queue enable",
               "description": "Split main's ruleset with your GitHub credentials once you confirm, then turn the merge queue on"
+            },
+            {
+              "command": "putnami cloud ci queue list",
+              "description": "List main's merge queue in line order, and the commit a pull request rebases on"
+            },
+            {
+              "command": "putnami cloud ci queue pause --reason \"release freeze\"",
+              "description": "Pause main's merge queue: nothing lands, and every entry keeps its place"
             }
           ]
         },

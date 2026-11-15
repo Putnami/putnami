@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -132,6 +133,10 @@ func runEnvDoctor(t *testing.T, root string, srv *httptest.Server, params map[st
 	cap := &captureIO{}
 	if env == nil {
 		env = map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	}
+	if _, set := env["HOME"]; !set {
+		// A stored session in the real home outranks PUTNAMI_CLOUD_TOKEN.
+		env = hometest.Env(t.TempDir(), env)
 	}
 	if params == nil {
 		params = map[string]any{}

@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 )
 
 func TestPrepareMigrationRequiresExplicitNamespaceForExistingBundle(t *testing.T) {
@@ -163,7 +164,7 @@ func TestPublishPreparedMigrationMakesOneBoundedDataCall(t *testing.T) {
 	var output []string
 	accepted, err := PublishPreparedMigration(
 		map[string]any{"control-plane-url": server.URL}, root,
-		map[string]string{"PUTNAMI_CLOUD_TOKEN": workspaceToken},
+		hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": workspaceToken}),
 		clicore.IO{Client: server.Client(), Stdout: func(line string) { output = append(output, line) }},
 		prepared, MigrationSelection{SourceRevision: "revision", SelectionFingerprint: "fingerprint"}, registryToken,
 	)
@@ -218,7 +219,7 @@ func TestPublishPreparedMigrationSanitizesRefusal(t *testing.T) {
 	writeLinkFile(t, root)
 	digest := "sha256:" + strings.Repeat("a", 64)
 	_, err := PublishPreparedMigration(
-		map[string]any{"control-plane-url": server.URL}, root, map[string]string{"PUTNAMI_CLOUD_TOKEN": "workspace-token"}, clicore.IO{Client: server.Client()},
+		map[string]any{"control-plane-url": server.URL}, root, hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "workspace-token"}), clicore.IO{Client: server.Client()},
 		&PreparedMigration{Application: "app", Version: "1", ExpectedCoordinate: "owner/app", BundleDigest: digest, Files: map[string][]byte{"bundle.json": []byte(`{}`)}},
 		MigrationSelection{SourceRevision: "revision", SelectionFingerprint: "fingerprint"}, secret,
 	)
@@ -462,7 +463,7 @@ func TestPublishNestedMigrationSendsThePathAndKeepsThePathMember(t *testing.T) {
 			}
 			accepted, err := PublishPreparedMigration(
 				map[string]any{"control-plane-url": server.URL}, root,
-				map[string]string{"PUTNAMI_CLOUD_TOKEN": "workspace-token"}, clicore.IO{Client: server.Client(), Stdout: func(string) {}},
+				hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "workspace-token"}), clicore.IO{Client: server.Client(), Stdout: func(string) {}},
 				prepared, MigrationSelection{SourceRevision: "revision", SelectionFingerprint: "fingerprint"}, "registry-token",
 			)
 			if test.wantErr {
