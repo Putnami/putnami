@@ -42,7 +42,8 @@ func TestTheManifestDeclaresChangeFinalize(t *testing.T) {
 	}
 	want := map[string]string{"base": "string", "branch": "string", "title": "string", "body-file": "string",
 		"task-source": "string", "task-id": "string", "verification-file": "string", "workflow-file": "string",
-		"gate": "string", "proof": "string", "draft": "boolean", "partial-delivery": "boolean"}
+		"gate": "string", "proof": "string", "draft": "boolean", "partial-delivery": "boolean",
+		"screenshots": "array", "waive-screenshots": "string"}
 	if !maps.Equal(flags, want) {
 		t.Errorf("change-finalize flags %v, want %v", flags, want)
 	}

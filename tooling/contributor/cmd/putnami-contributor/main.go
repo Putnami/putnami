@@ -8,6 +8,7 @@
 //	putnami-contributor verify [flags]            (putnami change verify)
 //	putnami-contributor finalize [flags]          (putnami change finalize)
 //	putnami-contributor estimate [flags]          (putnami change estimate)
+//	putnami-contributor screenshots [flags]       (putnami change screenshots)
 //	putnami-contributor epic-plan [flags]         (putnami epic plan)
 //	putnami-contributor epic-status [flags]       (putnami epic status)
 //	putnami-contributor agent-hook [flags]        (putnami agent hook)
@@ -46,6 +47,7 @@ import (
 	"go.putnami.dev/tooling/contributor/internal/finalize"
 	"go.putnami.dev/tooling/contributor/internal/host"
 	"go.putnami.dev/tooling/contributor/internal/language"
+	"go.putnami.dev/tooling/contributor/internal/screens"
 	"go.putnami.dev/tooling/contributor/internal/verify"
 )
 
@@ -103,6 +105,9 @@ func runIn(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	}
 	if len(args) > 0 && args[0] == "estimate" {
 		return runEstimate(args[1:], contextFile, stdout, stderr)
+	}
+	if len(args) > 0 && args[0] == "screenshots" {
+		return runScreenshots(args[1:], contextFile, stdout, stderr)
 	}
 	if len(args) > 0 && args[0] == "epic-plan" {
 		return runEpicPlan(args[1:], contextFile, stdout, stderr)
@@ -251,6 +256,24 @@ func runEstimate(args []string, contextFile string, stdout, stderr io.Writer) in
 		return 1
 	}
 	return estimate.Command{Root: root, ContextFile: contextFile, Stdout: stdout, Stderr: stderr}.Run(args)
+}
+
+// runScreenshots runs putnami change screenshots in the workspace root, which
+// is the working directory putnami launches the command in. It reads git and
+// drives a headless browser, and reaches no provider. SIGINT and SIGTERM
+// cancel the run.
+func runScreenshots(args []string, contextFile string, stdout, stderr io.Writer) int {
+	channel := host.Take("")
+	defer func() { _ = channel.Close() }()
+	root, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(stderr, "change screenshots: %v\n", err)
+		return 1
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return screens.Command{Root: root, ContextFile: contextFile, Git: screens.SystemGit(root), Launch: screens.LaunchBrowser,
+		Getenv: os.Getenv, LookPath: exec.LookPath, Stdout: stdout, Stderr: stderr}.Run(ctx, args)
 }
 
 // runEpicPlan runs putnami epic plan in the workspace root, which is the

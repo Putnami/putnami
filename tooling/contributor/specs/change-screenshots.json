@@ -1,0 +1,50 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "tooling/change-screenshots",
+  "outcomes": [
+    "putnami change screenshots captures every page a change touches in a web project, before and after, desktop and mobile, light and dark, into PNG files and one manifest bound to the committed head",
+    "putnami change finalize marks a change that touches a web page ready only with the screenshots of its head, or with a waiver that names its reason",
+    "The build workflow has the agent read its own screenshots and fix what they show before it finalizes, and the independent reviewer receives them with the diff"
+  ],
+  "nonGoals": [
+    "Serving the workload: the agent serves the base and the head and passes their URLs, because the executable never starts putnami",
+    "Uploading the screenshots to a hosted evidence store or showing them on a hosted change page",
+    "Judging a design automatically: the agent and the reviewer read the images",
+    "Comparing two captures pixel by pixel"
+  ],
+  "requirements": [
+    {
+      "id": "touched-pages",
+      "text": [
+        "A web project's pages are the file-route GET routes of its committed schema/http-routes.json; a page file is their evidencePath.",
+        "A changed page file touches its page; another changed file under the project's src/ that is no route's evidencePath touches every page.",
+        "A touched page is captured at its first route, or at each --route; a template takes its values from --fixtures, and a touched template without one is refused with exit 1."
+      ]
+    },
+    {
+      "id": "captures",
+      "text": [
+        "putnami change screenshots captures each touched page through headless Chromium over the DevTools pipe: desktop and mobile, light and dark, at --base-url and --head-url where the page exists, eight PNG files for a page both sides hold.",
+        "--storage-state signs the browser in from a Playwright storageState file.",
+        "A failed navigation, a status of 400 or more, or a dirty project directory fails the run with exit 1.",
+        "The manifest binds the head commit and the sha256 of each capture."
+      ]
+    },
+    {
+      "id": "finalize-asks-for-screenshots",
+      "text": [
+        "A ready publication of a change that touches a page of a web project needs a --screenshots manifest of the published head for that project, holding the after captures of every touched page with intact files, or --waive-screenshots <reason>.",
+        "Otherwise it stops before any write and names what is missing. The verification line names the manifests or the waiver.",
+        "A draft, and a change that touches no page, need none."
+      ]
+    },
+    {
+      "id": "agent-reviews-its-screens",
+      "text": [
+        "The build workflow's prove stage serves the base and the head of a web change, runs putnami change screenshots, has the agent read every capture against the workspace's design rules and fix what it finds before the final gate, and passes the manifest to change finalize.",
+        "The check stage gives the independent reviewer the manifest and the capture paths with the diff, and the reviewer reads them."
+      ]
+    }
+  ]
+}

@@ -61,17 +61,20 @@ type finalizerProvider struct {
 	proposalRepository                         string
 	taskProvider                               string
 	upserts, transitions, reviews, statusReads int
-	findReads                                  int
-	findHeadCommits                            []string
-	findStates                                 [][]collab.ProposalState
-	settled                                    []collab.Proposal
-	findPageSize                               int
-	findExisting                               bool
-	rejectRevision                             bool
-	upsertRevision                             string
-	unresolved                                 bool
-	dropLabels                                 bool
-	statusHook                                 func(*collab.Proposal)
+	reviewBodies                               []string
+	// reviewOffered adds review to the proposals capabilities.
+	reviewOffered   bool
+	findReads       int
+	findHeadCommits []string
+	findStates      [][]collab.ProposalState
+	settled         []collab.Proposal
+	findPageSize    int
+	findExisting    bool
+	rejectRevision  bool
+	upsertRevision  string
+	unresolved      bool
+	dropLabels      bool
+	statusHook      func(*collab.Proposal)
 	// autoMergeOffered adds automerge to the proposals capabilities, and
 	// autoMergeRefusal is the error the provider answers it with.
 	autoMergeOffered bool
@@ -95,6 +98,9 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		names := []string{collab.OperationFind, collab.OperationUpsert, collab.OperationStatus, collab.OperationGet, collab.OperationTransition}
 		if p.autoMergeOffered && contract == collab.ContractProposals {
 			names = append(names, collab.OperationAutoMerge)
+		}
+		if p.reviewOffered && contract == collab.ContractProposals {
+			names = append(names, collab.OperationReview)
 		}
 		operations := make([]collab.OperationCapability, 0, len(names))
 		for _, name := range names {
@@ -196,6 +202,9 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		return answer(collab.ProposalStatusResult{Proposal: read, Checks: p.checks})
 	case "proposals.review":
 		p.reviews++
+		var request collab.ProposalReviewInput
+		_ = json.Unmarshal(input, &request)
+		p.reviewBodies = append(p.reviewBodies, request.Body)
 		return answer(collab.ProposalReviewResult{})
 	default:
 		return collab.Envelope{Outcome: collab.OutcomeUnsupported, Error: &collab.Error{Message: "unexpected call"}}
@@ -473,7 +482,7 @@ func finalizerFixture(t *testing.T) (Finalizer, *finalizerGit, *finalizerProvide
 	git := &finalizerGit{branch: "topic", head: "0123456789012345678901234567890123456789", fingerprint: "tree-fingerprint", baseSHA: "base-sha", clean: true, ahead: true, paths: []string{"source.go"}}
 	provider := &finalizerProvider{task: collab.Task{Ref: collab.Ref{Source: "github:acme/app", ID: "42"}, Revision: "task-revision", URL: "https://github.com/acme/app/issues/42", State: collab.TaskStateInProgress}}
 	verifications := 0
-	f := Finalizer{Root: root, Git: git, Call: provider.call, Verify: func(context.Context, string, string) (Verified, error) {
+	f := Finalizer{Root: root, Git: git, Call: provider.call, Screens: noScreens, Verify: func(context.Context, string, string) (Verified, error) {
 		verifications++
 		return Verified{Fingerprint: git.fingerprint, HeadSHA: git.head, BaseSHA: git.baseSHA, GateSession: "session-id", WorkflowPresent: true, OutcomeComplete: true}, nil
 	}}
@@ -946,7 +955,7 @@ func TestABaseFetchedDuringFinalizationFailsOnlyWhenTheMergeBaseMoves(t *testing
 			}
 			native := NativeGit{Root: root}
 			provider := &finalizerProvider{}
-			f := Finalizer{Root: root, Call: provider.call,
+			f := Finalizer{Root: root, Call: provider.call, Screens: noScreens,
 				Git: fetchingGit{NativeGit: native, fetch: func() {
 					moved := git("commit-tree", "-p", tc.from, "-m", "chore: merged elsewhere", tc.from+"^{tree}")
 					git("update-ref", "refs/remotes/origin/main", moved)

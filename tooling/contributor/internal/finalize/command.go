@@ -65,9 +65,10 @@ func (c Command) Run(ctx context.Context, args []string) int {
 		fmt.Fprintf(c.Stderr, "change finalize: %v\n", err)
 		return 2
 	}
+	owners := onceOwners(c.Host.Owners)
 	f := Finalizer{Root: c.Root, Git: c.Git, Wait: c.Wait, Now: c.Now, Call: c.Host.Call,
 		Verify: DossierVerify(c.Root, c.Host.Recover), Workflow: HostedWorkflowVerify(c.Root, c.Host.Recover),
-		Owners: HostOwners(c.Root, c.Host.Owners)}
+		Owners: HostOwners(c.Root, owners), Screens: HostScreens(c.Root, owners)}
 	result, err := f.Run(ctx, options)
 	if err != nil {
 		fmt.Fprintf(c.Stderr, "change finalize: %v\n", err)

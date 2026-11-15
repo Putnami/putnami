@@ -20,7 +20,8 @@ Review always runs in a separate agent with an empty context, even when the
 profile sets `runs` to `main` for it. Its
 brief: the objective, the base, head and fingerprint, the diff, the slice
 contracts and the impact, the specs, architecture and ADRs of the touched
-projects, and the gate records. Never the expected verdict or your private
+projects, the gate records, and for a web change the screenshots manifest and
+the path of each capture it lists. Never the expected verdict or your private
 reasoning. It writes its report to `.putnami/<issue>/` and returns its path.
 
 | Severity | Meaning | Blocks |

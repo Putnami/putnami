@@ -32,6 +32,12 @@ type Options struct {
 	WorkflowFile     string
 	Gate             string
 	Proof            string
+	// Screenshots are the manifests of putnami change screenshots a ready
+	// publication of a web change presents, one per touched web project.
+	Screenshots []string
+	// WaiveScreenshots is the reason a ready web change publishes without
+	// screenshots.
+	WaiveScreenshots string
 }
 
 type Verified struct {
@@ -99,6 +105,7 @@ type Finalizer struct {
 	Verify   Verify
 	Workflow HostedWorkflow
 	Owners   RequirementOwners
+	Screens  TouchedScreens
 	Call     Provider
 	Wait     func(context.Context, time.Duration) error
 	Now      func() time.Time
@@ -125,6 +132,9 @@ type Result struct {
 	// Stripped lists each line of the body file that named an agent and that
 	// the run removed before it published the body.
 	Stripped []StrippedLine `json:"stripped,omitempty"`
+	// Screenshots says what a ready publication admitted for the web pages
+	// it touches: the manifests it checked, a waiver, or no page touched.
+	Screenshots string `json:"screenshots,omitempty"`
 }
 
 // StrippedLine is one line that named an agent, removed before publication.
@@ -310,6 +320,7 @@ func (f Finalizer) Run(ctx context.Context, opts Options) (Result, error) {
 		return Result{}, err
 	}
 	result.Stripped = candidate.stripped
+	result.Screenshots = candidate.screenshots
 	return result, nil
 }
 

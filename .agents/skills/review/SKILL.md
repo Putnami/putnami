@@ -33,7 +33,9 @@ Start code discovery with Putnami and use its local graph fallback when
 needed. For a candidate, account for every changed file and relevant consumer;
 read affected files in full and justify any exclusion, including generated
 copies inspected through source and parity proof. Bound a large pass and report
-unfinished coverage. Examine success and failure paths, compatibility,
+unfinished coverage. For a web change, read every screenshot the brief lists, before and after, in
+both viewports and both color schemes, and report a screen defect as a
+finding. Examine success and failure paths, compatibility,
 concurrency, authorization, migrations, cleanup, performance, tests and docs
 as applicable. Inspect the proposal title and body as the squash commit and
 report stale or incomplete net-change prose and any missing deletion statement.

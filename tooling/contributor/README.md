@@ -117,6 +117,11 @@ each issue and orders the issues in waves; `putnami epic status` reads each
 issue's task, proposal and sessions and names the issues that may launch now
 ([Run an epic](doc/08-epic.md),
 [ADR 0010](doc/adr/0010-an-epic-session-runs-issues-in-waves.md)).
+`putnami change screenshots` captures the pages a change touches in a web
+project, before and after, desktop and mobile, light and dark, and
+`putnami change finalize` asks for them on a ready web change
+([Capture the screens of a change](doc/09-change-screenshots.md),
+[ADR 0014](doc/adr/0014-screenshots-are-the-proof-of-a-web-change.md)).
 
 The build skill's dossier and workflow checker is `putnami change verify`,
 which this extension's executable serves. Its standalone `--workflow` validates a local progress
@@ -210,6 +215,7 @@ session:
 - [Publish a proposal](doc/06-change-finalize.md)
 - [Estimate a change plan](doc/07-change-estimate.md)
 - [Run an epic](doc/08-epic.md)
+- [Capture the screens of a change](doc/09-change-screenshots.md)
 - [ADR 0001](doc/adr/0001-one-contributor-extension.md)
 - [ADR 0002](doc/adr/0002-build-and-versioned-workflow-record.md)
 - [ADR 0004](doc/adr/0004-the-contributor-extension-ships-a-compiled-executable.md)
@@ -221,6 +227,7 @@ session:
 - [ADR 0011](doc/adr/0011-the-epic-session-publishes-a-cloud-child.md)
 - [ADR 0012](doc/adr/0012-an-authorized-ready-publication-can-turn-auto-merge-on.md)
 - [ADR 0013](doc/adr/0013-a-merge-queue-can-stand-for-the-hosted-gate.md)
+- [ADR 0014](doc/adr/0014-screenshots-are-the-proof-of-a-web-change.md)
 
 ## Publication
 

@@ -31,7 +31,19 @@ func ParseOptions(args []string) (Options, error) {
 				options.PartialDelivery = true
 			}
 			continue
-		case "--base", "--branch", "--title", "--body-file", "--task-source", "--task-id", "--verification-file", "--workflow-file", "--gate", "--proof":
+		case "--screenshots":
+			if !hasValue {
+				if len(args) == 0 {
+					return options, fmt.Errorf("%s needs a value", name)
+				}
+				value, args = args[0], args[1:]
+			}
+			if value == "" || strings.HasPrefix(value, "--") {
+				return options, fmt.Errorf("%s needs a nonempty value", name)
+			}
+			options.Screenshots = append(options.Screenshots, value)
+			continue
+		case "--base", "--branch", "--title", "--body-file", "--task-source", "--task-id", "--verification-file", "--workflow-file", "--gate", "--proof", "--waive-screenshots":
 		default:
 			return options, fmt.Errorf("unexpected finalize argument %q", raw)
 		}
@@ -73,6 +85,8 @@ func ParseOptions(args []string) (Options, error) {
 			options.Gate = value
 		case "--proof":
 			options.Proof = value
+		case "--waive-screenshots":
+			options.WaiveScreenshots = value
 		}
 	}
 	return options, nil

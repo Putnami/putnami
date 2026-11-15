@@ -158,6 +158,21 @@
               "description": "Publish one unit of a task and keep the task open"
             }
           ]
+        },
+        "screenshots": {
+          "description": "Capture the pages a change touches in a web project: before and after, desktop and mobile, light and dark.",
+          "command": "change-screenshots",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami change screenshots --project apps/web --base main --base-url http://127.0.0.1:3001 --head-url http://127.0.0.1:3000",
+              "description": "Capture the touched pages of apps/web from the base and head servers"
+            },
+            {
+              "command": "putnami change screenshots --project apps/web --base main --head-url http://127.0.0.1:3000 --storage-state .putnami/auth.json --fixtures .putnami/fixtures.json --out .putnami/42/screenshots",
+              "description": "Capture signed in, with template values, into the run directory"
+            }
+          ]
         }
       }
     },
@@ -344,7 +359,7 @@
       "activationFiles": [
         "putnami.extension.json"
       ],
-      "description": "Publish a proposal through the collaboration contracts: a draft with --draft, or a clean committed change with current proof, either a dossier that change verify accepts (--verification-file) or the hosted checks the contributor policy names (--gate ci). It pushes the branch, writes the proposal, reads it back, and with a task delivers it, or with --partial-delivery keeps it open. It runs no local gate and never retries a write whose outcome is unknown. It reaches the providers, the workspace and the task cache through the putnami process that launched it. --output=json prints the result document; otherwise it prints PROPOSAL_REF and PROPOSAL_URL lines. A usage error exits 2 and a failure exits 1.",
+      "description": "Publish a proposal through the collaboration contracts: a draft with --draft, or a clean committed change with current proof, either a dossier that change verify accepts (--verification-file) or the hosted checks the contributor policy names (--gate ci). It pushes the branch, writes the proposal, reads it back, and with a task delivers it, or with --partial-delivery keeps it open. A ready publication of a change that touches a page of a web project needs --screenshots, a manifest of the head per such project, or --waive-screenshots <reason>. It runs no local gate and never retries a write whose outcome is unknown. It reaches the providers, the workspace and the task cache through the putnami process that launched it. --output=json prints the result document; otherwise it prints PROPOSAL_REF and PROPOSAL_URL lines. A usage error exits 2 and a failure exits 1.",
       "flags": {
         "base": {
           "type": "string",
@@ -393,6 +408,14 @@
         "partial-delivery": {
           "type": "boolean",
           "description": "Deliver one unit of the task: refer to the task without closing it, and leave it open."
+        },
+        "screenshots": {
+          "type": "array",
+          "description": "Manifest of putnami change screenshots for a web project the change touches; repeat once per project. A ready publication of a change that touches a page needs one per such project, of the published head."
+        },
+        "waive-screenshots": {
+          "type": "string",
+          "description": "One-line reason to publish a ready web change without screenshots; the verification comment names it."
         }
       },
       "run": [
@@ -421,6 +444,56 @@
         {
           "id": "estimate",
           "task": "change-estimate"
+        }
+      ]
+    },
+    "change-screenshots": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Capture the pages a change touches in a web project, for the agent, the reviewer and change finalize. A web project commits schema/http-routes.json with pages, the file-route GET routes; a changed page file touches its page, and another changed file under the project's src/ that is no route's evidence touches every page. Each touched page is captured at its first route, or at each --route, with template values from --fixtures, by a headless Chromium driven over the DevTools pipe: desktop (1440x900) and mobile (390x844), light and dark, at --base-url where the merge base of --base holds the page and at --head-url where the head does. The agent serves both; the command starts no server. It refuses a project directory with uncommitted changes, and fails on a failed navigation or an HTTP status of 400 or more. It writes the PNG files and screenshots.json, the manifest bound to the head commit with the sha256, status and final URL of each file, into --out, by default .putnami/screenshots/<project slug>; a page that ended at another URL gets a note. --output=json prints the result document. A usage error exits 2 and a failure exits 1.",
+      "flags": {
+        "project": {
+          "type": "string",
+          "description": "Workspace-relative directory of the web project."
+        },
+        "base": {
+          "type": "string",
+          "description": "Base branch or commit; origin/<base> when that remote branch exists. The pages before are those of its merge base with HEAD."
+        },
+        "base-url": {
+          "type": "string",
+          "description": "URL of the server that serves the merge base; required when a touched page exists there."
+        },
+        "head-url": {
+          "type": "string",
+          "description": "URL of the server that serves the committed head."
+        },
+        "route": {
+          "type": "array",
+          "description": "A page route to capture besides the touched pages, as the route inventory writes it; repeatable."
+        },
+        "fixtures": {
+          "type": "string",
+          "description": "JSON file of parameter values per template route, such as {\"/tasks/{id}\": {\"id\": \"1\"}}."
+        },
+        "storage-state": {
+          "type": "string",
+          "description": "Playwright storageState file whose cookies and localStorage sign the browser in."
+        },
+        "out": {
+          "type": "string",
+          "description": "Output directory; default .putnami/screenshots/<project slug>, such as apps-web for apps/web."
+        },
+        "browser": {
+          "type": "string",
+          "description": "Chromium executable; default PUTNAMI_BROWSER, then a Playwright Chromium, then a Chromium or Chrome on PATH."
+        }
+      },
+      "run": [
+        {
+          "id": "screenshots",
+          "task": "change-screenshots"
         }
       ]
     },
@@ -604,6 +677,17 @@
       "cache": false,
       "description": "Size a change plan.",
       "timeoutMs": 60000
+    },
+    "change-screenshots": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "screenshots"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Capture the pages a change touches in a web project.",
+      "timeoutMs": 1800000
     },
     "epic-plan": {
       "kind": "command",

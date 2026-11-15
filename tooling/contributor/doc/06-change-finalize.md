@@ -161,6 +161,42 @@ unit, and the command closes the task. The record is refused when the change
 edits a native spec, an external spec a feature manifest names, or a feature
 manifest.
 
+## Screenshots
+
+A ready publication, local or hosted, of a change that touches a page of a web
+project needs the screenshots of its head
+([Capture the screens of a change](09-change-screenshots.md)). A web project
+commits `schema/http-routes.json` with pages. The command asks the putnami
+process for the projects that own each changed path, reads each one's route
+inventory at the merge base and the head, and selects the touched pages with
+the rule `putnami change screenshots` applies. A change that only removes
+pages needs none.
+
+```bash
+putnami change finalize --base main --branch topic --title "feat(web): a lighter task list" --body-file body.md \
+  --verification-file dossier.json --screenshots .putnami/42/screenshots/screenshots.json
+putnami change finalize --base main --branch topic --title "refactor(web): rename the layout class" --body-file body.md \
+  --gate ci --waive-screenshots "a class rename that renders the same"
+```
+
+- `--screenshots <manifest>`, once per touched web project, names the
+  manifest `putnami change screenshots` wrote. It counts when its `headSHA` is
+  the published head, its `project` is the touched project, it holds the after
+  captures of every touched page in both viewports and both schemes, each page
+  it lists holds its captures on each side it exists on, and each file next to
+  it holds the bytes its `sha256` records. A relative path resolves against
+  the workspace root.
+- `--waive-screenshots <reason>` publishes without them. The reason is one
+  line of at most 300 bytes.
+
+Otherwise the command stops before any write and names, for each project, the
+pages without a manifest or what the manifest does not prove. The verification
+comment gains a `screenshots:` line: the accepted manifests with their counts,
+`waived: <reason>`, or `no page touched`, which adds `, so the screenshots
+given are unused` when the run had a waiver or a manifest; the result document carries the
+same text as `screenshots`. A draft takes neither flag and needs no
+screenshots, and the two flags exclude each other.
+
 ## Text rules
 
 The title uses Conventional Commits. A `feat` or `fix` title is refused when
@@ -198,7 +234,7 @@ sent the request, it adds `AUTO_MERGE=squash` when auto-merge is on, or
 `AUTO_MERGE=off` with the reason on stderr. With `--output=json`, `jsonl` or `cloud-logging`, it
 prints the result document on one line instead: the proposal reference and
 URL, the head commit, the proposal state, the gate, whether the labels and
-assignees read back, for a hosted workflow, its digest, ready units and
+assignees read back, `screenshots` for a ready publication, for a hosted workflow, its digest, ready units and
 receipt, `autoMerge` (`method`, `enabled` and the `refusal`) when the run
 sent the request, and `stripped` (`field`, `line`, `kind` and `text` of each
 removed line) when the body lost a line. For a proposal already merged, the state is `merged`, the text output

@@ -1,6 +1,7 @@
 package finalize
 
 import (
+	"reflect"
 	"testing"
 )
 
@@ -10,16 +11,18 @@ func TestParseOptionsReadsEveryFlag(t *testing.T) {
 	t.Parallel()
 	got, err := ParseOptions([]string{"--base", "main", "--branch=topic", "--title", "feat: x", "--body-file", "body.md",
 		"--task-source", "local:s", "--task-id", "T-1", "--verification-file", "dossier.json", "--workflow-file", "workflow.json",
-		"--gate", "ci", "--proof", "ran", "--draft", "--partial-delivery"})
+		"--gate", "ci", "--proof", "ran", "--draft", "--partial-delivery", "--screenshots", "a/screenshots.json",
+		"--screenshots=b/screenshots.json", "--waive-screenshots", "no screen to show"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	want := Options{Base: "main", Branch: "topic", Title: "feat: x", BodyFile: "body.md", TaskSource: "local:s", TaskID: "T-1",
-		VerificationFile: "dossier.json", WorkflowFile: "workflow.json", Gate: "ci", Proof: "ran", Draft: true, PartialDelivery: true}
-	if got != want {
+		VerificationFile: "dossier.json", WorkflowFile: "workflow.json", Gate: "ci", Proof: "ran", Draft: true, PartialDelivery: true,
+		Screenshots: []string{"a/screenshots.json", "b/screenshots.json"}, WaiveScreenshots: "no screen to show"}
+	if !reflect.DeepEqual(got, want) {
 		t.Errorf("ParseOptions = %+v, want %+v", got, want)
 	}
-	if got, err := ParseOptions(nil); err != nil || got != (Options{}) {
+	if got, err := ParseOptions(nil); err != nil || !reflect.DeepEqual(got, Options{}) {
 		t.Errorf("ParseOptions(nil) = %+v, %v, want no option", got, err)
 	}
 }

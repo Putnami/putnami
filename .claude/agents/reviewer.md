@@ -23,6 +23,8 @@ fi
 
 Read `AGENTS.md` and `.agents/constraints.md` when present, then follow the review method in `.agents/skills/review/SKILL.md` on what the brief names: the objective, the base, head and fingerprint, the diff, the slice contracts and the impact, the specs, architecture and ADRs of the touched projects, and the gate records. Orient with `"$PUTNAMI_CLI" context map|pack` and `"$PUTNAMI_CLI" projects describe|deps|why`; use Grep for literal text.
 
+When the brief lists screenshots, read each capture: before and after, desktop and mobile, light and dark. A screen that is hard to read, clipped, overlapping or overflowing at mobile width, illegible in one scheme, or that loses what the before side got right is a finding like a code defect. Check that the manifest's head is the candidate's head and that it covers every page the diff touches.
+
 Known minefields, high risk whatever the diff size: build-cache keys and determinism, content addressing, concurrency and atomicity, auth and signing, and cross-runtime protocol parity. Each fails quietly when mishandled.
 
 A second round checks only the P1 and P2 fixes the brief lists, against the findings it quotes: say for each whether the fix holds, and raise a new finding only for a defect the fix introduced.

@@ -539,6 +539,87 @@
           "epic status"
         ]
       }
+    },
+    {
+      "id": "tooling/change-screenshots",
+      "type": "feature",
+      "name": "Change screenshots",
+      "outcome": "A contributor captures the pages a web change touches, before and after, desktop and mobile, light and dark, with putnami change screenshots, and change finalize marks a web change ready only with those screenshots or a waiver",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "touched-pages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-page-file-in-the-diff-touches-its-page",
+              "a-shared-source-file-touches-every-page",
+              "a-template-page-takes-its-values-from-the-fixtures",
+              "a-touched-template-without-a-value-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "captures",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "one-page-gets-eight-captures",
+              "a-page-one-side-lacks-gets-four-captures",
+              "an-error-status-fails-the-run",
+              "the-storage-state-signs-the-browser-in",
+              "a-dirty-project-is-refused",
+              "the-manifest-binds-the-head-and-hashes-each-capture"
+            ]
+          }
+        },
+        {
+          "id": "finalize-asks-for-screenshots",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-ready-web-change-without-screenshots-is-refused",
+              "a-manifest-of-the-head-covering-the-touched-pages-is-accepted",
+              "a-stale-or-incomplete-manifest-is-refused",
+              "a-waiver-is-named-in-the-verification",
+              "a-draft-or-a-change-without-pages-needs-none"
+            ]
+          }
+        },
+        {
+          "id": "agent-reviews-its-screens",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-prove-stage-captures-and-reviews-the-screens",
+              "the-reviewer-receives-the-screenshots"
+            ]
+          }
+        }
+      ],
+      "surface": {
+        "commands": [
+          "change screenshots",
+          "change finalize"
+        ]
+      }
     }
   ]
 }

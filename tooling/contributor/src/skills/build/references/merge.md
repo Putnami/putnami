@@ -49,6 +49,10 @@ exists; never invent a task to use it.
   feature requirement, such as an ADR with a `decisions/<id>.json` file, needs no such
   gate: its workflow names no source, its unit lists no requirement and sits
   at `candidate`, and the hosted checks complete it and close the task.
+- A web change: `--screenshots <manifest>` for each web project whose pages
+  it touches, the manifest prove wrote on the head being published, or
+  `--waive-screenshots <reason>` when the owner waived them. A ready
+  publication without either is refused before any write.
 - One unit of a larger task: `--partial-delivery`, on the draft and the final
   call. It keeps a non-closing reference and leaves the task's state alone.
 

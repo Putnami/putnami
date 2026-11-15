@@ -34,6 +34,9 @@ type publicationCandidate struct {
 	// stripped lists the lines that named an agent and that the body lost
 	// before publication.
 	stripped []StrippedLine
+	// screenshots is the verification line of the web pages a ready
+	// publication touches.
+	screenshots string
 }
 
 func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verified, error) {
@@ -138,6 +141,17 @@ func (f Finalizer) optionsPolicy(opts Options) (Policy, error) {
 	}
 	if opts.Draft && (opts.VerificationFile != "" || opts.Gate != "" || opts.Proof != "") {
 		return Policy{}, errors.New("draft accepts no verification, gate or proof")
+	}
+	if opts.Draft && (len(opts.Screenshots) > 0 || opts.WaiveScreenshots != "") {
+		return Policy{}, errors.New("draft accepts no screenshots and no screenshot waiver")
+	}
+	if len(opts.Screenshots) > 0 && opts.WaiveScreenshots != "" {
+		return Policy{}, errors.New("--screenshots and --waive-screenshots exclude each other")
+	}
+	if opts.WaiveScreenshots != "" {
+		if err := validWaiver(opts.WaiveScreenshots); err != nil {
+			return Policy{}, err
+		}
 	}
 	if opts.WorkflowFile != "" && opts.Gate != "ci" {
 		return Policy{}, errors.New("--workflow-file requires --gate ci")
@@ -338,6 +352,9 @@ func (f Finalizer) prepareBinding(ctx context.Context, c *publicationCandidate) 
 		}
 	}
 	if err := f.checkFeaturelessPartial(ctx, c); err != nil {
+		return err
+	}
+	if err := f.checkScreenshots(ctx, c); err != nil {
 		return err
 	}
 	_, err = c.recheck(ctx, f)
@@ -686,7 +703,7 @@ func (f Finalizer) reviewProof(ctx context.Context, c *publicationCandidate, res
 	if _, err := c.recheck(ctx, f); err != nil {
 		return err
 	}
-	comment := fmt.Sprintf("Verification of %s\n\n- ordinary gate: %s\n- local proof: %s", c.head, result.Gate, c.opts.Proof)
+	comment := fmt.Sprintf("Verification of %s\n\n- ordinary gate: %s\n- local proof: %s\n- screenshots: %s", c.head, result.Gate, c.opts.Proof, c.screenshots)
 	digest := sha256.Sum256([]byte(comment))
 	key := "verification:" + c.head + ":" + hex.EncodeToString(digest[:])[:12]
 	var review collab.ProposalReviewResult

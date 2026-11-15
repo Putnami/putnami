@@ -108,6 +108,7 @@ var Commands = []string{
 	"change-estimate",
 	"change-finalize",
 	"change-language",
+	"change-screenshots",
 	"change-verify",
 	"client-generate",
 	"clientgen-check",
