@@ -24,8 +24,8 @@ and epics that run 3 children at once in local workspaces.
 
 ## Reference: this repository's configuration
 
-Putnami binds tasks and proposals to the GitHub provider and sets the
-conventions its maintainers use. It is a reference, not a default for other
+Putnami binds tasks to the GitHub provider and proposals to `@putnami/cloud`,
+and sets the conventions its maintainers use. It is a reference, not a default for other
 repositories. A repository on another code host binds that host's provider
 for each contract it serves, and keeps the same contributor members. On
 GitLab, `@putnami/gitlab-collaboration` serves tasks only, names the project
@@ -51,15 +51,7 @@ binding names another provider, and `taskReference` uses `{url}`.
           "stateLabelPrefix": "status/"
         }
       },
-      "proposals": {
-        "provider": "@putnami/github-collaboration",
-        "version": 1,
-        "settings": {
-          "repository": "Putnami/putnami",
-          "assignAuthor": true,
-          "inheritLabelPrefixes": ["group/", "scope/", "area/", "severity/", "priority/"]
-        }
-      }
+      "proposals": { "provider": "@putnami/cloud", "version": 1 }
     },
     "@putnami/contributor": {
       "version": 1,
@@ -78,7 +70,7 @@ binding names another provider, and `taskReference` uses `{url}`.
         "documentation": ["sites/putnami.dev/doc/"],
         "ciGate": { "checks": ["Putnami CI"], "load": 0.7 }
       },
-      "publication": { "draft": false, "taskReference": "Closes #{id}", "bodyMaxBytes": 1500 },
+      "publication": { "draft": false, "taskReference": "Closes {url}", "bodyMaxBytes": 1500 },
       "integrations": {
         "contentBump": {
           "lock": "sites/putnami.dev/content.lock.json",
@@ -103,17 +95,24 @@ How the pieces combine for one delivery:
   provider applies a state's first label whenever another label decided it.
   No mapping alone avoids that collision: the contract has three open states,
   and this repository gives four meanings to its status labels.
-- `publication.taskReference` puts `Closes #<id>` in the commit and the
-  proposal body; the provider reads it to copy the issue's classification
-  labels (`inheritLabelPrefixes`) and the code host closes the issue on merge
-  when the mandated outcome is complete. For an intermediate unit, native finalize's
+- `@putnami/cloud` writes each pull request through Putnami Source and the
+  Putnami GitHub App, under the signed-in session of `putnami cloud login`
+  in a workspace `putnami cloud setup` linked, so publishing needs no GitHub
+  token, and a host's GitHub proxy cannot append its own footer to the body.
+  It takes no settings: the pull request is not assigned to its author
+  (`assignAuthor`) and does not copy the issue's classification labels
+  (`inheritLabelPrefixes`), which the GitHub provider did.
+- `publication.taskReference` puts `Closes <issue URL>` in the commit and the
+  proposal body, and the code host closes the issue on merge when the
+  mandated outcome is complete. It names the task by URL because tasks and
+  proposals have different providers: the `{id}` form needs both bound to the
+  same provider and repository. For an intermediate unit, native finalize's
   `--partial-delivery` uses a non-closing parent reference, rejects a caller
   closing directive and skips the task's delivered transition. If a versioned
   workflow dossier reports `outcomeComplete: false`, normal parent-task
   finalization is refused. This protection also applies if the policy maps
-  delivered to `done`. A partial proposal's non-closing reference may not
-  trigger the provider's closing-reference label inheritance; report the
-  actual labels from proposal read-back.
+  delivered to `done`. Report a proposal's labels as its read-back shows
+  them, never as copied from the task.
 - `claimAssignees: ["@me"]` is the GitHub provider's notation for the
   credential's account; another provider documents its own.
 - `verification.language: "en"` makes `check` and native finalization run the

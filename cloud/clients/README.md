@@ -32,7 +32,13 @@ file. `delivery-api` comes from the later version
 `0.0.0-20261110144910-13ece114a`, published on 2026-11-10, archive digest
 `sha256:082572ded5b2acb20382e546b27da1694abc630ff83b6530988a5568052a3fed`. It
 adds the merge queue setting (`getV1_Workspaces_Workspace_Ci_Queue`,
-`putV1_Workspaces_Workspace_Ci_Queue`).
+`putV1_Workspaces_Workspace_Ci_Queue`). `source-api` comes from the later
+version `0.0.0-20261115110438-6cf844fba`, published on 2026-11-15, archive
+digest
+`sha256:7edc53105fab142c91a4c50d2b3aef6df3d8c6121a305c9013a0abf45a40bbf9`. It
+adds the collaboration routes under `source/proposals`, `source/tasks` and
+`source/collaboration/capabilities`, which `@putnami/cloud` calls to serve the
+tasks and proposals contracts.
 
 ## Update the schemas
 

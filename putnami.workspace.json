@@ -102,19 +102,8 @@
         }
       },
       "proposals": {
-        "provider": "@putnami/github-collaboration",
-        "version": 1,
-        "settings": {
-          "repository": "Putnami/putnami",
-          "assignAuthor": true,
-          "inheritLabelPrefixes": [
-            "group/",
-            "scope/",
-            "area/",
-            "severity/",
-            "priority/"
-          ]
-        }
+        "provider": "@putnami/cloud",
+        "version": 1
       },
       "missions": {
         "provider": "@putnami/intelligence",
@@ -173,7 +162,7 @@
       },
       "publication": {
         "draft": false,
-        "taskReference": "Closes #{id}",
+        "taskReference": "Closes {url}",
         "bodyMaxBytes": 1500
       },
       "integrations": {

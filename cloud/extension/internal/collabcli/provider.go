@@ -277,6 +277,10 @@ func (p *Provider) Redact(data []byte) []byte {
 // unknown: a write answers unresolved and is never sent again, a read
 // answers unavailable and may be retried.
 func failureOf(err error, reconcile string) *collab.Failure {
+	var invalid *invalidRequest
+	if errors.As(err, &invalid) {
+		return collab.Fail(collab.OutcomeInvalid, collab.ReasonRequestInvalid, "%s; nothing was sent", invalid.reason)
+	}
 	var refusal *Refusal
 	if errors.As(err, &refusal) && refusal.Status > 0 && refusal.Status < 500 {
 		return refused(refusal)

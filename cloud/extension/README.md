@@ -366,6 +366,8 @@ it serves:
 | tasks | get, transition, assign (your own login only) | find, create, update, link |
 
 An operation Source does not serve answers `unsupported` and sends nothing.
+`proposals find` answers one page: a request that names a page cursor
+answers `invalid` and sends nothing.
 
 - **Credential.** A stored session always wins. `PUTNAMI_CLOUD_TOKEN` is used
   only when no session can give a workspace bearer. Without either, an

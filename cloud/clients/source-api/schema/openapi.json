@@ -54,6 +54,93 @@
         },
         "type": "object"
       },
+      "Change": {
+        "additionalProperties": false,
+        "properties": {
+          "base": {
+            "type": "string"
+          },
+          "head": {
+            "type": "string"
+          },
+          "headCommit": {
+            "type": "string"
+          },
+          "repository": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Check": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Checks": {
+        "additionalProperties": false,
+        "properties": {
+          "commit": {
+            "type": "string"
+          },
+          "detail": {
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            },
+            "type": "array"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "CollaborationCapabilities": {
+        "additionalProperties": false,
+        "properties": {
+          "contracts": {
+            "items": {
+              "$ref": "#/components/schemas/CollaborationContract"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "CollaborationContract": {
+        "additionalProperties": false,
+        "properties": {
+          "contract": {
+            "type": "string"
+          },
+          "operations": {
+            "items": {
+              "$ref": "#/components/schemas/OperationCapability"
+            },
+            "type": "array"
+          },
+          "version": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
       "CompleteSourceGitHubOnboardingRequest": {
         "additionalProperties": false,
         "properties": {
@@ -75,6 +162,327 @@
         },
         "type": "object"
       },
+      "OperationCapability": {
+        "additionalProperties": false,
+        "properties": {
+          "access": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "hostOnly": {
+            "type": "boolean"
+          },
+          "name": {
+            "type": "string"
+          },
+          "openWorld": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "preconditions": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "supported": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "Page": {
+        "additionalProperties": false,
+        "properties": {
+          "next": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Proposal": {
+        "additionalProperties": false,
+        "properties": {
+          "assignees": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "body": {
+            "type": "string"
+          },
+          "change": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "providerState": {
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/Ref2"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalAutoMergeInput": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedHeadCommit": {
+            "description": "The head commit the caller verified, 7 to 64 lowercase hexadecimal characters. A head that moved is a conflict, never a request to merge it.",
+            "type": "string"
+          },
+          "method": {
+            "description": "How the eventual merge combines the commits: squash, or absent for squash. merge and rebase are refused.",
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/Ref2",
+            "description": "The proposal: the source of the workspace's repository, such as github:acme/app, and the pull request number as id."
+          }
+        },
+        "required": [
+          "expectedHeadCommit",
+          "ref"
+        ],
+        "type": "object"
+      },
+      "ProposalComment": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "line": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/Ref2"
+          },
+          "review": {
+            "$ref": "#/components/schemas/Ref2",
+            "nullable": true
+          },
+          "submittedAt": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalCommentListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ProposalComment"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalListResult": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Proposal"
+            },
+            "type": "array"
+          },
+          "page": {
+            "$ref": "#/components/schemas/Page"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalResult": {
+        "additionalProperties": false,
+        "properties": {
+          "proposal": {
+            "$ref": "#/components/schemas/Proposal"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalReviewInput": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "idempotencyKey": {
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/Ref2"
+          },
+          "verdict": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalReviewResult": {
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "type": "boolean"
+          },
+          "review": {
+            "$ref": "#/components/schemas/Review"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalStatusResult": {
+        "additionalProperties": false,
+        "properties": {
+          "checks": {
+            "$ref": "#/components/schemas/Checks"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/Proposal"
+          },
+          "reviews": {
+            "items": {
+              "$ref": "#/components/schemas/Review"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalUpsertInput": {
+        "additionalProperties": false,
+        "properties": {
+          "body": {
+            "type": "string"
+          },
+          "change": {
+            "$ref": "#/components/schemas/Change"
+          },
+          "draft": {
+            "nullable": true,
+            "type": "boolean"
+          },
+          "expectedRevision": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ProposalUpsertResult": {
+        "additionalProperties": false,
+        "properties": {
+          "created": {
+            "type": "boolean"
+          },
+          "proposal": {
+            "$ref": "#/components/schemas/Proposal"
+          }
+        },
+        "type": "object"
+      },
+      "Ref2": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Review": {
+        "additionalProperties": false,
+        "properties": {
+          "author": {
+            "type": "string"
+          },
+          "commit": {
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/Ref2"
+          },
+          "submittedAt": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SourceError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/SourceWorkspaceRef",
+            "nullable": true
+          }
+        },
+        "type": "object"
+      },
       "SourceGitHubError": {
         "additionalProperties": false,
         "properties": {
@@ -83,6 +491,10 @@
           },
           "error": {
             "type": "string"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/SourceWorkspaceRef",
+            "nullable": true
           }
         },
         "type": "object"
@@ -370,6 +782,237 @@
           }
         },
         "type": "object"
+      },
+      "SourceWorkspaceRef": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Task": {
+        "additionalProperties": false,
+        "properties": {
+          "assignees": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "holder": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "parent": {
+            "$ref": "#/components/schemas/Ref2",
+            "nullable": true
+          },
+          "providerState": {
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/Ref2"
+          },
+          "revision": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskAssignInput": {
+        "additionalProperties": false,
+        "properties": {
+          "assignees": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "expectedRevision": {
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/Ref2"
+          }
+        },
+        "type": "object"
+      },
+      "TaskChangeRef": {
+        "additionalProperties": false,
+        "properties": {
+          "number": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskItem": {
+        "additionalProperties": false,
+        "properties": {
+          "closed_by": {
+            "items": {
+              "$ref": "#/components/schemas/TaskChangeRef"
+            },
+            "type": "array"
+          },
+          "task": {
+            "$ref": "#/components/schemas/Task"
+          }
+        },
+        "type": "object"
+      },
+      "TaskLabel": {
+        "additionalProperties": false,
+        "properties": {
+          "color": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskList": {
+        "additionalProperties": false,
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/TaskItem"
+            },
+            "type": "array"
+          },
+          "labels": {
+            "items": {
+              "$ref": "#/components/schemas/TaskLabel"
+            },
+            "type": "array"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/TaskSource"
+            },
+            "type": "array"
+          },
+          "truncated": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "TaskReadError": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "details": {
+            "$ref": "#/components/schemas/TaskSourceFailure",
+            "nullable": true
+          },
+          "error": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskResult": {
+        "additionalProperties": false,
+        "properties": {
+          "task": {
+            "$ref": "#/components/schemas/Task"
+          }
+        },
+        "type": "object"
+      },
+      "TaskSource": {
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "read_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskSourceFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TaskTransitionInput": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "ref": {
+            "$ref": "#/components/schemas/Ref2"
+          },
+          "state": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -387,9 +1030,217 @@
   },
   "openapi": "3.0.3",
   "paths": {
+    "/v1/workspaces/{workspace}/source/collaboration/capabilities": {
+      "get": {
+        "description": "Answer the operations of the collaboration protocol's proposals and tasks contracts that Source serves for a person, each with its access and, for an operation that takes an expected revision, preconditions checked: Source compares, then writes. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.read.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Collaboration_Capabilities",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CollaborationCapabilities"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/collaboration/capabilities",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
     "/v1/workspaces/{workspace}/source/github": {
       "delete": {
-        "description": "Idempotently disconnect the workspace's current GitHub repository. Requires platform.workspace.manage resolved at the target workspace.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Deprecated: use DELETE /v1/workspaces/{workspace}/source/repository instead. This GitHub-named path stays served while its callers move. Idempotently disconnect the workspace's current GitHub repository. Requires platform.workspace.manage resolved at the target workspace.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "deleteV1_Workspaces_Workspace_Source_Github",
         "parameters": [
           {
@@ -521,7 +1372,7 @@
         }
       },
       "get": {
-        "description": "Get the workspace's GitHub repository binding and lifecycle/permission health. Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
+        "description": "Deprecated: use GET /v1/workspaces/{workspace}/source/repository instead. This GitHub-named path stays served while its callers move. Get the workspace's GitHub repository binding and lifecycle/permission health. Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
         "operationId": "getV1_Workspaces_Workspace_Source_Github",
         "parameters": [
           {
@@ -659,7 +1510,7 @@
     },
     "/v1/workspaces/{workspace}/source/github/pull-requests": {
       "get": {
-        "description": "List durable GitHub pull requests for the workspace, newest update first: open by default, or closed or all through the state query. Requires platform.workspace.read; CI state is composed by Surfaces from Delivery.\n\nRequired scopes: platform.workspace.read.",
+        "description": "Deprecated: use GET /v1/workspaces/{workspace}/source/pull-requests instead. This GitHub-named path stays served while its callers move. List durable GitHub pull requests for the workspace, newest update first: open by default, or closed or all through the state query. Requires platform.workspace.read; CI state is composed by Surfaces from Delivery.\n\nRequired scopes: platform.workspace.read.",
         "operationId": "getV1_Workspaces_Workspace_Source_Github_Pull-requests",
         "parameters": [
           {
@@ -839,7 +1690,7 @@
     },
     "/v1/workspaces/{workspace}/source/github/sessions": {
       "post": {
-        "description": "Start or restart browser-assisted GitHub repository onboarding. The return_origin query names where the GitHub return pages link back to. Requires platform.workspace.manage resolved at the target workspace.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Deprecated: use POST /v1/workspaces/{workspace}/source/repository/sessions instead. This GitHub-named path stays served while its callers move. Start or restart browser-assisted GitHub repository onboarding. The return_origin query names where the GitHub return pages link back to. Requires platform.workspace.manage resolved at the target workspace.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "postV1_Workspaces_Workspace_Source_Github_Sessions",
         "parameters": [
           {
@@ -1038,7 +1889,7 @@
     },
     "/v1/workspaces/{workspace}/source/github/sessions/{session}": {
       "delete": {
-        "description": "Cancel an actor-owned GitHub onboarding session. Non-owner and foreign-workspace sessions return 404. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Deprecated: use DELETE /v1/workspaces/{workspace}/source/repository/sessions/{session} instead. This GitHub-named path stays served while its callers move. Cancel an actor-owned GitHub onboarding session. Non-owner and foreign-workspace sessions return 404. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "deleteV1_Workspaces_Workspace_Source_Github_Sessions_Session",
         "parameters": [
           {
@@ -1192,7 +2043,7 @@
         }
       },
       "get": {
-        "description": "Poll an actor-owned GitHub onboarding session. Non-owner and foreign-workspace sessions return 404. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Deprecated: use GET /v1/workspaces/{workspace}/source/repository/sessions/{session} instead. This GitHub-named path stays served while its callers move. Poll an actor-owned GitHub onboarding session. Non-owner and foreign-workspace sessions return 404. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "getV1_Workspaces_Workspace_Source_Github_Sessions_Session",
         "parameters": [
           {
@@ -1352,7 +2203,7 @@
     },
     "/v1/workspaces/{workspace}/source/github/sessions/{session}/complete": {
       "post": {
-        "description": "Complete an actor-owned fresh onboarding session by selecting a proved GitHub repository candidate. Replacement must be explicit. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Deprecated: use POST /v1/workspaces/{workspace}/source/repository/sessions/{session}/complete instead. This GitHub-named path stays served while its callers move. Complete an actor-owned fresh onboarding session by selecting a proved GitHub repository candidate. Replacement must be explicit. Requires platform.workspace.manage.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "postV1_Workspaces_Workspace_Source_Github_Sessions_Session_Complete",
         "parameters": [
           {
@@ -1533,7 +2384,15 @@
               "status": 409
             },
             {
+              "code": "source.github.repo_observed_elsewhere",
+              "status": 409
+            },
+            {
               "code": "source.github.workspace_already_bound",
+              "status": 409
+            },
+            {
+              "code": "source.workspace_bound_by_another_provider",
               "status": 409
             },
             {
@@ -1567,6 +2426,2755 @@
             {
               "encoding": "json",
               "path": "/v1/workspaces/{workspace}/source/github/sessions/{session}/complete",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/proposals": {
+      "get": {
+        "description": "Find the pull requests of an exact base and head branch of the workspace's repository, filtered by state, as the collaboration protocol's proposals. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.read.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Proposals",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The branch the change merges into, such as main.",
+            "in": "query",
+            "name": "base",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The branch carrying the change, a branch of the bound repository.",
+            "in": "query",
+            "name": "head",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The repository as owner/name. Absent names the bound repository; another one is refused.",
+            "in": "query",
+            "name": "repository",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The most proposals to answer, 1 to 100; 20 when absent.",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated proposal states to keep: draft, open, merged, closed. Absent keeps every state.",
+            "in": "query",
+            "name": "state",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalListResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The base, head, repository, state or size is invalid"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable, rate-limits or refuses Source's access"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/proposals",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "post": {
+        "description": "Open or update the pull request of an exact base and head branch of the workspace's repository, for the person who asks. Source checks first that the person's verified login can write the repository now. With an open pull request of that base and head, Source writes its title, body and draft state; with none, the provider's App opens it on the person's behalf, assigns them and names them in a comment, and Source records whom it was opened for. The body is written as sent. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.act. Never merges.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "postV1_Workspaces_Workspace_Source_Proposals",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalUpsertInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalUpsertResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected)"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The head commit is not the head branch's, or the expected revision moved (code source.proposal_moved)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The change, title or body is invalid, or names another repository; or the code host refuses to open the change, such as a head with no commit beyond the base (code source.proposal_unprocessable)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable or refuses Source's access, or the pull request opened and Source could not record whom for (code source.proposal_record_failed)"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "source.proposal_moved",
+              "status": 409
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "source.proposal_unprocessable",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.proposal_record_failed",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/proposals",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/proposals/{number}": {
+      "get": {
+        "description": "Read one pull request of the workspace's repository as the collaboration protocol's proposal status: the proposal, the check runs of its head, and its submitted reviews. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.read.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Proposals_Number",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalStatusResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected), or the provider has no such pull request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The pull request number is not a positive integer"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable, rate-limits or refuses Source's access"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/proposals/{number}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/proposals/{number}/automerge": {
+      "post": {
+        "description": "Turn squash auto-merge on for an open pull request of the workspace's repository that is not a draft and whose head is still the expected commit, for the person who asks: GitHub merges it, or enters it into the merge queue, once the repository's rules allow. Source checks first that the person's verified login can write the repository now. A pull request whose auto-merge is already on, or that merged, answers as it is. Source never merges itself. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.act.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "postV1_Workspaces_Workspace_Source_Proposals_Number_Automerge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalAutoMergeInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected), or the provider has no such pull request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The head moved from the expected commit (code source.proposal_moved)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The ref or commit is invalid, the method is not squash (code source.proposal_merge_method_refused), the pull request is a draft or closed (code source.proposal_not_ready), or GitHub refuses auto-merge, such as a repository that does not allow it (code source.proposal_unprocessable)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable or refuses Source's access"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "source.proposal_moved",
+              "status": 409
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "source.proposal_merge_method_refused",
+              "status": 422
+            },
+            {
+              "code": "source.proposal_not_ready",
+              "status": 422
+            },
+            {
+              "code": "source.proposal_unprocessable",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/proposals/{number}/automerge",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/proposals/{number}/comments": {
+      "get": {
+        "description": "Read one page of what people wrote on a pull request of the workspace's repository, oldest first, as the collaboration protocol's comments: each submitted review's body, each comment on a file or a line, and each comment on the pull request as a whole. The body of a review the provider's App wrote for a person reads as it was sent. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.read.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Proposals_Number_Comments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The page.next of the previous page; absent starts at the oldest comment.",
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "The most comments to answer, 1 to 100; 20 when absent. A page of large comments holds fewer.",
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "int64",
+              "maximum": 9223372036854775807,
+              "minimum": -9223372036854775808,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalCommentListResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected), or the provider has no such pull request"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The pull request number, cursor or size is invalid"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable, rate-limits or refuses Source's access"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/proposals/{number}/comments",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/proposals/{number}/reviews": {
+      "post": {
+        "description": "Write one comment review of a pull request of the workspace's repository, for the person who asks: the provider's App writes the body as sent, then a hidden marker of the idempotency key and a line that names the person. Source checks first that the person's verified login can write the repository now. A repeat of the same person's idempotency key answers the review it wrote, created false. Only the comment verdict is written: an agent never approves or requests changes. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.act.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "postV1_Workspaces_Workspace_Source_Proposals_Number_Reviews",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalReviewInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalReviewResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected), or the provider has no such pull request"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The commit is not the pull request's head (code source.proposal_moved), or the idempotency key holds a review of other content (code source.proposal_idempotency_mismatch)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The ref, body or key is invalid, the verdict is not comment (code source.proposal_verdict_refused), or the code host refuses the review (code source.proposal_unprocessable)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable or refuses Source's access"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "source.proposal_idempotency_mismatch",
+              "status": 409
+            },
+            {
+              "code": "source.proposal_moved",
+              "status": 409
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "source.proposal_unprocessable",
+              "status": 422
+            },
+            {
+              "code": "source.proposal_verdict_refused",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/proposals/{number}/reviews",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/tasks": {
+      "get": {
+        "description": "List the open tasks of the workspace, the newest created first: at most 300 for each source, with truncated set when a source has more. The tasks are the issues of the workspace's GitHub repository and of the Linear teams it binds. Source stores them and reads the changes again every 5 minutes; the first view reads the open issues from the tracker. Each item names, by code host source and number, the open changes that say they close it, or that name its key, such as ENG-42 for a Linear issue, in their title, branch or description. Each source says what its last read found: read; not_granted, with no task, until the GitHub App installation grants Issues: read; or not_connected when the workspace has no repository. A failed read names the provider and the source that failed. Requires platform.workspace.read.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Tasks",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskList"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Authentication required"
+          },
+          "403": {
+            "description": "Insufficient workspace permissions"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskReadError"
+                }
+              }
+            },
+            "description": "A task source's rate limit is reached; Retry-After names the wait in seconds, details the source"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskReadError"
+                }
+              }
+            },
+            "description": "The read of a task source failed; details names it"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskReadError"
+                }
+              }
+            },
+            "description": "A task source is unavailable or refuses the read; details names it"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskReadError"
+                }
+              }
+            },
+            "description": "Task reads are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "rate_limit",
+              "schema": {
+                "$ref": "#/components/schemas/TaskSourceFailure"
+              },
+              "status": 429
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "source.task_source_failed",
+              "schema": {
+                "$ref": "#/components/schemas/TaskSourceFailure"
+              },
+              "status": 500
+            },
+            {
+              "code": "source.task_source_unavailable",
+              "schema": {
+                "$ref": "#/components/schemas/TaskSourceFailure"
+              },
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/tasks",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/tasks/{task}": {
+      "get": {
+        "description": "Read one issue of the workspace's repository, by number, from GitHub as the collaboration protocol's task, with the ref and revision of Source's GitHub task source. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.read.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Source_Tasks_Task",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected), or the repository has no such issue"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The task number is not a positive integer"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable, or the installation does not grant Issues: read"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/tasks/{task}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/tasks/{task}/assign": {
+      "post": {
+        "description": "Replace the assignees of an issue of the workspace's repository, for the person who asks: only the person's own login may enter or leave the set. Source checks first that the person's verified login can write the repository now, and the expected revision. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.act.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "postV1_Workspaces_Workspace_Source_Tasks_Task_Assign",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskAssignInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected), or the repository has no such issue"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The expected revision moved (code source.task_moved)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The ref or an assignee is invalid, or the assignment changes another person (code source.task_assignee_refused)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable, or the installation does not grant Issues: write"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "source.task_moved",
+              "status": 409
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "source.task_assignee_refused",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/tasks/{task}/assign",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/source/tasks/{task}/transition": {
+      "post": {
+        "description": "Close an issue of the workspace's repository as completed, or reopen it, for the person who asks. done closes it only when an open or merged pull request of the repository says it closes the issue and the person authored it, or the provider's App opened it for them. Source checks first that the person's verified login can write the repository now, and the expected revision. Requires a person with platform.workspace.read and a verified sign-in with the provider: their own session, or the MCP server's child with mcp.act.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "postV1_Workspaces_Workspace_Source_Tasks_Task_Transition",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TaskTransitionInput"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskResult"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "No repository is bound to the workspace (code not_connected), or the repository has no such issue"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The expected revision moved (code source.task_moved), or no pull request of the person closes the issue (code source.task_not_delivered)"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The ref is invalid, or the state is not done or open (code source.task_state_unsupported)"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "502": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "The provider is unavailable, or the installation does not grant Issues: write"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SourceError"
+                }
+              }
+            },
+            "description": "Proposals are not configured"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "source.sign_in_required",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "source.task_moved",
+              "status": 409
+            },
+            {
+              "code": "source.task_not_delivered",
+              "status": 409
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "source.task_state_unsupported",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.bad_gateway",
+              "status": 502
+            },
+            {
+              "code": "source.pull_request_action_refused",
+              "status": 502
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            },
+            {
+              "code": "unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/source/tasks/{task}/transition",
               "protocol": "rest-json"
             }
           ]
