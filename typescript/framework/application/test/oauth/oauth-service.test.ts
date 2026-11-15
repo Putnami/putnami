@@ -200,6 +200,117 @@ describe('OAuthService', () => {
       const result = await service.refreshToken('old-refresh');
       expect(result?.access_token).toBe('new-tok');
     });
+
+    function rotatingTokenEndpoint(expiresIn = 3600) {
+      const used = new Set<string>();
+      let issued = 0;
+      const calls: string[] = [];
+      globalThis.fetch = mock((_url: string, init?: RequestInit) => {
+        const presented = new URLSearchParams(String(init?.body)).get('refresh_token') ?? '';
+        calls.push(presented);
+        if (used.has(presented)) {
+          return Promise.resolve(new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 }));
+        }
+        used.add(presented);
+        issued++;
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ access_token: `tok-${issued}`, refresh_token: `ref-${issued}`, expires_in: expiresIn }),
+            { status: 200 },
+          ),
+        );
+      }) as unknown as typeof fetch;
+      return calls;
+    }
+
+    function refreshingService(): OAuthService {
+      const service = new OAuthService();
+      service.confInit = { clientId: 'c', clientSecret: 's', tokenUri: TOKEN_URI };
+      return service;
+    }
+
+    it('answers a late caller holding the rotated refresh token with the same new tokens', async () => {
+      const calls = rotatingTokenEndpoint();
+      const service = refreshingService();
+
+      const first = await service.refreshToken('old');
+      const late = await service.refreshToken('old');
+
+      expect(first?.access_token).toBe('tok-1');
+      expect(late?.access_token).toBe('tok-1');
+      expect(late?.refresh_token).toBe('ref-1');
+      expect(calls).toEqual(['old']);
+    });
+
+    it('counts the late answer expiry from the original answer', async () => {
+      rotatingTokenEndpoint(3600);
+      const service = refreshingService();
+      const realNow = Date.now;
+      const start = realNow();
+      try {
+        Date.now = () => start;
+        await service.refreshToken('old');
+        Date.now = () => start + 30_000;
+        const late = await service.refreshToken('old');
+        expect(late?.expires_in).toBe(3570);
+      } finally {
+        Date.now = realNow;
+      }
+    });
+
+    it('forgets the answer after a minute', async () => {
+      const calls = rotatingTokenEndpoint();
+      const service = refreshingService();
+      const realNow = Date.now;
+      const start = realNow();
+      try {
+        Date.now = () => start;
+        await service.refreshToken('old');
+        Date.now = () => start + 61_000;
+        const late = await service.refreshToken('old');
+        expect(late).toBeUndefined();
+        expect(calls).toEqual(['old', 'old']);
+      } finally {
+        Date.now = realNow;
+      }
+    });
+
+    it('never keeps the answer past the new access token expiry', async () => {
+      const calls = rotatingTokenEndpoint(5);
+      const service = refreshingService();
+      const realNow = Date.now;
+      const start = realNow();
+      try {
+        Date.now = () => start;
+        await service.refreshToken('old');
+        Date.now = () => start + 6000;
+        expect(await service.refreshToken('old')).toBeUndefined();
+        expect(calls).toEqual(['old', 'old']);
+      } finally {
+        Date.now = realNow;
+      }
+    });
+
+    it('does not keep a failed refresh', async () => {
+      let status = 400;
+      let calls = 0;
+      globalThis.fetch = mock(() => {
+        calls++;
+        return Promise.resolve(
+          status === 200
+            ? new Response(JSON.stringify({ access_token: 'tok', refresh_token: 'ref', expires_in: 3600 }), {
+                status: 200,
+              })
+            : new Response(JSON.stringify({ error: 'invalid_grant' }), { status }),
+        );
+      }) as unknown as typeof fetch;
+      const service = refreshingService();
+
+      expect(await service.refreshToken('old')).toBeUndefined();
+      status = 200;
+      expect((await service.refreshToken('old'))?.access_token).toBe('tok');
+      expect(calls).toBe(2);
+    });
   });
 
   describe('authorizeUrl', () => {

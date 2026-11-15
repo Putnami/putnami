@@ -202,6 +202,12 @@ export class OAuthService {
   private _discovery: { doc: DiscoveryDocument; cachedAt: number; uri: string } | undefined;
   private _discoveryInflight: Promise<DiscoveryDocument | undefined> | undefined;
   private readonly _refreshInflight = new Map<string, Promise<TokenInfo | undefined>>();
+  private readonly _refreshAnswers = new Map<string, { token: TokenInfo; answeredAt: number; until: number }>();
+
+  /** How long a successful refresh answers a late caller that still holds the old refresh token. */
+  private static readonly REFRESH_ANSWER_TTL = 60 * 1000;
+  /** At most this many remembered refresh answers; the oldest goes first. */
+  private static readonly REFRESH_ANSWER_LIMIT = 1000;
 
   private get config() {
     return useConfig(OAuthConfig, { confInit: this.confInit });
@@ -321,20 +327,59 @@ export class OAuthService {
    * a page firing several XHRs against an expired session would otherwise POST the
    * same refresh token N times, and with refresh-token rotation (OAuth 2.1) all but
    * the first would get `invalid_grant` → spurious logout. Callers share one request.
+   *
+   * A successful answer is also kept for up to a minute, never past the new
+   * access token's expiry. A request that started with the old session still
+   * holds the old refresh token after the shared request ended; it gets the same
+   * new tokens instead of sending a rotated token again. Its `expires_in` counts
+   * from the original answer. A failed refresh is not kept.
    */
   async refreshToken(refreshToken: string): Promise<TokenInfo | undefined> {
+    const remembered = this.rememberedRefresh(refreshToken);
+    if (remembered) return remembered;
+
     const inflight = this._refreshInflight.get(refreshToken);
     if (inflight) return inflight;
 
     const promise = (async () => {
       try {
-        return await this.fetchToken({ grant_type: 'refresh_token', refresh_token: refreshToken });
+        const token = await this.fetchToken({ grant_type: 'refresh_token', refresh_token: refreshToken });
+        if (token) this.rememberRefresh(refreshToken, token);
+        return token;
       } finally {
         this._refreshInflight.delete(refreshToken);
       }
     })();
     this._refreshInflight.set(refreshToken, promise);
     return promise;
+  }
+
+  private rememberRefresh(refreshToken: string, token: TokenInfo): void {
+    const now = Date.now();
+    const lifetime = Number.isFinite(token.expires_in) ? token.expires_in * 1000 : 0;
+    const until = now + Math.min(OAuthService.REFRESH_ANSWER_TTL, Math.max(0, lifetime));
+    if (until <= now) return;
+    for (const [key, entry] of this._refreshAnswers) {
+      if (entry.until <= now) this._refreshAnswers.delete(key);
+    }
+    while (this._refreshAnswers.size >= OAuthService.REFRESH_ANSWER_LIMIT) {
+      const oldest = this._refreshAnswers.keys().next().value;
+      if (oldest === undefined) break;
+      this._refreshAnswers.delete(oldest);
+    }
+    this._refreshAnswers.set(refreshToken, { token, answeredAt: now, until });
+  }
+
+  private rememberedRefresh(refreshToken: string): TokenInfo | undefined {
+    const entry = this._refreshAnswers.get(refreshToken);
+    if (!entry) return undefined;
+    const now = Date.now();
+    if (entry.until <= now) {
+      this._refreshAnswers.delete(refreshToken);
+      return undefined;
+    }
+    const elapsed = Math.floor((now - entry.answeredAt) / 1000);
+    return { ...entry.token, expires_in: Math.max(0, entry.token.expires_in - elapsed) };
   }
 
   /**
