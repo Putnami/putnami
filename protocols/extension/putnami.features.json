@@ -392,6 +392,20 @@
               "the-dependency-name-grammar-is-pinned"
             ]
           }
+        },
+        {
+          "id": "a-subcommand-declares-the-workspace-state-it-reads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "workspace-state-is-a-closed-vocabulary",
+              "workspace-state-needs-no-contract-increment"
+            ]
+          }
         }
       ]
     }

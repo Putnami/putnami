@@ -65,7 +65,7 @@ func (r *RemoteCache) PublishRunMarker(ctx context.Context, workspaceID, branch 
 		return
 	}
 	sess, ok := r.ensureProvider(ctx, nil, nil)
-	if !ok {
+	if !ok || sess.ReadOnly() {
 		return
 	}
 	resp, err := sess.WriteMarker(ctx, &cache.MarkerWriteParams{

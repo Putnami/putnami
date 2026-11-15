@@ -15,7 +15,8 @@
         "report": {
           "command": "audit-report",
           "description": "Summarize the last audit of this workspace.",
-          "workspace": "required"
+          "workspace": "required",
+          "workspaceState": "none"
         }
       }
     }

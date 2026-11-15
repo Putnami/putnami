@@ -117,6 +117,7 @@
     "cli/extension-dependencies#update-moves-the-graph",
     "cli/extension-dependencies#what-satisfies-a-dependency",
     "cli/first-use-path#a-fresh-worktree-restores-generated-clients",
+    "cli/first-use-path#a-subcommand-that-reads-no-workspace-state-skips-the-bootstrap",
     "cli/first-use-path#first-use-smoke-legs",
     "cli/first-use-path#first-use-smoke-machine",
     "cli/first-use-path#first-use-smoke-stop",

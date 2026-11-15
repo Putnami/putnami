@@ -109,6 +109,24 @@ func TestRunCredentialContract(t *testing.T) {
 	}
 }
 
+// TestReadOnlyContract pins the read-only token a provider in another
+// repository reads, and that the capability rides the existing lists: an
+// initialize and its result that carry it parse strictly with no new field.
+func TestReadOnlyContract(t *testing.T) {
+	spectest.Proves(t, "cache/remote-cache-contract", "a-read-only-session-is-declared", "the-read-only-wire-is-pinned")
+	if CapabilityReadOnly != "read-only" {
+		t.Errorf("wire token = %q, want %q", CapabilityReadOnly, "read-only")
+	}
+	params, diags := ParseAndValidateInitializeParams([]byte(`{"protocolVersion":2,"blobExchangeDir":"/tmp/x","capabilities":["read-only"]}`))
+	if params == nil || diag.HasErrors(diags) || !slices.Contains(params.Capabilities, CapabilityReadOnly) {
+		t.Fatalf("an initialize that lists read-only must parse: %+v / %v", params, diags)
+	}
+	result, diags := ParseAndValidateInitializeResult([]byte(`{"protocolVersion":2,"providerVersion":"1.0.0","capabilities":["read-only"],"ready":true}`))
+	if result == nil || diag.HasErrors(diags) || !slices.Contains(result.Capabilities, CapabilityReadOnly) {
+		t.Fatalf("a result that echoes read-only must parse: %+v / %v", result, diags)
+	}
+}
+
 // TestRestoreResultOnlyContract pins the result-only tokens a provider in
 // another repository reads, and the wire shape of both request fields: each
 // is absent when unset, so a request without them is byte-identical to the

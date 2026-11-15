@@ -332,6 +332,23 @@
               "the-cli-refuses-two-declarers"
             ]
           }
+        },
+        {
+          "id": "a-read-only-session-is-declared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-read-only-wire-is-pinned",
+              "the-cli-lists-read-only",
+              "the-cli-writes-nothing-after-the-read-only-echo",
+              "a-declined-upload-is-not-an-upload-error",
+              "the-cloud-provider-declares-read-only-only-when-listed"
+            ]
+          }
         }
       ]
     }

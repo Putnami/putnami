@@ -42,11 +42,12 @@ func machineTokenSession(t *testing.T, cloudToken string) string {
 	return home
 }
 
-// signIn stores a user session in the Putnami home, the way
-// `putnami cloud login` does.
+// signIn stores a usable user session in the Putnami home, the way
+// `putnami cloud login` does: an access token and the refresh token that
+// renews it.
 func signIn(t *testing.T, home string) {
 	t.Helper()
-	stored := &clicore.StoredToken{AccessToken: "user-session-access-token", TokenType: "Bearer"}
+	stored := &clicore.StoredToken{AccessToken: "user-session-access-token", RefreshToken: "user-session-refresh-token", TokenType: "Bearer"}
 	if err := clicore.WriteAuth(stored, map[string]string{"PUTNAMI_HOME": home}); err != nil {
 		t.Fatal(err)
 	}
@@ -385,7 +386,7 @@ func TestCacheMachineTokenNeedsEveryCondition(t *testing.T) {
 			// The provider hands the config exactly that decision.
 			var logw bytes.Buffer
 			s := &providerSession{hosted: test.hosted, logw: &logw}
-			s.applyMachineToken(cfg)
+			s.applyMachineToken(cfg, false)
 			if cfg.SendsMachineToken() != test.want {
 				t.Fatalf("SendsMachineToken = %t, want %t", cfg.SendsMachineToken(), test.want)
 			}
@@ -603,7 +604,7 @@ func TestCacheTokenOverrideMachineTokenSessionIsReadOnly(t *testing.T) {
 			if err := cfg.ApplyEnv(); err != nil {
 				t.Fatal(err)
 			}
-			s.applyMachineToken(cfg)
+			s.applyMachineToken(cfg, false)
 
 			if s.readOnly != test.readOnly {
 				t.Fatalf("readOnly = %t, want %t", s.readOnly, test.readOnly)

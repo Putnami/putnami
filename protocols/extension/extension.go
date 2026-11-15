@@ -161,15 +161,22 @@ type CommandGroupDefinition struct {
 // CLI reads Workspace and Interactive on the top-level subcommand it
 // dispatches; on a nested subcommand they are validated the same way and carry
 // no dispatch meaning.
+//
+// WorkspaceState declares the installed workspace state the subcommand reads:
+// absent, the subcommand may read any of it, and SubcommandWorkspaceStateNone,
+// it reads none, so the CLI runs it without the first-use bootstrap (the
+// implicit install and the generated-client restore). The CLI reads it, like
+// Workspace, on the top-level subcommand it dispatches.
 type SubcommandDefinition struct {
-	Description string                          `json:"description,omitempty"`
-	Command     string                          `json:"command,omitempty"`
-	Interactive bool                            `json:"interactive,omitempty"`
-	Workspace   string                          `json:"workspace,omitempty"`
-	Flags       map[string]FlagDefinition       `json:"flags,omitempty"`
-	Positionals []PositionalDefinition          `json:"positionals,omitempty"`
-	Subcommands map[string]SubcommandDefinition `json:"subcommands,omitempty"`
-	Examples    []ExampleDefinition             `json:"examples,omitempty"`
+	Description    string                          `json:"description,omitempty"`
+	Command        string                          `json:"command,omitempty"`
+	Interactive    bool                            `json:"interactive,omitempty"`
+	Workspace      string                          `json:"workspace,omitempty"`
+	WorkspaceState string                          `json:"workspaceState,omitempty"`
+	Flags          map[string]FlagDefinition       `json:"flags,omitempty"`
+	Positionals    []PositionalDefinition          `json:"positionals,omitempty"`
+	Subcommands    map[string]SubcommandDefinition `json:"subcommands,omitempty"`
+	Examples       []ExampleDefinition             `json:"examples,omitempty"`
 }
 
 // Subcommand workspace requirements, the closed vocabulary of
@@ -183,6 +190,19 @@ const (
 	// on an interactive subcommand.
 	SubcommandWorkspaceOptional = "optional"
 )
+
+// SubcommandWorkspaceStateNone is the one value of
+// SubcommandDefinition.WorkspaceState: the subcommand reads no installed
+// workspace state.
+const SubcommandWorkspaceStateNone = "none"
+
+// ReadsNoWorkspaceState reports whether the subcommand declares that it reads
+// no installed workspace state, so the CLI skips the first-use bootstrap for
+// it. Any other value, including one the strict parser refuses, answers false:
+// the bootstrap runs, which is the behavior before the member.
+func (s SubcommandDefinition) ReadsNoWorkspaceState() bool {
+	return s.WorkspaceState == SubcommandWorkspaceStateNone
+}
 
 // RunsWithoutWorkspace reports whether the subcommand may run outside any
 // workspace: it declares SubcommandWorkspaceOptional and is interactive. A

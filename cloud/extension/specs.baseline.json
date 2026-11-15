@@ -2,6 +2,11 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "cloud/agent-session#a-read-only-cache-credential-is-declared",
+    "cloud/agent-session#login-hands-its-code-to-a-host",
+    "cloud/agent-session#read-commands-start-no-job",
+    "cloud/agent-session#the-command-names-its-credential",
+    "cloud/agent-session#the-signed-in-session-wins",
     "cloud/cache-provider-configuration#a-files-restore-receives-downloads",
     "cloud/cache-provider-configuration#an-unrequested-mode-is-left-to-the-run",
     "cloud/cache-provider-configuration#provider-resolves-its-configuration",

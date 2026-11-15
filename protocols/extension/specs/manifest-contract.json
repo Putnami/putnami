@@ -192,6 +192,13 @@
     {
       "id": "a-dependency-name-follows-the-grammar",
       "text": "An extensionDependencies key is @scope/name or an unscoped package name, each part matching [a-z0-9][a-z0-9._-]*; any other key reports invalid-extension-dependency at its field."
+    },
+    {
+      "id": "a-subcommand-declares-the-workspace-state-it-reads",
+      "text": [
+        "A command-group subcommand may declare `workspaceState`, whose one value is `none`: the subcommand reads no installed workspace state, so the CLI runs it without the implicit first-use install and without the generated-client restore.",
+        "The strict parser and the schema refuse any other value (invalid-enum), and the member needs no contract increment: a CLI that drops it runs the bootstrap, which is the behavior before the member."
+      ]
     }
   ],
   "decisions": [

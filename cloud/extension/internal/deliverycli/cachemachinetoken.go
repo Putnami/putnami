@@ -70,7 +70,7 @@ func cacheTokenOverrideIsMachineToken(cfg *remotecache.Config, hosted bool, env 
 // cache.write. The token is opaque to the client and holds no scope claim, but
 // that server rule is documented, so the session opens read-only and says so
 // once.
-func (s *providerSession) applyMachineToken(cfg *remotecache.Config) {
+func (s *providerSession) applyMachineToken(cfg *remotecache.Config, coreSaysReadOnly bool) {
 	token, problem := cacheMachineToken(cfg, s.hosted, nil)
 	if problem != "" {
 		s.log(problem)
@@ -84,8 +84,25 @@ func (s *providerSession) applyMachineToken(cfg *remotecache.Config) {
 	default:
 		return
 	}
-	if !s.readOnly {
+	if !s.readOnly && !coreSaysReadOnly {
 		s.log("the remote cache is read-only for this run: " + variable + " is a workspace machine token, which reads the shared cache and writes nothing to it; only hosted CI runs write")
+	}
+	s.readOnly = true
+}
+
+// applyDeveloperReadOnly opens the session read-only when its credential is
+// the signed-in user's cache token off a hosted run: the cache server lets
+// only hosted CI write, so its writes would be refused (the refusal
+// expectedDeveloperRefusal recognizes after the fact). Saying so at initialize
+// spares the run a refused write and a warning per entry. Every other token
+// source keeps learning from a refused write. The session says it once,
+// unless core says it (coreSaysReadOnly).
+func (s *providerSession) applyDeveloperReadOnly(cfg *remotecache.Config, coreSaysReadOnly bool) {
+	if s.readOnly || s.hosted || !cfg.Active() || !cfg.SendsSessionRecipe() {
+		return
+	}
+	if !coreSaysReadOnly {
+		s.log("the remote cache is read-only for this run: the signed-in user's cache token reads the shared cache and writes nothing to it; only hosted CI runs write")
 	}
 	s.readOnly = true
 }

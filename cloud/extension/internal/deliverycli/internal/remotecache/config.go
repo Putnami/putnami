@@ -100,6 +100,15 @@ func (c *Config) TakesMachineToken() bool {
 	}
 }
 
+// SendsSessionRecipe reports whether the configured token source is the
+// canonical `putnami cloud token --for cache` recipe, which mints the cache
+// token of the signed-in user, and no metadata identity replaces it. Like
+// TokenSource.Class it reads the environment at call time, so
+// PUTNAMI_CACHE_TOKEN keeps precedence.
+func (c *Config) SendsSessionRecipe() bool {
+	return c != nil && !c.metadataIdentity && c.Token.Class() == TokenClassCommand && isPutnamiCacheTokenCommand(c.Token.Command)
+}
+
 // SendsMachineToken reports whether ResolveBearer answers the machine token:
 // one was handed over, and the configured source still yields to it.
 func (c *Config) SendsMachineToken() bool {

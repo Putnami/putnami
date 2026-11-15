@@ -318,7 +318,10 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	// before the implicit install's first repository code.
 	hostedCache, hostedReporters := &engine.HostedRemoteCache{}, &engine.HostedReporters{}
 	defer closeHostedHolders(hostedCache, hostedReporters)
-	if !providerMode && wsRoot != "" && !isStructuredCommand(parsed.Commands[0]) {
+	// A subcommand that declares workspaceState none reads no installed
+	// state, so it answers without the install and the client restore.
+	if !providerMode && wsRoot != "" && !isStructuredCommand(parsed.Commands[0]) &&
+		!readsNoWorkspaceState(parsed, wsRoot, extensions, extensionGroups) {
 		if err := lifecycle.EnsureWorkspaceBootstrap(ctx, wsRoot, cfg, lifecycle.BootstrapOptions{
 			Command:    parsed.Commands[0],
 			Subcommand: parsed.Subcommand,

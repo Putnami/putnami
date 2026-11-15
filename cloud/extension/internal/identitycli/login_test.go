@@ -1,12 +1,14 @@
 package identitycli
 
 import (
+	"encoding/json"
 	"net/http"
 	"os"
 	"strings"
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 // deviceOK is the standard device-authorization response carrying an explicit
@@ -421,5 +423,82 @@ func TestLoginCustomClientIDAndScope(t *testing.T) {
 	}
 	if gotScope != "openid custom" {
 		t.Fatalf("scope = %q, want 'openid custom'", gotScope)
+	}
+}
+
+func TestLoginJSONLWritesTheCodeRecordBeforeItWaits(t *testing.T) {
+	spectest.Proves(t, "cloud/agent-session", "login-hands-its-code-to-a-host", "login-writes-the-code-record-before-it-waits")
+	spectest.Proves(t, "cloud/agent-session", "login-hands-its-code-to-a-host", "the-code-record-carries-no-device-code")
+	srv := newAuthServer(t)
+	srv.deviceOK()
+	srv.userinfoOK()
+	home := t.TempDir()
+	ioctx, _, stdout, _ := captureIO(t, srv.srv, home)
+	var seenAtFirstPoll []string
+	srv.tokenFn = func(w http.ResponseWriter, _ *http.Request) {
+		srv.mu.Lock()
+		hit := srv.tokenHits
+		srv.mu.Unlock()
+		if hit == 1 {
+			seenAtFirstPoll = append([]string(nil), *stdout...)
+			writeJSON(w, http.StatusBadRequest, map[string]any{"error": "authorization_pending"})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"access_token": jwt(t, tokenClaims(t)), "token_type": "Bearer", "expires_in": 3600})
+	}
+
+	result, err := Login(map[string]any{"open": false, "output": "jsonl", "poll-interval-ms": 0, "poll-timeout-ms": 60000}, ioctx.Env, ioctx)
+	if err != nil || result.Auth == nil {
+		t.Fatalf("Login: %+v, %v", result, err)
+	}
+	if len(seenAtFirstPoll) != 1 {
+		t.Fatalf("stdout before the first poll = %q, want exactly the code record", seenAtFirstPoll)
+	}
+	var record map[string]any
+	if err := json.Unmarshal([]byte(seenAtFirstPoll[0]), &record); err != nil {
+		t.Fatalf("the code record is not one JSON line: %q (%v)", seenAtFirstPoll[0], err)
+	}
+	want := map[string]any{
+		"type":                      DeviceRecordType,
+		"user_code":                 "BCDF-GHJK",
+		"verification_uri":          "https://verify.test/device",
+		"verification_uri_complete": "https://verify.test/device?code=BCDF-GHJK",
+		"expires_in":                float64(900),
+	}
+	if len(record) != len(want) {
+		t.Fatalf("record = %v, want exactly %v", record, want)
+	}
+	for k, v := range want {
+		if record[k] != v {
+			t.Fatalf("record[%s] = %v, want %v", k, record[k], v)
+		}
+	}
+	if strings.Contains(seenAtFirstPoll[0], "dev-123") || strings.Contains(seenAtFirstPoll[0], "device_code") {
+		t.Fatalf("the code record carries the device code: %s", seenAtFirstPoll[0])
+	}
+}
+
+func TestStructuredLoginWritesNoHumanLines(t *testing.T) {
+	spectest.Proves(t, "cloud/agent-session", "login-hands-its-code-to-a-host", "structured-login-writes-no-human-lines")
+	for _, output := range []string{"json", "jsonl"} {
+		t.Run(output, func(t *testing.T) {
+			srv := newAuthServer(t)
+			srv.deviceOK()
+			srv.tokenSuccess(t)
+			srv.userinfoOK()
+			ioctx, _, stdout, _ := captureIO(t, srv.srv, t.TempDir())
+			ioctx.OpenBrowser = func(string) error { return nil }
+			if _, err := Login(map[string]any{"open": true, "output": output}, ioctx.Env, ioctx); err != nil {
+				t.Fatalf("Login: %v", err)
+			}
+			for _, line := range *stdout {
+				if !strings.HasPrefix(line, "{") {
+					t.Fatalf("--output=%s wrote a human line: %q", output, line)
+				}
+			}
+			if wantRecords := map[string]int{"json": 0, "jsonl": 1}[output]; len(*stdout) != wantRecords {
+				t.Fatalf("--output=%s stdout = %q, want %d record(s) before the result", output, *stdout, wantRecords)
+			}
+		})
 	}
 }

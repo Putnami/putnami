@@ -119,6 +119,7 @@
           "description": "Sign in to Putnami Cloud with OAuth device authorization.",
           "command": "cloud-login",
           "interactive": true,
+          "workspaceState": "none",
           "examples": [
             {
               "command": "putnami cloud login",
@@ -130,6 +131,7 @@
           "description": "Clear stored Putnami Cloud credentials.",
           "command": "cloud-logout",
           "interactive": true,
+          "workspaceState": "none",
           "examples": [
             {
               "command": "putnami cloud logout",
@@ -141,6 +143,7 @@
           "description": "Show who you are signed in as and the linked workspace.",
           "command": "cloud-whoami",
           "interactive": true,
+          "workspaceState": "none",
           "examples": [
             {
               "command": "putnami cloud whoami",
@@ -175,6 +178,7 @@
           "description": "Show one line per entry that has a status: ok, degraded, failing or unknown, with the command that shows more. Exits 1 when an entry is failing, and with --strict on degraded and unknown too (supports --output).",
           "command": "cloud-status",
           "interactive": true,
+          "workspaceState": "none",
           "examples": [
             {
               "command": "putnami cloud status",

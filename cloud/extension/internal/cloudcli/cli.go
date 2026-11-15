@@ -236,7 +236,7 @@ func boundRunes(value string, limit int) string {
 	return string(runes[:limit-1]) + "…"
 }
 
-func RunCommand(command string, ioctx IO, args []string) error {
+func RunCommand(command string, ioctx IO, args []string) (err error) {
 	if command == "__putnami" {
 		return runtimeInfo(args, ioctx)
 	}
@@ -291,6 +291,12 @@ func RunCommand(command string, ioctx IO, args []string) error {
 	args, answered, err := rootHelpArgs(params, ioctx, command, args)
 	if answered {
 		return err
+	}
+	// An authentication error names the credential the server refused, on a
+	// machine that holds both a session and PUTNAMI_CLOUD_TOKEN. Signing in
+	// and out are about the session alone.
+	if command != "login" && command != "logout" {
+		defer func() { err = clicore.NameCredential(err) }()
 	}
 
 	switch command {
@@ -531,14 +537,14 @@ func login(params map[string]any, workspaceRoot string, env map[string]string, i
 		"registries":    distributioncli.RegistriesSummary(state),
 	}
 	followup := workspaceSetupFollowup(workspaceRoot)
-	if !truthy(param(params, "json")) && ioctx.TTY != nil {
+	if !clicore.StructuredOutput(params) && ioctx.TTY != nil {
 		ioctx.TTY("\n  " + res.Message + "\n")
 		if followup != "" {
 			ioctx.TTY("  " + followup + "\n")
 		}
 	}
 	writeResult(result, params, ioctx, res.Message)
-	if followup != "" && !truthy(param(params, "json")) {
+	if followup != "" && !clicore.StructuredOutput(params) {
 		ioctx.Stdout(followup)
 	}
 	return nil

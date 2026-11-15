@@ -1,6 +1,7 @@
 package identitycli
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -55,8 +56,15 @@ func Login(params map[string]any, env map[string]string, ioctx clicore.IO) (Logi
 	openURL := clicore.FirstString(clicore.ValueString(device, "verification_uri_complete"), verificationURI)
 	userCode := clicore.ValueString(device, "user_code")
 	openEnabled := clicore.BoolParam(params, true, "open")
+	// Under any structured output stdout carries records only. Under jsonl the
+	// first record hands the code to a host, which passes it to an approver
+	// while this command waits.
+	structured := clicore.StructuredOutput(params)
+	if mode, err := clicore.ResolveOutputMode(params); err == nil && mode == clicore.OutputJSONL {
+		writeDeviceRecord(ioctx, device)
+	}
 
-	if !clicore.Truthy(clicore.Param(params, "json")) {
+	if !structured {
 		lines := deviceInstructions(device, verificationURI, userCode, !openEnabled)
 		for _, line := range lines {
 			ioctx.Stdout(line)
@@ -78,7 +86,7 @@ func Login(params map[string]any, env map[string]string, ioctx clicore.IO) (Logi
 		if open == nil {
 			open = clicore.OpenBrowser
 		}
-		if err := open(openURL); err == nil && !clicore.Truthy(clicore.Param(params, "json")) {
+		if err := open(openURL); err == nil && !structured {
 			ioctx.Stdout("Browser opened automatically.")
 			if ioctx.TTY != nil {
 				ioctx.TTY("  Browser opened automatically.\n")
@@ -86,7 +94,7 @@ func Login(params map[string]any, env map[string]string, ioctx clicore.IO) (Logi
 		}
 	}
 
-	if !clicore.Truthy(clicore.Param(params, "json")) {
+	if !structured {
 		ioctx.Stdout("Waiting for authorization...")
 		if ioctx.TTY != nil {
 			ioctx.TTY("  Waiting for authorization...\n")
@@ -154,6 +162,28 @@ func Login(params map[string]any, env map[string]string, ioctx clicore.IO) (Logi
 			return LoginResult{}, clicore.NewError(description, clicore.ExitAuth)
 		}
 	}
+}
+
+// DeviceRecordType names the record putnami cloud login writes under
+// --output=jsonl before it waits.
+const DeviceRecordType = "device_authorization"
+
+// writeDeviceRecord writes the one record a host reads to hand the code to an
+// approver: the user code, where to enter it, and how long it lasts. It never
+// carries the device code, which only this process may exchange.
+func writeDeviceRecord(ioctx clicore.IO, device map[string]any) {
+	record := map[string]any{
+		"type":                      DeviceRecordType,
+		"user_code":                 clicore.ValueString(device, "user_code"),
+		"verification_uri":          clicore.ValueString(device, "verification_uri"),
+		"verification_uri_complete": clicore.ValueString(device, "verification_uri_complete"),
+		"expires_in":                clicore.ValueFloat(device, "expires_in"),
+	}
+	line, err := json.Marshal(record)
+	if err != nil {
+		return
+	}
+	ioctx.Stdout(string(line))
 }
 
 // requestDeviceAuthorization starts the device authorization grant: it POSTs
