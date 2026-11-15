@@ -142,6 +142,19 @@
         }
       },
       {
+        "id": "nx-import-keeps-the-build-order",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-imported-nx-test-waits-for-the-nx-build-and-folds-its-key"
+          ]
+        }
+      },
+      {
         "id": "init-from-moon",
         "stage": "coded",
         "evidenceKinds": [

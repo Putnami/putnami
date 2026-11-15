@@ -81,6 +81,10 @@
       "text": "On the Nx fixture of the putnami observe detector, after putnami init --from nx --mode delegate --apply with a stub nx on PATH, putnami test after a change to one project runs nx run <project>:test at the workspace root on that project and each project that depends on it, never on one it depends on, stores no Putnami cache entry and records delegatedTo nx."
     },
     {
+      "id": "nx-import-keeps-the-build-order",
+      "text": "On the Nx fixture of the putnami observe detector, whose nx.json gives test dependsOn [\"^build\"], with api imported and pricing delegated and a stub nx on PATH: putnami test plans api's moved test after nx run @demo/pricing:build, and an edit to pricing's sources moves the key of api's test, though pricing's build stores no Putnami cache entry."
+    },
+    {
       "id": "init-from-moon",
       "text": [
         "putnami init --from moon, at the root of a repository that holds .moon/workspace.yml, writes a workspace that declares @putnami/moon, records the mode in its options, installs it and runs putnami projects sync, which writes each moon project's putnami.json, then installs the language extensions the sync declared.",

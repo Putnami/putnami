@@ -856,3 +856,49 @@ func TestDetectLaysATargetOverItsTargetDefaultsAsNxDoes(t *testing.T) {
 		t.Errorf("e2e-ci options = %v, want the glob entry's", got)
 	}
 }
+
+func TestDetectResolvesTheDependsOnOfATargetAsNxDoes(t *testing.T) {
+	root := tree(t, map[string]string{
+		"nx.json": `{"targetDefaults": {
+			"build": {"dependsOn": ["^build"]},
+			"test": {"dependsOn": ["^build", "build"]},
+			"lint": {"dependsOn": [{"target": "build", "projects": "dependencies"}]}
+		}}`,
+		"package.json":        `{"name": "ws", "workspaces": ["libs/*"]}`,
+		"libs/a/package.json": `{"name": "a", "scripts": {"build": "tsc", "test": "jest", "lint": "eslint .", "e2e": "playwright test"}, "nx": {"targets": {"e2e": {"dependsOn": ["codegen", {"target": "build", "projects": ["b"]}, {"target": "serve", "dependencies": true, "params": "forward"}]}}}}`,
+		"libs/a/project.json": `{"name": "a", "targets": {"build": {"dependsOn": []}, "test": {"dependsOn": ["...", "^lint"]}, "deploy": {"dependsOn": ["...", "build"]}}}`,
+	})
+	detection := Detect(root, Options{})
+	if len(detection.Projects) != 1 {
+		t.Fatalf("projects = %+v", detection.Projects)
+	}
+	got := map[string][]string{}
+	for _, target := range detection.Projects[0].Targets {
+		got[target.Name] = target.DependsOn
+	}
+	want := map[string][]string{
+		// The target's empty list replaces its entry's.
+		"build": nil,
+		// "..." stands for the entry's list.
+		"test": {"^build", "build", "^lint"},
+		// An object naming the projects it depends on reads ^<target>.
+		"lint": {"^build"},
+		// With no entry, "..." stands for nothing.
+		"deploy": {"build"},
+		// One naming a list of projects is kept as its JSON.
+		"e2e": {"codegen", `{"target":"build","projects":["b"]}`, "^serve"},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("dependsOn = %v, want %v", got, want)
+	}
+
+	// A graph export holds the dependsOn Nx resolved.
+	root = tree(t, map[string]string{
+		"nx.json":             `{}`,
+		"libs/a/package.json": `{"name": "a", "scripts": {"test": "jest"}}`,
+		"graph.json":          `{"graph": {"nodes": {"a": {"name": "a", "type": "lib", "data": {"root": "libs/a", "targets": {"test": {"executor": "nx:run-script", "options": {"script": "test"}, "dependsOn": [{"target": "build", "dependencies": true}]}}}}}, "dependencies": {}}}`,
+	})
+	if got := Detect(root, Options{}).Projects[0].Targets[0].DependsOn; !reflect.DeepEqual(got, []string{"^build"}) {
+		t.Errorf("graph test dependsOn = %v, want [^build]", got)
+	}
+}

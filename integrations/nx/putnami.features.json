@@ -285,6 +285,19 @@
               "an-import-that-moves-no-target-declares-nothing"
             ]
           }
+        },
+        {
+          "id": "a-moved-task-keeps-its-depends-on",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-moved-test-waits-for-the-builds-nx-resolves"
+            ]
+          }
         }
       ]
     }

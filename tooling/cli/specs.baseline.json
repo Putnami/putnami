@@ -158,6 +158,7 @@
     "cli/init-from-a-monorepo-tool#moon-import-keeps-the-edges-the-sync-writes",
     "cli/init-from-a-monorepo-tool#moon-import-runs-the-language-extensions",
     "cli/init-from-a-monorepo-tool#nx-impact-runs-through-nx",
+    "cli/init-from-a-monorepo-tool#nx-import-keeps-the-build-order",
     "cli/init-from-a-monorepo-tool#only-listed-members-become-projects",
     "cli/init-from-a-monorepo-tool#pants-impact-runs-through-pants",
     "cli/init-from-a-monorepo-tool#rush-impact-runs-through-rush",

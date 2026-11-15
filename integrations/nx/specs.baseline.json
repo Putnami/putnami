@@ -4,6 +4,7 @@
   "executableRequirements": [
     "monorepo/nx-adoption#a-moved-lint-only-checks",
     "monorepo/nx-adoption#a-moved-task-does-what-its-script-did",
+    "monorepo/nx-adoption#a-moved-task-keeps-its-depends-on",
     "monorepo/nx-adoption#an-import-declares-only-what-moves",
     "monorepo/nx-adoption#delegate-imports-listed-projects",
     "monorepo/nx-adoption#import-adopts-typescript-conventions",
