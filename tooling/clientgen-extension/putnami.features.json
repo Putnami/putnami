@@ -332,8 +332,7 @@
             "kind": "acceptance",
             "checks": [
               "go-and-typescript-lifecycle-commands-depend-on-client-generate",
-              "a-consumer-only-selection-plans-the-generation-of-its-closure",
-              "a-contract-change-moves-the-key-of-a-consumer-task",
+              "the-lifecycle-commands-depend-on-client-generate-across-the-dependency-closure",
               "a-project-without-client-generate-plans-nothing-more"
             ]
           }

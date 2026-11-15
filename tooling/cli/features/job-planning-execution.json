@@ -232,7 +232,8 @@
             "a-missing-selected-command-is-rejected",
             "runner-publication-functional-gates",
             "a-step-dependency-reads-one-step-and-runs-after-the-command",
-            "a-closure-dependency-plans-the-command-across-the-dependency-closure"
+            "a-closure-dependency-plans-the-command-across-the-dependency-closure",
+            "a-consumer-only-selection-generates-its-clients-and-keys-on-their-contract"
           ]
         }
       },
