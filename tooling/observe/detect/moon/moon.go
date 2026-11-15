@@ -250,6 +250,34 @@ type exportTask struct {
 	Command json.RawMessage `json:"command"`
 	Args    json.RawMessage `json:"args"`
 	Script  json.RawMessage `json:"script"`
+	Deps    json.RawMessage `json:"deps"`
+}
+
+// targets are the targets of the task's deps, read leniently as the command
+// is.
+func (t exportTask) targets() []string {
+	var value any
+	if len(t.Deps) == 0 || json.Unmarshal(t.Deps, &value) != nil {
+		return nil
+	}
+	return depTargets(value)
+}
+
+// depTargets reads the targets of a task's deps: each a target string, or an
+// object with a target, as moon accepts both. Anything else names none.
+func depTargets(value any) []string {
+	list, _ := value.([]any)
+	var out []string
+	for _, dep := range list {
+		target, ok := dep.(string)
+		if object, isObject := dep.(map[string]any); isObject {
+			target, ok = object["target"].(string)
+		}
+		if ok && target != "" {
+			out = append(out, target)
+		}
+	}
+	return out
 }
 
 // commandLine is the command line the task runs: its script, else its

@@ -133,6 +133,11 @@ step of the dependent command wait for every `build` leaf job in the final plan.
 These are functional dependencies: if a barrier job fails, downstream
 side-effecting jobs are skipped unless `--continue-on-error` is set.
 
+A project adds `command` and `^command` dependencies of its own under
+`commands.<command>.dependsOn` of its `putnami.json`, for its jobs alone: an
+adopted monorepo keeps there the build order its tool declared. See
+[Project command order](../cli/doc/05-configuration.md#project-command-order).
+
 ### Embedded flags
 
 Append flags after a dependency reference to request a specific subset of work:

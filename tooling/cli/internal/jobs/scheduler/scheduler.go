@@ -140,9 +140,18 @@ type Scheduler struct {
 	// bypass is cfg.NoCache and cfg.NoCacheProjects resolved over this exact
 	// plan, once, at construction: every cache decision of the run reads it
 	// instead of re-deriving the closure per job.
-	bypass   cachekey.CacheBypass
-	renderer Renderer
-	cache    *store.CacheManager
+	bypass cachekey.CacheBypass
+	// keyless names the jobs whose cache is off by contract and whose
+	// would-be key a cacheable dependent folds (cachekey.KeylessIdentities),
+	// resolved once over this plan.
+	keyless map[string]bool
+	// byKey indexes the plan by job key, and keylessMemo holds the identity
+	// of each keyless job once a dependent computed it (dependencyKeys).
+	byKey       map[string]*ScheduledJob
+	keylessMu   sync.Mutex
+	keylessMemo map[string]string
+	renderer    Renderer
+	cache       *store.CacheManager
 	// cacheStats is present for every cache-enabled run, including local-only
 	// runs. A configured remote cache shares this exact accumulator so the final
 	// snapshot cannot split one session across two independently-timed views.
@@ -343,6 +352,9 @@ func newScheduler(
 		taskParams:               commandParams,
 		cfg:                      cfg,
 		bypass:                   cachekey.NewCacheBypass(planned, cfg.NoCache, cfg.NoCacheProjects),
+		keyless:                  cachekey.KeylessIdentities(planned),
+		byKey:                    cachekey.JobsByKey(planned),
+		keylessMemo:              make(map[string]string),
 		renderer:                 renderer,
 		cache:                    cache,
 		hookSlots:                make(map[string]*hookSlot),

@@ -220,6 +220,8 @@ type importPlan struct {
 	// lintChecks reports a TypeScript lint that moved and passes no write
 	// flag.
 	lintChecks bool
+	// order is what each command whose task moved waits for (movedOrder).
+	order map[string][]string
 }
 
 // planImport maps the moon tasks of a project whose language has an

@@ -2,6 +2,7 @@ package planner
 
 import (
 	"path/filepath"
+	"slices"
 	"sort"
 
 	"go.putnami.dev/tooling/cli/internal/extension"
@@ -145,7 +146,36 @@ func matchJobs(
 		return a.Name < b.Name
 	})
 
-	return valid
+	return withProjectCommandDeps(valid, proj, cmdName)
+}
+
+// withProjectCommandDeps returns the job definitions a project plans for a
+// command, each carrying, after the dependsOn its manifest declares, the
+// commands the project's putnami.json names under commands.<command>.dependsOn
+// (CLI ADR 0097). A definition is copied, never edited, since every project
+// shares the manifest's; without such entries the definitions are returned as
+// they are.
+func withProjectCommandDeps(defs []*extension.JobDefinition, proj *workspace.Project, cmdName string) []*extension.JobDefinition {
+	if proj == nil || proj.Config == nil {
+		return defs
+	}
+	declared := proj.Config.Commands[cmdName].DependsOn
+	if len(declared) == 0 {
+		return defs
+	}
+	out := make([]*extension.JobDefinition, len(defs))
+	for i, def := range defs {
+		deps := slices.Clone(def.CommandDependsOn)
+		for _, dep := range declared {
+			if !slices.Contains(deps, dep) {
+				deps = append(deps, dep)
+			}
+		}
+		clone := cloneJobDefinition(def)
+		clone.CommandDependsOn = deps
+		out[i] = clone
+	}
+	return out
 }
 
 func matchWorkspaceOnceJobs(

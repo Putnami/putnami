@@ -33,6 +33,9 @@ type Task struct {
 	// Command is the command line the task runs: its script, else its
 	// command followed by its args; empty when neither states one.
 	Command string
+	// Deps are the targets of the task's deps, as moon states them, such as
+	// ^:build, ~:build, build or types:build, in their order.
+	Deps []string
 }
 
 // Project is one moon project, with what an integration needs to run it.
@@ -217,7 +220,7 @@ func (d *detector) describe(p *project, inherited []taskFile) Project {
 	tasks := map[string]Task{}
 	if p.export != nil && p.export.Tasks != nil {
 		for name, t := range p.export.Tasks {
-			tasks[name] = Task{Tags: t.Tags, Command: t.commandLine()}
+			tasks[name] = Task{Tags: t.Tags, Command: t.commandLine(), Deps: t.targets()}
 		}
 	} else {
 		// The task files moon 2.x says the project inherits win over the
@@ -260,13 +263,13 @@ func (d *detector) describe(p *project, inherited []taskFile) Project {
 			settingsOf = named
 		}
 		for name, settings := range settingsOf {
-			tasks[name] = Task{Tags: stringsOf(settings["tags"]), Command: commandLine(settings)}
+			tasks[name] = Task{Tags: stringsOf(settings["tags"]), Command: commandLine(settings), Deps: depTargets(settings["deps"])}
 		}
 	}
 	for name, task := range tasks {
 		tags := slices.Clone(task.Tags)
 		slices.Sort(tags)
-		out.Tasks = append(out.Tasks, Task{Name: name, Tags: slices.Compact(tags), Command: task.Command})
+		out.Tasks = append(out.Tasks, Task{Name: name, Tags: slices.Compact(tags), Command: task.Command, Deps: task.Deps})
 	}
 	sort.Slice(out.Tasks, func(i, j int) bool { return out.Tasks[i].Name < out.Tasks[j].Name })
 	return out
@@ -384,6 +387,26 @@ func mergeTask(base, own map[string]any) map[string]any {
 	for key, value := range own {
 		if key != "args" && key != "tags" {
 			merged[key] = value
+		}
+	}
+	// deps merge as args and tags do, by options.mergeDeps, else
+	// options.merge, else appended; an entry may be a target object, so the
+	// list keeps its values as they are.
+	if ownDeps, set := own["deps"]; set {
+		options, _ := own["options"].(map[string]any)
+		inherited, _ := base["deps"].([]any)
+		mine, _ := ownDeps.([]any)
+		strategy, stated := options["mergeDeps"]
+		if !stated {
+			strategy = options["merge"]
+		}
+		switch strategy {
+		case "replace":
+			merged["deps"] = mine
+		case "prepend":
+			merged["deps"] = append(slices.Clone(mine), inherited...)
+		default:
+			merged["deps"] = append(slices.Clone(inherited), mine...)
 		}
 	}
 	if _, ok := own["command"]; ok {

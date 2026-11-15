@@ -15,6 +15,13 @@ Putnami adopts a tool in one of two modes:
   extension runs with the same tool, and every other task keeps running
   through the tool.
 
+In both modes a task keeps the build order its tool declared. With Rush,
+Turborepo and moon, the sync writes that order in each project's
+`putnami.json`, under `commands.<task>.dependsOn`: a delegated `rush test
+--only` waits for `rush build --to`, and a task that moved waits for the
+builds the tool ran before it, such as Turborepo's `dependsOn: ["^build"]` or
+a moon task's `deps`, even when those builds stay on the tool.
+
 An import never changes the tool that checks the code, whatever the monorepo
 tool:
 

@@ -158,6 +158,13 @@
         "$ref": "#/definitions/taskTuning"
       }
     },
+    "commands": {
+      "type": "object",
+      "description": "What each command waits for in this project, beside what the extension manifests declare. Keys are command names.",
+      "additionalProperties": {
+        "$ref": "#/definitions/projectCommand"
+      }
+    },
     "disable": {
       "type": "object",
       "description": "Opt-out configuration for jobs in this project.",
@@ -247,6 +254,20 @@
           "description": "Go only: provider operation ids the client leaves out."
         }
       }
+    },
+    "projectCommand": {
+      "type": "object",
+      "properties": {
+        "dependsOn": {
+          "type": "array",
+          "description": "Commands the command waits for: 'command' for this project's own, '^command' for every project it depends on, directly or transitively.",
+          "items": {
+            "type": "string",
+            "pattern": "^\\^?[^~^!/*\\s]+$"
+          }
+        }
+      },
+      "additionalProperties": false
     },
     "taskTuning": {
       "type": "object",

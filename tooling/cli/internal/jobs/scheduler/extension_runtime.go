@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"syscall"
@@ -462,6 +464,9 @@ func SynchronizeExtensionRuntimesForCommands(
 	commands []string,
 	report *PreparationReport,
 ) error {
+	if projectDeps := workspace.ProjectCommandDependencies(ws); len(projectDeps) > 0 {
+		commands = slices.Sorted(maps.Keys(toolchain.CommandDependencyClosureWith(extensions, commands, projectDeps)))
+	}
 	return synchronizeExtensionRuntimesForCommands(ctx, workspaceRootOf(ws), extensions, commands, report, toolchain.ResolveDeferred)
 }
 

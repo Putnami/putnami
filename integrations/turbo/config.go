@@ -116,6 +116,69 @@ func readTasks(dir string) (TaskSet, error) {
 	return out, nil
 }
 
+// TaskOrder is what each task of a turbo.json that states dependsOn depends
+// on, by task name, such as build, web#build or //#format. A task that
+// states no dependsOn is absent: it inherits the list of the configuration it
+// extends.
+type TaskOrder map[string][]string
+
+// ExtendsMarker is the entry of a package configuration's dependsOn that
+// stands for the list it inherits.
+const ExtendsMarker = "$TURBO_EXTENDS$"
+
+// readTaskOrder reads the dependsOn of each task of the turbo.json in dir
+// that states one, or of its pipeline for Turborepo 1. A missing file
+// declares none.
+func readTaskOrder(dir string) (TaskOrder, error) {
+	data, err := os.ReadFile(filepath.Join(dir, Marker)) //nolint:gosec // a file under the workspace root
+	if errors.Is(err, os.ErrNotExist) {
+		return TaskOrder{}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	type task struct {
+		DependsOn *[]string `json:"dependsOn"`
+	}
+	var doc struct {
+		Tasks    map[string]task `json:"tasks"`
+		Pipeline map[string]task `json:"pipeline"`
+	}
+	if err := json.Unmarshal(StripJSONC(data), &doc); err != nil {
+		return nil, fmt.Errorf("%s: %w", filepath.Join(dir, Marker), err)
+	}
+	out := TaskOrder{}
+	for _, tasks := range []map[string]task{doc.Pipeline, doc.Tasks} {
+		for name, t := range tasks {
+			if t.DependsOn != nil {
+				out[name] = *t.DependsOn
+			}
+		}
+	}
+	return out, nil
+}
+
+// resolveOrder answers the dependsOn of a task through the configurations
+// that may state it, most specific first: the first that states one gives
+// it, and ExtendsMarker in it stands for the list the next one gives.
+func resolveOrder(levels [][]string, stated []bool) []string {
+	for i := range levels {
+		if !stated[i] {
+			continue
+		}
+		var out []string
+		for _, dep := range levels[i] {
+			if dep == ExtendsMarker {
+				out = append(out, resolveOrder(levels[i+1:], stated[i+1:])...)
+				continue
+			}
+			out = append(out, dep)
+		}
+		return out
+	}
+	return nil
+}
+
 // StripJSONC removes the comments and the trailing commas Turborepo accepts
 // in turbo.json, so the rest decodes as JSON.
 func StripJSONC(data []byte) []byte {

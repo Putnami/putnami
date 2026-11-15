@@ -8,6 +8,7 @@
     "workspace/workspace-contract#a-lock-entry-binds-what-it-pins",
     "workspace/workspace-contract#a-lock-is-read-at-its-recorded-version",
     "workspace/workspace-contract#a-probe-digest-is-a-function-of-the-facts",
+    "workspace/workspace-contract#a-project-names-what-a-command-waits-for",
     "workspace/workspace-contract#a-reserved-call-exchanges-one-bounded-document",
     "workspace/workspace-contract#a-toolchain-answer-pins-only-what-was-asked",
     "workspace/workspace-contract#an-authored-form-survives-a-rewrite",

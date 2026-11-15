@@ -382,6 +382,19 @@
               "an-invalid-generated-from-is-refused-with-its-field"
             ]
           }
+        },
+        {
+          "id": "a-project-names-what-a-command-waits-for",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-project-command-dependency-is-a-command-or-its-closure"
+            ]
+          }
         }
       ]
     }

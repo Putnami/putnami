@@ -121,6 +121,14 @@
         "In import mode, a project names the extension of its language only when one of its tasks moves to it; a project none of whose tasks moves runs on moon alone.",
         "The sync declares a language extension in putnami.workspace.json only when a project names it: an import that moves no task leaves the workspace config, every manifest and the lockfile as they were."
       ]
+    },
+    {
+      "id": "a-moved-task-keeps-its-deps",
+      "text": [
+        "In import mode, a build, test or lint task that moves to its language extension keeps the deps moon resolves for it, in the project's putnami.json under commands.<task>.dependsOn: a build, test or lint task of a project it depends on as ^build, ^test or ^lint, and one of the project itself as build, test or lint.",
+        "A dependency on another task, or on a project outside its dependencies, is listed and not written.",
+        "The sync owns those entries: it removes one moon no longer gives and keeps every other command's."
+      ]
     }
   ],
   "decisions": [

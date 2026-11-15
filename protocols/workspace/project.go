@@ -50,9 +50,12 @@ type ProjectConfig struct {
 	// punch a contract-free execution path straight through that key. Per-project
 	// execution tuning belongs on `tasks` (ProjectTaskTuning); opting out of an
 	// extension-provided job belongs on `disable.jobs`.
-	Jobs    map[string]json.RawMessage   `json:"jobs,omitempty"`
-	Tasks   map[string]ProjectTaskTuning `json:"tasks,omitempty"`
-	Disable *ProjectDisableConfig        `json:"disable,omitempty"`
+	Jobs  map[string]json.RawMessage   `json:"jobs,omitempty"`
+	Tasks map[string]ProjectTaskTuning `json:"tasks,omitempty"`
+	// Commands names, per command, what the command waits for in this
+	// project, beside what the extension manifests declare (ProjectCommand).
+	Commands map[string]ProjectCommand `json:"commands,omitempty"`
+	Disable  *ProjectDisableConfig     `json:"disable,omitempty"`
 	// FeatureAuthority records why a published project declares no feature of
 	// its own. Absent means the ordinary case: the project is expected to
 	// declare one, and completeness tooling says so when it does not.
@@ -319,6 +322,16 @@ type ProjectTaskTuning struct {
 	TimeoutMs *int `json:"timeoutMs,omitempty"`
 }
 
+// ProjectCommand is what one command waits for in this project. Keys in
+// ProjectConfig.Commands are command names.
+type ProjectCommand struct {
+	// DependsOn names the commands this project's jobs of the command wait
+	// for, in the syntax of a manifest command's dependsOn restricted to two
+	// forms: `command`, the project's own, and `^command`, every project it
+	// depends on, directly or transitively (ValidateProjectCommands).
+	DependsOn []string `json:"dependsOn,omitempty"`
+}
+
 // BuildConfig defines build-time configuration for a project.
 type BuildConfig struct {
 	Assets  []BuildAsset      `json:"assets,omitempty"`
@@ -366,7 +379,8 @@ func LoadProjectConfigWithDiagnostics(projectDir string) (*ProjectConfig, []diag
 	// this would make any type error inside tasks indistinguishable from the
 	// historically lenient errors in unrelated legacy fields.
 	var raw struct {
-		Tasks json.RawMessage `json:"tasks"`
+		Tasks    json.RawMessage `json:"tasks"`
+		Commands json.RawMessage `json:"commands"`
 	}
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return nil, nil
@@ -375,13 +389,77 @@ func LoadProjectConfigWithDiagnostics(projectDir string) (*ProjectConfig, []diag
 	if diag.HasErrors(taskDiags) {
 		return nil, taskDiags
 	}
+	commands, commandDiags := decodeProjectCommands(raw.Commands)
+	if diag.HasErrors(commandDiags) {
+		return nil, commandDiags
+	}
 
 	var c ProjectConfig
 	if err := json.Unmarshal(data, &c); err != nil {
 		return nil, nil
 	}
 	c.Tasks = tasks
+	c.Commands = commands
+	if diags := ValidateProjectCommands(&c); diag.HasErrors(diags) {
+		return nil, diags
+	}
 	return &c, ValidateProjectTaskTuning(&c)
+}
+
+// decodeProjectCommands decodes the commands block strictly, as the tasks
+// block is: an unknown member or a value of another type is an error, while
+// the rest of putnami.json stays lenient.
+func decodeProjectCommands(raw json.RawMessage) (map[string]ProjectCommand, []diag.Diagnostic) {
+	if raw == nil || bytes.Equal(bytes.TrimSpace(raw), []byte("null")) {
+		return nil, nil
+	}
+	var entries map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &entries); err != nil || entries == nil {
+		if err == nil {
+			err = fmt.Errorf("commands must be an object")
+		}
+		return nil, []diag.Diagnostic{
+			diag.Errorf("invalid-project-command", "commands", "failed to parse commands: %v", err),
+		}
+	}
+	names := make([]string, 0, len(entries))
+	for name := range entries {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	commands := make(map[string]ProjectCommand, len(entries))
+	var diags []diag.Diagnostic
+	for _, name := range names {
+		field := "commands." + name
+		var properties map[string]json.RawMessage
+		if err := json.Unmarshal(entries[name], &properties); err != nil || properties == nil {
+			if err == nil {
+				err = fmt.Errorf("a command entry must be an object")
+			}
+			diags = append(diags, diag.Errorf("invalid-project-command", field, "failed to parse command: %v", err))
+			continue
+		}
+		unknown := false
+		for _, key := range sortedRawKeys(properties) {
+			if key != "dependsOn" {
+				diags = append(diags, diag.Errorf("unknown-project-command-field", field+"."+key, "unknown command field %q", key))
+				unknown = true
+			}
+		}
+		if unknown {
+			continue
+		}
+		var command ProjectCommand
+		if err := json.Unmarshal(entries[name], &command); err != nil {
+			diags = append(diags, diag.Errorf("invalid-project-command", field+".dependsOn", "failed to parse dependsOn: %v", err))
+			continue
+		}
+		commands[name] = command
+	}
+	if diag.HasErrors(diags) {
+		return nil, diags
+	}
+	return commands, nil
 }
 
 // decodeProjectTaskTuning decodes the new execution-tuning surface strictly

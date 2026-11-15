@@ -123,12 +123,18 @@ func TestPrecomputeKeys_SkipsDisabledJobs(t *testing.T) {
 		t.Error("expected cacheable job B to have a key")
 	}
 
-	wantB, err := ComputeJobCacheHash(ws, jobB, nil, nil, cache, nil)
+	// A contributes no key of its own, but B folds the key A would have
+	// (KeylessIdentities).
+	identityA, err := ComputeJobCacheHash(ws, jobA, nil, nil, cache, nil)
+	if err != nil {
+		t.Fatalf("compute identity A: %v", err)
+	}
+	wantB, err := ComputeJobCacheHash(ws, jobB, nil, nil, cache, map[string]string{"/proj:a": identityA})
 	if err != nil {
 		t.Fatalf("compute key B: %v", err)
 	}
 	if keys["/test-proj:b"] != wantB {
-		t.Errorf("key B = %s, want %s (no upstream contribution)", keys["/test-proj:b"], wantB)
+		t.Errorf("key B = %s, want %s (folding the identity of keyless A)", keys["/test-proj:b"], wantB)
 	}
 }
 

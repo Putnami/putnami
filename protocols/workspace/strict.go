@@ -160,6 +160,7 @@ func ValidateProjectConfig(c *ProjectConfig) []diag.Diagnostic {
 	diags = append(diags, validateProjectFeatureAuthority(c)...)
 	diags = append(diags, validateGeneratedFrom(c.GeneratedFrom)...)
 	diags = append(diags, ValidateProjectTaskTuning(c)...)
+	diags = append(diags, ValidateProjectCommands(c)...)
 
 	return diags
 }
@@ -314,6 +315,48 @@ func ValidateProjectTaskTuning(c *ProjectConfig) []diag.Diagnostic {
 		))
 	}
 	return diags
+}
+
+// ValidateProjectCommands validates the commands block: a command name is
+// not empty, and each dependsOn entry is `command` or `^command`, with a
+// command name that holds no step separator and no other prefix, and a
+// command does not wait for itself in its own project. A project
+// names neither a session barrier nor one step of a command.
+func ValidateProjectCommands(c *ProjectConfig) []diag.Diagnostic {
+	if c == nil {
+		return nil
+	}
+	names := make([]string, 0, len(c.Commands))
+	for name := range c.Commands {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	var diags []diag.Diagnostic
+	for _, name := range names {
+		if strings.TrimSpace(name) == "" {
+			diags = append(diags, diag.Errorf("invalid-project-command", "commands", "a command name must not be empty"))
+			continue
+		}
+		for i, entry := range c.Commands[name].DependsOn {
+			field := fmt.Sprintf("commands.%s.dependsOn[%d]", name, i)
+			switch {
+			case !ProjectCommandDependencyValid(entry):
+				diags = append(diags, diag.Errorf("invalid-project-command-dependency", field,
+					"dependency %q is not command or ^command", entry))
+			case entry == name:
+				diags = append(diags, diag.Errorf("invalid-project-command-dependency", field,
+					"command %q waits for itself; ^%s names the command of the projects it depends on", name, name))
+			}
+		}
+	}
+	return diags
+}
+
+// ProjectCommandDependencyValid reports whether entry is one of the two forms
+// a project's commands.<command>.dependsOn accepts: `command` or `^command`.
+func ProjectCommandDependencyValid(entry string) bool {
+	command := strings.TrimPrefix(entry, "^")
+	return command != "" && !strings.ContainsAny(command, "~^!/* \t\r\n")
 }
 
 // NormalizeProjectConfig applies canonical defaults to a parsed project config

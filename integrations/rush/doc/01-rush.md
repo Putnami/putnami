@@ -63,6 +63,7 @@ on another when a dependency of its `package.json` names it with the
 | `options["@putnami/rush"].filePatterns` | `rush.json`, `command-line.json` and the Rush lockfile, so a lockfile change runs every project | none |
 | `options["@putnami/rush"].tasks.<task>` | none | `rushx <task>` in the project's directory, for each script that stays on Rush |
 | `disable.jobs` | `test` and `lint` when `command-line.json` declares no bulk or phased command of that name | `build`, `test` or `lint` without a script of that name, and each task qualified by the extension that does not run it, such as `@putnami/rush:test` for a Jest test that moved and `@putnami/typescript:build` for a webpack build that stays |
+| `commands.<task>.dependsOn` | `build` for `test` or `lint` when its phased command reaches an upstream phase | `^build` for a project that builds; `build` and `^build` for `test` or `lint` when its phased command reaches an upstream phase |
 
 It writes a file only when a member it owns changes, and keeps every other
 member. In delegate mode it removes the extension and its edges from a project
@@ -102,6 +103,14 @@ build reruns its upstream projects. `rush test --only` and `rush lint --only`
 run on the named project alone, against the upstream outputs already on disk:
 a lint or a test of one project never lints or tests the projects it depends
 on.
+
+A `test` or `lint` that `command-line.json` declares as a phased command, one
+of whose phases depends on an upstream phase, as rushstack's `_phase:build`
+does, waits for the project's `build` task: `rush test --only` and
+`rush lint --only` skip the upstream phases, and `rush build --to <package>`
+runs them first. The sync writes that order as
+`commands.<task>.dependsOn: ["build"]` in the project's `putnami.json`; a bulk
+command waits for nothing.
 
 `putnami validate` fails with `rush.sync_stale` when a project's
 `putnami.json` no longer matches `rush.json` and the project manifests, such as
@@ -153,6 +162,14 @@ extension's install runs `rush install`, which keeps Rush's lockfile under
 `common/config/rush` and links each project's dependencies; it writes no root
 `package.json`. A root `package.json` that declares `packageManager` selects
 that manager instead. A hosted run does not install a Rush repository.
+
+An imported build keeps Rush's order: the sync writes
+`commands.build.dependsOn: ["^build"]` in each project that builds, so its
+build, whether `rushx build` or the TypeScript build, waits for the build of
+each project it depends on. A `test` or `lint` whose phased command reaches an
+upstream phase also waits for the project's build and the upstream builds
+(`["build", "^build"]`). A task that waits for a build kept on Rush folds that
+build's would-be key into its own: an edit to the upstream sources moves it.
 
 A lint script that moves and passes no write flag (`--write`, `--fix`,
 `--apply`) moves with `fix: false` in `options["@putnami/typescript:lint"]`:

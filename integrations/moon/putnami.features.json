@@ -209,6 +209,19 @@
               "an-import-that-moves-no-task-declares-nothing"
             ]
           }
+        },
+        {
+          "id": "a-moved-task-keeps-its-deps",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-moved-test-waits-for-the-build-moon-runs-before-it"
+            ]
+          }
         }
       ]
     }
