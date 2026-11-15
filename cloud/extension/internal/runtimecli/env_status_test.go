@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -242,7 +243,7 @@ func TestEnvStatusPrintsTheNodeWithoutTheReadinessRoute(t *testing.T) {
 	readiness := 0
 	srv := envStatusServer(t, &readiness)
 	defer srv.Close()
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL})
 
 	cap := &captureIO{}
 	if err := EnvStatus(map[string]any{}, []string{"prod"}, doctorWorkspace(t), env, cap.io(srv.Client())); err != nil {
@@ -282,7 +283,7 @@ func TestEnvStatusNodeNarrowsToTheEnvFlag(t *testing.T) {
 	readiness := 0
 	srv := envStatusServer(t, &readiness)
 	defer srv.Close()
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL})
 	root := doctorWorkspace(t)
 
 	named := EnvStatusNode(map[string]any{"env": "prod"}, root, env, (&captureIO{}).io(srv.Client()))
@@ -316,7 +317,7 @@ func TestEnvStatusLensesKeepTheTable(t *testing.T) {
 	readiness := 0
 	srv := envStatusServer(t, &readiness)
 	defer srv.Close()
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL})
 	root := doctorWorkspace(t)
 	writeDoctorFile(t, filepath.Join(root, "putnami.workspace.json"), map[string]any{
 		"options": map[string]any{"@putnami/cloud": map[string]any{"workspace": map[string]any{
@@ -418,7 +419,7 @@ func TestEnvStatusReadsTheDefinitionWorkloadsFromChannelFollow(t *testing.T) {
 	readiness := 0
 	srv := envStatusServerWith(t, &readiness, `"workloads":["shop/workloads/api"],`)
 	defer srv.Close()
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL})
 
 	cap := &captureIO{}
 	if err := EnvStatus(map[string]any{"output": "json"}, []string{"prod"}, doctorWorkspace(t), env, cap.io(srv.Client())); err != nil {

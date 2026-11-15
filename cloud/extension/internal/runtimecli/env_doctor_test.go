@@ -13,6 +13,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -131,7 +132,7 @@ func runEnvDoctor(t *testing.T, root string, srv *httptest.Server, params map[st
 	t.Helper()
 	cap := &captureIO{}
 	if env == nil {
-		env = map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+		env = hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL})
 	}
 	if params == nil {
 		params = map[string]any{}
@@ -440,7 +441,7 @@ func TestEnvDoctorUnresolvedSessionMakesNoCall(t *testing.T) {
 	defer srv.Close()
 
 	cap, err := runEnvDoctor(t, doctorWorkspace(t), srv, map[string]any{"output": "json"},
-		map[string]string{"PUTNAMI_CLOUD_TOKEN": "two words"}, (&okPublish{}).publish)
+		hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "two words"}), (&okPublish{}).publish)
 	if err != nil {
 		t.Fatalf("unchecked rows alone must not fail the command: %v", err)
 	}
@@ -505,7 +506,7 @@ func TestEnvRefusesUsageErrorsBeforeAnyCall(t *testing.T) {
 	srv := httptest.NewServer(server)
 	defer srv.Close()
 	root := doctorWorkspace(t)
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL})
 	for name, args := range map[string][]string{
 		"unknown subcommand": {"inspect"},
 		"two environments":   {"doctor", "prod", "staging"},

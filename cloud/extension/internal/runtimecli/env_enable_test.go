@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -256,7 +257,7 @@ func (s *enableServer) acceptances() []enableRequest {
 func runEnvEnable(t *testing.T, root string, srv *httptest.Server, params map[string]any, args ...string) (*captureIO, error) {
 	t.Helper()
 	cap := &captureIO{}
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL})
 	if params == nil {
 		params = map[string]any{}
 	}
