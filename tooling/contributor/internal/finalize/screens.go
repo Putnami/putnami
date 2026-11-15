@@ -192,7 +192,7 @@ func (f Finalizer) checkScreenshots(ctx context.Context, c *publicationCandidate
 			problems = append(problems, fmt.Sprintf("%s has no --screenshots manifest for its touched pages %s", project.Project, boundedList(routes)))
 			continue
 		}
-		if found := entry.manifest.Check(filepath.Dir(entry.file), c.head, project.Project, project.Pages); len(found) > 0 {
+		if found := screens.Check(entry.manifest, filepath.Dir(entry.file), c.head, project.Project, project.Pages); len(found) > 0 {
 			problems = append(problems, fmt.Sprintf("the manifest of %s does not prove the head: %s", project.Project, boundedList(found)))
 			continue
 		}

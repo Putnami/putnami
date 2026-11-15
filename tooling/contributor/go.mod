@@ -11,6 +11,7 @@ require (
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/job v0.0.0
 	go.putnami.dev/protocol/runtime v0.0.0
+	go.putnami.dev/protocol/screenshots v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
 	go.putnami.dev/sdk/extension v0.0.0
 )
@@ -39,6 +40,7 @@ replace (
 	go.putnami.dev/protocol/put => ../../protocols/put
 	go.putnami.dev/protocol/registry => ../../protocols/registry
 	go.putnami.dev/protocol/runtime => ../../protocols/runtime
+	go.putnami.dev/protocol/screenshots => ../../protocols/screenshots
 	go.putnami.dev/protocol/storage => ../../protocols/storage
 	go.putnami.dev/protocol/workspace => ../../protocols/workspace
 	go.putnami.dev/sdk/extension => ../extension-sdk

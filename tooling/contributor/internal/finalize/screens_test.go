@@ -12,6 +12,7 @@ import (
 
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/protocol/screenshots"
 
 	"go.putnami.dev/tooling/contributor/internal/host"
 	"go.putnami.dev/tooling/contributor/internal/screens"
@@ -41,7 +42,7 @@ func writeManifest(t *testing.T, dir, project, head string) string {
 		t.Fatal(err)
 	}
 	page := screens.Page{File: "src/app/tasks/page.tsx", Route: "/tasks", Path: "/tasks", Before: true, After: true}
-	manifest := screens.Manifest{ProtocolVersion: screens.ManifestVersion, Project: project, BaseSHA: "base-sha", HeadSHA: head,
+	manifest := screens.Manifest{ProtocolVersion: screenshots.ProtocolVersion, Project: project, BaseSHA: strings.Repeat("b", 40), HeadSHA: head,
 		Pages: []screens.Page{page}}
 	for _, side := range []string{screens.SideBefore, screens.SideAfter} {
 		for _, viewport := range screens.Viewports {
@@ -52,7 +53,7 @@ func writeManifest(t *testing.T, dir, project, head string) string {
 					t.Fatal(err)
 				}
 				manifest.Captures = append(manifest.Captures, screens.Capture{File: name, Route: page.Route, Side: side,
-					Viewport: viewport.Name, Scheme: scheme, SHA256: screens.Digest(data)})
+					Viewport: viewport.Name, Scheme: scheme, SHA256: screens.Digest(data), Status: 200, URL: "http://127.0.0.1:3000/tasks"})
 			}
 		}
 	}
@@ -125,6 +126,13 @@ func TestAStaleOrIncompleteManifestIsRefused(t *testing.T) {
 		{"an altered file", func(t *testing.T, root, _ string, _ *Finalizer) {
 			_ = os.WriteFile(filepath.Join(root, "shots", "01-tasks-after-desktop-light.png"), []byte("other"), 0o644)
 		}, "does not hold the bytes the manifest hashed"},
+		{"a manifest the protocol refuses", func(t *testing.T, _, file string, _ *Finalizer) {
+			data, err := os.ReadFile(file)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_ = os.WriteFile(file, []byte(strings.Replace(string(data), `"side": "after"`, `"side": "later"`, 1)), 0o644)
+		}, "--screenshots shots/screenshots.json: not a screenshots manifest:\n  - [error] captures[4].side: side \"later\" is not in the set: before, after (screenshots.invalid_side)"},
 		{"a page it misses", func(t *testing.T, _, _ string, f *Finalizer) {
 			f.Screens = func(context.Context, string, string, []string) ([]TouchedProject, error) {
 				return []TouchedProject{{Project: "apps/web", Pages: []screens.Page{

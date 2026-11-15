@@ -22,7 +22,9 @@ type fakeCapturer struct {
 	mu        sync.Mutex
 	statuses  map[string]int
 	redirects map[string]string
-	shots     []Shot
+	// pad is the size of each PNG payload, when it is more than the payload.
+	pad   int
+	shots []Shot
 }
 
 func (f *fakeCapturer) Capture(_ context.Context, shot Shot) (Captured, error) {
@@ -37,7 +39,11 @@ func (f *fakeCapturer) Capture(_ context.Context, shot Shot) (Captured, error) {
 	if to, ok := f.redirects[shot.URL]; ok {
 		final = to
 	}
-	return Captured{PNG: []byte(fmt.Sprintf("png %s %s %s", shot.URL, shot.Viewport.Name, shot.Scheme)), Status: status, URL: final}, nil
+	png := []byte(fmt.Sprintf("png %s %s %s", shot.URL, shot.Viewport.Name, shot.Scheme))
+	if f.pad > len(png) {
+		png = append(png, make([]byte, f.pad-len(png))...)
+	}
+	return Captured{PNG: png, Status: status, URL: final}, nil
 }
 
 func git(t *testing.T, dir string, args ...string) string {
@@ -139,7 +145,7 @@ func TestOnePageGetsEightCapturesBoundToTheHead(t *testing.T) {
 	if got.capturer.shots[0].URL != "http://127.0.0.1:3001/tasks" || got.capturer.shots[4].URL != "http://127.0.0.1:3000/tasks" {
 		t.Fatalf("urls %s, %s", got.capturer.shots[0].URL, got.capturer.shots[4].URL)
 	}
-	if problems := manifest.Check(out, head, "apps/web", manifest.Pages); len(problems) > 0 {
+	if problems := Check(manifest, out, head, "apps/web", manifest.Pages); len(problems) > 0 {
 		t.Fatalf("the manifest it wrote fails its check: %v", problems)
 	}
 	if manifest.Captures[0].Status != 200 || manifest.Captures[0].URL != "http://127.0.0.1:3001/tasks" {

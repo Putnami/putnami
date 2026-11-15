@@ -69,16 +69,6 @@ func (inv *Inventory) HasPage(route string) bool {
 	return false
 }
 
-// Page is one touched page: its page file, the route it is captured at, the
-// path visited for that route, and the sides that hold the page.
-type Page struct {
-	File   string `json:"file"`
-	Route  string `json:"route"`
-	Path   string `json:"path"`
-	Before bool   `json:"before"`
-	After  bool   `json:"after"`
-}
-
 // Selection is what selects a project's touched pages.
 type Selection struct {
 	// Project is the project's workspace-relative directory.
