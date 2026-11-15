@@ -99,11 +99,12 @@ func announceCredential(params map[string]any, ioctx IO, cred Credential) {
 // when the machine holds both a stored session and PUTNAMI_CLOUD_TOKEN, so
 // the person sees which one the server refused. A refusal is an ExitAuth
 // error or an HTTP 403. Any other error, an error of a command that sent no
-// credential through WorkspaceAuth, and any error on a machine with only one
-// credential (a CI job with the token alone) is returned as is.
+// credential through WorkspaceAuth, any error on a machine with only one
+// credential (a CI job with the token alone), and a delegated-route refusal,
+// which already names the session, are returned as is.
 func NameCredential(err error) error {
 	cred := usedCredential.Load()
-	if err == nil || cred == nil || !cred.TokenSet || !cred.Stored || !refusal(err) {
+	if err == nil || cred == nil || !cred.TokenSet || !cred.Stored || !refusal(err) || IsDelegatedRefusal(err) {
 		return err
 	}
 	return &credentialError{err: err, note: fmt.Sprintf("%s (credential: %s; run putnami cloud login to renew the session)", err.Error(), *cred)}

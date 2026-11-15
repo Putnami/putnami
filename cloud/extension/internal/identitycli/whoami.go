@@ -32,7 +32,11 @@ type WhoamiSession struct {
 	Credential clicore.Credential
 	// ExpiresAt is when the session ends, zero when it is not known.
 	ExpiresAt time.Time
-	Err       error
+	// Delegated reports that the session is delegated through a person's MCP
+	// connection; Delegation then says to whom, for which workspace.
+	Delegated  bool
+	Delegation clicore.Delegation
+	Err        error
 }
 
 // WhoamiLink is the workspace link of the repository: the id and name
@@ -67,6 +71,8 @@ func WhoamiStatusNodeFrom(session WhoamiSession, link WhoamiLink, at time.Time) 
 	switch {
 	case sessionNode.State == clicore.StatusOK && session.CIToken:
 		parts = append(parts, "PUTNAMI_CLOUD_TOKEN")
+	case sessionNode.State == clicore.StatusOK && session.Delegated:
+		parts = append(parts, delegatedLabel(session))
 	case sessionNode.State == clicore.StatusOK:
 		parts = append(parts, userLabel(session.User))
 	default:
@@ -103,6 +109,13 @@ func whoamiSessionNode(session WhoamiSession) clicore.StatusNode {
 	case session.Err == nil && session.CIToken:
 		node.State = clicore.StatusOK
 		node.Detail = "workspace commands use " + session.Credential.String()
+	case session.Err == nil && session.Delegated:
+		node.State = clicore.StatusOK
+		node.Detail = SignedInAs(delegatedLabel(session)) +
+			", workspace " + session.Delegation.WorkspaceID + ", delegated routes only"
+		if len(session.Delegation.Scopes) > 0 {
+			node.Detail += " (scopes " + strings.Join(session.Delegation.Scopes, " ") + ")"
+		}
 	case session.Err == nil:
 		node.State = clicore.StatusOK
 		node.Detail = SignedInAs(userLabel(session.User))
@@ -136,6 +149,12 @@ func whoamiLinkNode(link WhoamiLink) clicore.StatusNode {
 	return node
 }
 
+// delegatedLabel names a delegated session's person and the connection it
+// acts through: "dev@example.com through an MCP connection (agent-cli)".
+func delegatedLabel(session WhoamiSession) string {
+	return userLabel(session.User) + " through an MCP connection (" + session.Delegation.Actor + ")"
+}
+
 // SignedInAs is the one wording every surface uses for a working session:
 // `login`, `whoami` and the `putnami cloud status` synthesis.
 func SignedInAs(identity string) string {
@@ -153,7 +172,9 @@ const SignedOutMessage = "Signed out of Putnami Cloud."
 // refreshing it when it expired, and asks the userinfo endpoint who it
 // belongs to. A userinfo endpoint that refuses the token (401) ends the
 // session; one that does not answer falls back to the token claims, since the
-// session still works.
+// session still works. A delegated session (clicore.DelegationOf) is read
+// from its token claims alone: userinfo does not admit its token, and a
+// refresh that fails still ends it.
 func readWhoamiSession(params map[string]any, env map[string]string, ioctx clicore.IO) WhoamiSession {
 	cred := clicore.ResolveCredential(env, now(ioctx))
 	if cred.Machine {
@@ -165,6 +186,11 @@ func readWhoamiSession(params map[string]any, env map[string]string, ioctx clico
 	}
 	claims := clicore.DecodeJWT(auth.AccessToken)
 	session := WhoamiSession{User: userIdentity(nil, claims), ExpiresAt: sessionExpiry(auth), Credential: cred}
+	if delegation, ok := clicore.DelegationOf(auth); ok {
+		session.Delegated = true
+		session.Delegation = delegation
+		return session
+	}
 	client := contextClient(ioctx)
 	endpoints := clicore.AuthEndpoints(params, env, client, auth.Issuer)
 	userinfo, err := fetchUserInfo(client, endpoints, auth.AccessToken)

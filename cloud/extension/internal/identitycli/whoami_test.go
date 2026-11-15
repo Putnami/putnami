@@ -292,3 +292,76 @@ func TestWhoAmINamesTheCredentialAndWhy(t *testing.T) {
 		t.Fatalf("session alone: node = %+v", node)
 	}
 }
+
+// storeDelegatedAuth persists the session a person's MCP connection approves
+// for a hosted agent: an actor, one workspace, the MCP scopes, a refresh
+// token, and no openid scope.
+func storeDelegatedAuth(t *testing.T, home, issuer, expiresAt string) {
+	t.Helper()
+	token := jwt(t, map[string]any{
+		"sub":       "person-1",
+		"email":     "person@example.com",
+		"aud":       "https://mcp.example.test",
+		"scope":     "mcp.read mcp.act",
+		"act":       map[string]any{"sub": "agent-cli"},
+		"scope_ref": map[string]any{"workspace_id": "ws-acme"},
+	})
+	writeAuthFile(t, home, clicore.StoredToken{
+		AccessToken:  token,
+		RefreshToken: jwt(t, map[string]any{"exp": float64(fixedNow().Add(24 * time.Hour).Unix())}),
+		TokenType:    "Bearer",
+		ExpiresAt:    expiresAt,
+		Issuer:       issuer,
+		ClientID:     "putnami-cli",
+	})
+}
+
+func TestWhoAmIRecognisesADelegatedSession(t *testing.T) {
+	spectest.Proves(t, "cloud/agent-session", "a-delegated-session-says-what-it-reaches", "whoami-recognizes-a-delegated-session")
+	t.Cleanup(clicore.ForgetSentDelegation)
+	srv := newAuthServer(t)
+	srv.userinfoFn = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusUnauthorized, map[string]any{"error": "invalid_token"})
+	}
+	home := t.TempDir()
+	ioctx, env, stdout, _ := captureIO(t, srv.srv, home)
+	storeDelegatedAuth(t, home, srv.srv.URL, freshExpiry())
+	root := linkWorkspace(t, "acme")
+
+	if err := WhoAmI(map[string]any{}, root, env, ioctx); err != nil {
+		t.Fatalf("WhoAmI: %v", err)
+	}
+	joined := strings.Join(*stdout, "\n")
+	for _, want := range []string{
+		"person@example.com through an MCP connection (agent-cli), workspace acme",
+		"signed in as person@example.com through an MCP connection (agent-cli), workspace ws-acme, delegated routes only (scopes mcp.read mcp.act)",
+	} {
+		if !strings.Contains(joined, want) {
+			t.Fatalf("stdout missing %q:\n%s", want, joined)
+		}
+	}
+	if strings.Contains(joined, "not signed in") || srv.userinfoHits != 0 {
+		t.Fatalf("delegated session asked userinfo (%d) or read as signed out:\n%s", srv.userinfoHits, joined)
+	}
+	node := WhoamiStatusNode(map[string]any{}, root, env, ioctx)
+	if len(node.Metrics) != 1 || node.Metrics[0].Value != (24*time.Hour).Seconds() {
+		t.Fatalf("delegated session expiry = %+v", node.Metrics)
+	}
+}
+
+func TestWhoAmIDelegatedSessionWhoseRefreshFailsIsSignedOut(t *testing.T) {
+	t.Cleanup(clicore.ForgetSentDelegation)
+	srv := newAuthServer(t)
+	srv.tokenFn = func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"error": "invalid_grant", "error_description": "refresh token revoked"})
+	}
+	home := t.TempDir()
+	ioctx, env, _, _ := captureIO(t, srv.srv, home)
+	storeDelegatedAuth(t, home, srv.srv.URL, fixedNow().Add(-time.Hour).UTC().Format(time.RFC3339Nano))
+	root := linkWorkspace(t, "")
+
+	node := WhoamiStatusNode(map[string]any{}, root, env, ioctx)
+	if node.State != clicore.StatusFailing || node.Children[0].Detail != "not signed in" {
+		t.Fatalf("node = %+v", node)
+	}
+}

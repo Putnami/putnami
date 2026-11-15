@@ -226,8 +226,10 @@ func (n StatusNode) ChildStates() []StatusState {
 
 // UnknownStatus builds the node of an entry that did not answer. The first
 // line of the error is the detail, so the reader sees why, and fix names the
-// command that shows the entry in full.
+// command that shows the entry in full. A route a delegated session does not
+// admit names that reason and the MCP read tool for the same data.
 func UnknownStatus(id, title string, err error, fix string) StatusNode {
+	err = DelegatedRefusal(err, id)
 	detail := "no answer"
 	if err != nil {
 		detail = strings.TrimSpace(err.Error())

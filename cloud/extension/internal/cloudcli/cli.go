@@ -294,9 +294,11 @@ func RunCommand(command string, ioctx IO, args []string) (err error) {
 	}
 	// An authentication error names the credential the server refused, on a
 	// machine that holds both a session and PUTNAMI_CLOUD_TOKEN. Signing in
-	// and out are about the session alone.
+	// and out are about the session alone. A route a delegated session does
+	// not admit names that reason and the MCP read tool for the same data
+	// instead: the session works, and signing in again changes nothing.
 	if command != "login" && command != "logout" {
-		defer func() { err = clicore.NameCredential(err) }()
+		defer func() { err = clicore.NameCredential(clicore.DelegatedRefusal(err, command)) }()
 	}
 
 	switch command {

@@ -669,6 +669,21 @@
           }
         },
         {
+          "id": "a-delegated-session-says-what-it-reaches",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "whoami-recognizes-a-delegated-session",
+              "a-refused-route-names-the-delegation-and-the-read-tool",
+              "a-status-entry-on-a-refused-route-is-unknown"
+            ]
+          }
+        },
+        {
           "id": "a-read-only-cache-credential-is-declared",
           "stage": "coded",
           "evidenceKinds": [

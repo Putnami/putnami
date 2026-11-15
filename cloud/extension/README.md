@@ -155,6 +155,19 @@ HTTP 403 names the credential the server refused. `cloud evidence-report` and
 `cloud config drift` keep a bearer of their own and send `PUTNAMI_CLOUD_TOKEN`
 whenever it is set (see their sections).
 
+A session that a person's MCP connection approved for a hosted agent is
+delegated: its token carries an actor (for example `agent-cli`) and is bound
+to one workspace, and it admits only the routes delegated to that connection.
+`whoami` and `status` read it from the token, without the userinfo endpoint,
+and report it as `signed in as <person> through an MCP connection
+(agent-cli), workspace <id>, delegated routes only`; a refresh that fails
+still ends it. A 401 or 403 such a session gets from a route its token does
+not admit says so, instead of asking to sign in again, and names the MCP read
+tool for the same data when one exists: `query_logs`, `query_metrics`,
+`query_traces`, `list_errors`, `list_runs`, `get_run`, `list_environments`,
+`list_releases`, `get_configuration` or `list_databases`. A `status` entry
+that needs such a route is `unknown` with that reason.
+
 ### Intelligence
 
 The Intelligence commands ship with the

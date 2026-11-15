@@ -37,7 +37,18 @@ type StoredWorkspaceAccess struct {
 }
 
 // ActiveAuth returns a fresh base session token, refreshing it when expired.
+// A session it returns is recorded as the one sent (SentDelegation); a read
+// or a refresh that fails records nothing, so its error is never taken for a
+// route refusal.
 func ActiveAuth(params map[string]any, env map[string]string, ioctx IO) (*StoredToken, error) {
+	auth, err := activeAuth(params, env, ioctx)
+	if err == nil {
+		recordDelegation(auth)
+	}
+	return auth, err
+}
+
+func activeAuth(params map[string]any, env map[string]string, ioctx IO) (*StoredToken, error) {
 	auth, err := ReadAuth(env, true)
 	if err != nil {
 		return nil, err
@@ -67,6 +78,9 @@ func ActiveAuth(params map[string]any, env map[string]string, ioctx IO) (*Stored
 // machine token is valid, and ActiveAuth never accepts it. Any other error is
 // returned as is.
 func UserSessionError(err error, env map[string]string) error {
+	if refusal := DelegatedRefusal(err, ""); IsDelegatedRefusal(refusal) {
+		return refusal
+	}
 	if err == nil || ExitCode(err) != ExitAuth || !tokenWithoutSession(env) {
 		return err
 	}
@@ -79,10 +93,11 @@ func UserSessionError(err error, env map[string]string) error {
 // fix to name.
 func UserSessionStatus(id, title string, err error, env map[string]string) StatusNode {
 	fix := ""
-	if ExitCode(err) == ExitAuth && !tokenWithoutSession(env) {
+	err = UserSessionError(DelegatedRefusal(err, id), env)
+	if ExitCode(err) == ExitAuth && !IsDelegatedRefusal(err) && !tokenWithoutSession(env) {
 		fix = "putnami cloud login"
 	}
-	return UnknownStatus(id, title, UserSessionError(err, env), fix)
+	return UnknownStatus(id, title, err, fix)
 }
 
 // tokenWithoutSession reports whether the process holds PUTNAMI_CLOUD_TOKEN
@@ -113,6 +128,19 @@ func WorkspaceAuth(params map[string]any, env map[string]string, ioctx IO, works
 	if workspaceID == "" {
 		return ActiveAuth(params, env, ioctx)
 	}
+	var session *StoredToken
+	token, err := workspaceAuth(params, env, ioctx, workspaceID, &session)
+	if err == nil {
+		// The stored session says whether the bearer is delegated: a
+		// workspace token minted from it acts for the same connection.
+		recordDelegation(session)
+	}
+	return token, err
+}
+
+// workspaceAuth is WorkspaceAuth; session receives the stored session it
+// read, nil when it sent PUTNAMI_CLOUD_TOKEN.
+func workspaceAuth(params map[string]any, env map[string]string, ioctx IO, workspaceID string, session **StoredToken) (*StoredToken, error) {
 	cred := ResolveCredential(env, ioctxNow(ioctx))
 	recordCredential(cred)
 	announceCredential(params, ioctx, cred)
@@ -128,6 +156,7 @@ func WorkspaceAuth(params map[string]any, env map[string]string, ioctx IO, works
 	if err != nil {
 		return nil, err
 	}
+	*session = auth
 	if cached := cachedWorkspaceAuth(auth, workspaceID, ioctx.Now()); cached != nil {
 		return cached, nil
 	}
@@ -442,13 +471,30 @@ func refreshStoredAuth(params map[string]any, env map[string]string, ioctx IO, a
 	}
 	response, err := PostTokenEndpoint(ioctx.Client, endpoints.TokenURL, body, []int{http.StatusOK, http.StatusBadRequest})
 	if err != nil {
-		return nil, err
+		return nil, &refreshError{err: err}
 	}
 	if oauthError := ValueString(response, "error"); oauthError != "" {
 		description := FirstString(ValueString(response, "error_description"), oauthError)
 		return nil, NewOAuthTokenError(oauthError, description, ExitAuth)
 	}
 	return StoredAuth(response, endpoints.Issuer, clientID, ioctx.Now()), nil
+}
+
+// refreshError is a sign-in refresh the token endpoint refused or did not
+// answer. Its message and exit code are the cause's; it only marks the
+// failure as the session's, never a route's (RefusalStatus).
+type refreshError struct {
+	err error
+}
+
+func (e *refreshError) Error() string { return e.err.Error() }
+
+func (e *refreshError) Unwrap() error { return e.err }
+
+func isRefreshError(err error) bool {
+	var refresh *refreshError
+	var oauth *oauthTokenError
+	return errors.As(err, &refresh) || errors.As(err, &oauth)
 }
 
 type oauthTokenError struct {

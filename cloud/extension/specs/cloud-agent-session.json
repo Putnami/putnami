@@ -42,6 +42,14 @@
       ]
     },
     {
+      "id": "a-delegated-session-says-what-it-reaches",
+      "text": [
+        "A session delegated through a person's MCP connection (an actor and a workspace scope in its token) is read from its claims, not userinfo: whoami and status name the person, the actor and the workspace, delegated routes only. A failed refresh still ends it.",
+        "A 401 or 403 from a route it does not admit says so and names the MCP read tool for that data; such a status entry is unknown, not failing.",
+        "Own sessions and PUTNAMI_CLOUD_TOKEN runs are unchanged."
+      ]
+    },
+    {
       "id": "a-read-only-cache-credential-is-declared",
       "text": [
         "When core lists read-only at initialize, the cache provider echoes it for a session that cannot write: a workspace machine token, or the signed-in user's putnami cloud token --for cache recipe off a hosted run.",
