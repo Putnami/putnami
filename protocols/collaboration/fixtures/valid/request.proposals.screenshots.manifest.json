@@ -1,0 +1,8 @@
+{
+  "ref": {
+    "source": "github:acme/app",
+    "id": "7"
+  },
+  "commit": "0123456789abcdef0123456789abcdef01234567",
+  "manifest": ".putnami/screenshots/apps-web/screenshots.json"
+}

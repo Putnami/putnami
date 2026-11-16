@@ -52,7 +52,10 @@ exists; never invent a task to use it.
 - A web change: `--screenshots <manifest>` for each web project whose pages
   it touches, the manifest prove wrote on the head being published, or
   `--waive-screenshots <reason>` when the owner waived them. A ready
-  publication without either is refused before any write.
+  publication without either is refused before any write. The command
+  uploads each manifest to the proposals provider when it stores
+  screenshots; report a `the screenshots were not uploaded` warning, and
+  after an upload failure fix the cause it names and run the command again.
 - One unit of a larger task: `--partial-delivery`, on the draft and the final
   call. It keeps a non-closing reference and leaves the task's state alone.
 

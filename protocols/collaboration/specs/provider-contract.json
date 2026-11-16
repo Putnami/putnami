@@ -18,7 +18,7 @@
       "id": "one-closed-catalog",
       "text": [
         "Each contract speaks only version 1. tasks requires find, get, create, update and transition and offers assign, claim and link;",
-        "proposals requires find, review, status and upsert and offers automerge, comments and merge;",
+        "proposals requires find, review, status and upsert and offers automerge, comments, merge and screenshots;",
         "memory requires checkpoint, context and mission and offers search;",
         "missions requires ask, reply and sync and offers status. tasks.create, proposals.review, memory.checkpoint and missions.ask take an idempotencyKey.",
         "Only missions.sync is host-only, and only a mutation can be."
@@ -152,6 +152,14 @@
       ]
     },
     {
+      "id": "proposal-screenshots",
+      "text": [
+        "proposals.screenshots, an optional mutation, hands the provider one screenshots manifest: the request is the proposal's ref, the commit captured and the path of the manifest file, at most 4096 bytes on one line.",
+        "The result names the proposal, the commit, the project, the captures listed and the files uploaded.",
+        "The CLI answers unresolved, with provider.identity_mismatch and the repeat as reconciliation, an ok answer for another proposal or commit."
+      ]
+    },
+    {
       "id": "memory-scenarios",
       "text": [
         "Every memory provider passes providertest.RunMemory: an unknown mission has no record;",
@@ -256,6 +264,7 @@
     "tooling/contributor/doc/adr/0008-build-pushes-its-intent-before-its-code.md",
     "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md",
     "protocols/collaboration/doc/adr/0005-missions-status-reads-a-missions-sessions.md",
-    "protocols/collaboration/doc/adr/0006-version-1-is-stable.md"
+    "protocols/collaboration/doc/adr/0006-version-1-is-stable.md",
+    "tooling/contributor/doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md"
   ]
 }

@@ -9,7 +9,12 @@ import type {
   Plugin,
   SourceScopedDesignContributor,
 } from '@putnami/application';
-import { designDataSchemaNode, designServiceNode, loadRegisteredModule } from '@putnami/application';
+import {
+  designDataSchemaNode,
+  designServiceNode,
+  hasRegisteredModules,
+  loadRegisteredModule,
+} from '@putnami/application';
 import type { MigrationRegistry } from '@putnami/migration';
 import { tokenName, useLogger } from '@putnami/runtime';
 import { robustRemove, robustRename } from '@putnami/runtime/robustio';
@@ -340,6 +345,11 @@ export function sql(
         const registered = await loadRegisteredModule('sql-loader');
         if (registered) {
           logger.debug('SQL tables registered (bundled)');
+        } else if (hasRegisteredModules()) {
+          // A bundled build registers 'sql-loader' only when the app declares
+          // tables. Without it, the bundle has none, and there is no workspace
+          // to look the generated file up in: the lookup would throw.
+          logger.debug('SQL tables: none in this bundle');
         } else {
           const project = getCurrentProject();
           if (project) {

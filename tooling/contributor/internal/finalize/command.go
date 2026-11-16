@@ -13,6 +13,8 @@ import (
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 	features "go.putnami.dev/protocol/features"
 	job "go.putnami.dev/protocol/job"
+
+	"go.putnami.dev/tooling/contributor/internal/screens"
 )
 
 // Host is what the command reaches through the putnami process that
@@ -87,6 +89,7 @@ func (c Command) Run(ctx context.Context, args []string) int {
 	if result.AutoMerge != nil && !result.AutoMerge.Enabled {
 		fmt.Fprintf(c.Stderr, "change finalize: auto-merge is not on: %s; the proposal stays ready for review\n", result.AutoMerge.Refusal)
 	}
+	reportScreenshotsUpload(c.Stderr, result.ScreenshotsUpload)
 	if protocolcli.OutputMode(output).IsMachineReadable() {
 		data, err := json.Marshal(result)
 		if err != nil {
@@ -113,6 +116,22 @@ func (c Command) Run(ctx context.Context, args []string) int {
 		fmt.Fprintf(c.Stdout, "AUTO_MERGE=%s\n", state)
 	}
 	return 0
+}
+
+// reportScreenshotsUpload writes what became of the accepted screenshots:
+// one line per manifest the provider stored, and a warning when it stored
+// none.
+func reportScreenshotsUpload(stderr io.Writer, upload *ScreenshotsUpload) {
+	if upload == nil {
+		return
+	}
+	for _, manifest := range upload.Manifests {
+		fmt.Fprintf(stderr, "change finalize: uploaded the screenshots of %s: %s, %s sent\n", manifest.Project,
+			screens.Plural(manifest.Captures, "capture"), screens.Plural(manifest.Uploaded, "file"))
+	}
+	if upload.Skipped != "" {
+		fmt.Fprintf(stderr, "change finalize: warning: the screenshots were not uploaded: %s; the verification comment is unchanged\n", upload.Skipped)
+	}
 }
 
 // refusedSelection names the project selection flag the launch carries, in

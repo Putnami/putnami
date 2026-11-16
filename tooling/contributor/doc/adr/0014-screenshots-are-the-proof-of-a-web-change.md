@@ -1,6 +1,8 @@
 # ADR 0014 — Screenshots are the proof of a web change
 
 - **Status**: accepted
+- **Amended by**: [ADR 0015](0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md),
+  on consequence 2
 - **Scope**: `@putnami/contributor`: a new `change screenshots` command,
   `change finalize`, and the `build` skill's prove and check stages
 - **Extends**: [ADR 0005](0005-the-contributor-executable-serves-the-change-noun.md),

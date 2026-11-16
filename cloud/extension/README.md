@@ -272,6 +272,9 @@ putnami cloud ci queue                          # the setting of main, and wheth
 putnami cloud ci queue enable --dry-run         # what enable would change, without changing it
 putnami cloud ci queue enable                   # split the rulesets once you confirm, then turn the queue on
 putnami cloud ci queue disable                  # turn the queue off; the rulesets stay as they are
+putnami cloud ci queue list                     # the entries in line order, and the commit to rebase on
+putnami cloud ci queue pause --reason <why>     # stop the queue; every entry keeps its place
+putnami cloud ci queue resume                   # move the queue again from its first entry
 ```
 
 Every verb takes `--branch <branch>`, `main` by default.
@@ -320,6 +323,28 @@ carries the setting, the plan (`rules.create`, `rules.update`) and what
 entry with the reason `queue-off`, and GitHub's auto-merge then merges each
 pull request that still has it on. The rulesets stay split: the
 `pull_request` rule still applies to everyone but the App.
+
+`list` prints the line: each entry's position, pull request, state, the
+commit its queue commit is built on, the queue commit and its run. It then
+lists the requests that wait outside the line and the condition each waits
+for, such as `conflict` or `ready-for-review`, and the entries that landed or
+dropped in the last 24 hours. Last, it prints the commit a pull request of the
+branch rebases on: the queue commit of the last entry of the green front of
+the line, on its `putnami-queue/<n>` branch, or the head of the branch, with
+the command:
+
+```sh
+git fetch origin <ref> && git rebase FETCH_HEAD
+```
+
+`--output=json` carries the setting and the whole answer.
+
+`pause --reason <why>` stops a queue that is on, once you confirm or pass
+`--yes`: nothing is built and nothing lands, a queue run already running
+finishes, new requests still enter in order, and every entry keeps its place.
+The reason holds at most 500 bytes. `status` and `list` then name who paused
+the queue, when and why. `resume` moves the queue again from its first entry.
+Both take a person, like `enable`.
 
 ## Report local gate sessions
 
@@ -375,12 +400,38 @@ it serves:
 
 | Contract | Served | Answers unsupported |
 | --- | --- | --- |
-| proposals | find, upsert (open, update, draft or ready), status, comments, review, automerge (squash) | merge |
+| proposals | find, upsert (open, update, draft or ready), status, comments, review, automerge (squash), screenshots | merge |
 | tasks | get, transition, assign (your own login only) | find, create, update, link |
 
 An operation Source does not serve answers `unsupported` and sends nothing.
 `proposals find` answers one page: a request that names a page cursor
 answers `invalid` and sends nothing.
+
+`proposals screenshots` is the one operation that goes to Putnami Delivery,
+which stores the screenshots of a change and shows them on the change page.
+`putnami change finalize --screenshots <manifest>` calls it. It posts the
+manifest file as written to
+`/v1/workspaces/{workspace}/changes/pr-<number>/screenshots`, then puts each
+file Delivery lists as missing to `.../screenshots/captures/{sha256}` as
+`image/png`. A second upload of the same files sends the manifest only.
+
+| Case | Answer |
+| --- | --- |
+| The manifest captures another commit than the request names, or a file does not hash to its digest | `invalid`; the manifest or the file is not sent |
+| Delivery does not serve the route (404 on the manifest) | `unsupported`, reason `screenshots.not_served` |
+| The process holds only `PUTNAMI_CLOUD_TOKEN` | `unsupported`, reason `screenshots.session_required`; nothing is sent, because Delivery takes the upload from a person's session |
+| The head is not a commit of the change (409) | `conflict`, with Delivery's message |
+| A file or a manifest is too large, or is not the PNG its digest names (413, 422) | `invalid`, with Delivery's message |
+| The outcome is unknown | `unresolved`; run it again, and it sends only what is still missing |
+
+A CLI that predates the operation does not know it, and withdraws this
+provider's whole proposals contract: move a workspace's CLI pin with, or
+before, the pin of a `@putnami/cloud` that declares `screenshots`
+([ADR 0015](../../tooling/contributor/doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md)).
+
+One call uploads one manifest within the provider's 100 second budget. The
+two routes are hand-written until the published Cloud schema declares them
+([`clientgen.framework.json`](clientgen.framework.json)).
 
 - **Credential.** A stored session always wins. `PUTNAMI_CLOUD_TOKEN` is used
   only when no session can give a workspace bearer. Without either, an
@@ -937,7 +988,7 @@ putnami cloud ci report --conclusion success       # report a delivery-run outco
 putnami cloud ci status                            # CI readiness checks, queue, last run reuse, runs and spend over 7 days
 putnami cloud ci view <run> [--output=json]        # one run: phases, timing, cache, failures, its verdict, and the release-set members it reused
 putnami cloud ci usage [--window <duration>]       # runs, spend, billed cost, merges by verdict, and deploys over the window
-putnami cloud ci queue [enable|disable] [--branch <b>]  # the merge queue: enable splits the rulesets with your GitHub credentials, then turns it on
+putnami cloud ci queue [enable|disable|list|pause|resume] [--branch <b>]  # the merge queue: enable splits the rulesets with your GitHub credentials, then turns it on; list shows the line and the commit to rebase on
 putnami cloud cache [status]                       # the build cache config, its identity, and the reuse of the last CI run
 putnami cloud cache disable [--remove]             # disable (enabled:false) or delete the cache config
 putnami cloud source connect [--repo owner/name] [--replace]  # browser-assisted GitHub authorization; structured mode requires --repo
@@ -1695,7 +1746,8 @@ that neither claims:
 
 - [`clientgen.framework.json`](clientgen.framework.json) lists the Putnami
   calls with no contract yet: the session and log chunk ingest of the CI
-  reporters, and the OCI registry fast path. They wait on contract
+  reporters, the screenshots upload of a change, and the OCI registry fast
+  path. They wait on contract
   declarations in delivery-api and oci-server. It also lists the transport
   primitives of the remote cache client.
 - [`clientgen.external.json`](clientgen.external.json) lists third-party calls:

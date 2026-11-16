@@ -88,7 +88,7 @@ credential never leaves its own host or this machine.
 | Contract | Offered | Not offered |
 |---|---|---|
 | tasks v1 | `find`, `get`, `create`, `update`, `transition`, `assign`, `link` | `claim` |
-| proposals v1 | `find`, `upsert`, `status`, `review`, `comments`, `merge` (with `allowMerge`), `automerge` | — |
+| proposals v1 | `find`, `upsert`, `status`, `review`, `comments`, `merge` (with `allowMerge`), `automerge` | `screenshots` |
 
 - **States.** An open issue is `blocked`, `in_progress` or `open` by the first
   of those states whose label it carries, and `open` without one. A closed

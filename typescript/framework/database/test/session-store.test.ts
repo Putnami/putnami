@@ -291,6 +291,22 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       expect(user.profile.name).toBe('John Doe');
       expect(user.profile.settings.theme).toBe('dark');
     });
+
+    it('returns every key as it was written, snake_case and nested included', async () => {
+      const sessionId = 'test-session-keys';
+      const sessionData = {
+        oauth_pending: { state: 's-1', code_verifier: 'v-1', redirect_to: '/r/queue' },
+        accessToken: 't-1',
+        token_set: [{ expires_at: 1 }],
+      };
+
+      await store.setAllAsync(sessionId, sessionData);
+
+      expect(await store.getAllAsync<typeof sessionData>(sessionId)).toEqual(sessionData);
+      expect(await store.getAsync<typeof sessionData.oauth_pending>(sessionId, 'oauth_pending')).toEqual(
+        sessionData.oauth_pending,
+      );
+    });
   });
 
   describe('behind the session API of an HTTP application', () => {
@@ -305,6 +321,11 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
         setSession('cart', ['item-1']);
         return { ok: true };
       });
+      hp.route('GET', '/login', () => {
+        setSession('oauth_pending', { state: 's-1', code_verifier: 'v-1' });
+        return { ok: true };
+      });
+      hp.route('GET', '/callback', () => ({ pending: useSession('oauth_pending') ?? null }));
       hp.route('GET', '/forget', () => {
         deleteSessionAll();
         return { ok: true };
@@ -328,6 +349,15 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
 
         const read = await fetch(`${base}/read`, { headers: { Cookie: cookie } });
         expect(await read.json()).toEqual({ cart: ['item-1'] });
+      });
+    });
+
+    it('reads back a snake_case key the previous request wrote, as an OAuth callback does', async () => {
+      await sql`DELETE FROM sessions`;
+      await withServer(async (base) => {
+        const cookie = cookieOf(await fetch(`${base}/login`));
+        const callback = await fetch(`${base}/callback`, { headers: { Cookie: cookie } });
+        expect(await callback.json()).toEqual({ pending: { state: 's-1', code_verifier: 'v-1' } });
       });
     });
 

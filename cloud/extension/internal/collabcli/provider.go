@@ -1,7 +1,8 @@
 // Package collabcli is the collaboration provider of @putnami/cloud: the
 // tasks and proposals contracts of go.putnami.dev/protocol/collaboration,
 // served by Putnami Source through the Putnami GitHub App of the repository
-// connected to the linked workspace. It needs no GitHub token on the machine:
+// connected to the linked workspace. proposals.screenshots alone goes to
+// Putnami Delivery, which stores a change's screenshots. It needs no GitHub token on the machine:
 // every call presents the signed-in Putnami session.
 //
 // A write is sent once. When its outcome is unknown (the connection broke
@@ -78,20 +79,21 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 		taskRead       = "read the task with tasks.get"
 	)
 	return map[collab.OperationKey]collab.Handler{
-		key(collab.ContractProposals, collab.OperationFind):      served(p, "", Source.FindProposals),
-		key(collab.ContractProposals, collab.OperationUpsert):    served(p, proposalRead, Source.UpsertProposal),
-		key(collab.ContractProposals, collab.OperationStatus):    served(p, "", Source.ProposalStatus),
-		key(collab.ContractProposals, collab.OperationComments):  served(p, "", Source.ProposalComments),
-		key(collab.ContractProposals, collab.OperationReview):    served(p, reviewRepeat, Source.ReviewProposal),
-		key(collab.ContractProposals, collab.OperationAutoMerge): served(p, proposalStatus, Source.AutoMergeProposal),
-		key(collab.ContractProposals, collab.OperationMerge):     notServed,
-		key(collab.ContractTasks, collab.OperationGet):           served(p, "", Source.GetTask),
-		key(collab.ContractTasks, collab.OperationTransition):    served(p, taskRead, Source.TransitionTask),
-		key(collab.ContractTasks, collab.OperationAssign):        served(p, taskRead, Source.AssignTask),
-		key(collab.ContractTasks, collab.OperationFind):          notServed,
-		key(collab.ContractTasks, collab.OperationCreate):        notServed,
-		key(collab.ContractTasks, collab.OperationUpdate):        notServed,
-		key(collab.ContractTasks, collab.OperationLink):          notServed,
+		key(collab.ContractProposals, collab.OperationFind):        served(p, "", Source.FindProposals),
+		key(collab.ContractProposals, collab.OperationUpsert):      served(p, proposalRead, Source.UpsertProposal),
+		key(collab.ContractProposals, collab.OperationStatus):      served(p, "", Source.ProposalStatus),
+		key(collab.ContractProposals, collab.OperationComments):    served(p, "", Source.ProposalComments),
+		key(collab.ContractProposals, collab.OperationReview):      served(p, reviewRepeat, Source.ReviewProposal),
+		key(collab.ContractProposals, collab.OperationAutoMerge):   served(p, proposalStatus, Source.AutoMergeProposal),
+		key(collab.ContractProposals, collab.OperationMerge):       notServed,
+		key(collab.ContractProposals, collab.OperationScreenshots): p.screenshots,
+		key(collab.ContractTasks, collab.OperationGet):             served(p, "", Source.GetTask),
+		key(collab.ContractTasks, collab.OperationTransition):      served(p, taskRead, Source.TransitionTask),
+		key(collab.ContractTasks, collab.OperationAssign):          served(p, taskRead, Source.AssignTask),
+		key(collab.ContractTasks, collab.OperationFind):            notServed,
+		key(collab.ContractTasks, collab.OperationCreate):          notServed,
+		key(collab.ContractTasks, collab.OperationUpdate):          notServed,
+		key(collab.ContractTasks, collab.OperationLink):            notServed,
 	}
 }
 
@@ -178,17 +180,7 @@ func (p *Provider) open(ctx context.Context, workspaceRoot string) (Source, *col
 		}
 		return nil, collab.Fail(collab.OutcomeUnavailable, reasonTransport, "resolve the linked workspace: %v", err)
 	}
-	p.remember(bearerValue(workspace.AuthToken))
-	refresh := workspace.RefreshAuth
-	if refresh != nil {
-		workspace.RefreshAuth = func() (clicore.Bearer, error) {
-			fresh, err := refresh()
-			if err == nil {
-				p.remember(bearerValue(fresh))
-			}
-			return fresh, err
-		}
-	}
+	p.watchBearer(workspace)
 	connect := p.Connect
 	if connect == nil {
 		connect = connectSource
@@ -249,6 +241,23 @@ func (p *Provider) environment() map[string]string {
 
 func bearerValue(bearer clicore.Bearer) string {
 	return strings.TrimPrefix(bearer.Authorization(), "Bearer ")
+}
+
+// watchBearer registers the workspace's bearer for redaction, and every
+// bearer its RefreshAuth renews later.
+func (p *Provider) watchBearer(workspace *clicore.WorkspaceContext) {
+	p.remember(bearerValue(workspace.AuthToken))
+	refresh := workspace.RefreshAuth
+	if refresh == nil {
+		return
+	}
+	workspace.RefreshAuth = func() (clicore.Bearer, error) {
+		fresh, err := refresh()
+		if err == nil {
+			p.remember(bearerValue(fresh))
+		}
+		return fresh, err
+	}
 }
 
 func (p *Provider) remember(secret string) {

@@ -289,6 +289,10 @@ func ValidateInput(input any) []diag.Diagnostic {
 	case *ProposalCommentsInput:
 		c.ref("ref", in.Ref)
 		c.page(in.Page)
+	case *ProposalScreenshotsInput:
+		c.ref("ref", in.Ref)
+		c.commit("commit", in.Commit)
+		c.filePath("manifest", in.Manifest)
 	case *ProposalMergeInput:
 		c.ref("ref", in.Ref)
 		c.commit("expectedHeadCommit", in.ExpectedHeadCommit)
@@ -370,6 +374,16 @@ func ValidateResult(result any) []diag.Diagnostic {
 		c.proposal("proposal", r.Proposal)
 	case *ProposalResult:
 		c.proposal("proposal", r.Proposal)
+	case *ProposalScreenshotsResult:
+		c.ref("ref", r.Ref)
+		c.commit("commit", r.Commit)
+		c.bounded("project", r.Project, MaxFilePathBytes, true)
+		if r.Captures < 0 {
+			c.errorf(ErrorCodeInvalidValue, "captures", "captures is negative")
+		}
+		if r.Uploaded < 0 || r.Uploaded > r.Captures {
+			c.errorf(ErrorCodeInvalidValue, "uploaded", "uploaded is between 0 and captures")
+		}
 	case *ProposalStatusResult:
 		c.proposal("proposal", r.Proposal)
 		c.checks("checks", r.Checks)
@@ -597,6 +611,24 @@ func (c *checker) bounded(field, value string, limit int, required bool) {
 	}
 	if utf8.RuneCountInString(value) > limit {
 		c.errorf(ErrorCodeTooLarge, field, "%s exceeds %d characters", field, limit)
+	}
+	if strings.ContainsAny(value, "\n\r\x00") {
+		c.errorf(ErrorCodeInvalidValue, field, "%s is one line", field)
+	}
+}
+
+// MaxFilePathBytes bounds a file path a request carries.
+const MaxFilePathBytes = 4096
+
+// filePath checks a required file path: one line of at most
+// MaxFilePathBytes.
+func (c *checker) filePath(field, value string) {
+	if strings.TrimSpace(value) == "" {
+		c.errorf(ErrorCodeRequired, field, "%s is required", field)
+		return
+	}
+	if len(value) > MaxFilePathBytes {
+		c.errorf(ErrorCodeTooLarge, field, "%s exceeds %d bytes", field, MaxFilePathBytes)
 	}
 	if strings.ContainsAny(value, "\n\r\x00") {
 		c.errorf(ErrorCodeInvalidValue, field, "%s is one line", field)

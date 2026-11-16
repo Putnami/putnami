@@ -53,7 +53,7 @@ func activeAuth(params map[string]any, env map[string]string, ioctx IO) (*Stored
 	if err != nil {
 		return nil, err
 	}
-	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, ioctx.Now()) {
+	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, ioctxNow(ioctx)) {
 		return auth, nil
 	}
 	if auth.RefreshToken == "" {
@@ -157,10 +157,10 @@ func workspaceAuth(params map[string]any, env map[string]string, ioctx IO, works
 		return nil, err
 	}
 	*session = auth
-	if cached := cachedWorkspaceAuth(auth, workspaceID, ioctx.Now()); cached != nil {
+	if cached := cachedWorkspaceAuth(auth, workspaceID, ioctxNow(ioctx)); cached != nil {
 		return cached, nil
 	}
-	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, ioctx.Now()) && ClaimedWorkspaceID(DecodeJWT(auth.AccessToken)) == workspaceID {
+	if AccessTokenFresh(auth.AccessToken, auth.ExpiresAt, ioctxNow(ioctx)) && ClaimedWorkspaceID(DecodeJWT(auth.AccessToken)) == workspaceID {
 		return auth, nil
 	}
 	if auth.RefreshToken == "" {
@@ -263,7 +263,7 @@ func MintWorkspaceScopedAuthContext(
 	// key is instead bounded to ten minutes, restricted to requestedScope, and
 	// revoked immediately after its one exchange. The grant then applies the
 	// strict key ∩ client ∩ requested intersection server-side.
-	expiresAt := ioctx.Now().Add(10 * time.Minute).UTC().Format(time.RFC3339Nano)
+	expiresAt := ioctxNow(ioctx).Add(10 * time.Minute).UTC().Format(time.RFC3339Nano)
 	created, err := keys.CreateApikeys(client.WithForwardedUserToken(ctx, session.AccessToken), authserverclient.CreateApikeysInput{
 		Body: authserverclient.CreateApikeysBody{
 			Name:          fmt.Sprintf("cli:%s:%s", clientID, workspaceID),
@@ -300,7 +300,7 @@ func MintWorkspaceScopedAuthContext(
 		return nil, NewOAuthTokenError(oauthError, description, ExitAuth)
 	}
 
-	scoped := StoredAuth(response, endpoints.Issuer, clientID, ioctx.Now())
+	scoped := StoredAuth(response, endpoints.Issuer, clientID, ioctxNow(ioctx))
 	if fields := strings.Fields(scoped.AccessToken); len(fields) != 1 || fields[0] != scoped.AccessToken {
 		return nil, NewError("auth server returned an empty or malformed scoped access token", ExitAPI)
 	}
@@ -416,7 +416,7 @@ func refreshStoredAuthWithRetry(params map[string]any, env map[string]string, io
 			continue
 		}
 		if allowCached {
-			if reusable := reusableAuthAfterRefreshRace(latest, workspaceID, ioctx.Now()); reusable != nil {
+			if reusable := reusableAuthAfterRefreshRace(latest, workspaceID, ioctxNow(ioctx)); reusable != nil {
 				return reusable, latest, nil
 			}
 		}
@@ -477,7 +477,7 @@ func refreshStoredAuth(params map[string]any, env map[string]string, ioctx IO, a
 		description := FirstString(ValueString(response, "error_description"), oauthError)
 		return nil, NewOAuthTokenError(oauthError, description, ExitAuth)
 	}
-	return StoredAuth(response, endpoints.Issuer, clientID, ioctx.Now()), nil
+	return StoredAuth(response, endpoints.Issuer, clientID, ioctxNow(ioctx)), nil
 }
 
 // refreshError is a sign-in refresh the token endpoint refused or did not

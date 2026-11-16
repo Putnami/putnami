@@ -80,6 +80,13 @@ type finalizerProvider struct {
 	autoMergeOffered bool
 	autoMergeRefusal *collab.Error
 	autoMerges       []collab.ProposalAutoMergeInput
+	// screenshotsOffered adds screenshots to the proposals capabilities.
+	// screenshotsAnswer, when set, is the failure the provider answers it
+	// with; held is the set of capture digests it already stores.
+	screenshotsOffered bool
+	screenshotsAnswer  *collab.Envelope
+	screenshotUploads  []collab.ProposalScreenshotsInput
+	held               map[string]bool
 	// log lists every contract operation called, in order, but capabilities.
 	log []string
 }
@@ -98,6 +105,9 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 		names := []string{collab.OperationFind, collab.OperationUpsert, collab.OperationStatus, collab.OperationGet, collab.OperationTransition}
 		if p.autoMergeOffered && contract == collab.ContractProposals {
 			names = append(names, collab.OperationAutoMerge)
+		}
+		if p.screenshotsOffered && contract == collab.ContractProposals {
+			names = append(names, collab.OperationScreenshots)
 		}
 		if p.reviewOffered && contract == collab.ContractProposals {
 			names = append(names, collab.OperationReview)
@@ -131,6 +141,33 @@ func (p *finalizerProvider) envelope(_ context.Context, contract, operation stri
 			return collab.Envelope{Outcome: collab.OutcomeConflict, Error: p.autoMergeRefusal}
 		}
 		return answer(collab.ProposalResult{Proposal: p.proposal})
+	case "proposals.screenshots":
+		var request collab.ProposalScreenshotsInput
+		_ = json.Unmarshal(input, &request)
+		p.screenshotUploads = append(p.screenshotUploads, request)
+		if p.screenshotsAnswer != nil {
+			return *p.screenshotsAnswer
+		}
+		var manifest struct {
+			Project  string `json:"project"`
+			Captures []struct {
+				SHA256 string `json:"sha256"`
+			} `json:"captures"`
+		}
+		data, _ := os.ReadFile(request.Manifest)
+		_ = json.Unmarshal(data, &manifest)
+		if p.held == nil {
+			p.held = map[string]bool{}
+		}
+		uploaded := 0
+		for _, capture := range manifest.Captures {
+			if !p.held[capture.SHA256] {
+				p.held[capture.SHA256] = true
+				uploaded++
+			}
+		}
+		return answer(collab.ProposalScreenshotsResult{Ref: request.Ref, Commit: request.Commit, Project: manifest.Project,
+			Captures: len(manifest.Captures), Uploaded: uploaded})
 	case "tasks.get":
 		return answer(collab.TaskResult{Task: p.task})
 	case "tasks.transition":

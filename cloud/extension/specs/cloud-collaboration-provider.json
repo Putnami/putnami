@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "cloud/collaboration-provider",
   "outcomes": [
-    "A workspace that binds @putnami/cloud to the tasks and proposals contracts publishes, reviews, readies and auto-merges its pull requests and reads and closes its issues through Putnami Source and the Putnami GitHub App, under the signed-in Putnami session, with no GitHub token on the machine"
+    "A workspace that binds @putnami/cloud to the tasks and proposals contracts publishes, reviews, readies and auto-merges its pull requests and reads and closes its issues through Putnami Source and the Putnami GitHub App, and stores a change's screenshots in Putnami Delivery, under the signed-in Putnami session, with no GitHub token on the machine"
   ],
   "nonGoals": [
     "Falling back from @putnami/github-collaboration to Putnami Source: the core binds one provider per contract, and a workspace chooses this one in options.collaboration",
@@ -15,7 +15,7 @@
       "id": "declares-the-source-operations",
       "text": [
         "The @putnami/cloud manifest declares version 1 of the tasks and proposals contracts, run by its own runtime with the provider argument, and every operation each version requires.",
-        "The proposals contract also declares comments and automerge; the tasks contract also declares assign.",
+        "The proposals contract also declares comments, automerge and screenshots; the tasks contract also declares assign.",
         "upsert, transition and assign declare checked preconditions: Source compares the expected revision with what it read before it writes."
       ]
     },
@@ -31,6 +31,15 @@
       "text": [
         "Source's refusals keep their outcome: a missing item is not_found, a stale revision or a moved head is a conflict with the current revision when Source names it, a refused credential or permission is denied, and an invalid request is invalid.",
         "A binding whose settings carry any member is invalid, and a workspace with no Cloud link answers unavailable and names putnami cloud setup."
+      ]
+    },
+    {
+      "id": "uploads-screenshots-to-delivery",
+      "text": [
+        "proposals.screenshots posts the manifest file as written to changes/pr-<number>/screenshots of Putnami Delivery, then puts each file the answer lists in missing to captures/{sha256} as image/png.",
+        "A manifest of another commit, and a file that does not hash to its digest, are invalid and not sent.",
+        "A 404 on the manifest, and a process on PUTNAMI_CLOUD_TOKEN alone, which sends nothing, answer unsupported.",
+        "A 409 is a conflict, a 413 or 422 invalid; an unknown outcome is unresolved and names its repeat."
       ]
     },
     {

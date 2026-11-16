@@ -30,7 +30,8 @@ const (
 	ContractTasks = "tasks"
 	// ContractProposals finds or creates the change proposal for an exact
 	// repository/base/head, reads its status, checks and comments, publishes
-	// reviews, and merges or turns auto-merge on where a provider offers it.
+	// reviews, and merges, turns auto-merge on or stores a change's screenshots
+	// where a provider offers it.
 	ContractProposals = "proposals"
 	// ContractMemory loads contextual records, reads a mission and saves a
 	// checkpoint against an expected revision.
@@ -72,6 +73,9 @@ const (
 	OperationMerge     = "merge"
 	OperationAutoMerge = "automerge"
 	OperationComments  = "comments"
+	// OperationScreenshots hands a provider one screenshots manifest of a
+	// proposal, with the capture files beside it.
+	OperationScreenshots = "screenshots"
 
 	OperationContext    = "context"
 	OperationMission    = "mission"
@@ -344,6 +348,14 @@ var catalog = []ContractSpec{
 				Summary: "Publish a review of a proposal at an exact head commit. A retry with the same idempotencyKey " +
 					"returns the review already published instead of publishing a second one.",
 				newInput: alloc[ProposalReviewInput](), newResult: alloc[ProposalReviewResult](),
+			},
+			{
+				Name: OperationScreenshots, Access: AccessMutating, Destructive: true,
+				Summary: "Store the screenshots of a proposal at one commit: the request names the manifest file " +
+					"putnami change screenshots wrote, and the provider reads it and the capture files beside it. A later " +
+					"manifest of the same project and commit replaces the first, and a repeat uploads only the files the " +
+					"provider lacks. Optional capability.",
+				newInput: alloc[ProposalScreenshotsInput](), newResult: alloc[ProposalScreenshotsResult](),
 			},
 			{
 				Name: OperationStatus, Access: AccessRead, Required: true,

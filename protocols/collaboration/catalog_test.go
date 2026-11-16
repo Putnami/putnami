@@ -24,7 +24,7 @@ func TestCatalog_RequiredOperationsAreTheContract(t *testing.T) {
 	optional := map[string][]string{
 		ContractMemory:    {OperationSearch},
 		ContractMissions:  {OperationStatus},
-		ContractProposals: {OperationAutoMerge, OperationComments, OperationMerge},
+		ContractProposals: {OperationAutoMerge, OperationComments, OperationMerge, OperationScreenshots},
 		ContractTasks:     {OperationAssign, OperationClaim, OperationLink},
 	}
 	for _, contract := range ContractNames {

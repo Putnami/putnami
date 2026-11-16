@@ -135,6 +135,31 @@ type Result struct {
 	// Screenshots says what a ready publication admitted for the web pages
 	// it touches: the manifests it checked, a waiver, or no page touched.
 	Screenshots string `json:"screenshots,omitempty"`
+	// ScreenshotsUpload reports the upload of the accepted manifests to the
+	// proposals provider; nil when the publication accepted none.
+	ScreenshotsUpload *ScreenshotsUpload `json:"screenshotsUpload,omitempty"`
+}
+
+// ScreenshotsUpload is what became of the accepted screenshots manifests: the
+// ones the proposals provider stored, or why none was sent. A skipped upload
+// never fails the run.
+type ScreenshotsUpload struct {
+	// Manifests lists each manifest the provider stored, in project order.
+	Manifests []UploadedManifest `json:"manifests,omitempty"`
+	// Skipped says why the provider stored nothing: it does not offer the
+	// operation, or it answered unsupported.
+	Skipped string `json:"skipped,omitempty"`
+}
+
+// UploadedManifest is one manifest the proposals provider stored.
+type UploadedManifest struct {
+	// Project is the web project the manifest captures.
+	Project string `json:"project"`
+	// Captures is the number of captures the manifest lists.
+	Captures int `json:"captures"`
+	// Uploaded is the number of files the run sent; the provider already
+	// held the others.
+	Uploaded int `json:"uploaded"`
 }
 
 // StrippedLine is one line that named an agent, removed before publication.
@@ -174,14 +199,8 @@ func (f Finalizer) call(ctx context.Context, contract, operation string, input a
 	if err != nil {
 		return err
 	}
-	if envelope.Outcome != collab.OutcomeOK {
-		if envelope.Error == nil {
-			return fmt.Errorf("%s.%s answered %s", contract, operation, envelope.Outcome)
-		}
-		if envelope.Outcome == collab.OutcomeUnresolved {
-			return fmt.Errorf("%s.%s unresolved: %s; reconcile with %s before resuming; no write was retried", contract, operation, envelope.Error.Message, envelope.Error.Reconcile)
-		}
-		return fmt.Errorf("%s.%s answered %s (%s): %s", contract, operation, envelope.Outcome, envelope.Error.Reason, envelope.Error.Message)
+	if err := envelopeError(contract, operation, envelope); err != nil {
+		return err
 	}
 	if output == nil {
 		return nil
@@ -190,6 +209,21 @@ func (f Finalizer) call(ctx context.Context, contract, operation string, input a
 		return fmt.Errorf("invalid %s.%s result: %w", contract, operation, err)
 	}
 	return nil
+}
+
+// envelopeError is the error of an envelope whose outcome is not ok, with
+// the provider's reason and message, or nil.
+func envelopeError(contract, operation string, envelope collab.Envelope) error {
+	if envelope.Outcome == collab.OutcomeOK {
+		return nil
+	}
+	if envelope.Error == nil {
+		return fmt.Errorf("%s.%s answered %s", contract, operation, envelope.Outcome)
+	}
+	if envelope.Outcome == collab.OutcomeUnresolved {
+		return fmt.Errorf("%s.%s unresolved: %s; reconcile with %s before resuming; no write was retried", contract, operation, envelope.Error.Message, envelope.Error.Reconcile)
+	}
+	return fmt.Errorf("%s.%s answered %s (%s): %s", contract, operation, envelope.Outcome, envelope.Error.Reason, envelope.Error.Message)
 }
 
 func (f Finalizer) capabilities(ctx context.Context, contract string, needed ...string) (collab.Capabilities, error) {

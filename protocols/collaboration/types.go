@@ -454,6 +454,36 @@ type ProposalReviewResult struct {
 	Created bool `json:"created"`
 }
 
+// ProposalScreenshotsInput is the proposals.screenshots request. It carries a
+// path, not the files: the provider process runs on the machine that holds
+// them, and one request document cannot carry them.
+type ProposalScreenshotsInput struct {
+	// Ref identifies the proposal the screenshots belong to.
+	Ref Ref `json:"ref"`
+	// Commit is the commit the manifest captures. A provider refuses a
+	// manifest of another commit.
+	Commit string `json:"commit"`
+	// Manifest is the path of the manifest file putnami change screenshots
+	// wrote, absolute or relative to the workspace root. Its capture files
+	// lie beside it.
+	Manifest string `json:"manifest"`
+}
+
+// ProposalScreenshotsResult is the proposals.screenshots result.
+type ProposalScreenshotsResult struct {
+	// Ref identifies the proposal the provider stored the screenshots for.
+	Ref Ref `json:"ref"`
+	// Commit is the commit the stored manifest captures.
+	Commit string `json:"commit"`
+	// Project is the project the manifest names.
+	Project string `json:"project"`
+	// Captures is the number of captures the manifest lists.
+	Captures int `json:"captures"`
+	// Uploaded is the number of capture files this call sent: 0 when the
+	// provider already held them all.
+	Uploaded int `json:"uploaded"`
+}
+
 // ProposalCommentsInput is the proposals.comments request.
 type ProposalCommentsInput struct {
 	// Ref identifies the proposal whose comments to list.

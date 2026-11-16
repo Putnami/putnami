@@ -2,6 +2,7 @@ package finalize
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -10,6 +11,7 @@ import (
 	"strings"
 	"sync"
 
+	collab "go.putnami.dev/protocol/collaboration"
 	wire "go.putnami.dev/protocol/extension/hostrpc"
 
 	"go.putnami.dev/tooling/contributor/internal/screens"
@@ -180,6 +182,7 @@ func (f Finalizer) checkScreenshots(ctx context.Context, c *publicationCandidate
 		manifests[project] = read{file: full, manifest: manifest}
 	}
 	var problems, accepted []string
+	c.manifests = nil
 	for _, project := range touched {
 		entry, ok := manifests[project.Project]
 		if !ok {
@@ -196,15 +199,80 @@ func (f Finalizer) checkScreenshots(ctx context.Context, c *publicationCandidate
 			problems = append(problems, fmt.Sprintf("the manifest of %s does not prove the head: %s", project.Project, boundedList(found)))
 			continue
 		}
+		c.manifests = append(c.manifests, acceptedManifest{project: project.Project, file: entry.file})
 		accepted = append(accepted, fmt.Sprintf("%s, %s of %s", project.Project, screens.Plural(len(entry.manifest.Captures), "capture"),
 			screens.Plural(len(entry.manifest.Pages), "page")))
 	}
 	if len(problems) > 0 {
+		c.manifests = nil
 		return fmt.Errorf("a ready change that touches web pages needs their screenshots: %s; run `putnami change screenshots --project <dir>` on the committed head and pass --screenshots <manifest>, or pass --waive-screenshots <reason>",
 			strings.Join(problems, "; "))
 	}
 	c.screenshots = strings.Join(accepted, "; ")
 	return nil
+}
+
+// acceptedManifest is one --screenshots manifest a ready publication
+// accepted for a touched web project.
+type acceptedManifest struct {
+	// project is the web project the manifest captures.
+	project string
+	// file is the absolute path of the manifest.
+	file string
+}
+
+// uploadScreenshots sends each accepted manifest, once, to the proposals
+// provider, after the proposal is published and before the verification
+// comment. A provider that does not offer proposals.screenshots gets no
+// call, and one that answers unsupported changes nothing: the report names
+// why, and the run goes on. Any other failure is an error, since the
+// screenshots are part of what the verification comment says was verified.
+// It returns nil when the publication accepted no manifest.
+func (f Finalizer) uploadScreenshots(ctx context.Context, c *publicationCandidate, proposal collab.Ref) (*ScreenshotsUpload, error) {
+	if len(c.manifests) == 0 {
+		return nil, nil
+	}
+	report := &ScreenshotsUpload{}
+	if !operationSupported(c.proposalCaps, collab.OperationScreenshots) {
+		report.Skipped = "the proposals provider does not offer screenshots"
+		return report, nil
+	}
+	for _, manifest := range c.manifests {
+		if _, err := c.recheck(ctx, f); err != nil {
+			return nil, err
+		}
+		request, err := json.Marshal(collab.ProposalScreenshotsInput{Ref: proposal, Commit: c.head, Manifest: manifest.file})
+		if err != nil {
+			return nil, err
+		}
+		if f.Call == nil {
+			return nil, errors.New("collaboration provider unavailable")
+		}
+		envelope, err := f.Call(ctx, collab.ContractProposals, collab.OperationScreenshots, request)
+		if err != nil {
+			return nil, fmt.Errorf("upload the screenshots of %s: %w", manifest.project, err)
+		}
+		if envelope.Outcome == collab.OutcomeUnsupported {
+			report.Skipped = "the proposals provider answered unsupported"
+			if envelope.Error != nil && envelope.Error.Message != "" {
+				report.Skipped = envelope.Error.Message
+			}
+			return report, nil
+		}
+		if err := envelopeError(collab.ContractProposals, collab.OperationScreenshots, envelope); err != nil {
+			return nil, fmt.Errorf("upload the screenshots of %s: %w", manifest.project, err)
+		}
+		var stored collab.ProposalScreenshotsResult
+		if err := json.Unmarshal(envelope.Result, &stored); err != nil {
+			return nil, fmt.Errorf("invalid proposals.screenshots result: %w", err)
+		}
+		if stored.Ref != proposal || stored.Commit != c.head || path.Clean(stored.Project) != manifest.project {
+			return nil, fmt.Errorf("proposals.screenshots answered %s of %s/%s at %s, not %s of the published proposal at %s",
+				stored.Project, stored.Ref.Source, stored.Ref.ID, stored.Commit, manifest.project, c.head)
+		}
+		report.Manifests = append(report.Manifests, UploadedManifest{Project: manifest.project, Captures: stored.Captures, Uploaded: stored.Uploaded})
+	}
+	return report, nil
 }
 
 // validWaiver checks the reason of --waive-screenshots: one line, at most

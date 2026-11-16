@@ -10,21 +10,23 @@ import (
 	"strings"
 	"time"
 
+	"go.putnami.dev/client"
 	deliveryapiclient "go.putnami.dev/cloud/clients/delivery-api/go"
 	"go.putnami.dev/cloud/extension/internal/clicore"
 )
 
-// `putnami cloud ci queue [status|enable|disable]` turns the merge queue of a
-// branch on or off. On a branch with a queue, Putnami tests the exact commit
-// that becomes the head of the branch, then moves the branch to it: nothing
-// is built again after the merge.
+// `putnami cloud ci queue [status|enable|disable|list|pause|resume]` turns the
+// merge queue of a branch on or off, lists its entries, and pauses it. On a
+// branch with a queue, Putnami tests the exact commit that becomes the head of
+// the branch, then moves the branch to it: nothing is built again after the
+// merge.
 //
 // enable does every step of the activation in one command: it reads the
 // branch's rulesets with the person's GitHub credentials, shows the split the
 // queue needs, applies it once the person confirms, checks that the branch
 // enforces the same rules, then turns the Delivery setting on. Run again, it
 // resumes where it stopped. disable turns the setting off and leaves the
-// rulesets as they are.
+// rulesets as they are. list, pause and resume live in queue_line.go.
 
 const queueMaxDepth = 16
 
@@ -37,6 +39,18 @@ type CIQueueSetting struct {
 	Depth      int        `json:"depth"`
 	UpdatedAt  *time.Time `json:"updatedAt,omitempty"`
 	UpdatedBy  string     `json:"updatedBy,omitempty"`
+	// Paused: the queue is on, builds nothing and lands nothing, and every
+	// entry keeps its place. Pause says who paused it, when and why.
+	Paused bool          `json:"paused,omitempty"`
+	Pause  *CIQueuePause `json:"pause,omitempty"`
+}
+
+// CIQueuePause is the CLI's twin of delivery-api's QueuePause.
+type CIQueuePause struct {
+	At      *time.Time `json:"at,omitempty"`
+	By      string     `json:"by,omitempty"`
+	ByLogin string     `json:"byLogin,omitempty"`
+	Reason  string     `json:"reason,omitempty"`
 }
 
 // CIQueueRules is what the command found in the branch's rulesets.
@@ -83,8 +97,14 @@ func ciQueue(params map[string]any, args []string, workspaceRoot string, env map
 		return ciQueueEnable(params, workspaceRoot, env, ioctx)
 	case "disable":
 		return ciQueueDisable(params, workspaceRoot, env, ioctx)
+	case "list":
+		return ciQueueList(params, workspaceRoot, env, ioctx)
+	case "pause":
+		return ciQueuePause(params, workspaceRoot, env, ioctx)
+	case "resume":
+		return ciQueueResume(params, workspaceRoot, env, ioctx)
 	default:
-		return clicore.NewError("unknown cloud ci queue verb: "+verb+"; expected status, enable or disable", clicore.ExitUsage)
+		return clicore.NewError("unknown cloud ci queue verb: "+verb+"; expected status, enable, disable, list, pause or resume", clicore.ExitUsage)
 	}
 }
 
@@ -122,9 +142,9 @@ func queueDepth(params map[string]any) (int, error) {
 
 // queueCall issues one generated delivery-api call and maps a refusal onto a
 // message that names the queue verb and the provider's reason.
-func queueCall[R any](reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, target string,
+func queueCall[R, T any](reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, target string,
 	call func(context.Context, *deliveryapiclient.DeliveryClient) (*R, error),
-) (*CIQueueSetting, error) {
+) (*T, error) {
 	api, err := newDeliveryAPIClient(ctx)
 	if err != nil {
 		return nil, err
@@ -138,7 +158,7 @@ func queueCall[R any](reqCtx context.Context, ctx *clicore.WorkspaceContext, ver
 		}
 		return nil, ciCallError(reqCtx, "queue "+verb, target, err)
 	}
-	var out CIQueueSetting
+	var out T
 	data, err := json.Marshal(resp)
 	if err == nil {
 		err = json.Unmarshal(data, &out)
@@ -170,7 +190,7 @@ func queueURL(ctx *clicore.WorkspaceContext, branch string) string {
 }
 
 func readQueueSetting(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, branch string) (*CIQueueSetting, error) {
-	return queueCall(reqCtx, ctx, verb, queueURL(ctx, branch),
+	return queueCall[deliveryapiclient.QueueSetting, CIQueueSetting](reqCtx, ctx, verb, queueURL(ctx, branch),
 		func(callCtx context.Context, api *deliveryapiclient.DeliveryClient) (*deliveryapiclient.QueueSetting, error) {
 			return api.GetV1WorkspacesCiQueue(callCtx, deliveryapiclient.GetV1WorkspacesCiQueueInput{
 				Path:  deliveryapiclient.GetV1WorkspacesCiQueuePath{Workspace: ctx.WorkspaceID},
@@ -180,12 +200,16 @@ func readQueueSetting(reqCtx context.Context, ctx *clicore.WorkspaceContext, ver
 }
 
 func writeQueueSetting(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, branch string, enabled bool, depth int) (*CIQueueSetting, error) {
-	request := deliveryapiclient.QueueSettingRequest{Enabled: &enabled}
+	request := deliveryapiclient.QueueSettingRequest{Enabled: client.Some(enabled)}
 	if depth > 0 {
 		value := int64(depth)
 		request.Depth = &value
 	}
-	return queueCall(reqCtx, ctx, verb, queueURL(ctx, branch),
+	return putQueueSetting(reqCtx, ctx, verb, branch, request)
+}
+
+func putQueueSetting(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, branch string, request deliveryapiclient.QueueSettingRequest) (*CIQueueSetting, error) {
+	return queueCall[deliveryapiclient.QueueSetting, CIQueueSetting](reqCtx, ctx, verb, queueURL(ctx, branch),
 		func(callCtx context.Context, api *deliveryapiclient.DeliveryClient) (*deliveryapiclient.QueueSetting, error) {
 			return api.UpdateV1WorkspacesCiQueue(callCtx, deliveryapiclient.UpdateV1WorkspacesCiQueueInput{
 				Path:  deliveryapiclient.UpdateV1WorkspacesCiQueuePath{Workspace: ctx.WorkspaceID},
@@ -269,6 +293,8 @@ func queueSettingLine(setting *CIQueueSetting, branch string) string {
 	switch {
 	case !setting.Configured:
 		return subject + ": off. Pull requests merge through the pull request gate."
+	case setting.Enabled && setting.Paused:
+		return fmt.Sprintf("%s: paused, depth %d%s. Nothing is built and nothing lands; every entry keeps its place.", subject, setting.Depth, queuePausedBy(setting))
 	case setting.Enabled:
 		return fmt.Sprintf("%s: on, depth %d%s.", subject, setting.Depth, queueChangedBy(setting))
 	default:

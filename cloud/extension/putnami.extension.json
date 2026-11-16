@@ -370,6 +370,14 @@
             {
               "command": "putnami cloud ci queue enable",
               "description": "Split main's ruleset with your GitHub credentials once you confirm, then turn the merge queue on"
+            },
+            {
+              "command": "putnami cloud ci queue list",
+              "description": "List main's merge queue in line order, and the commit a pull request rebases on"
+            },
+            {
+              "command": "putnami cloud ci queue pause --reason \"release freeze\"",
+              "description": "Pause main's merge queue: nothing lands, and every entry keeps its place"
             }
           ]
         },
@@ -3018,6 +3026,10 @@
         },
         "automerge": {
           "description": "Turn squash auto-merge on for an open, ready pull request whose head is still the expected commit, through Putnami Source and the Putnami GitHub App. Source refuses a draft, a closed pull request and a moved head. Binding this provider authorizes nobody to turn it on.",
+          "openWorld": true
+        },
+        "screenshots": {
+          "description": "Store the screenshots of a pull request in Putnami Delivery, under the signed-in person's session: the manifest file as written, then each capture file Delivery does not hold yet. A process that holds only PUTNAMI_CLOUD_TOKEN, and a Delivery that does not serve the route, answer unsupported. A repeat sends only what is still missing.",
           "openWorld": true
         }
       }

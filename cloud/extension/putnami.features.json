@@ -506,7 +506,7 @@
       "id": "cloud/collaboration-provider",
       "type": "feature",
       "name": "Collaboration through Putnami Source",
-      "outcome": "A workspace that binds @putnami/cloud to the tasks and proposals contracts publishes, reviews, readies and auto-merges its pull requests and reads and closes its issues through Putnami Source and the Putnami GitHub App, under the signed-in Putnami session, with no GitHub token on the machine",
+      "outcome": "A workspace that binds @putnami/cloud to the tasks and proposals contracts publishes, reviews, readies and auto-merges its pull requests and reads and closes its issues through Putnami Source and the Putnami GitHub App, and stores a change's screenshots in Putnami Delivery, under the signed-in Putnami session, with no GitHub token on the machine",
       "owner": "cloud",
       "target": "coded",
       "requirements": [
@@ -546,6 +546,22 @@
             "kind": "acceptance",
             "checks": [
               "collab-provider-refusal-outcomes"
+            ]
+          }
+        },
+        {
+          "id": "uploads-screenshots-to-delivery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-uploads-screenshots-in-two-steps",
+              "collab-provider-reuploads-nothing-when-nothing-is-missing",
+              "collab-provider-screenshots-refusals",
+              "collab-provider-screenshots-need-a-person"
             ]
           }
         },

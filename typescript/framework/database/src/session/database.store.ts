@@ -45,14 +45,6 @@ export function sessionMigrations(datasource: Datasource): Plugin & { migrationS
   };
 }
 
-interface SessionRow {
-  session_id: string;
-  data: Record<string, unknown>;
-  expires_at: Date;
-  created_at: Date;
-  updated_at: Date;
-}
-
 /**
  * Database-backed session store using PostgreSQL.
  *
@@ -181,20 +173,23 @@ export class DatabaseSessionStore implements AsyncSessionStore {
     const config = useConfig(SessionConfig);
     const expiresAt = new Date(Date.now() + config.ttl * 1000);
 
-    // Single query: extend TTL and return data atomically
-    const result = await sql<Pick<SessionRow, 'data'>[]>`
+    // Single query: extend TTL and return data atomically. The data comes
+    // back as text: the client turns the keys of a JSON column into
+    // camelCase, and the session must return the keys it was given
+    // (`oauth_pending` stays `oauth_pending`).
+    const result = await sql<{ data: string }[]>`
       UPDATE sessions
       SET expires_at = ${expiresAt}, updated_at = NOW()
       WHERE session_id = ${sessionId}
         AND expires_at > NOW()
-      RETURNING data
+      RETURNING data::text AS data
     `;
 
     if (result.length === 0) {
       return {} as S;
     }
 
-    return result[0].data as S;
+    return JSON.parse(result[0].data) as S;
   }
 
   async setAllAsync<S>(sessionId: string, session: S): Promise<void> {
