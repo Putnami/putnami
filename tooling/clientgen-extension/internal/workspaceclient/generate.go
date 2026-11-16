@@ -82,7 +82,7 @@ func goGeneratorArguments(generation GoGeneration) []string {
 
 // GenerateTypeScript runs the @putnami/client emitter the workspace installed.
 // It writes only the project's src tree. It fails before the run when the
-// install differs from the version bun.lock pins
+// install differs from the version the workspace's lockfile pins
 // (requireLockedTypeScriptEmitter), and after it when the emitter exits 0
 // without leaving src/index.ts for a contract that declares a first-party
 // operation (requireGeneratedTypeScriptClient).

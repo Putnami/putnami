@@ -94,7 +94,10 @@
             "kind": "acceptance",
             "checks": [
               "an-install-that-lags-the-lock-fails-before-the-emitter-runs",
-              "an-install-that-matches-the-lock-or-a-lock-with-no-registry-pin-generates"
+              "an-install-that-matches-the-lock-or-a-lock-with-no-registry-pin-generates",
+              "the-check-reads-the-lockfile-of-the-workspace-package-manager",
+              "a-lockfile-the-check-cannot-read-refuses-the-generation",
+              "the-key-folds-the-lockfile-of-every-package-manager"
             ]
           }
         },

@@ -8,12 +8,14 @@ import (
 	"path"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gittest"
+	"go.putnami.dev/tooling/clientgen/extension/internal/workspaceclient"
 )
 
 // The TypeScript emitter runs Biome's format and lint writer phases over every
@@ -101,6 +103,29 @@ func TestGenerationTasksKeyOnTheCommittedContractAndFoldTheBuiltOne(t *testing.T
 			if !declared[want] {
 				t.Errorf("task %q cache key does not include %q", name, want)
 			}
+		}
+	}
+}
+
+// The install check compares the installed @putnami/client with the lockfile
+// of the workspace's package manager, and the key holds no node_modules. So
+// every lockfile the check may read keys client-generate-ts: an upgrade that
+// moves any of them moves the key.
+func TestClientgenTsCacheKeyFoldsTheLockfileOfEveryPackageManager(t *testing.T) {
+	spectest.Proves(t, clientgenFeature, "an-install-that-differs-from-the-lock-fails", "the-key-folds-the-lockfile-of-every-package-manager")
+	task := loadExtensionManifest(t).Tasks["client-generate-ts"]
+	if task.Cache.Key == nil {
+		t.Fatal("client-generate-ts declares no cache key")
+	}
+	lockfiles := workspaceclient.Lockfiles()
+	for _, want := range []string{"bun.lock", "bun.lockb", "package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock"} {
+		if !slices.Contains(lockfiles, want) {
+			t.Errorf("the install check does not know the lockfile %q", want)
+		}
+	}
+	for _, lockfile := range lockfiles {
+		if !coveredByKey(lockfile, "services/provider", task.Cache.Key.Files, task.Cache.Key.WorkspaceFiles) {
+			t.Errorf("the lockfile %q is not a client-generate-ts cache key entry\n  workspaceFiles: %v", lockfile, task.Cache.Key.WorkspaceFiles)
 		}
 	}
 }

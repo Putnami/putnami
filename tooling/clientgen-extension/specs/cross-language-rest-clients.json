@@ -41,7 +41,7 @@
     },
     {
       "id": "an-install-that-differs-from-the-lock-fails",
-      "text": "A TypeScript generation whose installed @putnami/client differs from the version the workspace's bun.lock pins fails before the emitter runs, and names `putnami deps install`. The task's key folds bun.lock, never node_modules, so an install that lags the lock would store an older client under the lock's key, and a later install would not move it."
+      "text": "A TypeScript generation whose installed @putnami/client differs from the version the lockfile of the workspace's package manager pins fails before the emitter runs, and names `putnami deps install`. The key folds the lockfile of every manager @putnami/typescript installs with, never node_modules. A lockfile the check cannot read, such as bun.lockb, refuses the generation; a workspace-linked @putnami/client or a lock that pins no registry version leaves nothing to compare."
     },
     {
       "id": "honest-effects",

@@ -145,7 +145,21 @@
         "deterministic": true,
         "key": {
           "files": [".editorconfig", "biome.json", "package.json", "putnami.json"],
-          "workspaceFiles": [".editorconfig", "biome.json", "bun.lock", "package.json", "tsconfig.base.json"]
+          "workspaceFiles": [
+            ".editorconfig",
+            "biome.json",
+            "bun.lock",
+            "bun.lockb",
+            "common/config/rush/npm-shrinkwrap.json",
+            "common/config/rush/pnpm-lock.yaml",
+            "common/config/rush/yarn.lock",
+            "npm-shrinkwrap.json",
+            "package-lock.json",
+            "package.json",
+            "pnpm-lock.yaml",
+            "tsconfig.base.json",
+            "yarn.lock"
+          ]
         }
       },
       "declares": {

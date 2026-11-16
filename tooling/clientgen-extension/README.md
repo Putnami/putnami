@@ -288,14 +288,26 @@ Putnami-installed `@putnami/client` package shim. Generation does not depend on
 a framework source checkout in the consumer workspace or a globally installed
 `go`, `bun` or language generator.
 
-The TypeScript key holds the `@putnami/client` version `bun.lock` pins, not
-the package `node_modules` holds. The generation checks the install before and
-after the emitter runs:
+The TypeScript key holds the `@putnami/client` version the workspace's
+lockfile pins, not the package `node_modules` holds. It folds the lockfile of
+every package manager `@putnami/typescript` installs with: `bun.lock`,
+`bun.lockb`, `package-lock.json`, `npm-shrinkwrap.json`, `pnpm-lock.yaml`,
+`yarn.lock`, and the ones a Rush repository commits under
+`common/config/rush`. The generation checks the install before and after the
+emitter runs:
 
 1. Before the emitter runs, an installed `@putnami/client` that differs from
-   the version `bun.lock` pins fails the generation and asks for
-   `putnami deps install`. Otherwise the cache would store an older client
-   under the lock's key, and a later install would not move that key.
+   the version the lockfile of the workspace's package manager pins fails the
+   generation and asks for `putnami deps install`. Otherwise the cache would
+   store an older client under the lock's key, and a later install would not
+   move that key. The manager is the one `@putnami/typescript` installs with:
+   the `packageManager` field of the root `package.json`, else Rush for a root
+   `rush.json`, else the manager whose lockfile lies at the root. The binary
+   `bun.lockb` cannot be read, so it fails the generation and asks to migrate
+   to the text `bun.lock`; so do a lockfile in no format its manager writes and
+   a `packageManager` that `@putnami/typescript` does not install with. A workspace with no lockfile,
+   an `@putnami/client` linked from the workspace, or a lock that pins no
+   registry version leaves nothing to compare.
 2. After the emitter runs, a generation that exits 0 without `src/index.ts`,
    for a contract that declares a first-party operation, fails. An emitter that
    predates the `--contract` and `--output` arguments ignores them and writes

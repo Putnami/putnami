@@ -7,6 +7,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"go.putnami.dev/protocol/clientcontract"
@@ -52,40 +53,47 @@ func requireGeneratedTypeScriptClient(emitter string, generation TypeScriptGener
 }
 
 // requireLockedTypeScriptEmitter is the emitter's pre-condition: the
-// @putnami/client the emitter shim belongs to is the version the workspace's
-// bun.lock pins.
+// @putnami/client the emitter shim belongs to is a version the lockfile of the
+// workspace's package manager pins (workspaceLockfile).
 //
-// The task's cache key folds bun.lock, and the engine never hashes
-// node_modules. An install that lags the lock would write an older client,
-// which the engine would store under the lock's key: a later install would not
-// move that key, so every hit would restore the older client. A lock that pins
-// no version, such as a workspace package, or no bun.lock, leaves nothing to
-// compare.
+// The task's cache key folds every lockfile and no node_modules, so the
+// version the lockfile pins is the version the key describes. A workspace with
+// no lockfile, an @putnami/client linked from the workspace, or a lock that
+// pins no registry version leaves nothing to compare. A lockfile the check
+// cannot read, such as the binary bun.lockb, fails the generation.
 func requireLockedTypeScriptEmitter(workspaceRoot, emitter string, generation TypeScriptGeneration) error {
-	lock, err := os.ReadFile(filepath.Join(workspaceRoot, "bun.lock")) //nolint:gosec // G304: the workspace's own lockfile
-	if errors.Is(err, fs.ErrNotExist) {
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("read the workspace's bun.lock: %w", err)
+	lockfile, err := workspaceLockfile(workspaceRoot)
+	if err != nil || lockfile == "" {
+		return err
 	}
-	lockKeys := []string{clientPackage}
+	installedDir := filepath.Join(filepath.Dir(filepath.Dir(emitter)), filepath.FromSlash(clientPackage))
+	if linkedFromWorkspace(workspaceRoot, installedDir) {
+		return nil
+	}
+	lock, err := os.ReadFile(filepath.Join(workspaceRoot, filepath.FromSlash(lockfile))) //nolint:gosec // G304: the workspace's own lockfile
+	if err != nil {
+		return fmt.Errorf("read the workspace's %s: %w", lockfile, err)
+	}
+	bunKeys := []string{clientPackage}
 	if !strings.HasPrefix(emitter, filepath.Join(workspaceRoot, "node_modules")+string(filepath.Separator)) {
 		// The client project's own install: bun keys it under the project's name.
-		lockKeys = []string{generation.PackageName + "/" + clientPackage, clientPackage}
+		bunKeys = []string{generation.PackageName + "/" + clientPackage, clientPackage}
 	}
-	pinned := lockedVersion(lock, lockKeys)
-	if pinned == "" {
+	pinned, err := lockedClientVersions(lockfile, lock, bunKeys)
+	if err != nil {
+		return err
+	}
+	if len(pinned) == 0 {
 		return nil
 	}
-	manifest := filepath.Join(filepath.Dir(filepath.Dir(emitter)), filepath.FromSlash(clientPackage), "package.json")
-	installed, err := packageVersion(manifest)
+	installed, err := packageVersion(filepath.Join(installedDir, "package.json"))
 	if err != nil {
 		return fmt.Errorf("read the installed %s: %w; run `putnami deps install`", clientPackage, err)
 	}
-	if installed != pinned {
-		return fmt.Errorf("the installed %s is %s, but bun.lock pins %s: the emitter would write a client the cache "+
+	if !slices.Contains(pinned, installed) {
+		return fmt.Errorf("the installed %s is %s, but %s pins %s: the emitter would write a client the cache "+
 			"key does not describe; run `putnami deps install` so the install matches the lockfile, then generate again",
-			clientPackage, installed, pinned)
+			clientPackage, installed, lockfile, strings.Join(pinned, " or "))
 	}
 	return nil
 }
@@ -94,11 +102,9 @@ func requireLockedTypeScriptEmitter(workspaceRoot, emitter string, generation Ty
 const clientPackage = "@putnami/client"
 
 // lockedVersion reads the version bun.lock pins for the first of keys it
-// lists in its packages, or "" when it lists none or pins no registry
-// version. A bun.lock package line reads
-// `"<key>": ["<name>@<version>", ...`. A registry version starts with a digit
-// and holds no colon or slash. Every other pin is a source, not a version:
-// workspace:, link:, a URL, or the path bun writes for a file: tarball, which
+// lists in its packages, or "" when it lists none or pins no registry version
+// (isRegistryVersion). A bun.lock package line reads
+// `"<key>": ["<name>@<version>", ...`. The path bun writes for a file: tarball
 // may be a bare file name such as 0.5.0-2.tgz.
 func lockedVersion(lock []byte, keys []string) string {
 	for _, key := range keys {
@@ -109,7 +115,7 @@ func lockedVersion(lock []byte, keys []string) string {
 				continue
 			}
 			version, _, closed := strings.Cut(rest, `"`)
-			if !closed || version == "" || version[0] < '0' || version[0] > '9' || strings.ContainsAny(version, ":/") || isTarballName(version) {
+			if !closed || !isRegistryVersion(version) {
 				return ""
 			}
 			return version
