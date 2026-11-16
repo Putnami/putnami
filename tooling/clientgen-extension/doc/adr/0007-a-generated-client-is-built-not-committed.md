@@ -57,8 +57,9 @@ each operation's producer project and feature, into the committed
 build writes `.gen/clientgen/config.json` or stages a client.
 
 **5. Generation runs before every language command that reads it.** The
-`@putnami/go` and `@putnami/typescript` `build`, `test`, `lint`, `serve` and
-`package` commands depend on `client-generate`, in their own project and
+`@putnami/go` and `@putnami/typescript` `build`, `test`, `lint`, `validate`,
+`serve`, `run` and `package` commands depend on `client-generate`, in their
+own project and
 across the dependency closure (`^client-generate`). The dependency plans
 nothing in a project without the command. A consumer-only selection therefore
 generates or restores every client the consumer depends on, whether or not

@@ -97,7 +97,7 @@
     },
     {
       "id": "language-commands-wait-for-generation",
-      "text": "The @putnami/go and @putnami/typescript build, test, lint, validate, serve and package commands depend on client-generate, in their own project and across the dependency closure, so generated code exists before a compiler, a linter or a packager reads it. The key of a task that compiles a client folds the client's generation key, so a contract change moves it. A project that declares no client-generate plans nothing more."
+      "text": "The @putnami/go and @putnami/typescript build, test, lint, validate, serve, run and package commands depend on client-generate, in their own project and across the dependency closure, so generated code exists before a compiler, a linter or a packager reads it. The key of a task that compiles a client folds the client's generation key, so a contract change moves it. A project that declares no client-generate plans nothing more."
     },
     {
       "id": "no-committed-client",
