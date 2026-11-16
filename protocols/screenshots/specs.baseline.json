@@ -1,0 +1,14 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
+  "protocolVersion": 2,
+  "executableRequirements": [
+    "screenshots/manifest-contract#a-capture-is-well-formed",
+    "screenshots/manifest-contract#a-manifest-parses-strictly",
+    "screenshots/manifest-contract#a-page-is-well-formed",
+    "screenshots/manifest-contract#a-written-manifest-reads-back",
+    "screenshots/manifest-contract#the-bounds-are-published",
+    "screenshots/manifest-contract#the-captures-cover-the-pages",
+    "screenshots/manifest-contract#the-corpus-is-the-contract",
+    "screenshots/manifest-contract#the-identifiers-are-pinned"
+  ]
+}

@@ -1,0 +1,131 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-features.json",
+  "protocolVersion": 2,
+  "namespace": "screenshots",
+  "features": [
+    {
+      "id": "screenshots/manifest-contract",
+      "type": "feature",
+      "name": "Screenshots manifest contract",
+      "outcome": "A consumer that stores or reads the manifest of putnami change screenshots decodes it against one versioned contract, so a writer and a reader never disagree on a capture",
+      "owner": "protocols",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "the-identifiers-are-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-version-identifiers-are-pinned",
+              "the-schema-members-match-the-go-types",
+              "the-schema-closed-sets-match-the-go-sets"
+            ]
+          }
+        },
+        {
+          "id": "a-manifest-parses-strictly",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-unknown-duplicate-or-missing-member-is-refused",
+              "each-envelope-rule-has-a-stable-code"
+            ]
+          }
+        },
+        {
+          "id": "a-page-is-well-formed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-page-rule-has-a-stable-code"
+            ]
+          }
+        },
+        {
+          "id": "a-capture-is-well-formed",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-capture-rule-has-a-stable-code"
+            ]
+          }
+        },
+        {
+          "id": "the-captures-cover-the-pages",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-page-holds-one-capture-per-side-viewport-and-scheme",
+              "a-capture-names-a-page-and-a-side-that-holds-it"
+            ]
+          }
+        },
+        {
+          "id": "the-corpus-is-the-contract",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-valid-fixture-validates",
+              "every-invalid-fixture-fails-with-its-code",
+              "every-expected-code-is-registered",
+              "every-code-has-an-invalid-fixture",
+              "every-fixture-is-judged-by-the-schema"
+            ]
+          }
+        },
+        {
+          "id": "the-bounds-are-published",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-manifest-past-a-bound-is-refused",
+              "marshal-refuses-a-manifest-past-the-byte-bound"
+            ]
+          }
+        },
+        {
+          "id": "a-written-manifest-reads-back",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "marshal-refuses-an-invalid-manifest",
+              "a-marshaled-manifest-parses-to-the-same-value"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

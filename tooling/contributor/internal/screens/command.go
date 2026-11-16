@@ -15,6 +15,7 @@ import (
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	job "go.putnami.dev/protocol/job"
+	"go.putnami.dev/protocol/screenshots"
 )
 
 // Git runs one git command in the workspace root and returns its standard
@@ -246,7 +247,7 @@ func (c Command) run(ctx context.Context, opts options, invocation string) (Resu
 	if stopErr != nil {
 		fmt.Fprintf(c.Stderr, "change screenshots: stop the browser: %v\n", stopErr)
 	}
-	manifest := Manifest{ProtocolVersion: ManifestVersion, Project: project, BaseSHA: mergeBase, HeadSHA: head,
+	manifest := Manifest{ProtocolVersion: screenshots.ProtocolVersion, Project: project, BaseSHA: mergeBase, HeadSHA: head,
 		Pages: pages, Captures: captures}
 	file, err := writeOutput(out, files, manifest)
 	if err != nil {
@@ -289,6 +290,10 @@ func captureAll(ctx context.Context, capturer Capturer, pages []Page, urls map[s
 						noted[side+target] = true
 						notes = append(notes, fmt.Sprintf("%s %s ended at %s", side, page.Path, got.URL))
 					}
+					if len(got.PNG) > screenshots.MaxCaptureBytes {
+						return nil, nil, nil, fmt.Errorf("%s %s (%s %s): the capture is %d bytes, more than the %d a capture may be",
+							side, page.Path, viewport.Name, scheme, len(got.PNG), screenshots.MaxCaptureBytes)
+					}
 					name := CaptureName(i, page, side, viewport, scheme)
 					files[name] = got.PNG
 					captures = append(captures, Capture{File: name, Route: page.Route, Side: side, Viewport: viewport.Name,
@@ -310,26 +315,36 @@ func joinURL(server, page string) (string, error) {
 	return parsed.Scheme + "://" + parsed.Host + strings.TrimSuffix(parsed.EscapedPath(), "/") + page, nil
 }
 
-// writeOutput writes the captures and the manifest into out. It first
-// removes the files a previous manifest there lists, and nothing else.
+// writeOutput writes the captures and the manifest into out. It serializes
+// the manifest first, so a manifest the protocol refuses writes nothing. It
+// then removes the files a previous manifest there lists, and nothing else.
 func writeOutput(out string, files map[string][]byte, manifest Manifest) (string, error) {
+	data, err := screenshots.Marshal(manifest)
+	if err != nil {
+		return "", err
+	}
 	if err := os.MkdirAll(out, 0o755); err != nil {
 		return "", err
 	}
-	if previous, err := ReadManifest(filepath.Join(out, ManifestFile)); err == nil {
-		for _, capture := range previous.Captures {
-			if ownFile(capture.File) {
-				_ = os.Remove(filepath.Join(out, capture.File))
+	file := filepath.Join(out, ManifestFile)
+	// The previous manifest is parsed, not validated: a manifest the contract
+	// refuses still names the files its run wrote.
+	if previous, err := readBounded(file, screenshots.MaxManifestBytes); err == nil {
+		if listed, _ := screenshots.Parse(previous); listed != nil {
+			for _, capture := range listed.Captures {
+				if ownFile(capture.File) {
+					_ = os.Remove(filepath.Join(out, capture.File))
+				}
 			}
 		}
 	}
-	_ = os.Remove(filepath.Join(out, ManifestFile))
+	_ = os.Remove(file)
 	for _, capture := range manifest.Captures {
 		if err := os.WriteFile(filepath.Join(out, capture.File), files[capture.File], 0o644); err != nil {
 			return "", err
 		}
 	}
-	return WriteManifest(out, manifest)
+	return file, os.WriteFile(file, data, 0o644)
 }
 
 func (c Command) revParse(ctx context.Context, ref string) (string, error) {

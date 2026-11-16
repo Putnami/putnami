@@ -1,0 +1,151 @@
+{
+  "protocolVersion": 1,
+  "project": "apps/web",
+  "baseSHA": "1f0e2d3c4b5a69788796a5b4c3d2e1f001234567",
+  "headSHA": "89abcdef0123456789abcdef0123456789abcdef",
+  "pages": [
+    {
+      "file": "src/app/tasks/page.tsx",
+      "route": "/tasks",
+      "path": "/tasks",
+      "before": true,
+      "after": true
+    },
+    {
+      "file": "src/app/tasks/[id]/page.tsx",
+      "route": "/tasks/{id}",
+      "path": "/tasks/42",
+      "before": false,
+      "after": true
+    },
+    {
+      "file": "src/app/legacy/page.tsx",
+      "route": "/legacy",
+      "path": "/legacy",
+      "before": true,
+      "after": false
+    }
+  ],
+  "captures": [
+    {
+      "file": "01-tasks-after-desktop-light.png",
+      "route": "/tasks",
+      "side": "after",
+      "viewport": "desktop",
+      "scheme": "light",
+      "sha256": "a0a56536d525ba7299229f0ca4b4208c48d426ea7c329391f2fc2b1c54855421",
+      "status": 203,
+      "url": "https://accounts.example.test/sign-in?next=%2Ftasks"
+    },
+    {
+      "file": "01-tasks-after-desktop-dark.png",
+      "route": "/tasks",
+      "side": "after",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "sha256": "477b2d9f7a7a59cf3df6b66dcfb3f693985287f4fa49d2cc229376add6f49ebf",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/tasks"
+    },
+    {
+      "file": "01-tasks-after-mobile-light.png",
+      "route": "/tasks",
+      "side": "after",
+      "viewport": "mobile",
+      "scheme": "light",
+      "sha256": "47550558438f3560200487f6c99d8df125f476ef3a2cb79113e904d70f355fd0",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/tasks"
+    },
+    {
+      "file": "01-tasks-after-mobile-dark.png",
+      "route": "/tasks",
+      "side": "after",
+      "viewport": "mobile",
+      "scheme": "dark",
+      "sha256": "3ffe54dd9e836bbd1f7aa01d64a36097ffe5b1326b9c086571ce6a1480b7bc2b",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/tasks"
+    },
+    {
+      "file": "02-tasks-id-after-desktop-light.png",
+      "route": "/tasks/{id}",
+      "side": "after",
+      "viewport": "desktop",
+      "scheme": "light",
+      "sha256": "bf5d232442b6b8a948a6e98d76a63cb9a598101c28f2c8a56f19412da58d706d",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/tasks/42"
+    },
+    {
+      "file": "02-tasks-id-after-desktop-dark.png",
+      "route": "/tasks/{id}",
+      "side": "after",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "sha256": "28374b11bc6bb6fe2fa4276f02c89364a2794a9cde691c7ec646122b70c45296",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/tasks/42"
+    },
+    {
+      "file": "02-tasks-id-after-mobile-light.png",
+      "route": "/tasks/{id}",
+      "side": "after",
+      "viewport": "mobile",
+      "scheme": "light",
+      "sha256": "0533330d57c3c12f6a2643722fd77f72f6580942bc57b47805e0a384a8115622",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/tasks/42"
+    },
+    {
+      "file": "02-tasks-id-after-mobile-dark.png",
+      "route": "/tasks/{id}",
+      "side": "after",
+      "viewport": "mobile",
+      "scheme": "dark",
+      "sha256": "596effa2207635a7e55767d81146dfeb6f4bcdbc02b60b508eea6628d0503e1b",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/tasks/42"
+    },
+    {
+      "file": "03-legacy-before-desktop-light.png",
+      "route": "/legacy",
+      "side": "before",
+      "viewport": "desktop",
+      "scheme": "light",
+      "sha256": "506c1514b032017fbbaa25caa247510d85d18a8bb592137faa57a1feb4d3a56a",
+      "status": 200,
+      "url": "http://127.0.0.1:4100/legacy"
+    },
+    {
+      "file": "03-legacy-before-desktop-dark.png",
+      "route": "/legacy",
+      "side": "before",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "sha256": "7eb056a76cf0eb131563cc18f18fab9ae1904cc82fec41265e1dec41fa8fbdb3",
+      "status": 200,
+      "url": "http://127.0.0.1:4100/legacy"
+    },
+    {
+      "file": "03-legacy-before-mobile-light.png",
+      "route": "/legacy",
+      "side": "before",
+      "viewport": "mobile",
+      "scheme": "light",
+      "sha256": "75f8d4f792721632930c32607a84a5911df34f838ddaec9fd83f37454c4f86a8",
+      "status": 200,
+      "url": "http://127.0.0.1:4100/legacy"
+    },
+    {
+      "file": "03-legacy-before-mobile-dark.png",
+      "route": "/legacy",
+      "side": "before",
+      "viewport": "mobile",
+      "scheme": "dark",
+      "sha256": "600e72d73889e693a220af118afd1ff6b2b94748ff74de322eb9129007496dd1",
+      "status": 200,
+      "url": "http://127.0.0.1:4100/legacy"
+    }
+  ]
+}

@@ -1,55 +1,40 @@
 package screens
 
 import (
-	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	diag "go.putnami.dev/protocol/diagnostic"
+	"go.putnami.dev/protocol/screenshots"
 )
 
 // ManifestFile is the name of the manifest in the output directory.
-const ManifestFile = "screenshots.json"
-
-// ManifestVersion is the protocol version of the manifest this contributor
-// writes and reads.
-const ManifestVersion = 1
+const ManifestFile = screenshots.ManifestFile
 
 // Sides are the two sides of a change a page is captured on.
 const (
-	SideBefore = "before"
-	SideAfter  = "after"
+	SideBefore = screenshots.SideBefore
+	SideAfter  = screenshots.SideAfter
 )
 
-// Manifest is the record of one run of putnami change screenshots.
-type Manifest struct {
-	ProtocolVersion int       `json:"protocolVersion"`
-	Project         string    `json:"project"`
-	BaseSHA         string    `json:"baseSHA"`
-	HeadSHA         string    `json:"headSHA"`
-	Pages           []Page    `json:"pages"`
-	Captures        []Capture `json:"captures"`
-}
-
-// Capture is one PNG file of the manifest, relative to the manifest's
-// directory, with the status and the final URL of its document.
-type Capture struct {
-	File     string `json:"file"`
-	Route    string `json:"route"`
-	Side     string `json:"side"`
-	Viewport string `json:"viewport"`
-	Scheme   string `json:"scheme"`
-	SHA256   string `json:"sha256"`
-	// Status is the HTTP status of the captured document.
-	Status int `json:"status"`
-	// URL is where the page ended, after any redirect.
-	URL string `json:"url"`
-}
+// The manifest is a go.putnami.dev/protocol/screenshots document: the
+// protocol owns its members, its closed sets, its rules and its bounds.
+type (
+	// Manifest is the record of one run of putnami change screenshots.
+	Manifest = screenshots.Manifest
+	// Page is one touched page: its page file, the route it is captured at,
+	// the path visited for that route, and the sides that hold the page.
+	Page = screenshots.Page
+	// Capture is one PNG file of the manifest, relative to the manifest's
+	// directory, with the status and the final URL of its document.
+	Capture = screenshots.Capture
+)
 
 // Digest returns the hex sha256 of data.
 func Digest(data []byte) string {
@@ -76,39 +61,36 @@ func CaptureName(i int, page Page, side string, viewport Viewport, scheme string
 	return fmt.Sprintf("%02d-%s-%s-%s-%s.png", i+1, Slug(page.Route), side, viewport.Name, scheme)
 }
 
-// ReadManifest reads the manifest at file.
+// ReadManifest reads the manifest at file with the protocol decoder, which
+// refuses a manifest the contract does not allow.
 func ReadManifest(file string) (Manifest, error) {
-	data, err := readBounded(file, 4<<20)
+	data, err := readBounded(file, screenshots.MaxManifestBytes)
 	if err != nil {
 		return Manifest{}, err
 	}
-	decoder := json.NewDecoder(bytes.NewReader(data))
-	decoder.DisallowUnknownFields()
-	var manifest Manifest
-	if err := decoder.Decode(&manifest); err != nil {
-		return Manifest{}, fmt.Errorf("not a screenshots manifest: %w", err)
+	manifest, diags := screenshots.Decode(data)
+	if manifest == nil {
+		return Manifest{}, fmt.Errorf("not a screenshots manifest:\n%s", diag.ErrorText(diags))
 	}
-	if manifest.ProtocolVersion != ManifestVersion {
-		return Manifest{}, fmt.Errorf("protocolVersion %d, want %d", manifest.ProtocolVersion, ManifestVersion)
-	}
-	return manifest, nil
+	return *manifest, nil
 }
 
-// WriteManifest writes the manifest into dir.
+// WriteManifest writes the manifest into dir through the protocol, which
+// refuses to serialize a manifest its decoder would refuse.
 func WriteManifest(dir string, manifest Manifest) (string, error) {
-	data, err := json.MarshalIndent(manifest, "", "  ")
+	data, err := screenshots.Marshal(manifest)
 	if err != nil {
 		return "", err
 	}
 	file := filepath.Join(dir, ManifestFile)
-	return file, os.WriteFile(file, append(data, '\n'), 0o644)
+	return file, os.WriteFile(file, data, 0o644)
 }
 
 // Check verifies a manifest read from dir against a change: it names head and
 // project, it holds every capture each of its pages needs on each side that
 // holds it, each capture file is intact, and every touched route holds its
 // after captures. It returns every problem it finds.
-func (m Manifest) Check(dir, head, project string, touched []Page) []string {
+func Check(m Manifest, dir, head, project string, touched []Page) []string {
 	var problems []string
 	if m.HeadSHA != head {
 		problems = append(problems, fmt.Sprintf("it captures %s, not the head %s", short(m.HeadSHA), short(head)))
@@ -124,7 +106,7 @@ func (m Manifest) Check(dir, head, project string, touched []Page) []string {
 			problems = append(problems, fmt.Sprintf("the capture %s is not a file of its directory", capture.File))
 			continue
 		}
-		data, err := readBounded(filepath.Join(dir, name), 256<<20)
+		data, err := readBounded(filepath.Join(dir, name), screenshots.MaxCaptureBytes)
 		if err != nil {
 			problems = append(problems, fmt.Sprintf("the capture %s is missing: %v", capture.File, unwrapPathError(err)))
 			continue

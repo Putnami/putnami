@@ -583,6 +583,20 @@
           }
         },
         {
+          "id": "the-manifest-is-a-protocol-document",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-written-manifest-validates-against-the-published-schema",
+              "a-manifest-the-protocol-refuses-is-not-read"
+            ]
+          }
+        },
+        {
           "id": "finalize-asks-for-screenshots",
           "stage": "coded",
           "evidenceKinds": [

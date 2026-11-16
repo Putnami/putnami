@@ -1,0 +1,16 @@
+{
+  "protocolVersion": 1,
+  "project": "apps/web",
+  "baseSHA": "1f0e2d3c4b5a69788796a5b4c3d2e1f001234567",
+  "headSHA": "89abcdef0123456789abcdef0123456789abcdef",
+  "pages": [
+    {
+      "file": "src/app/page.tsx",
+      "route": "/",
+      "path": "/",
+      "before": false,
+      "after": false
+    }
+  ],
+  "captures": []
+}

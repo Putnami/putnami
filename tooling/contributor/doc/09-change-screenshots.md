@@ -95,6 +95,13 @@ directory in lowercase with each other character run turned into `-`, such as
 `apps-web` for `apps/web`. A new run there first removes
 the files the previous manifest lists, and nothing else.
 
+The manifest is a `go.putnami.dev/protocol/screenshots` document. The
+[protocol](../../../protocols/screenshots/README.md) owns its members, its
+rules and the bounds a consumer may apply. The command writes the manifest
+through the protocol, so a run whose manifest the contract refuses fails with
+exit 1 and writes nothing: a page that ends at a URL that is not `http` or
+`https`, or a capture file of more than 64 MiB.
+
 ```json
 {
   "protocolVersion": 1,

@@ -1,0 +1,57 @@
+{
+  "protocolVersion": 1,
+  "project": "apps/web",
+  "baseSHA": "1f0e2d3c4b5a69788796a5b4c3d2e1f001234567",
+  "headSHA": "89abcdef0123456789abcdef0123456789abcdef",
+  "pages": [
+    {
+      "file": "src/app/page.tsx",
+      "route": "/",
+      "path": "/",
+      "before": false,
+      "after": true
+    }
+  ],
+  "captures": [
+    {
+      "file": "01-root-after-desktop-light.png",
+      "route": "/",
+      "side": "after",
+      "viewport": "desktop",
+      "scheme": "light",
+      "sha256": "0aa51949e018860cfc68b8139a3a647c08eec9ff2d725663c2657335053f24be",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/"
+    },
+    {
+      "file": "01-root-after-desktop-dark.png",
+      "route": "/",
+      "side": "after",
+      "viewport": "desktop",
+      "scheme": "dark",
+      "sha256": "f03e7ae2528130b35ae658f535e2f207eae552f136c977feb64f30e5163219a1",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/"
+    },
+    {
+      "file": "01-root-after-mobile-light.png",
+      "route": "/",
+      "side": "after",
+      "viewport": "mobile",
+      "scheme": "light",
+      "sha256": "0940e230f2bae8f27f83a0d7d17ee99aab79f727774f57992c81d9c75db4ae71",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/"
+    },
+    {
+      "file": "01-root-after-mobile-dark.png",
+      "route": "/",
+      "side": "after",
+      "viewport": "mobile",
+      "scheme": "dark",
+      "sha256": "41739a86f5e0148cc00b2bbfd0d826809252257643e4e27942c29a57ca35a50b",
+      "status": 200,
+      "url": "http://127.0.0.1:4200/"
+    }
+  ]
+}

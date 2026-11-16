@@ -16,6 +16,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"go.putnami.dev/protocol/screenshots"
 )
 
 // Viewport is one window size a page is captured at.
@@ -27,14 +29,19 @@ type Viewport struct {
 	Mobile bool
 }
 
-// Viewports are the two sizes every page is captured at, desktop first.
-var Viewports = []Viewport{
-	{Name: "desktop", Width: 1440, Height: 900, Scale: 1},
-	{Name: "mobile", Width: 390, Height: 844, Scale: 2, Mobile: true},
-}
+// Viewports are the two sizes every page is captured at, desktop first: the
+// closed set of the screenshots protocol, and mobile emulates a touch device.
+var Viewports = func() []Viewport {
+	var viewports []Viewport
+	for _, v := range screenshots.Viewports() {
+		viewports = append(viewports, Viewport{Name: v.Name, Width: v.Width, Height: v.Height,
+			Scale: float64(v.Scale), Mobile: v.Name == screenshots.ViewportMobile})
+	}
+	return viewports
+}()
 
 // Schemes are the two color schemes every page is captured in, light first.
-var Schemes = []string{"light", "dark"}
+var Schemes = screenshots.Schemes()
 
 // maxPageHeight bounds the height, in CSS pixels, of a full-page capture.
 const maxPageHeight = 10000

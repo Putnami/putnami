@@ -632,6 +632,11 @@
       "status": "stable"
     },
     {
+      "id": "go.putnami.dev/protocol/screenshots",
+      "kind": "protocol",
+      "status": "preview"
+    },
+    {
       "id": "go.putnami.dev/protocol/sitecontent",
       "kind": "protocol",
       "status": "preview"
