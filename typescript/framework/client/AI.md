@@ -148,6 +148,37 @@ void and raw octet operations and every stream shape refuse the sink before
 anything is sent. See
 [transports](doc/03-transports.md#verbatim-success-bodies).
 
+## Conditional Reads
+
+An operation whose contract declares a `304` is a conditional read. Its
+generated method takes `ClientConditionalCallOptions`, which add `ifNoneMatch`
+to the ordinary call options and send it as `If-None-Match`, and it returns a
+result discriminated by status: `200` carries the decoded body and the
+response `headers`, so the caller keeps the `ETag`, and `304` carries no data.
+A 304 is a result, never an error:
+
+```ts
+let etag: string | undefined;
+let summary: MissionCatalogSummary | undefined;
+
+const answer = await missions.getV1_Missions_Summary(input, { ifNoneMatch: etag });
+if (answer.status === 200) {
+  summary = answer.data;
+  etag = answer.headers.get('ETag') ?? undefined;
+} // 304: keep `summary` as it is
+```
+
+A `successBody` sink passed to a call answered 304 receives an empty array.
+A browser on another origin than the provider reads `ETag` and sends
+`If-None-Match` only when the provider's CORS policy exposes the first and
+allows the second: without the first, every read is a full 200; without the
+second, a call that passes `ifNoneMatch` fails before it reaches the provider.
+
+Generation fails for a 304 that declares a body, on anything but a unary
+`GET`, on a transport other than `rest-json`, beside raw octets or a declared
+response cache, and beside a declared `If-None-Match` header parameter. An
+operation that declares no 304 is generated as before.
+
 ## Streaming
 
 Generated first-party streams go through `BaseClient`:

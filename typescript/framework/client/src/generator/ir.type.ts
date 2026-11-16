@@ -52,6 +52,12 @@ export interface SuccessIR {
   headers?: ResponseHeaderIR[];
 }
 
+/** A declared 304 answer: an `If-None-Match` named the current entity tag. */
+export interface NotModifiedIR {
+  description: string;
+  headers?: ResponseHeaderIR[];
+}
+
 /**
  * A complete service definition parsed from an API spec.
  */
@@ -82,6 +88,11 @@ export interface MethodIR {
   request?: RequestIR;
   /** Every declared 2xx response, including true void responses. */
   successes?: SuccessIR[];
+  /**
+   * The operation's declared 304: present only when the contract declares it,
+   * which makes the operation a conditional read. A 304 carries no body.
+   */
+  notModified?: NotModifiedIR;
   /** First-party operation semantics. Present only for marked contracts. */
   client?: ClientContractOperation;
   /** Path parameter types */

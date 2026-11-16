@@ -14,6 +14,7 @@ import {
   type ContentIR,
   type FieldIR,
   type MethodIR,
+  type NotModifiedIR,
   type ParameterIR,
   type RequestIR,
   type ResponseHeaderIR,
@@ -464,6 +465,8 @@ function strictOperationToMethod(
   ) {
     unsupported('a raw HTTP stream cannot declare a response cache', context, 'x-putnami-client.resilience.cache');
   }
+  const notModified = readStrictNotModified(operation.responses, doc, context);
+  if (notModified) validateConditionalRead(httpMethod, client, successes, context);
   return {
     name: toSafeIdentifier(toCamelCase(context.operationId)),
     operationId: context.operationId,
@@ -472,8 +475,62 @@ function strictOperationToMethod(
     ...(parameters.length ? { parameters } : {}),
     ...(request ? { request } : {}),
     successes,
+    ...(notModified ? { notModified } : {}),
     client,
   };
+}
+
+/**
+ * The operation's declared 304, which makes it a conditional read. A 304 never
+ * carries a body (RFC 9110, section 15.4.5), so a declared one is refused
+ * rather than silently dropped.
+ */
+function readStrictNotModified(
+  input: unknown,
+  doc: OpenApiDocument,
+  context: OperationContext,
+): NotModifiedIR | undefined {
+  const entry = object(input, context, 'responses')['304'];
+  if (entry === undefined) return undefined;
+  const field = 'responses.304';
+  const response = object(entry, context, field);
+  assertKnownKeys(response, ['description', 'content', 'headers'], context, field);
+  if (response.content !== undefined && Object.keys(object(response.content, context, `${field}.content`)).length)
+    unsupported('a 304 response carries no body', context, `${field}.content`);
+  const headers = readResponseHeaders(response.headers, doc, context, `${field}.headers`);
+  return {
+    description: string(response.description, context, `${field}.description`, true),
+    ...(headers.length ? { headers } : {}),
+  };
+}
+
+/**
+ * A conditional read revalidates one unary representation the caller already
+ * holds. A stream, a write, raw octets and a declared response cache have no
+ * such representation, or one the cache would serve instead of the provider.
+ */
+function validateConditionalRead(
+  httpMethod: string,
+  client: ClientContractOperation,
+  successes: readonly SuccessIR[],
+  context: OperationContext,
+): void {
+  // A HEAD answers its 200 without the body the 200 declares, so only a GET
+  // revalidates a representation the caller holds.
+  if (httpMethod !== 'GET') unsupported('only a GET operation can declare a 304', context, 'responses.304');
+  if (client.stream !== 'unary') unsupported('only a unary operation can declare a 304', context, 'responses.304');
+  if (client.resilience?.cache)
+    unsupported(
+      'a conditional read cannot declare a response cache: the cache would answer instead of the provider',
+      context,
+      'x-putnami-client.resilience.cache',
+    );
+  if (
+    successes.some((success) =>
+      success.content.some((content) => content.streamed || isBinarySchemaObject(content.schema)),
+    )
+  )
+    unsupported('a raw octet operation cannot declare a 304', context, 'responses.304');
 }
 
 function readStrictParameters(

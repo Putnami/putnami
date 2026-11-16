@@ -441,6 +441,19 @@
           }
         },
         {
+          "id": "conditional-read",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-declared-304-is-a-typed-result-of-a-conditional-read",
+              "an-operation-without-a-304-generates-as-before",
+              "an-unrepresentable-304-fails-generation"
+            ]
+          }
+        },
+        {
           "id": "streamed-binary-payloads",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

@@ -39,6 +39,8 @@ export function generateStrictTypeScriptClient(spec: SpecIR): GeneratedFile[] {
 function validateStrictRestSpec(spec: SpecIR): void {
   const generatedSymbols = new Map<string, string>();
   claimGeneratedSymbol(generatedSymbols, 'ClientCallOptions', 'framework call options');
+  if (spec.services.some((service) => service.methods.some(isConditionalRead)))
+    claimGeneratedSymbol(generatedSymbols, 'ClientConditionalCallOptions', 'conditional read call options');
   const hasErrors = spec.services.some((service) => service.methods.some((method) => method.client?.errors.length));
   const hasErrorSchemas = spec.services.some((service) =>
     service.methods.some((method) => method.client?.errors.some((error) => error.schema !== undefined)),
@@ -82,6 +84,7 @@ function validateStrictRestSpec(spec: SpecIR): void {
         throw unsupported(method, `a request body on ${method.httpMethod.toUpperCase()}`);
       }
       validateBinaryOperation(method);
+      if (isConditionalRead(method)) validateConditionalRead(method);
       // Connect carries unary and server streams; it cannot carry a client or
       // bidirectional stream over HTTP/1.1, and the provider answers those
       // `unimplemented`.
@@ -186,7 +189,7 @@ function validateStrictRestSpec(spec: SpecIR): void {
       if (request?.schema) claimGeneratedSymbol(generatedSymbols, `${base}Body`, `${method.operationId} request body`);
       if (groups.path.length || groups.query.length || groups.header.length || request)
         claimGeneratedSymbol(generatedSymbols, `${base}Input`, `${method.operationId} request input`);
-      if (stream === 'unary' && requiresResultEnvelope(method.successes ?? []))
+      if (stream === 'unary' && requiresResultEnvelope(declaredResults(method)))
         claimGeneratedSymbol(generatedSymbols, `${base}Result`, `${method.operationId} response result`);
       for (const error of operation.errors) {
         if (error.schema) schemaType(error.schema, spec, `${method.operationId}.errors.${error.code}`);
@@ -328,6 +331,16 @@ function generateStrictTypes(spec: SpecIR): string {
     '}',
     '',
   );
+  if (spec.services.some((service) => service.methods.some(isConditionalRead))) {
+    lines.push(
+      '/** Call options of a conditional read: an operation whose contract declares a 304. */',
+      'export interface ClientConditionalCallOptions extends ClientCallOptions {',
+      '  /** Sent as If-None-Match: the ETag of the last answer. The provider answers 304 while it still names the current one. */',
+      '  ifNoneMatch?: string;',
+      '}',
+      '',
+    );
+  }
   for (const service of spec.services) {
     for (const method of service.methods) lines.push(...methodTypes(method, spec));
   }
@@ -372,7 +385,7 @@ function methodTypes(method: MethodIR, spec: SpecIR): string[] {
   }
   const octetResponse = binaryResponse(method);
   if (octetResponse) lines.push(...binaryPayloadTypeLines(base, method, octetResponse));
-  const successes = method.successes ?? [];
+  const successes = declaredResults(method);
   if (method.client?.stream === 'unary' && requiresResultEnvelope(successes)) {
     lines.push(`export type ${base}Result =`);
     for (const [index, success] of successes.entries()) {
@@ -448,14 +461,15 @@ function generateStrictService(service: ServiceIR, spec: SpecIR): string {
     if (isDuplexMode(method.client?.stream) && !isByteStream(method)) typeImports.add(`${base}Send`);
     const octetResponse = binaryResponse(method);
     if (octetResponse) typeImports.add(binaryPayloadTypeName(base));
-    if (method.client?.stream === 'unary' && !octetResponse && requiresResultEnvelope(method.successes ?? []))
+    if (isConditionalRead(method)) typeImports.add('ClientConditionalCallOptions');
+    if (method.client?.stream === 'unary' && !octetResponse && requiresResultEnvelope(declaredResults(method)))
       typeImports.add(`${base}Result`);
     const success = method.successes?.[0];
     if (
       method.client?.stream === 'unary' &&
       !octetResponse &&
       success &&
-      !requiresResultEnvelope(method.successes ?? [])
+      !requiresResultEnvelope(declaredResults(method))
     ) {
       collectReferencedType(responseContent(method, success, spec).schema, typeImports);
     }
@@ -564,11 +578,11 @@ function serviceDesign(service: ServiceIR, spec: SpecIR): Record<string, unknown
 
 function renderMethod(method: MethodIR, spec: SpecIR): string[] {
   const base = operationTypeBase(method.operationId);
-  const args = `${methodTakesInput(method) ? `input: ${base}Input, ` : ''}options?: ClientCallOptions`;
+  const args = `${methodTakesInput(method) ? `input: ${base}Input, ` : ''}options?: ${isConditionalRead(method) ? 'ClientConditionalCallOptions' : 'ClientCallOptions'}`;
   if (method.client?.stream === 'server') return renderServerStreamMethod(method, base, args);
   if (providerWireOf(method)) return renderProviderWireMethod(method, base, args);
   if (isDuplexMode(method.client?.stream)) return renderDuplexStreamMethod(method, base, args);
-  const successes = method.successes ?? [];
+  const successes = declaredResults(method);
   const octetResponse = binaryResponse(method);
   const envelope = !octetResponse && requiresResultEnvelope(successes);
   const returnType = octetResponse
@@ -583,8 +597,8 @@ function renderMethod(method: MethodIR, spec: SpecIR): string[] {
   const requestParts: string[] = [];
   if (groups.path.length) requestParts.push(`      params: ${renderParameterValues(groups.path, 'input.path')},`);
   if (groups.query.length) requestParts.push(`      query: ${renderParameterValues(groups.query, 'input.query')},`);
-  if (groups.header.length)
-    requestParts.push(`      headers: ${renderParameterValues(groups.header, 'input.headers')},`);
+  if (groups.header.length || isConditionalRead(method))
+    requestParts.push(`      headers: ${renderHeaderValues(method, groups.header)},`);
   const request = requestContent(method, spec);
   if (request?.binary) requestParts.push(...binaryRequestParts(request.binary));
   else if (request) {
@@ -725,6 +739,15 @@ function objectAlias(name: string, parameters: ParameterIR[], spec: SpecIR): str
   }
   lines.push('}');
   return lines;
+}
+
+/** The declared header parameters, then a conditional read's If-None-Match from its call option. */
+function renderHeaderValues(method: MethodIR, headers: ParameterIR[]): string {
+  const declared = headers.length ? renderParameterValues(headers, 'input.headers') : '{}';
+  if (!isConditionalRead(method)) return declared;
+  return headers.length
+    ? `{ ...${declared}, 'If-None-Match': options?.ifNoneMatch }`
+    : "{ 'If-None-Match': options?.ifNoneMatch }";
 }
 
 function renderParameterValues(parameters: ParameterIR[], root: string): string {
@@ -1040,6 +1063,46 @@ function parameterGroups(parameters: ParameterIR[]): Record<ParameterIR['locatio
 
 function allOptional(parameters: ParameterIR[]): boolean {
   return parameters.every((parameter) => !parameter.required);
+}
+
+/** Whether the operation's contract declares a 304, which makes it a conditional read. */
+function isConditionalRead(method: MethodIR): boolean {
+  return method.notModified !== undefined;
+}
+
+/**
+ * Every answer the generated method returns: the declared 2xx variants, then
+ * the declared 304 as a variant of its own, which carries no body. The runtime
+ * accepts exactly these statuses, so a 304 is a result and never an error.
+ */
+function declaredResults(method: MethodIR): SuccessIR[] {
+  const successes = method.successes ?? [];
+  if (!method.notModified) return successes;
+  return [
+    ...successes,
+    {
+      status: 304,
+      description: method.notModified.description,
+      content: [],
+      ...(method.notModified.headers ? { headers: method.notModified.headers } : {}),
+    },
+  ];
+}
+
+/**
+ * The reader already holds a conditional read to a unary GET with no
+ * raw octets and no response cache. The emitter owns the rest: If-None-Match
+ * is its own call option, and a 304 has no Connect equivalent.
+ */
+function validateConditionalRead(method: MethodIR): void {
+  if (
+    method.parameters?.some(
+      (parameter) => parameter.location === 'header' && parameter.name.toLowerCase() === 'if-none-match',
+    )
+  )
+    throw unsupported(method, 'an If-None-Match header parameter beside a declared 304, whose call option sends it');
+  if (method.client?.transports.some((transport) => transport.protocol !== 'rest-json'))
+    throw unsupported(method, 'a declared 304 on a transport other than rest-json');
 }
 
 function requiresResultEnvelope(successes: SuccessIR[]): boolean {

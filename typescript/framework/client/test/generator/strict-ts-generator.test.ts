@@ -680,6 +680,15 @@ describe('emitted sources compile', () => {
             ],
           }),
         }),
+        // A conditional read: its If-None-Match option, merged with a declared
+        // header, and its 304 result variant have to type-check too.
+        method({
+          name: 'summarizeItems',
+          operationId: 'summarizeItems',
+          path: '/items/summary',
+          parameters: [{ name: 'x-region', location: 'header', required: false, schema: { type: 'string' } }],
+          notModified: { description: 'unchanged' },
+        }),
       ]);
 
       const root = mkdtempSync(join(tmpdir(), 'clientgen-compile-'));

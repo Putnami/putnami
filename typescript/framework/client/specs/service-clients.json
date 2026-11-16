@@ -118,6 +118,10 @@
       "text": "A call made with withoutResponseCache goes to the provider: it neither reads, stores nor joins the cache, and no stored answer masks its failure. invalidateResponsesByField drops every answer whose declared response field carries a value, across the service's operations and identities, compared in the canonical form both runtimes render. A value neither can render throws, and a call in flight for a declaring operation is never stored."
     },
     {
+      "id": "conditional-read",
+      "text": "An operation that declares a 304 generates a conditional read: an ifNoneMatch call option sent as If-None-Match, and a status-discriminated result where 200 carries the body and the response headers and 304 carries no data, never an error. A 304 with a body, outside a unary GET over rest-json, beside raw octets, a response cache or a declared If-None-Match parameter fails generation. An operation without a 304 is unchanged."
+    },
+    {
       "id": "streamed-binary-payloads",
       "text": "An explicit raw HTTP stream generates a required request contentType with a BinarySource and returns a readable body with its status and full concrete Content-Type. The runtime does not buffer or JSON-decode it, returns before EOF, and retains cancellation through body consumption. Uploads cannot be replayed by ordinary retries or forwarded-user credential refresh. A streamed operation cannot declare a response cache. Declared auth, errors and unary HTTP transport stay in force."
     },
