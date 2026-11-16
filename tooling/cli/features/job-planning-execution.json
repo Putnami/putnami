@@ -1420,6 +1420,20 @@
             "a-keyless-dependency-moves-the-key-of-its-dependent"
           ]
         }
+      },
+      {
+        "id": "a-consumer-keys-on-the-generation-of-its-clients",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-consumer-only-selection-plans-the-generation-of-its-closure-clients",
+            "a-contract-edit-moves-the-keys-of-the-consumer-jobs"
+          ]
+        }
       }
     ]
   }

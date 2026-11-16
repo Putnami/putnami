@@ -168,6 +168,7 @@
     "cli/init-from-a-monorepo-tool#rush-import-runs-through-putnami",
     "cli/init-from-a-monorepo-tool#turbo-delegate-impact",
     "cli/init-from-a-monorepo-tool#turbo-import-graph",
+    "cli/job-planning-execution#a-consumer-keys-on-the-generation-of-its-clients",
     "cli/job-planning-execution#a-declared-provider-that-cannot-serve-says-so-once",
     "cli/job-planning-execution#a-flag-takes-its-ci-default-when-ci-is-set",
     "cli/job-planning-execution#a-group-default-takes-positionals",

@@ -64,8 +64,12 @@ A provider that keeps a Go client inside its own module commits a
 committed contract. The `@putnami/go` and `@putnami/typescript` build, test,
 lint, validate, serve and package commands depend on `client-generate`, so
 building, linting or validating a client or a project that depends on one
-generates it first. `lint` and `validate` reach every client of the
-dependency closure through `^client-generate`, since they build nothing:
+generates it first. `test`, `lint`, `validate` and `serve` also reach every
+client of the dependency closure through `^client-generate`: they can plan no
+step in a dependency, as a client with no test file under `test` or a library
+under `serve`, so a consumer selected alone still generates the clients it
+reads, and its keys move with their providers' contracts. `build` and
+`package` reach a dependency's client through that dependency's own build:
 
 ```bash
 putnami build --projects my-consumer

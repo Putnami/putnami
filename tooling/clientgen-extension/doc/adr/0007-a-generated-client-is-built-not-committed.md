@@ -57,10 +57,16 @@ each operation's producer project and feature, into the committed
 build writes `.gen/clientgen/config.json` or stages a client.
 
 **5. Generation runs before every language command that reads it.** The
-`@putnami/go` and `@putnami/typescript` `build`, `test`, `lint`, `serve` and
-`package` commands depend on `client-generate`. The dependency plans nothing
-in a project without the command. A consumer reaches a client through its
-ordinary dependency, so a consumer-only selection generates or restores it.
+`@putnami/go` and `@putnami/typescript` `build`, `test`, `lint`, `validate`,
+`serve` and `package` commands depend on `client-generate`. The dependency
+plans nothing in a project without the command. A consumer selected alone
+generates or restores every client it reads: `build` and `package` reach a
+dependency's client through that dependency's own build, and `test`, `lint`,
+`validate` and `serve` also depend on `client-generate` across the dependency
+closure (`^client-generate`), since a dependency can plan none of their steps,
+as a client with no test file under `test` or a library under `serve`. The
+consumer's jobs reach that generation over functional edges, so a contract
+change moves their keys.
 
 **6. The cache keeps today's reuse.** `client-generate` is cacheable. The
 client's identity folds its provider's contract digest

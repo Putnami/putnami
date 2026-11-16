@@ -334,7 +334,7 @@
       ]
     },
     "test": {
-      "dependsOn": ["client-generate"],
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Run tests.",
       "activationFiles": [
         "**/*.test.ts",
@@ -538,7 +538,7 @@
       ]
     },
     "serve": {
-      "dependsOn": ["client-generate"],
+      "dependsOn": ["client-generate", "^client-generate"],
       "description": "Serve an application with hot-reload.",
       "traits": {
         "requiresRunnable": true,

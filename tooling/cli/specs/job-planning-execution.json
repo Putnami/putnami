@@ -372,6 +372,13 @@
         "A cacheable task's key folds, for a direct dependency in another project whose cache is off, the key it would have, and for one in its own project, the digest of the keys and would-be keys that reach it from other projects: a change to the inputs of a delegated upstream build moves the key of a task that waits for it.",
         "Neither addresses an entry, and a dependency that publishes a key contributes it as before."
       ]
+    },
+    {
+      "id": "a-consumer-keys-on-the-generation-of-its-clients",
+      "text": [
+        "With the shipped Go and TypeScript extensions, a test, serve or build of a consumer selected alone plans the generation of every client in its dependency closure, a library client with no test file included.",
+        "The consumer's jobs that compile the client reach it over functional edges, and its key folds the provider's contract digest: a contract edit moves their keys, so no verdict stored against the previous client is replayed."
+      ]
     }
   ],
   "decisions": [

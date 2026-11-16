@@ -341,9 +341,12 @@ func TestClientGenerateReadsCommittedFilesAndBuildsNoProvider(t *testing.T) {
 // a generated client exists before a compiler, a linter or a packager reads
 // it. The dependency is a plain command name, not a session barrier: it plans
 // the project's own client-generate, which plans nothing where no step
-// activates. Lint and validate build nothing, so they also depend on
-// client-generate across the dependency closure (`^client-generate`): the
-// clients they type-check in a dependency exist before they read them.
+// activates. Build and package reach a dependency's client through that
+// dependency's own build, which depends on its client-generate. Test, lint,
+// validate and serve can plan no step in a dependency, as a TypeScript client
+// with no test file under test or a library under serve, so they also depend
+// on client-generate across the dependency closure (`^client-generate`): a
+// consumer selected alone generates every client it reads.
 func TestLanguageCommandsWaitForClientGenerate(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "language-commands-wait-for-generation", "go-and-typescript-lifecycle-commands-depend-on-client-generate")
 	spectest.Proves(t, clientgenFeature, "language-commands-wait-for-generation", "a-project-without-client-generate-plans-nothing-more")
@@ -365,9 +368,9 @@ func TestLanguageCommandsWaitForClientGenerate(t *testing.T) {
 			if !slices.Contains(command.DependsOn, "client-generate") {
 				t.Errorf("%s %s dependsOn = %v, want client-generate", manifestPath, name, command.DependsOn)
 			}
-			typeChecksWithoutBuilding := name == "lint" || name == "validate"
-			if typeChecksWithoutBuilding != slices.Contains(command.DependsOn, "^client-generate") {
-				t.Errorf("%s %s dependsOn = %v; lint and validate alone depend on ^client-generate",
+			buildsItsDependencies := name == "build" || name == "package"
+			if buildsItsDependencies == slices.Contains(command.DependsOn, "^client-generate") {
+				t.Errorf("%s %s dependsOn = %v; test, lint, validate and serve alone depend on ^client-generate",
 					manifestPath, name, command.DependsOn)
 			}
 			for _, dependency := range command.DependsOn {
