@@ -67,7 +67,7 @@ var (
 
 // Parse strictly decodes a manifest: one JSON object within MaxManifestBytes,
 // with every member present, no unknown member, no member twice, and no list
-// past MaxPages or MaxCaptures, which it counts before it reads an item. It
+// past MaxPages or MaxCaptures: it reads no item past the bound. It
 // does not judge the values; Validate does.
 func Parse(data []byte) (*Manifest, []diag.Diagnostic) {
 	if len(data) > MaxManifestBytes {
@@ -430,6 +430,11 @@ func scanValue(decoder *json.Decoder, field string, depth int, members map[strin
 	if delim == '[' {
 		for index := 0; decoder.More(); index++ {
 			if index == limit {
+				// More peeks at one byte: a trailing comma is a syntax error,
+				// not an item past the bound.
+				if _, err := decoder.Token(); err != nil {
+					return refuse(ErrorCodeParseError, "", "the manifest is not JSON: %v", err)
+				}
 				code := ErrorCodeTooManyPages
 				if field == "captures" {
 					code = ErrorCodeTooManyCaptures

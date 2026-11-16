@@ -359,10 +359,24 @@ func TestAManifestPastABoundIsRefused(t *testing.T) {
 		_, diags := Parse([]byte(text))
 		runtime.ReadMemStats(&after)
 		if len(diags) != 1 || (diags[0].Code != ErrorCodeTooManyPages && diags[0].Code != ErrorCodeTooManyCaptures) {
-			t.Errorf("%s: %d findings, want one bound", name, len(diags))
+			t.Errorf("%s: %v, want one bound", name, diags)
 		}
-		if bytes := after.TotalAlloc - before.TotalAlloc; bytes > 4*MaxManifestBytes || allocated > 100000 {
-			t.Errorf("%s: %d bytes in %v allocations, more than the input warrants", name, bytes, allocated)
+		if used := after.TotalAlloc - before.TotalAlloc; used > 4*MaxManifestBytes || allocated > 100000 {
+			t.Errorf("%s: %d bytes in %v allocations, more than the input warrants", name, used, allocated)
+		}
+	}
+	// A full list with a trailing comma is a syntax error, not a list past
+	// its bound.
+	full, err := Marshal(manifestOf(MaxPages))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, list := range []string{`"pages"`, `"captures"`} {
+		at := bytes.Index(full, []byte(list))
+		end := at + bytes.Index(full[at:], []byte("\n  ]"))
+		trailing := slices.Concat(full[:end], []byte(","), full[end:])
+		if _, diags := Parse(trailing); len(diags) != 1 || diags[0].Code != ErrorCodeParseError {
+			t.Errorf("a full %s list with a trailing comma: %v, want one parse error", list, diags)
 		}
 	}
 	empty := `{"protocolVersion": 1, "pages": [` + strings.Repeat(`{},`, MaxPages) + `{}], "captures": [` +

@@ -107,7 +107,7 @@ if manifest == nil {
 rule refuses it; otherwise each finding carries a stable code and the path of
 its member. `Parse` alone applies the shape and the list bounds: one JSON object,
 every member present, no unknown member, no member twice, and no more than
-`MaxPages` pages or `MaxCaptures` captures, counted before an item is read. Member names match by their
+`MaxPages` pages or `MaxCaptures` captures: no item past a bound is read. Member names match by their
 exact case, and a value that nests deeper than a manifest does is refused
 before it is read. `Marshal` validates before it
 serializes, so a writer that goes through the protocol cannot write a manifest
