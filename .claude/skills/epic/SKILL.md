@@ -106,9 +106,8 @@ For each issue it lists, in plan order:
      `<branch>` at each checkpoint, declarations first; do not run
      `change finalize`. End with the pushed head, the title, the body, the
      task, the gated projects and whether the delivery is partial. The epic
-     session publishes your proposal against `<base>`." The host adds a
-     footer to each proposal body it writes, so the epic session publishes
-     it (section 6).
+     session publishes your proposal against `<base>`." The epic session
+     publishes it (section 6), so its review and gate cover every child.
 
 `epic status` counts the children launched or in progress against
 `envelope.sessions`; it lists nothing once their tokens reach the envelope.

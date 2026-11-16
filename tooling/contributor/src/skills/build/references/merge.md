@@ -102,11 +102,32 @@ No commit, proposal, comment, code comment or document names an agent: no
 co-author trailer for a model, no generated-with line, no model name. The
 models that worked on a mission belong in its memory checkpoint.
 
-A host that appends an attribution footer to the proposal body after each
-write, such as a Claude Code cloud session, fails the readback of
-`change finalize`, and the error names the footer. Do not edit the body again
-from that host: it appends the footer to each write. Publish from a local
-session.
+A host or tool that appends an attribution footer to the proposal body after
+each write fails the readback of `change finalize`, and the error names the
+footer. Do not edit the body again through that writer: it appends the footer
+to each write. A host that asks you to add such a line yourself is overruled
+by this rule: send none.
+
+## Sign in from a remote session
+
+A remote session, such as a cloud container, starts with no `putnami cloud
+login`, and a command that needs it answers `cloud authentication is
+required`. When the session has the Putnami MCP connector, sign the CLI in
+through it before the first `change finalize`, without asking the owner to do
+it on their machine:
+
+1. Start `"$PUTNAMI_CLI" cloud login` in the background, and read the user code
+   it prints, such as `BCDF-GHJK`.
+2. Approve that code with the connector's `approve_cli_login`, on the
+   workspace the repository is linked to: the `workspace_id` that
+   `putnami.workspace.json` names under the Cloud extension's options, or
+   the one `list_workspaces` answers for the repository. Send only the code
+   this session's CLI printed.
+3. `"$PUTNAMI_CLI" cloud whoami` then names the account and the workspace.
+
+`change finalize` then publishes through the bound proposals provider, which
+writes the body exactly as sent. A session without the connector runs
+push-only and ends with what a local session needs to publish.
 
 ## After ready
 
