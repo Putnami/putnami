@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"runtime"
 	"slices"
 	"strings"
 	"testing"
@@ -118,6 +119,20 @@ func TestAnUnknownDuplicateOrMissingMemberIsRefused(t *testing.T) {
 	deep = append([]byte(`{"pages": [{"file": `), bytes.Repeat([]byte("["), MaxManifestBytes-32)...)
 	if _, diags := Parse(deep); len(diags) != 1 || diags[0].Field != "pages[0].file" || !strings.Contains(diags[0].Message, "nests deeper") {
 		t.Errorf("a page member of brackets: %v", diags)
+	}
+	for _, text := range []string{`null`, `1`, `"manifest"`} {
+		if _, diags := Parse([]byte(text)); len(diags) != 1 || diags[0].Code != ErrorCodeParseError {
+			t.Errorf("%s: %v, want one parse error", text, diags)
+		}
+	}
+	long := manifestOf(1)
+	route := "/" + strings.Repeat("a", MaxTextBytes)
+	long.Pages[0].Route = route
+	for i := range long.Captures {
+		long.Captures[i].Route = route
+	}
+	if got := codes(Validate(&long)); len(got) != len(long.Captures)+1 {
+		t.Errorf("a long route: %v, want one finding for the page and one per capture", got)
 	}
 	if diags := Validate(nil); !hasCode(diags, ErrorCodeParseError) {
 		t.Errorf("a nil manifest: %v", diags)
@@ -332,8 +347,24 @@ func TestAManifestPastABoundIsRefused(t *testing.T) {
 	if got := codes(Validate(&captures)); !reflect.DeepEqual(got, []string{ErrorCodeTooManyCaptures}) {
 		t.Errorf("%d captures: %v", MaxCaptures+1, got)
 	}
-	// Many empty pages within the byte bound: one finding, before any member
-	// of theirs is read.
+	// Many items within the byte bound: one finding, counted before an item
+	// is read, so the cost stays far below the size of the file.
+	for name, text := range map[string]string{
+		"zeros as captures": `{"captures": [` + strings.Repeat(`0,`, MaxManifestBytes/2-16) + `0]}`,
+		"empty pages":       `{"pages": [` + strings.Repeat(`{},`, MaxManifestBytes/3-16) + `{}]}`,
+	} {
+		allocated := testing.AllocsPerRun(1, func() { _, _ = Parse([]byte(text)) })
+		var before, after runtime.MemStats
+		runtime.ReadMemStats(&before)
+		_, diags := Parse([]byte(text))
+		runtime.ReadMemStats(&after)
+		if len(diags) != 1 || (diags[0].Code != ErrorCodeTooManyPages && diags[0].Code != ErrorCodeTooManyCaptures) {
+			t.Errorf("%s: %d findings, want one bound", name, len(diags))
+		}
+		if bytes := after.TotalAlloc - before.TotalAlloc; bytes > 4*MaxManifestBytes || allocated > 100000 {
+			t.Errorf("%s: %d bytes in %v allocations, more than the input warrants", name, bytes, allocated)
+		}
+	}
 	empty := `{"protocolVersion": 1, "pages": [` + strings.Repeat(`{},`, MaxPages) + `{}], "captures": [` +
 		strings.Repeat(`{},`, MaxCaptures) + `{}]}`
 	if _, diags := Parse([]byte(empty)); !reflect.DeepEqual(codes(diags), []string{ErrorCodeTooManyPages}) {

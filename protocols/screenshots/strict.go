@@ -66,8 +66,9 @@ var (
 )
 
 // Parse strictly decodes a manifest: one JSON object within MaxManifestBytes,
-// with every member present, no unknown member and no member twice. It does
-// not judge the values; Validate does.
+// with every member present, no unknown member, no member twice, and no list
+// past MaxPages or MaxCaptures, which it counts before it reads an item. It
+// does not judge the values; Validate does.
 func Parse(data []byte) (*Manifest, []diag.Diagnostic) {
 	if len(data) > MaxManifestBytes {
 		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeTooLarge, "",
@@ -111,14 +112,6 @@ func Parse(data []byte) (*Manifest, []diag.Diagnostic) {
 	var diags []diag.Diagnostic
 	missing := func(field string) {
 		diags = append(diags, diag.Errorf(ErrorCodeMissingField, field, "%s is required", field))
-	}
-	// The lists are bounded before a member of theirs is read, so a manifest
-	// of many empty pages costs one finding, not one per missing member.
-	if wire.Pages != nil && len(*wire.Pages) > MaxPages {
-		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeTooManyPages, "pages", "%d pages, more than %d", len(*wire.Pages), MaxPages)}
-	}
-	if wire.Captures != nil && len(*wire.Captures) > MaxCaptures {
-		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeTooManyCaptures, "captures", "%d captures, more than %d", len(*wire.Captures), MaxCaptures)}
 	}
 	manifest := &Manifest{}
 	manifest.ProtocolVersion = required(wire.ProtocolVersion, "protocolVersion", missing)
@@ -328,7 +321,9 @@ func Validate(manifest *Manifest) []diag.Diagnostic {
 
 	seen := map[string]bool{}
 	for i, page := range manifest.Pages {
-		if seen[page.Route] {
+		// A route past the text bound has its own finding, which is not
+		// repeated once per capture it lacks.
+		if seen[page.Route] || len(page.Route) > MaxTextBytes {
 			continue
 		}
 		seen[page.Route] = true
@@ -386,7 +381,7 @@ const maxDepth = 3
 // costs nothing.
 func scan(data []byte) *diag.Diagnostic {
 	decoder := json.NewDecoder(bytes.NewReader(data))
-	if finding := scanValue(decoder, "", 1, manifestMembers); finding != nil {
+	if finding := scanValue(decoder, "", 1, manifestMembers, 0); finding != nil {
 		return finding
 	}
 	if _, err := decoder.Token(); err != io.EOF {
@@ -397,8 +392,9 @@ func scan(data []byte) *diag.Diagnostic {
 }
 
 // scanValue reads one value at field. members are the names an object there
-// may hold; nil where the contract holds no object.
-func scanValue(decoder *json.Decoder, field string, depth int, members map[string]bool) *diag.Diagnostic {
+// may hold; nil where the contract holds no object. limit is the most items a
+// list there may hold.
+func scanValue(decoder *json.Decoder, field string, depth int, members map[string]bool, limit int) *diag.Diagnostic {
 	refuse := func(code, at, format string, args ...any) *diag.Diagnostic {
 		finding := diag.Errorf(code, at, format, args...)
 		return &finding
@@ -409,6 +405,9 @@ func scanValue(decoder *json.Decoder, field string, depth int, members map[strin
 	}
 	delim, nested := token.(json.Delim)
 	if !nested {
+		if depth == 1 {
+			return refuse(ErrorCodeParseError, "", "the manifest is no JSON object")
+		}
 		return nil
 	}
 	if depth > maxDepth {
@@ -430,7 +429,14 @@ func scanValue(decoder *json.Decoder, field string, depth int, members map[strin
 	}
 	if delim == '[' {
 		for index := 0; decoder.More(); index++ {
-			if finding := scanValue(decoder, fmt.Sprintf("%s[%d]", field, index), depth+1, members); finding != nil {
+			if index == limit {
+				code := ErrorCodeTooManyPages
+				if field == "captures" {
+					code = ErrorCodeTooManyCaptures
+				}
+				return refuse(code, field, "%s holds more than %d items", field, limit)
+			}
+			if finding := scanValue(decoder, fmt.Sprintf("%s[%d]", field, index), depth+1, members, 0); finding != nil {
 				return finding
 			}
 		}
@@ -454,12 +460,13 @@ func scanValue(decoder *json.Decoder, field string, depth int, members map[strin
 			}
 			seen[key] = true
 			var inner map[string]bool
+			limit := 0
 			if depth == 1 && key == "pages" {
-				inner = pageMembers
+				inner, limit = pageMembers, MaxPages
 			} else if depth == 1 && key == "captures" {
-				inner = captureMembers
+				inner, limit = captureMembers, MaxCaptures
 			}
-			if finding := scanValue(decoder, member, depth+1, inner); finding != nil {
+			if finding := scanValue(decoder, member, depth+1, inner, limit); finding != nil {
 				return finding
 			}
 		}

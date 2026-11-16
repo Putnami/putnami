@@ -105,8 +105,9 @@ if manifest == nil {
 
 `Decode` parses strictly, then validates. It returns the manifest only when no
 rule refuses it; otherwise each finding carries a stable code and the path of
-its member. `Parse` alone applies the shape: one JSON object, every member
-present, no unknown member, no member twice. Member names match by their
+its member. `Parse` alone applies the shape and the list bounds: one JSON object,
+every member present, no unknown member, no member twice, and no more than
+`MaxPages` pages or `MaxCaptures` captures, counted before an item is read. Member names match by their
 exact case, and a value that nests deeper than a manifest does is refused
 before it is read. `Marshal` validates before it
 serializes, so a writer that goes through the protocol cannot write a manifest
