@@ -354,7 +354,14 @@ func TestImpactedProjects_SingleBranchCloneOfMasterUsesOriginMaster(t *testing.T
 
 	clone := filepath.Join(t.TempDir(), "clone")
 	runGitForImpact(t, upstream, "clone", "-q", "--single-branch", "--branch", "master", upstream, clone)
-	runGitForImpact(t, clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+	// Whether a single-branch clone records origin/HEAD depends on the git
+	// version: delete it only where this git created it.
+	if gittest.Command(clone, "symbolic-ref", "-q", "refs/remotes/origin/HEAD").Run() == nil {
+		runGitForImpact(t, clone, "symbolic-ref", "--delete", "refs/remotes/origin/HEAD")
+	}
+	if gittest.Command(clone, "rev-parse", "-q", "--verify", "refs/remotes/origin/HEAD").Run() == nil {
+		t.Fatal("origin/HEAD still exists after the setup")
+	}
 	runGitForImpact(t, clone, "checkout", "-b", "feature")
 	runGitForImpact(t, clone, "branch", "-D", "master")
 
