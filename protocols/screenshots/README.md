@@ -141,6 +141,14 @@ validates with the schema alone applies those rules itself.
 test, without a JSON Schema library. `putnami change screenshots` uses it to
 prove that its output validates.
 
+## Support
+
+`preview`, as recorded in the [reviewed support catalog](../../putnami.support.json).
+`@putnami/contributor` produces the manifest through `putnami change
+screenshots` and reads it in `putnami change finalize`. Stable support still
+requires a consumer outside this repository, such as a service that stores the
+screenshots of a change, and an explicit compatibility window.
+
 ## Versioning
 
 A change to a member, a closed set, a rule or a bound needs a new
