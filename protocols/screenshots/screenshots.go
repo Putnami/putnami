@@ -58,8 +58,9 @@ const (
 type Viewport struct {
 	// Name is the value a capture carries as viewport.
 	Name string
-	// Width and Height are the size of the viewport, in CSS pixels.
-	Width  int
+	// Width is the width of the viewport, in CSS pixels.
+	Width int
+	// Height is the height of the viewport, in CSS pixels.
 	Height int
 	// Scale is the device scale factor.
 	Scale int

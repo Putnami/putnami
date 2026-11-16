@@ -95,10 +95,29 @@ func TestAnUnknownDuplicateOrMissingMemberIsRefused(t *testing.T) {
 			t.Errorf("%q: %v, want a parse error", text, diags)
 		}
 	}
-	// A file of brackets within the byte bound is refused at the fourth level.
+	// An object or a list where the contract holds another type is a parse
+	// error at its member, never a member of an invented path.
+	for text, field := range map[string]string{
+		`{"project": {"a": 1}}`:             "project",
+		`{"pages": {"file": "a"}}`:          "pages",
+		`{"pages": [[]]}`:                   "pages[0]",
+		`{"captures": [{"status": {}}]}`:    "captures[0].status",
+		`{"captures": [{"route": ["/a"]}]}`: "captures[0].route",
+		`[]`:                                "",
+	} {
+		if _, diags := Parse([]byte(text)); len(diags) != 1 || diags[0].Code != ErrorCodeParseError || diags[0].Field != field {
+			t.Errorf("%s: %v, want one parse error at %q", text, diags, field)
+		}
+	}
+	// Brackets within the byte bound are refused where a list cannot start,
+	// and at the fourth level at most.
 	deep := bytes.Repeat([]byte("["), MaxManifestBytes)
-	if _, diags := Parse(deep); len(diags) != 1 || diags[0].Code != ErrorCodeParseError || !strings.Contains(diags[0].Message, "nests deeper") {
+	if _, diags := Parse(deep); len(diags) != 1 || diags[0].Code != ErrorCodeParseError || diags[0].Field != "" {
 		t.Errorf("a file of brackets: %v", diags)
+	}
+	deep = append([]byte(`{"pages": [{"file": `), bytes.Repeat([]byte("["), MaxManifestBytes-32)...)
+	if _, diags := Parse(deep); len(diags) != 1 || diags[0].Field != "pages[0].file" || !strings.Contains(diags[0].Message, "nests deeper") {
+		t.Errorf("a page member of brackets: %v", diags)
 	}
 	if diags := Validate(nil); !hasCode(diags, ErrorCodeParseError) {
 		t.Errorf("a nil manifest: %v", diags)
@@ -312,6 +331,17 @@ func TestAManifestPastABoundIsRefused(t *testing.T) {
 	captures.Captures = append(captures.Captures, captures.Captures[0])
 	if got := codes(Validate(&captures)); !reflect.DeepEqual(got, []string{ErrorCodeTooManyCaptures}) {
 		t.Errorf("%d captures: %v", MaxCaptures+1, got)
+	}
+	// Many empty pages within the byte bound: one finding, before any member
+	// of theirs is read.
+	empty := `{"protocolVersion": 1, "pages": [` + strings.Repeat(`{},`, MaxPages) + `{}], "captures": [` +
+		strings.Repeat(`{},`, MaxCaptures) + `{}]}`
+	if _, diags := Parse([]byte(empty)); !reflect.DeepEqual(codes(diags), []string{ErrorCodeTooManyPages}) {
+		t.Errorf("%d empty pages: %d findings, first %v", MaxPages+1, len(diags), diags[0])
+	}
+	empty = `{"captures": [` + strings.Repeat(`{},`, MaxCaptures) + `{}]}`
+	if _, diags := Parse([]byte(empty)); !reflect.DeepEqual(codes(diags), []string{ErrorCodeTooManyCaptures}) {
+		t.Errorf("%d empty captures: %d findings", MaxCaptures+1, len(diags))
 	}
 	data, err := Marshal(manifestOf(1))
 	if err != nil {

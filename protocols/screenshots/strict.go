@@ -112,6 +112,14 @@ func Parse(data []byte) (*Manifest, []diag.Diagnostic) {
 	missing := func(field string) {
 		diags = append(diags, diag.Errorf(ErrorCodeMissingField, field, "%s is required", field))
 	}
+	// The lists are bounded before a member of theirs is read, so a manifest
+	// of many empty pages costs one finding, not one per missing member.
+	if wire.Pages != nil && len(*wire.Pages) > MaxPages {
+		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeTooManyPages, "pages", "%d pages, more than %d", len(*wire.Pages), MaxPages)}
+	}
+	if wire.Captures != nil && len(*wire.Captures) > MaxCaptures {
+		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeTooManyCaptures, "captures", "%d captures, more than %d", len(*wire.Captures), MaxCaptures)}
+	}
 	manifest := &Manifest{}
 	manifest.ProtocolVersion = required(wire.ProtocolVersion, "protocolVersion", missing)
 	manifest.Project = required(wire.Project, "project", missing)
@@ -405,6 +413,20 @@ func scanValue(decoder *json.Decoder, field string, depth int, members map[strin
 	}
 	if depth > maxDepth {
 		return refuse(ErrorCodeParseError, field, "%s nests deeper than a manifest does", field)
+	}
+	// A manifest is an object whose pages and captures are lists of objects:
+	// an object or a list anywhere else is a value of the wrong type.
+	wantList := depth == 2 && members != nil
+	wantObject := depth == 1 || depth == 3 && members != nil
+	if delim == '[' && !wantList || delim == '{' && !wantObject {
+		at, kind := field, "a list"
+		if delim == '{' {
+			kind = "an object"
+		}
+		if at == "" {
+			at = "the manifest"
+		}
+		return refuse(ErrorCodeParseError, field, "%s is %s, which a manifest does not hold there", at, kind)
 	}
 	if delim == '[' {
 		for index := 0; decoder.More(); index++ {
