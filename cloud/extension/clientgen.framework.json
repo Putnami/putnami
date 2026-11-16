@@ -3,6 +3,29 @@
   "transports": [
     {
       "runtime": "@putnami/cloud-extension",
+      "status": "pending-provider-contract",
+      "adapter": "cloud/extension/internal/collabcli/screenshots.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/collabcli/screenshots.go",
+          "transport": "http",
+          "symbol": "http.NewRequestWithContext",
+          "fingerprint": "a8610a20a8bb95e22a50d423b0a86db776159d1d1a2a593c0b655df6cba9f409"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/collabcli/screenshots_test.go"
+      ],
+      "reason": "The screenshots upload of a change to delivery-api, which proposals.screenshots sends: the manifest, then each missing capture as image/png. delivery-api declares both operations in its OpenAPI document, but the published Cloud CLI schema package this repository generates the delivery-api client from does not carry them yet.",
+      "operations": [
+        "delivery-api.postV1_Workspaces_Workspace_Changes_Reference_Screenshots",
+        "delivery-api.putV1_Workspaces_Workspace_Changes_Reference_Screenshots_Captures_Digest"
+      ],
+      "pendingWork": "Copy the delivery-api schema that declares the screenshots routes into cloud/clients/delivery-api, then call the generated client"
+    },
+    {
+      "runtime": "@putnami/cloud-extension",
       "status": "transport-primitive",
       "adapter": "cloud/extension/internal/deliverycli/internal/remotecache/client.go",
       "callsites": [

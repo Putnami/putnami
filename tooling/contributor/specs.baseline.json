@@ -20,6 +20,7 @@
     "tooling/change-screenshots#agent-reviews-its-screens",
     "tooling/change-screenshots#captures",
     "tooling/change-screenshots#finalize-asks-for-screenshots",
+    "tooling/change-screenshots#finalize-uploads-screenshots",
     "tooling/change-screenshots#touched-pages",
     "tooling/contributor-executable#authorized-auto-merge",
     "tooling/contributor-executable#change-finalize-parity",

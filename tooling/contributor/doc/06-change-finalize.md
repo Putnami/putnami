@@ -197,6 +197,30 @@ given are unused` when the run had a waiver or a manifest; the result document c
 same text as `screenshots`. A draft takes neither flag and needs no
 screenshots, and the two flags exclude each other.
 
+### Upload
+
+The command sends each manifest it accepted to the bound proposals provider,
+so a reviewer sees the screenshots on the change
+([ADR 0015](adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md)).
+It calls `proposals.screenshots` once per manifest, in project order, with the
+published proposal, the published head and the manifest's path. The upload
+runs after the proposal is published and its gate passed, and before the
+verification comment. A waiver, a draft and a change that touches no page
+send nothing.
+
+| The provider | The run |
+|---|---|
+| Stores the manifest | Prints `uploaded the screenshots of <project>: <n> captures, <n> files sent` on stderr. A provider that already holds a file does not receive it again. |
+| Does not offer `screenshots`, such as `@putnami/github-collaboration` | Sends nothing and warns on stderr. |
+| Answers `unsupported`: `@putnami/cloud` under a machine token (`PUTNAMI_CLOUD_TOKEN` with no signed-in session), or with a Putnami Delivery that does not serve the route | Stops uploading and warns on stderr with the provider's message. |
+| Answers anything else, such as a head that is not a commit of the change, or a file too large | Fails with the provider's message, before the verification comment and the task's transition. Fix the cause and run the command again: it sends only what the provider still lacks. |
+
+A warning changes neither the verification comment nor the exit code. The
+verification comment is the same with and without the upload. The result
+document carries `screenshotsUpload`: `manifests` (`project`, `captures` and
+`uploaded` for each one stored), or `skipped` with the reason nothing was
+stored.
+
 ## Text rules
 
 The title uses Conventional Commits. A `feat` or `fix` title is refused when
@@ -234,7 +258,7 @@ sent the request, it adds `AUTO_MERGE=squash` when auto-merge is on, or
 `AUTO_MERGE=off` with the reason on stderr. With `--output=json`, `jsonl` or `cloud-logging`, it
 prints the result document on one line instead: the proposal reference and
 URL, the head commit, the proposal state, the gate, whether the labels and
-assignees read back, `screenshots` for a ready publication, for a hosted workflow, its digest, ready units and
+assignees read back, `screenshots` for a ready publication, `screenshotsUpload` when it accepted a manifest, for a hosted workflow, its digest, ready units and
 receipt, `autoMerge` (`method`, `enabled` and the `refusal`) when the run
 sent the request, and `stripped` (`field`, `line`, `kind` and `text` of each
 removed line) when the body lost a line. For a proposal already merged, the state is `merged`, the text output

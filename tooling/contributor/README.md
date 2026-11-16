@@ -119,9 +119,11 @@ issue's task, proposal and sessions and names the issues that may launch now
 [ADR 0010](doc/adr/0010-an-epic-session-runs-issues-in-waves.md)).
 `putnami change screenshots` captures the pages a change touches in a web
 project, before and after, desktop and mobile, light and dark, and
-`putnami change finalize` asks for them on a ready web change
+`putnami change finalize` asks for them on a ready web change, and sends
+them to the proposals provider when it stores screenshots
 ([Capture the screens of a change](doc/09-change-screenshots.md),
-[ADR 0014](doc/adr/0014-screenshots-are-the-proof-of-a-web-change.md)).
+[ADR 0014](doc/adr/0014-screenshots-are-the-proof-of-a-web-change.md),
+[ADR 0015](doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md)).
 
 The build skill's dossier and workflow checker is `putnami change verify`,
 which this extension's executable serves. Its standalone `--workflow` validates a local progress
@@ -228,6 +230,7 @@ session:
 - [ADR 0012](doc/adr/0012-an-authorized-ready-publication-can-turn-auto-merge-on.md)
 - [ADR 0013](doc/adr/0013-a-merge-queue-can-stand-for-the-hosted-gate.md)
 - [ADR 0014](doc/adr/0014-screenshots-are-the-proof-of-a-web-change.md)
+- [ADR 0015](doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md)
 
 ## Publication
 

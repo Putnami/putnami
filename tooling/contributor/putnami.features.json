@@ -544,7 +544,7 @@
       "id": "tooling/change-screenshots",
       "type": "feature",
       "name": "Change screenshots",
-      "outcome": "A contributor captures the pages a web change touches, before and after, desktop and mobile, light and dark, with putnami change screenshots, and change finalize marks a web change ready only with those screenshots or a waiver",
+      "outcome": "A contributor captures the pages a web change touches, before and after, desktop and mobile, light and dark, with putnami change screenshots, and change finalize marks a web change ready only with those screenshots or a waiver, and sends them to the proposals provider",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -596,6 +596,23 @@
               "a-stale-or-incomplete-manifest-is-refused",
               "a-waiver-is-named-in-the-verification",
               "a-draft-or-a-change-without-pages-needs-none"
+            ]
+          }
+        },
+        {
+          "id": "finalize-uploads-screenshots",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "finalize-uploads-each-accepted-manifest-before-the-verification-comment",
+              "a-provider-without-the-operation-gets-a-warning-and-the-same-comment",
+              "an-unsupported-upload-warns-and-keeps-the-verification-comment",
+              "a-refused-upload-fails-finalize-with-the-provider-message",
+              "a-waiver-or-a-draft-uploads-nothing"
             ]
           }
         },

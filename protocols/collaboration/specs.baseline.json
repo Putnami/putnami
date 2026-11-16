@@ -21,6 +21,7 @@
     "collaboration/provider-contract#one-outcome-per-envelope",
     "collaboration/provider-contract#proposal-comments",
     "collaboration/provider-contract#proposal-scenarios",
+    "collaboration/provider-contract#proposal-screenshots",
     "collaboration/provider-contract#refused-before-the-provider",
     "collaboration/provider-contract#scenarios-normalize-requests",
     "collaboration/provider-contract#schemas-track-the-go-types",

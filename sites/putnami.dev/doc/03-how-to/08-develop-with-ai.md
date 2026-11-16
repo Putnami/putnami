@@ -85,7 +85,8 @@ touches a page of a web project, `putnami change screenshots` captures each
 touched page before and after, desktop and mobile, light and dark, the agent
 reads the captures and fixes what they show, the reviewer receives them, and
 `change finalize` marks the change ready only with their manifest or a waiver
-that names its reason. Configured content
+that names its reason, and sends the screenshots to the proposals provider
+when it stores them. Configured content
 updates remain explicit-only. A natural-language build
 request authorizes its objective; task publication, merge and deployment still
 follow the existing mandate. Workspace-local checkpoints and experiments need

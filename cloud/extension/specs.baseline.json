@@ -21,6 +21,7 @@
     "cloud/collaboration-provider#keeps-the-outcome-of-a-refusal",
     "cloud/collaboration-provider#never-repeats-an-uncertain-write",
     "cloud/collaboration-provider#signed-in-session-wins",
+    "cloud/collaboration-provider#uploads-screenshots-to-delivery",
     "cloud/compressed-session-reporting#gzip-only-after-an-advertising-answer",
     "cloud/compressed-session-reporting#the-chunk-bytes-are-what-the-receiver-stores",
     "cloud/compressed-session-reporting#unadvertised-gzip-acceptance-fails-closed",

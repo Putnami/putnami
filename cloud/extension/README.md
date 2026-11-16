@@ -400,12 +400,38 @@ it serves:
 
 | Contract | Served | Answers unsupported |
 | --- | --- | --- |
-| proposals | find, upsert (open, update, draft or ready), status, comments, review, automerge (squash) | merge |
+| proposals | find, upsert (open, update, draft or ready), status, comments, review, automerge (squash), screenshots | merge |
 | tasks | get, transition, assign (your own login only) | find, create, update, link |
 
 An operation Source does not serve answers `unsupported` and sends nothing.
 `proposals find` answers one page: a request that names a page cursor
 answers `invalid` and sends nothing.
+
+`proposals screenshots` is the one operation that goes to Putnami Delivery,
+which stores the screenshots of a change and shows them on the change page.
+`putnami change finalize --screenshots <manifest>` calls it. It posts the
+manifest file as written to
+`/v1/workspaces/{workspace}/changes/pr-<number>/screenshots`, then puts each
+file Delivery lists as missing to `.../screenshots/captures/{sha256}` as
+`image/png`. A second upload of the same files sends the manifest only.
+
+| Case | Answer |
+| --- | --- |
+| The manifest captures another commit than the request names, or a file does not hash to its digest | `invalid`; the manifest or the file is not sent |
+| Delivery does not serve the route (404 on the manifest) | `unsupported`, reason `screenshots.not_served` |
+| The process holds only `PUTNAMI_CLOUD_TOKEN` | `unsupported`, reason `screenshots.session_required`; nothing is sent, because Delivery takes the upload from a person's session |
+| The head is not a commit of the change (409) | `conflict`, with Delivery's message |
+| A file or a manifest is too large, or is not the PNG its digest names (413, 422) | `invalid`, with Delivery's message |
+| The outcome is unknown | `unresolved`; run it again, and it sends only what is still missing |
+
+A CLI that predates the operation does not know it, and withdraws this
+provider's whole proposals contract: move a workspace's CLI pin with, or
+before, the pin of a `@putnami/cloud` that declares `screenshots`
+([ADR 0015](../../tooling/contributor/doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md)).
+
+One call uploads one manifest within the provider's 100 second budget. The
+two routes are hand-written until the published Cloud schema declares them
+([`clientgen.framework.json`](clientgen.framework.json)).
 
 - **Credential.** A stored session always wins. `PUTNAMI_CLOUD_TOKEN` is used
   only when no session can give a workspace bearer. Without either, an
@@ -1720,7 +1746,8 @@ that neither claims:
 
 - [`clientgen.framework.json`](clientgen.framework.json) lists the Putnami
   calls with no contract yet: the session and log chunk ingest of the CI
-  reporters, and the OCI registry fast path. They wait on contract
+  reporters, the screenshots upload of a change, and the OCI registry fast
+  path. They wait on contract
   declarations in delivery-api and oci-server. It also lists the transport
   primitives of the remote cache client.
 - [`clientgen.external.json`](clientgen.external.json) lists third-party calls:

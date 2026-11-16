@@ -77,6 +77,7 @@ enforces it.
 | `comments` | read | no | — | — | `ref`, `page` | `items: [comment]`, `page` |
 | `merge` | mutating | no | yes | — | `ref`, `expectedHeadCommit`, `method` | `proposal` (state `merged`) |
 | `automerge` | mutating | no | yes | — | `ref`, `expectedHeadCommit`, `method` | `proposal` (state `open` or `merged`) |
+| `screenshots` | mutating | no | yes | — | `ref`, `commit`, `manifest` | `ref`, `commit`, `project`, `captures`, `uploaded` |
 
 A proposal is `ref`, `revision`, `url`, `change` (`repository`, `base`,
 `head`, `headCommit`), `title`, `body`, `state` (`draft`, `open`, `merged`,
@@ -109,6 +110,20 @@ refuses a head that moved from `expectedHeadCommit`, and offering it
 authorizes nobody to turn it on. Repeating it changes nothing. A repository
 that does not allow auto-merge, or a proposal the backend would merge at once,
 is a refusal the caller reports.
+
+`screenshots` hands the provider the screenshots of a proposal at one commit.
+`manifest` is the path of the `screenshots.json` file that
+`putnami change screenshots` wrote, absolute or relative to the workspace
+root, on one line of at most 4096 bytes; the capture files lie beside it. The
+request carries a path because the provider runs on the machine that holds
+the files, and one document cannot carry them. The provider reads the
+manifest, refuses one that captures another commit than `commit`, and stores
+the manifest and its files however its backend takes them. The result names
+the proposal, the commit, the manifest's `project`, the number of `captures`
+the manifest lists and the number of files this call `uploaded`. A later
+manifest of the same project and commit replaces the first, and a repeat
+uploads only the files the provider lacks, so repeating it after a failure is
+safe.
 
 `comments` lists what people wrote on one proposal. A comment is `ref` and
 `body`, plus, when known, `url`, `author`, `submittedAt`, `review` (the ref of

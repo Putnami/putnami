@@ -266,6 +266,21 @@
           }
         },
         {
+          "id": "proposal-screenshots",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-screenshots-request-names-its-commit-and-its-manifest",
+              "a-screenshots-result-counts-captures-and-uploads",
+              "the-cli-refuses-a-screenshots-answer-for-another-proposal-or-commit"
+            ]
+          }
+        },
+        {
           "id": "memory-scenarios",
           "stage": "coded",
           "evidenceKinds": [

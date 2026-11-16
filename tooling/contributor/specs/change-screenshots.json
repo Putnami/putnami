@@ -5,11 +5,12 @@
   "outcomes": [
     "putnami change screenshots captures every page a change touches in a web project, before and after, desktop and mobile, light and dark, into PNG files and one manifest bound to the committed head",
     "putnami change finalize marks a change that touches a web page ready only with the screenshots of its head, or with a waiver that names its reason",
+    "putnami change finalize sends the screenshots it accepted to the bound proposals provider, so a reviewer sees them on the change",
     "The build workflow has the agent read its own screenshots and fix what they show before it finalizes, and the independent reviewer receives them with the diff"
   ],
   "nonGoals": [
     "Serving the workload: the agent serves the base and the head and passes their URLs, because the executable never starts putnami",
-    "Uploading the screenshots to a hosted evidence store or showing them on a hosted change page",
+    "Storing the screenshots or showing them on a hosted change page: the proposals provider that receives them owns both",
     "Judging a design automatically: the agent and the reviewer read the images",
     "Comparing two captures pixel by pixel"
   ],
@@ -37,6 +38,15 @@
         "A ready publication of a change that touches a page of a web project needs a --screenshots manifest of the published head for that project, holding the after captures of every touched page with intact files, or --waive-screenshots <reason>.",
         "Otherwise it stops before any write and names what is missing. The verification line names the manifests or the waiver.",
         "A draft, and a change that touches no page, need none."
+      ]
+    },
+    {
+      "id": "finalize-uploads-screenshots",
+      "text": [
+        "A ready publication sends each --screenshots manifest it accepted once to the proposals provider with proposals.screenshots, after it publishes the proposal and before the verification comment.",
+        "A provider that does not offer the operation gets no call. For it, and for an unsupported answer, the run warns and posts the same comment.",
+        "Any other failure stops the run with the provider's message, before the comment.",
+        "A waiver, a draft and a change that touches no page send nothing."
       ]
     },
     {

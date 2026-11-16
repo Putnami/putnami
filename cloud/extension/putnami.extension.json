@@ -3027,6 +3027,10 @@
         "automerge": {
           "description": "Turn squash auto-merge on for an open, ready pull request whose head is still the expected commit, through Putnami Source and the Putnami GitHub App. Source refuses a draft, a closed pull request and a moved head. Binding this provider authorizes nobody to turn it on.",
           "openWorld": true
+        },
+        "screenshots": {
+          "description": "Store the screenshots of a pull request in Putnami Delivery, under the signed-in person's session: the manifest file as written, then each capture file Delivery does not hold yet. A process that holds only PUTNAMI_CLOUD_TOKEN, and a Delivery that does not serve the route, answer unsupported. A repeat sends only what is still missing.",
+          "openWorld": true
         }
       }
     }

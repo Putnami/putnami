@@ -37,6 +37,9 @@ type publicationCandidate struct {
 	// screenshots is the verification line of the web pages a ready
 	// publication touches.
 	screenshots string
+	// manifests are the --screenshots manifests the publication accepted,
+	// one per touched web project, in project order.
+	manifests []acceptedManifest
 }
 
 func (c *publicationCandidate) recheck(ctx context.Context, f Finalizer) (Verified, error) {
@@ -569,6 +572,11 @@ func (f Finalizer) publish(ctx context.Context, c *publicationCandidate) (Result
 	if c.opts.Draft {
 		return result, nil
 	}
+	upload, err := f.uploadScreenshots(ctx, c, result.ProposalRef)
+	if err != nil {
+		return result, err
+	}
+	result.ScreenshotsUpload = upload
 	if err := f.reviewProof(ctx, c, result); err != nil {
 		return result, err
 	}

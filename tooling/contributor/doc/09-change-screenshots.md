@@ -121,9 +121,14 @@ exits 0. A usage error exits 2; a failure exits 1.
 A ready `putnami change finalize`, local or hosted, of a change that touches a
 page of a web project takes `--screenshots <manifest>` for each such project,
 or `--waive-screenshots <reason>` ([Publish a proposal](06-change-finalize.md#screenshots)).
+It then sends each accepted manifest and its files to the bound proposals
+provider, when that provider stores screenshots
+([Upload](06-change-finalize.md#upload)).
 
 ## Limits
 
-The captures stay on the machine that took them; no hosted change page shows
-them yet. A route an application registers only at runtime is absent from the
+The captures leave the machine that took them only through
+`change finalize`, and only when the bound proposals provider offers
+`proposals.screenshots`. `@putnami/cloud` does, under a signed-in person's
+session; a hosted run on a machine token uploads nothing. A route an application registers only at runtime is absent from the
 inventory and never selected.

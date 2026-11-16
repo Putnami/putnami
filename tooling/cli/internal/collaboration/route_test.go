@@ -200,7 +200,7 @@ func TestResolve_BindsOnlyTheNamedAvailableProvider(t *testing.T) {
 func collabBoundCall(t *testing.T, contract, operation, arguments string) *providerCall {
 	t.Helper()
 	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"`+contract+`":{"provider":"@a/one","version":1}}}}`)
-	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, contract, "automerge", "claim", "comments", "merge", "search", "assign", "link", "status"))}, nil)
+	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, contract, "automerge", "claim", "comments", "merge", "screenshots", "search", "assign", "link", "status"))}, nil)
 	call, answer := prepareCall(read, resolution, operation, json.RawMessage(arguments))
 	if answer != nil {
 		t.Fatalf("prepareCall refused: %+v", answer.Error)
@@ -835,4 +835,33 @@ func preconditionMembers(typ reflect.Type, prefix []int, path string) []precondi
 		}
 	}
 	return members
+}
+
+// TestInterpret_AScreenshotsAnswerForAnotherProposalOrCommitIsUnresolved: an
+// ok proposals.screenshots answer names the proposal and the commit the
+// request named. Any other answer is unresolved, and its reconciliation is
+// the repeat, which uploads only what the provider lacks.
+func TestInterpret_AScreenshotsAnswerForAnotherProposalOrCommitIsUnresolved(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "proposal-screenshots", "the-cli-refuses-a-screenshots-answer-for-another-proposal-or-commit")
+	const request = `{"ref":{"source":"local:x","id":"P-1"},"commit":"abcdef1","manifest":"screenshots.json"}`
+	answer := func(id, commit string) []byte {
+		return collabOK(t, &collab.ProposalScreenshotsResult{Ref: collab.Ref{Source: "local:x", ID: id}, Commit: commit, Project: "apps/web", Captures: 8, Uploaded: 8})
+	}
+	if envelope := interpretResult(collabBoundCall(t, "proposals", "screenshots", request), answer("P-1", "abcdef1234")); envelope.Outcome != collab.OutcomeOK {
+		t.Fatalf("an answer for the requested proposal and commit: %s %+v", envelope.Outcome, envelope.Error)
+	}
+	for name, result := range map[string][]byte{
+		"another proposal": answer("P-2", "abcdef1"),
+		"another commit":   answer("P-1", "1234567"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			envelope := interpretResult(collabBoundCall(t, "proposals", "screenshots", request), result)
+			if envelope.Outcome != collab.OutcomeUnresolved || envelope.Error == nil || envelope.Error.Reason != collab.ReasonProviderIdentity {
+				t.Fatalf("envelope %s %+v, want unresolved %s", envelope.Outcome, envelope.Error, collab.ReasonProviderIdentity)
+			}
+			if envelope.Error.Retryable || !strings.Contains(envelope.Error.Reconcile, "proposals.screenshots") {
+				t.Errorf("reconciliation = %+v, want the repeat of proposals.screenshots", envelope.Error)
+			}
+		})
+	}
 }
