@@ -71,6 +71,34 @@
           }
         },
         {
+          "id": "an-emitter-that-writes-no-client-fails",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-generation-that-leaves-no-client-for-a-contract-with-operations-fails",
+              "a-generation-of-a-contract-with-no-first-party-operation-needs-no-client"
+            ]
+          }
+        },
+        {
+          "id": "an-install-that-differs-from-the-lock-fails",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-install-that-lags-the-lock-fails-before-the-emitter-runs",
+              "an-install-that-matches-the-lock-or-a-lock-with-no-registry-pin-generates"
+            ]
+          }
+        },
+        {
           "id": "portable-emitter-resolution",
           "stage": "coded",
           "evidenceKinds": [

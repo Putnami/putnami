@@ -36,6 +36,14 @@
       "text": "Preparation packages the runtime and the framework Go emitter side by side and the TypeScript emitter is the Putnami-installed package shim run through the lock-resolved runtime, so no task needs a framework source checkout. The emitter is packaged, never linked: no compiled package imports go.putnami.dev/api."
     },
     {
+      "id": "an-emitter-that-writes-no-client-fails",
+      "text": "A TypeScript generation whose emitter exits 0 but leaves no src/index.ts, for a contract that declares a first-party operation, fails and names the package to upgrade. An emitter that predates the --contract and --output arguments ignores them and writes nothing, so the task never succeeds with an empty client and no cache entry records that client's src empty."
+    },
+    {
+      "id": "an-install-that-differs-from-the-lock-fails",
+      "text": "A TypeScript generation whose installed @putnami/client differs from the version the workspace's bun.lock pins fails before the emitter runs, and names `putnami deps install`. The task's key folds bun.lock, never node_modules, so an install that lags the lock would store an older client under the lock's key, and a later install would not move it."
+    },
+    {
       "id": "honest-effects",
       "text": "Each task declares exactly the effects it has, a task is cacheable only when no declared effect is one a cache hit cannot reproduce, and a dishonest declaration is rejected by the shared validator."
     },

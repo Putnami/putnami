@@ -81,10 +81,17 @@ func goGeneratorArguments(generation GoGeneration) []string {
 }
 
 // GenerateTypeScript runs the @putnami/client emitter the workspace installed.
-// It writes only the project's src tree.
+// It writes only the project's src tree. It fails before the run when the
+// install differs from the version bun.lock pins
+// (requireLockedTypeScriptEmitter), and after it when the emitter exits 0
+// without leaving src/index.ts for a contract that declares a first-party
+// operation (requireGeneratedTypeScriptClient).
 func GenerateTypeScript(workspaceRoot string, generation TypeScriptGeneration) error {
 	shim, err := typescriptGeneratorExecutable(workspaceRoot, generation.Project)
 	if err != nil {
+		return err
+	}
+	if err := requireLockedTypeScriptEmitter(workspaceRoot, shim, generation); err != nil {
 		return err
 	}
 	command, err := typescriptGeneratorCommand(shim, generation)
@@ -96,7 +103,7 @@ func GenerateTypeScript(workspaceRoot string, generation TypeScriptGeneration) e
 	if output, err := command.CombinedOutput(); err != nil {
 		return fmt.Errorf("typescript client generation for %s failed: %w\n%s", generation.Project, err, output)
 	}
-	return nil
+	return requireGeneratedTypeScriptClient(shim, generation)
 }
 
 // PackageName reads the npm name a client project declares in its own

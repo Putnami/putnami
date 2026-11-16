@@ -54,7 +54,13 @@ func runFixtureSubcommand(t *testing.T, wsRoot, sub string) (bootstrapped bool) 
 			t.Fatalf("demo %s exit = %d, want %d", sub, code, ExitSuccess)
 		}
 	})
-	return os.Getenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED") == wsRoot
+	// The CLI records the workspace root with its links resolved: on macOS a
+	// temporary directory under /var is /private/var to it.
+	resolved, err := filepath.EvalSymlinks(wsRoot)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return os.Getenv("PUTNAMI_WORKSPACE_BOOTSTRAPPED") == resolved
 }
 
 func TestAppRun_NoStateSubcommandRunsNoBootstrap(t *testing.T) {

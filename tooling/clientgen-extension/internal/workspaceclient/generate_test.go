@@ -31,7 +31,13 @@ func TestTypeScriptGenerationRunsTheInstalledEmitterWithoutFrameworkSource(t *te
 	}
 	writeExecutableFixture(t, filepath.Join(root, "node_modules", ".bin"), "putnami-client-generate", "ts")
 
-	generation := TypeScriptGeneration{Contract: "/contract.json", Project: client, PackageName: "@example/items"}
+	// A contract with no first-party operation, so the fixture emitter needs to
+	// write no client.
+	contract := filepath.Join(root, "contract.json")
+	if err := os.WriteFile(contract, []byte(`{"openapi":"3.1.0"}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	generation := TypeScriptGeneration{Contract: contract, Project: client, PackageName: "@example/items"}
 	if err := GenerateTypeScript(root, generation); err != nil {
 		t.Fatalf("run the installed emitter: %v", err)
 	}
@@ -39,7 +45,7 @@ func TestTypeScriptGenerationRunsTheInstalledEmitterWithoutFrameworkSource(t *te
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := "ts --contract /contract.json --output " + client + " --package-name @example/items --format-project " + client
+	want := "ts --contract " + contract + " --output " + client + " --package-name @example/items --format-project " + client
 	if got := strings.TrimSpace(string(data)); got != want {
 		t.Fatalf("emitter call = %q, want %q", got, want)
 	}

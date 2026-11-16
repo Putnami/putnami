@@ -288,6 +288,20 @@ Putnami-installed `@putnami/client` package shim. Generation does not depend on
 a framework source checkout in the consumer workspace or a globally installed
 `go`, `bun` or language generator.
 
+The TypeScript key holds the `@putnami/client` version `bun.lock` pins, not
+the package `node_modules` holds. The generation checks the install before and
+after the emitter runs:
+
+1. Before the emitter runs, an installed `@putnami/client` that differs from
+   the version `bun.lock` pins fails the generation and asks for
+   `putnami deps install`. Otherwise the cache would store an older client
+   under the lock's key, and a later install would not move that key.
+2. After the emitter runs, a generation that exits 0 without `src/index.ts`,
+   for a contract that declares a first-party operation, fails. An emitter that
+   predates the `--contract` and `--output` arguments ignores them and writes
+   nothing; the remedy is to upgrade `@putnami/client`. No cache entry records
+   that client's `src` empty.
+
 Each generation task claims only what its emitter writes: `client.gen.go` for
 a Go client project, `src` for a TypeScript one, and, for an in-module target,
 the `client.gen.go` it reports through the `moduleClientOutput` port, since

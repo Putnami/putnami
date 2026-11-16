@@ -1290,3 +1290,48 @@ func TestEmptiedOutputsMoveOnlyTheKeysOfTasksThatOwnOne(t *testing.T) {
 		})
 	}
 }
+
+// A hit of an entry that holds an optionalEmpty project directory that declares
+// emptied puts back exactly what the execution wrote, the shape of a generated
+// TypeScript client's src: from a deleted directory, and over the directory the
+// execution left. Neither restore leaves the directory empty.
+func TestAHitOfAnEmptiedOptionalOutputRestoresWhatTheTaskWrote(t *testing.T) {
+	spectest.Proves(t, emptyingFeature, emptyingRequirement, "a-hit-of-a-present-output-and-an-adopted-result-empty-nothing")
+	f := newEmptyingFixture(t, false)
+	f.planned[0].Extension.Tasks[emptyingTask] = extension.TaskDefinition{Declares: &extension.TaskDeclaration{
+		Outputs: map[string]extension.DeclaredOutput{
+			"client": {
+				Kind: extension.OutputKindDirectory, Root: extension.OutputRootProject, Path: ".gen/public",
+				OptionalEmpty: true, Emptied: true,
+			},
+		},
+	}}
+	client := filepath.Join(f.gen, "public")
+	want := []string{"static/index.html", "static/types.html"}
+	emptyings := recordEmptyings(t)
+
+	f.setPages(t, "index", "types")
+	first := f.executed(t, "execution", f.run(t, SchedulerConfig{}))[0]
+	assertFilesIn(t, "execution", client, want...)
+	if got := f.storedOutput(t, first.CacheKey, "client"); !reflect.DeepEqual(got, want) {
+		t.Fatalf("the entry holds %v, want %v", got, want)
+	}
+
+	if err := os.RemoveAll(client); err != nil {
+		t.Fatal(err)
+	}
+	f.hit(t, "hit over a deleted directory", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "hit over a deleted directory", client, want...)
+
+	f.hit(t, "hit over the restored directory", f.run(t, SchedulerConfig{}))
+	assertFilesIn(t, "hit over the restored directory", client, want...)
+
+	if got := invocationLog(t, f.logPath); len(got) != 1 {
+		t.Fatalf("invocations = %v, want the one execution", got)
+	}
+	// Only the execution emptied the directory: a hit of a present record
+	// empties nothing.
+	if got := emptyings(); !reflect.DeepEqual(got, []string{client}) {
+		t.Fatalf("emptied %v, want only the execution's %v", got, []string{client})
+	}
+}

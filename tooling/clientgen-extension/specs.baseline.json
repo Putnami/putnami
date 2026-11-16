@@ -2,6 +2,8 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "tooling/cross-language-rest-clients#an-emitter-that-writes-no-client-fails",
+    "tooling/cross-language-rest-clients#an-install-that-differs-from-the-lock-fails",
     "tooling/cross-language-rest-clients#censused-pending-transports",
     "tooling/cross-language-rest-clients#classified-transport-inventory",
     "tooling/cross-language-rest-clients#client-owned-generation",
