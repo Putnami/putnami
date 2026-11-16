@@ -110,6 +110,15 @@ func ParseResult(contract string, version int, operation string, data []byte) (a
 	if diags := ValidateResult(result); diag.HasErrors(diags) {
 		return nil, diags
 	}
+	// A task result is shared by get and the task mutations; only get
+	// reports the context members.
+	if r, ok := result.(*TaskResult); ok && op.Name != OperationGet {
+		c := &checker{}
+		c.noTaskContext("task", r.Task)
+		if diag.HasErrors(c.diags) {
+			return nil, c.diags
+		}
+	}
 	return result, nil
 }
 
@@ -354,15 +363,19 @@ func ValidateResult(result any) []diag.Diagnostic {
 		c.itemsPresent(r.Items == nil)
 		c.listBound("items", len(r.Items))
 		for i := range r.Items {
-			c.task(fmt.Sprintf("items[%d]", i), r.Items[i])
+			field := fmt.Sprintf("items[%d]", i)
+			c.task(field, r.Items[i])
+			c.noTaskContext(field, r.Items[i])
 		}
 		c.nextCursor(r.Page.Next)
 	case *TaskResult:
 		c.task("task", r.Task)
 	case *TaskCreateResult:
 		c.task("task", r.Task)
+		c.noTaskContext("task", r.Task)
 	case *TaskClaimResult:
 		c.task("task", r.Task)
+		c.noTaskContext("task", r.Task)
 	case *ProposalListResult:
 		c.itemsPresent(r.Items == nil)
 		c.listBound("items", len(r.Items))
@@ -877,6 +890,93 @@ func (c *checker) task(field string, task Task) {
 	c.optionalToken(field+".holder", task.Holder)
 	c.timestamp(field+".createdAt", task.CreatedAt, false)
 	c.timestamp(field+".updatedAt", task.UpdatedAt, false)
+	if task.ParentProgress != nil {
+		c.parentProgress(field+".parentProgress", *task.ParentProgress, task.Parent != nil)
+	}
+	c.linkedTasks(field+".blockedBy", task.Ref, task.BlockedBy)
+	c.linkedTasks(field+".blocking", task.Ref, task.Blocking)
+	if task.Comments != nil {
+		c.commentSummary(field+".comments", *task.Comments)
+	}
+}
+
+// noTaskContext refuses the context members on a task that an operation other
+// than tasks.get answers: only get reports them. ValidateResult applies it to
+// the results only other operations answer, and ParseResult to a TaskResult
+// of any operation but get.
+func (c *checker) noTaskContext(field string, task Task) {
+	present := map[string]bool{
+		TaskMemberParentProgress: task.ParentProgress != nil,
+		TaskMemberBlockedBy:      task.BlockedBy != nil,
+		TaskMemberBlocking:       task.Blocking != nil,
+		TaskMemberComments:       task.Comments != nil,
+	}
+	for _, member := range TaskContextMembers {
+		if present[member] {
+			c.errorf(ErrorCodeInvalidValue, field+"."+member, "only tasks.get reports %s", member)
+		}
+	}
+}
+
+// parentProgress checks the progress of a task's parent: it describes the
+// parent the task names, and its done children are among its children.
+func (c *checker) parentProgress(field string, progress TaskParentProgress, hasParent bool) {
+	if !hasParent {
+		c.errorf(ErrorCodeRequired, field, "a parent progress describes the task's parent; the task names none")
+	}
+	c.optionalToken(field+".key", progress.Key)
+	c.title(field+".title", progress.Title)
+	c.url(field+".url", progress.URL)
+	switch {
+	case progress.Done < 0:
+		c.errorf(ErrorCodeInvalidValue, field+".done", "done is negative")
+	case progress.Total < 0:
+		c.errorf(ErrorCodeInvalidValue, field+".total", "total is negative")
+	case progress.Done > progress.Total:
+		c.errorf(ErrorCodeInvalidValue, field+".done", "done exceeds total: the done children are among the children")
+	case hasParent && progress.Total < 1:
+		c.errorf(ErrorCodeInvalidValue, field+".total", "total counts the task itself among the parent's children")
+	}
+}
+
+// linkedTasks checks a list of linked tasks: each names another task than
+// self, once, with a reference and a state.
+func (c *checker) linkedTasks(field string, self Ref, tasks []LinkedTask) {
+	c.listBound(field, len(tasks))
+	seen := map[Ref]bool{}
+	for i, task := range tasks {
+		item := fmt.Sprintf("%s[%d]", field, i)
+		c.ref(item+".ref", task.Ref)
+		switch {
+		case task.Ref == self:
+			c.errorf(ErrorCodeInvalidValue, item+".ref", "a task is not linked to itself")
+		case seen[task.Ref]:
+			c.errorf(ErrorCodeInvalidValue, item+".ref", "the linked task is repeated")
+		}
+		seen[task.Ref] = true
+		c.optionalToken(item+".key", task.Key)
+		c.bounded(item+".title", task.Title, MaxTitleLength, false)
+		c.url(item+".url", task.URL)
+		if task.State == "" {
+			c.errorf(ErrorCodeRequired, item+".state", "a linked task names its state")
+		} else {
+			c.taskState(item+".state", task.State)
+		}
+	}
+}
+
+// commentSummary checks a task's comment summary: a count, and the last
+// comment only when there is one.
+func (c *checker) commentSummary(field string, summary TaskCommentSummary) {
+	if summary.Count < 0 {
+		c.errorf(ErrorCodeInvalidValue, field+".count", "count is negative")
+	}
+	if summary.Count == 0 && (summary.LastAuthor != "" || summary.LastAt != "") {
+		c.errorf(ErrorCodeInvalidValue, field, "a task without comments has no last comment")
+	}
+	c.optionalToken(field+".lastAuthor", summary.LastAuthor)
+	c.timestamp(field+".lastAt", summary.LastAt, false)
+	c.url(field+".url", summary.URL)
 }
 
 func (c *checker) proposal(field string, proposal Proposal) {

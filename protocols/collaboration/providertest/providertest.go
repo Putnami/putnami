@@ -12,8 +12,9 @@
 // scenarios then check what validation cannot: that an answer is about the
 // item asked for, that an idempotent repeat returns the first result instead
 // of a second item, that a stale revision is a conflict, that pages cover a
-// result set exactly once, and that a reference another source issued is not
-// found. The memory scenarios check that a checkpoint lands only against the
+// result set exactly once, that a reference another source issued is not
+// found, and that tasks.get returns each context member the target declares
+// in TaskMembers and no other. The memory scenarios check that a checkpoint lands only against the
 // revision it names, that of concurrent writers at one revision exactly one
 // lands, that a repeated idempotency key replays the write that landed, that
 // another provider instance resumes from the store alone, that a record
@@ -60,6 +61,11 @@ type Target struct {
 	// that carry none when the scenario starts.
 	Base  string
 	Heads [2]string
+	// TaskMembers are the context members the provider's manifest declares
+	// under the members of its tasks.get operation (collab.TaskContextMembers
+	// lists them). RunTasks checks that get returns each of them and no other,
+	// and that no other operation returns one.
+	TaskMembers []string
 	// Settle is how long a read may take to observe a write the provider
 	// acknowledged, for a backend whose search index is eventually consistent.
 	// Zero means every read observes every acknowledged write at once.

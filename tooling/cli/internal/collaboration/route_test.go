@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -863,5 +864,30 @@ func TestInterpret_AScreenshotsAnswerForAnotherProposalOrCommitIsUnresolved(t *t
 				t.Errorf("reconciliation = %+v, want the repeat of proposals.screenshots", envelope.Error)
 			}
 		})
+	}
+}
+
+// TestCapabilities_ReportTheDeclaredMembers: capabilities reports the members a
+// provider's operation declares, and none for an operation that declares
+// none.
+func TestCapabilities_ReportTheDeclaredMembers(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "declared-task-context", "capabilities-report-the-declared-members")
+	read := readCollabFixture(t, `{"options":{"collaboration":{"tasks":{"provider":"@a/one","version":1}}}}`)
+	providers := collabProviders(t, "tasks")
+	get := providers["tasks"].Operations[collab.OperationGet]
+	get.Members = []string{collab.TaskMemberBlockedBy, collab.TaskMemberComments}
+	providers["tasks"].Operations[collab.OperationGet] = get
+	resolution := resolveCollab(read, "tasks", []*extension.ExtensionDescription{provider("@a/one", providers)}, nil)
+	if resolution.Status != collab.BindingStatusBound {
+		t.Fatalf("resolution %+v", resolution)
+	}
+	for _, op := range capabilitiesOf(resolution).Operations {
+		want := []string(nil)
+		if op.Name == collab.OperationGet {
+			want = []string{collab.TaskMemberBlockedBy, collab.TaskMemberComments}
+		}
+		if !slices.Equal(op.Members, want) {
+			t.Errorf("%s members = %v, want %v", op.Name, op.Members, want)
+		}
 	}
 }

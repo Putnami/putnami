@@ -281,6 +281,36 @@
           }
         },
         {
+          "id": "task-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-task-keeps-its-context-members-through-a-re-encoding",
+              "invalid-context-members-are-refused"
+            ]
+          }
+        },
+        {
+          "id": "declared-task-context",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-tasks-get-declares-the-context-members",
+              "an-undeclared-member-withdraws-the-contract-version",
+              "capabilities-report-the-declared-members",
+              "the-task-scenarios-check-the-declared-context-members"
+            ]
+          }
+        },
+        {
           "id": "memory-scenarios",
           "stage": "coded",
           "evidenceKinds": [

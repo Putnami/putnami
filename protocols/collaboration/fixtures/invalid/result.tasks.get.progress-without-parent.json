@@ -1,0 +1,47 @@
+{
+  "task": {
+    "ref": {
+      "source": "github:acme/app",
+      "id": "42"
+    },
+    "key": "#42",
+    "revision": "etag-42",
+    "url": "https://github.com/acme/app/issues/42",
+    "title": "Fix the login redirect",
+    "state": "open",
+    "parentProgress": {
+      "key": "#40",
+      "title": "Sign-in rework",
+      "url": "https://github.com/acme/app/issues/40",
+      "done": 3,
+      "total": 5
+    },
+    "blockedBy": [
+      {
+        "ref": {
+          "source": "github:acme/app",
+          "id": "41"
+        },
+        "key": "#41",
+        "title": "Rotate the session keys",
+        "url": "https://github.com/acme/app/issues/41",
+        "state": "in_progress"
+      }
+    ],
+    "blocking": [
+      {
+        "ref": {
+          "source": "github:acme/web",
+          "id": "7"
+        },
+        "state": "open"
+      }
+    ],
+    "comments": {
+      "count": 4,
+      "lastAuthor": "octocat",
+      "lastAt": "2026-11-15T17:20:00Z",
+      "url": "https://github.com/acme/app/issues/42#issuecomment-9"
+    }
+  }
+}

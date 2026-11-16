@@ -93,6 +93,7 @@ what every operation of the contract shares, and the operations:
 | `operations.<name>.openWorld` | yes | Whether the operation reaches a system outside this machine |
 | `operations.<name>.preconditions` | no | How the provider enforces a revision precondition: `atomic`, `checked` or `none` |
 | `operations.<name>.workspaceSelection` | no | Ask the CLI to resolve the workspace view (the complete membership and the resolved `projects`, `impacted` and `baseline` selection) and put it on the request |
+| `operations.<name>.members` | no | The optional result members the provider fills, each one the contract's catalog lists for the operation, such as `blockedBy` on `tasks.get`. The provider returns such a member only when it names it here. Requires `cliContract` 24 |
 
 The CLI writes one provider request on the command's standard input and reads
 one collaboration response from its standard output. A provider gets no host

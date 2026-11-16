@@ -161,6 +161,11 @@ type OperationSpec struct {
 	// agent, never by the agent itself. The command line and the host
 	// channel route them like any other operation.
 	HostOnly bool
+	// Members are the optional result members a provider may declare under
+	// the operation's members, in canonical order: it returns one only when
+	// it declares it. A member that joins version 1 this way keeps every
+	// version 1 document valid (ADR 0007).
+	Members []string
 	// Summary is the provider-neutral, agent-facing description.
 	Summary string
 	// newInput and newResult allocate the request and result documents.
@@ -403,7 +408,9 @@ var catalog = []ContractSpec{
 			},
 			{
 				Name: OperationGet, Access: AccessRead, Required: true,
-				Summary:  "Read one task by its source-qualified reference.",
+				Members: TaskContextMembers,
+				Summary: "Read one task by its source-qualified reference, with the parent's progress, the tasks that " +
+					"block it and that it blocks, and a comment summary where capabilities lists them as members.",
 				newInput: alloc[TaskRefInput](), newResult: alloc[TaskResult](),
 			},
 			{

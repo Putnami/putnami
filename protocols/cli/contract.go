@@ -336,7 +336,15 @@ const DependencyClosureContract = 22
 // and would read every layer, so it refuses the stamp instead.
 const CommandLayerInputsContract = 23
 
+// ProviderMembersContract is required by a manifest whose provider operation
+// declares members: the optional result members the provider fills. A reader
+// at this contract checks each member against the collaboration catalog,
+// reports it in the operation's capabilities and accepts it in the
+// operation's answers, so an older reader, which would refuse every answer
+// that carries one, refuses the stamp instead.
+const ProviderMembersContract = 24
+
 // LatestContract is the highest contract this CLI reads. A manifest stamped
 // above it is refused as written for a newer putnami; a manifest stamped at or
 // below it loads when the stamp covers the vocabulary the manifest uses.
-const LatestContract = CommandLayerInputsContract
+const LatestContract = ProviderMembersContract

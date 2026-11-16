@@ -84,7 +84,7 @@
     {
       "id": "truthful-provider-declarations",
       "text": [
-        "A provider offers a contract version only when its providers section declares each required operation once, with its precondition rule, atomic for claim, and workspaceSelection where the operation takes the selection.",
+        "A provider offers a contract version only when its providers section declares each required operation once, with its precondition rule, atomic for claim, workspaceSelection where the operation takes the selection, and only members the catalog lists for the operation.",
         "Any error withdraws that version; a provider of an unknown version draws one warning.",
         "The local, GitHub, GitLab, Linear and memory providers' manifests draw no diagnostic, and the CLI answers a call to a withdrawn version unsupported."
       ]
@@ -157,6 +157,22 @@
         "proposals.screenshots, an optional mutation, hands the provider one screenshots manifest: the request is the proposal's ref, the commit captured and the path of the manifest file, at most 4096 bytes on one line.",
         "The result names the proposal, the commit, the project, the captures listed and the files uploaded.",
         "The CLI answers unresolved, with provider.identity_mismatch and the repeat as reconciliation, an ok answer for another proposal or commit."
+      ]
+    },
+    {
+      "id": "task-context",
+      "text": [
+        "tasks.get may answer parentProgress (the parent's key, title, link, done and total children), blockedBy and blocking (linked tasks: reference, state, and key, title and link when known) and comments (a count, the last author and time, a link; no body).",
+        "Absent means not reported; [] or a zero count means none.",
+        "Refused: parentProgress without parent, total under 1 or below done; a linked task without reference or state, or naming the task itself; a negative count; a last comment on a zero count."
+      ]
+    },
+    {
+      "id": "declared-task-context",
+      "text": [
+        "A provider names the context members it fills under members of its get operation; the catalog lists what each operation may declare, another member withdraws the contract version, and capabilities reports the declared ones.",
+        "The members are outside the task's revision, and only get answers them: the CLI refuses one in any other operation's result.",
+        "providertest checks that get returns each declared member and no other, and that the other operations it calls return none."
       ]
     },
     {
@@ -265,6 +281,7 @@
     "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md",
     "protocols/collaboration/doc/adr/0005-missions-status-reads-a-missions-sessions.md",
     "protocols/collaboration/doc/adr/0006-version-1-is-stable.md",
-    "tooling/contributor/doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md"
+    "tooling/contributor/doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md",
+    "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md"
   ]
 }

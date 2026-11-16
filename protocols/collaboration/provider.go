@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
 	"sort"
 	"strings"
 
@@ -30,6 +31,15 @@ type ProvidedOperation struct {
 // the operation, empty when it declares none.
 func (p ProvidedOperation) Preconditions() Preconditions {
 	return Preconditions(p.Operation.Preconditions)
+}
+
+// Members returns the optional result members the provider declares it
+// fills, nil when it declares none.
+func (p ProvidedOperation) Members() []string {
+	if len(p.Operation.Members) == 0 {
+		return nil
+	}
+	return slices.Clone(p.Operation.Members)
 }
 
 // ProviderOffer is everything one extension's manifest offers, keyed by
@@ -62,7 +72,8 @@ func (o ProviderOffer) Operations(contract string, version int) (map[string]Prov
 // A declaration naming a contract version this package does not implement is
 // reported as a warning and ignored. Every other problem is an error that
 // withdraws the contract from the offer: an unknown contract, a declaration
-// without a version or a command, an unknown operation, a precondition rule
+// without a version or a command, an unknown operation, a member the catalog
+// does not list for the operation, a precondition rule
 // the operation does not allow, an operation that takes the canonical
 // selection without declaring workspaceSelection, or a missing required
 // operation.
@@ -172,6 +183,16 @@ func validateProvidedOperation(c *checker, field, contract string, operation ext
 			c.errorf(ErrorCodeInvalidDeclaration, field+".preconditions",
 				"%s.%s is offered only by a provider that enforces it atomically; declare preconditions: atomic",
 				contract, op.Name)
+		}
+	}
+	for i, member := range operation.Members {
+		if !slices.Contains(op.Members, member) {
+			allowed := "none"
+			if len(op.Members) > 0 {
+				allowed = strings.Join(op.Members, ", ")
+			}
+			c.errorf(ErrorCodeInvalidDeclaration, fmt.Sprintf("%s.members[%d]", field, i),
+				"%s.%s has no declared member %q; it lists %s", contract, op.Name, member, allowed)
 		}
 	}
 	if op.WorkspaceSelection && !operation.WorkspaceSelection {

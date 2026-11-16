@@ -33,9 +33,66 @@
           "$ref": "collaboration.json#/$defs/ref",
           "description": "The containing task. The one member a provider may leave outside revision; such a provider says so in its link operation's description."
         },
+        "parentProgress": {
+          "$ref": "#/$defs/parentProgress",
+          "description": "The parent's key, title, link and progress. Requires parent. Only tasks.get reports it, from a provider whose get operation declares parentProgress. Outside revision."
+        },
+        "blockedBy": {
+          "$ref": "#/$defs/linkedTasks",
+          "description": "The tasks that block this one. Absent: not reported; []: none. Only tasks.get reports it, from a provider whose get operation declares blockedBy. Outside revision."
+        },
+        "blocking": {
+          "$ref": "#/$defs/linkedTasks",
+          "description": "The tasks this one blocks. Absent: not reported; []: none. Only tasks.get reports it, from a provider whose get operation declares blocking. Outside revision."
+        },
+        "comments": {
+          "$ref": "#/$defs/commentSummary",
+          "description": "The comment count, the last comment's author and time, and a link to the comments; never a body. Only tasks.get reports it, from a provider whose get operation declares comments. Outside revision."
+        },
         "holder": { "$ref": "collaboration.json#/$defs/token", "description": "The exclusive claimant, from a provider offering claim." },
         "createdAt": { "$ref": "collaboration.json#/$defs/timestamp" },
         "updatedAt": { "$ref": "collaboration.json#/$defs/timestamp" }
+      }
+    },
+    "parentProgress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "done", "total"],
+      "properties": {
+        "key": { "$ref": "collaboration.json#/$defs/token" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "url": { "$ref": "collaboration.json#/$defs/url" },
+        "done": { "type": "integer", "minimum": 0, "description": "The parent's children that are done or canceled. At most total." },
+        "total": { "type": "integer", "minimum": 1, "description": "The parent's children, done included, and the task among them." }
+      }
+    },
+    "linkedTask": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ref", "state"],
+      "properties": {
+        "ref": { "$ref": "collaboration.json#/$defs/ref" },
+        "key": { "$ref": "collaboration.json#/$defs/token" },
+        "title": { "type": "string", "maxLength": 256 },
+        "url": { "$ref": "collaboration.json#/$defs/url" },
+        "state": { "$ref": "#/$defs/taskState" }
+      }
+    },
+    "linkedTasks": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/linkedTask" },
+      "description": "Each linked task at most once."
+    },
+    "commentSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 0 },
+        "lastAuthor": { "$ref": "collaboration.json#/$defs/token", "description": "The account that wrote the last comment. Only with a positive count." },
+        "lastAt": { "$ref": "collaboration.json#/$defs/timestamp", "description": "When the last comment was written. Only with a positive count." },
+        "url": { "$ref": "collaboration.json#/$defs/url" }
       }
     },
     "findInput": {

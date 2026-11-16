@@ -1,0 +1,19 @@
+{
+  "task": {
+    "ref": {
+      "source": "github:acme/app",
+      "id": "42"
+    },
+    "key": "#42",
+    "revision": "etag-42",
+    "url": "https://github.com/acme/app/issues/42",
+    "title": "Fix the login redirect",
+    "state": "open",
+    "blockedBy": [],
+    "blocking": [],
+    "comments": {
+      "count": 0,
+      "url": "https://github.com/acme/app/issues/42"
+    }
+  }
+}

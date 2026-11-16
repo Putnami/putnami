@@ -56,6 +56,12 @@ when it resolves a binding:
   take `projects`, `impacted` and `baseline`: Putnami resolves them and puts
   the resolved `selection` and the workspace membership on your request. Never
   resolve a selector yourself.
+- `members` names the optional result members you fill, and only members the
+  catalog lists for the operation: on `tasks.get`, `parentProgress`,
+  `blockedBy`, `blocking` and `comments` ([task context](01-operations.md#task-context)).
+  Return a listed member only when you declare it, and always when you do,
+  `[]` or a count of 0 when there is none. `<contract> capabilities` reports
+  them. Declaring members needs `cliContract` 24.
 - Every required operation of the version you declare, and no operation the
   version does not have. Any error withdraws that contract version from your
   offer, so a workspace binding it fails clearly rather than half-working.
@@ -195,6 +201,10 @@ write.
   against a fresh store, and
   [`@putnami/github-collaboration`](../../../tooling/github-collaboration/README.md)
   against an in-memory GitHub stand-in and, on request, a real repository.
+- A tasks target names in `TaskMembers` the context members your manifest
+  declares on `tasks.get`: the scenarios check that `get` returns each of them
+  and no other, and that `create`, `update`, `transition`, and `assign` and
+  `link` where you offer them, return none.
 - A memory target also names `Workspace`, the name the orchestrator fills
   into an identity, and `Reopen`, which returns a second provider instance on
   the same store. `RunMemory` checks creation with `mustNotExist`, the replay

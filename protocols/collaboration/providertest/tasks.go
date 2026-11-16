@@ -22,6 +22,7 @@ func RunTasks(t *testing.T, newTarget func(t *testing.T) Target) {
 		{"state, label and text filters", tasksFilters},
 		{"a stale revision is a conflict", tasksPreconditions},
 		{"a reference from another source is not found", tasksForeignReferences},
+		{"get returns the declared context members", tasksContext},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -214,4 +215,98 @@ func tasksForeignReferences(t *testing.T, s *Session) {
 	s.Fails("tasks", "get", `{"ref":`+ref+`}`, collab.OutcomeNotFound)
 	s.Fails("tasks", "update", `{"ref":`+ref+`,"title":"x"}`, collab.OutcomeNotFound)
 	s.Fails("tasks", "transition", `{"ref":`+ref+`,"state":"done"}`, collab.OutcomeNotFound)
+}
+
+// tasksContext checks the context members against the target's declaration:
+// get returns each declared member and no other, and create, update,
+// transition, and assign and link where offered, return none. With link offered, the task gets a parent, so a declared
+// parentProgress describes it.
+func tasksContext(t *testing.T, s *Session) {
+	for _, member := range s.target.TaskMembers {
+		if !slices.Contains(collab.TaskContextMembers, member) {
+			t.Fatalf("the target declares %q, which tasks.get does not list", member)
+		}
+	}
+	run := Unique(t)
+	label := `[` + quote("pt-"+run) + `]`
+	created := s.createTask("Context "+run, label, "providertest-context-"+run).Task
+	if problem := ContextProblem(created, nil); problem != "" {
+		t.Fatalf("create: %s", problem)
+	}
+	var got collab.TaskResult
+	s.OK("tasks", "get", `{"ref":`+refJSON(created.Ref)+`}`, &got)
+	if problem := ContextProblem(got.Task, s.target.TaskMembers); problem != "" {
+		t.Fatalf("get: %s", problem)
+	}
+	var updated collab.TaskResult
+	s.OK("tasks", "update", `{"ref":`+refJSON(created.Ref)+`,"title":`+quote("Context renamed "+run)+`}`, &updated)
+	if problem := ContextProblem(updated.Task, nil); problem != "" {
+		t.Fatalf("update: %s", problem)
+	}
+	if s.offers("tasks", "assign") {
+		var assigned collab.TaskResult
+		s.OK("tasks", "assign", `{"ref":`+refJSON(created.Ref)+`,"assignees":[]}`, &assigned)
+		if problem := ContextProblem(assigned.Task, nil); problem != "" {
+			t.Fatalf("assign: %s", problem)
+		}
+	}
+	if s.offers("tasks", "link") {
+		tasksContextUnderAParent(t, s, created, label, run)
+	}
+	var moved collab.TaskResult
+	s.OK("tasks", "transition", `{"ref":`+refJSON(created.Ref)+`,"state":"done"}`, &moved)
+	if problem := ContextProblem(moved.Task, nil); problem != "" {
+		t.Fatalf("transition: %s", problem)
+	}
+}
+
+// tasksContextUnderAParent gives the task a parent: link returns no context
+// member, and get then describes the parent when it declares parentProgress.
+func tasksContextUnderAParent(t *testing.T, s *Session, created collab.Task, label, run string) {
+	parent := s.createTask("Context parent "+run, label, "providertest-context-parent-"+run).Task
+	var linked collab.TaskResult
+	s.OK("tasks", "link", `{"ref":`+refJSON(created.Ref)+`,"parent":`+refJSON(parent.Ref)+`}`, &linked)
+	if problem := ContextProblem(linked.Task, nil); problem != "" {
+		t.Fatalf("link: %s", problem)
+	}
+	var got collab.TaskResult
+	s.OK("tasks", "get", `{"ref":`+refJSON(created.Ref)+`}`, &got)
+	if got.Task.Parent == nil || *got.Task.Parent != parent.Ref {
+		t.Fatalf("get after link names parent %v, want %v", got.Task.Parent, parent.Ref)
+	}
+	if problem := ContextProblem(got.Task, s.target.TaskMembers); problem != "" {
+		t.Fatalf("get after link: %s", problem)
+	}
+	if progress := got.Task.ParentProgress; progress != nil && (progress.Title != parent.Title || progress.Total < 1) {
+		t.Fatalf("parentProgress %+v does not describe the parent %q, which has one child", *progress, parent.Title)
+	}
+}
+
+// ContextProblem says how a task's context members differ from the members
+// declared, empty when they match: each declared member is present, and no
+// other one is. A declared parentProgress is present exactly when the task
+// names a parent. Declare nothing to check an answer that must carry no
+// context member, such as one of an operation other than tasks.get.
+func ContextProblem(task collab.Task, declared []string) string {
+	present := map[string]bool{
+		collab.TaskMemberParentProgress: task.ParentProgress != nil,
+		collab.TaskMemberBlockedBy:      task.BlockedBy != nil,
+		collab.TaskMemberBlocking:       task.Blocking != nil,
+		collab.TaskMemberComments:       task.Comments != nil,
+	}
+	for _, member := range collab.TaskContextMembers {
+		want := slices.Contains(declared, member)
+		if member == collab.TaskMemberParentProgress {
+			want = want && task.Parent != nil
+		}
+		switch {
+		case present[member] && !want && !slices.Contains(declared, member):
+			return fmt.Sprintf("%s is present, and it is not declared", member)
+		case present[member] && !want:
+			return fmt.Sprintf("%s is present on a task without a parent", member)
+		case !present[member] && want:
+			return fmt.Sprintf("%s is declared and absent; a provider that declares it answers it, [] or a count of 0 for none", member)
+		}
+	}
+	return ""
 }

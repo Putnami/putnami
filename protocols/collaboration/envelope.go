@@ -205,6 +205,11 @@ type OperationCapability struct {
 	// HostOnly is true when only the host that runs an agent calls the
 	// operation, never the agent itself.
 	HostOnly bool `json:"hostOnly,omitempty"`
+	// Members are the optional result members the bound provider fills, as
+	// its manifest declares them; see OperationSpec.Members. A member the
+	// catalog lists for the operation and this list omits never appears in
+	// the operation's result.
+	Members []string `json:"members,omitempty"`
 }
 
 // CapabilityIssue is one reason a binding cannot be honored.

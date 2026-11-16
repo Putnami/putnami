@@ -178,6 +178,7 @@ func capabilitiesOf(resolution collabResolution) collab.Capabilities {
 			entry.Supported = true
 			entry.Preconditions = provided.Preconditions()
 			entry.Description = provided.Operation.Description
+			entry.Members = provided.Members()
 			if declared := provided.Operation.OpenWorld; declared != nil {
 				openWorld := *declared
 				entry.OpenWorld = &openWorld

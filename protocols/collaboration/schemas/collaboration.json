@@ -247,7 +247,13 @@
         "preconditions": { "$ref": "#/$defs/preconditions" },
         "openWorld": { "type": "boolean", "description": "Whether the operation reaches a system outside this machine." },
         "description": { "type": "string", "description": "The provider's own description of provider-specific behavior and limits." },
-        "hostOnly": { "type": "boolean", "description": "True when only the host that runs an agent calls the operation, never the agent itself. Absent otherwise." }
+        "hostOnly": { "type": "boolean", "description": "True when only the host that runs an agent calls the operation, never the agent itself. Absent otherwise." },
+        "members": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": { "type": "string", "minLength": 1 },
+          "description": "The optional result members the bound provider fills, as its manifest declares them. A member of the catalog's list for the operation that is absent here never appears in the operation's result. Absent when it fills none."
+        }
       }
     },
     "capabilityIssue": {

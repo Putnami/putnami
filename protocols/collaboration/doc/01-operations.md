@@ -24,7 +24,8 @@ atomically.
   changes; `expectedRevision` compares against it. A task's `parent` is the
   one member a provider may leave outside it; such a provider says so in its
   `link` operation's description, which `capabilities` reports, and an
-  `expectedRevision` then does not detect a concurrent `link`.
+  `expectedRevision` then does not detect a concurrent `link`. A task's
+  context members (below) describe other items and are always outside it.
 - **Page** — a list request takes `page: {"size", "cursor"}` (size 0–100;
   0 or absent means the default, 20); a list result carries `items` (never
   null; an empty page is `[]`) and `page.next`, absent on the last page. Items
@@ -57,14 +58,37 @@ atomically.
 | `claim` | mutating | no | yes | atomic | `ref`, `holder`, `release` | `task` (with `holder`), `held` |
 
 A task is `ref`, `key`, `revision`, `url`, `title`, `body`, `state`,
-`providerState`, `labels`, `assignees`, `parent`, `holder`, `createdAt`,
-`updatedAt`. `state` is one of `open`, `in_progress`, `blocked`, `done`,
+`providerState`, `labels`, `assignees`, `parent`, `parentProgress`,
+`blockedBy`, `blocking`, `comments`, `holder`, `createdAt`, `updatedAt`. `state` is one of `open`, `in_progress`, `blocked`, `done`,
 `canceled`; `providerState` is the backend's own label, for display. `key` is
 the identifier people read and write, such as `#123` or `ENG-42`: it is for
 display and for matching a mention in text, and `ref`, not `key`, names the
 task in a request. An assignee is information, never an
 exclusive lease: exclusivity is `claim`'s, offered only where the backend
 enforces it.
+
+### Task context
+
+`parentProgress`, `blockedBy`, `blocking` and `comments` are a task's context
+members: they place the task among the work around it, without a call to the
+tracker's own API. Only `get` reports them, and only the ones the provider's
+manifest names under `members` of its `get` operation, which `capabilities`
+reports. Every other operation's task carries none, and the CLI refuses one
+on any other operation's result.
+
+| Member | Shape | Meaning |
+|---|---|---|
+| `parentProgress` | `key`, `title`, `url`, `done`, `total` | The task's parent and how many of its children are done or canceled, out of how many. It requires `parent`; `total` counts the task itself, so it is at least 1, and `done` is at most `total`. |
+| `blockedBy` | `[linkedTask]` | The tasks that block this one. |
+| `blocking` | `[linkedTask]` | The tasks this one blocks. |
+| `comments` | `count`, `lastAuthor`, `lastAt`, `url` | The comment count, the last comment's author and time, and a link to the comments. Never a comment's text. `lastAuthor` and `lastAt` only with a positive count. |
+
+A linked task is `ref`, `key`, `title`, `url` and `state`, the
+provider-neutral state; `ref` and `state` are required, and a list names
+another task than the one read, at most once. Absent means the provider does not report the member; `[]`
+or a `count` of 0 means there is none. The members describe other items, so
+they may change without a revision change, and an `expectedRevision` does not
+detect such a change.
 
 ## proposals v1
 

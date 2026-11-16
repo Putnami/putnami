@@ -14,11 +14,14 @@
 // rules, and collaboration.ReadProviderOffer checks a declaration against it.
 // Declaring the member is additive vocabulary: the manifest must carry
 // cliContract ProviderContract, which a reader that predates the member
-// refuses instead of loading the extension with no provider.
+// refuses instead of loading the extension with no provider. An operation's
+// members are additive vocabulary too: they need ProviderMembersContract, which
+// a reader that would refuse the members' answers refuses instead.
 
 package extension
 
 import (
+	"fmt"
 	"regexp"
 	"slices"
 	"strings"
@@ -73,6 +76,12 @@ type ProviderOperation struct {
 	// already holds the answer, publishes it, exactly as it does for a job
 	// subprocess (`selection` and `workspaceProjects` in protocols/job).
 	WorkspaceSelection bool `json:"workspaceSelection,omitempty"`
+	// Members names the optional members of the operation's result that the
+	// provider fills. The contract's catalog lists the members each operation
+	// may declare; a provider returns such a member only when it names it
+	// here. Declaring one raises the manifest's contract to
+	// protocolcli.ProviderMembersContract.
+	Members []string `json:"members,omitempty"`
 }
 
 // Provider precondition rules: how a provider enforces a revision
@@ -103,6 +112,23 @@ var providerNameFormat = regexp.MustCompile(`^[a-z][a-z0-9-]{0,63}$`)
 // provider, the vocabulary of protocolcli.ProviderContract.
 func DeclaresProviders(m *Manifest) bool {
 	return m != nil && len(m.Providers) > 0
+}
+
+// DeclaresProviderMembers reports whether a provider operation of the
+// manifest declares members, the vocabulary of
+// protocolcli.ProviderMembersContract.
+func DeclaresProviderMembers(m *Manifest) bool {
+	if m == nil {
+		return false
+	}
+	for _, provider := range m.Providers {
+		for _, operation := range provider.Operations {
+			if len(operation.Members) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ValidateProviders checks the shape of the manifest's providers, in sorted
@@ -164,5 +190,24 @@ func validateProviderOperation(field, name string, operation ProviderOperation) 
 		diags = append(diags, diag.Errorf("invalid-enum", field+".preconditions",
 			"operation preconditions must be one of %s", strings.Join(ProviderPreconditions, ", ")))
 	}
+	if operation.Members != nil && len(operation.Members) == 0 {
+		diags = append(diags, diag.Errorf("invalid-value", field+".members",
+			"members lists at least one member; leave it out when the provider fills none"))
+	}
+	seen := map[string]bool{}
+	for i, member := range operation.Members {
+		item := fmt.Sprintf("%s.members[%d]", field, i)
+		switch {
+		case !providerMemberFormat.MatchString(member):
+			diags = append(diags, diag.Errorf("invalid-value", item,
+				"member %q must name a result member of the operation (for example, blockedBy)", member))
+		case seen[member]:
+			diags = append(diags, diag.Errorf("invalid-value", item, "member %q is repeated", member))
+		}
+		seen[member] = true
+	}
 	return diags
 }
+
+// providerMemberFormat is the shape of a result member's JSON name.
+var providerMemberFormat = regexp.MustCompile(`^[a-z][A-Za-z0-9]{0,63}$`)

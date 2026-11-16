@@ -23,6 +23,8 @@ type memory struct {
 	reviews   map[string][]collab.Review
 	comments  map[string][]collab.ProposalComment
 	keys      map[string]keyed
+	// context fills the blocking links and the comment summary on get.
+	context bool
 }
 
 type keyed struct {
@@ -124,7 +126,12 @@ func (m *memory) getTask(_ context.Context, call collab.Call) (any, *collab.Fail
 	if index < 0 {
 		return nil, notFound(in.Ref)
 	}
-	return &collab.TaskResult{Task: m.tasks[index]}, nil
+	task := m.tasks[index]
+	if m.context {
+		task.BlockedBy, task.Blocking = []collab.LinkedTask{}, []collab.LinkedTask{}
+		task.Comments = &collab.TaskCommentSummary{Count: 0}
+	}
+	return &collab.TaskResult{Task: task}, nil
 }
 
 func (m *memory) createTask(_ context.Context, call collab.Call) (any, *collab.Failure) {
@@ -358,5 +365,49 @@ func TestUniqueTokensDiffer(t *testing.T) {
 	first, second := Unique(t), Unique(t)
 	if first == second || len(first) != 8 {
 		t.Errorf("tokens %q and %q", first, second)
+	}
+}
+
+// TestTheTaskScenariosCheckTheDeclaredContextMembers: the task scenarios pass
+// against a provider whose get returns the members it declares, and
+// ContextProblem names a declared member that is missing, an undeclared one
+// that is present, and a parent progress on a task without a parent.
+func TestTheTaskScenariosCheckTheDeclaredContextMembers(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "declared-task-context", "the-task-scenarios-check-the-declared-context-members")
+	declared := []string{collab.TaskMemberBlockedBy, collab.TaskMemberBlocking, collab.TaskMemberComments}
+	RunTasks(t, func(t *testing.T) Target {
+		m := newMemory()
+		m.context = true
+		return Target{Handlers: m.handlers(), WorkspaceRoot: t.TempDir(), TaskMembers: declared}
+	})
+
+	parent := collab.Ref{Source: memorySource, ID: "T-0"}
+	full := collab.Task{
+		Parent:         &parent,
+		ParentProgress: &collab.TaskParentProgress{Title: "epic", Done: 0, Total: 1},
+		BlockedBy:      []collab.LinkedTask{},
+		Blocking:       []collab.LinkedTask{},
+		Comments:       &collab.TaskCommentSummary{},
+	}
+	for name, tc := range map[string]struct {
+		task     collab.Task
+		declared []string
+		want     string
+	}{
+		"every member declared":         {full, collab.TaskContextMembers, ""},
+		"no member reported":            {collab.Task{}, nil, ""},
+		"no parent, progress declared":  {collab.Task{}, []string{collab.TaskMemberParentProgress}, ""},
+		"a declared member is missing":  {collab.Task{BlockedBy: []collab.LinkedTask{}}, declared, "blocking is declared and absent"},
+		"an undeclared member answered": {collab.Task{Comments: &collab.TaskCommentSummary{}}, nil, "comments is present, and it is not declared"},
+		"progress without parent": {
+			collab.Task{ParentProgress: &collab.TaskParentProgress{Title: "epic"}}, []string{collab.TaskMemberParentProgress},
+			"parentProgress is present on a task without a parent",
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := ContextProblem(tc.task, tc.declared); !strings.HasPrefix(got, tc.want) || (tc.want == "") != (got == "") {
+				t.Errorf("ContextProblem = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }

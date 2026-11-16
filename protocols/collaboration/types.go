@@ -68,7 +68,9 @@ type Task struct {
 	// expectedRevision precondition compares. Parent is the one member a
 	// provider may leave outside it: such a provider says so in the
 	// description of its link operation, which capabilities reports, and an
-	// expectedRevision then does not detect a concurrent link.
+	// expectedRevision then does not detect a concurrent link. The context
+	// members (ParentProgress, BlockedBy, Blocking and Comments) describe
+	// other items and are always outside it.
 	Revision string `json:"revision"`
 	// URL is a display link. It is never an identity.
 	URL string `json:"url,omitempty"`
@@ -89,6 +91,24 @@ type Task struct {
 	// Parent is the task's containing item, when the provider supports
 	// hierarchy.
 	Parent *Ref `json:"parent,omitempty"`
+	// ParentProgress describes Parent: its key, title, link and how many of
+	// its children are done. Only tasks.get reports it, and only from a
+	// provider whose get operation declares TaskMemberParentProgress. It
+	// requires Parent and is outside Revision.
+	ParentProgress *TaskParentProgress `json:"parentProgress,omitempty"`
+	// BlockedBy are the tasks that block this one. Only tasks.get reports it,
+	// and only from a provider whose get operation declares
+	// TaskMemberBlockedBy. Absent means not reported and [] means none. It is
+	// outside Revision.
+	BlockedBy []LinkedTask `json:"blockedBy,omitzero"`
+	// Blocking are the tasks this one blocks. Only tasks.get reports it, and
+	// only from a provider whose get operation declares TaskMemberBlocking.
+	// Absent means not reported and [] means none. It is outside Revision.
+	Blocking []LinkedTask `json:"blocking,omitzero"`
+	// Comments summarizes the discussion on the task, never its text. Only
+	// tasks.get reports it, and only from a provider whose get operation
+	// declares TaskMemberComments. It is outside Revision.
+	Comments *TaskCommentSummary `json:"comments,omitempty"`
 	// Holder is the current exclusive claimant, reported only by a provider
 	// that offers the claim operation.
 	Holder string `json:"holder,omitempty"`
@@ -96,6 +116,65 @@ type Task struct {
 	CreatedAt string `json:"createdAt,omitempty"`
 	// UpdatedAt is when the task last changed, in RFC 3339, when known.
 	UpdatedAt string `json:"updatedAt,omitempty"`
+}
+
+// The context members of a task: the optional Task members that describe
+// other items. A provider returns one only from tasks.get, and only when its
+// manifest names it under the members of its get operation.
+const (
+	TaskMemberParentProgress = "parentProgress"
+	TaskMemberBlockedBy      = "blockedBy"
+	TaskMemberBlocking       = "blocking"
+	TaskMemberComments       = "comments"
+)
+
+// TaskContextMembers is the closed vocabulary of a task's context members in
+// canonical order.
+var TaskContextMembers = []string{TaskMemberBlockedBy, TaskMemberBlocking, TaskMemberComments, TaskMemberParentProgress}
+
+// TaskParentProgress describes a task's parent and how far it is.
+type TaskParentProgress struct {
+	// Key is the identifier people read and write for the parent, when the
+	// provider has one.
+	Key string `json:"key,omitempty"`
+	// Title is the parent's short summary.
+	Title string `json:"title"`
+	// URL is a display link to the parent. It is never an identity.
+	URL string `json:"url,omitempty"`
+	// Done is how many of the parent's children are done or canceled.
+	Done int `json:"done"`
+	// Total is how many children the parent has, Done included.
+	Total int `json:"total"`
+}
+
+// LinkedTask is a task another task names in a blocking link.
+type LinkedTask struct {
+	// Ref is the linked task's source-qualified reference.
+	Ref Ref `json:"ref"`
+	// Key is the identifier people read and write for the linked task, when
+	// the provider has one.
+	Key string `json:"key,omitempty"`
+	// Title is the linked task's short summary, when the provider can read it.
+	Title string `json:"title,omitempty"`
+	// URL is a display link to the linked task. It is never an identity.
+	URL string `json:"url,omitempty"`
+	// State is the linked task's provider-neutral state.
+	State TaskState `json:"state"`
+}
+
+// TaskCommentSummary counts the comments on a task. It never carries a
+// comment's text.
+type TaskCommentSummary struct {
+	// Count is how many comments the task has.
+	Count int `json:"count"`
+	// LastAuthor is the account that wrote the last comment, when Count is
+	// positive and the provider knows it.
+	LastAuthor string `json:"lastAuthor,omitempty"`
+	// LastAt is when the last comment was written, in RFC 3339, when Count is
+	// positive and the provider knows it.
+	LastAt string `json:"lastAt,omitempty"`
+	// URL is a display link to the comments.
+	URL string `json:"url,omitempty"`
 }
 
 // TaskFindInput is the tasks.find request.

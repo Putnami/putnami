@@ -134,6 +134,8 @@ func NegotiateManifest(path string, data []byte) (*Manifest, error) {
 	default:
 		reason := ""
 		switch {
+		case required == protocolcli.ProviderMembersContract:
+			reason = " for the members of its provider operations"
 		case required == protocolcli.CommandLayerInputsContract:
 			reason = " for a step that reads no command option layer"
 		case required == protocolcli.DependencyClosureContract:

@@ -46,7 +46,9 @@
     "result.proposals.status.hosted.json",
     "result.proposals.status.local.json",
     "result.proposals.upsert.created.json",
-    "result.tasks.find.two.json"
+    "result.tasks.find.two.json",
+    "result.tasks.get.context.json",
+    "result.tasks.get.no-context.json"
   ],
   "invalid": {
     "bindings.credential-in-value.json": ["collaboration.credential_setting"],
@@ -109,7 +111,17 @@
     "result.proposals.status.repeated-assignee.json": ["collaboration.invalid_value"],
     "result.proposals.upsert.url-with-credentials.json": ["collaboration.invalid_url"],
     "result.tasks.find.bad-state.json": ["collaboration.invalid_state"],
+    "result.tasks.find.context.json": ["collaboration.invalid_value"],
     "result.tasks.find.key-with-space.json": ["collaboration.invalid_value"],
-    "result.tasks.find.null-items.json": ["collaboration.required"]
+    "result.tasks.find.null-items.json": ["collaboration.required"],
+    "result.tasks.get.done-above-total.json": ["collaboration.invalid_value"],
+    "result.tasks.get.last-comment-without-comments.json": ["collaboration.invalid_value"],
+    "result.tasks.get.linked-repeated.json": ["collaboration.invalid_value"],
+    "result.tasks.get.linked-without-ref.json": ["collaboration.invalid_reference"],
+    "result.tasks.get.linked-without-state.json": ["collaboration.required"],
+    "result.tasks.get.negative-comment-count.json": ["collaboration.invalid_value"],
+    "result.tasks.get.progress-without-parent.json": ["collaboration.required"],
+    "result.tasks.transition.context.json": ["collaboration.invalid_value"],
+    "result.tasks.update.context.json": ["collaboration.invalid_value"]
   }
 }

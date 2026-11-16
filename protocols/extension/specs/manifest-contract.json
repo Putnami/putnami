@@ -39,7 +39,7 @@
     {
       "id": "an-additive-vocabulary-raises-the-contract-floor",
       "text": [
-        "Agent content, verbs, command kinds, publish channels, a provisioned toolchain, a group default with positionals, input selectors, a source-bound task, a git or release baseline input, a dependency on one step of a command, providers (contract 19), user-scope skills (contract 20) and build-graph edges (contract 21) each raise the contract a manifest requires, only when used.",
+        "Agent content, verbs, command kinds, publish channels, a provisioned toolchain, a group default with positionals, input selectors, a source-bound task, a git or release baseline input, a dependency on one step of a command, providers (19), user-scope skills (20), build-graph edges (21) and a provider operation's members (24) each raise the contract a manifest requires, only when used.",
         "RequiredCLIContract takes the highest rung, and a manifest stamped below its vocabulary's rung does not load."
       ]
     },
@@ -217,6 +217,7 @@
     "protocols/extension/doc/adr/0012-a-provisioned-candidate-names-the-pinned-archive-executable.md",
     "protocols/extension/doc/adr/0013-a-default-that-takes-positionals-requires-contract-15.md",
     "protocols/extension/doc/adr/0014-a-declared-output-may-be-read-by-dependents.md",
-    "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md"
+    "protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md",
+    "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md"
   ]
 }
