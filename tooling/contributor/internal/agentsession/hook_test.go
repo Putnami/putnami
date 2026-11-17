@@ -537,7 +537,7 @@ func TestAMessageCountsAsDeliveredOnceWritten(t *testing.T) {
 	// The host stops the hook after it decided and before it wrote.
 	h := newHarness(t)
 	h.provider.post(promptMessage())
-	input, err := readHookInput(bytes.NewReader(h.payload(claude, "session-start", claudeSession, nil)))
+	input, _, err := readHookInput(bytes.NewReader(h.payload(claude, "session-start", claudeSession, nil)))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -172,7 +172,7 @@ func Hook(ctx context.Context, e *Env, args []string, stdin io.Reader, stdout, s
 		_, _ = io.Copy(io.Discard, stdin)
 		return 0
 	}
-	input, err := readHookInput(stdin)
+	input, payload, err := readHookInput(stdin)
 	if input != nil {
 		event = input.Event
 	}
@@ -184,6 +184,10 @@ func Hook(ctx context.Context, e *Env, args []string, stdin io.Reader, stdout, s
 	}
 	if err != nil {
 		e.log(engine, event, err)
+		return 0
+	}
+	if !e.claimEvent(engine, idleWake, payload) {
+		// Another hook source sent this event, and that hook handles it.
 		return 0
 	}
 	ctx, cancel := context.WithTimeout(ctx, eventBudget(engine, input.Event, idleWake))
@@ -303,25 +307,26 @@ func parseHookArgs(args []string) (engine string, idleWake bool, err error) {
 	return engine, idleWake, nil
 }
 
-// readHookInput reads one payload. It reads stdin to its end even past the
-// bound, so the engine never writes into a closed pipe.
-func readHookInput(r io.Reader) (*hookInput, error) {
+// readHookInput reads one payload, and answers its bytes too. It reads stdin
+// to its end even past the bound, so the engine never writes into a closed
+// pipe.
+func readHookInput(r io.Reader) (*hookInput, []byte, error) {
 	data, err := io.ReadAll(io.LimitReader(r, hookStdinMax+1))
 	if err != nil {
-		return nil, fmt.Errorf("read the hook payload: %w", err)
+		return nil, nil, fmt.Errorf("read the hook payload: %w", err)
 	}
 	if len(data) > hookStdinMax {
 		_, _ = io.Copy(io.Discard, r)
-		return nil, errors.New("the hook payload exceeds 64 MiB")
+		return nil, nil, errors.New("the hook payload exceeds 64 MiB")
 	}
 	var input hookInput
 	if err := json.Unmarshal(data, &input); err != nil {
-		return nil, fmt.Errorf("decode the hook payload: %w", err)
+		return nil, nil, fmt.Errorf("decode the hook payload: %w", err)
 	}
 	if !sessionIDPattern.MatchString(input.SessionID) {
-		return &input, errors.New("the hook payload names no valid session_id")
+		return &input, nil, errors.New("the hook payload names no valid session_id")
 	}
-	return &input, nil
+	return &input, data, nil
 }
 
 func sessionKey(engine, session string) string {

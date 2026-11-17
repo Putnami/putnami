@@ -63,6 +63,8 @@ type spawnSite struct {
 // unsure, mark it: that fails closed.
 var spawnSites = map[string]spawnSite{
 	// Repository code, recorded before the spawn.
+	"launch/host_hook.go:RunHostHook": {spawns: 1, verdict: marked, by: "launch/host_hook.go:RunHostHook",
+		why: "the hook's command path in its event's workspace, through that workspace's putnamiw or a CLI that loads its extensions"},
 	"collaboration/invoke.go:invokeProvider": {spawns: 1, verdict: marked, by: "collaboration/invoke.go:invokeProvider",
 		why: "a collaboration provider runs in the workspace"},
 	"commands/cachecmd/cache_verify.go:addDetachedWorktree": {spawns: 1, verdict: marked, by: "commands/cachecmd/cache_verify.go:addDetachedWorktree",

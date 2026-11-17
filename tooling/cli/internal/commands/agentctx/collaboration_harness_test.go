@@ -28,9 +28,25 @@ var (
 	collaborationHarnessErr     string
 )
 
+// TestMain also keeps every test of the package away from the user's own
+// host hook files: a run reads its environment as CI, which writes none, and
+// its home as a directory of its own. A test of the user files opts in with
+// userHostHookHome.
 func TestMain(m *testing.M) {
+	home, err := os.MkdirTemp("", "agentctx-home-")
+	if err != nil {
+		panic(err)
+	}
+	hostHookGetenv = func(name string) string {
+		if name == "CI" {
+			return "true"
+		}
+		return ""
+	}
+	hostHookHomeDir = func() (string, error) { return home, nil }
 	code := m.Run()
 	_ = collaborationHarnessScratch.Remove()
+	_ = os.RemoveAll(home)
 	os.Exit(code)
 }
 

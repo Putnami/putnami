@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw agent hook --engine codex || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw host-hook agent hook --engine codex || true",
             "timeout": 30
           }
         ]
@@ -26,7 +26,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw agent hook --engine codex || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw host-hook agent hook --engine codex || true",
             "timeout": 30
           }
         ]
@@ -37,7 +37,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw agent hook --engine codex || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$(git rev-parse --show-toplevel)\"/putnamiw host-hook agent hook --engine codex || true",
             "timeout": 240
           }
         ]

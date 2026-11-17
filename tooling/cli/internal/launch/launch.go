@@ -139,9 +139,12 @@ const putnamiHomeEnv = "PUTNAMI_HOME"
 // IsExemptCommand reports whether a command is exempt from the launcher by name
 // alone, regardless of its flags. `pin` is always exempt so a pin can be changed
 // or removed even when the pinned engine is broken — otherwise `putnami pin`
-// would relaunch into the very engine it is meant to replace.
+// would relaunch into the very engine it is meant to replace. `host-hook` is
+// exempt because the directory an agent host starts it in may be a stale
+// checkout: the relay hands the event to the workspace its cwd names, whose
+// launcher follows that workspace's pin (CLI ADR 0098).
 func IsExemptCommand(name string) bool {
-	return name == "pin"
+	return name == "pin" || name == HostHookCommand
 }
 
 // IsExemptInvocation reports whether a full CLI invocation must run as the

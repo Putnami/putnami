@@ -20,7 +20,7 @@
     {
       "id": "check-codes-are-frozen",
       "text": [
-        "The check-code taxonomy holds 17 codes, each with a baked remediation, and an unknown code has none.",
+        "The check-code taxonomy holds 18 codes, each with a baked remediation, and an unknown code has none.",
         "Severity is info, warning, high or critical, and profile is dev, test or production."
       ]
     },

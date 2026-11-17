@@ -207,6 +207,14 @@ const (
 	// page a reader or an agent opens first to learn what the project is for,
 	// how to run its checks and where its documentation lives.
 	CheckMissingReadme CheckCode = "doctor.missing_readme"
+	// CheckAgentHooksUnreachable marks a workstation where an agent host would
+	// run none of the hooks a workspace's explicit install writes: the user's
+	// own hook file of that host holds no Putnami handler for one of the
+	// events the workspace asks for, or putnami, which those handlers run, is
+	// not on the PATH. A host that reads its project settings from another
+	// checkout, or from a directory that is no checkout, then runs no hook of
+	// the workspace, and its sessions report nothing.
+	CheckAgentHooksUnreachable CheckCode = "doctor.agent_hooks_unreachable"
 )
 
 // ValidCheckCodes enumerates the canonical, frozen check-code taxonomy.
@@ -228,6 +236,7 @@ var ValidCheckCodes = map[CheckCode]bool{
 	CheckGitLongPathsDisabled:       true,
 	CheckVCRuntimeMissing:           true,
 	CheckMissingReadme:              true,
+	CheckAgentHooksUnreachable:      true,
 }
 
 // CheckRemediations maps every check code to its baked, actionable remediation:
@@ -251,6 +260,7 @@ var CheckRemediations = map[CheckCode]string{
 	CheckGitLongPathsDisabled:       "Run `git config --global core.longpaths true` so Git for Windows reads and checks out paths longer than 260 characters.",
 	CheckVCRuntimeMissing:           "Install the Microsoft Visual C++ Redistributable for x64: run `winget install --id Microsoft.VCRedist.2015+.x64`, or download and run https://aka.ms/vs/17/release/vc_redist.x64.exe.",
 	CheckMissingReadme:              "Add a README.md at the project root with a one-line purpose, the project's putnami commands, and where its documentation lives; `putnami lint` then checks its links.",
+	CheckAgentHooksUnreachable:      "Run `putnami install` in the workspace with putnami on the PATH; in a cloud environment, run it from the environment's setup script so the hooks exist when the session starts, and in Codex, trust the new hooks with /hooks.",
 }
 
 // Remediation returns the baked remediation for a check code, or the empty

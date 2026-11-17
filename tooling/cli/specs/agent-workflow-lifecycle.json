@@ -11,7 +11,8 @@
     "A workspace whose lock is below format 5 can explicitly migrate it to format 5, and one that pins toolchains reaches it through putnami install",
     "A workspace that opts into an extension's agent content receives the instructions of exactly the extension version it installed",
     "A workspace that still declares or records its workflows as separate artifacts is refused with nothing written and told what to replace or delete",
-    "A workspace that opts into an extension's agent content and binds the collaboration contract its hooks require gets the extension's host hooks from putnami init, putnami install and putnami upgrade, beside the hooks the person wrote"
+    "A workspace that opts into an extension's agent content and binds the collaboration contract its hooks require gets the extension's host hooks from putnami init, putnami install and putnami upgrade, beside the hooks the person wrote",
+    "Every session of a person who ran an explicit install, init or upgrade in a workspace with active host hooks runs those hooks, whatever checkout the agent host reads its settings from or starts its hooks in"
   ],
   "nonGoals": [
     "A force-overwrite flag, or any other way to discard a user-owned file",
@@ -20,7 +21,8 @@
     "Installing agent workflows as an artifact outside an extension",
     "Converting a lock older than format version 5 as a side effect",
     "Downloading anything during putnami upgrade --dry-run",
-    "Writing host hooks during the first-use bootstrap or context generate"
+    "Writing host hooks during the first-use bootstrap or context generate",
+    "Removing a hook from the user's own hook files"
   ],
   "requirements": [
     {
@@ -123,17 +125,16 @@
     {
       "id": "host-hooks-ownership-by-command",
       "text": [
-        "A handler is Putnami's when its command runs a known launcher as a command word, followed by a command path an installed extension declares;",
-        "a launcher that is another command's argument is not.",
-        "A run replaces it in place and never adds a second one; every other entry keeps its bytes and place.",
-        "Without the opt-in or binding, a run removes Putnami's handlers and anything only they filled.",
+        "A handler is Putnami's when its command runs a known launcher as a command word, then a declared command path, directly or after host-hook; a launcher that is another command's argument is not.",
+        "A run replaces it in place, never adds a second one, and keeps every other entry's bytes and place.",
+        "Without the opt-in or binding, a run removes Putnami's handlers, and what only they filled, from the workspace files.",
         "A file that cannot be read, parsed or safely edited, or is a link, stays untouched with a warning."
       ]
     },
     {
       "id": "host-hooks-exit-guard",
       "text": [
-        "Every hook command starts with PUTNAMI_NO_AUTO_INSTALL=1, so a hook never installs.",
+        "Every extension hook command starts with PUTNAMI_NO_AUTO_INSTALL=1 and runs its command path through host-hook, so a hook never installs.",
         "No CLI exit code reaches the host as is: an ordinary hook ends with || true, and a Claude Code wake hook exits 2 when its command exits 75 and 0 otherwise.",
         "Claude Code matchers are A|B and Codex matchers ^(A|B)$.",
         "A source workspace runs \"$CLAUDE_PROJECT_DIR\"/putnamiw in Claude Code and \"$(git rev-parse --show-toplevel)\"/putnamiw in Codex."
@@ -145,6 +146,36 @@
         "`extensions install --user <name>` writes only the skills the extension's `agentContent.userScope` names, under the user's home (`.claude/skills/<skill>`, `.agents/skills/<skill>`), from the content its pin binds, under the workspace's ownership rules: a file it did not write or that was edited is kept and reported, and one collision writes nothing.",
         "An unchanged pin writes nothing; `remove --user` removes what it wrote.",
         "Nothing is written in the current directory."
+      ]
+    },
+    {
+      "id": "host-hook-relay",
+      "text": [
+        "putnami host-hook reads the hook event on standard input, at most 64 MiB, and runs its command path in the event's cwd when that is an absolute directory inside a workspace, through that workspace's launcher: its putnamiw in a source workspace, else the running binary, which follows that workspace's pin.",
+        "Any other event runs in the relay's own directory; a workspace whose repository no Putnami command recorded under the user's home runs nothing."
+      ]
+    },
+    {
+      "id": "host-hook-relay-passthrough",
+      "text": [
+        "The relay's child receives the event byte for byte, its output passes through, and the relay exits with its exit code.",
+        "The relay follows no pin and no source-workspace rule of the directory it starts in, and its child inherits neither the launcher's loop guard nor its opt-out.",
+        "The relay prints nothing of its own on standard output; a child it cannot start is reported on standard error with exit 1."
+      ]
+    },
+    {
+      "id": "host-hooks-user-files",
+      "text": [
+        "When an explicit install, init or upgrade writes an extension's hooks into the workspace files, it writes the same hooks, launched by putnami, into the user's hook file of each host: settings.json in CLAUDE_CONFIG_DIR or ~/.claude, and hooks.json in CODEX_HOME or ~/.codex.",
+        "The workspace files' ownership and merge rules hold there, and a repeated run changes nothing."
+      ]
+    },
+    {
+      "id": "host-hooks-user-files-kept",
+      "text": [
+        "upgrade --dry-run lists the user hook files it would change.",
+        "A run never removes a hook from a user hook file and never writes the client restore hook there.",
+        "A run with CI set to a true value writes no user hook file."
       ]
     }
   ],

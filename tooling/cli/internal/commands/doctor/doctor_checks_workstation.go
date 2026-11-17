@@ -2,10 +2,14 @@ package doctor
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"runtime"
+	"strings"
 
 	doctor "go.putnami.dev/protocol/doctor"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/git"
 )
 
@@ -47,6 +51,9 @@ type workstationProbe struct {
 	// vcRuntimeInstalled reports whether the Visual C++ runtime is in the
 	// Windows system directory.
 	vcRuntimeInstalled func() (bool, error)
+	// agentHookGaps reports where an agent host would run none of the hooks
+	// the workspace's install writes (CLI ADR 0098).
+	agentHookGaps func() []shared.HostHookGap
 }
 
 // systemWorkstationProbe returns the probe of the running host for the
@@ -69,6 +76,7 @@ func systemWorkstationProbe(wsRoot string) workstationProbe {
 func checkWorkstation(profile doctor.Profile, probe workstationProbe) []doctor.Finding {
 	var findings []doctor.Finding
 	findings = append(findings, checkCRLFCheckout(profile, probe)...)
+	findings = append(findings, checkAgentHooks(profile, probe)...)
 	if probe.goos == "windows" {
 		findings = append(findings, checkLongPaths(profile, probe)...)
 		findings = append(findings, checkGitLongPaths(profile, probe)...)
@@ -172,4 +180,49 @@ func workstationFinding(code doctor.CheckCode, profile doctor.Profile, path, fie
 		Evidence:    []doctor.Evidence{{Path: path, Field: field}},
 		Remediation: doctor.Remediation(code),
 	}
+}
+
+// hostHookNames are the agent hosts as a report names them.
+var hostHookNames = map[string]string{"claude-code": "Claude Code", "codex": "Codex"}
+
+// checkAgentHooks reports each way an agent host would run none of the hooks
+// the workspace's explicit install writes: a user hook file that lacks them,
+// or putnami off the PATH. The workspace's own hook files do not count: a host
+// may read its project settings from another checkout, or from a directory
+// that is no checkout, and the user's file is the one it always reads.
+func checkAgentHooks(profile doctor.Profile, probe workstationProbe) []doctor.Finding {
+	if probe.agentHookGaps == nil {
+		return nil
+	}
+	var findings []doctor.Finding
+	for _, gap := range probe.agentHookGaps() {
+		host := hostHookNames[gap.Host]
+		switch {
+		case gap.Kind == shared.HostHookGapPath:
+			findings = append(findings, workstationFinding(doctor.CheckAgentHooksUnreachable, profile, "PATH", "putnami", gap.Reason))
+		case gap.Kind == shared.HostHookGapRepository:
+			findings = append(findings, workstationFinding(doctor.CheckAgentHooksUnreachable, profile, ".", "",
+				"the user's hooks do not serve this repository: "+gap.Reason))
+		case gap.File == "":
+			findings = append(findings, workstationFinding(doctor.CheckAgentHooksUnreachable, profile, host, "",
+				fmt.Sprintf("%s would run no Putnami hook of this workspace: %s", host, gap.Reason)))
+		default:
+			findings = append(findings, workstationFinding(doctor.CheckAgentHooksUnreachable, profile, displayHomePath(gap.File), strings.Join(gap.Events, ","),
+				fmt.Sprintf("%s would run no Putnami hook of this workspace for %s: %s, and a session whose host reads another checkout's settings reports nothing", host, strings.Join(gap.Events, ", "), gap.Reason)))
+		}
+	}
+	return findings
+}
+
+// displayHomePath names a path under the user's home from ~, so a report
+// reads the same on every machine.
+func displayHomePath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		return filepath.ToSlash(path)
+	}
+	if rel, err := filepath.Rel(home, path); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+		return "~/" + filepath.ToSlash(rel)
+	}
+	return filepath.ToSlash(path)
 }

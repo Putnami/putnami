@@ -8,6 +8,10 @@
 - **Amended**: 2026-10-29, by
   [ADR 0004 of the collaboration contracts](../../../../protocols/collaboration/doc/adr/0004-a-provider-is-declared-under-providers-and-speaks-its-own-wire.md):
   `hostHooks[].mcpTools` is deleted (decision 11)
+- **Amended**: 2026-11-17, by
+  [ADR 0098](0098-host-hooks-reach-every-session.md): a hook runs through
+  the `host-hook` relay, and the explicit commands also write the user's
+  hook files (decisions 2, 4, 6 and 10)
 - **Date**: 2026-10-26
 - **Amends**: [ADR 0040](0040-register-the-mcp-server-and-reconcile-agent-workflows-at-session-start.md)
   and [ADR 0047](0047-extension-owned-agent-content.md)

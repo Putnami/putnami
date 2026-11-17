@@ -81,6 +81,28 @@ func registerArtifactRoot(wsRoot string) {
 	}
 }
 
+// recordHostHookRepository records the workspace's repository as one the
+// host-hook relay serves (CLI ADR 0098): the person ran Putnami there, so its
+// code already ran. A hosted run, or one in CI, records nothing, and a failure
+// only leaves the relay refusing the repository.
+func recordHostHookRepository(wsRoot string) {
+	if wsRoot == "" || runcredential.Hosted() || hostHookCI(os.Getenv("CI")) {
+		return
+	}
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		_ = launch.RecordHostHookRepository(home, wsRoot)
+	}
+}
+
+// hostHookCI reads CI the way the hook writer reads it: 1, true, yes or on.
+func hostHookCI(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
+}
+
 // Run executes the CLI with the given arguments.
 func (a *App) Run(ctx context.Context, args []string) int {
 	// The release-set coordinator invokes the already-authoritative executable,
@@ -92,6 +114,15 @@ func (a *App) Run(ctx context.Context, args []string) int {
 	if err := enterProcess(args); err != nil {
 		printCommandError(os.Stderr, err)
 		return ExitUsage
+	}
+
+	// An agent host's hook runs the relay (CLI ADR 0098). It is served before
+	// anything reads the workspace of this process's directory: the host may
+	// have started it in a stale checkout, whose pin, extensions and bindings
+	// must not serve the event. The relay hands the event to the workspace of
+	// its cwd, whose own launcher then follows that workspace's pin.
+	if !providerChild && len(args) > 0 && args[0] == launch.HostHookCommand {
+		return launch.RunHostHook(ctx, args[1:], launch.ProcessHostHookEnv())
 	}
 
 	// Load config early for alias resolution
@@ -148,6 +179,7 @@ func (a *App) Run(ctx context.Context, args []string) int {
 		}
 	}
 	registerArtifactRoot(wsRoot)
+	recordHostHookRepository(wsRoot)
 	// Capture capability transports only after a possible pinned-CLI relaunch:
 	// exec must carry them into the authoritative process. From this point on the
 	// process environment is clean before artifact setup, extension discovery,

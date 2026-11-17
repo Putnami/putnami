@@ -21,7 +21,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -42,7 +42,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -62,7 +62,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw host-hook agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
             "timeout": 660,
             "asyncRewake": true
           }
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -85,7 +85,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 \"$CLAUDE_PROJECT_DIR\"/putnamiw host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]

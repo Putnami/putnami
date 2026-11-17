@@ -62,7 +62,13 @@ func hostHooksWorkspace(t *testing.T) string {
 // on behalf of another command.
 func TestInstall_WritesHostHooksOnlyWhenExplicit(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "host-hooks-written-on-explicit-lifecycle", "an-explicit-install-writes-the-hooks")
-	hometest.Temp(t)
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "host-hooks-user-files", "an-explicit-install-writes-the-user-hook-files")
+	home := hometest.Temp(t)
+	// The user files follow the hosts' own variables, and a CI run writes
+	// none: the run here is neither.
+	for _, name := range []string{"CI", "CLAUDE_CONFIG_DIR", "CODEX_HOME"} {
+		t.Setenv(name, "")
+	}
 	install := func(ctx context.Context, root string) string {
 		t.Helper()
 		var out strings.Builder
@@ -78,15 +84,22 @@ func TestInstall_WritesHostHooksOnlyWhenExplicit(t *testing.T) {
 		root := hostHooksWorkspace(t)
 		out := install(context.Background(), root)
 		claude := readWorkspaceFile(t, root, ".claude/settings.json")
-		if !strings.Contains(claude, `"command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true"`) {
+		if !strings.Contains(claude, `"command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code || true"`) {
 			t.Fatalf("Claude Code hooks:\n%s", claude)
 		}
 		codex := readWorkspaceFile(t, root, ".codex/hooks.json")
-		if !strings.Contains(codex, `"command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine codex || true"`) {
+		if !strings.Contains(codex, `"command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine codex || true"`) {
 			t.Fatalf("Codex hooks:\n%s", codex)
 		}
 		if !strings.Contains(out, "run /hooks") {
 			t.Fatalf("install did not report the Codex trust step:\n%s", out)
+		}
+		user := readWorkspaceFile(t, home, ".claude/settings.json")
+		if !strings.Contains(user, `"command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code || true"`) {
+			t.Fatalf("the user's Claude Code hooks:\n%s", user)
+		}
+		if userCodex := readWorkspaceFile(t, home, ".codex/hooks.json"); !strings.Contains(userCodex, "putnami host-hook agent hook --engine codex") {
+			t.Fatalf("the user's Codex hooks:\n%s", userCodex)
 		}
 	})
 

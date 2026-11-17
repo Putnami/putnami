@@ -274,6 +274,66 @@
             "a-user-scope-remove-removes-what-it-wrote"
           ]
         }
+      },
+      {
+        "id": "host-hook-relay",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-relay-runs-the-path-in-the-event-workspace",
+            "the-relay-falls-back-to-its-own-directory",
+            "the-relay-runs-a-source-workspace-wrapper",
+            "the-relay-serves-only-a-recorded-repository"
+          ]
+        }
+      },
+      {
+        "id": "host-hook-relay-passthrough",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-relay-replays-the-event-and-passes-the-exit-code",
+            "the-child-drops-the-launcher-guards",
+            "a-child-that-cannot-start-exits-1"
+          ]
+        }
+      },
+      {
+        "id": "host-hooks-user-files",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-explicit-install-writes-the-user-hook-files",
+            "a-repeated-run-leaves-the-user-files"
+          ]
+        }
+      },
+      {
+        "id": "host-hooks-user-files-kept",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-user-files-are-never-pruned",
+            "ci-writes-no-user-file",
+            "a-dry-run-lists-the-user-files"
+          ]
+        }
       }
     ]
   }

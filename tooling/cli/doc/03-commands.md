@@ -561,6 +561,35 @@ command writes these files, and each run keeps every entry it did not write.
   the collaboration contract the hooks need. They never run the first-use
   install. See
   [ADR 0081](adr/0081-the-core-writes-declared-host-hooks.md).
+- **The relay.** Every extension hook runs its command through
+  `putnami host-hook`, for example
+  `PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code || true`.
+  The host may start a hook in another checkout than the session's: the Claude
+  desktop app runs a worktree session's hooks in the main checkout. The relay
+  reads the event's `cwd`, runs the command in that directory through its
+  workspace's own launcher (`putnamiw` in a source workspace, else the
+  workspace's CLI pin), replays the event on its standard input and exits with
+  its code. An event outside any workspace runs where the host started the
+  hook. The relay serves only a repository where you ran Putnami: every
+  command in a workspace, outside CI, records its repository (with every
+  worktree of the clone) in `~/.putnami/host-hooks/repositories.json`. A hook
+  in your user file runs in every session, and must not start the code of a
+  repository you never ran Putnami in. Agent hosts start `host-hook`;
+  `putnami help` does not list it.
+- **The user's hook files.** The same run writes the extension hooks, launched
+  by `putnami`, into the user's own hook file of each host:
+  `settings.json` in `$CLAUDE_CONFIG_DIR` or `~/.claude`, and `hooks.json` in
+  `$CODEX_HOME` or `~/.codex`. Hosts read these files in every session, so a
+  session reports even when its host reads project settings from a stale main
+  checkout. A multi-repository cloud session, which starts in the parent
+  directory of its clones, reports from its first event inside a workspace. A
+  run never removes a hook from a user file, never writes the client restore hook there, and writes no
+  user file in CI (`CI` set to a true value). In a cloud environment, run
+  `putnami install` from the environment's setup script: a host reads its
+  hooks when a session starts. Codex runs a new user hook only after `/hooks`
+  trusts it. `putnami doctor` reports a host whose user file lacks the hooks,
+  and `putnami` missing from the `PATH`. See
+  [ADR 0098](adr/0098-host-hooks-reach-every-session.md).
 - **The client restore hook.** When a project declares a generated client, the
   CLI writes a `SessionStart` hook that runs `client-generate --projects '*'`.
   It names every project, so `disable.tags` does not skip one. No extension
@@ -1158,7 +1187,7 @@ Findings are derived from **committed** artifacts — manifests, declared capabi
 
 Three codes are repository hygiene rather than production readiness and never block a profile: `doctor.missing_readme` reports a project with no `README.md` at its root (a template project, which ships `README.md.template` for the project it renders, and a generated client project are exempt), `doctor.committed_manifest_stability` reports a committed generated artifact whose content is derived from workspace state (a workspace version string, a dependency-closure enumeration, a source binding) instead of the project's own declared inputs, and `doctor.undeclared_schema_commit` reports a project that tracks generated schemas without declaring `options.generate.schema`. The last two are explained in [configuration](05-configuration.md#generated-schema-commit-regime). All three are waivable per project and per field.
 
-`putnami doctor` also checks the workstation the workspace is checked out on. These findings are scoped to the workspace root (`/`), never block a profile, and are waivable. `doctor.crlf_checkout` reports tracked text files that the working tree holds with CRLF endings while the commit has LF, or `core.autocrlf=true` with no `.gitattributes` rule that sets `eol=lf`. On Windows only, `doctor.long_paths_disabled` reports that the `LongPathsEnabled` registry value (`HKLM\SYSTEM\CurrentControlSet\Control\FileSystem`) is not 1, `doctor.git_long_paths_disabled` reports that Git does not set `core.longpaths`, and `doctor.vc_runtime_missing` reports that `vcruntime140.dll` is not in the Windows system directory, so Biome, which `@putnami/typescript` runs to lint and format TypeScript, cannot start. The human report prints each finding's fix. The production gate inside job commands does not run these checks.
+`putnami doctor` also checks the workstation the workspace is checked out on. These findings are scoped to the workspace root (`/`), never block a profile, and are waivable. `doctor.agent_hooks_unreachable` reports an agent host that would run none of the hooks the workspace's `putnami install` writes: the user's hook file of that host (`~/.claude/settings.json`, `~/.codex/hooks.json`) holds no Putnami hook for an event the workspace asks for, or `putnami` is not on the `PATH`; a run in CI does not check it. `doctor.crlf_checkout` reports tracked text files that the working tree holds with CRLF endings while the commit has LF, or `core.autocrlf=true` with no `.gitattributes` rule that sets `eol=lf`. On Windows only, `doctor.long_paths_disabled` reports that the `LongPathsEnabled` registry value (`HKLM\SYSTEM\CurrentControlSet\Control\FileSystem`) is not 1, `doctor.git_long_paths_disabled` reports that Git does not set `core.longpaths`, and `doctor.vc_runtime_missing` reports that `vcruntime140.dll` is not in the Windows system directory, so Biome, which `@putnami/typescript` runs to lint and format TypeScript, cannot start. The human report prints each finding's fix. The production gate inside job commands does not run these checks.
 
 `putnami doctor --machine` skips the preflight and reports the machine load: the one-minute load average divided by the logical CPU count, printed as a ratio such as `0.50`, or `unknown` when the host cannot report it. With `--output=json` the result's `data` is `{"known":true,"oneMinute":2,"cpus":4,"ratio":0.5}`, or `{"known":false}`. Passing `--profile` or `--project` with `--machine` is a usage error.
 

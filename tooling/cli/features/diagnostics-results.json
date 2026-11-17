@@ -223,6 +223,21 @@
             "summary-groups-records-by-digest"
           ]
         }
+      },
+      {
+        "id": "doctor-names-unreachable-agent-hooks",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "doctor-reports-a-host-without-user-hooks",
+            "doctor-reports-putnami-off-the-path",
+            "doctor-is-quiet-when-hooks-reach-the-host"
+          ]
+        }
       }
     ]
   }

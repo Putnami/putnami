@@ -203,7 +203,9 @@ func cmdDoctor(env *CommandEnv) error {
 		}
 		return doctor.MachineCommand(env.OutputFormat, doctor.NativeLoadReader())
 	}
-	return doctor.DoctorCommand(env.WsRoot, env.Args, env.Global.Projects, env.Global.EnvProfile, env.OutputFormat)
+	return doctor.DoctorCommand(env.WsRoot, env.Args, env.Global.Projects, env.Global.EnvProfile, env.OutputFormat, func(wsRoot string) []shared.HostHookGap {
+		return agentctx.UserHostHookGaps(wsRoot, wsproto.Load(wsRoot))
+	})
 }
 
 // cmdPin pins, shows, or removes the workspace's CLI version pin.

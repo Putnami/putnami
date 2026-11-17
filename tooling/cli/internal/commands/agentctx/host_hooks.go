@@ -19,6 +19,7 @@ import (
 	"go.putnami.dev/tooling/cli/internal/commands/shared"
 	"go.putnami.dev/tooling/cli/internal/extension"
 	"go.putnami.dev/tooling/cli/internal/iox"
+	"go.putnami.dev/tooling/cli/internal/launch"
 	"go.putnami.dev/tooling/cli/internal/workspace"
 )
 
@@ -33,6 +34,12 @@ import (
 // removes them. The restore hook is written when the workspace declares a
 // generated client, and removed when it declares none (client_restore.go).
 //
+// An extension hook runs its command path through the host-hook relay, which
+// serves the event from the workspace of its cwd. The same run also writes the
+// extension hooks into the user's own hook file of each host, launched by
+// putnami, so a session whose host reads another checkout's settings, or none,
+// still runs them. A run never removes a hook from a user file (ADR 0098).
+//
 // The files are shared with the person who edits them, and no record says
 // which entries Putnami wrote. A hook handler is Putnami's when its command
 // runs a known launcher followed by the command path an installed extension
@@ -45,6 +52,36 @@ type hostHookFile struct {
 	// rel is the workspace-relative path, in slash form.
 	rel string
 }
+
+// hostHookUserFile is the user's own hook file of one agent host: rel under
+// the directory env names, or under home when env is unset.
+type hostHookUserFile struct {
+	host string
+	env  string
+	home string
+	rel  string
+}
+
+// hostHookUserFiles lists the user's hook file of every host, in the order
+// they are written: Claude Code reads CLAUDE_CONFIG_DIR, and Codex CODEX_HOME.
+var hostHookUserFiles = []hostHookUserFile{
+	{host: extproto.HostClaudeCode, env: "CLAUDE_CONFIG_DIR", home: ".claude", rel: "settings.json"},
+	{host: extproto.HostCodex, env: "CODEX_HOME", home: ".codex", rel: "hooks.json"},
+}
+
+// hostHookUserLauncher starts every hook of a user file: the file serves every
+// workspace of the person, and the relay finds the workspace from the event.
+const hostHookUserLauncher = "putnami"
+
+// hostHookRelay is the core command an extension hook runs its command path
+// through (launch.HostHookCommand).
+const hostHookRelay = "host-hook"
+
+// Tests replace the user's environment.
+var (
+	hostHookGetenv  = os.Getenv
+	hostHookHomeDir = os.UserHomeDir
+)
 
 // hostHookFiles lists the hook file of every host, in the order they are
 // written.
@@ -109,8 +146,11 @@ const (
 type HostHookChange struct {
 	// Host is the agent host the file belongs to.
 	Host string
-	// File is the workspace-relative path, in slash form.
+	// File is the workspace-relative path, in slash form, or the absolute
+	// path of a user file.
 	File string
+	// User marks the user's own hook file of the host.
+	User bool
 	// Action is what the run did to the file.
 	Action HostHookAction
 }
@@ -186,7 +226,79 @@ func applyHostHooks(wsRoot string, cfg *wsproto.Config, warn io.Writer, write bo
 		}
 		changes = append(changes, HostHookChange{Host: file.host, File: file.rel, Action: plan.action})
 	}
+	return append(changes, applyUserHostHooks(wsRoot, set, warnf, write)...)
+}
+
+// applyUserHostHooks writes the extension hooks the workspace asks for into
+// the user's hook file of each host. A user file serves every workspace of the
+// person, so a run only adds and replaces there: an event the workspace asks
+// nothing of keeps its handlers. A run also records the workspace's
+// repository, the only kind the relay serves from a user hook. A run inside
+// CI writes no user file: a runner hosts no agent session.
+func applyUserHostHooks(wsRoot string, set hostHookSet, warnf func(string, ...any), write bool) []HostHookChange {
+	if len(set.user) == 0 || hostHookTruthy(hostHookGetenv("CI")) {
+		return nil
+	}
+	if write {
+		home, err := hostHookHomeDir()
+		if err == nil {
+			err = launch.RecordHostHookRepository(home, wsRoot)
+		}
+		if err != nil {
+			warnf("the repository is not recorded for the user's host hooks: %v", err)
+		}
+	}
+	var changes []HostHookChange
+	for _, file := range hostHookUserFiles {
+		if len(set.user[file.host]) == 0 {
+			continue
+		}
+		path, err := file.path()
+		if err != nil {
+			warnf("host hooks are not written to the user's %s file: %v", file.host, err)
+			continue
+		}
+		plan, err := planHostHookPath(path, file.host, set.paths, set.user[file.host], true)
+		if err != nil {
+			warnf("host hooks are not written to %s: %v. Fix the file, then run `putnami install`.", path, err)
+			continue
+		}
+		if plan == nil {
+			continue
+		}
+		if write {
+			if err := plan.apply(); err != nil {
+				warnf("host hooks are not written to %s: %v", path, err)
+				continue
+			}
+		}
+		changes = append(changes, HostHookChange{Host: file.host, File: path, User: true, Action: plan.action})
+	}
 	return changes
+}
+
+// path is the absolute path of the user file.
+func (f hostHookUserFile) path() (string, error) {
+	if dir := strings.TrimSpace(hostHookGetenv(f.env)); dir != "" {
+		if !filepath.IsAbs(dir) {
+			return "", fmt.Errorf("%s is not an absolute path", f.env)
+		}
+		return filepath.Join(dir, f.rel), nil
+	}
+	home, err := hostHookHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("find the home directory: %w", err)
+	}
+	return filepath.Join(home, f.home, f.rel), nil
+}
+
+// hostHookTruthy reads a switch the way the launcher reads its own.
+func hostHookTruthy(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // hostHookSet is what the workspace asks of the hook files.
@@ -199,14 +311,30 @@ type hostHookSet struct {
 	// there: the active extensions' groups, in extension name order, then
 	// declared order, and the restore hook last.
 	desired map[string]map[string][]hostHookGroupJSON
+	// user maps a host and an event to the groups the user's hook file gets:
+	// the active extensions' groups launched by putnami, never the restore
+	// hook, which restores the clients of the checkout the host starts in.
+	user map[string]map[string][]hostHookGroupJSON
 }
 
 // addDesired appends a group to the hooks of host at event.
 func (s *hostHookSet) addDesired(host, event string, group hostHookGroupJSON) {
-	events := s.desired[host]
+	addHostHookGroup(s.desired, host, event, group)
+}
+
+// addUser appends a group to the user file's hooks of host at event.
+func (s *hostHookSet) addUser(host, event string, group hostHookGroupJSON) {
+	if s.user == nil {
+		s.user = map[string]map[string][]hostHookGroupJSON{}
+	}
+	addHostHookGroup(s.user, host, event, group)
+}
+
+func addHostHookGroup(groups map[string]map[string][]hostHookGroupJSON, host, event string, group hostHookGroupJSON) {
+	events := groups[host]
 	if events == nil {
 		events = map[string][]hostHookGroupJSON{}
-		s.desired[host] = events
+		groups[host] = events
 	}
 	events[event] = append(events[event], group)
 }
@@ -275,7 +403,8 @@ func collectHostHooks(wsRoot string, cfg *wsproto.Config, warnf func(string, ...
 		}
 		for _, file := range hostHookFiles {
 			for _, entry := range declaration.Hosts[file.host] {
-				set.addDesired(file.host, entry.Event, renderHostHookGroup(file.host, base, declaration.Command, entry))
+				set.addDesired(file.host, entry.Event, renderHostHookGroup(file.host, hostHookLauncher(file.host, base), declaration.Command, entry))
+				set.addUser(file.host, entry.Event, renderHostHookGroup(file.host, hostHookUserLauncher, declaration.Command, entry))
 			}
 		}
 	}
@@ -355,11 +484,10 @@ type hostHookHandlerJSON struct {
 	AsyncRewake bool   `json:"asyncRewake,omitempty"`
 }
 
-// renderHostHookGroup renders one declared hook for host, started with the
-// workspace's launcher (base, from workspaceLauncher), with the first-use
-// install turned off.
-func renderHostHookGroup(host, base string, path []string, entry extproto.HostHookEntry) hostHookGroupJSON {
-	words := append([]string{hostHookEnvironment, hostHookLauncher(host, base)}, path...)
+// renderHostHookGroup renders one declared hook for host, started with
+// launcher through the host-hook relay, with the first-use install turned off.
+func renderHostHookGroup(host, launcher string, path []string, entry extproto.HostHookEntry) hostHookGroupJSON {
+	words := append([]string{hostHookEnvironment, launcher, hostHookRelay}, path...)
 	words = append(words, entry.Args...)
 	command := strings.Join(words, " ")
 	if entry.Wake {
@@ -402,13 +530,14 @@ func hostHookMatcher(host string, entry extproto.HostHookEntry) string {
 }
 
 // ownsHostHookCommand reports whether a handler command runs one of paths
-// through a known launcher: the launcher and the path, word for word, as a
-// command the shell runs (see runsShellCommand).
+// through a known launcher, directly or through the host-hook relay: the
+// launcher and the path, word for word, as a command the shell runs (see
+// runsShellCommand).
 func ownsHostHookCommand(command string, paths [][]string) bool {
 	for _, path := range paths {
 		tail := " " + strings.Join(path, " ")
 		for _, launcher := range hostHookLaunchers {
-			if runsShellCommand(command, launcher+tail) {
+			if runsShellCommand(command, launcher+tail) || runsShellCommand(command, launcher+" "+hostHookRelay+tail) {
 				return true
 			}
 		}
@@ -491,7 +620,12 @@ func (p *hostHookFilePlan) apply() error {
 // planHostHookFile plans the change to one host's file. It returns nil when
 // the file already says what the workspace asks.
 func planHostHookFile(wsRoot string, file hostHookFile, set hostHookSet) (*hostHookFilePlan, error) {
-	path := filepath.Join(wsRoot, filepath.FromSlash(file.rel))
+	return planHostHookPath(filepath.Join(wsRoot, filepath.FromSlash(file.rel)), file.host, set.paths, set.desired[file.host], false)
+}
+
+// planHostHookPath plans the change to the hook file of host at path. A user
+// file keeps the events desired asks nothing of (keepUndesired).
+func planHostHookPath(path, host string, paths [][]string, desired map[string][]hostHookGroupJSON, keepUndesired bool) (*hostHookFilePlan, error) {
 	var data []byte
 	exists := false
 	info, err := os.Lstat(path)
@@ -509,8 +643,8 @@ func planHostHookFile(wsRoot string, file hostHookFile, set hostHookSet) (*hostH
 			return nil, err
 		}
 	}
-	owns := func(command string) bool { return ownsHostHookCommand(command, set.paths) }
-	out, remove, changed, err := mergeHostHookFile(data, exists, file.host, owns, set.desired[file.host])
+	owns := func(command string) bool { return ownsHostHookCommand(command, paths) }
+	out, remove, changed, err := mergeHostHookFile(data, exists, host, owns, desired, keepUndesired)
 	if err != nil || !changed {
 		return nil, err
 	}
@@ -534,12 +668,15 @@ var errHostHookFileUnparseable = errors.New("it is not valid JSON")
 // that also holds a handler of the person keeps it, and the new group follows
 // it. New groups beyond the places available follow the event's other groups;
 // places beyond the new groups are dropped. An event, the hooks object or the
-// file that only the removed handlers filled is removed with them.
+// file that only the removed handlers filled is removed with them. With
+// keepUndesired, an event desired asks nothing of keeps its handlers, and so
+// does a group of Putnami's beyond the ones desired replaces, so the merge
+// only adds and replaces.
 //
 // Every value the merge does not edit keeps its exact bytes. Edited values are
 // written with the indentation the file already uses, two spaces by default,
 // so a file in the format the hosts write changes only where the hooks do.
-func mergeHostHookFile(data []byte, exists bool, host string, owns func(string) bool, desired map[string][]hostHookGroupJSON) (out []byte, remove, changed bool, err error) {
+func mergeHostHookFile(data []byte, exists bool, host string, owns func(string) bool, desired map[string][]hostHookGroupJSON, keepUndesired bool) (out []byte, remove, changed bool, err error) {
 	unit := "  "
 	trailing := "\n"
 	var root []jsonMember
@@ -568,6 +705,9 @@ func mergeHostHookFile(data []byte, exists bool, host string, owns func(string) 
 	}
 
 	for _, event := range extproto.HostHookEvents(host) {
+		if keepUndesired && len(desired[event]) == 0 {
+			continue
+		}
 		eventIndex, count := jsonMemberIndex(hooks, event)
 		if count > 1 {
 			return nil, false, false, fmt.Errorf("it declares hooks.%s more than once", event)
@@ -578,7 +718,7 @@ func mergeHostHookFile(data []byte, exists bool, host string, owns func(string) 
 				return nil, false, false, fmt.Errorf("its hooks.%s member is not an array", event)
 			}
 		}
-		merged := mergeHostHookGroups(groups, owns, desired[event], unit)
+		merged := mergeHostHookGroups(groups, owns, desired[event], unit, keepUndesired)
 		switch {
 		case eventIndex < 0 && len(merged) == 0:
 		case eventIndex < 0:
@@ -613,7 +753,10 @@ func mergeHostHookFile(data []byte, exists bool, host string, owns func(string) 
 // mergeHostHookGroups merges one event's groups. A group whose handlers are
 // all Putnami's becomes a place for a new group; a group that also holds the
 // person's handlers keeps them, and a place follows it.
-func mergeHostHookGroups(groups [][]byte, owns func(string) bool, desired []hostHookGroupJSON, unit string) [][]byte {
+func mergeHostHookGroups(groups [][]byte, owns func(string) bool, desired []hostHookGroupJSON, unit string, keepExtra bool) [][]byte {
+	if keepExtra {
+		return mergeUserHostHookGroups(groups, owns, desired, unit)
+	}
 	var places [][]byte // nil marks a place for a new group
 	for _, group := range groups {
 		kept, ours := splitHostHookGroup(group, owns, unit)
@@ -641,6 +784,95 @@ func mergeHostHookGroups(groups [][]byte, owns func(string) bool, desired []host
 		merged = append(merged, renderJSONValue(desired[next], 3, unit))
 	}
 	return merged
+}
+
+// mergeUserHostHookGroups merges one event's groups of a user file, which
+// serves every workspace of the person: a group of Putnami's alone is
+// replaced only by the desired group of the same hook, the one that runs the
+// same command once the launcher and the relay are set aside; every other
+// group stays as it is, and a desired group the file lacks follows the
+// event's groups.
+func mergeUserHostHookGroups(groups [][]byte, owns func(string) bool, desired []hostHookGroupJSON, unit string) [][]byte {
+	used := make([]bool, len(desired))
+	match := func(group []byte) int {
+		for _, command := range hostHookGroupCommands(group) {
+			if !owns(command) {
+				continue
+			}
+			key := hostHookCommandKey(command)
+			for i, group := range desired {
+				if !used[i] && hostHookCommandKey(group.Hooks[0].Command) == key {
+					return i
+				}
+			}
+		}
+		return -1
+	}
+	merged := make([][]byte, 0, len(groups)+len(desired))
+	for _, group := range groups {
+		kept, ours := splitHostHookGroup(group, owns, unit)
+		index := -1
+		if ours && kept == nil {
+			index = match(group)
+		}
+		if index < 0 {
+			merged = append(merged, group)
+			continue
+		}
+		used[index] = true
+		merged = append(merged, renderJSONValue(desired[index], 3, unit))
+	}
+	for i, group := range desired {
+		if !used[i] && !slices.ContainsFunc(merged, func(existing []byte) bool { return sameHostHookGroup(existing, group) }) {
+			merged = append(merged, renderJSONValue(group, 3, unit))
+		}
+	}
+	return merged
+}
+
+// sameHostHookGroup reports whether an existing group already runs the hook
+// of group, whatever its launcher.
+func sameHostHookGroup(existing []byte, group hostHookGroupJSON) bool {
+	key := hostHookCommandKey(group.Hooks[0].Command)
+	for _, command := range hostHookGroupCommands(existing) {
+		if hostHookCommandKey(command) == key {
+			return true
+		}
+	}
+	return false
+}
+
+// hostHookGroupCommands lists the commands of a group's handlers.
+func hostHookGroupCommands(group []byte) []string {
+	var decoded struct {
+		Hooks []struct {
+			Command string `json:"command"`
+		} `json:"hooks"`
+	}
+	if json.Unmarshal(group, &decoded) != nil {
+		return nil
+	}
+	commands := make([]string, 0, len(decoded.Hooks))
+	for _, handler := range decoded.Hooks {
+		commands = append(commands, handler.Command)
+	}
+	return commands
+}
+
+// hostHookCommandKey is a hook command without what only says how it starts:
+// the switch that turns the install off, the launcher and the relay. Two
+// commands with one key run the same hook.
+func hostHookCommandKey(command string) string {
+	key := strings.TrimPrefix(command, hostHookEnvironment+" ")
+	for _, launcher := range hostHookLaunchers {
+		if rest, ok := strings.CutPrefix(key, launcher+" "+hostHookRelay+" "); ok {
+			return rest
+		}
+		if rest, ok := strings.CutPrefix(key, launcher+" "); ok {
+			return rest
+		}
+	}
+	return key
 }
 
 // splitHostHookGroup removes Putnami's handlers from one group. ours reports

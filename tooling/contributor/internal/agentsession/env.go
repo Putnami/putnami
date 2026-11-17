@@ -58,6 +58,9 @@ type Env struct {
 	Sleep func(ctx context.Context, d time.Duration) error
 	// Getenv reads the process environment.
 	Getenv func(string) string
+	// DuplicateWindow is how long a handled event keeps an identical one
+	// from being handled again (claimEvent); zero claims nothing.
+	DuplicateWindow time.Duration
 }
 
 // NewEnv is the Env of a launch: the process clock and environment, git on
@@ -68,7 +71,7 @@ func NewEnv(root string, channel Host) *Env {
 	if home == "" {
 		home = filepath.Join(root, putnamihome.DirName)
 	}
-	return &Env{Home: home, Root: root, Host: channel, Git: runGit, Now: time.Now, Sleep: sleepContext, Getenv: os.Getenv}
+	return &Env{Home: home, Root: root, Host: channel, Git: runGit, Now: time.Now, Sleep: sleepContext, Getenv: os.Getenv, DuplicateWindow: duplicateEventWindow}
 }
 
 // sessionsDir holds every session cache, the mission declarations, the

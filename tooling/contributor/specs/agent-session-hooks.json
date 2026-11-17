@@ -106,6 +106,14 @@
         "An unknown stage exits 2.",
         "No session exits 1 and says why: the workspace has no session hooks, or the host did not run them for the session it names."
       ]
+    },
+    {
+      "id": "duplicate-event",
+      "text": [
+        "agent hook claims each event before it handles it: the digest of the engine, the idle-wake flag and the payload bytes names a marker created exclusively in the session directory.",
+        "A hook that finds a marker younger than 60 seconds prints nothing and exits 0, so an event two hook sources send is handled once.",
+        "A claim removes older markers, and a marker it cannot write is logged and the event handled."
+      ]
     }
   ],
   "decisions": [

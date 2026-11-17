@@ -407,6 +407,21 @@
               "agent-stage-says-why-no-session-is-found"
             ]
           }
+        },
+        {
+          "id": "duplicate-event",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-second-identical-event-is-skipped",
+              "a-distinct-event-is-handled",
+              "an-old-marker-is-pruned-and-reclaimed"
+            ]
+          }
         }
       ],
       "surface": {

@@ -128,7 +128,7 @@ func wantClaudeHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine claude-code || true",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -140,7 +140,7 @@ func wantClaudeHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine claude-code || true",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -151,7 +151,7 @@ func wantClaudeHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` host-hook agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
             "timeout": 660,
             "asyncRewake": true
           }
@@ -174,7 +174,7 @@ func wantCodexHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine codex || true",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` host-hook agent hook --engine codex || true",
             "timeout": 30
           }
         ]
@@ -185,7 +185,7 @@ func wantCodexHooks(launcher string) string {
         "hooks": [
           {
             "type": "command",
-            "command": "` + hookEnv + jsonEscape(launcher) + ` agent hook --engine codex || true",
+            "command": "` + hookEnv + jsonEscape(launcher) + ` host-hook agent hook --engine codex || true",
             "timeout": 240
           }
         ]
@@ -243,7 +243,7 @@ func TestHostHooksMergeTable(t *testing.T) {
         "hooks": [
           {
             "type": "command",
-            "command": "%s%s agent hook %s || true",
+            "command": "%s%s host-hook agent hook %s || true",
             "timeout": %d
           }
         ]
@@ -263,7 +263,7 @@ func TestHostHooksMergeTable(t *testing.T) {
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
             "timeout": 660,
             "asyncRewake": true
           }
@@ -274,7 +274,7 @@ func TestHostHooksMergeTable(t *testing.T) {
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -325,8 +325,13 @@ func TestHostHooksMergeTable(t *testing.T) {
 		{
 			name: "ours stale after a launcher change",
 			before: settings(ours("./putnamiw", "--engine claude-code", 30), personStop+",\n      "+
-				strings.Replace(wake, "putnami agent", `\"$CLAUDE_PROJECT_DIR\"/putnamiw agent`, 1)),
+				strings.Replace(wake, "putnami host-hook", `\"$CLAUDE_PROJECT_DIR\"/putnamiw host-hook`, 1)),
 			want: current,
+		},
+		{
+			name:   "ours from a CLI that ran the path without the relay",
+			before: strings.ReplaceAll(current, " host-hook agent hook", " agent hook"),
+			want:   current,
 		},
 		{
 			name:   "ours from a CLI that let a hook install",
@@ -392,7 +397,7 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
+                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code --idle-wake; s=$?; [ \"$s\" -eq 75 ] && exit 2; exit 0",
                         "timeout": 660,
                         "asyncRewake": true
                     }
@@ -405,7 +410,7 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true",
+                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code || true",
                         "timeout": 30
                     }
                 ]
@@ -417,7 +422,7 @@ func TestHostHooksKeepThePersonsEntriesByteForByte(t *testing.T) {
                 "hooks": [
                     {
                         "type": "command",
-                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true",
+                        "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code || true",
                         "timeout": 30
                     }
                 ]
@@ -491,7 +496,7 @@ func TestHostHooksSplitAMixedGroup(t *testing.T) {
         "hooks": [
           {
             "type": "command",
-            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --engine claude-code || true",
+            "command": "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --engine claude-code || true",
             "timeout": 30
           }
         ]
@@ -737,6 +742,10 @@ func TestHostHookOwnershipByCommand(t *testing.T) {
 		"A=1  B= ./putnamiw agent hook":                           true,
 		"if true; then putnami agent hook; fi":                    true,
 		"(putnami agent hook)":                                    true,
+		"putnami host-hook agent hook --engine codex || true":     true,
+		`"$CLAUDE_PROJECT_DIR"/putnamiw host-hook agent hook`:     true,
+		"echo putnami host-hook agent hook":                       false,
+		"putnami host-hook other hook":                            false,
 		"echo putnami agent hook":                                 false,
 		"echo 'putnami agent hook'":                               false,
 		"say done; echo run putnami agent hook":                   false,
@@ -779,12 +788,12 @@ func TestHostHookGuardsMapExitCodes(t *testing.T) {
 	path := []string{"agent", "hook"}
 	wake := renderHostHookGroup(extproto.HostClaudeCode, "putnami", path,
 		extproto.HostHookEntry{Event: "Stop", Args: []string{"--idle-wake"}, Wake: true, TimeoutSeconds: 660}).Hooks[0]
-	if want := `PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook --idle-wake; s=$?; [ "$s" -eq 75 ] && exit 2; exit 0`; wake.Command != want || !wake.AsyncRewake {
+	if want := `PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook --idle-wake; s=$?; [ "$s" -eq 75 ] && exit 2; exit 0`; wake.Command != want || !wake.AsyncRewake {
 		t.Fatalf("wake handler = %+v, want command %q with asyncRewake", wake, want)
 	}
 	ordinary := renderHostHookGroup(extproto.HostCodex, "putnami", path,
 		extproto.HostHookEntry{Event: "Stop", TimeoutSeconds: 240}).Hooks[0]
-	if want := "PUTNAMI_NO_AUTO_INSTALL=1 putnami agent hook || true"; ordinary.Command != want || ordinary.AsyncRewake {
+	if want := "PUTNAMI_NO_AUTO_INSTALL=1 putnami host-hook agent hook || true"; ordinary.Command != want || ordinary.AsyncRewake {
 		t.Fatalf("ordinary handler = %+v, want command %q", ordinary, want)
 	}
 	for _, tc := range []struct {

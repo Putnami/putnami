@@ -356,6 +356,7 @@ func TestCheckCodeTaxonomy_Frozen(t *testing.T) {
 		CheckGitLongPathsDisabled,
 		CheckVCRuntimeMissing,
 		CheckMissingReadme,
+		CheckAgentHooksUnreachable,
 	}
 	for _, code := range required {
 		if !ValidCheckCodes[code] {

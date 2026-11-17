@@ -52,6 +52,7 @@ engine.
   | `doctor.git_long_paths_disabled` | On Windows, Git does not set `core.longpaths`. | Run `git config --global core.longpaths true`. |
   | `doctor.vc_runtime_missing` | On Windows, the Microsoft Visual C++ runtime (`vcruntime140.dll`) is not in the system directory, so Biome cannot start. | Install the Visual C++ Redistributable for x64 with `winget install --id Microsoft.VCRedist.2015+.x64` or its installer. |
   | `doctor.missing_readme` | A project has no `README.md` at its root. | Add one with a one-line purpose, the project's commands, and where its docs live. |
+  | `doctor.agent_hooks_unreachable` | An agent host would run none of the hooks a workspace's install writes: the user's hook file of that host lacks them, or `putnami` is not on the `PATH`. | Run `putnami install` with `putnami` on the `PATH`, from a cloud environment's setup script there, and trust new Codex hooks with `/hooks`. |
 
   The IDs are frozen once merged: config and capability evidence is produced
   targeted at these exact codes (notably `doctor.ephemeral_signing_key`), and a

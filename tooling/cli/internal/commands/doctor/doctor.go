@@ -50,7 +50,11 @@ import (
 // profile and the target project set, evaluates the committed artifacts, and
 // renders the report. High/critical findings (only reachable under production)
 // return an exit-2 error with the report attached for the failure envelope.
-func DoctorCommand(wsRoot string, args []string, globalProjects, envProfile, outputFormat string) error {
+//
+// agentHookGaps answers where an agent host would run none of the hooks the
+// workspace's install writes; the caller wires the agent-content vertical,
+// which this one does not import. Nil checks nothing.
+func DoctorCommand(wsRoot string, args []string, globalProjects, envProfile, outputFormat string, agentHookGaps func(wsRoot string) []shared.HostHookGap) error {
 	profile := normalizeProfile(envProfile)
 
 	ws, err := workspace.Load(wsRoot)
@@ -62,7 +66,11 @@ func DoctorCommand(wsRoot string, args []string, globalProjects, envProfile, out
 		return err
 	}
 
-	workstation := checkWorkstation(profile, systemWorkstationProbe(ws.Root))
+	probe := systemWorkstationProbe(ws.Root)
+	if agentHookGaps != nil {
+		probe.agentHookGaps = func() []shared.HostHookGap { return agentHookGaps(ws.Root) }
+	}
+	workstation := checkWorkstation(profile, probe)
 	report, runErr := doctorRun(ws.Root, projects, profile, time.Now(), workstation)
 	return renderDoctor(iox.Stdout(), outputFormat, report, runErr)
 }

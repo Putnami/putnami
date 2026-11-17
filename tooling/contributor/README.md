@@ -135,9 +135,15 @@ dossier can compute `Putnami verified` for the declared local scope.
 
 The manifest declares host hooks for Claude Code and Codex
 ([ADR 0007](doc/adr/0007-the-contributor-declares-agent-session-hooks.md)).
-The core writes them into `.claude/settings.json` and `.codex/hooks.json` when
+The core writes them into `.claude/settings.json` and `.codex/hooks.json`, and
+into the user's own `~/.claude/settings.json` and `~/.codex/hooks.json`, when
 the workspace opts into this extension's content and binds the `missions`
-contract. Each hook runs `putnami agent hook`, which the executable serves:
+contract ([CLI ADR 0098](../cli/doc/adr/0098-host-hooks-reach-every-session.md)).
+Each hook runs `putnami host-hook agent hook`: the relay serves the event from
+the workspace of its `cwd`, in a repository where you ran Putnami,
+and the executable serves `agent hook`. When both
+files run the same event, the first hook claims it and the second does
+nothing ([ADR 0016](doc/adr/0016-an-event-two-hook-sources-send-is-handled-once.md)):
 
 - At session start, the agent receives its mission sheet and the owner's
   waiting messages.
@@ -191,9 +197,12 @@ session:
   enabled = true
   ```
 
-- A committed `.codex/hooks.json`. In a linked git worktree, Codex 0.165
+- The hooks in a file Codex reads. In a linked git worktree, Codex 0.165
   reads project hooks from the main checkout's `.codex/hooks.json`, not the
-  worktree's. Commit the file, so the main checkout has it too.
+  worktree's, and the Claude desktop app does the same with
+  `.claude/settings.json`. `putnami install` also writes the hooks into the
+  user's own files, which every session reads; `putnami doctor` reports a
+  host whose user file lacks them.
 
 ## What it deliberately excludes
 

@@ -5,6 +5,8 @@
   `PostToolUse` no longer matches `missions.ask` and `missions.reply`. The
   commands `agent ask` and `agent reply` call them and record the decision and
   the reply for the session.
+  Amended by [ADR 0016](0016-an-event-two-hook-sources-send-is-handled-once.md):
+  `agent hook` handles an event once when two hook sources send it.
 - **Scope**: `@putnami/contributor` (`tooling/contributor`): its manifest, its
   runtime and the host files the core writes for it
 - **Follows**: [ADR 0006](0006-the-contributor-executable-serves-change-finalize.md),

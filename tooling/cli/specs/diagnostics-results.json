@@ -113,6 +113,13 @@
         "Summary --by-digest groups the selected sessions' records by digest in first-recorded order, with records, executed, reused and failed counts and each occurrence's session and reuse;",
         "records without a digest are counted apart."
       ]
+    },
+    {
+      "id": "doctor-names-unreachable-agent-hooks",
+      "text": [
+        "Doctor reports doctor.agent_hooks_unreachable for a workspace whose explicit install writes extension hooks: per host, a user hook file without a Putnami handler for an event the workspace asks for; a repository no Putnami command recorded; putnami off the PATH.",
+        "The finding is advisory and scoped to the workspace root; its remediation names putnami install, a cloud environment's setup script and Codex's /hooks trust step."
+      ]
     }
   ],
   "decisions": [
