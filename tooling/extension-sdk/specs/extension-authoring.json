@@ -158,7 +158,7 @@
       "text": [
         "publicationupload.Upload uploads one npm, go, oci, put or archive member to the registry its caller resolved and answers the digest the registry stores, with an archive's platforms.",
         "It reads only the files the request's member names, never outbox.json, and refuses a size or digest other than an entry's before any request.",
-        "It asks the bearer at most once, for that registry, sends it nowhere else and puts it in no error.",
+        "It asks that registry's bearer before each request, sends it nowhere else and puts it in no error.",
         "A version held at the same digest is reused."
       ]
     },
@@ -167,6 +167,13 @@
       "text": [
         "An error of publicationupload.Upload for an artifact whose size or digest is not its member entry's matches ErrArtifactMismatch under errors.Is, and one for a registry that already holds another artifact at the member's version matches ErrArtifactConflict.",
         "Any other failure matches neither, and a marked error keeps its text."
+      ]
+    },
+    {
+      "id": "upload-kit-adopts-a-stored-version",
+      "text": [
+        "With AdoptPublished, a put or archive member whose version the registry already holds with another manifest is adopted, not refused.",
+        "The result names the stored digest, and an archive's stored platforms, and says Adopted."
       ]
     },
     {

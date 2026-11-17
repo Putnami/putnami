@@ -41,7 +41,9 @@
     "cloud/local-session-reporting#hosted-credential-wins",
     "cloud/local-session-reporting#local-session-fails-closed",
     "cloud/local-session-reporting#local-session-under-developer-login",
+    "cloud/publication-uploader#cloud-retries-adopt-an-earlier-attempt",
     "cloud/publication-uploader#cloud-uploads-its-registries-in-the-provider-session",
+    "cloud/publication-uploader#cloud-uploads-renew-the-plan-bearer",
     "cloud/publish-channels#publish-tasks-declare-their-channels",
     "cloud/secret-config-key#declared-key-stored",
     "cloud/secret-config-key#undeclared-key-stored-with-warning"

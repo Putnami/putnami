@@ -392,6 +392,20 @@
               "the-cloud-provider-maps-a-failed-upload-to-its-refusal"
             ]
           }
+        },
+        {
+          "id": "an-upload-may-adopt-a-stored-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-adopted-answer-is-validated",
+              "a-version-names-its-revision-by-its-last-identifier"
+            ]
+          }
         }
       ]
     }

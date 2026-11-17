@@ -356,8 +356,9 @@ func (run *ReleaseSetRun) checkPacked(packed extproto.OutboxMember, planned rele
 // module zip's, the OCI manifest's, or the stored Put manifest payload's,
 // with the platforms of an archive. Every check that needs the project's
 // declarations runs before the upload, and the answer must name the packed
-// digest. An OCI member's published image is then recorded beside the
-// publication job's output (recordPublishedImage).
+// digest unless it adopted the stored version (adoptedPlatforms). An OCI
+// member's published image is then recorded beside the publication job's
+// output (recordPublishedImage).
 func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *jobmodel.ScheduledJob, outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, kind distribution.MemberKind) (string, map[string]string, error) {
 	params := &registryproto.UploadParams{PlanDigest: run.open.Plan.PlanDigest, Outbox: outbox.Root(), Member: packed}
 	var image *packedImage
@@ -383,6 +384,13 @@ func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *jobmodel.Sc
 	if err != nil {
 		return "", nil, err
 	}
+	if answer.Adopted {
+		platforms, err := run.adoptedPlatforms(outbox, packed, answer)
+		if err != nil {
+			return "", nil, err
+		}
+		return answer.Digest, platforms, nil
+	}
 	if packedDigest := packedArtifactDigest(packed); answer.Digest != packedDigest {
 		return "", nil, fmt.Errorf("the credential provider answered digest %s for %s; the publication job packed %s",
 			answer.Digest, printableReleaseKey(releaseset.MemberKey(distribution.Ecosystem(packed.Ecosystem), packed.Coordinate)), packedDigest)
@@ -397,6 +405,40 @@ func (run *ReleaseSetRun) uploadPacked(ctx context.Context, publish *jobmodel.Sc
 		}
 	}
 	return answer.Digest, platforms, nil
+}
+
+// adoptedPlatforms accepts an upload answer that adopted the version the
+// registry already holds, and returns the stored platforms it names. Only a
+// put or archive member whose version names the plan's source revision
+// (registryproto.VersionNamesRevision) may be adopted: an earlier attempt of
+// the same commit published it. An archive answer names its stored platforms,
+// which must be the platforms the packed manifest names, at other digests; a
+// put answer names none.
+func (run *ReleaseSetRun) adoptedPlatforms(outbox *publicationoutbox.Outbox, packed extproto.OutboxMember, answer *registryproto.UploadResult) (map[string]string, error) {
+	key := printableReleaseKey(releaseset.MemberKey(distribution.Ecosystem(packed.Ecosystem), packed.Coordinate))
+	switch {
+	case packed.Ecosystem != extproto.OutboxEcosystemPut && packed.Ecosystem != extproto.OutboxEcosystemArchive:
+		return nil, fmt.Errorf("the credential provider adopted a stored version of %s; only a put or archive member is adopted", key)
+	case !registryproto.VersionNamesRevision(packed.Version, run.open.Plan.SourceRevision):
+		return nil, fmt.Errorf("the credential provider adopted %s at version %s, which does not name the plan's commit %s; a retry of this commit cannot publish it",
+			key, packed.Version, run.open.Plan.SourceRevision)
+	case packed.Ecosystem == extproto.OutboxEcosystemArchive && len(answer.Platforms) == 0:
+		return nil, fmt.Errorf("the credential provider adopted the archive member %s without its stored platforms", key)
+	case packed.Ecosystem == extproto.OutboxEcosystemPut && len(answer.Platforms) > 0:
+		return nil, fmt.Errorf("the credential provider answered platforms for the put member %s, which has none", key)
+	case packed.Ecosystem == extproto.OutboxEcosystemPut:
+		return nil, nil
+	}
+	// The stored archive's digests differ from the packed ones, but it covers
+	// the platforms this commit's build packed.
+	platforms, err := packedArchivePlatforms(outbox, packed)
+	if err != nil {
+		return nil, err
+	}
+	if !slices.Equal(slices.Sorted(maps.Keys(platforms)), slices.Sorted(maps.Keys(answer.Platforms))) {
+		return nil, fmt.Errorf("the credential provider adopted the archive member %s with platforms other than its packed manifest names", key)
+	}
+	return answer.Platforms, nil
 }
 
 // packedArtifactDigest is the artifact digest of a packed member: its npm
@@ -428,6 +470,20 @@ func packedPlatforms(outbox *publicationoutbox.Outbox, packed extproto.OutboxMem
 		}
 		return nil, nil
 	}
+	platforms, err := packedArchivePlatforms(outbox, packed)
+	if err != nil {
+		return nil, err
+	}
+	if !maps.Equal(platforms, answered) {
+		return nil, fmt.Errorf("the credential provider answered platforms for the archive member %s other than its packed manifest names", packed.Coordinate)
+	}
+	return platforms, nil
+}
+
+// packedArchivePlatforms returns the platforms the packed manifest of an
+// archive member names, read from the outbox, which must still hold the
+// packed bytes.
+func packedArchivePlatforms(outbox *publicationoutbox.Outbox, packed extproto.OutboxMember) (map[string]string, error) {
 	manifest, err := outbox.ReadFile(packed.Put.Manifest)
 	if err != nil {
 		return nil, err
@@ -436,11 +492,7 @@ func packedPlatforms(outbox *publicationoutbox.Outbox, packed extproto.OutboxMem
 	if archive == nil {
 		return nil, fmt.Errorf("the archive member %s packed a manifest that is not an archive payload", packed.Coordinate)
 	}
-	platforms := archive.Platforms()
-	if !maps.Equal(platforms, answered) {
-		return nil, fmt.Errorf("the credential provider answered platforms for the archive member %s other than its packed manifest names", packed.Coordinate)
-	}
-	return platforms, nil
+	return archive.Platforms(), nil
 }
 
 // maxPrintedRegistry bounds a registry URL or host an upload error names.

@@ -171,6 +171,12 @@ func (u *uploadRig) started() *uploadRig {
 // uploadPlan publishes one member of each ecosystem the session uploads.
 func uploadPlan(t *testing.T) registry.PublicationPlan {
 	t.Helper()
+	return uploadPlanAt(t, "0.3.0")
+}
+
+// uploadPlanAt is uploadPlan with the archive acme/cli at archiveVersion.
+func uploadPlanAt(t *testing.T, archiveVersion string) registry.PublicationPlan {
+	t.Helper()
 	member := func(ecosystem, coordinate, version, fingerprint string) registry.PublicationPlanMember {
 		return registry.PublicationPlanMember{
 			Ecosystem: distribution.Ecosystem(ecosystem), Coordinate: coordinate, Version: version,
@@ -181,7 +187,7 @@ func uploadPlan(t *testing.T) registry.PublicationPlan {
 		ProtocolVersion: registry.PublicationPlanProtocolVersion, Namespace: pubNamespace, SourceRevision: pubSource,
 		Channels: []string{pubCanary, pubImmutable}, ImmutableChannel: pubImmutable,
 		Members: []registry.PublicationPlanMember{
-			member("archive", "acme/cli", "0.3.0", "1"),
+			member("archive", "acme/cli", archiveVersion, "1"),
 			member("go", "go.acme.dev/mod", "v1.2.3", "2"),
 			member("npm", "@acme/web", "1.2.3", "3"),
 			member("oci", "acme/app", "1.2.3", "4"),
@@ -193,7 +199,13 @@ func uploadPlan(t *testing.T) registry.PublicationPlan {
 // openedPlan opens uploadPlan.
 func (u *uploadRig) openedPlan() *uploadRig {
 	u.t.Helper()
-	plan := uploadPlan(u.t)
+	return u.openedPlanAt("0.3.0")
+}
+
+// openedPlanAt opens uploadPlanAt archiveVersion.
+func (u *uploadRig) openedPlanAt(archiveVersion string) *uploadRig {
+	u.t.Helper()
+	plan := uploadPlanAt(u.t, archiveVersion)
 	mustOpened(u.t, u.open(registry.OpenParams{Plan: plan, Ancestry: pubAncestry()}), plan.PlanDigest)
 	return u
 }
@@ -295,6 +307,12 @@ func goUpload(t *testing.T, origin string) packedUpload {
 // the Put registry at origin, with variant appended to its darwin archive.
 func archiveUpload(t *testing.T, origin, variant string) packedUpload {
 	t.Helper()
+	return archiveUploadAt(t, origin, variant, "0.3.0")
+}
+
+// archiveUploadAt is archiveUpload at version, under uploadPlanAt version.
+func archiveUploadAt(t *testing.T, origin, variant, version string) packedUpload {
+	t.Helper()
 	linux, darwin := []byte("linux cli archive"), []byte("darwin cli archive"+variant)
 	payload := []byte(fmt.Sprintf(`{"artifacts":{"darwin-arm64":{"digest":%q,"size":%d},"linux-amd64":{"digest":%q,"size":%d}}}`,
 		put.Digest(darwin), len(darwin), put.Digest(linux), len(linux)))
@@ -307,8 +325,9 @@ func archiveUpload(t *testing.T, origin, variant string) packedUpload {
 			file := outboxFile(t, w, fmt.Sprintf("put/blob-%d", index), blob.data)
 			block.Blobs = append(block.Blobs, extproto.OutboxPutBlob{Path: file.Path, Digest: file.Digest, Size: file.Size, MediaType: blob.mediaType})
 		}
-		return extproto.OutboxMember{Ecosystem: extproto.OutboxEcosystemArchive, Coordinate: "acme/cli", Version: "0.3.0", Project: "/cli", Put: block}
+		return extproto.OutboxMember{Ecosystem: extproto.OutboxEcosystemArchive, Coordinate: "acme/cli", Version: version, Project: "/cli", Put: block}
 	})
+	params.PlanDigest = uploadPlanAt(t, version).PlanDigest
 	return packedUpload{
 		params:    params,
 		digest:    put.Digest(payload),
@@ -560,10 +579,14 @@ func TestUploadRefusesBeforeAnyRegistryRequest(t *testing.T) {
 
 // A failed upload answers why: an artifact whose size or digest is not the
 // member's is artifact_digest_mismatch, a registry that holds another
-// artifact at the version is artifact_conflict, and any other failure is
-// upload_failed. No refusal carries the bearer.
+// artifact at the version is artifact_conflict, which says a retry of this
+// commit cannot pass, and any other failure is upload_failed, which names a
+// bearer the registry refused. No refusal
+// carries the bearer.
 func TestUploadFailuresAnswerTheirRefusal(t *testing.T) {
 	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-is-refused-before-any-registry-request", "the-cloud-provider-maps-a-failed-upload-to-its-refusal")
+	spectest.Proves(t, uploadFeature, "cloud-uploads-renew-the-plan-bearer", "a-refused-bearer-is-named-in-the-refusal")
+	spectest.Proves(t, uploadFeature, "cloud-retries-adopt-an-earlier-attempt", "another-conflict-says-a-retry-cannot-pass")
 	forbidden := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusForbidden) })
 	u := newUploadRig(t, forbidden, nil).started().openedPlan()
 	held := func(t *testing.T, upload packedUpload) {
@@ -590,6 +613,7 @@ func TestUploadFailuresAnswerTheirRefusal(t *testing.T) {
 		name   string
 		upload packedUpload
 		code   string
+		says   string
 		before func(t *testing.T)
 	}{
 		{name: "a tampered npm tarball", upload: tamperedTarball, code: registry.RefusalArtifactDigestMismatch},
@@ -600,9 +624,10 @@ func TestUploadFailuresAnswerTheirRefusal(t *testing.T) {
 		},
 		{
 			name: "another archive manifest at the version", upload: archiveUpload(t, u.putURL, ""), code: registry.RefusalArtifactConflict,
+			says:   "a retry of this commit cannot pass",
 			before: func(t *testing.T) { held(t, archiveUpload(t, u.putURL, " held")) },
 		},
-		{name: "a Go registry that refuses the upload", upload: goUpload(t, u.goURL), code: registry.RefusalUploadFailed},
+		{name: "a Go registry that refuses the bearer", upload: goUpload(t, u.goURL), code: registry.RefusalUploadFailed, says: "the registry refused the publish bearer"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.before != nil {
@@ -611,12 +636,84 @@ func TestUploadFailuresAnswerTheirRefusal(t *testing.T) {
 			requests := u.registryRequests()
 			refusal := mustRefusal(t, u.upload(tc.upload.params), tc.code)
 			texts = append(texts, refusal.Message)
+			if !strings.Contains(refusal.Message, tc.says) {
+				t.Fatalf("refusal = %q, want it to say %q", refusal.Message, tc.says)
+			}
 			if after := u.registryRequests(); tc.code == registry.RefusalArtifactDigestMismatch && after != requests {
 				t.Fatalf("a tampered artifact reached the registries with %d requests", after-requests)
 			}
 		})
 	}
 	u.noSecret(texts...)
+}
+
+// A retry of the plan's commit adopts the archive an earlier attempt
+// published: the version names the plan's source revision, the registry holds
+// it with another manifest, and the answer names the stored digest and
+// platforms and says adopted.
+func TestARetryAdoptsTheArchiveAnEarlierAttemptPublished(t *testing.T) {
+	spectest.Proves(t, uploadFeature, "cloud-retries-adopt-an-earlier-attempt", "a-version-of-the-plans-commit-is-adopted")
+	version := "0.0.0-20261117093000-" + pubSource[:7]
+	u := newUploadRig(t, nil, nil).started().openedPlanAt(version)
+	earlier := archiveUploadAt(t, u.putURL, " earlier attempt", version)
+	bearer := func(context.Context, *url.URL) (string, error) { return uploadBearer, nil }
+	if _, err := publicationupload.Upload(context.Background(), publicationupload.Request{
+		Outbox: earlier.params.Outbox, Member: earlier.params.Member, Registry: earlier.params.Registry, Kind: earlier.params.Kind,
+	}, bearer); err != nil {
+		t.Fatal(err)
+	}
+	response := u.upload(archiveUploadAt(t, u.putURL, " retry", version).params)
+	if !response.OK {
+		t.Fatalf("the retry was refused: %+v", response.Error)
+	}
+	result, err := registry.ParseUploadResult(response.Payload)
+	if err != nil || !result.Adopted || result.Digest != earlier.digest || !maps.Equal(result.Platforms, earlier.platforms) {
+		t.Fatalf("the retry answered %+v, %v; want the earlier attempt's %s adopted", result, err, earlier.digest)
+	}
+	if !strings.Contains(u.h.stderr.String(), "upload: adopted the archive member acme/cli@"+version) {
+		t.Fatalf("stderr = %q, want the adoption reported", u.h.stderr.String())
+	}
+}
+
+// An upload that outlasts half the plan bearer's lifetime sends the renewed
+// bearer at its next request: the Go origin, which accepts only the bearer
+// Delivery minted last, stores the module after the clock passes the half.
+func TestAnUploadRenewsThePlanBearerPastHalfItsLifetime(t *testing.T) {
+	spectest.Proves(t, uploadFeature, "cloud-uploads-renew-the-plan-bearer", "an-upload-past-half-the-bearer-lifetime-sends-a-renewed-bearer")
+	goRegistry := publicationuploadtest.NewGoRegistry(t, uploadBearer)
+	var u *uploadRig
+	var mu sync.Mutex
+	var seen []string
+	origin := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, minted := u.delivery.calls()
+		latest := fmt.Sprintf("Bearer publish-bearer-%d", minted)
+		authorization := r.Header.Get("Authorization")
+		mu.Lock()
+		first := len(seen) == 0
+		if !slices.Contains(seen, authorization) {
+			seen = append(seen, authorization)
+		}
+		mu.Unlock()
+		if authorization != latest {
+			w.WriteHeader(http.StatusUnauthorized)
+			return
+		}
+		if first {
+			// The first request spends more than half the bearer's life.
+			u.clock.Advance(151 * time.Second)
+		}
+		r.Header.Set("Authorization", "Bearer "+uploadBearer)
+		goRegistry.Server.Config.Handler.ServeHTTP(w, r)
+	})
+	u = newUploadRig(t, origin, nil).started().openedPlan()
+	upload := goUpload(t, u.goURL)
+	mustUploaded(t, u.upload(upload.params), upload)
+	if want := []string{"Bearer publish-bearer-1", "Bearer publish-bearer-2"}; !slices.Equal(seen, want) {
+		t.Fatalf("the Go origin saw bearers %v, want %v", seen, want)
+	}
+	if zip, _ := goRegistry.Stored("go.acme.dev/mod", "v1.2.3"); string(zip) != "module zip of go.acme.dev/mod@v1.2.3" {
+		t.Fatalf("the Go registry stores %q", zip)
+	}
 }
 
 func writeOutbox(t *testing.T, path string, data []byte) {

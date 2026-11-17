@@ -227,7 +227,7 @@ func UploadBlob(ctx context.Context, client *http.Client, registryURL, token, co
 // the manifest the registry stores. A 409 means the version is already
 // published: the stored manifest is read back, and the version is a reuse only
 // when its media type and payload bytes equal member's; another manifest is
-// refused with an error marked artifacterr.ErrConflict. A transient failure
+// refused with a *ConflictError that names it. A transient failure
 // (package retry) sends the publish again, up to retry.Attempts times in all,
 // and a 409 after a lost answer is accepted by the same rule. A registryURL
 // that ValidateRegistryURL refuses is refused before any request.
@@ -270,12 +270,29 @@ func publishManifest(ctx context.Context, client *http.Client, registryURL, toke
 			return nil, false, fmt.Errorf("version %s is already published, and its manifest cannot be read: %w", member.Version, err)
 		}
 		if diag.HasErrors(put.ValidateManifestFor(*manifest, member.MediaType, member.Manifest)) {
-			return nil, false, artifacterr.Conflict(fmt.Errorf("version %s is already published with another manifest", member.Version))
+			return nil, false, &ConflictError{Version: member.Version, Stored: *manifest}
 		}
 		return manifest, true, nil
 	}
 	return nil, false, fmt.Errorf("publish returned %d%s", answer.status, retry.Note(outcome, attempts))
 }
+
+// ConflictError refuses a publish whose version the registry already holds
+// with another manifest. Stored is that manifest, as the registry answered
+// it. errors.Is matches it to artifacterr.ErrConflict.
+type ConflictError struct {
+	// Version is the version the registry holds.
+	Version string
+	// Stored is the manifest the registry holds at Version.
+	Stored put.Manifest
+}
+
+func (e *ConflictError) Error() string {
+	return fmt.Sprintf("version %s is already published with another manifest", e.Version)
+}
+
+// Is matches artifacterr.ErrConflict.
+func (e *ConflictError) Is(target error) bool { return target == artifacterr.ErrConflict }
 
 // ReadManifest reads the stored manifest of coordinate at version. A
 // transient failure (package retry) sends the read again, up to

@@ -1440,7 +1440,11 @@ capabilities, a release-set publish runs through that one session
    again and uploads it with its own `publish` credential; the engine asks
    for none.
    The engine compares the answered digest with the packed one, and each
-   upload node reports one `published-member` event in the session. An
+   upload node reports one `published-member` event in the session. A put or
+   archive member whose version names the plan's commit may be answered
+   `adopted`: an earlier attempt of that commit published the version, and
+   the engine releases the stored digest the answer names
+   ([ADR 0099](adr/0099-a-retry-adopts-its-commits-stored-version.md)). An
    upload is sent once, bounded by 10 minutes plus 1 minute per 256 MiB of
    the member's files; an upload the provider does not answer in time ends
    the session, and the run fails.

@@ -94,6 +94,20 @@
         }
       },
       {
+        "id": "an-adopted-upload-names-the-plans-commit",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "an-adopted-digest-of-the-plans-commit-is-released",
+            "an-adopted-answer-for-another-version-fails"
+          ]
+        }
+      },
+      {
         "id": "bound-requests-publish-through-the-provider",
         "stage": "coded",
         "evidenceKinds": [

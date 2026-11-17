@@ -16,6 +16,20 @@
         "On a hosted run that serves publication-v1, the credential provider offers uploader-v1 and uploads every ecosystem of the plan to its publication origins.",
         "It mints the plan's bearer itself, uploads with the SDK upload kit, and answers the digest each registry stores."
       ]
+    },
+    {
+      "id": "cloud-uploads-renew-the-plan-bearer",
+      "text": [
+        "Each registry request of an upload carries the plan's write bearer the provider holds at that request, renewed once half its lifetime has passed, so an upload that outlasts one bearer is not refused for it.",
+        "An upload the registry refuses 401 or 403 is refused upload_failed with a message that says the registry refused the publish bearer."
+      ]
+    },
+    {
+      "id": "cloud-retries-adopt-an-earlier-attempt",
+      "text": [
+        "A put or archive member whose version names the plan's source revision adopts the version the registry already holds with another manifest: an earlier attempt of the same commit published it, so a retry passes.",
+        "Any other conflict is refused artifact_conflict, with a message that says the version holds other bytes and that a retry of this commit cannot pass."
+      ]
     }
   ]
 }

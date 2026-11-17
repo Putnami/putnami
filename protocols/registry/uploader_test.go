@@ -22,7 +22,7 @@ var uploadFixtures = map[string][]string{
 	"request-upload-npm-loopback.json": {"response-upload-refusal-conflict.json"},
 	"request-upload-go.json":           nil,
 	"request-upload-oci.json":          nil,
-	"request-upload-archive.json":      {"response-upload-archive.json"},
+	"request-upload-archive.json":      {"response-upload-archive.json", "response-upload-adopted.json"},
 	"request-upload-put.json":          nil,
 }
 
@@ -120,14 +120,15 @@ func TestUploaderCapabilityNeedsPublication(t *testing.T) {
 
 // TestUploadWireCarriesNoCredentialAndNoReuse pins the members of the upload
 // payloads: the request names no credential, the provider holds its own, and
-// no project beside the member's own; the answer reports no reuse.
+// no project beside the member's own; the answer reports no reuse, only an
+// adoption.
 func TestUploadWireCarriesNoCredentialAndNoReuse(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-carries-no-credential", "the-upload-wire-holds-no-credential")
 	if got := jsonMembers(UploadParams{}); got != "kind,member,outbox,planDigest,registry" {
 		t.Errorf("upload params members = %s", got)
 	}
-	if got := jsonMembers(UploadResult{}); got != "digest,platforms" {
+	if got := jsonMembers(UploadResult{}); got != "adopted,digest,platforms" {
 		t.Errorf("upload result members = %s", got)
 	}
 }
@@ -368,6 +369,9 @@ func TestUploadSchemaTracksWireShape(t *testing.T) {
 						PropertyNames        schemaText `json:"propertyNames"`
 						AdditionalProperties schemaRef  `json:"additionalProperties"`
 					} `json:"platforms"`
+					Adopted struct {
+						Const *bool `json:"const"`
+					} `json:"adopted"`
 				} `json:"properties"`
 			} `json:"uploadResult"`
 			Capabilities struct {
@@ -406,6 +410,9 @@ func TestUploadSchemaTracksWireShape(t *testing.T) {
 	}
 	if result.Platforms.MinProperties != 1 || result.Platforms.MaxProperties != distribution.MaxPlatformsPerMember || result.Platforms.PropertyNames.Pattern != UploadPlatformPattern {
 		t.Error("upload platforms grammar or bounds diverged")
+	}
+	if adopted := result.Adopted.Const; adopted == nil || !*adopted {
+		t.Error("upload adopted is not the constant true")
 	}
 	capabilities := schema.Definitions.Capabilities
 	if capabilities.If.Contains.Const != CapabilityUploaderV1 || capabilities.Then.Contains.Const != CapabilityPublicationV1 {
@@ -446,6 +453,7 @@ func TestUploadInvalidFixturesFailForTheirRule(t *testing.T) {
 		"response-upload-bad-digest.json":                       "upload digest must match",
 		"response-upload-bad-platform.json":                     "upload platform \"darwin-arm64\" must match",
 		"response-upload-empty-platforms.json":                  "member \"platforms\" is empty",
+		"response-upload-adopted-false.json":                    "member \"adopted\" is empty",
 	} {
 		line := readFixture(t, "invalid", name)
 		var err error
@@ -456,6 +464,50 @@ func TestUploadInvalidFixturesFailForTheirRule(t *testing.T) {
 		}
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Errorf("%s: %v, want an error naming %q", name, err, want)
+		}
+	}
+}
+
+// An adopted answer is validated like any other, and adopted is absent or
+// true: false is refused as an empty member.
+func TestAnAdoptedAnswerIsValidated(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-may-adopt-a-stored-version", "an-adopted-answer-is-validated")
+	result, err := ParseUploadResult(json.RawMessage(`{"digest":"sha256:` + strings.Repeat("e", 64) + `","adopted":true}`))
+	if err != nil || !result.Adopted {
+		t.Fatalf("an adopted answer = %+v, %v; want it accepted", result, err)
+	}
+	for payload, want := range map[string]string{
+		`{"digest":"sha256:` + strings.Repeat("e", 64) + `","adopted":false}`: `member "adopted" is empty`,
+		`{"digest":"sha256:short","adopted":true}`:                            "upload digest must match",
+		`{"digest":"sha256:` + strings.Repeat("e", 64) + `","adopted":"yes"}`: "adopted",
+	} {
+		if _, err := ParseUploadResult(json.RawMessage(payload)); err == nil || !strings.Contains(err.Error(), want) {
+			t.Errorf("%s: %v, want an error naming %q", payload, err, want)
+		}
+	}
+}
+
+// A version names a revision by its last hyphen-separated identifier, a
+// lowercase hexadecimal prefix of at least 7 characters of that revision.
+func TestAVersionNamesItsRevisionByItsLastIdentifier(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "registry/credential-seam-contract", "an-upload-may-adopt-a-stored-version", "a-version-names-its-revision-by-its-last-identifier")
+	const revision = "1a2b3c4d5e6f708192a3b4c5d6e7f8091a2b3c4d"
+	for version, want := range map[string]bool{
+		"0.0.0-20261117093000-1a2b3c4":            true,
+		"0.0.0-20261117093000-1a2b3c4d5e6f":       true,
+		"0.0.0-20261117093000-" + revision:        true,
+		"0.0.0-20261117093000-1a2b3c":             false, // under 7 characters
+		"0.0.0-20261117093000-1a2b3c5":            false, // another revision
+		"0.0.0-20261117093000-1A2B3C4":            false, // not lowercase
+		"0.0.0-20261117093000-" + revision + "00": false, // longer than the revision
+		"0.0.0-1a2b3c4-rc1":                       false, // not the last identifier
+		"1.2.3":                                   false,
+		"":                                        false,
+	} {
+		if got := VersionNamesRevision(version, revision); got != want {
+			t.Errorf("VersionNamesRevision(%q) = %v, want %v", version, got, want)
 		}
 	}
 }

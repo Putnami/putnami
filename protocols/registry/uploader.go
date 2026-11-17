@@ -118,6 +118,36 @@ type UploadResult struct {
 	// set to the digest of that platform's artifact. Absent for a single
 	// artifact.
 	Platforms map[string]string `json:"platforms,omitempty"`
+	// Adopted reports that the registry already held the member's version
+	// with another manifest, published by an earlier attempt of the plan's
+	// commit, and that Digest and Platforms are that stored version's. Only a
+	// put or archive member whose version names the plan's source revision
+	// (VersionNamesRevision) is adopted.
+	Adopted bool `json:"adopted,omitempty"`
+}
+
+// minRevisionPrefix is the shortest revision prefix a version may name.
+const minRevisionPrefix = 7
+
+// VersionNamesRevision reports whether version names revision: its last
+// hyphen-separated identifier is a lowercase hexadecimal prefix of at least 7
+// characters of revision, as in 0.0.0-20261117093000-1a2b3c4. A version
+// without a hyphen names no revision.
+func VersionNamesRevision(version, revision string) bool {
+	cut := strings.LastIndexByte(version, '-')
+	if cut < 0 {
+		return false
+	}
+	identifier := version[cut+1:]
+	if len(identifier) < minRevisionPrefix || !strings.HasPrefix(revision, identifier) {
+		return false
+	}
+	for _, char := range identifier {
+		if (char < '0' || char > '9') && (char < 'a' || char > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 // ValidateUploadParams checks an upload payload: a plan digest, a member the

@@ -46,7 +46,10 @@ stores and, for a release archive, the digest of each platform.
 3. **The answer must be the packed artifact.** The answered digest must equal
    the packed one: the npm tarball, the Go module zip, the OCI manifest or the
    Put registry manifest. Only a release archive may answer platforms, and
-   they must be the platforms its packed manifest names. The node then writes
+   they must be the platforms its packed manifest names.
+   [ADR 0099](0099-a-retry-adopts-its-commits-stored-version.md) amends this
+   rule: an answer that adopted a version of the plan's commit names the
+   stored digest and platforms. The node then writes
    `published-image.json` for an OCI member and reports one
    `published-member` event, as before.
 4. **One bounded attempt.** One upload is bounded by 10 minutes plus 1 minute

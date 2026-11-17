@@ -202,6 +202,7 @@ The answer names what the registry stores:
 |--------|------|
 | `digest` | The artifact digest: the npm tarball's, the Go module zip's, the OCI manifest's, or the stored Put manifest payload's |
 | `platforms` | For a member published as a multi-platform set, each `os/arch` mapped to the digest of that platform's artifact: 1 to 32 entries. Absent otherwise. |
+| `adopted` | `true` when the registry already held the member's version with another manifest and the provider adopted it: `digest` and `platforms` are then the stored version's. Only a put or archive member whose version names the plan's source revision is adopted (`VersionNamesRevision`: its last hyphen-separated identifier is a hexadecimal prefix of at least 7 characters of that revision), since an earlier attempt of the same commit published it. Absent otherwise. An engine older than this member refuses an answer that carries it. |
 
 | Rule | Meaning |
 |------|---------|
@@ -210,7 +211,7 @@ The answer names what the registry stores:
 | No credential | The request carries no credential, and the answer carries none. |
 | Files | The provider reads every file of the member from the outbox and refuses one whose size or digest is not the member's with `artifact_digest_mismatch`. |
 | Bounds | The publication bounds: a line is at most 8 MiB and 12 levels deep. |
-| Refusals | `plan_not_open`; `plan_mismatch`, for another plan or a member the opened plan does not select; `registry_not_served`, for a registry the provider does not upload to; `artifact_digest_mismatch`; `artifact_conflict`, when the registry holds another artifact at the member's version and nothing was uploaded; and `upload_failed`, for any other registry refusal or an upload that did not complete (`UploadRefusalCodes`). |
+| Refusals | `plan_not_open`; `plan_mismatch`, for another plan or a member the opened plan does not select; `registry_not_served`, for a registry the provider does not upload to; `artifact_digest_mismatch`; `artifact_conflict`, when the registry holds another artifact at the member's version, the provider did not adopt it, and nothing was uploaded; and `upload_failed`, for any other registry refusal or an upload that did not complete (`UploadRefusalCodes`). |
 
 | Symbol | Meaning |
 |--------|---------|
@@ -281,7 +282,8 @@ released sets in memory, and uploads to fake registries.
 the four ops. The release set (`tooling/cli/internal/jobs/publication`)
 resolves through it, opens after the barrier, checks each packed npm, Go
 module, OCI and Put registry member, sends one `upload` per member, compares
-the answered digest with the packed one, and releases. A session without the
+the answered digest with the packed one, unless the answer adopted a version
+of the plan's commit, and releases. A session without the
 `publication-v1` echo leaves the release set on its release-set provider
 process, unchanged. A session that echoes `publication-v1` without
 `uploader-v1` fails the command before the first hook when the run is hosted

@@ -337,6 +337,34 @@
               "each-ecosystem-uploads-and-answers-the-stored-digest"
             ]
           }
+        },
+        {
+          "id": "cloud-uploads-renew-the-plan-bearer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-upload-past-half-the-bearer-lifetime-sends-a-renewed-bearer",
+              "a-refused-bearer-is-named-in-the-refusal"
+            ]
+          }
+        },
+        {
+          "id": "cloud-retries-adopt-an-earlier-attempt",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-version-of-the-plans-commit-is-adopted",
+              "another-conflict-says-a-retry-cannot-pass"
+            ]
+          }
         }
       ]
     },

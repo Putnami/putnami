@@ -275,6 +275,7 @@
     "cli/portable-runner#isolated-execution",
     "cli/portable-runner#optional-placement",
     "cli/portable-runner#portable-request",
+    "cli/provider-publication#an-adopted-upload-names-the-plans-commit",
     "cli/provider-publication#ancestry-is-read-before-repository-code",
     "cli/provider-publication#bound-requests-publish-through-the-provider",
     "cli/provider-publication#gate-only-launches-no-publication",

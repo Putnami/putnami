@@ -17,6 +17,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote"
 
 	"go.putnami.dev/sdk/extension/internal/artifacterr"
+	"go.putnami.dev/sdk/extension/internal/freshbearer"
 	"go.putnami.dev/sdk/extension/registryorigin"
 )
 
@@ -65,14 +66,39 @@ var (
 // goes through an ambient proxy unless options supplies a transport, and no
 // error carries the bearer. An empty bearer sends anonymous requests.
 func PushLayout(ctx context.Context, layoutDir string, target LayoutTarget, bearer string, options ...PushOptions) (PushedLayout, error) {
-	pushed, err := pushLayout(ctx, layoutDir, target, bearer, options)
+	var source BearerSource
+	if bearer != "" {
+		source = func(context.Context) (string, error) { return bearer, nil }
+	}
+	return PushLayoutFrom(ctx, layoutDir, target, source, options...)
+}
+
+// BearerSource returns the registry bearer to send now.
+type BearerSource func(context.Context) (string, error)
+
+// PushLayoutFrom is PushLayout with a bearer asked from bearer before each
+// registry request, so a push that outlasts one bearer sends the value its
+// caller holds at each request. bearer is first asked once the layout passed
+// its checks. A nil bearer sends anonymous requests. When the registry refuses
+// a bearer (401 or 403), the error matches ErrBearerRefused under errors.Is.
+func PushLayoutFrom(ctx context.Context, layoutDir string, target LayoutTarget, bearer BearerSource, options ...PushOptions) (PushedLayout, error) {
+	var fresh *freshbearer.Transport
+	pushed, err := pushLayout(ctx, layoutDir, target, bearer, options, &fresh)
 	if err != nil {
-		return PushedLayout{}, redactBearer(err, bearer)
+		var issued []string
+		if fresh != nil {
+			issued = fresh.Issued()
+		}
+		return PushedLayout{}, freshbearer.Mark(redactBearer(err, issued...), fresh)
 	}
 	return pushed, nil
 }
 
-func pushLayout(ctx context.Context, layoutDir string, target LayoutTarget, bearer string, options []PushOptions) (PushedLayout, error) {
+// ErrBearerRefused marks a PushLayoutFrom error after the registry answered
+// 401 or 403 to a request that carried the bearer.
+var ErrBearerRefused = freshbearer.ErrRefused
+
+func pushLayout(ctx context.Context, layoutDir string, target LayoutTarget, source BearerSource, options []PushOptions, fresh **freshbearer.Transport) (PushedLayout, error) {
 	transport, err := transportOf(options)
 	if err != nil {
 		return PushedLayout{}, err
@@ -120,6 +146,14 @@ func pushLayout(ctx context.Context, layoutDir string, target LayoutTarget, bear
 		return PushedLayout{}, artifacterr.Mismatch(fmt.Errorf("layout manifest digest %s does not match expected digest %s", got, want))
 	}
 
+	bearer := ""
+	if source != nil {
+		*fresh = freshbearer.New(transport, repo.RegistryStr(), freshbearer.Source(source))
+		if bearer, err = (*fresh).Ask(ctx); err != nil {
+			return PushedLayout{}, fmt.Errorf("registry bearer: %w", err)
+		}
+		transport = *fresh
+	}
 	keychain := bearerKeychain{host: repo.RegistryStr(), token: bearer}
 	ref := repo.Digest(want.String())
 	remoteOptions := []remote.Option{remote.WithContext(ctx), remote.WithAuthFromKeychain(keychain), remote.WithTransport(transport)}
@@ -225,12 +259,15 @@ type redactedError struct {
 func (e *redactedError) Error() string { return e.message }
 func (e *redactedError) Unwrap() error { return e.cause }
 
-// redactBearer returns err with bearer, its query escaping and every
+// redactBearer returns err with each bearer, its query escaping and every
 // "Bearer <value>" removed from its text. A registry error can echo the
 // request's Authorization header, so the original error is not kept.
-func redactBearer(err error, bearer string) error {
+func redactBearer(err error, bearers ...string) error {
 	message := err.Error()
-	if bearer != "" {
+	for _, bearer := range bearers {
+		if bearer == "" {
+			continue
+		}
 		message = strings.ReplaceAll(message, bearer, "[redacted]")
 		if escaped := url.QueryEscape(bearer); escaped != bearer {
 			message = strings.ReplaceAll(message, escaped, "[redacted]")

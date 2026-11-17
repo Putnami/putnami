@@ -502,3 +502,66 @@ func TestAnArchiveAnsweredWithOtherPlatformsFailsTheUpload(t *testing.T) {
 		t.Fatalf("events %+v, ops %v after a refused answer", events, h.session.recorded())
 	}
 }
+
+// An answer that adopted the stored version of an archive whose version names
+// the plan's commit is released with the stored digest and platforms it
+// names. The same answer fails the upload and releases nothing for a version
+// that names no commit, an archive without platforms or with others than it
+// packed, and a put member with platforms.
+func TestAnAdoptedArchiveOfThePlansCommitIsReleased(t *testing.T) {
+	stored := map[string]string{"darwin/arm64": digestFor('1'), "linux/amd64": digestFor('2')}
+	commit := "0.0.0-20261117093000-" + testRevision[:7]
+	for _, tc := range []struct {
+		name, version, check, refusal string
+		fixture                       int
+		platforms                     map[string]string
+	}{
+		{name: "the plan's commit", version: commit, check: "an-adopted-digest-of-the-plans-commit-is-released", platforms: stored},
+		{name: "another version", version: "0.3.0", check: "an-adopted-answer-for-another-version-fails", platforms: stored, refusal: "does not name the plan's commit " + testRevision},
+		{name: "an archive without platforms", version: commit, check: "an-adopted-answer-for-another-version-fails", refusal: "without its stored platforms"},
+		{
+			name: "an archive of other platforms", version: commit, check: "an-adopted-answer-for-another-version-fails",
+			platforms: map[string]string{"linux/amd64": digestFor('2')}, refusal: "with platforms other than its packed manifest names",
+		},
+		{name: "a put member with platforms", version: commit, fixture: 1, check: "an-adopted-answer-for-another-version-fails", platforms: stored, refusal: "answered platforms for the put member"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spectest.Proves(t, "cli/provider-publication", "an-adopted-upload-names-the-plans-commit", tc.check)
+			reg := newPutRegistry(t)
+			h := newPublicationHarness(t, providertest.Config{
+				Bearer: publicationBearer, Hosts: []string{serverHost(t, reg.server)},
+				UploadAnswer: func(registryproto.UploadParams, registryproto.UploadResult) registryproto.UploadResult {
+					return registryproto.UploadResult{Digest: digestFor('f'), Platforms: tc.platforms, Adopted: true}
+				},
+			})
+			fixture := putMemberFixtures()[tc.fixture]
+			fixture.version = tc.version
+			job := packedPutMember(t, h, fixture, reg.server.URL)
+			planned, internal := h.plan(nil, fixedAncestry{testRevision}, nil)
+			results := h.execute(context.Background(), planned, internal, nil)
+
+			upload := results[h.uploadKey(job)]
+			if tc.refusal != "" {
+				if upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, tc.refusal) {
+					t.Fatalf("an adopted answer for another version: %s", resultMessage(upload))
+				}
+				if slices.Contains(h.session.recorded(), "release") {
+					t.Fatalf("ops %v after a refused adoption", h.session.recorded())
+				}
+				return
+			}
+			if outcome := results[releaseSetResultKey]; outcome == nil || outcome.Status != "success" {
+				t.Fatalf("release: %s; upload %s", resultMessage(outcome), resultMessage(upload))
+			}
+			events := uploadEvents(t, upload)
+			if len(events) != 1 || events[0].ArtifactDigest != digestFor('f') || !maps.Equal(events[0].Platforms, stored) {
+				t.Fatalf("upload reported %+v; want the adopted digest and platforms", events)
+			}
+			head, _ := h.provider.Head("putnami", "canary")
+			set, _ := h.provider.ReleaseSet(head)
+			if len(set.Members) != 1 || set.Members[0].ArtifactDigest != digestFor('f') || !maps.Equal(set.Members[0].Platforms, stored) {
+				t.Fatalf("released %+v; want the adopted digest and platforms", set.Members)
+			}
+		})
+	}
+}

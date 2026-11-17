@@ -50,6 +50,13 @@
       ]
     },
     {
+      "id": "an-adopted-upload-names-the-plans-commit",
+      "text": [
+        "An upload answer must name the packed digest, unless it says adopted: then the member is a put or archive member whose version names the plan's source revision (registry.VersionNamesRevision), and the engine releases the stored digest and platforms the answer names.",
+        "An adopted answer for any other member fails the member."
+      ]
+    },
+    {
       "id": "bound-requests-publish-through-the-provider",
       "text": [
         "A bound request with invocation.publication publishes through publication-v1 when the credential provider echoes it, as a local run does: open waits for its barrier commands, and the provider receives the plan digest a local run of the commit opens.",

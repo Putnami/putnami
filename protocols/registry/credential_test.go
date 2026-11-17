@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -164,16 +165,16 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 		t.Fatal(err)
 	}
 	type property struct {
-		Const     *int     `json:"const"`
-		Enum      []string `json:"enum"`
-		Pattern   string   `json:"pattern"`
-		MinLength int      `json:"minLength"`
-		MaxLength int      `json:"maxLength"`
-		MinItems  int      `json:"minItems"`
-		MaxItems  int      `json:"maxItems"`
-		Minimum   int      `json:"minimum"`
-		Maximum   int      `json:"maximum"`
-		Ref       string   `json:"$ref"`
+		Const     json.RawMessage `json:"const"`
+		Enum      []string        `json:"enum"`
+		Pattern   string          `json:"pattern"`
+		MinLength int             `json:"minLength"`
+		MaxLength int             `json:"maxLength"`
+		MinItems  int             `json:"minItems"`
+		MaxItems  int             `json:"maxItems"`
+		Minimum   int             `json:"minimum"`
+		Maximum   int             `json:"maximum"`
+		Ref       string          `json:"$ref"`
 		Items     struct {
 			Pattern   string `json:"pattern"`
 			MaxLength int    `json:"maxLength"`
@@ -242,7 +243,7 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"request", "response"} {
-		if version := schema.Definitions[name].Properties["protocolVersion"].Const; version == nil || *version != CredentialProtocolVersion {
+		if version := schema.Definitions[name].Properties["protocolVersion"].Const; string(version) != strconv.Itoa(CredentialProtocolVersion) {
 			t.Errorf("%s: protocolVersion const diverged", name)
 		}
 	}
@@ -272,7 +273,7 @@ func TestCredentialSchemaTracksWireShape(t *testing.T) {
 		}
 	}
 	plan := schema.Definitions["plan"].Properties
-	if *plan["protocolVersion"].Const != PublicationPlanProtocolVersion || plan["members"].MaxItems != distribution.MaxMembers || plan["channels"].MinItems != 1 || plan["channels"].MaxItems != distribution.MaxChannelsPerRelease {
+	if string(plan["protocolVersion"].Const) != strconv.Itoa(PublicationPlanProtocolVersion) || plan["members"].MaxItems != distribution.MaxMembers || plan["channels"].MinItems != 1 || plan["channels"].MaxItems != distribution.MaxChannelsPerRelease {
 		t.Error("plan version or bounds diverged")
 	}
 	if plan["namespace"].MaxLength != distribution.MaxNamespaceBytes {

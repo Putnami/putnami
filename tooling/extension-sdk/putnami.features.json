@@ -388,7 +388,8 @@
               "a-tampered-artifact-is-refused-before-any-request",
               "the-bearer-goes-only-to-its-registry",
               "no-error-carries-the-bearer",
-              "a-version-held-at-the-same-digest-is-reused"
+              "a-version-held-at-the-same-digest-is-reused",
+              "each-request-asks-the-bearer-again"
             ]
           }
         },
@@ -404,6 +405,19 @@
               "a-tampered-artifact-is-a-mismatch",
               "another-artifact-at-the-version-is-a-conflict",
               "any-other-failure-is-neither"
+            ]
+          }
+        },
+        {
+          "id": "upload-kit-adopts-a-stored-version",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-adopted-version-answers-the-stored-digest"
             ]
           }
         },

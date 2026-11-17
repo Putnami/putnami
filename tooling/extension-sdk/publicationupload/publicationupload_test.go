@@ -3,6 +3,7 @@ package publicationupload_test
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"maps"
 	"net/http"
@@ -209,8 +210,8 @@ func writeOver(t *testing.T, path string, data []byte) {
 // Each ecosystem uploads with its own uploader to the registry the request
 // names, and the result is the digest the registry stores: the npm
 // tarball's, the Go module zip's, the Put manifest payload's with the
-// archive's platforms, and the OCI manifest's. The bearer is asked once, for
-// that registry.
+// archive's platforms, and the OCI manifest's. The bearer is asked for that
+// registry alone.
 func TestUploadAnswersTheDigestTheRegistryStores(t *testing.T) {
 	spectest.Proves(t, feature, requirement, "each-ecosystem-uploads-and-answers-the-stored-digest")
 	npm := publicationuploadtest.NewNPMRegistry(t, testBearer)
@@ -233,8 +234,8 @@ func TestUploadAnswersTheDigestTheRegistryStores(t *testing.T) {
 			if err != nil || got.Digest != tc.member.want.Digest || !maps.Equal(got.Platforms, tc.member.want.Platforms) {
 				t.Fatalf("upload = %+v, %v; want %+v", got, err, tc.member.want)
 			}
-			if asked := source.asked(); !slices.Equal(asked, []string{tc.target}) {
-				t.Fatalf("the bearer was asked for %v, want %s once", asked, tc.target)
+			if asked := source.asked(); len(asked) == 0 || slices.ContainsFunc(asked, func(target string) bool { return target != tc.target }) {
+				t.Fatalf("the bearer was asked for %v, want %s alone", asked, tc.target)
 			}
 		})
 	}
@@ -391,7 +392,6 @@ func TestUploadRefusesATamperedArtifactBeforeAnyRequest(t *testing.T) {
 				writeOver(t, path, append(data, '\n'))
 			},
 			refusal: ociManifestRefusal,
-			asked:   1,
 		},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -526,7 +526,7 @@ func TestUploadSendsTheBearerOnlyToItsRegistry(t *testing.T) {
 			if got, err := publicationupload.Upload(ctx, member.request, source.get); err == nil {
 				t.Errorf("%s uploaded as %+v through a registry that redirects every request", name, got)
 			}
-			if asked := source.asked(); len(asked) != 1 || asked[0] != "http://"+hostOf(t, redirecting) {
+			if asked := source.asked(); len(asked) == 0 || slices.ContainsFunc(asked, func(target string) bool { return target != "http://"+hostOf(t, redirecting) }) {
 				t.Errorf("%s asked the bearer for %v", name, asked)
 			}
 		}
@@ -604,6 +604,24 @@ func TestUploadErrorsNeverCarryTheBearer(t *testing.T) {
 				t.Errorf("%s error carries the bearer: %v", name, err)
 			}
 		}
+		// A source that renews at every ask: the error carries none of the
+		// renewed bearers the registry echoed.
+		renewing := &renewingBearers{}
+		if _, err = publicationupload.Upload(context.Background(), member.request, renewing.get); err == nil {
+			t.Errorf("%s uploaded under renewed bearers to a registry that refuses every upload", name)
+			continue
+		}
+		renewing.mu.Lock()
+		issued := slices.Collect(maps.Keys(renewing.issued))
+		renewing.mu.Unlock()
+		if len(issued) == 0 {
+			t.Errorf("%s asked no bearer", name)
+		}
+		for _, secret := range issued {
+			if strings.Contains(err.Error(), secret) {
+				t.Errorf("%s error carries the renewed bearer %s: %v", name, secret, err)
+			}
+		}
 	}
 }
 
@@ -623,4 +641,180 @@ func writeTestLayout(t testing.TB, dir string, img v1.Image) string {
 		t.Fatal(err)
 	}
 	return digest.String()
+}
+
+// renewingBearers answers a new bearer at each ask and remembers each one.
+type renewingBearers struct {
+	mu     sync.Mutex
+	issued map[string]bool
+}
+
+func (b *renewingBearers) get(context.Context, *url.URL) (string, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.issued == nil {
+		b.issued = map[string]bool{}
+	}
+	token := fmt.Sprintf("renewed-bearer-%d", len(b.issued)+1)
+	b.issued[token] = true
+	return token, nil
+}
+
+// onceEach serves inner, which answers testBearer alone, to a request that
+// carries a bearer of source no earlier request carried, and answers 401 to a
+// request that sends a bearer again, as a registry does once that bearer
+// expired. Concurrent requests each carry their own bearer, so the rule holds
+// for a parallel push. It counts the bearers it accepted.
+func onceEach(t *testing.T, source *renewingBearers, inner http.Handler) (*httptest.Server, func() int) {
+	t.Helper()
+	var mu sync.Mutex
+	accepted := map[string]bool{}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authorization := r.Header.Get("Authorization"); authorization != "" {
+			token, _ := strings.CutPrefix(authorization, "Bearer ")
+			source.mu.Lock()
+			issued := source.issued[token]
+			source.mu.Unlock()
+			mu.Lock()
+			fresh := issued && !accepted[token]
+			accepted[token] = true
+			mu.Unlock()
+			if !fresh {
+				w.WriteHeader(http.StatusUnauthorized)
+				return
+			}
+			r.Header.Set("Authorization", "Bearer "+testBearer)
+		}
+		inner.ServeHTTP(w, r)
+	}))
+	t.Cleanup(server.Close)
+	return server, func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(accepted)
+	}
+}
+
+// Each request of an upload asks the bearer again, so an upload that outlasts
+// one bearer sends a renewed one at every request: a registry that accepts each
+// bearer for one request alone stores each ecosystem's member.
+func TestUploadAsksTheBearerBeforeEachRequest(t *testing.T) {
+	spectest.Proves(t, feature, requirement, "each-request-asks-the-bearer-again")
+	for name, tc := range map[string]struct {
+		registry func(t *testing.T) http.Handler
+		member   func(t *testing.T, server *httptest.Server) packed
+	}{
+		"npm": {
+			registry: func(t *testing.T) http.Handler {
+				return publicationuploadtest.NewNPMRegistry(t, testBearer).Server.Config.Handler
+			},
+			member: func(t *testing.T, server *httptest.Server) packed { return npmMember(t, server.URL, "") },
+		},
+		"go": {
+			registry: func(t *testing.T) http.Handler {
+				return publicationuploadtest.NewGoRegistry(t, testBearer).Server.Config.Handler
+			},
+			member: func(t *testing.T, server *httptest.Server) packed { return goMember(t, server.URL) },
+		},
+		"archive": {
+			registry: func(t *testing.T) http.Handler {
+				return publicationuploadtest.NewPutRegistry(t, testBearer).Server.Config.Handler
+			},
+			member: func(t *testing.T, server *httptest.Server) packed { return archiveMember(t, server.URL, "") },
+		},
+		"oci": {
+			registry: func(*testing.T) http.Handler { return registry.New() },
+			member:   func(t *testing.T, server *httptest.Server) packed { return ociMember(t, hostOf(t, server)) },
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			source := &renewingBearers{}
+			server, accepted := onceEach(t, source, tc.registry(t))
+			member := tc.member(t, server)
+			got, err := publicationupload.Upload(context.Background(), member.request, source.get)
+			if err != nil || got.Digest != member.want.Digest {
+				t.Fatalf("upload = %+v, %v; want %+v", got, err, member.want)
+			}
+			if count := accepted(); count < 2 {
+				t.Fatalf("the registry accepted %d bearers; each request should send a renewed one", count)
+			}
+		})
+	}
+}
+
+// A registry that refuses the bearer (401 or 403) fails the upload with an
+// error that matches ErrBearerRefused, whatever the ecosystem.
+func TestUploadSaysTheRegistryRefusedTheBearer(t *testing.T) {
+	spectest.Proves(t, feature, requirement, "no-error-carries-the-bearer")
+	for name, member := range map[string]func(t *testing.T, server *httptest.Server) packed{
+		"npm":     func(t *testing.T, server *httptest.Server) packed { return npmMember(t, server.URL, "") },
+		"go":      func(t *testing.T, server *httptest.Server) packed { return goMember(t, server.URL) },
+		"archive": func(t *testing.T, server *httptest.Server) packed { return archiveMember(t, server.URL, "") },
+		"oci":     func(t *testing.T, server *httptest.Server) packed { return ociMember(t, hostOf(t, server)) },
+	} {
+		t.Run(name, func(t *testing.T) {
+			refusing := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Header.Get("Authorization") == "" && r.URL.Path == "/v2/" {
+					w.WriteHeader(http.StatusOK)
+					return
+				}
+				w.WriteHeader(http.StatusUnauthorized)
+			}))
+			t.Cleanup(refusing.Close)
+			source := &bearers{}
+			_, err := publicationupload.Upload(context.Background(), member(t, refusing).request, source.get)
+			if !errors.Is(err, publicationupload.ErrBearerRefused) {
+				t.Fatalf("upload to a registry that refuses the bearer = %v; want ErrBearerRefused", err)
+			}
+			if strings.Contains(err.Error(), testBearer) || strings.Contains(err.Error(), url.QueryEscape(testBearer)) {
+				t.Fatalf("the error carries the bearer: %v", err)
+			}
+		})
+	}
+}
+
+// With AdoptPublished, an archive whose version the registry holds with
+// another manifest is adopted: the result names the stored digest and stored
+// platforms and says Adopted. Without it, or for an npm member, the same
+// conflict is refused as ErrArtifactConflict.
+func TestUploadAdoptsAStoredVersion(t *testing.T) {
+	spectest.Proves(t, feature, "upload-kit-adopts-a-stored-version", "an-adopted-version-answers-the-stored-digest")
+	ctx := context.Background()
+	putRegistry := publicationuploadtest.NewPutRegistry(t, testBearer)
+	earlier := archiveMember(t, putRegistry.Server.URL, " earlier attempt")
+	if _, err := publicationupload.Upload(ctx, earlier.request, (&bearers{}).get); err != nil {
+		t.Fatal(err)
+	}
+	retry := archiveMember(t, putRegistry.Server.URL, " retry")
+	if _, err := publicationupload.Upload(ctx, retry.request, (&bearers{}).get); !errors.Is(err, publicationupload.ErrArtifactConflict) {
+		t.Fatalf("a conflict without AdoptPublished = %v; want ErrArtifactConflict", err)
+	}
+	retry.request.AdoptPublished = true
+	before, _ := putRegistry.Recorded()
+	got, err := publicationupload.Upload(ctx, retry.request, (&bearers{}).get)
+	want := publicationupload.Result{Digest: earlier.want.Digest, Platforms: earlier.want.Platforms, Adopted: true}
+	if err != nil || got.Digest != want.Digest || !maps.Equal(got.Platforms, want.Platforms) || !got.Adopted {
+		t.Fatalf("an adopted upload = %+v, %v; want %+v", got, err, want)
+	}
+	// The retry reads the stored manifest first and sends no blob again.
+	if after, _ := putRegistry.Recorded(); len(after)-len(before) != 1 || !strings.HasSuffix(after[len(after)-1], "/manifest") {
+		t.Fatalf("the adopted retry sent %v; want the manifest read alone", after[len(before):])
+	}
+	// An unpublished version is published as usual, after one manifest read.
+	fresh := archiveMember(t, putRegistry.Server.URL, " retry")
+	fresh.request.Member.Version = "0.4.0"
+	fresh.request.AdoptPublished = true
+	if got, err := publicationupload.Upload(ctx, fresh.request, (&bearers{}).get); err != nil || got.Adopted || got.Digest != fresh.want.Digest {
+		t.Fatalf("an unpublished version with AdoptPublished = %+v, %v; want it published", got, err)
+	}
+
+	npm := publicationuploadtest.NewNPMRegistry(t, testBearer)
+	if _, err := publicationupload.Upload(ctx, npmMember(t, npm.Server.URL, "").request, (&bearers{}).get); err != nil {
+		t.Fatal(err)
+	}
+	other := npmMember(t, npm.Server.URL, " changed")
+	other.request.AdoptPublished = true
+	if _, err := publicationupload.Upload(ctx, other.request, (&bearers{}).get); !errors.Is(err, publicationupload.ErrArtifactConflict) {
+		t.Fatalf("an npm conflict with AdoptPublished = %v; want ErrArtifactConflict", err)
+	}
 }

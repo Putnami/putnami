@@ -1079,10 +1079,12 @@ func TestTamperedOutboxArtifactIsRefusedByDigest(t *testing.T) {
 }
 
 // The provider's answer must name the packed artifact digest, and platforms
-// only for an archive member: an upload answered otherwise fails, reports no
+// only for an archive member, and only a put or archive member may be
+// adopted: an upload answered otherwise fails, reports no
 // published member, records no published image, and releases nothing.
 func TestAnAnsweredDigestOtherThanThePackedOneFailsTheUpload(t *testing.T) {
 	spectest.Proves(t, "cli/provider-publication", "uploads-go-to-the-credential-provider", "the-answered-digest-must-be-the-packed-one")
+	spectest.Proves(t, "cli/provider-publication", "an-adopted-upload-names-the-plans-commit", "an-adopted-answer-for-another-version-fails")
 	for name, tc := range map[string]struct {
 		oci     bool
 		answer  func(registryproto.UploadResult) registryproto.UploadResult
@@ -1100,6 +1102,12 @@ func TestAnAnsweredDigestOtherThanThePackedOneFailsTheUpload(t *testing.T) {
 				return registryproto.UploadResult{Digest: digestFor('f')}
 			},
 			refusal: "the credential provider answered digest " + digestFor('f'),
+		},
+		"an npm member that says adopted": {
+			answer: func(registryproto.UploadResult) registryproto.UploadResult {
+				return registryproto.UploadResult{Digest: digestFor('f'), Adopted: true}
+			},
+			refusal: "only a put or archive member is adopted",
 		},
 		"an npm member with platforms": {
 			answer: func(answer registryproto.UploadResult) registryproto.UploadResult {
@@ -1139,7 +1147,7 @@ func TestAnAnsweredDigestOtherThanThePackedOneFailsTheUpload(t *testing.T) {
 			if upload == nil || upload.Status != "failed" || upload.Error == nil || !strings.Contains(upload.Error.Message, tc.refusal) {
 				t.Fatalf("upload answered otherwise: %s; want a refusal that says %q", resultMessage(upload), tc.refusal)
 			}
-			if tc.answer(registryproto.UploadResult{}).Digest != "" && !strings.Contains(upload.Error.Message, packed) {
+			if answer := tc.answer(registryproto.UploadResult{}); answer.Digest != "" && !answer.Adopted && !strings.Contains(upload.Error.Message, packed) {
 				t.Fatalf("the refusal %q does not name the packed digest %s", upload.Error.Message, packed)
 			}
 			if events := uploadEvents(t, upload); len(events) != 0 {

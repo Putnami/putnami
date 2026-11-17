@@ -29,6 +29,7 @@
     "tooling/extension-authoring#subprocess-control",
     "tooling/extension-authoring#test-environment-policy",
     "tooling/extension-authoring#tree-fingerprint",
+    "tooling/extension-authoring#upload-kit-adopts-a-stored-version",
     "tooling/extension-authoring#upload-kit-tells-a-mismatch-from-a-conflict",
     "tooling/extension-authoring#upload-kit-uploads-what-the-engine-verified"
   ]
