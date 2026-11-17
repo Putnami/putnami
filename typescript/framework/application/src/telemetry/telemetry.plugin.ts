@@ -9,32 +9,32 @@
  * The flush timer drains completed per-second buckets from the collector,
  * renders them as OTLP/JSON, and POSTs them to a standard OTLP/HTTP collector's
  * /v1/metrics and /v1/traces. Each push asks the registered telemetry token
- * source for its bearer. Logs are opt-in via OtlpLogSink on the application
- * logger.
+ * source for its bearer. Logs go through an OtlpLogSink on the root logger,
+ * which `application()` attaches when the environment names a collector.
  *
  * `application()` adds the plugin `telemetryFromEnvironment()` builds when the
  * environment names a collector and the composition holds no `telemetry()`.
  */
 
-import { getTelemetryTokenSource, type InferConfig, useConfig, useLogger } from '@putnami/runtime';
+import { type InferConfig, useConfig, useLogger } from '@putnami/runtime';
 import type { Module, Plugin } from '../application';
 import type { HttpMiddleware } from '../http/http-middleware.type';
 import { HttpPlugin } from '../http/http.plugin';
 import type { MetricsBucket, TelemetrySpanRecord } from './telemetry.collector';
 import { TelemetryCollector } from './telemetry.collector';
 import { TelemetryConfig, type TelemetryOptions } from './telemetry.config';
-import { environmentEndpoint, environmentResource, withProcessInstance } from './telemetry.environment';
+import { CollectorAccess } from './telemetry.credential';
+import { environmentEndpoint, serviceIdentity } from './telemetry.environment';
 import { TelemetryMiddleware } from './telemetry.middleware';
-import { type OtlpSendResult, sendMetrics, sendTraces } from './telemetry.sender';
+import { sendMetrics, sendTraces } from './telemetry.sender';
 import { clearCollector, setCollector } from './telemetry.utils';
 
 /** Where a running plugin pushes, and as whom. */
 interface TelemetryTarget {
-  endpoint: string;
+  /** The collector and the credential of each push. */
+  access: CollectorAccess;
   /** The OTLP resource's service.name. */
   app: string;
-  /** A static bearer; it wins over the registered token source. */
-  bearer?: string;
   resourceAttributes: Record<string, string>;
 }
 
@@ -46,8 +46,6 @@ export class TelemetryPlugin implements Plugin {
   private target: TelemetryTarget | undefined;
   private middleware: HttpMiddleware | undefined;
   private readonly environment: boolean;
-  private refusalWarned = false;
-  private credentialWarned = false;
 
   /** Runtime flush interval. */
   private flushIntervalS = 30;
@@ -99,7 +97,7 @@ export class TelemetryPlugin implements Plugin {
 
   async start(app: Module): Promise<void> {
     if (!this.collector || !this.target) return;
-    const endpoint = this.target.endpoint;
+    const endpoint = this.target.access.endpoint;
 
     this.flushTimer = setInterval(() => {
       this.flush().catch((error) => {
@@ -129,7 +127,7 @@ export class TelemetryPlugin implements Plugin {
     // Drain everything (including the current second) on shutdown
     if (this.collector) {
       await this.push(this.collector.drainAll(), this.collector.drainSpans()).catch((error) => {
-        useLogger('telemetry').warn('Shutdown flush failed', { endpoint: this.target?.endpoint, error });
+        useLogger('telemetry').warn('Shutdown flush failed', { endpoint: this.target?.access.endpoint, error });
       });
     }
 
@@ -167,12 +165,11 @@ export class TelemetryPlugin implements Plugin {
     }
     if (!endpoint) return undefined;
 
-    const resource = environmentResource();
+    const identity = serviceIdentity(config.app);
     return {
-      endpoint,
-      app: resource.serviceName ?? resource.attributes['service.name'] ?? config.app ?? 'unknown',
-      ...(bearer ? { bearer } : {}),
-      resourceAttributes: withProcessInstance(resource.attributes),
+      access: new CollectorAccess(endpoint, bearer),
+      app: identity.serviceName,
+      resourceAttributes: identity.resourceAttributes,
     };
   }
 
@@ -189,47 +186,13 @@ export class TelemetryPlugin implements Plugin {
     const target = this.target;
     if (!target || (buckets.length === 0 && spans.length === 0)) return;
 
-    const credential = await this.credential(target);
+    const credential = await target.access.credential();
     if (!credential.ok) return;
 
+    const endpoint = target.access.endpoint;
     const opts = { app: target.app, bearer: credential.bearer, resourceAttributes: target.resourceAttributes };
-    if (buckets.length > 0) this.observe(await sendMetrics(target.endpoint, buckets, opts));
-    if (spans.length > 0) this.observe(await sendTraces(target.endpoint, spans, opts));
-  }
-
-  /**
-   * The bearer of one push: the static bearer, else the registered token
-   * source's answer. A failing source drops the batch: nothing is sent
-   * without a credential.
-   */
-  private async credential(target: TelemetryTarget): Promise<{ ok: boolean; bearer?: string }> {
-    if (target.bearer) return { ok: true, bearer: target.bearer };
-    const source = getTelemetryTokenSource();
-    if (!source) return { ok: true };
-    try {
-      const bearer = await source(target.endpoint);
-      return bearer ? { ok: true, bearer } : { ok: true };
-    } catch {
-      if (!this.credentialWarned) {
-        this.credentialWarned = true;
-        useLogger('telemetry').warn(
-          'telemetry could not obtain a credential for its collector; the batch was dropped. Later failures are not logged.',
-          { endpoint: target.endpoint },
-        );
-      }
-      return { ok: false };
-    }
-  }
-
-  /** Log the first refusal by the collector; later ones stay silent. */
-  private observe(result: OtlpSendResult): void {
-    if ((result.status === 401 || result.status === 403) && !this.refusalWarned) {
-      this.refusalWarned = true;
-      useLogger('telemetry').warn(
-        `the telemetry collector refused a push (HTTP ${result.status}); check the credential its token source supplies. Later refusals are not logged.`,
-        { endpoint: this.target?.endpoint },
-      );
-    }
+    if (buckets.length > 0) target.access.observe(await sendMetrics(endpoint, buckets, opts));
+    if (spans.length > 0) target.access.observe(await sendTraces(endpoint, spans, opts));
   }
 }
 

@@ -69,6 +69,28 @@ export function environmentResource(env: Environment = process.env): Environment
   };
 }
 
+/** The service identity of a pushed resource. */
+export interface ServiceIdentity {
+  /** The resource's service.name. */
+  serviceName: string;
+  /** The pairs of `OTEL_RESOURCE_ATTRIBUTES`, with the process's `service.instance.id`. */
+  resourceAttributes: Record<string, string>;
+}
+
+/**
+ * The service identity every signal pushes: `service.name` is
+ * `OTEL_SERVICE_NAME`, then the `service.name` pair of
+ * `OTEL_RESOURCE_ATTRIBUTES`, then `fallback`, then `unknown`; the
+ * attributes carry the process's `service.instance.id` unless they set one.
+ */
+export function serviceIdentity(fallback?: string, env: Environment = process.env): ServiceIdentity {
+  const resource = environmentResource(env);
+  return {
+    serviceName: resource.serviceName ?? resource.attributes['service.name'] ?? fallback ?? 'unknown',
+    resourceAttributes: withProcessInstance(resource.attributes),
+  };
+}
+
 /**
  * Parse `OTEL_RESOURCE_ATTRIBUTES`: comma-separated `key=value` pairs whose
  * keys and values may be percent-encoded. A pair without `=`, with an empty

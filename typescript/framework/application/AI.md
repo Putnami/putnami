@@ -614,7 +614,12 @@ With `OTEL_EXPORTER_OTLP_ENDPOINT` set, `application()` adds the plugin
 `telemetryFromEnvironment()` builds unless the composition holds `telemetry()`;
 `OTEL_SDK_DISABLED=true` turns it off. Its middleware goes on every composed
 `HttpPlugin` through `useOutermost`, and it creates no server. Each push asks
-the token source registered in `@putnami/runtime` for its bearer. See
+the token source registered in `@putnami/runtime` for its bearer. The same
+variables make `start()` attach an `OtlpLogSink` to the root logger
+(`telemetry.logs.ts`), unless it already holds one, whatever the composition;
+applications in one process share it, a `run()` runner flushes it when it
+returns, and the last `stop()` or failed start detaches and closes it. The sink takes the
+environment's resource and asks the same token source. See
 `doc/telemetry.md` and ADR 0007.
 
 ## Testing

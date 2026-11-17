@@ -22,16 +22,34 @@ import { redact } from './redact';
  * to derive a named child and {@link Logger.with} to attach structured fields.
  */
 export class Logger {
-  private sinks: LogSink[];
+  private readonly sinkList: LogSink[];
   private loggerName?: string;
   private detachedContext: Record<string, unknown>;
   private skipLevelCheck: boolean;
 
   constructor(sinks: LogSink[], name?: string, detachedContext: Record<string, unknown> = {}, skipLevelCheck = false) {
-    this.sinks = sinks;
+    this.sinkList = sinks;
     this.loggerName = name;
     this.detachedContext = detachedContext;
     this.skipLevelCheck = skipLevelCheck;
+  }
+
+  /** The sinks this logger writes to, shared with every logger derived from it. */
+  get sinks(): readonly LogSink[] {
+    return this.sinkList;
+  }
+
+  /**
+   * Add a sink to the list this logger shares with every logger derived from
+   * it, including those derived before the call, and with any other logger
+   * built on the same array. Returns a function that removes that sink again.
+   */
+  addSink(sink: LogSink): () => void {
+    this.sinkList.push(sink);
+    return () => {
+      const index = this.sinkList.indexOf(sink);
+      if (index >= 0) this.sinkList.splice(index, 1);
+    };
   }
 
   /** The logger's name, or an empty string when unnamed. */
@@ -41,7 +59,7 @@ export class Logger {
 
   /** Derive a logger that tags its entries with `name`, sharing this logger's sinks and detached context. */
   named(name: string): Logger {
-    return new Logger(this.sinks, name, { ...this.detachedContext }, this.skipLevelCheck);
+    return new Logger(this.sinkList, name, { ...this.detachedContext }, this.skipLevelCheck);
   }
 
   /**
@@ -111,7 +129,7 @@ export class Logger {
     // Return a new Logger with a copy-on-write context along the touched path.
     const nextContext = { ...this.detachedContext };
     applyField(nextContext, path, value, op, options, true);
-    return new Logger(this.sinks, this.loggerName, nextContext, this.skipLevelCheck);
+    return new Logger(this.sinkList, this.loggerName, nextContext, this.skipLevelCheck);
   }
 
   /** Log at `debug` level. Extra params are captured as structured data; an `Error` param is recorded with its cause chain. */
@@ -136,14 +154,14 @@ export class Logger {
 
   /** Flush every sink that buffers entries, resolving once all have drained. */
   async flush(): Promise<void> {
-    for (const sink of this.sinks) {
+    for (const sink of this.sinkList) {
       await sink.flush?.();
     }
   }
 
   /** Close every sink, releasing its resources. The logger should not be used afterwards. */
   async close(): Promise<void> {
-    for (const sink of this.sinks) {
+    for (const sink of this.sinkList) {
       await sink.close?.();
     }
   }
@@ -162,7 +180,7 @@ export class Logger {
       };
     }
 
-    for (const sink of this.sinks) {
+    for (const sink of this.sinkList) {
       sink.write(entry);
     }
   }

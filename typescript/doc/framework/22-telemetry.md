@@ -12,12 +12,14 @@ When the environment sets `OTEL_EXPORTER_OTLP_ENDPOINT`, every `application()` a
 |---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector base URL. Without it, the application gets no telemetry and nothing leaves the process. |
 | `OTEL_SDK_DISABLED=true` | Turns this default telemetry off, whatever the endpoint says. |
-| `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option. |
+| `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option or the log sink's `serviceName` option. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Comma-separated `key=value` pairs added to every pushed resource. |
+
+The same variables export logs. `application()` attaches an `OtlpLogSink` to the root logger when it starts, so every record reaches `<endpoint>/v1/logs` with the resource and the credentials of metrics and traces. Applications started in one process share that sink, a `run()` runner flushes it when it returns, and the last application to stop closes it. A root logger that already holds an `OtlpLogSink` the application configured keeps it alone.
 
 ### Explicitly
 
-Register the `telemetry()` plugin to configure telemetry yourself. An explicit plugin owns telemetry: the environment then adds nothing, and the plugin's own configuration decides.
+Register the `telemetry()` plugin to configure telemetry yourself. An explicit plugin owns metrics and traces: the environment then adds no second plugin, and the plugin's own configuration decides. It exports no logs, so the log sink the environment attaches stays; `OTEL_SDK_DISABLED=true` turns it off.
 
 ```ts
 import { application, http, telemetry } from '@putnami/application';
@@ -40,7 +42,7 @@ Once telemetry runs, HTTP metrics are collected automatically. No further setup 
 
 ## Credentials
 
-Before each push, the plugin asks the telemetry token source registered with `@putnami/runtime` for a bearer token, so a token that expires is renewed without a restart. On Putnami Cloud, `register()` from `@putnami/cloud/runtime`, which a Cloud workload already calls in its `activate.ts`, registers a source that returns a Google ID token for the collector.
+Before each push, the plugin and the log sink ask the telemetry token source registered with `@putnami/runtime` for a bearer token, so a token that expires is renewed without a restart. On Putnami Cloud, `register()` from `@putnami/cloud/runtime`, which a Cloud workload already calls in its `activate.ts`, registers a source that returns a Google ID token for the collector.
 
 ```ts
 import { registerTelemetryTokenSource } from '@putnami/runtime';

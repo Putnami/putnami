@@ -77,7 +77,7 @@ Setting `OTLP` auto-wires the metric reader (`/v1/metrics`) and the trace span e
 
 ### 5) Ship logs too
 
-Logs are opt-in: attach an OTLP log sink to your application logger and records are batched and POSTed to `<endpoint>/v1/logs`.
+On the Go runtime, attach an OTLP log sink to your application logger and records are batched and POSTed to `<endpoint>/v1/logs`.
 
 ```go
 // Go
@@ -89,12 +89,12 @@ defer sink.Close() // final flush on shutdown
 log := logger.New("checkout", logger.LevelInfo, logger.NewJSONSink(), sink)
 ```
 
-On the TypeScript runtime the equivalent sink is `OtlpLogSink` from `@putnami/application`, added to the application logger the same way as the console/JSON sinks.
+On the TypeScript runtime, `application()` attaches the equivalent sink, `OtlpLogSink` from `@putnami/application`, to the root logger by itself when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, with the same resource and token source as metrics and traces. To push logs elsewhere, add your own `OtlpLogSink` to the root logger with `useLogger().addSink(sink)` before the application starts; `application()` then adds none.
 
 ## What you get
 
 - **Metrics** — framework metrics out of the box, plus your own counters, gauges, and histograms.
 - **Traces** — request spans from both runtimes.
-- **Logs** — structured logs forwarded to the collector through the opt-in OTLP sink.
+- **Logs** — structured logs forwarded to the collector through the OTLP log sink, attached from the environment on the TypeScript runtime.
 
 Any standard OTLP/HTTP collector accepts this data. Collector errors are dropped by design — telemetry never affects the workload's request path.

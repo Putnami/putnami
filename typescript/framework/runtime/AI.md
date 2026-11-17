@@ -268,6 +268,10 @@ logger.error('Failed', { error });
 logger.debug('Query', { sql, params });
 ```
 
+`logger.addSink(sink)` adds a sink to a running logger and to every logger
+derived from it, before or after the call; it returns a function that removes
+the sink. `logger.sinks` lists the current sinks.
+
 ## Error Handling
 
 ```ts

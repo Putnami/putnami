@@ -335,6 +335,25 @@ const logger = new Logger([new MyCustomSink(), new JsonSink()]);
 logger.info('Sent to both sinks');
 ```
 
+### Adding a Sink to a Running Logger
+
+`addSink()` adds a sink to a logger that already runs. The logger shares its
+sinks with every logger derived from it, so `named()` and `with()` loggers,
+those derived before the call included, write to the new sink too. It returns
+a function that removes the sink again; `sinks` lists the current ones.
+
+```typescript
+import { useLogger } from '@putnami/runtime';
+
+const root = useLogger();
+const remove = root.addSink(new MyCustomSink());
+// later:
+remove();
+```
+
+`application()` from `@putnami/application` uses it to attach an
+`OtlpLogSink` to the root logger when the environment names a collector.
+
 ## Testing
 
 Use `MemoryLogger` to capture and assert on log output in tests:

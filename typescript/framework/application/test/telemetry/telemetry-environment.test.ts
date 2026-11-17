@@ -7,6 +7,7 @@ import type { Application } from '../../src/application';
 import { application, module } from '../../src/application';
 import { HttpPlugin, http } from '../../src/http/http.plugin';
 import { platform } from '../../src/platform/platform.plugin';
+import { OtlpLogSink } from '../../src/telemetry/otlp-log.sink';
 import { parseResourceAttributes } from '../../src/telemetry/telemetry.environment';
 import { TelemetryPlugin, telemetry, telemetryFromEnvironment } from '../../src/telemetry/telemetry.plugin';
 import { getCollector } from '../../src/telemetry/telemetry.utils';
@@ -48,10 +49,18 @@ type Collector = ReturnType<typeof fakeCollector>;
 
 /** The string attributes of the first resource of an OTLP request body. */
 function resourceAttributes(body: Record<string, unknown>): Record<string, string> {
-  const list = (body['resourceMetrics'] ?? body['resourceSpans']) as Array<{
+  const list = (body['resourceMetrics'] ?? body['resourceSpans'] ?? body['resourceLogs']) as Array<{
     resource: { attributes: Array<{ key: string; value: { stringValue: string } }> };
   }>;
   return Object.fromEntries(list[0].resource.attributes.map((a) => [a.key, a.value.stringValue]));
+}
+
+/** Messages of the log records a logs request body carries. */
+function logMessages(body: Record<string, unknown>): string[] {
+  const list = body['resourceLogs'] as Array<{
+    scopeLogs: Array<{ logRecords: Array<{ body?: { stringValue?: string } }> }>;
+  }>;
+  return list.flatMap((r) => r.scopeLogs.flatMap((s) => s.logRecords.map((record) => record.body?.stringValue ?? '')));
 }
 
 /** Names of the metrics a metrics request body carries. */
@@ -145,7 +154,7 @@ describe('telemetry from the environment', () => {
   );
 
   specTest(
-    'a disabled explicit telemetry() wins over the environment',
+    'a disabled explicit telemetry() wins over the environment for metrics and traces',
     { feature: FEATURE, requirement: 'default-from-environment', check: 'an-explicit-plugin-owns-telemetry' },
     async () => {
       collector = fakeCollector();
@@ -153,7 +162,7 @@ describe('telemetry from the environment', () => {
 
       await serveOneRequest((a) => a.use(telemetry({ enabled: false })));
 
-      expect(collector.pushes).toHaveLength(0);
+      expect(collector.pushes.map((push) => push.path)).toEqual(['/v1/logs']);
     },
   );
 
@@ -177,7 +186,7 @@ describe('telemetry from the environment', () => {
         });
 
         expect(plugins).toBe(1);
-        expect(environmentCollector.pushes).toHaveLength(0);
+        expect(environmentCollector.pushes.map((push) => push.path)).toEqual(['/v1/logs']);
         const metrics = collector.pushes.filter((push) => push.path === '/v1/metrics');
         const points = (
           metrics[0].body['resourceMetrics'] as Array<{
@@ -245,8 +254,10 @@ describe('telemetry from the environment', () => {
         OTEL_RESOURCE_ATTRIBUTES: 'service=team/workloads/site,revision=site-00001',
       });
 
-      // Each process pushes its metrics and its traces once, on stop.
+      // Each process pushes its metrics, its traces and its logs once, on stop.
       expect(collector?.pushes.map((push) => push.path).sort()).toEqual([
+        '/v1/logs',
+        '/v1/logs',
         '/v1/metrics',
         '/v1/metrics',
         '/v1/traces',
@@ -254,6 +265,7 @@ describe('telemetry from the environment', () => {
       ]);
       for (const id of ids) expect(id).toBeTruthy();
       expect(new Set(ids).size).toBe(2);
+      expect(new Set(ids.slice(0, 3)).size).toBe(1);
     },
     { timeout: 30_000 },
   );
@@ -270,7 +282,7 @@ describe('telemetry from the environment', () => {
         OTEL_RESOURCE_ATTRIBUTES: 'service.name=site,service.instance.id=site-7f9c',
       });
 
-      expect(ids).toEqual(['site-7f9c', 'site-7f9c', 'site-7f9c', 'site-7f9c']);
+      expect(ids).toEqual(Array(6).fill('site-7f9c'));
     },
     { timeout: 30_000 },
   );
@@ -291,7 +303,7 @@ describe('telemetry from the environment', () => {
 
       await serveOneRequest();
 
-      expect(collector.pushes.map((push) => push.path).sort()).toEqual(['/v1/metrics', '/v1/traces']);
+      expect(collector.pushes.map((push) => push.path).sort()).toEqual(['/v1/logs', '/v1/metrics', '/v1/traces']);
       for (const push of collector.pushes) {
         expect(resourceAttributes(push.body)).toEqual({
           deployment: 'd,1',
@@ -427,8 +439,12 @@ describe('telemetry from the environment', () => {
 
       await serveOneRequest();
 
-      expect(asked).toEqual([collector.url]);
-      expect(collector.pushes.map((push) => push.authorization)).toEqual(['Bearer token-1', 'Bearer token-1']);
+      expect(asked).toEqual([collector.url, collector.url]);
+      expect(collector.pushes.map((push) => [push.path, push.authorization])).toEqual([
+        ['/v1/metrics', 'Bearer token-1'],
+        ['/v1/traces', 'Bearer token-1'],
+        ['/v1/logs', 'Bearer token-2'],
+      ]);
     },
   );
 
@@ -464,7 +480,8 @@ describe('telemetry from the environment', () => {
 
       expect(collector.pushes).toHaveLength(0);
       const credentialWarnings = warnings().filter((message) => message.includes('could not obtain a credential'));
-      expect(credentialWarnings).toHaveLength(1);
+      // One from the plugin, one from the log sink the environment attached.
+      expect(credentialWarnings).toHaveLength(2);
       expect(credentialWarnings[0]).not.toContain('secret-detail');
     },
   );
@@ -478,8 +495,129 @@ describe('telemetry from the environment', () => {
 
       await serveOneRequest();
 
-      expect(collector.pushes).toHaveLength(2);
-      expect(warnings().filter((message) => message.includes('refused a push (HTTP 401)'))).toHaveLength(1);
+      expect(collector.pushes.map((push) => push.path)).toEqual(['/v1/metrics', '/v1/traces', '/v1/logs']);
+      // One from the plugin, one from the log sink the environment attached.
+      expect(warnings().filter((message) => message.includes('refused a push (HTTP 401)'))).toHaveLength(2);
+    },
+  );
+
+  specTest(
+    'the environment endpoint attaches a log sink, and a disabled SDK attaches none',
+    { feature: FEATURE, requirement: 'logs-from-environment', check: 'the-environment-endpoint-exports-logs' },
+    async () => {
+      collector = fakeCollector();
+      process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] = collector.url;
+      process.env['OTEL_SERVICE_NAME'] = 'checkout';
+
+      await serveOneRequest();
+
+      const logs = collector.pushes.filter((push) => push.path === '/v1/logs');
+      expect(logs).toHaveLength(1);
+      expect(resourceAttributes(logs[0].body)['service.name']).toBe('checkout');
+      expect(logMessages(logs[0].body)).toContain('🤖 ready');
+
+      process.env['OTEL_SDK_DISABLED'] = 'true';
+      await serveOneRequest();
+      expect(collector.pushes.filter((push) => push.path === '/v1/logs')).toHaveLength(1);
+      expect(logger.sinks).toHaveLength(1);
+    },
+  );
+
+  specTest(
+    'a root logger that holds an OTLP log sink keeps it alone',
+    { feature: FEATURE, requirement: 'logs-from-environment', check: 'a-configured-log-sink-is-kept' },
+    async () => {
+      collector = fakeCollector();
+      const own = fakeCollector();
+      process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] = collector.url;
+      const sink = new OtlpLogSink({ endpoint: own.url, flushIntervalMs: 1_000_000 });
+      const remove = logger.addSink(sink);
+      try {
+        await serveOneRequest();
+
+        expect(logger.sinks.filter((candidate) => candidate instanceof OtlpLogSink)).toEqual([sink]);
+        await sink.flush();
+        expect(collector.pushes.some((push) => push.path === '/v1/logs')).toBe(false);
+        expect(own.pushes.map((push) => push.path)).toEqual(['/v1/logs']);
+      } finally {
+        remove();
+        await sink.close();
+        own.stop();
+      }
+    },
+  );
+
+  specTest(
+    'stopping or failing to start detaches the log sink and flushes it',
+    { feature: FEATURE, requirement: 'logs-from-environment', check: 'stopping-closes-the-log-sink' },
+    async () => {
+      collector = fakeCollector();
+      process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] = collector.url;
+
+      await serveOneRequest();
+      expect(logger.sinks).toHaveLength(1);
+      const stopped = collector.pushes.find((push) => push.path === '/v1/logs');
+      expect(stopped && logMessages(stopped.body)).toContain('👋 Application stopped');
+
+      app = application().use({
+        start: async () => {
+          throw new Error('cannot start');
+        },
+      });
+      await expect(app.start()).rejects.toThrow('cannot start');
+      app = undefined;
+
+      expect(logger.sinks).toHaveLength(1);
+      const failed = collector.pushes.filter((push) => push.path === '/v1/logs')[1];
+      expect(failed && logMessages(failed.body)).toContain('‼️ startup failed: cannot start');
+    },
+  );
+
+  specTest(
+    'applications in one process share the log sink until the last one stops',
+    { feature: FEATURE, requirement: 'logs-from-environment', check: 'stopping-closes-the-log-sink' },
+    async () => {
+      collector = fakeCollector();
+      process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] = collector.url;
+      const first = application();
+      const second = application();
+      try {
+        await first.start();
+        await second.start();
+        expect(logger.sinks.filter((sink) => sink instanceof OtlpLogSink)).toHaveLength(1);
+
+        await first.stop();
+        expect(logger.sinks).toHaveLength(2);
+        logger.info('after the first stop');
+
+        await second.stop();
+        expect(logger.sinks).toHaveLength(1);
+        const messages = collector.pushes
+          .filter((push) => push.path === '/v1/logs')
+          .flatMap((push) => logMessages(push.body));
+        expect(messages).toContain('after the first stop');
+        expect(messages.filter((message) => message === '👋 Application stopped')).toHaveLength(2);
+      } finally {
+        await first.stop();
+        await second.stop();
+      }
+    },
+  );
+
+  specTest(
+    'a runner flushes the log sink once it returns',
+    { feature: FEATURE, requirement: 'logs-from-environment', check: 'the-environment-endpoint-exports-logs' },
+    async () => {
+      collector = fakeCollector();
+      process.env['OTEL_EXPORTER_OTLP_ENDPOINT'] = collector.url;
+      app = application().run(async () => {
+        logger.info('runner done');
+      });
+
+      await app.start();
+
+      const logs = collector.pushes.filter((push) => push.path === '/v1/logs');
+      expect(logs.flatMap((push) => logMessages(push.body))).toContain('runner done');
     },
   );
 });

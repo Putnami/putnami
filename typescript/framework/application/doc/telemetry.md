@@ -12,12 +12,14 @@ When the environment sets `OTEL_EXPORTER_OTLP_ENDPOINT`, every `application()` a
 |---|---|
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector base URL. Without it, the application gets no telemetry and nothing leaves the process. |
 | `OTEL_SDK_DISABLED=true` | Turns this default telemetry off, whatever the endpoint says. |
-| `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option. |
+| `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option or the log sink's `serviceName` option. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Comma-separated `key=value` pairs added to every pushed resource. `putnami.framework` keeps the framework's value. |
 
 Every pushed resource also names its process: a random `service.instance.id`, drawn once per process, unless `OTEL_RESOURCE_ATTRIBUTES` sets one. Two instances of one revision then write two metric series, which a collector that requires points in order accepts.
 
-An application that registers `telemetry()` itself owns telemetry: the environment adds nothing, so a request is counted once.
+An application that registers `telemetry()` itself owns its metrics and traces: the environment adds no second plugin, so a request is counted once.
+
+The same variables export logs: `application()` attaches an `OtlpLogSink` to the root logger when it starts, unless that logger already holds one the application configured, and flushes it once a `run()` runner returns. Applications started in the same process share that sink; the last one to stop detaches and closes it. An explicit `telemetry()` plugin exports no logs, so it does not stop this sink; `OTEL_SDK_DISABLED=true` does.
 
 ## Explicit plugin
 
@@ -173,19 +175,24 @@ This is the canonical envelope defined by the [telemetry protocol](../../../../p
 
 ## Logs
 
-Logs are pushed with the same wire format via an opt-in `OtlpLogSink` you attach to the application logger:
+Logs are pushed with the same wire format by an `OtlpLogSink`. When the environment names a collector, `application()` attaches one to the root logger (see [From the environment](#from-the-environment)). To push logs to another collector, add your own sink to the root logger before `start()`; `application()` then attaches none:
 
 ```typescript
-import { Logger, JsonSink } from '@putnami/runtime';
+import { useLogger } from '@putnami/runtime';
 import { OtlpLogSink } from '@putnami/application';
 
 const otlp = new OtlpLogSink({ endpoint: 'https://collector:4318', serviceName: 'my-service' });
-const logger = new Logger([new JsonSink(), otlp], 'my-service');
+const remove = useLogger().addSink(otlp);
 // on shutdown:
+remove();
 await otlp.close(); // flushes remaining records to /v1/logs
 ```
 
+A sink on a logger you build yourself (`new Logger([...])`) receives only that logger's records, and does not stop `application()` from attaching the environment's sink to the root logger.
+
 The sink batches records and POSTs them to `<endpoint>/v1/logs` on a background ticker (10s default) and on `close()`, so the logging path never blocks on the network. A bounded queue drops the oldest records if the collector wedges.
+
+Its resource carries the same service identity as metrics and traces: `OTEL_SERVICE_NAME`, then the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then its `serviceName` option, then `unknown`, with every other pair of `OTEL_RESOURCE_ATTRIBUTES`. Before each push it asks the registered telemetry token source for its bearer; a static `bearer` option wins. A credential failure drops the batch, and the first credential failure and the first refusal each log one warning, as for metrics.
 
 ## Lifecycle
 

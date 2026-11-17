@@ -1,6 +1,7 @@
-import { afterEach, describe, expect, mock } from 'bun:test';
-import type { LogEntry } from '@putnami/runtime';
+import { afterEach, beforeEach, describe, expect, mock } from 'bun:test';
+import { type LogEntry, registerTelemetryTokenSource, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
+import { MemoryLogger, resetTelemetryTokenSourceForTest } from '@putnami/runtime/testing';
 import { OtlpLogSink } from '../../src/telemetry/otlp-log.sink';
 
 interface OtlpAny {
@@ -31,11 +32,162 @@ function entry(over: Partial<LogEntry>): LogEntry {
   };
 }
 
+const FEATURE = 'typescript/service-telemetry';
+const OTEL_KEYS = ['OTEL_SERVICE_NAME', 'OTEL_RESOURCE_ATTRIBUTES'] as const;
+
+/** The string attributes of the resource of a logs request body. */
+function resourceAttributes(body: string | undefined): Record<string, string> {
+  const req = JSON.parse(body as string) as OtlpLogsRequest;
+  const attributes = req.resourceLogs[0].resource.attributes ?? [];
+  return Object.fromEntries(attributes.map((a) => [a.key, a.value.stringValue ?? '']));
+}
+
 describe('OtlpLogSink', () => {
   const originalFetch = globalThis.fetch;
+  let saved: Record<string, string | undefined>;
+  let logger: MemoryLogger;
+
+  beforeEach(() => {
+    saved = Object.fromEntries(OTEL_KEYS.map((key) => [key, process.env[key]]));
+    for (const key of OTEL_KEYS) delete process.env[key];
+    logger = new MemoryLogger();
+    setRootLogger(logger);
+  });
+
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    for (const key of OTEL_KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+    resetTelemetryTokenSourceForTest();
+    resetDefaultLogger();
   });
+
+  const warnings = () => logger.entries.filter((e) => e.level === 'warn').map((e) => e.message);
+
+  /** A fetch double that answers `status` and records each call's authorization and body. */
+  function recordingFetch(status = 200) {
+    const calls: Array<{ authorization: string | undefined; body: string }> = [];
+    globalThis.fetch = mock((_u: string, init: RequestInit) => {
+      const headers = init.headers as Record<string, string>;
+      calls.push({ authorization: headers['Authorization'], body: init.body as string });
+      return Promise.resolve(new Response(null, { status }));
+    }) as unknown as typeof fetch;
+    return calls;
+  }
+
+  specTest(
+    'asks the registered token source before each push, and a static bearer wins',
+    { feature: FEATURE, requirement: 'per-push-credential', check: 'the-log-sink-authenticates-each-push' },
+    async () => {
+      const calls = recordingFetch();
+      const asked: string[] = [];
+      let issued = 0;
+      registerTelemetryTokenSource(async (endpoint) => {
+        asked.push(endpoint);
+        issued += 1;
+        return `token-${issued}`;
+      });
+
+      const sink = new OtlpLogSink({ endpoint: 'https://collector:4318', flushIntervalMs: 1_000_000 });
+      sink.write(entry({ message: 'first' }));
+      await sink.flush();
+      sink.write(entry({ message: 'second' }));
+      await sink.close();
+
+      const fixed = new OtlpLogSink({
+        endpoint: 'https://collector:4318',
+        bearer: 'static',
+        flushIntervalMs: 1_000_000,
+      });
+      fixed.write(entry({ message: 'third' }));
+      await fixed.close();
+
+      expect(asked).toEqual(['https://collector:4318', 'https://collector:4318']);
+      expect(calls.map((call) => call.authorization)).toEqual(['Bearer token-1', 'Bearer token-2', 'Bearer static']);
+    },
+  );
+
+  specTest(
+    'a failing token source drops the batch and warns once',
+    { feature: FEATURE, requirement: 'per-push-credential', check: 'a-log-sink-credential-failure-drops-the-batch' },
+    async () => {
+      const calls = recordingFetch();
+      registerTelemetryTokenSource(async () => {
+        throw new Error('metadata server unreachable: secret-detail');
+      });
+
+      const sink = new OtlpLogSink({ endpoint: 'https://collector:4318', flushIntervalMs: 1_000_000 });
+      sink.write(entry({ message: 'first' }));
+      await sink.flush();
+      sink.write(entry({ message: 'second' }));
+      await sink.close();
+
+      expect(calls).toHaveLength(0);
+      const credentialWarnings = warnings().filter((message) => message.includes('could not obtain a credential'));
+      expect(credentialWarnings).toHaveLength(1);
+      expect(credentialWarnings[0]).not.toContain('secret-detail');
+    },
+  );
+
+  specTest(
+    'a collector refusal logs one warning however many pushes it refuses',
+    { feature: FEATURE, requirement: 'per-push-credential', check: 'a-log-sink-refusal-warns-once' },
+    async () => {
+      const calls = recordingFetch(403);
+
+      const sink = new OtlpLogSink({ endpoint: 'https://collector:4318', flushIntervalMs: 1_000_000 });
+      sink.write(entry({ message: 'first' }));
+      await sink.flush();
+      sink.write(entry({ message: 'second' }));
+      await sink.close();
+
+      expect(calls).toHaveLength(2);
+      expect(warnings().filter((message) => message.includes('refused a push (HTTP 403)'))).toHaveLength(1);
+    },
+  );
+
+  specTest(
+    'the resource takes OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES',
+    {
+      feature: FEATURE,
+      requirement: 'service-identity-from-environment',
+      check: 'the-log-sink-takes-the-environment-resource',
+    },
+    async () => {
+      const calls = recordingFetch();
+      process.env['OTEL_RESOURCE_ATTRIBUTES'] =
+        'service.name=from-attributes,deployment.environment=prod,putnami.framework=go';
+
+      const fromAttributes = new OtlpLogSink({
+        endpoint: 'https://collector:4318',
+        serviceName: 'option',
+        flushIntervalMs: 1_000_000,
+      });
+      fromAttributes.write(entry({}));
+      await fromAttributes.close();
+
+      process.env['OTEL_SERVICE_NAME'] = 'checkout';
+      const fromName = new OtlpLogSink({ endpoint: 'https://collector:4318', flushIntervalMs: 1_000_000 });
+      fromName.write(entry({}));
+      await fromName.close();
+
+      delete process.env['OTEL_SERVICE_NAME'];
+      delete process.env['OTEL_RESOURCE_ATTRIBUTES'];
+      const unnamed = new OtlpLogSink({ endpoint: 'https://collector:4318', flushIntervalMs: 1_000_000 });
+      unnamed.write(entry({}));
+      await unnamed.close();
+
+      const [attributes, named, fallback] = calls.map((call) => resourceAttributes(call.body));
+      expect(attributes['service.name']).toBe('from-attributes');
+      expect(attributes['deployment.environment']).toBe('prod');
+      expect(attributes['putnami.framework']).toBe('typescript');
+      expect(named['service.name']).toBe('checkout');
+      expect(named['deployment.environment']).toBe('prod');
+      expect(fallback['service.name']).toBe('unknown');
+    },
+  );
 
   specTest(
     'batches records and POSTs them as OTLP/JSON to /v1/logs on close',

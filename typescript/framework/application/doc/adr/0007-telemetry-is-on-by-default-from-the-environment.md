@@ -8,7 +8,8 @@
 ## Context
 
 A TypeScript service exports metrics and traces only when its entry point adds
-`telemetry({ enabled: true, endpoint })`. No deployed site does. The platform
+`telemetry({ enabled: true, endpoint })`, and logs only when it builds its own
+logger around an `OtlpLogSink`. No deployed site does. The platform
 already sets `OTEL_EXPORTER_OTLP_ENDPOINT` and `OTEL_RESOURCE_ATTRIBUTES` on
 every workload, but the plugin reads neither.
 
@@ -54,6 +55,18 @@ The Go framework settled the same gap in
    `@putnami/cloud/runtime`, which every Cloud workload already calls, also
    registers a source that returns a Google ID token for the collector URL on
    Google Cloud and nothing elsewhere.
+8. **Logs follow the same environment.** When the environment names a
+   collector, `application()` attaches an `OtlpLogSink` to the root logger
+   when it starts, unless that logger already holds one the application
+   configured. Applications started in one process share that sink; the last
+   to stop, or to fail its start, detaches and closes it, which flushes its
+   buffer, and a `run()` runner flushes it when it returns.
+   Every `OtlpLogSink` takes the service identity of point 3 and asks the
+   token source of point 5 before each push, with the warnings of point 6.
+   An explicit `telemetry()` plugin exports no logs, so it does not stop this
+   sink: `OTEL_SDK_DISABLED=true` turns logs off with the other signals. The
+   root logger gains `addSink()` and a read-only `sinks` in
+   `@putnami/runtime` for this.
 
 ## Rejected alternatives
 
@@ -68,11 +81,18 @@ The Go framework settled the same gap in
   would drift.
 - **Send without a credential when the source fails.** The collector refuses
   it anyway, and a credential failure would look like a collector failure.
+- **Let the environment telemetry plugin own the log sink.** That plugin is
+  absent whenever the composition holds `telemetry()`, which exports no logs,
+  so an application with an explicit plugin would lose its logs.
+- **Replace the root logger with one that adds the sink.** Its sinks are not
+  readable, a logger derived before the swap would keep writing to the old
+  sinks only, and stop would have to restore a logger someone else may have
+  replaced meanwhile.
 
 ## Consequences
 
-- Every TypeScript workload on Putnami Cloud exports request metrics and
-  traces once its framework version carries this change. It needs no code
+- Every TypeScript workload on Putnami Cloud exports request metrics, traces
+  and logs once its framework version carries this change. It needs no code
   change.
 - A workload outside Putnami Cloud that sets `OTEL_EXPORTER_OTLP_ENDPOINT`
   exports too, as any OpenTelemetry SDK would. `OTEL_SDK_DISABLED=true` stops

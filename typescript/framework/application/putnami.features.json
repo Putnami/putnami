@@ -1193,7 +1193,7 @@
       "id": "typescript/service-telemetry",
       "type": "feature",
       "name": "TypeScript service telemetry",
-      "outcome": "A TypeScript service pushes its metrics and spans to the collector its environment or its plugin names, authenticated for that collector, and its logs through a sink it attaches, with bounded metric series and without a failing collector ever failing the service",
+      "outcome": "A TypeScript service pushes its metrics, spans and log records to the collector its environment, its plugin or its log sink names, with the same resource and authenticated for that collector, with bounded metric series and without a failing collector ever failing the service",
       "owner": "typescript",
       "target": "coded",
       "requirements": [
@@ -1224,12 +1224,29 @@
           }
         },
         {
+          "id": "logs-from-environment",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-environment-endpoint-exports-logs",
+              "a-configured-log-sink-is-kept",
+              "stopping-closes-the-log-sink"
+            ]
+          }
+        },
+        {
           "id": "service-identity-from-environment",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["the-service-name-comes-from-the-environment", "resource-attributes-reach-every-signal"]
+            "checks": [
+              "the-service-name-comes-from-the-environment",
+              "resource-attributes-reach-every-signal",
+              "the-log-sink-takes-the-environment-resource"
+            ]
           }
         },
         {
@@ -1267,7 +1284,10 @@
             "checks": [
               "a-registered-token-source-authenticates-each-push",
               "a-credential-failure-drops-the-batch",
-              "a-refusal-warns-once"
+              "a-refusal-warns-once",
+              "the-log-sink-authenticates-each-push",
+              "a-log-sink-credential-failure-drops-the-batch",
+              "a-log-sink-refusal-warns-once"
             ]
           }
         },

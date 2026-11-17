@@ -151,6 +151,28 @@ describe('Logger', () => {
     });
   });
 
+  describe('addSink()', () => {
+    it('reaches the logger and the loggers derived from it before and after', () => {
+      const derived = logger.named('child');
+      const added = new MemorySink();
+      const remove = logger.addSink(added);
+
+      logger.info('root');
+      derived.info('derived before');
+      logger.with('k', 'v').info('derived after');
+
+      expect(added.entries.map((e) => e.message)).toEqual(['root', 'derived before', 'derived after']);
+      expect(logger.sinks).toEqual([sink, added]);
+
+      remove();
+      remove();
+      derived.info('after removal');
+      expect(added.entries).toHaveLength(3);
+      expect(sink.entries).toHaveLength(4);
+      expect(logger.sinks).toEqual([sink]);
+    });
+  });
+
   describe('named()', () => {
     it('should create a child logger with a different name', () => {
       const child = logger.named('child');

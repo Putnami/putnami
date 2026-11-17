@@ -33,6 +33,7 @@ import { propagateBuildOptions, runGenerate, runPostGenerate } from './app-build
 import { buildAppContainerContext } from './app-container';
 import { closeContainerContext, runShutdownHooks, stopPlugins } from './app-shutdown';
 import { installSignalHandlers } from './app-signals';
+import { attachLogSinkFromEnvironment, type LogSinkHold } from '../telemetry/telemetry.logs';
 import { TelemetryPlugin, telemetryFromEnvironment } from '../telemetry/telemetry.plugin';
 import { type BuildOptions, type GenerateResult, Module, type Plugin } from './module';
 
@@ -137,6 +138,7 @@ export class Application extends Module {
   private _context?: ContainerContext;
   private _contextOptions: ContainerContextOptions;
   private _removeExceptionHandler?: () => void;
+  private _logSink?: LogSinkHold;
   private _removeSignalHandlers?: () => void;
   private _migrationRegistry = new MigrationRegistry();
 
@@ -425,6 +427,8 @@ export class Application extends Module {
 
   /**
    * Start the application lifecycle:
+   * 0. Hold the OTLP log sink the environment names on the root logger
+   *    (ADR 0007); stop() and a failed start release it
    * 1. Prepare (warmup + collect migration sources + build DI context)
    * 2. Migrate phase: invoke plugin.migrate hooks, then registry.applyAll
    *    (source-only metadata is tolerated; runners no-op unless their
@@ -432,9 +436,10 @@ export class Application extends Module {
    * 3. Start all plugins (in parallel), then call every plugin's
    *    `startupCompleted()` and log the ready record with its workload
    *    readiness marker
-   * 4. Execute the runner (if defined)
+   * 4. Execute the runner (if defined), then flush the environment's log sink
    */
   async start(): Promise<void> {
+    this._logSink ??= attachLogSinkFromEnvironment();
     const logger = useLogger('putnami');
     const startedAt = Date.now();
     let contextStarted = false;
@@ -505,6 +510,7 @@ export class Application extends Module {
       // Execute the runner if defined
       if (this.runner) {
         await this.runner();
+        await this._logSink?.flush();
       }
     } catch (error) {
       const detail = error instanceof Error ? error.message : String(error);
@@ -551,6 +557,14 @@ export class Application extends Module {
 
     this.running = false;
     logger.info('👋 Application stopped');
+    await this.releaseLogSink();
+  }
+
+  /** Give up this application's hold on the log sink the environment attached. */
+  private async releaseLogSink(): Promise<void> {
+    const hold = this._logSink;
+    this._logSink = undefined;
+    await hold?.release();
   }
 
   /**
@@ -600,6 +614,7 @@ export class Application extends Module {
       await closeContainerContext(this._context, logger);
       this._context = undefined;
     }
+    await this.releaseLogSink();
   }
 
   /**

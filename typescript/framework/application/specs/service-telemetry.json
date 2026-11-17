@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "typescript/service-telemetry",
   "outcomes": [
-    "A TypeScript service pushes its metrics and spans to the OTLP/HTTP collector its environment or its telemetry plugin names, authenticated for that collector, and sends nothing when neither names one",
+    "A TypeScript service pushes its metrics, spans and log records to the OTLP/HTTP collector its environment, its telemetry plugin or its log sink names, with the same resource and authenticated for that collector, and sends nothing when none names one",
     "An unreachable or failing collector degrades observability and never fails a request, a log call or a shutdown",
     "Metric series stay bounded whatever paths callers request",
     "Every instance of a scaled-out service writes its own metric series, so the collector accepts what each instance pushes",
@@ -13,7 +13,6 @@
     "Defining the OTLP/JSON envelope, its signal paths, its resource keys or its golden bytes, which telemetry/otlp-push-contract owns",
     "Running a collector, or defining collector-side retention, sampling or routing",
     "A /metrics scrape endpoint or an OpenTelemetry exporter SDK dependency",
-    "Exporting logs implicitly: the log sink is attached to the application logger deliberately",
     "Minting a credential: a runtime package registers the token source for its platform"
   ],
   "requirements": [
@@ -33,16 +32,24 @@
       ]
     },
     {
+      "id": "logs-from-environment",
+      "text": [
+        "An application whose environment sets OTEL_EXPORTER_OTLP_ENDPOINT, without OTEL_SDK_DISABLED=true, attaches an OTLP log sink to its root logger when it starts, so its records reach <endpoint>/v1/logs with no sink in its code.",
+        "A root logger that already holds an OTLP log sink keeps it, and the environment attaches no second one.",
+        "Applications in one process share that sink: the last to stop, or to fail its start, detaches and closes it, flushing its records; a run() runner flushes it when it returns."
+      ]
+    },
+    {
       "id": "service-identity-from-environment",
       "text": [
-        "The pushed resource names the service from OTEL_SERVICE_NAME, then the service.name pair of OTEL_RESOURCE_ATTRIBUTES, then the plugin's app option, then unknown.",
-        "Every other key=value pair of OTEL_RESOURCE_ATTRIBUTES reaches the resource of every metrics and traces request; putnami.framework keeps the value the framework sets."
+        "The resource of every metrics, traces and logs request names the service from OTEL_SERVICE_NAME, then the service.name pair of OTEL_RESOURCE_ATTRIBUTES, then the plugin's app option or the log sink's serviceName option, then unknown.",
+        "Every other key=value pair of OTEL_RESOURCE_ATTRIBUTES reaches the resource of every metrics, traces and logs request; putnami.framework keeps the value the framework sets."
       ]
     },
     {
       "id": "process-instance-identity",
       "text": [
-        "Every metrics and traces request the plugin pushes carries a service.instance.id unique to the process, so two processes started from one environment push distinct series.",
+        "Every metrics, traces and logs request carries a service.instance.id unique to the process, so two processes started from one environment push distinct series.",
         "A service.instance.id that OTEL_RESOURCE_ATTRIBUTES sets is kept."
       ]
     },
@@ -56,9 +63,9 @@
     {
       "id": "per-push-credential",
       "text": [
-        "Each push asks the token source registered for the collector endpoint for its bearer, and a static bearer wins over the source.",
+        "Each push of metrics, spans or log records asks the token source registered for the collector endpoint for its bearer, and a static bearer wins over the source.",
         "When the source fails, the batch is dropped and nothing is sent without a credential.",
-        "The first collector refusal (401 or 403) and the first credential failure each log one warning; later ones stay silent and no failure reaches the application."
+        "The first collector refusal (401 or 403) and the first credential failure each log one warning per plugin or log sink; later ones stay silent and no failure reaches the application."
       ]
     },
     {
