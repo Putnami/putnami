@@ -8,7 +8,7 @@ Putnami is serverless-first: instances scale to zero and are never externally ad
 
 ### 1) Enable the telemetry plugin
 
-On the TypeScript runtime, setting `OTEL_EXPORTER_OTLP_ENDPOINT` to your collector's base URL is enough: every `application()` then pushes to it, and `OTEL_SDK_DISABLED=true` turns it off. Putnami Cloud sets the variable for you. To configure telemetry in code instead, register the `telemetry` plugin and point it at your collector's base URL:
+On the TypeScript runtime, setting `OTEL_EXPORTER_OTLP_ENDPOINT` to your collector's base URL is enough: every `application()` then pushes to it, and `OTEL_SDK_DISABLED=true` turns it off. Putnami Cloud sets the variable for you. On both runtimes, telemetry from the environment names its process in `service.instance.id`, unless `OTEL_RESOURCE_ATTRIBUTES` sets one, so each instance of a scaled-out service writes its own metric series. To configure telemetry in code instead, register the `telemetry` plugin and point it at your collector's base URL:
 
 ```typescript
 import { telemetry } from '@putnami/application';

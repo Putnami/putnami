@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { registerTelemetryTokenSource, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
@@ -11,6 +12,8 @@ import { TelemetryPlugin, telemetry, telemetryFromEnvironment } from '../../src/
 import { getCollector } from '../../src/telemetry/telemetry.utils';
 
 const FEATURE = 'typescript/service-telemetry';
+/** The fixture a process-instance-identity test starts as a child process. */
+const PUSH_ONCE = join(import.meta.dir, 'fixtures', 'push-once.ts');
 const OTEL_KEYS = [
   'OTEL_EXPORTER_OTLP_ENDPOINT',
   'OTEL_SDK_DISABLED',
@@ -215,6 +218,63 @@ describe('telemetry from the environment', () => {
     },
   );
 
+  /**
+   * Start the push-once fixture twice from one environment, extended with
+   * extra, and return the service.instance.id of every request they pushed.
+   */
+  async function instanceIdsPushedByTwoProcesses(extra: Record<string, string>): Promise<string[]> {
+    collector = fakeCollector();
+    const env = { ...process.env, OTEL_EXPORTER_OTLP_ENDPOINT: collector.url, OTEL_SDK_DISABLED: '', ...extra };
+    for (let i = 0; i < 2; i++) {
+      const child = Bun.spawn([process.execPath, PUSH_ONCE], { env, stdout: 'ignore', stderr: 'pipe' });
+      const code = await child.exited;
+      if (code !== 0) throw new Error(`push-once exited ${code}: ${await new Response(child.stderr).text()}`);
+    }
+    return collector.pushes.map((push) => resourceAttributes(push.body)['service.instance.id']);
+  }
+
+  specTest(
+    'two processes started from one environment push distinct service.instance.id values',
+    {
+      feature: FEATURE,
+      requirement: 'process-instance-identity',
+      check: 'two-processes-from-one-environment-push-distinct-instance-ids',
+    },
+    async () => {
+      const ids = await instanceIdsPushedByTwoProcesses({
+        OTEL_RESOURCE_ATTRIBUTES: 'service=team/workloads/site,revision=site-00001',
+      });
+
+      // Each process pushes its metrics and its traces once, on stop.
+      expect(collector?.pushes.map((push) => push.path).sort()).toEqual([
+        '/v1/metrics',
+        '/v1/metrics',
+        '/v1/traces',
+        '/v1/traces',
+      ]);
+      for (const id of ids) expect(id).toBeTruthy();
+      expect(new Set(ids).size).toBe(2);
+    },
+    { timeout: 30_000 },
+  );
+
+  specTest(
+    'a service.instance.id that OTEL_RESOURCE_ATTRIBUTES sets is kept',
+    {
+      feature: FEATURE,
+      requirement: 'process-instance-identity',
+      check: 'an-instance-id-from-the-environment-is-kept',
+    },
+    async () => {
+      const ids = await instanceIdsPushedByTwoProcesses({
+        OTEL_RESOURCE_ATTRIBUTES: 'service.name=site,service.instance.id=site-7f9c',
+      });
+
+      expect(ids).toEqual(['site-7f9c', 'site-7f9c', 'site-7f9c', 'site-7f9c']);
+    },
+    { timeout: 30_000 },
+  );
+
   specTest(
     'OTEL_RESOURCE_ATTRIBUTES reaches the metrics and traces resource, framework keys win',
     {
@@ -236,6 +296,7 @@ describe('telemetry from the environment', () => {
         expect(resourceAttributes(push.body)).toEqual({
           deployment: 'd,1',
           'putnami.framework': 'typescript',
+          'service.instance.id': expect.any(String),
           'service.name': 'site',
           'service.version': '1.2.3',
           workspace: 'ws-1',

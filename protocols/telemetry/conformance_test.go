@@ -55,7 +55,7 @@ func TestConformance_Signals(t *testing.T) {
 // every runtime populates.
 func TestConformance_ResourceAttributes(t *testing.T) {
 	spectest.Proves(t, "telemetry/otlp-push-contract", "the-resource-names-the-service", "the-resource-keys-are-fixed")
-	want := []string{"service.name", "service.version", "putnami.framework"}
+	want := []string{"service.name", "service.version", "putnami.framework", "service.instance.id"}
 	if len(CanonicalResourceAttrs) != len(want) {
 		t.Fatalf("CanonicalResourceAttrs has %d entries, want %d", len(CanonicalResourceAttrs), len(want))
 	}

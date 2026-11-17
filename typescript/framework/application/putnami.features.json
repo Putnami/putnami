@@ -1233,6 +1233,18 @@
           }
         },
         {
+          "id": "process-instance-identity",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "two-processes-from-one-environment-push-distinct-instance-ids",
+              "an-instance-id-from-the-environment-is-kept"
+            ]
+          }
+        },
+        {
           "id": "outermost-request-instrumentation",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

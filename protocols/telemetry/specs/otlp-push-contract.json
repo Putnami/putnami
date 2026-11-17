@@ -27,7 +27,7 @@
     },
     {
       "id": "the-resource-names-the-service",
-      "text": "The canonical resource attribute keys are service.name, service.version and putnami.framework, in that order."
+      "text": "The canonical resource attribute keys are service.name, service.version, putnami.framework and service.instance.id, in that order. service.name is required; a runtime populates the others when it knows them, and service.instance.id names the process that pushes."
     },
     {
       "id": "the-exporter-never-hurts-the-workload",

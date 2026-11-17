@@ -5,6 +5,8 @@ package telemetry
 
 import (
 	"context"
+	"crypto/rand"
+	"fmt"
 	"sync"
 	"time"
 
@@ -22,6 +24,7 @@ import (
 	"go.putnami.dev/errors"
 	"go.putnami.dev/inject"
 	"go.putnami.dev/logger"
+	otlp "go.putnami.dev/protocol/telemetry"
 )
 
 // Error codes for the telemetry package.
@@ -92,6 +95,9 @@ func (c Config) withDefaults() Config {
 // configured ServiceName/ServiceVersion. It merges them onto the SDK default
 // resource so telemetry.sdk.* attributes are preserved. Returns nil when
 // neither field is set, leaving the providers' default resource untouched.
+// Built from the environment, it also carries the environment's attributes and
+// a service.instance.id unique to the process, unless the environment names
+// one.
 //
 // Without this, both fields were silently dropped and all spans/metrics were
 // emitted under the default unknown_service resource — unusable for the
@@ -116,6 +122,11 @@ func (c Config) resource() *resource.Resource {
 				base = merged
 			}
 		}
+		// Each process names its own instance; a non-empty value the
+		// environment sets is kept.
+		if v, ok := base.Set().Value(otlp.AttrServiceInstanceID); !ok || v.AsString() == "" {
+			attrs = append(attrs, attribute.String(otlp.AttrServiceInstanceID, processInstanceID()))
+		}
 	}
 	merged, err := resource.Merge(base, resource.NewSchemaless(attrs...))
 	if err != nil {
@@ -125,6 +136,18 @@ func (c Config) resource() *resource.Resource {
 	}
 	return merged
 }
+
+// processInstanceID returns the service.instance.id of this process: a random
+// UUID drawn once, the same for every provider the process builds.
+var processInstanceID = sync.OnceValue(func() string {
+	var b [16]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		panic(err) // rand.Read crashes the program rather than return an error
+	}
+	b[6] = b[6]&0x0f | 0x40 // version 4
+	b[8] = b[8]&0x3f | 0x80 // RFC 4122 variant
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:16])
+})
 
 // Plugin integrates OpenTelemetry into the application lifecycle.
 // It registers a TracerProvider and MeterProvider as DI singletons.

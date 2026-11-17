@@ -85,6 +85,9 @@ const (
 	AttrServiceName      = "service.name"
 	AttrServiceVersion   = "service.version"
 	AttrPutnamiFramework = "putnami.framework"
+	// AttrServiceInstanceID names the process that pushes: two processes of
+	// one service carry two values.
+	AttrServiceInstanceID = "service.instance.id"
 )
 
 // CanonicalResourceAttrs is the canonical ordered set of resource attribute keys
@@ -94,6 +97,7 @@ var CanonicalResourceAttrs = []string{
 	AttrServiceName,
 	AttrServiceVersion,
 	AttrPutnamiFramework,
+	AttrServiceInstanceID,
 }
 
 // Framework values for the putnami.framework resource attribute.

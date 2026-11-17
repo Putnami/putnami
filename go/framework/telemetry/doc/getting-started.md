@@ -219,6 +219,11 @@ It reads the standard OpenTelemetry variables:
 | `OTEL_SDK_DISABLED=true` | Turns the default telemetry off, whatever the endpoint says. |
 | `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | Service identity on every metric and span. |
 
+Every process also names its own instance: the resource carries a random
+`service.instance.id`, drawn once per process, unless `OTEL_RESOURCE_ATTRIBUTES`
+sets one. Two instances of one revision then write two metric series, which a
+collector that requires points in order accepts.
+
 The plugin adds `HTTPMiddleware` outermost on every HTTP server of the
 application, so a request that an inner middleware refuses is still counted. It
 builds the tracer and meter providers that push to the collector, unless the

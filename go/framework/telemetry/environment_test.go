@@ -2,7 +2,10 @@ package telemetry
 
 import (
 	"context"
+	"encoding/json"
 	"net/http/httptest"
+	"os"
+	"os/exec"
 	"strings"
 	"testing"
 
@@ -12,6 +15,7 @@ import (
 	"go.putnami.dev/app"
 	putnami_http "go.putnami.dev/http"
 	"go.putnami.dev/protocol/features/spectest"
+	otlp "go.putnami.dev/protocol/telemetry"
 )
 
 func TestFromEnvironmentNeedsACollectorAndHonorsTheOptOut(t *testing.T) {
@@ -160,5 +164,117 @@ func TestFromEnvironmentLeavesTheProvidersToAnExplicitPluginAndCountsOnce(t *tes
 	}
 	if n := col.count(); n != 0 {
 		t.Fatalf("the environment plugin pushed %d times while an explicit plugin owns the providers, want 0", n)
+	}
+}
+
+// envPushHelper names the variable that turns TestHelperEnvironmentPush into
+// the body of a child process.
+const envPushHelper = "PUTNAMI_TELEMETRY_PUSH_HELPER"
+
+// TestHelperEnvironmentPush is not a test of its own: run as a child process
+// with envPushHelper set, it serves one request with the telemetry the
+// environment gives it, so its stop pushes to the collector the environment
+// names.
+func TestHelperEnvironmentPush(t *testing.T) {
+	if os.Getenv(envPushHelper) != "1" {
+		t.Skip("runs only as the child process of a process-instance-identity test")
+	}
+	server := helloServer()
+	a := app.New("hello")
+	a.Use(FromEnvironment(EnvironmentOptions{}))
+	a.Use(server)
+	serveOnce(t, a, server)
+}
+
+// pushedResource is the resource of one OTLP/JSON resourceMetrics or
+// resourceSpans entry.
+type pushedResource struct {
+	Resource struct {
+		Attributes []struct {
+			Key   string `json:"key"`
+			Value struct {
+				StringValue string `json:"stringValue"`
+			} `json:"value"`
+		} `json:"attributes"`
+	} `json:"resource"`
+}
+
+// instanceIDsPushedByTwoProcesses starts two processes from one environment,
+// extended with extra, and returns the service.instance.id of every resource
+// they pushed to a test collector.
+func instanceIDsPushedByTwoProcesses(t *testing.T, extra ...string) []string {
+	t.Helper()
+	col := &testCollector{}
+	srv := col.server(t)
+	env := append(os.Environ(), envPushHelper+"=1", EnvOTLPEndpoint+"="+srv.URL, EnvSDKDisabled+"=")
+	env = append(env, extra...)
+	for range 2 {
+		cmd := exec.CommandContext(t.Context(), os.Args[0], "-test.run=^TestHelperEnvironmentPush$", "-test.count=1")
+		cmd.Env = env
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("child process: %v\n%s", err, out)
+		}
+	}
+	col.mu.Lock()
+	defer col.mu.Unlock()
+	var ids []string
+	for _, req := range col.reqs {
+		var body struct {
+			ResourceMetrics []pushedResource `json:"resourceMetrics"`
+			ResourceSpans   []pushedResource `json:"resourceSpans"`
+		}
+		if err := json.Unmarshal(req.body, &body); err != nil {
+			t.Fatalf("%s push is not OTLP/JSON: %v", req.path, err)
+		}
+		for _, pushed := range append(body.ResourceMetrics, body.ResourceSpans...) {
+			for _, a := range pushed.Resource.Attributes {
+				if a.Key == otlp.AttrServiceInstanceID {
+					ids = append(ids, req.path+"="+a.Value.StringValue)
+				}
+			}
+		}
+	}
+	return ids
+}
+
+func TestTwoProcessesFromOneEnvironmentPushDistinctInstanceIDs(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "process-instance-identity", "two-processes-from-one-environment-push-distinct-instance-ids")
+	ids := instanceIDsPushedByTwoProcesses(t, "OTEL_RESOURCE_ATTRIBUTES=service=team/workloads/hello,revision=hello-00001")
+	// Each process pushes its metrics and its traces once, on stop.
+	if len(ids) != 4 {
+		t.Fatalf("pushes carrying service.instance.id = %v, want 4 (metrics and traces of two processes)", ids)
+	}
+	perProcess := map[string]bool{}
+	for _, id := range ids {
+		_, value, _ := strings.Cut(id, "=")
+		if value == "" {
+			t.Fatalf("a push carries an empty service.instance.id: %v", ids)
+		}
+		perProcess[value] = true
+	}
+	if len(perProcess) != 2 {
+		t.Fatalf("service.instance.id values = %v, want one per process, so 2 distinct values", ids)
+	}
+}
+
+func TestAnInstanceIDFromTheEnvironmentIsKept(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "process-instance-identity", "an-instance-id-from-the-environment-is-kept")
+	ids := instanceIDsPushedByTwoProcesses(t, "OTEL_RESOURCE_ATTRIBUTES=service.name=hello,service.instance.id=hello-7f9c")
+	if len(ids) != 4 {
+		t.Fatalf("pushes carrying service.instance.id = %v, want 4 (metrics and traces of two processes)", ids)
+	}
+	for _, id := range ids {
+		if _, value, _ := strings.Cut(id, "="); value != "hello-7f9c" {
+			t.Fatalf("service.instance.id values = %v, want the value OTEL_RESOURCE_ATTRIBUTES sets in every push", ids)
+		}
+	}
+}
+
+func TestAnEmptyInstanceIDFromTheEnvironmentNamesTheProcess(t *testing.T) {
+	t.Setenv("OTEL_RESOURCE_ATTRIBUTES", "service.name=hello,service.instance.id=")
+	res := Config{fromEnvironment: true}.resource()
+	v, ok := res.Set().Value(otlp.AttrServiceInstanceID)
+	if !ok || v.AsString() != processInstanceID() {
+		t.Fatalf("service.instance.id = %q (present %v), want the process's own %q", v.AsString(), ok, processInstanceID())
 	}
 }

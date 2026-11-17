@@ -87,6 +87,7 @@
     "typescript/service-telemetry#outermost-request-instrumentation",
     "typescript/service-telemetry#per-push-credential",
     "typescript/service-telemetry#per-second-aggregation",
+    "typescript/service-telemetry#process-instance-identity",
     "typescript/service-telemetry#push-transport",
     "typescript/service-telemetry#service-identity-from-environment",
     "typescript/service-telemetry#trace-propagation"

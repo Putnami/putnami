@@ -6,6 +6,7 @@
     "A TypeScript service pushes its metrics and spans to the OTLP/HTTP collector its environment or its telemetry plugin names, authenticated for that collector, and sends nothing when neither names one",
     "An unreachable or failing collector degrades observability and never fails a request, a log call or a shutdown",
     "Metric series stay bounded whatever paths callers request",
+    "Every instance of a scaled-out service writes its own metric series, so the collector accepts what each instance pushes",
     "A span a TypeScript service records joins the caller's trace"
   ],
   "nonGoals": [
@@ -36,6 +37,13 @@
       "text": [
         "The pushed resource names the service from OTEL_SERVICE_NAME, then the service.name pair of OTEL_RESOURCE_ATTRIBUTES, then the plugin's app option, then unknown.",
         "Every other key=value pair of OTEL_RESOURCE_ATTRIBUTES reaches the resource of every metrics and traces request; putnami.framework keeps the value the framework sets."
+      ]
+    },
+    {
+      "id": "process-instance-identity",
+      "text": [
+        "Every metrics and traces request the plugin pushes carries a service.instance.id unique to the process, so two processes started from one environment push distinct series.",
+        "A service.instance.id that OTEL_RESOURCE_ATTRIBUTES sets is kept."
       ]
     },
     {

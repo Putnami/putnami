@@ -15,6 +15,8 @@ When the environment sets `OTEL_EXPORTER_OTLP_ENDPOINT`, every `application()` a
 | `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Comma-separated `key=value` pairs added to every pushed resource. `putnami.framework` keeps the framework's value. |
 
+Every pushed resource also names its process: a random `service.instance.id`, drawn once per process, unless `OTEL_RESOURCE_ATTRIBUTES` sets one. Two instances of one revision then write two metric series, which a collector that requires points in order accepts.
+
 An application that registers `telemetry()` itself owns telemetry: the environment adds nothing, so a request is counted once.
 
 ## Explicit plugin
@@ -134,7 +136,7 @@ observeHistogram('app.order.processing.duration', Date.now() - start);
 
 ## Wire Format
 
-Each flush POSTs an OTLP/JSON `ExportMetricsServiceRequest` to `<endpoint>/v1/metrics`. Counters become monotonic delta `Sum`s, gauges become `Gauge`s, and histograms become `Histogram`s (count/sum/min/max). The resource carries `service.name`, optional `service.version`, and `putnami.framework: typescript`.
+Each flush POSTs an OTLP/JSON `ExportMetricsServiceRequest` to `<endpoint>/v1/metrics`. Counters become monotonic delta `Sum`s, gauges become `Gauge`s, and histograms become `Histogram`s (count/sum/min/max). The resource carries `service.name`, optional `service.version`, `putnami.framework: typescript`, and the `service.instance.id` of the process.
 
 ```json
 {
@@ -143,6 +145,7 @@ Each flush POSTs an OTLP/JSON `ExportMetricsServiceRequest` to `<endpoint>/v1/me
       "resource": {
         "attributes": [
           { "key": "putnami.framework", "value": { "stringValue": "typescript" } },
+          { "key": "service.instance.id", "value": { "stringValue": "5f0c6c2e-8d1a-4f3b-9a7e-2b4d6e8f0a1c" } },
           { "key": "service.name", "value": { "stringValue": "my-service" } }
         ]
       },

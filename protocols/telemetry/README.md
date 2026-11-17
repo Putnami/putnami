@@ -15,7 +15,7 @@ The canonical push transport is **OTLP/JSON over HTTP** — the documented OpenT
 - **Signal endpoints.** `/v1/metrics`, `/v1/traces`, `/v1/logs`, joined onto the configured collector base URL.
 - **Envelope shape per signal.** The subset of the OTLP types Putnami emits (`MetricsRequest`, `TracesRequest`, `LogsRequest` and the nested resource/scope/data-point types), with the proto3-JSON encodings the spec requires: 64-bit integers (timestamps, counts, int values) as **decimal strings**, trace/span IDs as **lowercase hex**, enums as **integers**, lowerCamelCase field names.
 - **Canonical serialization.** `AttrsFromStrings` sorts attributes by key and `MarshalCanonical` emits compact JSON with HTML escaping off and a fixed field order, so two runtimes produce **byte-identical** bytes for equivalent input. The equivalence goldens + pinned SHA-256 digests guard it.
-- **Resource attributes** every runtime populates: `service.name`, `service.version`, `putnami.framework`.
+- **Resource attributes** every runtime populates: `service.name`, `service.version`, `putnami.framework`, and `service.instance.id`, which names the process that pushes.
 - **Exporter behaviour** (`ExportContract`): default 10s flush cadence, mandatory final flush on shutdown, drop-on-collector-error (telemetry never affects the workload), and a bounded in-memory queue.
 
 Why the transport is hand-rolled OTLP/JSON and nothing else is recorded in [`doc/adr/0001-otlp-json-is-the-only-transport.md`](doc/adr/0001-otlp-json-is-the-only-transport.md).

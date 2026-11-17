@@ -38,6 +38,8 @@ export const OTLP_CONTENT_TYPE = 'application/json';
 // Resource attribute keys (mirror the protocol's Attr* constants).
 const ATTR_SERVICE_NAME = 'service.name';
 const ATTR_SERVICE_VERSION = 'service.version';
+/** The resource attribute that names the process that pushes. */
+export const ATTR_SERVICE_INSTANCE_ID = 'service.instance.id';
 const ATTR_PUTNAMI_FRAMEWORK = 'putnami.framework';
 const FRAMEWORK_TYPESCRIPT = 'typescript';
 

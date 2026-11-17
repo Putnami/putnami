@@ -23,7 +23,7 @@ import { HttpPlugin } from '../http/http.plugin';
 import type { MetricsBucket, TelemetrySpanRecord } from './telemetry.collector';
 import { TelemetryCollector } from './telemetry.collector';
 import { TelemetryConfig, type TelemetryOptions } from './telemetry.config';
-import { environmentEndpoint, environmentResource } from './telemetry.environment';
+import { environmentEndpoint, environmentResource, withProcessInstance } from './telemetry.environment';
 import { TelemetryMiddleware } from './telemetry.middleware';
 import { type OtlpSendResult, sendMetrics, sendTraces } from './telemetry.sender';
 import { clearCollector, setCollector } from './telemetry.utils';
@@ -172,7 +172,7 @@ export class TelemetryPlugin implements Plugin {
       endpoint,
       app: resource.serviceName ?? resource.attributes['service.name'] ?? config.app ?? 'unknown',
       ...(bearer ? { bearer } : {}),
-      resourceAttributes: resource.attributes,
+      resourceAttributes: withProcessInstance(resource.attributes),
     };
   }
 

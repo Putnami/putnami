@@ -6,13 +6,15 @@
     "A serverless or short-lived workload exports its telemetry by pushing it, without needing to be scraped",
     "An unreachable or failing collector degrades observability and nothing else",
     "A container that exits promptly still delivers its last batch of measurements",
-    "A request's span is attributed to the right service and joined to the caller's trace"
+    "A request's span is attributed to the right service and joined to the caller's trace",
+    "Every instance of a scaled-out workload writes its own metric series, so the collector accepts what each instance pushes"
   ],
   "nonGoals": [
     "Running a collector, or defining collector-side retention, sampling, or routing",
     "Exporting via gRPC OTLP or via an OpenTelemetry exporter SDK; the wire is rendered directly as OTLP/JSON over HTTP",
     "Exporting logs implicitly: the log sink is attached to the application logger deliberately",
-    "Promising strict compatibility between every pre-1.0 minor release"
+    "Promising strict compatibility between every pre-1.0 minor release",
+    "Naming the process in service.instance.id for a telemetry Plugin the application builds itself: only the providers FromEnvironment builds name it"
   ],
   "requirements": [
     {
@@ -34,6 +36,13 @@
     {
       "id": "service-identity",
       "text": "A configured service name or version is merged onto the SDK's default resource so telemetry SDK attributes are preserved, and leaving both unset leaves the providers' own default resource untouched."
+    },
+    {
+      "id": "process-instance-identity",
+      "text": [
+        "The resource of the providers FromEnvironment builds carries a service.instance.id unique to the process, so two processes started from one environment push distinct series.",
+        "A service.instance.id that OTEL_RESOURCE_ATTRIBUTES sets is kept."
+      ]
     },
     {
       "id": "explicit-sampling",

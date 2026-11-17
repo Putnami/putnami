@@ -7,6 +7,8 @@
  * builds when the composition holds no `telemetry()` of its own.
  */
 
+import { ATTR_SERVICE_INSTANCE_ID } from './otlp';
+
 /** Collector base URL. Telemetry from the environment is on only when it is set. */
 export const ENV_OTLP_ENDPOINT = 'OTEL_EXPORTER_OTLP_ENDPOINT';
 /** `true` turns telemetry from the environment off, whatever the endpoint says. */
@@ -17,6 +19,28 @@ export const ENV_SERVICE_NAME = 'OTEL_SERVICE_NAME';
 export const ENV_RESOURCE_ATTRIBUTES = 'OTEL_RESOURCE_ATTRIBUTES';
 
 type Environment = Readonly<Record<string, string | undefined>>;
+
+let instanceId: string | undefined;
+
+/**
+ * The `service.instance.id` of this process: a random UUID drawn once, the
+ * same for every push the process makes.
+ */
+export function processInstanceId(): string {
+  instanceId ??= crypto.randomUUID();
+  return instanceId;
+}
+
+/**
+ * The attributes with a `service.instance.id`: the non-empty one they carry,
+ * else the process's own.
+ */
+export function withProcessInstance(attributes: Readonly<Record<string, string>>): Record<string, string> {
+  return {
+    ...attributes,
+    [ATTR_SERVICE_INSTANCE_ID]: attributes[ATTR_SERVICE_INSTANCE_ID] || processInstanceId(),
+  };
+}
 
 /**
  * The collector endpoint the environment names, without trailing slashes, or
