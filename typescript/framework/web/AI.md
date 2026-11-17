@@ -94,6 +94,34 @@ export default page()
   .render(function AdminPage() { ... });
 ```
 
+### What a page proves
+
+A page names the feature requirements it proves, the way `specTest` binds a
+test (`feature`, `requirement`; no `check`). `at` is a concrete path that
+renders the page with fixture data:
+
+```tsx
+import { type PageProof, page } from '@putnami/web';
+
+export const proves = [
+  { feature: 'acme/change-review', requirement: 'tabs-in-mission-order', at: '/w/acme/changes/pr-24/code' },
+] satisfies PageProof[];
+
+export default page().render(CodeTab);
+```
+
+The build writes each entry into the `proves` list of the page's routes in
+`schema/http-routes.json` whose path admits `at`. A malformed list, an ID
+outside the feature grammar, an `at` with a `{param}`, or an `at` no route of
+the page admits fails the build. See `doc/file-based-routing.md`.
+
+`proves` is an optional member of the inventory protocol. A consumer of
+`schema/http-routes.json` built before it refuses an inventory that carries
+it, so upgrade every consumer before a page declares `proves`. The build
+checks that a route of the page admits `at`, not that the router sends `at` to
+this page: pick a path that no more specific page claims, such as a static
+page beside a template one.
+
 ## Rendering Modes — SSG / ISR / Islands
 
 Declare how each route renders. The mode is explicit and never inferred.

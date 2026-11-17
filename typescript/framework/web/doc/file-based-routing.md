@@ -34,6 +34,38 @@ together.
 The hook runs live whenever the TypeScript generate task executes. Cache reuse
 restores the enclosing task's outputs; the hook has no separate cached result.
 
+### What a page proves
+
+A page can name the feature requirements it proves, with the `feature` and
+`requirement` keys a test binds with in `specTest`. `at` is a concrete path
+that renders the page with fixture data:
+
+```tsx
+// src/app/w/[workspace]/changes/[change]/code/page.tsx
+import { type PageProof, page } from '@putnami/web';
+
+export const proves = [
+  { feature: 'acme/change-review', requirement: 'tabs-in-mission-order', at: '/w/acme/changes/pr-24/code' },
+] satisfies PageProof[];
+
+export default page().render(CodeTab);
+```
+
+The build writes each entry into the page's routes in the route inventory
+whose path admits its `at`. Under localization, `at` names one locale's path,
+and only that locale's route carries the entry. The build fails on a
+malformed list, on a feature or requirement ID that does not follow the
+feature grammar, on an `at` with a template parameter, and on an `at` that no
+route of the page admits. A tool then finds the pages of a requirement by
+reading `schema/http-routes.json`, without following imports.
+
+`proves` is an optional member of the inventory protocol. A consumer of
+`schema/http-routes.json` built before it refuses an inventory that carries
+it, so upgrade every consumer before a page declares `proves`. The build
+checks that a route of the page admits `at`, not that the router sends `at` to
+this page: pick a path that no more specific page claims, such as a static
+page beside a template one.
+
 ## Route File Conventions
 
 ### Page Components (`page.tsx`)

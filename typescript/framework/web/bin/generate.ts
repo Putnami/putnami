@@ -70,6 +70,7 @@ import {
   buildWebSitemapHttpRoutes,
   type WebPageRouteFact,
 } from '../src/ssr/http-routes';
+import { readPageProves } from '../src/ssr/page-proves';
 import { PutnamiReactConfig } from '../src/ssr/react-ssr.config';
 import { applyRoutePrefix, asRoute } from '../src/ssr/react-ssr.utils';
 import { resolveScanRoots } from '../src/ssr/scan-roots.utils';
@@ -186,10 +187,14 @@ async function runGenerate(_options: unknown, context: HookContext): Promise<Hoo
       appGenerator.addPage(f, { ...options, staticMeta });
       clientGenerator.addPage(f, options);
       const route = applyRoutePrefix(asRoute(f), root.routePrefix);
+      const evidencePath = joinPath(root.relativePath, f);
+      // A malformed `proves` export fails the build before any artifact is written.
+      const proves = await readPageProves(joinPath(root.scanPath, f), evidencePath);
       httpPageRoutes.push({
         route,
-        evidencePath: joinPath(root.relativePath, f),
+        evidencePath,
         hasAction: fileExists(joinPath(root.scanPath, getDirectoryName(f), 'action.ts')),
+        ...(proves ? { proves } : {}),
       });
       if (staticConfig) {
         staticSpecs.push({ route, staticConfig });

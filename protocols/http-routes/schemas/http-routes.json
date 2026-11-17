@@ -60,7 +60,36 @@
           "items": { "$ref": "#/$defs/method" }
         },
         "publicEdge": { "type": "boolean" },
-        "provenance": { "$ref": "#/$defs/provenance" }
+        "provenance": { "$ref": "#/$defs/provenance" },
+        "proves": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/proof" },
+          "description": "Feature requirements this page proves. Only a page route, a file-route whose methods are exactly GET and HEAD, may carry it."
+        }
+      }
+    },
+    "proof": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["feature", "requirement", "at"],
+      "properties": {
+        "feature": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$",
+          "description": "Feature ID, as a test binding names it."
+        },
+        "requirement": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$",
+          "description": "Requirement ID within the feature."
+        },
+        "at": {
+          "type": "string",
+          "pattern": "^/[^{}?#]*$",
+          "description": "Concrete request path the route admits, which renders the page with fixture data."
+        }
       }
     },
     "route": {

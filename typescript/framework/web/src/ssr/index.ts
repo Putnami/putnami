@@ -34,6 +34,7 @@ export * from './static';
 export * from './static-di';
 export * from './budget';
 export * from './manifest';
+export type { PageProof } from './page-proves';
 export { renderStaticDocument, staticHtmlResponse, type StaticRenderResult } from './static-render';
 export { revalidateTag } from './static-serve.utils';
 

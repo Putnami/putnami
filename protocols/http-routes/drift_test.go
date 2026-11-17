@@ -29,6 +29,7 @@ func TestSchemaFieldParity(t *testing.T) {
 	assertJSONFields(t, "Manifest", schema.Properties, Manifest{})
 	assertJSONFields(t, "Route", schema.Defs["routeBase"].Properties, Route{})
 	assertJSONFields(t, "Provenance", schema.Defs["provenance"].Properties, Provenance{})
+	assertJSONFields(t, "Proof", schema.Defs["proof"].Properties, Proof{})
 }
 
 func assertJSONFields(t *testing.T, name string, schemaFields map[string]any, value any) {

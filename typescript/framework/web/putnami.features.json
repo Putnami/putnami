@@ -176,6 +176,19 @@
           }
         },
         {
+          "id": "page-proves",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-malformed-proves-fails-the-build",
+              "a-page-proves-reaches-its-page-routes",
+              "an-at-outside-the-page-fails-the-build"
+            ]
+          }
+        },
+        {
           "id": "render-manifest",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

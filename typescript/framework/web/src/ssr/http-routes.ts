@@ -1,4 +1,9 @@
-import { type GeneratedHttpRoute, normalizeGeneratedHttpRoutePath } from '@putnami/application/http-routes';
+import {
+  type GeneratedHttpRoute,
+  type HttpRouteProof,
+  httpRouteAdmitsPath,
+  normalizeGeneratedHttpRoutePath,
+} from '@putnami/application/http-routes';
 
 export interface WebPageRouteFact {
   route: string;
@@ -6,17 +11,34 @@ export interface WebPageRouteFact {
   hasAction: boolean;
   /** Concrete paths registered by a finite static catch-all expansion. */
   expandedPaths?: string[];
+  /** The feature requirements the page module's `proves` export declares. */
+  proves?: readonly HttpRouteProof[];
 }
 
-/** Convert file-system pages/actions into v1 route facts. */
+/**
+ * Convert file-system pages/actions into v1 route facts. A page's `proves`
+ * declarations go to each of its page routes whose path admits their `at`;
+ * a declaration that no route of its page admits throws, naming the page.
+ */
 export function buildWebPageHttpRoutes(pages: readonly WebPageRouteFact[]): GeneratedHttpRoute[] {
   const routes: GeneratedHttpRoute[] = [];
+  // Per page file: every declaration, and the ones a route of the page admits.
+  // One page file yields several facts under i18n, one per locale.
+  const declared = new Map<string, Map<string, HttpRouteProof>>();
+  const admitted = new Map<string, Set<string>>();
   for (const page of pages) {
     const evidencePath = page.evidencePath.replaceAll('\\', '/');
     const pagePaths =
       page.route.includes('*') && page.expandedPaths?.length ? [...new Set(page.expandedPaths)].sort() : [page.route];
+    const pageDeclared = declared.get(evidencePath) ?? new Map<string, HttpRouteProof>();
+    const pageAdmitted = admitted.get(evidencePath) ?? new Set<string>();
+    declared.set(evidencePath, pageDeclared);
+    admitted.set(evidencePath, pageAdmitted);
+    for (const proof of page.proves ?? []) pageDeclared.set(proofKey(proof), proof);
     for (const path of pagePaths) {
       const normalized = normalizeGeneratedHttpRoutePath(path);
+      const proves = (page.proves ?? []).filter((proof) => httpRouteAdmitsPath(normalized, proof.at));
+      for (const proof of proves) pageAdmitted.add(proofKey(proof));
       routes.push({
         ...normalized,
         methods: ['GET', 'HEAD'],
@@ -26,6 +48,7 @@ export function buildWebPageHttpRoutes(pages: readonly WebPageRouteFact[]): Gene
           sourceKind: 'file-route',
           evidencePath,
         },
+        ...(proves.length > 0 ? { proves: proves.map((proof) => ({ ...proof })) } : {}),
       });
       if (page.hasAction) {
         routes.push({
@@ -41,7 +64,21 @@ export function buildWebPageHttpRoutes(pages: readonly WebPageRouteFact[]): Gene
       }
     }
   }
+  const errors: string[] = [];
+  for (const [evidencePath, pageDeclared] of declared) {
+    for (const [key, proof] of pageDeclared) {
+      if (!admitted.get(evidencePath)?.has(key))
+        errors.push(
+          `${evidencePath}: proves at '${proof.at}' (${proof.feature}#${proof.requirement}) is not a path this page serves`,
+        );
+    }
+  }
+  if (errors.length > 0) throw new Error(`${errors.length} page proves error(s):\n${errors.join('\n')}`);
   return routes;
+}
+
+function proofKey(proof: HttpRouteProof): string {
+  return `${proof.feature}\0${proof.requirement}\0${proof.at}`;
 }
 
 /** Collapse hashed client bundles to the bounded directories the build owns. */

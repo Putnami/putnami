@@ -33,6 +33,7 @@ const (
 	ErrorCodeDuplicateRoute      = "http_routes.duplicate_route"
 	ErrorCodeVisibilityOverlap   = "http_routes.visibility_overlap"
 	ErrorCodeSerialization       = "http_routes.serialization_error"
+	ErrorCodeInvalidProof        = "http_routes.invalid_proof"
 )
 
 // ValidErrorCodes is the closed diagnostic taxonomy shared by consumers and
@@ -46,12 +47,18 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeDuplicateMethod: true, ErrorCodeMissingProvenance: true,
 	ErrorCodeInvalidSourceKind: true, ErrorCodeInvalidEvidencePath: true,
 	ErrorCodeDuplicateRoute: true, ErrorCodeVisibilityOverlap: true,
-	ErrorCodeSerialization: true,
+	ErrorCodeSerialization: true, ErrorCodeInvalidProof: true,
 }
 
 var (
 	parameterNamePattern = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
 	digestPattern        = regexp.MustCompile(`^sha256:[0-9a-f]{64}$`)
+	// featureIDPattern and requirementIDPattern are the feature and segment ID
+	// grammars of go.putnami.dev/protocol/features, which a test binding uses
+	// for the same two keys. They are copied, not imported: this module depends
+	// on the features module only in its tests.
+	featureIDPattern     = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$`)
+	requirementIDPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 )
 
 var validMethods = map[string]bool{
@@ -73,11 +80,12 @@ var validSourceKinds = map[SourceKind]bool{
 // values are rejected.
 func ParseManifest(data []byte) (*Manifest, []diag.Diagnostic) {
 	type routeWire struct {
-		Match      MatchKind  `json:"match"`
-		Path       string     `json:"path"`
-		Methods    []string   `json:"methods"`
-		PublicEdge *bool      `json:"publicEdge"`
-		Provenance Provenance `json:"provenance"`
+		Match      MatchKind       `json:"match"`
+		Path       string          `json:"path"`
+		Methods    []string        `json:"methods"`
+		PublicEdge *bool           `json:"publicEdge"`
+		Provenance Provenance      `json:"provenance"`
+		Proves     json.RawMessage `json:"proves"`
 	}
 	type manifestWire struct {
 		Schema   string      `json:"$schema"`
@@ -108,15 +116,65 @@ func ParseManifest(data []byte) (*Manifest, []diag.Diagnostic) {
 			return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeParseError, field,
 				"publicEdge is required and must be a boolean")}
 		}
+		proves, proveDiag := parseProves(fmt.Sprintf("routes[%d].proves", i), route.Proves)
+		if proveDiag != nil {
+			return nil, []diag.Diagnostic{*proveDiag}
+		}
 		manifest.Routes[i] = Route{
 			Match:      route.Match,
 			Path:       route.Path,
 			Methods:    route.Methods,
 			PublicEdge: *route.PublicEdge,
 			Provenance: route.Provenance,
+			Proves:     proves,
 		}
 	}
 	return &manifest, nil
+}
+
+// parseProves strictly decodes one route's proves member. An absent member is
+// nil; an explicit null, a non-array list, a non-object entry and a missing or
+// non-string key are parse errors, as in the TypeScript decoder. Like every
+// other member, encoding/json matches the keys without regard to case.
+func parseProves(field string, raw json.RawMessage) ([]Proof, *diag.Diagnostic) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	type proofWire struct {
+		Feature     *string `json:"feature"`
+		Requirement *string `json:"requirement"`
+		At          *string `json:"at"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(raw))
+	dec.DisallowUnknownFields()
+	var entries *[]*proofWire
+	if err := dec.Decode(&entries); err != nil {
+		d := decodeDiagnostic(err)
+		if d.Code == ErrorCodeUnknownField {
+			d.Field = field + "." + d.Field
+		} else {
+			d.Field = field
+		}
+		return nil, &d
+	}
+	if entries == nil {
+		d := diag.Errorf(ErrorCodeParseError, field, "proves must be an array of objects when present")
+		return nil, &d
+	}
+	proves := make([]Proof, len(*entries))
+	for i, entry := range *entries {
+		entryField := fmt.Sprintf("%s[%d]", field, i)
+		if entry == nil {
+			d := diag.Errorf(ErrorCodeParseError, entryField, "a proves entry must be an object")
+			return nil, &d
+		}
+		if entry.Feature == nil || entry.Requirement == nil || entry.At == nil {
+			d := diag.Errorf(ErrorCodeParseError, entryField, "a proves entry requires string feature, requirement and at")
+			return nil, &d
+		}
+		proves[i] = Proof{Feature: *entry.Feature, Requirement: *entry.Requirement, At: *entry.At}
+	}
+	return proves, nil
 }
 
 // ParseAndValidateManifest strictly parses and validates a manifest, including
@@ -233,6 +291,64 @@ func validateRoute(field string, route Route) []diag.Diagnostic {
 			diags = append(diags, diag.Errorf(ErrorCodeInvalidEvidencePath, field+".provenance.evidencePath",
 				"evidencePath must be a normalized workspace-relative path that does not escape the project"))
 		}
+	}
+	if route.Proves != nil {
+		diags = append(diags, validateProves(field+".proves", route)...)
+	}
+	return diags
+}
+
+// IsPageRoute reports whether route is a page: a file-route whose methods are
+// exactly GET and HEAD. Only a page route may carry a proves list.
+func IsPageRoute(route Route) bool {
+	if route.Provenance.SourceKind != SourceFileRoute || len(route.Methods) != 2 {
+		return false
+	}
+	hasGet, hasHead := false, false
+	for _, method := range route.Methods {
+		hasGet = hasGet || method == "GET"
+		hasHead = hasHead || method == "HEAD"
+	}
+	return hasGet && hasHead
+}
+
+// validateProves checks a route's proves list: only a page route carries one,
+// it is never empty, each entry names a feature and a requirement by their ID
+// grammars and a concrete path the route admits, and no entry repeats.
+func validateProves(field string, route Route) []diag.Diagnostic {
+	if !IsPageRoute(route) {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidProof, field,
+			"proves is allowed only on a page route: a file-route whose methods are exactly GET and HEAD")}
+	}
+	if len(route.Proves) == 0 {
+		return []diag.Diagnostic{diag.Errorf(ErrorCodeInvalidProof, field,
+			"proves must list at least one requirement when present")}
+	}
+	routePathValid := validatePath("", route.Match, route.Path) == nil
+	var diags []diag.Diagnostic
+	seen := map[Proof]bool{}
+	for i, proof := range route.Proves {
+		entryField := fmt.Sprintf("%s[%d]", field, i)
+		if !featureIDPattern.MatchString(proof.Feature) {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidProof, entryField+".feature",
+				"feature %q is not a feature ID such as \"acme/change-review\"", proof.Feature))
+		}
+		if !requirementIDPattern.MatchString(proof.Requirement) {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidProof, entryField+".requirement",
+				"requirement %q is not a requirement ID such as \"tabs-in-mission-order\"", proof.Requirement))
+		}
+		if atDiags := validatePath(entryField+".at", MatchExact, proof.At); atDiags != nil {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidProof, entryField+".at",
+				"at must be a concrete request path: %s", atDiags[0].Message))
+		} else if routePathValid && !pathsOverlap(Route{Match: MatchExact, Path: proof.At}, route) {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidProof, entryField+".at",
+				"at %q is not a path the route %q admits", proof.At, route.Path))
+		}
+		if seen[proof] {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidProof, entryField,
+				"proves entry repeats an earlier entry"))
+		}
+		seen[proof] = true
 	}
 	return diags
 }

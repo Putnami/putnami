@@ -21,6 +21,7 @@ func Canonicalize(routes []Route) (*Manifest, []diag.Diagnostic) {
 		Routes:   cloneRoutes(routes),
 	}
 	normalizeMethods(canonical.Routes)
+	sortProves(canonical.Routes)
 	sortRoutes(canonical.Routes)
 
 	diags := ValidateRoutes(canonical.Routes)
@@ -73,8 +74,28 @@ func cloneRoutes(routes []Route) []Route {
 	for i, route := range routes {
 		out[i] = route
 		out[i].Methods = append([]string(nil), route.Methods...)
+		if route.Proves != nil {
+			out[i].Proves = append([]Proof{}, route.Proves...)
+		}
 	}
 	return out
+}
+
+// sortProves orders each route's proves list by feature, requirement and at,
+// so the order a page declares them in never changes the bytes or the digest.
+func sortProves(routes []Route) {
+	for i := range routes {
+		sort.SliceStable(routes[i].Proves, func(a, b int) bool {
+			left, right := routes[i].Proves[a], routes[i].Proves[b]
+			if left.Feature != right.Feature {
+				return left.Feature < right.Feature
+			}
+			if left.Requirement != right.Requirement {
+				return left.Requirement < right.Requirement
+			}
+			return left.At < right.At
+		})
+	}
 }
 
 func normalizeMethods(routes []Route) {

@@ -86,6 +86,22 @@
               "the-web-routes-pass-the-strict-parser"
             ]
           }
+        },
+        {
+          "id": "a-page-route-carries-what-it-proves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-page-route-proof-validates",
+              "a-misplaced-or-malformed-proof-fails",
+              "proofs-are-canonical-and-digested",
+              "the-typescript-validator-agrees-on-proofs"
+            ]
+          }
         }
       ]
     }

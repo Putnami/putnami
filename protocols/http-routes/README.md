@@ -77,6 +77,37 @@ the distinct `evidencePath` values of page routes, not the page routes. The
 TypeScript web producer sets `evidencePath` on every `file-route`: the page
 file for a page, and the `action.ts` beside it for an action.
 
+## What a page proves
+
+A page route may carry `proves`, the feature requirements the page renders
+proof of, with the `feature` and `requirement` keys a test binds with:
+
+```json
+"proves": [
+  { "feature": "acme/change-review", "requirement": "tabs-in-mission-order", "at": "/w/acme/changes/pr-24/code" }
+]
+```
+
+- `feature` follows the feature ID grammar and `requirement` the requirement
+  ID grammar of `go.putnami.dev/protocol/features`.
+- `at` is a concrete request path the route admits, with no template
+  parameter, that renders the page with fixture data. A template page names
+  one value per parameter; a catch-all page names one or more segments.
+- Only a page route may carry it: `proves` on any other route is
+  `http_routes.invalid_proof`. On a page route, an empty list, a repeated
+  entry, a malformed ID and an `at` the route does not admit are
+  `http_routes.invalid_proof` too.
+- A `null` or non-array list, a non-object entry, and a missing or non-string
+  key are `http_routes.parse_error`. An extra key is
+  `http_routes.unknown_field`.
+- Canonicalization sorts the list by `feature`, `requirement` and `at`, and
+  the digest covers it. The member is omitted when the page declares nothing.
+
+A tool that needs the pages of a requirement reads this one table: it does not
+follow imports or render anything. The TypeScript web producer writes the
+`proves` export of a page module into each of the page's routes that admits
+its `at`.
+
 ## Match semantics and conversion
 
 The three match kinds have intentionally narrow semantics:
@@ -186,6 +217,15 @@ changes meaning. A pre-extension consumer rejects the new shape outright (it
 reads `{name...}` as `http_routes.unsupported_pattern` and refuses the whole
 inventory), which fails safe toward deny: an old edge denies module traffic
 rather than admitting an unvalidated route.
+
+`proves` was added to a route as an optional member, not a new major, under
+the same rule. Every manifest without it keeps its canonical bytes and digest.
+A consumer that predates it rejects a manifest carrying it as
+`http_routes.unknown_field` and refuses the whole inventory, which fails safe
+toward deny. Upgrade every consumer of an inventory before a producer writes
+`proves` into it.
+[ADR 0002](doc/adr/0002-optional-members-fail-closed-on-old-consumers.md)
+records this choice.
 
 ## Non-goals
 

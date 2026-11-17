@@ -18,17 +18,31 @@ export interface HttpRouteProvenance {
   evidencePath?: string;
 }
 
+/**
+ * One feature requirement a page proves, with the feature and requirement keys
+ * a test binds with. `at` is a concrete path the page route admits that
+ * renders the page with fixture data.
+ */
+export interface HttpRouteProof {
+  feature: string;
+  requirement: string;
+  at: string;
+}
+
 export interface HttpRoute {
   match: HttpRouteMatch;
   path: string;
   methods: HttpRouteMethod[];
   publicEdge: boolean;
   provenance: HttpRouteProvenance;
+  /** Only a page route (a file-route serving exactly GET and HEAD) carries it; never empty when present. */
+  proves?: HttpRouteProof[];
 }
 
 /** Input accepted by the canonicalizer before method case/order normalization. */
-export interface HttpRouteInput extends Omit<HttpRoute, 'methods'> {
+export interface HttpRouteInput extends Omit<HttpRoute, 'methods' | 'proves'> {
   methods: readonly string[];
+  proves?: readonly HttpRouteProof[];
 }
 
 export interface HttpRoutesManifest {
@@ -68,6 +82,7 @@ export const HTTP_ROUTES_ERROR_CODES = {
   duplicateRoute: 'http_routes.duplicate_route',
   visibilityOverlap: 'http_routes.visibility_overlap',
   serializationError: 'http_routes.serialization_error',
+  invalidProof: 'http_routes.invalid_proof',
 } as const;
 
 const VALID_METHODS = new Set<HttpRouteMethod>(['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PATCH', 'POST', 'PUT']);
@@ -81,6 +96,10 @@ const VALID_SOURCE_KINDS = new Set<HttpRouteSourceKind>([
 ]);
 const PARAMETER_NAME = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
+// The feature and segment ID grammars of go.putnami.dev/protocol/features, the
+// keys a test binding names.
+const FEATURE_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)+$/;
+const REQUIREMENT_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /**
  * Strictly parse and validate a v1 inventory. Unknown fields, unsafe route
@@ -186,6 +205,7 @@ export function canonicalizeHttpRoutes(routes: readonly HttpRouteInput[]): Parse
       methods: route.methods.map((method) => method.toUpperCase()).sort(compareStrings) as HttpRouteMethod[],
       publicEdge: route.publicEdge,
       provenance: canonicalProvenance(route.provenance),
+      ...(route.proves !== undefined ? { proves: canonicalProves(route.proves) } : {}),
     }),
   );
   normalized.sort(compareRoutes);
@@ -254,11 +274,12 @@ function validateRouteShape(value: unknown, field: string, diagnostics: HttpRout
   }
   validateObjectShape(
     value,
-    ['match', 'path', 'methods', 'publicEdge', 'provenance'],
+    ['match', 'path', 'methods', 'publicEdge', 'provenance', 'proves'],
     ['match', 'path', 'methods', 'publicEdge', 'provenance'],
     field,
     diagnostics,
   );
+  if (Object.hasOwn(value, 'proves')) validateProvesShape(value['proves'], `${field}.proves`, diagnostics);
   if (typeof value['match'] !== 'string')
     diagnostics.push(error(HTTP_ROUTES_ERROR_CODES.parseError, `${field}.match`, 'match must be a string'));
   if (typeof value['path'] !== 'string')
@@ -298,6 +319,33 @@ function validateRouteShape(value: unknown, field: string, diagnostics: HttpRout
     diagnostics.push(
       error(HTTP_ROUTES_ERROR_CODES.parseError, `${field}.provenance.evidencePath`, 'evidencePath must be a string'),
     );
+}
+
+function validateProvesShape(value: unknown, field: string, diagnostics: HttpRoutesDiagnostic[]): void {
+  if (!Array.isArray(value)) {
+    diagnostics.push(
+      error(HTTP_ROUTES_ERROR_CODES.parseError, field, 'proves must be an array of objects when present'),
+    );
+    return;
+  }
+  value.forEach((entry, index) => {
+    const entryField = `${field}[${index}]`;
+    if (!isRecord(entry)) {
+      diagnostics.push(error(HTTP_ROUTES_ERROR_CODES.parseError, entryField, 'a proves entry must be an object'));
+      return;
+    }
+    validateObjectShape(
+      entry,
+      ['feature', 'requirement', 'at'],
+      ['feature', 'requirement', 'at'],
+      entryField,
+      diagnostics,
+    );
+    for (const key of ['feature', 'requirement', 'at']) {
+      if (Object.hasOwn(entry, key) && typeof entry[key] !== 'string')
+        diagnostics.push(error(HTTP_ROUTES_ERROR_CODES.parseError, `${entryField}.${key}`, `${key} must be a string`));
+    }
+  });
 }
 
 function validateObjectShape(
@@ -398,6 +446,131 @@ function validateRoute(route: HttpRoute, field: string): HttpRoutesDiagnostic[] 
       );
     }
   }
+  if (route.proves !== undefined) diagnostics.push(...validateProves(route, `${field}.proves`));
+  return diagnostics;
+}
+
+/** A page route is a file-route whose methods are exactly GET and HEAD; only it may carry `proves`. */
+export function isHttpPageRoute(route: Pick<HttpRouteInput, 'methods' | 'provenance'>): boolean {
+  return (
+    route.provenance.sourceKind === 'file-route' &&
+    route.methods.length === 2 &&
+    route.methods.includes('GET') &&
+    route.methods.includes('HEAD')
+  );
+}
+
+/**
+ * Whether a valid exact, template or prefix route admits the concrete request
+ * path `at`, by the same segment-boundary rules the overlap check uses.
+ */
+export function httpRouteAdmitsPath(route: Pick<HttpRoute, 'match' | 'path'>, at: string): boolean {
+  return pathsOverlap({ match: 'exact', path: at } as HttpRoute, route as HttpRoute);
+}
+
+/**
+ * Read a `proves` declaration a framework found in source, such as a page
+ * module's export, without a route: it must be a non-empty array of
+ * `{ feature, requirement, at }` objects with no other key, each a feature ID,
+ * a requirement ID and a concrete absolute path, with no repeated entry.
+ * Returns the copied entries, or one message per defect.
+ */
+export function readHttpRouteProves(value: unknown): { proves?: HttpRouteProof[]; errors: string[] } {
+  if (!Array.isArray(value)) return { errors: ['proves must be an array of { feature, requirement, at } objects'] };
+  if (value.length === 0) return { errors: ['proves must list at least one requirement'] };
+  const errors: string[] = [];
+  const proves: HttpRouteProof[] = [];
+  const seen = new Set<string>();
+  value.forEach((entry, index) => {
+    const where = `proves[${index}]`;
+    if (!isRecord(entry)) {
+      errors.push(`${where} must be an object`);
+      return;
+    }
+    const extra = Object.keys(entry).filter((key) => key !== 'feature' && key !== 'requirement' && key !== 'at');
+    if (extra.length > 0)
+      errors.push(`${where} has unknown key(s) ${extra.map((key) => JSON.stringify(key)).join(', ')}`);
+    const { feature, requirement, at } = entry;
+    if (typeof feature !== 'string' || !FEATURE_ID.test(feature))
+      errors.push(`${where}.feature ${JSON.stringify(feature)} is not a feature ID such as "acme/change-review"`);
+    if (typeof requirement !== 'string' || !REQUIREMENT_ID.test(requirement))
+      errors.push(
+        `${where}.requirement ${JSON.stringify(requirement)} is not a requirement ID such as "tabs-in-mission-order"`,
+      );
+    if (typeof at !== 'string') errors.push(`${where}.at must be a string`);
+    else {
+      const atDiagnostics = validatePath('exact', at, `${where}.at`);
+      if (atDiagnostics.length > 0) errors.push(`${where}.at ${JSON.stringify(at)}: ${atDiagnostics[0].message}`);
+    }
+    if (typeof feature === 'string' && typeof requirement === 'string' && typeof at === 'string') {
+      const key = `${feature}\0${requirement}\0${at}`;
+      if (seen.has(key)) errors.push(`${where} repeats an earlier entry`);
+      seen.add(key);
+      proves.push({ feature, requirement, at });
+    }
+  });
+  return errors.length > 0 ? { errors } : { proves, errors: [] };
+}
+
+function validateProves(route: HttpRoute, field: string): HttpRoutesDiagnostic[] {
+  const proves = route.proves ?? [];
+  if (!isHttpPageRoute(route))
+    return [
+      error(
+        HTTP_ROUTES_ERROR_CODES.invalidProof,
+        field,
+        'proves is allowed only on a page route: a file-route whose methods are exactly GET and HEAD',
+      ),
+    ];
+  if (proves.length === 0)
+    return [
+      error(HTTP_ROUTES_ERROR_CODES.invalidProof, field, 'proves must list at least one requirement when present'),
+    ];
+  const routePathValid = VALID_MATCHES.has(route.match) && validatePath(route.match, route.path, '').length === 0;
+  const diagnostics: HttpRoutesDiagnostic[] = [];
+  const seen = new Set<string>();
+  proves.forEach((proof, index) => {
+    const entryField = `${field}[${index}]`;
+    if (!FEATURE_ID.test(proof.feature))
+      diagnostics.push(
+        error(
+          HTTP_ROUTES_ERROR_CODES.invalidProof,
+          `${entryField}.feature`,
+          `feature ${JSON.stringify(proof.feature)} is not a feature ID such as "acme/change-review"`,
+        ),
+      );
+    if (!REQUIREMENT_ID.test(proof.requirement))
+      diagnostics.push(
+        error(
+          HTTP_ROUTES_ERROR_CODES.invalidProof,
+          `${entryField}.requirement`,
+          `requirement ${JSON.stringify(proof.requirement)} is not a requirement ID such as "tabs-in-mission-order"`,
+        ),
+      );
+    const atDiagnostics = validatePath('exact', proof.at, `${entryField}.at`);
+    if (atDiagnostics.length > 0)
+      diagnostics.push(
+        error(
+          HTTP_ROUTES_ERROR_CODES.invalidProof,
+          `${entryField}.at`,
+          `at must be a concrete request path: ${atDiagnostics[0].message}`,
+        ),
+      );
+    else if (routePathValid && !httpRouteAdmitsPath(route, proof.at))
+      diagnostics.push(
+        error(
+          HTTP_ROUTES_ERROR_CODES.invalidProof,
+          `${entryField}.at`,
+          `at ${JSON.stringify(proof.at)} is not a path the route ${JSON.stringify(route.path)} admits`,
+        ),
+      );
+    const key = `${proof.feature}\0${proof.requirement}\0${proof.at}`;
+    if (seen.has(key))
+      diagnostics.push(
+        error(HTTP_ROUTES_ERROR_CODES.invalidProof, entryField, 'proves entry repeats an earlier entry'),
+      );
+    seen.add(key);
+  });
   return diagnostics;
 }
 
@@ -537,6 +710,18 @@ function canonicalProvenance(provenance: HttpRouteProvenance): HttpRouteProvenan
     sourceKind: provenance.sourceKind,
     ...(provenance.evidencePath ? { evidencePath: provenance.evidencePath } : {}),
   };
+}
+
+/** Copy a proves list in canonical order: feature, then requirement, then at. */
+function canonicalProves(proves: readonly HttpRouteProof[]): HttpRouteProof[] {
+  return proves
+    .map((proof) => ({ feature: proof.feature, requirement: proof.requirement, at: proof.at }))
+    .sort(
+      (left, right) =>
+        compareStrings(left.feature, right.feature) ||
+        compareStrings(left.requirement, right.requirement) ||
+        compareStrings(left.at, right.at),
+    );
 }
 
 function computeDigest(routes: readonly HttpRoute[]): string {

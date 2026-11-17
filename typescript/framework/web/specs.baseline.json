@@ -15,6 +15,7 @@
     "typescript/web-application-delivery#layout-loader-endpoint",
     "typescript/web-application-delivery#link-navigation",
     "typescript/web-application-delivery#navigation-scroll",
+    "typescript/web-application-delivery#page-proves",
     "typescript/web-application-delivery#redirect-outside-the-router",
     "typescript/web-application-delivery#render-manifest",
     "typescript/web-application-delivery#route-graph",

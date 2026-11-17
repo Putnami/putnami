@@ -1,0 +1,45 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "template",
+      "path": "/w/{workspace}/changes/{change}/code",
+      "methods": ["GET", "HEAD"],
+      "publicEdge": true,
+      "provenance": { "project": "example/web", "package": "@putnami/web", "sourceKind": "file-route", "evidencePath": "src/app/w/[workspace]/changes/[change]/code/page.tsx" },
+      "proves": [
+        { "feature": "acme/change-review", "requirement": "tabs-in-mission-order", "at": "/w/acme/changes/pr-24/code" },
+        { "feature": "acme/change-review", "requirement": "diff-renders-per-file", "at": "/w/acme/changes/pr-24/code" }
+      ]
+    },
+    {
+      "match": "template",
+      "path": "/w/{workspace}/changes/{change}/code",
+      "methods": ["POST"],
+      "publicEdge": true,
+      "provenance": { "project": "example/web", "package": "@putnami/web", "sourceKind": "file-route", "evidencePath": "src/app/w/[workspace]/changes/[change]/code/action.ts" }
+    },
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": ["GET", "HEAD"],
+      "publicEdge": true,
+      "provenance": { "project": "example/web", "package": "@putnami/web", "sourceKind": "file-route", "evidencePath": "src/app/page.tsx" },
+      "proves": [
+        { "feature": "acme/home", "requirement": "lists-recent-changes", "at": "/" }
+      ]
+    },
+    {
+      "match": "template",
+      "path": "/docs/{slug...}",
+      "methods": ["GET", "HEAD"],
+      "publicEdge": true,
+      "provenance": { "project": "example/web", "package": "@putnami/web", "sourceKind": "file-route", "evidencePath": "src/app/docs/[...slug]/page.tsx" },
+      "proves": [
+        { "feature": "acme/docs", "requirement": "renders-nested-pages", "at": "/docs/guides/start" }
+      ]
+    }
+  ],
+  "digest": "sha256:4b9ecbcc06614b184b9e6917b4b293f888c5312c134d0939b8d8bc7bc149fcc3"
+}

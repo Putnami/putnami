@@ -582,6 +582,14 @@ unavailable evaluation also fails `build-generate`, which keeps the committed
 does not cover routes registered only at runtime, such as OAuth routes
 registered during application warmup.
 
+A page route may carry `proves`, the `{ feature, requirement, at }` entries
+the page proves. `readHttpRouteProves(value)` checks a declared list without a
+route and returns `{ proves, errors }`; `isHttpPageRoute(route)` tells a page
+route, the only kind that carries the member; `httpRouteAdmitsPath(route, at)`
+tells whether the route's path admits a concrete path. The validator gives
+each proves fixture of `go.putnami.dev/protocol/http-routes` the Go verdict
+and code.
+
 Both hook scripts activate the workload's complete config registry before they
 read it, through the shared `bin/_activate-config.ts`: import every generated
 `*-loader` (which runs the route handlers' `configToken()` calls), then walk the

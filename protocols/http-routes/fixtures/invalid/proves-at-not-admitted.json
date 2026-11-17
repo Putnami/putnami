@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "template",
+      "path": "/w/{workspace}/changes/{change}/code",
+      "methods": ["GET", "HEAD"],
+      "publicEdge": true,
+      "provenance": { "project": "example/web", "package": "@putnami/web", "sourceKind": "file-route", "evidencePath": "src/app/w/[workspace]/changes/[change]/code/page.tsx" },
+      "proves": [
+        { "feature": "acme/change-review", "requirement": "tabs-in-mission-order", "at": "/w/acme/changes/pr-24/files" }
+      ]
+    }
+  ],
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

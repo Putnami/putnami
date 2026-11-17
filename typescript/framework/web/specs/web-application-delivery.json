@@ -122,6 +122,10 @@
     {
       "id": "render-manifest",
       "text": "Every build serializes a sorted, newline-terminated route manifest containing mode, hydration, DI proof, and per-route client-JavaScript bytes, and the budget gate rejects absolute or baseline-relative regressions deterministically."
+    },
+    {
+      "id": "page-proves",
+      "text": "A page module may export proves, a list of {feature, requirement, at}; the build writes each entry into the page routes of the route inventory whose path admits at, and a malformed list, or an at that no route of the page admits, fails the build."
     }
   ],
   "decisions": [

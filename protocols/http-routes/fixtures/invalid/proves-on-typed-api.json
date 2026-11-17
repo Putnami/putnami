@@ -1,0 +1,17 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/api/health",
+      "methods": ["GET", "HEAD"],
+      "publicEdge": true,
+      "provenance": { "project": "example/web", "package": "@putnami/application", "sourceKind": "typed-api", "evidencePath": "src/api/health.ts" },
+      "proves": [
+        { "feature": "acme/health", "requirement": "reports-ready", "at": "/api/health" }
+      ]
+    }
+  ],
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}

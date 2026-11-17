@@ -79,6 +79,23 @@ type Route struct {
 	PublicEdge bool `json:"publicEdge"`
 	// Provenance points back to the framework fact that contributed this route.
 	Provenance Provenance `json:"provenance"`
+	// Proves lists the feature requirements this page renders proof of. Only a
+	// page route, a file-route serving exactly GET and HEAD, may carry it; it is
+	// omitted when the page declares none and is never empty when present.
+	Proves []Proof `json:"proves,omitempty"`
+}
+
+// Proof binds a page route to one feature requirement it proves, with the
+// same feature and requirement keys a test binds with. At is a concrete path
+// the route admits that renders the page with fixture data.
+type Proof struct {
+	// Feature is the feature ID, such as "acme/change-review".
+	Feature string `json:"feature"`
+	// Requirement is the requirement ID within Feature.
+	Requirement string `json:"requirement"`
+	// At is a concrete request path the route admits: no template parameter,
+	// no query string and no fragment.
+	At string `json:"at"`
 }
 
 // Manifest is the canonical putnami.http-routes.v1 artifact. Field order is

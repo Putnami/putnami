@@ -22,7 +22,7 @@ func TestAggregateHTTPRoutesAcrossFrameworkFragments(t *testing.T) {
   {"match":"exact","path":"/favicon.ico","methods":["GET","HEAD"],"publicEdge":true,"provenance":{"project":"example/web","package":"@putnami/application","sourceKind":"public-file","evidencePath":"public/favicon.ico"}}
 ]}`
 	web := `{"routes":[
-  {"match":"template","path":"/blog/{slug}","methods":["GET","HEAD"],"publicEdge":true,"provenance":{"project":"example/web","package":"@putnami/web","sourceKind":"file-route","evidencePath":"src/app/blog/[slug]/page.tsx"}},
+  {"match":"template","path":"/blog/{slug}","methods":["GET","HEAD"],"publicEdge":true,"provenance":{"project":"example/web","package":"@putnami/web","sourceKind":"file-route","evidencePath":"src/app/blog/[slug]/page.tsx"},"proves":[{"feature":"acme/blog","requirement":"renders-a-post","at":"/blog/hello"}]},
   {"match":"prefix","path":"/react/","methods":["GET","HEAD"],"publicEdge":true,"provenance":{"project":"example/web","package":"@putnami/web","sourceKind":"static-mount","evidencePath":".gen/public/react"}}
 ]}`
 	if err := os.WriteFile(filepath.Join(fragmentDir, "web.json"), []byte(web), 0o644); err != nil {
@@ -46,6 +46,16 @@ func TestAggregateHTTPRoutesAcrossFrameworkFragments(t *testing.T) {
 	}
 	if len(manifest.Routes) != 4 {
 		t.Fatalf("routes = %d, want 4", len(manifest.Routes))
+	}
+	// A page's proves list survives the merge into the committed inventory.
+	var proves []httproutes.Proof
+	for _, route := range manifest.Routes {
+		if route.Path == "/blog/{slug}" {
+			proves = route.Proves
+		}
+	}
+	if len(proves) != 1 || proves[0] != (httproutes.Proof{Feature: "acme/blog", Requirement: "renders-a-post", At: "/blog/hello"}) {
+		t.Fatalf("page proves = %v, want the fragment's declaration", proves)
 	}
 
 	first := string(body)

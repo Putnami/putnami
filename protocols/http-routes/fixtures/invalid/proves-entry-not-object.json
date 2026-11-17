@@ -1,0 +1,15 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-http-routes-v1.json",
+  "protocol": "putnami.http-routes.v1",
+  "routes": [
+    {
+      "match": "exact",
+      "path": "/",
+      "methods": ["GET", "HEAD"],
+      "publicEdge": true,
+      "provenance": { "project": "example/web", "package": "@putnami/web", "sourceKind": "file-route", "evidencePath": "src/app/page.tsx" },
+      "proves": ["acme/home#lists-recent-changes"]
+    }
+  ],
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+}
