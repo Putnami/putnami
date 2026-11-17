@@ -91,14 +91,6 @@ func sessionMissionKey(dir, root, branch string) string {
 	return key
 }
 
-// missionTitle is the title a new mission starts with.
-func missionTitle(key string) string {
-	if issue, ok := strings.CutPrefix(key, "issue-"); ok {
-		return "Issue #" + issue
-	}
-	return strings.TrimPrefix(key, "branch:")
-}
-
 // checkoutBranch reads the branch of the checkout, or "" on a detached HEAD:
 // the one case where `git symbolic-ref -q` exits with status 1. Any other
 // failure, such as a git stopped at its caller's deadline, is an error, never a

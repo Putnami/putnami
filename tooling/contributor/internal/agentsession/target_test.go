@@ -83,12 +83,6 @@ func TestTheMissionKeyFollowsTheDeclaredIssue(t *testing.T) {
 	if key := sessionMissionKey(dir, root, "feat/z"); key != "branch:feat/z" {
 		t.Errorf("a foreign declaration answered %q", key)
 	}
-	if title := missionTitle("issue-7"); title != "Issue #7" {
-		t.Errorf("title %q", title)
-	}
-	if title := missionTitle("branch:feat/x"); title != "feat/x" {
-		t.Errorf("title %q", title)
-	}
 }
 
 func TestAttachDeclaresTheMissionOfTheBranch(t *testing.T) {

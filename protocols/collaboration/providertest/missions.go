@@ -38,6 +38,7 @@ func RunMissions(t *testing.T, newTarget func(t *testing.T) Target) {
 		{"an older sync never overwrites a newer one", missionsOlderSync},
 		{"an older sync describes the mission it names", missionsOlderSyncNamesItsMission},
 		{"a sync without a plan keeps it and an empty plan clears it", missionsPlan},
+		{"a sync's title names a mission still titled by its key, and no other", missionsTitle},
 		{"a session reports its stage, its usage and its end", missionsEnded},
 		{"status lists the sessions of a mission, newest first", missionsStatus},
 	}
@@ -489,6 +490,27 @@ func missionsPlan(t *testing.T, m *missionRun) {
 
 // status reads a mission's view and sessions, and checks that the answer
 // describes the mission it names.
+func missionsTitle(t *testing.T, m *missionRun) {
+	keyed := m.other("keyed")
+	keyed.Title = collab.MissionKeyTitle(keyed.Key)
+	if got := m.sync(0, func(in *collab.MissionsSyncInput) { in.Mission = keyed }).Mission.Title; got != keyed.Title {
+		t.Fatalf("a sync that creates a mission titled by its key answered title %q, want %q", got, keyed.Title)
+	}
+	named := keyed
+	named.Title = "Named " + m.run
+	if got := m.sync(time.Second, func(in *collab.MissionsSyncInput) { in.Mission = named }).Mission.Title; got != named.Title {
+		t.Fatalf("a sync naming a mission titled by its key answered title %q, want %q", got, named.Title)
+	}
+	for i, title := range []string{keyed.Title, "Other " + m.run} {
+		again := keyed
+		again.Title = title
+		after := time.Duration(i+2) * time.Second
+		if got := m.sync(after, func(in *collab.MissionsSyncInput) { in.Mission = again }).Mission.Title; got != named.Title {
+			t.Fatalf("a sync naming %q on a named mission answered title %q, want %q", title, got, named.Title)
+		}
+	}
+}
+
 func (m *missionRun) status(mission collab.MissionName, page *collab.PageRequest) collab.MissionsStatusResult {
 	m.t.Helper()
 	var result collab.MissionsStatusResult

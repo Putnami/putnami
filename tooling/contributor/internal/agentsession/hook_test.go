@@ -825,7 +825,7 @@ func TestTheTranscriptNamesTheMission(t *testing.T) {
 	lines := `{"type":"custom-title","customTitle":"Old name","sessionId":"s"}` + "\n" +
 		`{"type":"assistant","message":{"model":"model-a"}}` + "\n" +
 		`{"type":"custom-title","customTitle":"Page title","sessionId":"s"}` + "\n" +
-		`{"type":"user","message":{"content":"a custom-title in a prompt"}}` + "\n"
+		`{"type":"user","message":{"content":"\"custom-title\" in a prompt"}}` + "\n"
 	if err := os.WriteFile(transcript, []byte(lines), 0o600); err != nil {
 		t.Fatal(err)
 	}

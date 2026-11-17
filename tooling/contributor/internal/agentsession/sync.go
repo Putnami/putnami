@@ -170,7 +170,7 @@ func mergeSyncAnswer(cache *sessionCache, snapshot syncSnapshot, answer collab.M
 // titled by its key, else the key's title for a mission no sync answered yet,
 // else none, and the mission keeps its own.
 func syncTitle(cache *sessionCache) string {
-	keyTitle := boundedLine(missionTitle(cache.Mission.Key), collab.MaxTitleLength)
+	keyTitle := boundedLine(collab.MissionKeyTitle(cache.Mission.Key), collab.MaxTitleLength)
 	if !cache.Mission.Known || cache.Mission.Title == "" || cache.Mission.Title == keyTitle {
 		if name := boundedLine(cache.Name, collab.MaxTitleLength); name != "" {
 			return name

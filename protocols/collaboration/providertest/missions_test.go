@@ -171,9 +171,7 @@ func (s *missionsStore) sync(_ context.Context, call collab.Call) (any, *collab.
 			held = &missionsMission{}
 			s.missions[mission] = held
 		}
-		if in.Mission.Title != "" {
-			held.title = in.Mission.Title
-		}
+		held.title = collab.SyncedMissionTitle(held.title, in.Mission.Key, in.Mission.Title)
 		if in.Plan != nil {
 			held.plan = slices.Clone(in.Plan.Steps)
 		}

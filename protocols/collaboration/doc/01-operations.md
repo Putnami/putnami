@@ -205,7 +205,13 @@ the memory identity's `repository` and `mission`, and both are required.
 Together they are the mission's identity, compared exactly. `repository` is
 lowercase, such as `owner/name`: a host sends it so, and a name with an
 uppercase letter is refused. `title` is for display, is not part of the
-identity, and follows the task title bound. A session is `{engine, id}`:
+identity, and follows the task title bound. The key is opaque except for the
+title it gives (`MissionKeyTitle`): `Issue #<n>` for `issue-<n>`, the branch for
+`branch:<branch>`, else the key. A `sync` or an `ask` that names a title
+applies it to a mission without a title or still titled by its key, and to no
+other (`SyncedMissionTitle`): a host names the key's title until it knows a
+better one, such as the session's own name, and never replaces a title a
+checkpoint or a session named. A session is `{engine, id}`:
 `engine` is `[a-z0-9-]{1,32}` and names the host that runs the agent, and `id`
 is that host's own session id, `[A-Za-z0-9._:-]{1,128}`.
 
