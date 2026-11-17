@@ -10,9 +10,12 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func TestTokenSource_EnvOverrideWins(t *testing.T) {
+	spectest.Proves(t, "cloud/agent-session", "a-delegated-session-reads-the-cache-with-its-own-token", "the-cache-token-override-still-wins")
 	t.Setenv(TokenEnv, "env-token")
 	// Even with a command configured, the env override takes precedence.
 	got, err := TokenSource{Command: []string{"false"}}.Resolve(context.Background())
@@ -62,6 +65,13 @@ func TestTokenSource_CommandFailureSurfacesSafeAuthRecovery(t *testing.T) {
 	var commandErr *TokenCommandError
 	if !errors.As(err, &commandErr) {
 		t.Fatalf("error type = %T, want *TokenCommandError", err)
+	}
+}
+
+func TestTokenSource_DelegatedSessionOfAnotherWorkspaceNamesTheCause(t *testing.T) {
+	diagnostic, authFailure := classifyTokenCommandStderr([]byte("putnami: this session is delegated for workspace ws-other, and the workspace link names ws-acme"))
+	if diagnostic != "the delegated cloud session is bound to another workspace" || !authFailure {
+		t.Fatalf("diagnostic = %q, auth failure = %v", diagnostic, authFailure)
 	}
 }
 

@@ -2,10 +2,13 @@ package deliverycli
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"slices"
 	"strings"
 	"testing"
 
+	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	"go.putnami.dev/cloud/extension/internal/deliverycli/internal/remotecache"
 	"go.putnami.dev/protocol/cache"
 	"go.putnami.dev/protocol/features/spectest"
@@ -89,6 +92,64 @@ func TestADeveloperSessionIsDeclaredReadOnlyOffAHostedRun(t *testing.T) {
 	_, log, _ = readOnlyInit(t, root, false)
 	if got := strings.Count(log, "the remote cache is read-only for this run: the signed-in user's cache token"); got != 1 {
 		t.Fatalf("read-only lines = %d, want one for a core that does not list the capability: %q", got, log)
+	}
+}
+
+// signInDelegated stores a session a person's MCP connection approved: its
+// access token carries an actor and is bound to one workspace.
+func signInDelegated(t *testing.T, home string) {
+	t.Helper()
+	payload, err := json.Marshal(map[string]any{
+		"sub":       "person-1",
+		"act":       map[string]any{"sub": "agent-cli"},
+		"scope":     "mcp.read mcp.act",
+		"scope_ref": map[string]any{"workspace_id": "ws-acme"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	stored := &clicore.StoredToken{
+		AccessToken:  "e30." + base64.RawURLEncoding.EncodeToString(payload) + ".sig",
+		RefreshToken: "delegated-refresh-token",
+		TokenType:    "Bearer",
+	}
+	if err := clicore.WriteAuth(stored, map[string]string{"PUTNAMI_HOME": home}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestADelegatedSessionIsDeclaredReadOnly(t *testing.T) {
+	spectest.Proves(t, "cloud/agent-session", "a-delegated-session-reads-the-cache-with-its-own-token", "a-delegated-session-is-declared-read-only")
+	// A hosted agent session may hold a workspace machine token too: the
+	// stored delegated session keeps the recipe.
+	home := machineTokenSession(t, testMachineToken)
+	signInDelegated(t, home)
+	srv, writes := writeRefusingCacheServer(t)
+	root := t.TempDir()
+	command, _ := canonicalRecipe(t)
+	writeCacheConfig(t, root, srv.URL, map[string]any{"command": command})
+
+	result, log, s := readOnlyInit(t, root, true)
+	if !slices.Contains(result.Capabilities, cache.CapabilityReadOnly) {
+		t.Fatalf("capabilities = %v, want read-only echoed for a delegated session's cache token", result.Capabilities)
+	}
+	assertWritesNothing(t, s)
+	mustSummary(t, s)
+	if got := writes.Load(); got != 0 {
+		t.Fatalf("write requests = %d, want none", got)
+	}
+	if strings.Contains(log, "read-only") {
+		t.Fatalf("the session printed a read-only line core prints: %q", log)
+	}
+
+	// The stored delegated session, not the machine token, makes the run
+	// read-only: the line names the signed-in user's cache token.
+	_, log, _ = readOnlyInit(t, root, false)
+	if got := strings.Count(log, "the remote cache is read-only for this run: the signed-in user's cache token"); got != 1 {
+		t.Fatalf("read-only lines = %d, want one naming the signed-in user's cache token: %q", got, log)
+	}
+	if strings.Contains(log, "workspace machine token") {
+		t.Fatalf("the session took the machine token over the delegated session: %q", log)
 	}
 }
 

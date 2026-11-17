@@ -58,7 +58,8 @@ const (
 	TokenClassStatic TokenClass = "static"
 	// TokenClassCommand runs the configured recipe — canonically
 	// `putnami cloud token --for cache`. Renewable: each invocation mints a fresh
-	// short-lived bearer.
+	// short-lived bearer, or, for a delegated session, prints its own access
+	// token refreshed when it expired.
 	TokenClassCommand TokenClass = "command"
 	// TokenClassURL GETs a token endpoint. Renewable.
 	TokenClassURL TokenClass = "url"
@@ -324,6 +325,8 @@ func classifyTokenCommandStderr(raw []byte) (diagnostic string, authFailure bool
 		return "cloud session expired", true
 	case strings.Contains(message, "session is not refreshable"):
 		return "cloud session is not refreshable", true
+	case strings.Contains(message, "session is delegated for workspace"):
+		return "the delegated cloud session is bound to another workspace", true
 	case strings.Contains(message, "not authenticated"):
 		return "cloud authentication is required", true
 	case strings.Contains(message, "invalid_grant"):

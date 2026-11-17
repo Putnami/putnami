@@ -101,8 +101,10 @@ func (c *Config) TakesMachineToken() bool {
 }
 
 // SendsSessionRecipe reports whether the configured token source is the
-// canonical `putnami cloud token --for cache` recipe, which mints the cache
-// token of the signed-in user, and no metadata identity replaces it. Like
+// canonical `putnami cloud token --for cache` recipe, and no metadata identity
+// replaces it. The recipe prints the cache token of the signed-in user: a
+// cache.read bearer minted for a person's own session, or the access token of
+// a session delegated through a person's MCP connection. Neither writes. Like
 // TokenSource.Class it reads the environment at call time, so
 // PUTNAMI_CACHE_TOKEN keeps precedence.
 func (c *Config) SendsSessionRecipe() bool {

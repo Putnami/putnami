@@ -12,6 +12,7 @@ import (
 	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 	deliverycli "go.putnami.dev/cloud/extension/internal/deliverycli"
 	distributioncli "go.putnami.dev/cloud/extension/internal/distributioncli"
+	"go.putnami.dev/protocol/features/spectest"
 )
 
 func setupCacheEnv(t *testing.T) (home, workspaceRoot string) {
@@ -390,6 +391,7 @@ func TestSetupHonorsCacheModeAndURL(t *testing.T) {
 // backing key is cleaned up, and stdout is one bare least-privilege bearer even
 // with --json present.
 func TestCloudTokenForCacheEmitsBareBearer(t *testing.T) {
+	spectest.Proves(t, "cloud/agent-session", "a-delegated-session-reads-the-cache-with-its-own-token", "an-own-session-still-mints-a-cache-key")
 	for _, extra := range [][]string{{"--for", "cache"}, {"--for", "cache", "--json"}} {
 		home := t.TempDir()
 		workspaceRoot := t.TempDir()

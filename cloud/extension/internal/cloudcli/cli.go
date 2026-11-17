@@ -941,15 +941,15 @@ func workspaceToken(params map[string]any, workspaceRoot string, env map[string]
 	}
 	workspaceID := stringValue(link["workspace_id"])
 	if purpose == "cache" {
-		auth, err := clicore.MintWorkspaceScopedAuth(params, env, ioctx, workspaceID, cacheOAuthClientID, cacheReadScope)
+		token, err := cacheToken(params, env, ioctx, workspaceID)
 		if err != nil {
 			return err
 		}
 		// --for cache is the token *source* the build cache config records. The
 		// contract (.putnami/cache.json `token.command`) is "trimmed stdout is the
-		// bearer", so emit the bare least-privilege access token on its own line and
-		// nothing else — no status message or JSON envelope in any output mode.
-		ioctx.Stdout(auth.AccessToken)
+		// bearer", so emit the bare access token on its own line and nothing
+		// else — no status message or JSON envelope in any output mode.
+		ioctx.Stdout(token)
 		return nil
 	}
 	auth, err := workspaceAuth(params, env, ioctx, workspaceID)
@@ -965,6 +965,29 @@ func workspaceToken(params map[string]any, workspaceRoot string, env map[string]
 	}
 	writeResult(out, params, ioctx, "Minted cloud token for workspace "+workspaceID+".")
 	return nil
+}
+
+// cacheToken is the bearer `cloud token --for cache` prints for workspaceID.
+// A delegated session (a person's MCP connection approved this CLI's sign-in)
+// creates no API key: its own access token, refreshed when it expired, is the
+// cache bearer, and it must be bound to workspaceID. Every other session mints
+// a cache.read bearer through a short-lived API key.
+func cacheToken(params map[string]any, env map[string]string, ioctx IO, workspaceID string) (string, error) {
+	session, err := clicore.ActiveAuth(params, env, ioctx)
+	if err != nil {
+		return "", err
+	}
+	if delegation, ok := clicore.DelegationOf(session); ok {
+		if delegation.WorkspaceID != workspaceID {
+			return "", newError(fmt.Sprintf("this session is delegated for workspace %s, and the workspace link names %s; sign in again through the MCP connection of workspace %s", delegation.WorkspaceID, workspaceID, workspaceID), ExitAuth)
+		}
+		return session.AccessToken, nil
+	}
+	auth, err := clicore.MintWorkspaceScopedAuth(params, env, ioctx, workspaceID, cacheOAuthClientID, cacheReadScope)
+	if err != nil {
+		return "", err
+	}
+	return auth.AccessToken, nil
 }
 
 // deriveWorkspaceName reads the workspace's display name from

@@ -1499,6 +1499,17 @@ writes to it`. That covers a signed-in laptop and a member's workspace machine
 token, even one created with `cache.write`: both read the shared cache and write
 nothing.
 
+**Delegated sessions.** A session that a person's MCP connection approved is
+delegated: its access token carries an actor (for example `agent-cli`) and is
+bound to one workspace. Such a session may not create an API key, so for it
+`putnami cloud token --for cache` creates none: it prints the session's own
+access token, refreshed first when it expired. The cache server admits that
+token for reads. A delegated session bound to another workspace than the
+workspace link fails and names both workspaces. Like the signed-in user's
+token, it reads the shared cache and writes nothing, so off a hosted run the
+session opens read-only and prints one line. `PUTNAMI_CACHE_TOKEN` still wins
+when it is set.
+
 **Sessions with no signed-in user.** A cloud agent session or a CI job holds
 one secret, `PUTNAMI_CLOUD_TOKEN`: a workspace machine token with the
 `cache.read` scope. The token command needs a signed-in user, so the cache

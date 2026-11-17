@@ -50,6 +50,15 @@
       ]
     },
     {
+      "id": "a-delegated-session-reads-the-cache-with-its-own-token",
+      "text": [
+        "For a session delegated through a person's MCP connection, putnami cloud token --for cache prints its access token, refreshed when expired, and creates no API key.",
+        "A delegated session of another workspace than the link fails, names both, and prints no bearer.",
+        "An own session still mints a cache.read key; PUTNAMI_CACHE_TOKEN still wins.",
+        "Off a hosted run the cache provider declares that recipe read-only."
+      ]
+    },
+    {
       "id": "a-read-only-cache-credential-is-declared",
       "text": [
         "When core lists read-only at initialize, the cache provider echoes it for a session that cannot write: a workspace machine token, or the signed-in user's putnami cloud token --for cache recipe off a hosted run.",

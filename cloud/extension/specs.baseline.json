@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "cloud/agent-session#a-delegated-session-reads-the-cache-with-its-own-token",
     "cloud/agent-session#a-delegated-session-says-what-it-reaches",
     "cloud/agent-session#a-read-only-cache-credential-is-declared",
     "cloud/agent-session#login-hands-its-code-to-a-host",

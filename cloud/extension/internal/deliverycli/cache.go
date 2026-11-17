@@ -53,7 +53,9 @@ type CacheConfig struct {
 }
 
 // cacheTokenCommand is the token source `cloud setup` records by default: the
-// user's own `putnami` entrypoint minting a fresh, workspace-scoped bearer.
+// user's own `putnami` entrypoint printing a workspace-scoped bearer, minted
+// fresh for a person's own session or, for a delegated session, its own
+// access token.
 // Routing through `putnami` (rather than the compiled extension binary)
 // keeps the source resolvable in any checkout or CI runner without the
 // extension binary on PATH.

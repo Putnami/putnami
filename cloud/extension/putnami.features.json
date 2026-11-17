@@ -729,6 +729,24 @@
           }
         },
         {
+          "id": "a-delegated-session-reads-the-cache-with-its-own-token",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-recipe-prints-the-delegated-access-token",
+              "the-recipe-refreshes-an-expired-delegated-session",
+              "a-delegated-session-of-another-workspace-is-refused",
+              "an-own-session-still-mints-a-cache-key",
+              "the-cache-token-override-still-wins",
+              "a-delegated-session-is-declared-read-only"
+            ]
+          }
+        },
+        {
           "id": "a-read-only-cache-credential-is-declared",
           "stage": "coded",
           "evidenceKinds": [
