@@ -4,7 +4,7 @@ import "testing"
 
 func TestMissionKeyTitle(t *testing.T) {
 	for key, want := range map[string]string{
-		"issue-5":     "Issue #5",
+		"issue-5":       "Issue #5",
 		"issue-0":       "issue-0",
 		"issue-12a":     "issue-12a",
 		"issue-":        "issue-",
