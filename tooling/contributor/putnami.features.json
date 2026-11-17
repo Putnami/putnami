@@ -74,6 +74,19 @@
           }
         },
         {
+          "id": "session-bound-proposal",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-published-proposal-binds-to-the-host-session"
+            ]
+          }
+        },
+        {
           "id": "authorized-auto-merge",
           "stage": "coded",
           "evidenceKinds": [

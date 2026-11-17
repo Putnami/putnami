@@ -13,7 +13,11 @@ edit: run `"$PUTNAMI_CLI" change finalize --draft` with the planned title, a
 body that states the intended change, and the task reference. Pass
 `--partial-delivery` when the proposal delivers one unit of a larger task. The
 command adds an empty commit carrying the title when the branch has none; the
-squash removes it. A draft starts no hosted run.
+squash removes it. A draft starts no hosted run. Once the command prints the
+proposal URL, bind it to the host session when the host offers a tool that
+binds a pull request to its session, such as Claude Code's `bind_pr`; a host
+without one skips this step. The merge stage's "Bind the proposal to the
+session" section gives the whole rule.
 
 ## What to show
 

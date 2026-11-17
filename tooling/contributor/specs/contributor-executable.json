@@ -50,6 +50,14 @@
       ]
     },
     {
+      "id": "session-bound-proposal",
+      "text": [
+        "A host binds a pull request to its session only when it sees the pull request open, which a proposal published through the provider's API escapes.",
+        "Build binds the proposal it publishes to the host session when the host offers a bind tool, with no manual step.",
+        "A host without one skips the step and behaves as before; a push-only run publishes nothing and binds nothing."
+      ]
+    },
+    {
       "id": "authorized-auto-merge",
       "text": [
         "publication.autoMerge is \"squash\" or false, false by default; any other value stops the run before any write.",
