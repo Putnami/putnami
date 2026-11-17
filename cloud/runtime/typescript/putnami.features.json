@@ -78,6 +78,19 @@
           }
         },
         {
+          "id": "register-authenticates-telemetry",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "register-registers-the-telemetry-token-source",
+              "on-google-cloud-a-push-carries-an-id-token-for-the-collector",
+              "off-google-cloud-no-token-is-supplied"
+            ]
+          }
+        },
+        {
           "id": "required-sources-retry-within-a-budget",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

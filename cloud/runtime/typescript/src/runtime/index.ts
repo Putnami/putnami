@@ -43,6 +43,13 @@ export type {
   ManagedEventServerEventsConfig,
 } from './event-server-destination';
 
+// Telemetry credential: a Google ID token for the workspace collector.
+export {
+  cloudTelemetryTokenSource,
+  googleTelemetryTokenSource,
+  type GoogleTelemetryTokenSourceOptions,
+} from './telemetry-token-source';
+
 // Registration entry point for the framework config loader.
 export { cloudConfigLoaderResetHooks, cloudSourceDiscoverers, register } from './register';
 export type { CloudRuntimeRegistrar, SourceDiscoverer } from './register';

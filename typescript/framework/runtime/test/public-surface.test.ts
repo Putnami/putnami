@@ -73,6 +73,15 @@ describe('@putnami/runtime public surface', () => {
     expect(root['registerConfigLoaderResetHook']).toBeFunction();
   });
 
+  it('exposes the telemetry token-source seam from the root barrel and its reset from testing', () => {
+    const root = rootSurface as unknown as Record<string, unknown>;
+    const testing = testingSurface as unknown as Record<string, unknown>;
+    expect(root['registerTelemetryTokenSource']).toBeFunction();
+    expect(root['getTelemetryTokenSource']).toBeFunction();
+    expect(root['resetTelemetryTokenSourceForTest']).toBeUndefined();
+    expect(testing['resetTelemetryTokenSourceForTest']).toBeFunction();
+  });
+
   it('keeps cloud-owned runtime symbols off the core package surface', () => {
     const root = rootSurface as unknown as Record<string, unknown>;
     expect(root['RemoteConfigSource']).toBeUndefined();

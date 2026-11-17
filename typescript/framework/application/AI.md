@@ -608,6 +608,15 @@ Non-scheduler callers can use
 generated loaders without mutating the scheduler-owned manifest. `createTestApp` uses this mode so test
 execution cannot overwrite the extension-reconciled build artifact.
 
+## Telemetry
+
+With `OTEL_EXPORTER_OTLP_ENDPOINT` set, `application()` adds the plugin
+`telemetryFromEnvironment()` builds unless the composition holds `telemetry()`;
+`OTEL_SDK_DISABLED=true` turns it off. Its middleware goes on every composed
+`HttpPlugin` through `useOutermost`, and it creates no server. Each push asks
+the token source registered in `@putnami/runtime` for its bearer. See
+`doc/telemetry.md` and ADR 0007.
+
 ## Testing
 
 ```ts

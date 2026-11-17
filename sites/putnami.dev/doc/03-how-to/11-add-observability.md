@@ -8,7 +8,7 @@ Putnami is serverless-first: instances scale to zero and are never externally ad
 
 ### 1) Enable the telemetry plugin
 
-Register the `telemetry` plugin on your application and point it at your collector's base URL:
+On the TypeScript runtime, setting `OTEL_EXPORTER_OTLP_ENDPOINT` to your collector's base URL is enough: every `application()` then pushes to it, and `OTEL_SDK_DISABLED=true` turns it off. Putnami Cloud sets the variable for you. To configure telemetry in code instead, register the `telemetry` plugin and point it at your collector's base URL:
 
 ```typescript
 import { telemetry } from '@putnami/application';
@@ -94,7 +94,7 @@ On the TypeScript runtime the equivalent sink is `OtlpLogSink` from `@putnami/ap
 ## What you get
 
 - **Metrics** — framework metrics out of the box, plus your own counters, gauges, and histograms.
-- **Traces** — request spans on the Go runtime (`telemetry.Tracer(...)`).
+- **Traces** — request spans from both runtimes.
 - **Logs** — structured logs forwarded to the collector through the opt-in OTLP sink.
 
 Any standard OTLP/HTTP collector accepts this data. Collector errors are dropped by design — telemetry never affects the workload's request path.

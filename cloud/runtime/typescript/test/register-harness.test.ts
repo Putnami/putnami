@@ -128,7 +128,7 @@ describe('register() activation contract', () => {
         registerSourceDiscoverer: () => {},
         registerConfigLoaderResetHook: (reset) => resetHooks.push(reset),
       });
-      expect(resetHooks).toHaveLength(3); // config cache, secrets cache, token cache
+      expect(resetHooks).toHaveLength(4); // config cache, secrets cache, token cache, telemetry token cache
       for (const reset of resetHooks) {
         reset(); // each hook is callable without throwing
       }

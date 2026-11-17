@@ -1,8 +1,9 @@
 # @putnami/cloud
 
 The Putnami Cloud runtime destination for TypeScript workloads. It gives
-`@putnami/runtime` two remote config sources (config and secrets) and gives
-`@putnami/events` a managed Event Server destination. Both authenticate with
+`@putnami/runtime` two remote config sources (config and secrets) and a
+telemetry credential, and gives `@putnami/events` a managed Event Server
+destination. Both authenticate with
 an operator token or with Google workload identity.
 
 ## Import
@@ -35,6 +36,12 @@ Import `./activate` first in `src/main.ts`. The framework also calls
 when `node_modules` exist (`putnami serve`, tests). A bun-compiled binary
 cannot resolve that `require`, so a deployed workload needs the static import.
 Registering twice is safe: the loader dedupes discoverers.
+
+`register` also registers the telemetry token source with `@putnami/runtime`.
+On Google Cloud (`K_SERVICE` or `GOOGLE_CLOUD_PROJECT` set), each telemetry
+push to the workspace collector that `OTEL_EXPORTER_OTLP_ENDPOINT` names
+carries a Google ID token whose audience is the collector URL, cached until
+shortly before it expires. Elsewhere the source supplies no token.
 
 The Event Server destination has no activation step. Call
 `eventServerDestination(config.events)` and pass the returned transport to

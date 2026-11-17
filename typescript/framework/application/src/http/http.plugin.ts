@@ -122,6 +122,7 @@ export class HttpPlugin implements Plugin {
   private server: Server<WsDataType> | undefined;
   private options: ServerOptions;
   private middlewares: HttpMiddleware[] = [];
+  private outermostMiddlewares: HttpMiddleware[] = [];
   private _routeEntries: RouteEntry[] = [];
   private _nativeRoutes: NativeRouteEntry[] = [];
   private _rewrites: RequestRewrite[] = [];
@@ -137,6 +138,20 @@ export class HttpPlugin implements Plugin {
 
   prepend(middleware: HttpMiddleware): this {
     this.middlewares.unshift(middleware);
+    return this;
+  }
+
+  /**
+   * Register a middleware in front of every other one, the server's own
+   * compression, security headers and origin guard included, so it sees every
+   * request and every response, a refusal included. Telemetry uses it to count
+   * the requests an inner middleware turns away. A later call runs inside an
+   * earlier one.
+   */
+  useOutermost(middleware: HttpMiddleware): this {
+    if (!this.outermostMiddlewares.includes(middleware)) {
+      this.outermostMiddlewares.push(middleware);
+    }
     return this;
   }
 
@@ -221,6 +236,7 @@ export class HttpPlugin implements Plugin {
   merge(other: HttpPlugin): this {
     this.router = this.router.merge(other.router);
     this.mergeMiddlewares(other.middlewares);
+    for (const middleware of other.outermostMiddlewares) this.useOutermost(middleware);
     this._routeEntries.push(...other._routeEntries);
     this._nativeRoutes.push(...other._nativeRoutes);
     this._rewrites.push(...other._rewrites);
@@ -236,6 +252,7 @@ export class HttpPlugin implements Plugin {
       this.route(method, prefixFn(path, prefix), handler, options);
     }
     this.mergeMiddlewares(other.middlewares);
+    for (const middleware of other.outermostMiddlewares) this.useOutermost(middleware);
     for (const { method, path, responder } of other._nativeRoutes) {
       this._nativeRoutes.push({ method, path: prefixFn(path, prefix), responder });
     }
@@ -566,6 +583,10 @@ export class HttpPlugin implements Plugin {
       const compressionOpts = typeof this.options.compression === 'object' ? this.options.compression : {};
       middlewares.unshift(CompressionMiddleware(compressionOpts));
     }
+
+    // Outermost slot (telemetry): in front of compression, so a request any
+    // other middleware refuses is still observed.
+    middlewares.unshift(...this.outermostMiddlewares);
 
     // Auto-enable CSRF token protection (double-submit cookie) when opted in
     if (this.options.csrf) {

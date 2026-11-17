@@ -8,3 +8,4 @@ export * from './error';
 export * from './inject.public';
 export * from './logger';
 export * from './schema';
+export * from './telemetry';

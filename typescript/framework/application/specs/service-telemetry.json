@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "typescript/service-telemetry",
   "outcomes": [
-    "A TypeScript service pushes its metrics, spans and logs to the OTLP/HTTP collector it names, and sends nothing when telemetry is not configured",
+    "A TypeScript service pushes its metrics and spans to the OTLP/HTTP collector its environment or its telemetry plugin names, authenticated for that collector, and sends nothing when neither names one",
     "An unreachable or failing collector degrades observability and never fails a request, a log call or a shutdown",
     "Metric series stay bounded whatever paths callers request",
     "A span a TypeScript service records joins the caller's trace"
@@ -12,14 +12,45 @@
     "Defining the OTLP/JSON envelope, its signal paths, its resource keys or its golden bytes, which telemetry/otlp-push-contract owns",
     "Running a collector, or defining collector-side retention, sampling or routing",
     "A /metrics scrape endpoint or an OpenTelemetry exporter SDK dependency",
-    "Exporting logs implicitly: the log sink is attached to the application logger deliberately"
+    "Exporting logs implicitly: the log sink is attached to the application logger deliberately",
+    "Minting a credential: a runtime package registers the token source for its platform"
   ],
   "requirements": [
     {
       "id": "opt-in-with-explicit-endpoint",
       "text": [
-        "Telemetry is off by default and when disabled, and enabling it without an endpoint leaves the plugin inert, so no collector is installed and nothing leaves the process.",
+        "An explicit telemetry() plugin is off by default and when disabled, and enabling it without an endpoint leaves it inert, so no collector is installed and nothing leaves the process.",
         "Enabling it with an endpoint installs a collector at warmup that records every HTTP request without further wiring."
+      ]
+    },
+    {
+      "id": "default-from-environment",
+      "text": [
+        "An application whose environment sets OTEL_EXPORTER_OTLP_ENDPOINT records every HTTP request and pushes its metrics and spans to that collector, with no telemetry() plugin in its composition.",
+        "Without that endpoint, or with OTEL_SDK_DISABLED=true, the application installs no collector and sends nothing.",
+        "An application that installs telemetry() keeps that plugin's configuration, and the environment adds no second collector, so a request is counted once."
+      ]
+    },
+    {
+      "id": "service-identity-from-environment",
+      "text": [
+        "The pushed resource names the service from OTEL_SERVICE_NAME, then the service.name pair of OTEL_RESOURCE_ATTRIBUTES, then the plugin's app option, then unknown.",
+        "Every other key=value pair of OTEL_RESOURCE_ATTRIBUTES reaches the resource of every metrics and traces request; putnami.framework keeps the value the framework sets."
+      ]
+    },
+    {
+      "id": "outermost-request-instrumentation",
+      "text": [
+        "The telemetry middleware runs before every other middleware of every HTTP server the application composes, in a sub-module too, so a request an inner middleware refuses is still counted and traced.",
+        "Telemetry starts no HTTP server of its own: an application without one keeps its collector for custom metrics and listens on no port."
+      ]
+    },
+    {
+      "id": "per-push-credential",
+      "text": [
+        "Each push asks the token source registered for the collector endpoint for its bearer, and a static bearer wins over the source.",
+        "When the source fails, the batch is dropped and nothing is sent without a credential.",
+        "The first collector refusal (401 or 403) and the first credential failure each log one warning; later ones stay silent and no failure reaches the application."
       ]
     },
     {

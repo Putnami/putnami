@@ -7,6 +7,7 @@
  */
 
 export { MemoryLogger, MemorySink } from '../logger/memory.logger';
+export { resetTelemetryTokenSourceForTest } from '../telemetry/telemetry-token-source';
 export {
   assertRecord,
   caseLogger,

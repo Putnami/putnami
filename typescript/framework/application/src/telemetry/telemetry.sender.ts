@@ -22,6 +22,8 @@ const SEND_TIMEOUT_MS = 5000;
 /** Result of an OTLP send. */
 export interface OtlpSendResult {
   ok: boolean;
+  /** HTTP status of the collector's answer; absent when no answer arrived. */
+  status?: number;
 }
 
 export interface MetricsSendOptions {
@@ -29,6 +31,8 @@ export interface MetricsSendOptions {
   app: string;
   /** Optional service.version resource attribute. */
   serviceVersion?: string;
+  /** Extra resource attributes, such as OTEL_RESOURCE_ATTRIBUTES. */
+  resourceAttributes?: Readonly<Record<string, string>>;
   /** Bearer token for the collector. */
   bearer?: string;
   /** Extra headers (e.g. tenant routing). */
@@ -39,14 +43,22 @@ type TracesSendOptions = MetricsSendOptions;
 
 /** Build the OTLP/JSON metrics request body from per-second buckets. */
 export function buildMetricsBody(buckets: MetricsBucket[], opts: MetricsSendOptions): string {
-  const req = metricsRequestFromBuckets(buckets, { serviceName: opts.app, serviceVersion: opts.serviceVersion });
+  const req = metricsRequestFromBuckets(buckets, {
+    serviceName: opts.app,
+    serviceVersion: opts.serviceVersion,
+    resourceAttributes: opts.resourceAttributes,
+  });
   return marshalCanonical(req);
 }
 
 /** Build the OTLP/JSON traces request body from completed framework spans. */
 export function buildTracesBody(spans: readonly TelemetrySpanRecord[], opts: TracesSendOptions): string {
   return marshalCanonical(
-    tracesRequestFromSpans(spans, { serviceName: opts.app, serviceVersion: opts.serviceVersion }),
+    tracesRequestFromSpans(spans, {
+      serviceName: opts.app,
+      serviceVersion: opts.serviceVersion,
+      resourceAttributes: opts.resourceAttributes,
+    }),
   );
 }
 
@@ -79,7 +91,7 @@ export async function postOtlp(
       body,
       signal: controller.signal,
     });
-    return { ok: res.ok };
+    return { ok: res.ok, status: res.status };
   } catch {
     return { ok: false };
   } finally {

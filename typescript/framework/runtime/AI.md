@@ -248,6 +248,15 @@ Config extraction walks the composed plugin tree, aggregates every
 (and the secrets their `Sensitive` fields declare), and rejects a path the
 workload already defines — the same way migration sources aggregate from deps.
 
+## Telemetry credential
+
+`registerTelemetryTokenSource(source)` installs the process-wide function the
+telemetry plugin of `@putnami/application` asks, before each push, for the
+bearer of the collector at `endpoint`; `getTelemetryTokenSource()` reads it.
+A runtime package registers it (`register()` from `@putnami/cloud/runtime`
+does); the source owns its cache. Tests reset it with
+`resetTelemetryTokenSourceForTest` from `@putnami/runtime/testing`.
+
 ## Logging
 
 ```ts

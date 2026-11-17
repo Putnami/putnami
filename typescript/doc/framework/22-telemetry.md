@@ -1,12 +1,23 @@
 # Telemetry
 
-The `TelemetryPlugin` collects application metrics — HTTP request counts, response durations, error rates — and pushes them to an OTLP-style telemetry backend of your choice. You can also record custom counters, gauges, and histograms.
-
-> Telemetry is opt-in. It is disabled by default and has no default endpoint, so no operational data leaves the process unless you explicitly set `enabled: true` and configure an `endpoint`.
+The `TelemetryPlugin` collects application metrics and spans — HTTP request counts, response durations, error rates — and pushes them as OTLP/JSON over HTTP to an OpenTelemetry collector. You can also record custom counters, gauges, and histograms.
 
 ## Getting started
 
-Register the `telemetry()` plugin alongside `http()`:
+### From the environment
+
+When the environment sets `OTEL_EXPORTER_OTLP_ENDPOINT`, every `application()` adds the telemetry plugin by itself and pushes to that collector. No code is needed: Putnami Cloud sets this variable on every workload, with the URL of its workspace collector.
+
+| Variable | Effect |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector base URL. Without it, the application gets no telemetry and nothing leaves the process. |
+| `OTEL_SDK_DISABLED=true` | Turns this default telemetry off, whatever the endpoint says. |
+| `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option. |
+| `OTEL_RESOURCE_ATTRIBUTES` | Comma-separated `key=value` pairs added to every pushed resource. |
+
+### Explicitly
+
+Register the `telemetry()` plugin to configure telemetry yourself. An explicit plugin owns telemetry: the environment then adds nothing, and the plugin's own configuration decides.
 
 ```ts
 import { application, http, telemetry } from '@putnami/application';
@@ -16,7 +27,6 @@ const app = application()
     telemetry({
       enabled: true,
       endpoint: process.env.TELEMETRY_ENDPOINT,
-      bearer: process.env.TELEMETRY_TOKEN,
     }),
   )
   .use(http({ port: 3000 }));
@@ -24,11 +34,25 @@ const app = application()
 await app.start();
 ```
 
-Once enabled with an endpoint, HTTP metrics are collected automatically. No further setup is needed.
+> An explicit plugin is opt-in. It is disabled by default and has no default endpoint, so it sends nothing unless you set `enabled: true` and an `endpoint`.
+
+Once telemetry runs, HTTP metrics are collected automatically. No further setup is needed.
+
+## Credentials
+
+Before each push, the plugin asks the telemetry token source registered with `@putnami/runtime` for a bearer token, so a token that expires is renewed without a restart. On Putnami Cloud, `register()` from `@putnami/cloud/runtime`, which a Cloud workload already calls in its `activate.ts`, registers a source that returns a Google ID token for the collector.
+
+```ts
+import { registerTelemetryTokenSource } from '@putnami/runtime';
+
+registerTelemetryTokenSource(async (endpoint) => fetchTokenFor(endpoint));
+```
+
+A static `bearer` option wins over the source. When the source fails, the batch is dropped rather than sent without a credential. The first collector refusal (`401` or `403`) and the first credential failure each log one warning.
 
 ## What is collected automatically
 
-The plugin registers a middleware that instruments every HTTP request:
+The plugin registers a middleware in front of every other one on each HTTP server the application composes, so a request that an inner middleware refuses (for example the origin guard) is still counted and traced:
 
 | Metric | Type | Name pattern | Example |
 |---|---|---|---|
@@ -82,7 +106,7 @@ observeHistogram('app.order.processing.duration', Date.now() - start);
 ```ts
 telemetry({
   enabled: true,
-  endpoint: 'https://otel.example.com/v1/runtime',
+  endpoint: 'https://collector.example:4318',
   bearer: 'my-token',
   flushIntervalS: 30,
   app: 'my-service',
@@ -91,11 +115,11 @@ telemetry({
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | `boolean` | `false` | Enable telemetry collection (explicit opt-in) |
-| `endpoint` | `string` | — | Telemetry ingest URL; required when enabled |
-| `bearer` | `string` | — | Bearer token for authentication |
+| `enabled` | `boolean` | `false` | Enable the explicit plugin (opt-in) |
+| `endpoint` | `string` | — | OTLP/HTTP collector base URL; metrics go to `<endpoint>/v1/metrics`, spans to `<endpoint>/v1/traces`. Required when enabled |
+| `bearer` | `string` | — | Static bearer token; wins over the registered token source |
 | `flushIntervalS` | `number` | `30` | Seconds between flushes |
-| `app` | `string` | — | Application identifier |
+| `app` | `string` | — | `service.name` when neither `OTEL_SERVICE_NAME` nor a `service.name` resource attribute is set; `unknown` without all three |
 
 If `enabled` is `true` but `endpoint` is missing, the plugin logs a warning and stays inert. It never falls back to a hardcoded destination.
 
@@ -104,19 +128,16 @@ Or via YAML:
 ```yaml
 telemetry:
   enabled: true
-  endpoint: "https://otel.example.com/v1/runtime"
-  bearer: "..."
+  endpoint: "https://collector.example:4318"
   flushIntervalS: 30
   app: "my-service"
 ```
 
 ## How aggregation works
 
-Metrics are bucketed by Unix second in memory. A periodic timer drains completed buckets, builds a JSON payload, and POSTs it to the endpoint. On shutdown, all remaining buckets (including the current second) are flushed immediately.
+Metrics are bucketed by Unix second in memory. A periodic timer drains completed buckets, renders them as an OTLP/JSON request, and POSTs it to `<endpoint>/v1/metrics`; completed spans go to `<endpoint>/v1/traces`. On shutdown, all remaining buckets (including the current second) are flushed immediately.
 
-The telemetry backend can adjust the flush interval dynamically by returning `{ "flushIntervalS": N }` in the response. The plugin applies it without restart.
-
-All telemetry failures are silently dropped — they never affect application behavior.
+Telemetry failures never affect application behavior.
 
 ## Related guides
 

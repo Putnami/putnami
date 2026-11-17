@@ -423,16 +423,23 @@ export interface RenderBucket {
 interface MetricsRenderOptions {
   serviceName: string;
   serviceVersion?: string;
+  /** Extra resource attributes, such as OTEL_RESOURCE_ATTRIBUTES; the framework's own keys win. */
+  resourceAttributes?: Readonly<Record<string, string>>;
   scopeName?: string;
   scopeVersion?: string;
 }
 
 /** Build the Putnami resource (framework marker + service identity). */
-function putnamiResource(opts: { serviceName: string; serviceVersion?: string }): OtlpNode {
+function putnamiResource(opts: {
+  serviceName: string;
+  serviceVersion?: string;
+  resourceAttributes?: Readonly<Record<string, string>>;
+}): OtlpNode {
   return resourceFromStrings({
+    ...opts.resourceAttributes,
     [ATTR_PUTNAMI_FRAMEWORK]: FRAMEWORK_TYPESCRIPT,
     [ATTR_SERVICE_NAME]: opts.serviceName,
-    [ATTR_SERVICE_VERSION]: opts.serviceVersion ?? '',
+    ...(opts.serviceVersion ? { [ATTR_SERVICE_VERSION]: opts.serviceVersion } : {}),
   });
 }
 
@@ -572,6 +579,8 @@ export interface TraceRenderRecord {
 interface TracesRenderOptions {
   serviceName: string;
   serviceVersion?: string;
+  /** Extra resource attributes, such as OTEL_RESOURCE_ATTRIBUTES; the framework's own keys win. */
+  resourceAttributes?: Readonly<Record<string, string>>;
   scopeName?: string;
   scopeVersion?: string;
 }
@@ -599,6 +608,8 @@ export function tracesRequestFromSpans(spans: readonly TraceRenderRecord[], opts
 interface LogsRenderOptions {
   serviceName: string;
   serviceVersion?: string;
+  /** Extra resource attributes, such as OTEL_RESOURCE_ATTRIBUTES; the framework's own keys win. */
+  resourceAttributes?: Readonly<Record<string, string>>;
   scopeName?: string;
   scopeVersion?: string;
 }

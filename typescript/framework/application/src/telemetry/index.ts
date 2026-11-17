@@ -26,7 +26,14 @@ export {
 } from './client-telemetry';
 export { TelemetryConfig, type TelemetryOptions } from './telemetry.config';
 export { TelemetryMiddleware } from './telemetry.middleware';
-export { TelemetryPlugin, telemetry } from './telemetry.plugin';
+export {
+  ENV_OTLP_ENDPOINT,
+  ENV_RESOURCE_ATTRIBUTES,
+  ENV_SDK_DISABLED,
+  ENV_SERVICE_NAME,
+  parseResourceAttributes,
+} from './telemetry.environment';
+export { TelemetryPlugin, telemetry, telemetryFromEnvironment } from './telemetry.plugin';
 export {
   buildMetricsBody,
   buildTracesBody,

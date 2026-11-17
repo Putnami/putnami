@@ -33,6 +33,7 @@ import { propagateBuildOptions, runGenerate, runPostGenerate } from './app-build
 import { buildAppContainerContext } from './app-container';
 import { closeContainerContext, runShutdownHooks, stopPlugins } from './app-shutdown';
 import { installSignalHandlers } from './app-signals';
+import { TelemetryPlugin, telemetryFromEnvironment } from '../telemetry/telemetry.plugin';
 import { type BuildOptions, type GenerateResult, Module, type Plugin } from './module';
 
 export {
@@ -367,6 +368,17 @@ export class Application extends Module {
   }
 
   /**
+   * Add the telemetry the environment asks for (`OTEL_EXPORTER_OTLP_ENDPOINT`,
+   * see ADR 0007) unless the composition already holds a telemetry plugin,
+   * which then owns telemetry, so a request is counted once.
+   */
+  private useTelemetryFromEnvironment(): void {
+    if (this.collectPlugins().some(({ plugin }) => plugin instanceof TelemetryPlugin)) return;
+    const plugin = telemetryFromEnvironment();
+    if (plugin) this.use(plugin);
+  }
+
+  /**
    * Prepare the application without starting it: run warmup on every
    * plugin, then collect MigrationContributor sources into the per-app
    * MigrationRegistry. After `prepare()` returns, the DI context is
@@ -378,6 +390,7 @@ export class Application extends Module {
    * Application; `start()` invokes `prepare()` internally.
    */
   async prepare(): Promise<void> {
+    this.useTelemetryFromEnvironment();
     const warmupPlugins = this.collectPlugins();
 
     // Warmup plugins sequentially in tree order so runners can register
@@ -385,6 +398,12 @@ export class Application extends Module {
     for (const { plugin, owner } of warmupPlugins) {
       // biome-ignore lint/performance/noAwaitInLoops: warmup ordering matters
       await plugin.warmup?.(owner);
+    }
+
+    // A server another plugin created in its own warmup exists only now:
+    // instrument it, whatever the composition order (ADR 0007).
+    for (const { plugin, owner } of this.collectPlugins()) {
+      if (plugin instanceof TelemetryPlugin) plugin.instrument(owner);
     }
 
     // After warmup: collect contributions and finalize the DI context.

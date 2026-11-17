@@ -1193,7 +1193,7 @@
       "id": "typescript/service-telemetry",
       "type": "feature",
       "name": "TypeScript service telemetry",
-      "outcome": "A TypeScript service that opts in pushes its metrics, spans and logs as OTLP/JSON to the collector it names, with bounded metric series and without a failing collector ever failing the service",
+      "outcome": "A TypeScript service pushes its metrics and spans to the collector its environment or its plugin names, authenticated for that collector, and its logs through a sink it attaches, with bounded metric series and without a failing collector ever failing the service",
       "owner": "typescript",
       "target": "coded",
       "requirements": [
@@ -1207,6 +1207,55 @@
               "an-enabled-plugin-collects-http-metrics",
               "telemetry-is-off-by-default",
               "enabling-without-an-endpoint-stays-inert"
+            ]
+          }
+        },
+        {
+          "id": "default-from-environment",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-environment-endpoint-turns-telemetry-on",
+              "no-endpoint-or-a-disabled-sdk-sends-nothing",
+              "an-explicit-plugin-owns-telemetry"
+            ]
+          }
+        },
+        {
+          "id": "service-identity-from-environment",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-service-name-comes-from-the-environment", "resource-attributes-reach-every-signal"]
+          }
+        },
+        {
+          "id": "outermost-request-instrumentation",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-refused-request-is-still-counted",
+              "every-composed-server-is-instrumented",
+              "a-server-another-plugin-creates-is-instrumented",
+              "telemetry-starts-no-server"
+            ]
+          }
+        },
+        {
+          "id": "per-push-credential",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-registered-token-source-authenticates-each-push",
+              "a-credential-failure-drops-the-batch",
+              "a-refusal-warns-once"
             ]
           }
         },

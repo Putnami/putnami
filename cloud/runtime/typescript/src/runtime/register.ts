@@ -1,6 +1,7 @@
-import type { ConfigSource } from '@putnami/runtime';
+import { type ConfigSource, registerTelemetryTokenSource } from '@putnami/runtime';
 import { discoverRemoteSource, resetRemoteConfigSourceCacheForTest } from './remote-config-source';
 import { discoverRemoteSecretsSource, resetRemoteSecretsSourceCacheForTest } from './remote-secrets-source';
+import { cloudTelemetryTokenSource, resetTelemetryTokenCacheForTest } from './telemetry-token-source';
 import { resetTokenSourceCacheForTest } from './token-source';
 
 /**
@@ -43,11 +44,14 @@ export const cloudConfigLoaderResetHooks: ReadonlyArray<() => void> = [
   resetRemoteConfigSourceCacheForTest,
   resetRemoteSecretsSourceCacheForTest,
   resetTokenSourceCacheForTest,
+  resetTelemetryTokenCacheForTest,
 ];
 
 /**
  * Registers this package's config/secrets sources with the framework config
- * loader. The framework calls it when it can resolve `@putnami/cloud/runtime`;
+ * loader, and its telemetry token source with `@putnami/runtime`, so every
+ * telemetry push to the workspace collector carries a Google ID token for it.
+ * The framework calls it when it can resolve `@putnami/cloud/runtime`;
  * a bundled binary activates it with a static import instead.
  *
  * The registrar is dependency-injected. Activation is a one-line, additive
@@ -60,6 +64,8 @@ export const cloudConfigLoaderResetHooks: ReadonlyArray<() => void> = [
  * ```
  */
 export function register(registrar: CloudRuntimeRegistrar): void {
+  // Telemetry pushes to the workspace collector carry a Google ID token for it.
+  registerTelemetryTokenSource(cloudTelemetryTokenSource);
   for (const discoverer of cloudSourceDiscoverers) {
     registrar.registerSourceDiscoverer(discoverer);
   }

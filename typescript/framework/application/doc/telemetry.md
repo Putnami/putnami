@@ -4,9 +4,22 @@ The `TelemetryPlugin` collects application metrics and pushes them to a standard
 
 Putnami is serverless-first, so telemetry is *pushed* (not scraped): metrics are aggregated per second in memory and POSTed to the collector's `/v1/metrics` every N seconds. The wire format is the canonical OTLP/JSON envelope shared with the Go runtime — see the [telemetry protocol](../../../../protocols/telemetry/README.md) — so the same collector ingests both runtimes identically.
 
-> **Telemetry is opt-in.** It is **disabled by default** and has **no default endpoint**. No operational data ever leaves the process unless you explicitly set `enabled: true` **and** configure an `endpoint`. If telemetry is enabled without an endpoint, the plugin logs a warning and stays inert — it never falls back to a hardcoded destination.
+## From the environment
 
-## Quick Start
+When the environment sets `OTEL_EXPORTER_OTLP_ENDPOINT`, every `application()` adds the telemetry plugin by itself and pushes to that collector ([ADR 0007](./adr/0007-telemetry-is-on-by-default-from-the-environment.md)). Putnami Cloud sets this variable on every workload.
+
+| Variable | Effect |
+|---|---|
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector base URL. Without it, the application gets no telemetry and nothing leaves the process. |
+| `OTEL_SDK_DISABLED=true` | Turns this default telemetry off, whatever the endpoint says. |
+| `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option. |
+| `OTEL_RESOURCE_ATTRIBUTES` | Comma-separated `key=value` pairs added to every pushed resource. `putnami.framework` keeps the framework's value. |
+
+An application that registers `telemetry()` itself owns telemetry: the environment adds nothing, so a request is counted once.
+
+## Explicit plugin
+
+> **The explicit plugin is opt-in.** It is **disabled by default** and has **no default endpoint**. If it is enabled without an endpoint, it logs a warning and stays inert — it never falls back to a hardcoded destination.
 
 ```typescript
 import { application, http, telemetry } from '@putnami/application';
@@ -16,7 +29,6 @@ const app = application()
     telemetry({
       enabled: true,
       endpoint: process.env.OTLP_ENDPOINT, // collector base URL, e.g. https://collector:4318
-      bearer: process.env.OTLP_TOKEN,
     }),
   )
   .use(http({ port: 3000 }));
@@ -25,11 +37,15 @@ await app.start();
 // HTTP metrics are collected automatically.
 ```
 
+## Credentials
+
+Before each push, the plugin asks the telemetry token source registered with `registerTelemetryTokenSource` from `@putnami/runtime` for a bearer, so an expiring token is renewed without a restart. `register()` from `@putnami/cloud/runtime` registers a source that returns a Google ID token for the collector on Google Cloud. A static `bearer` wins over the source. When the source fails, the batch is dropped. The first collector refusal (`401` or `403`) and the first credential failure each log one warning.
+
 ## How It Works
 
-1. **Collect** — Every HTTP request records per-route counters and duration histograms via a middleware. Custom metrics are recorded with `incCounter()`, `setGauge()`, and `observeHistogram()`.
+1. **Collect** — Every HTTP request records per-route counters, duration histograms and a span via a middleware that runs in front of every other one on each HTTP server the application composes, so a refused request is counted too. Telemetry starts no server of its own. Custom metrics are recorded with `incCounter()`, `setGauge()`, and `observeHistogram()`.
 2. **Aggregate** — Metrics are bucketed by Unix second in memory. This keeps the memory footprint small and gives the backend per-second resolution.
-3. **Flush** — A periodic timer drains completed buckets, renders them as an OTLP/JSON metrics request, and POSTs it to `<endpoint>/v1/metrics`. On shutdown, remaining buckets are flushed immediately. Collector errors are dropped — telemetry never affects application behaviour.
+3. **Flush** — A periodic timer drains completed buckets, renders them as an OTLP/JSON metrics request, and POSTs it to `<endpoint>/v1/metrics`, with completed spans to `<endpoint>/v1/traces`. On shutdown, remaining buckets are flushed immediately. Collector errors are dropped — telemetry never affects application behaviour.
 
 ## Configuration
 
@@ -39,7 +55,7 @@ telemetry({
   endpoint: 'https://collector:4318', // OTLP/HTTP collector base URL — required when enabled, no default
   bearer: 'my-token',
   flushIntervalS: 30,             // default (seconds)
-  app: 'my-service',              // defaults to package name; reported as service.name
+  app: 'my-service',              // service.name when OTEL_SERVICE_NAME is unset
 });
 ```
 
@@ -47,9 +63,9 @@ telemetry({
 |---|---|---|---|
 | `enabled` | `boolean` | `false` | Enable telemetry collection (explicit opt-in) |
 | `endpoint` | `string` | — (required when enabled) | OTLP/HTTP collector **base URL**; metrics POST to `<endpoint>/v1/metrics`. No default, so data is never shipped to a hardcoded destination |
-| `bearer` | `string` | — | Bearer token for the collector |
+| `bearer` | `string` | — | Static bearer token; wins over the registered token source |
 | `flushIntervalS` | `number` | `30` | Flush interval in seconds |
-| `app` | `string` | — | Reported as the OTLP resource's `service.name`; defaults to package name |
+| `app` | `string` | — | The OTLP resource's `service.name` when neither `OTEL_SERVICE_NAME` nor a `service.name` resource attribute is set; `unknown` without all three |
 
 If `enabled` is `true` but no `endpoint` is set, the plugin logs a warning and does not start. The endpoint is any standard OTLP/HTTP collector base URL.
 
@@ -172,11 +188,11 @@ The sink batches records and POSTs them to `<endpoint>/v1/logs` on a background 
 
 | Phase | Behavior |
 |---|---|
-| `warmup` | Initializes the collector, registers HTTP middleware |
+| `warmup` | Initializes the collector, registers the middleware outermost on every composed HTTP server |
 | `start` | Starts the periodic flush timer |
 | `stop` | Drains all remaining buckets (including the current second), POSTs a final OTLP/JSON request, clears the timer |
 
-The flush timer is `unref()`'d so it does not keep the process alive. All telemetry failures are silently dropped — they never affect application behavior.
+The flush timer is `unref()`'d so it does not keep the process alive. Telemetry failures never affect application behavior.
 
 ## Best Practices
 
@@ -184,15 +200,16 @@ The flush timer is `unref()`'d so it does not keep the process alive. All teleme
 2. **Keep counter cardinality bounded** — Avoid dynamic segments in metric names. Use route patterns, not resolved paths.
 3. **Use histograms for durations** — They give you count, sum, min, and max in a single metric.
 4. **Set the `app` option** — Makes it easy to filter metrics per service in the backend.
-5. **Configure bearer via YAML/env** — Never hardcode tokens in source code.
+5. **Prefer a token source to a static bearer** — It renews expiring tokens; never hardcode tokens in source code.
 
 ## Troubleshooting
 
 ### Metrics not appearing in the backend
 
-- Check that `enabled` is `true` — telemetry is **disabled by default**.
-- Check that `endpoint` is set — there is **no default endpoint**. If it is missing, the logs show `telemetry is enabled but no endpoint is configured`.
-- Verify the `bearer` token is valid for the target environment.
+- Without an explicit plugin, check that `OTEL_EXPORTER_OTLP_ENDPOINT` is set and `OTEL_SDK_DISABLED` is not `true`.
+- With an explicit plugin, check that `enabled` is `true` and `endpoint` is set. If the endpoint is missing, the logs show `telemetry is enabled but no endpoint is configured`.
+- A `the telemetry collector refused a push` warning means the credential is wrong: on Putnami Cloud, check that `src/activate.ts` calls `register()` from `@putnami/cloud/runtime`.
+- A `telemetry could not obtain a credential` warning means the token source failed.
 - Check application logs for `telemetry flush every Ns` at startup — if missing, the plugin did not initialize.
 
 ### High memory usage
