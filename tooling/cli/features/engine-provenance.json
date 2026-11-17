@@ -58,6 +58,19 @@
         }
       },
       {
+        "id": "vcs-stamp-follows-git",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "only-a-git-directory-at-the-workspace-root-that-git-reads-stamps-the-build"
+          ]
+        }
+      },
+      {
         "id": "build-only-engine",
         "stage": "coded",
         "evidenceKinds": [

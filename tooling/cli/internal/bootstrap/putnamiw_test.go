@@ -1080,6 +1080,92 @@ func TestPutnamiwSourceKey_SiblingWorktreesShareOneBuild(t *testing.T) {
 	}
 }
 
+// goBuildLines returns the arguments of every `go build` the stub received.
+func goBuildLines(t *testing.T, env []string) []string {
+	t.Helper()
+	data, err := os.ReadFile(envValue(env, "GO_LOG"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var lines []string
+	for _, line := range strings.Split(string(data), "\n") {
+		if strings.HasPrefix(line, "build ") {
+			lines = append(lines, line)
+		}
+	}
+	return lines
+}
+
+// The build stamps version-control information only when the workspace root
+// holds a .git directory that git reads. A checkout git cannot read, one with
+// no .git, and every linked worktree build with -buildvcs=false: `go build` stamps from the
+// nearest enclosing .git directory, which for a linked worktree is another
+// repository, here one that answers every git call with exit 128.
+func TestPutnamiwSourceKey_VCSStampFollowsGit(t *testing.T) {
+	repo, _, env := gitSourceRepo(t)
+	root := filepath.Dir(repo)
+
+	unreadable := filepath.Join(root, "unreadable")
+	if out, err := exec.Command("cp", "-R", repo, unreadable).CombinedOutput(); err != nil {
+		t.Fatalf("copy checkout: %v\n%s", err, out)
+	}
+	if err := os.WriteFile(filepath.Join(unreadable, ".git", "HEAD"), []byte("not a ref\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	nogit := filepath.Join(root, "nogit")
+	if out, err := exec.Command("cp", "-R", repo, nogit).CombinedOutput(); err != nil {
+		t.Fatalf("copy checkout: %v\n%s", err, out)
+	}
+	if err := os.RemoveAll(filepath.Join(nogit, ".git")); err != nil {
+		t.Fatal(err)
+	}
+	assertNotAGitWorkTree(t, nogit)
+
+	worktree := filepath.Join(root, "worktree")
+	git(t, repo, "worktree", "add", "-q", "--detach", worktree)
+
+	enclosing := filepath.Join(root, "enclosing")
+	if err := os.MkdirAll(filepath.Join(enclosing, ".git"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	enclosed := filepath.Join(enclosing, "worktree")
+	git(t, repo, "worktree", "add", "-q", "--detach", enclosed)
+
+	for _, dir := range []string{unreadable, enclosing} {
+		if out, err := gittest.Command(dir, "status", "--porcelain").CombinedOutput(); err == nil {
+			t.Fatalf("fixture: git reads %s:\n%s", dir, out)
+		}
+	}
+
+	cases := []struct {
+		dir     string
+		stamped bool
+	}{
+		{repo, true},
+		{unreadable, false},
+		{nogit, false},
+		{worktree, false},
+		{enclosed, false},
+	}
+	for i, c := range cases {
+		// --bootstrap makes each run build, so each one shows its own flags.
+		out, code := runIn(t, c.dir, env, "--bootstrap", "ping")
+		if code != 0 || !strings.Contains(out, "RAN_BUILT") {
+			t.Fatalf("%s: code=%d out=%s", filepath.Base(c.dir), code, out)
+		}
+		lines := goBuildLines(t, env)
+		if len(lines) != i+1 {
+			t.Fatalf("%s: `go build` count %d, want %d", filepath.Base(c.dir), len(lines), i+1)
+		}
+		if stamped := !strings.Contains(lines[i], "-buildvcs=false"); stamped != c.stamped {
+			t.Errorf("%s: build %q stamps VCS = %v, want %v", filepath.Base(c.dir), lines[i], stamped, c.stamped)
+		}
+	}
+	spectest.Proves(t, "cli/engine-provenance", "vcs-stamp-follows-git",
+		"only-a-git-directory-at-the-workspace-root-that-git-reads-stamps-the-build")
+}
+
 // The regression this feature exists for: a change OUTSIDE tooling/cli must
 // invalidate the binary. The old mtime gate watched tooling/cli only, so an edit
 // under protocols/ shipped a stale engine behind a green run.

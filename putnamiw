@@ -1217,8 +1217,24 @@ build_cli_package() {
   if [ -z "$go_root" ]; then
     go_root="$(cd "$(dirname "$GO_BINARY")/.." && pwd)"
   fi
-  (cd "$SCRIPT_DIR" && GOROOT="$go_root" PATH="$go_root/bin:$PATH" GOTOOLCHAIN=local \
-    "$GO_BINARY" build -o "$out" -ldflags="$CLI_LDFLAGS" "$CLI_SOURCE") >&2
+  # `go build` stamps git information from the nearest directory named .git
+  # that encloses the workspace root. The build keeps that stamp only when the
+  # workspace root itself holds a .git directory and git answers, from there,
+  # the two reads `go build` stamps from; a caller's GOFLAGS then keeps its own
+  # -buildvcs. Otherwise, in a linked worktree whose .git is a file, a checkout
+  # with no .git, or one git cannot read, the build passes -buildvcs=false and
+  # stamps nothing, so no enclosing git repository is read.
+  (
+    cd "$SCRIPT_DIR" || exit 1
+    export GOROOT="$go_root" PATH="$go_root/bin:$PATH" GOTOOLCHAIN=local
+    vcs_flag=()
+    if [ ! -d .git ] ||
+      ! git status --porcelain >/dev/null 2>&1 ||
+      ! git -c log.showsignature=false log -1 --format=%H:%ct >/dev/null 2>&1; then
+      vcs_flag=(-buildvcs=false)
+    fi
+    "$GO_BINARY" build ${vcs_flag[@]+"${vcs_flag[@]}"} -o "$out" -ldflags="$CLI_LDFLAGS" "$CLI_SOURCE"
+  ) >&2
 }
 
 build_cli() {

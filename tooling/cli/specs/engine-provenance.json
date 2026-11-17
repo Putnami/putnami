@@ -46,6 +46,13 @@
       ]
     },
     {
+      "id": "vcs-stamp-follows-git",
+      "text": [
+        "The from-source build stamps version-control information into the CLI only when the workspace root holds a .git directory that git reads.",
+        "In a linked worktree, a checkout with no .git, or one git cannot read, the build passes -buildvcs=false and succeeds with no environment set by the caller: it never stamps from, or fails on, a git repository that encloses the workspace."
+      ]
+    },
+    {
       "id": "build-only-engine",
       "text": [
         "`./putnamiw --print-engine` builds or reuses the content-keyed store blob like a normal run, writes nothing under .putnami/bin, runs only `putnami extensions prepare` with it, and prints one JSON line on stdout: the absolute blob path, the source key and the absolute workspace root.",

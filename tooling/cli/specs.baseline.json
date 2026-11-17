@@ -106,6 +106,7 @@
     "cli/engine-provenance#foreign-engine-refused",
     "cli/engine-provenance#print-engine-installs-the-locked-go",
     "cli/engine-provenance#source-workspace-declaration",
+    "cli/engine-provenance#vcs-stamp-follows-git",
     "cli/extension-dependencies#a-channel-never-moves-a-pin-backwards",
     "cli/extension-dependencies#a-dependency-serves-no-reserved-provider",
     "cli/extension-dependencies#agent-content-may-name-a-dependency",

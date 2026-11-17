@@ -538,6 +538,15 @@ You no longer need `--bootstrap` after editing `protocols/` or the extension SDK
 | `--bootstrap` | Rebuild and republish, ignoring the cached key. |
 | `go build` fails | Hard failure. No fallback to a cached blob or a downloaded binary. |
 | Not a git work tree (a tarball checkout) | No key; the historical mtime gate runs unchanged. |
+| A linked worktree, or a checkout git cannot read | The build passes `-buildvcs=false` and succeeds. You set no `GOFLAGS`. |
+
+The build stamps git information into the CLI only when the workspace root
+holds a `.git` directory that git reads. `go build` stamps from the nearest
+`.git` directory at or above the workspace root. A linked worktree has a
+`.git` file, so the nearest `.git` directory, when there is one, belongs to
+another repository, and the wrapper turns stamping off. The content key does
+not cover the stamp: checkouts at the same tree state share one blob, stamped
+or not, and the CLI reads no stamp.
 
 ## Build Integration
 
