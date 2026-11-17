@@ -856,7 +856,7 @@ func TestSyncTitleNamesOnlyAKeyTitledMission(t *testing.T) {
 		{"a mission titled by its key", sessionCache{Name: "Page title", Mission: sessionMissionState{Key: sessionBranchKey, Known: true, Title: sessionBranch}}, "Page title"},
 		{"an untitled mission", sessionCache{Name: "Page title", Mission: sessionMissionState{Key: sessionBranchKey, Known: true}}, "Page title"},
 		{"a titled mission", sessionCache{Name: "Page title", Mission: sessionMissionState{Key: sessionBranchKey, Known: true, Title: "Checkpoint"}}, ""},
-		{"a known mission and no name", sessionCache{Mission: sessionMissionState{Key: "issue-12", Known: true, Title: "Issue #12"}}, ""},
+		{"a known mission and no name", sessionCache{Mission: sessionMissionState{Key: "issue-4", Known: true, Title: "Issue #4"}}, ""},
 	} {
 		if got := syncTitle(&tc.cache); got != tc.want {
 			t.Errorf("%s: syncTitle = %q, want %q", tc.name, got, tc.want)
