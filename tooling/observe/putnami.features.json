@@ -184,7 +184,8 @@
             "checks": [
               "a-workspace-change-carries-its-declarations",
               "a-workspace-carries-its-newest-spec-verification-record",
-              "another-repository-declares-nothing"
+              "another-repository-declares-nothing",
+              "a-workspace-change-that-touches-no-declaration-carries-an-empty-list"
             ]
           }
         }

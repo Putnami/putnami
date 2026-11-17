@@ -87,7 +87,10 @@ type Result struct {
 	Deepened int
 	// ChangedFiles is the diff from BaseSHA to HeadSHA.
 	ChangedFiles []ChangedFile
-	Diagnostics  []diag.Diagnostic
+	// Truncated is true when the diff holds more than MaxChangedFiles files
+	// and ChangedFiles lists only the first ones.
+	Truncated   bool
+	Diagnostics []diag.Diagnostic
 }
 
 // Resolve resolves req. Every failure is a diagnostic of the result.
@@ -205,6 +208,7 @@ func (r *Result) diff(g git) {
 	if len(files) > MaxChangedFiles {
 		r.warn(CodeTooManyChangedFiles, "", "the change touches %d files; the first %d are listed", len(files), MaxChangedFiles)
 		files = files[:MaxChangedFiles]
+		r.Truncated = true
 	}
 	r.ChangedFiles = files
 }

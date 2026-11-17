@@ -138,7 +138,7 @@ func Run(ctx context.Context, opts Options) Observation {
 		o.Reports = []reports.Report{}
 	}
 	set := components.Detect(root, opts.detectors())
-	input := analyze.Input{Root: root, Set: set, ChangedFiles: o.ChangedFiles, Reports: o.Reports, DecisionDirs: opts.Decisions, ArchUnitClasses: opts.ArchUnitClasses}
+	input := analyze.Input{Root: root, Set: set, ChangedFiles: o.ChangedFiles, DiffRead: diffRead(resolved), Reports: o.Reports, DecisionDirs: opts.Decisions, ArchUnitClasses: opts.ArchUnitClasses}
 	var analysisDiags []diag.Diagnostic
 	if resolved.BaseSHA != "" && resolved.HeadSHA != "" {
 		added, err := gitbase.AddedLines(ctx, root, resolved.BaseSHA, resolved.HeadSHA)
@@ -471,4 +471,10 @@ func count(n int, noun string) string {
 		return "1 " + noun
 	}
 	return fmt.Sprintf("%d %ss", n, noun)
+}
+
+// diffRead reports whether the resolution read the whole diff of the change:
+// a nil list is a diff that was not read, and a truncated one was cut.
+func diffRead(resolved gitbase.Result) bool {
+	return resolved.ChangedFiles != nil && !resolved.Truncated
 }

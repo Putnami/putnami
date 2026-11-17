@@ -466,7 +466,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-spec-verification-and-the-declarations-each-ride-alone"
+              "the-spec-verification-and-the-declarations-each-ride-alone",
+              "an-empty-declarations-list-rides-alone"
             ]
           }
         },

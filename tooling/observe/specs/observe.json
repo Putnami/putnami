@@ -108,7 +108,7 @@
     {
       "id": "declared-repository-evidence",
       "text": [
-        "In a repository that holds putnami.workspace.json, the evidence document carries the declaration files the change touches, each with its document at the base and at the head, and the newest spec verification record a `putnami test` run wrote under .putnami/sessions.",
+        "In a repository that holds putnami.workspace.json, the evidence document carries the declaration files the change touches, each with its document at the base and at the head, an empty list when it touches none and the whole diff was read, and the newest spec verification record a `putnami test` run wrote under .putnami/sessions.",
         "A workspace without a record gets the observe.spec_verification_missing warning, which names the step to add.",
         "Another repository's document carries neither member."
       ]

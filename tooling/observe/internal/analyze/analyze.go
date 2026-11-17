@@ -49,6 +49,10 @@ type Input struct {
 	Set components.Set
 	// ChangedFiles is the diff from the merge base to the head.
 	ChangedFiles []gitbase.ChangedFile
+	// DiffRead is true when ChangedFiles is the whole diff: the merge base
+	// resolved, the diff was read, and no file was cut from it. Only then
+	// does a change that lists no declaration touch none.
+	DiffRead bool
 	// Reports are the test and coverage reports found.
 	Reports []reports.Report
 	// AddedLines are the lines the change adds per path at the head; nil
@@ -87,9 +91,10 @@ type Result struct {
 	// path.
 	Decisions []evidence.Decision `json:"decisions,omitempty"`
 	// Declarations are the declaration files the change touches, with their
-	// two documents, in diff order; empty unless the repository is a Putnami
-	// workspace.
-	Declarations []evidence.Declaration `json:"declarations,omitempty"`
+	// two documents, in diff order. Nil unless the repository is a Putnami
+	// workspace; an empty list when it is one, the whole diff was read and
+	// it touches no declaration.
+	Declarations []evidence.Declaration `json:"declarations,omitzero"`
 	Diagnostics  []diag.Diagnostic      `json:"-"`
 }
 

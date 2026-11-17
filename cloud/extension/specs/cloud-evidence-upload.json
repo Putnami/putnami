@@ -49,6 +49,7 @@
       "id": "sends-the-declared-records",
       "text": [
         "A document's spec verification record and its declarations are each posted in a batch of their own under the run's submission id, copied from the document.",
+        "An empty declarations list is posted as an empty list.",
         "A document without them sends no such batch."
       ]
     },

@@ -312,6 +312,19 @@
           }
         },
         {
+          "id": "declarations-empty-when-none-touched",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-empty-declarations-list-stays-an-empty-list"
+            ]
+          }
+        },
+        {
           "id": "the-spec-verification-record-is-carried-whole",
           "stage": "coded",
           "evidenceKinds": [

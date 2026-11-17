@@ -1,9 +1,11 @@
 package analyze
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/evidence"
@@ -83,6 +85,38 @@ func TestADeclarationOverItsBoundKeepsItsEntry(t *testing.T) {
 	}
 	if len(r.Diagnostics) != 1 || r.Diagnostics[0].Code != CodeDeclarationUnread {
 		t.Fatalf("diagnostics = %v", r.Diagnostics)
+	}
+}
+
+func TestAWorkspaceChangeThatTouchesNoDeclarationCarriesAnEmptyList(t *testing.T) {
+	spectest.Proves(t, "tooling/observe", "declared-repository-evidence", "a-workspace-change-that-touches-no-declaration-carries-an-empty-list")
+	in := Input{
+		Root:         declaredRoot(t),
+		ChangedFiles: []gitbase.ChangedFile{{Path: "pricing/discount_test.go", Status: gitbase.StatusModified}},
+		DiffRead:     true,
+		Show: func(Revision, string) ([]byte, bool, error) {
+			t.Error("a declaration was read")
+			return nil, false, nil
+		},
+	}
+	var r Result
+	r.declarations(in)
+	if r.Declarations == nil || len(r.Declarations) != 0 {
+		t.Fatalf("declarations = %#v, want an empty list", r.Declarations)
+	}
+	data, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"declarations":[]`) {
+		t.Fatalf("the empty list does not reach the JSON: %s", data)
+	}
+	// A diff that was not read whole tells nothing: the member stays absent.
+	in.DiffRead = false
+	var unread Result
+	unread.declarations(in)
+	if unread.Declarations != nil {
+		t.Fatalf("declarations = %#v, want absent without the whole diff", unread.Declarations)
 	}
 }
 

@@ -264,7 +264,7 @@
     "declarations": {
       "type": "array",
       "maxItems": 1024,
-      "description": "The declaration files the change touches, each with its document at the base and at the head. Absent when the repository declares nothing or the change touches no declaration.",
+      "description": "The declaration files the change touches, each with its document at the base and at the head. Absent when the repository declares nothing or the producer could not read the whole diff; an empty list when the repository declares and the change touches no declaration.",
       "items": {
         "$ref": "#/$defs/declaration"
       }

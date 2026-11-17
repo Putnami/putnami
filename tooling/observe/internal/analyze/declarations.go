@@ -26,6 +26,12 @@ func (r *Result) declarations(in Input) {
 	if _, err := os.Stat(filepath.Join(in.Root, WorkspaceFile)); err != nil {
 		return
 	}
+	// A whole diff that lists no declaration says the change touches none:
+	// the list is empty, not absent, so a reader tells it from a repository
+	// that declares nothing.
+	if in.DiffRead {
+		r.Declarations = []evidence.Declaration{}
+	}
 	left := 0
 	for _, file := range in.ChangedFiles {
 		renamed := file.Status == gitbase.StatusRenamed

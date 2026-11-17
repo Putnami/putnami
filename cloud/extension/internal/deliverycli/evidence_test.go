@@ -312,6 +312,37 @@ func TestEvidenceReportSendsTheDeclaredRecordsInBatchesOfTheirOwn(t *testing.T) 
 	}
 }
 
+func TestEvidenceReportSendsAnEmptyDeclarationsListAlone(t *testing.T) {
+	spectest.Proves(t, evidenceFeature, "sends-the-declared-records", "an-empty-declarations-list-rides-alone")
+	var doc map[string]any
+	data, err := os.ReadFile(evidenceFixture("declared-pull-request.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatal(err)
+	}
+	doc["declarations"] = []any{}
+	fake := &evidenceFakeServer{}
+	if _, err := runEvidenceReport(t, fake, evidenceEnv(), "--file", writeEvidenceDoc(t, doc)); err != nil {
+		t.Fatalf("evidence-report: %v", err)
+	}
+	if got := fake.paths(); len(got) != 4 {
+		t.Fatalf("requests = %v, want the run, the components, the record and the declarations", got)
+	}
+	body := fake.requests[3].Body
+	got, ok := body["declarations"]
+	if !ok {
+		t.Fatalf("the last batch carries no declarations member: %v", body)
+	}
+	if list, isList := got.([]any); !isList || len(list) != 0 {
+		t.Fatalf("declarations = %#v, want an empty list", got)
+	}
+	if _, also := body["specVerification"]; also {
+		t.Fatal("the declarations batch also carries the spec verification record")
+	}
+}
+
 func writeEvidenceDoc(t *testing.T, doc any) string {
 	t.Helper()
 	data, err := json.Marshal(doc)

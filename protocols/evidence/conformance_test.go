@@ -1100,6 +1100,36 @@ func TestConformance_ADocumentWithoutDeclarationsValidatesAsBefore(t *testing.T)
 	}))
 }
 
+func TestConformance_AnEmptyDeclarationsListStaysAnEmptyList(t *testing.T) {
+	spectest.Proves(t, feature, "declarations-empty-when-none-touched", "an-empty-declarations-list-stays-an-empty-list")
+	document := readValid(t, "declared-pull-request.json")
+	document.Declarations = []Declaration{}
+	data, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), `"declarations":[]`) {
+		t.Fatalf("an empty list marshals without its member: %s", data)
+	}
+	parsed, diags := ParseAndValidate(data)
+	if diag.HasErrors(diags) {
+		t.Fatalf("an empty list does not validate: %v", diags)
+	}
+	if parsed.Declarations == nil || len(parsed.Declarations) != 0 {
+		t.Fatalf("declarations = %#v, want an empty list", parsed.Declarations)
+	}
+	document.Declarations = nil
+	if data, err = json.Marshal(document); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), `"declarations"`) {
+		t.Fatalf("a document that declares nothing marshals the member: %s", data)
+	}
+	if parsed, _ = ParseAndValidate(data); parsed.Declarations != nil {
+		t.Fatalf("declarations = %#v, want absent", parsed.Declarations)
+	}
+}
+
 func TestConformance_TheSpecVerificationRecordIsOneBoundedObject(t *testing.T) {
 	spectest.Proves(t, feature, "the-spec-verification-record-is-carried-whole", "the-spec-verification-record-is-one-bounded-object")
 	for label, record := range map[string]string{"array": `[1]`, "string": `"verified"`, "null": `null`} {

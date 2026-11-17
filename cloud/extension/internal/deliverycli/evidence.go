@@ -120,7 +120,7 @@ type evidenceReportBatch struct {
 	// rides in a batch of its own: the declarations carry whole documents,
 	// and Delivery bounds the batch, not each member.
 	SpecVerification json.RawMessage        `json:"specVerification,omitempty"`
-	Declarations     []evidence.Declaration `json:"declarations,omitempty"`
+	Declarations     []evidence.Declaration `json:"declarations,omitzero"`
 	// Provider, Repo and Repository name the repository, as the run does.
 	Provider   string              `json:"provider,omitempty"`
 	Repo       string              `json:"repo,omitempty"`
@@ -661,7 +661,8 @@ func evidenceBatches(doc *evidence.Document, submissionID string) []evidenceRepo
 	if len(doc.SpecVerification) > 0 {
 		batches = append(batches, evidenceReportBatch{SubmissionID: submissionID, Stream: stream, SpecVerification: doc.SpecVerification})
 	}
-	if len(doc.Declarations) > 0 {
+	// An empty list rides too: it says the change touches no declaration.
+	if doc.Declarations != nil {
 		batches = append(batches, evidenceReportBatch{SubmissionID: submissionID, Stream: stream, Declarations: doc.Declarations})
 	}
 	return batches

@@ -293,8 +293,9 @@ type Document struct {
 	Decisions []Decision `json:"decisions,omitempty"`
 	// Declarations are the declaration files the change touches, each with
 	// its document at the base and at the head. Absent when the repository
-	// declares nothing or the change touches no declaration.
-	Declarations []Declaration `json:"declarations,omitempty"`
+	// declares nothing, or its producer could not read the whole diff; an
+	// empty list when it declares and the change touches no declaration.
+	Declarations []Declaration `json:"declarations,omitzero"`
 	// SpecVerification is the spec verification record of the repository's
 	// own workspace: the features protocol's record the Putnami engine writes
 	// when it verifies the specs. The document carries it as the engine wrote
