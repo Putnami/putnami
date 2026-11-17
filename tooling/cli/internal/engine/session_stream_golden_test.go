@@ -95,7 +95,8 @@ func TestSessionStreamSubscribersKeepRecordedBytesIdenticalToBase(t *testing.T) 
 // TestSessionStreamKilledSubscriberKeepsTheVerdictAndRecordsPartial kills the
 // real reporter provider after it acknowledged part of the stream. The run keeps
 // its own verdict, the reporter's evidence is partial with the unacknowledged
-// records counted as lost, and a replay afterwards delivers the rest.
+// records counted as lost, none when it acknowledged every record but the final
+// marker before the kill landed, and a replay afterwards delivers the rest.
 func TestSessionStreamKilledSubscriberKeepsTheVerdictAndRecordsPartial(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "engine-lifecycle", "a-killed-subscriber-keeps-the-verdict-and-records-partial-evidence")
 	for _, exit := range []int{0, 1} {
@@ -133,12 +134,18 @@ func TestSessionStreamKilledSubscriberKeepsTheVerdictAndRecordsPartial(t *testin
 			if err != nil {
 				t.Fatal(err)
 			}
-			records := int64(bytes.Count(events, []byte("\n")))
+			stream := sessionstream.Position{Offset: int64(len(events)), Records: int64(bytes.Count(events, []byte("\n")))}
+			if len(evidence.Subscribers) != 1 || evidence.Stream != stream {
+				t.Fatalf("evidence after a kill = %+v, want the reporter alone over %+v", evidence, stream)
+			}
+			// The kill lands after the reporter's first durable acknowledgement,
+			// but the reporter may acknowledge every record before it lands:
+			// the final marker alone is then lost, and so are no records.
 			reporter := evidence.Subscribers[0]
-			if len(evidence.Subscribers) != 1 || reporter.Name != protocolcli.SessionReporterCommand ||
-				reporter.Evidence != protocolcli.SubscriberEvidencePartial || reporter.Acknowledged.Offset == 0 ||
-				reporter.Lost == 0 || evidence.Stream != (sessionstream.Position{Offset: int64(len(events)), Records: records}) {
-				t.Fatalf("evidence after a kill = %+v, want the reporter partial with lost records", evidence)
+			if reporter.Name != protocolcli.SessionReporterCommand || reporter.Evidence != protocolcli.SubscriberEvidencePartial ||
+				reporter.Acknowledged.Offset == 0 || reporter.Lost != stream.Records-reporter.Acknowledged.Records ||
+				reporter.Lost == 0 && reporter.Acknowledged != stream {
+				t.Fatalf("evidence after a kill = %+v, want the reporter partial, every record it did not acknowledge counted as lost", evidence)
 			}
 
 			if err := os.Remove(filepath.Join(root, "dead")); err != nil {
