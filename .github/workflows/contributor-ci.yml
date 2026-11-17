@@ -234,6 +234,16 @@ jobs:
         run: |
           echo '{"enabled": false}' > .putnami/cache.json
 
+      # The runner's Ubuntu forbids unprivileged user namespaces through
+      # AppArmor, so the Chromium on its PATH cannot start its sandbox and the
+      # screens tests of @putnami/contributor fail with "No usable sandbox".
+      # A developer's desktop allows them; the runner allows them again here.
+      - name: Let Chromium start its sandbox
+        run: |
+          if [ -e /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+          fi
+
       # A green gate that selected zero projects is green over nothing. Publish
       # what was selected so a reviewer reads the scope, not just the checkmark.
       - name: Report what the gate covers
