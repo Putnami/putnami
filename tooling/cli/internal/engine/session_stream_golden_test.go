@@ -95,8 +95,8 @@ func TestSessionStreamSubscribersKeepRecordedBytesIdenticalToBase(t *testing.T) 
 // TestSessionStreamKilledSubscriberKeepsTheVerdictAndRecordsPartial kills the
 // real reporter provider after it acknowledged part of the stream. The run keeps
 // its own verdict, the reporter's evidence is partial with the unacknowledged
-// records counted as lost, none when it acknowledged every record but the final
-// marker before the kill landed, and a replay afterwards delivers the rest.
+// records counted as lost, none when it acknowledged every record but not the
+// final marker, and a replay afterwards delivers the rest.
 func TestSessionStreamKilledSubscriberKeepsTheVerdictAndRecordsPartial(t *testing.T) {
 	spectest.Proves(t, "cli/native-session-reporting", "engine-lifecycle", "a-killed-subscriber-keeps-the-verdict-and-records-partial-evidence")
 	for _, exit := range []int{0, 1} {
@@ -138,9 +138,10 @@ func TestSessionStreamKilledSubscriberKeepsTheVerdictAndRecordsPartial(t *testin
 			if len(evidence.Subscribers) != 1 || evidence.Stream != stream {
 				t.Fatalf("evidence after a kill = %+v, want the reporter alone over %+v", evidence, stream)
 			}
-			// The kill lands after the reporter's first durable acknowledgement,
-			// but the reporter may acknowledge every record before it lands:
-			// the final marker alone is then lost, and so are no records.
+			// The lost count is the stream's records minus the records the
+			// reporter acknowledged. It is zero only when the reporter
+			// acknowledged every record but not the final marker: the evidence
+			// is still partial, since only the final marker is unacknowledged.
 			reporter := evidence.Subscribers[0]
 			if reporter.Name != protocolcli.SessionReporterCommand || reporter.Evidence != protocolcli.SubscriberEvidencePartial ||
 				reporter.Acknowledged.Offset == 0 || reporter.Lost != stream.Records-reporter.Acknowledged.Records ||
