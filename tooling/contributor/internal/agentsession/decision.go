@@ -59,9 +59,7 @@ func Ask(ctx context.Context, e *Env, args []string, cmd CommandIO) int {
 			return nil, nil
 		}
 		mission = collab.MissionName{Repository: cache.Repository, Key: cache.Mission.Key}
-		if !cache.Mission.Known {
-			mission.Title = boundedLine(missionTitle(cache.Mission.Key), collab.MaxTitleLength)
-		}
+		mission.Title = syncTitle(cache)
 		session = sessionKey(cache.Engine, cache.Session)
 		if inSession {
 			// The host runs this command inside a turn of the session.
@@ -130,8 +128,8 @@ func recordAskedDecision(cache *sessionCache, id string) {
 
 // askIdempotencyKey derives the key of an ask that gave none from the
 // session and the content, so the same ask run again replays. The mission
-// title is not content: it is there until a sync answers, and the key does
-// not change with it.
+// title is not content: it changes once the session has a name or a sync
+// answers, and the key does not change with it.
 func askIdempotencyKey(session string, request collab.MissionsAskInput) string {
 	request.IdempotencyKey, request.Mission.Title = "", ""
 	content, _ := json.Marshal(request)

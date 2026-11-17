@@ -52,6 +52,9 @@ type sessionCache struct {
 	Branch     string `json:"branch,omitempty"`
 	Model      string `json:"model,omitempty"`
 	Transcript string `json:"transcript,omitempty"`
+	// Name is the session's own name, read from its transcript: it titles a
+	// mission that is untitled or still titled by its key.
+	Name string `json:"name,omitempty"`
 
 	Mission sessionMissionState `json:"mission"`
 

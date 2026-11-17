@@ -178,15 +178,8 @@ func FindBrowser(flag string, getenv func(string) string, lookPath func(string) 
 	if env := getenv("PUTNAMI_BROWSER"); env != "" {
 		return env, nil
 	}
-	candidates := []string{"/opt/pw-browsers/chromium"}
-	if runtime.GOOS == "darwin" {
-		candidates = append(candidates, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-			"/Applications/Chromium.app/Contents/MacOS/Chromium")
-	}
-	for _, candidate := range candidates {
-		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
-			return candidate, nil
-		}
+	if installed := installedBrowser(); installed != "" {
+		return installed, nil
 	}
 	for _, name := range []string{"chromium", "chromium-browser", "google-chrome", "google-chrome-stable", "chrome"} {
 		if path, err := lookPath(name); err == nil {
@@ -194,6 +187,22 @@ func FindBrowser(flag string, getenv func(string) string, lookPath func(string) 
 		}
 	}
 	return "", errors.New("no Chromium found: pass --browser <path> or set PUTNAMI_BROWSER")
+}
+
+// installedBrowser is the first Chromium installed at a well-known place of
+// this system, or "" when there is none.
+func installedBrowser() string {
+	candidates := []string{"/opt/pw-browsers/chromium"}
+	if runtime.GOOS == "darwin" {
+		candidates = append(candidates, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+			"/Applications/Chromium.app/Contents/MacOS/Chromium")
+	}
+	for _, candidate := range candidates {
+		if info, err := os.Stat(candidate); err == nil && !info.IsDir() {
+			return candidate
+		}
+	}
+	return ""
 }
 
 // Browser is one headless Chromium driven over the DevTools pipe.

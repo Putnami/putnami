@@ -814,6 +814,56 @@ func TestTheTranscriptNamesTheModel(t *testing.T) {
 	}
 }
 
+func TestTheTranscriptNamesTheMission(t *testing.T) {
+	spectest.Proves(t, sessionFeature, "mission-title", "the-session-name-titles-a-key-titled-mission")
+	h := newHarness(t)
+	h.hook(claude, "session-start", claudeSession, nil)
+	if title := h.provider.lastSync(t).Mission.Title; title != sessionBranch {
+		t.Fatalf("the first sync named %q, want the branch", title)
+	}
+	transcript := filepath.Join(t.TempDir(), "session.jsonl")
+	lines := `{"type":"custom-title","customTitle":"Old name","sessionId":"s"}` + "\n" +
+		`{"type":"assistant","message":{"model":"model-a"}}` + "\n" +
+		`{"type":"custom-title","customTitle":"Page title","sessionId":"s"}` + "\n" +
+		`{"type":"user","message":{"content":"\"custom-title\" in a prompt"}}` + "\n"
+	if err := os.WriteFile(transcript, []byte(lines), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	withTranscript := func(payload map[string]any) { payload["transcript_path"] = transcript }
+	h.hook(claude, "stop", claudeSession, withTranscript)
+	if title := h.provider.lastSync(t).Mission.Title; title != "Page title" {
+		t.Fatalf("a stop after the session was named sent %q", title)
+	}
+	// The mission now holds the session's name: later syncs name no title.
+	h.hook(claude, "stop", claudeSession, withTranscript)
+	if title := h.provider.lastSync(t).Mission.Title; title != "" {
+		t.Errorf("a sync on a mission the session named sent %q", title)
+	}
+	if name := transcriptName("relative.jsonl"); name != "" {
+		t.Errorf("a relative transcript answered %q", name)
+	}
+}
+
+func TestSyncTitleNamesOnlyAKeyTitledMission(t *testing.T) {
+	spectest.Proves(t, sessionFeature, "mission-title", "the-session-name-titles-a-key-titled-mission")
+	for _, tc := range []struct {
+		name  string
+		cache sessionCache
+		want  string
+	}{
+		{"an unknown mission", sessionCache{Mission: sessionMissionState{Key: sessionBranchKey}}, sessionBranch},
+		{"an unknown mission and a name", sessionCache{Name: "Page title", Mission: sessionMissionState{Key: sessionBranchKey}}, "Page title"},
+		{"a mission titled by its key", sessionCache{Name: "Page title", Mission: sessionMissionState{Key: sessionBranchKey, Known: true, Title: sessionBranch}}, "Page title"},
+		{"an untitled mission", sessionCache{Name: "Page title", Mission: sessionMissionState{Key: sessionBranchKey, Known: true}}, "Page title"},
+		{"a titled mission", sessionCache{Name: "Page title", Mission: sessionMissionState{Key: sessionBranchKey, Known: true, Title: "Checkpoint"}}, ""},
+		{"a known mission and no name", sessionCache{Mission: sessionMissionState{Key: "issue-4", Known: true, Title: "Issue #4"}}, ""},
+	} {
+		if got := syncTitle(&tc.cache); got != tc.want {
+			t.Errorf("%s: syncTitle = %q, want %q", tc.name, got, tc.want)
+		}
+	}
+}
+
 // No text a hook gives the agent names the provider, an address or a store
 // path: the provider is whatever the workspace binds.
 func TestNoTextNamesAProviderOrAPath(t *testing.T) {

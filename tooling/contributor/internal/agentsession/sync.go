@@ -85,9 +85,7 @@ func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncIn
 	if utf8.RuneCountInString(cache.Branch) <= collab.MaxBranchLength && !strings.ContainsFunc(cache.Branch, unicode.IsControl) {
 		request.Branch = cache.Branch
 	}
-	if !cache.Mission.Known {
-		request.Mission.Title = boundedLine(missionTitle(cache.Mission.Key), collab.MaxTitleLength)
-	}
+	request.Mission.Title = syncTitle(cache)
 	switch request.State {
 	case collab.SessionStateWaiting:
 		if cache.WaitUntil.IsZero() {
@@ -165,6 +163,23 @@ func mergeSyncAnswer(cache *sessionCache, snapshot syncSnapshot, answer collab.M
 	mergeMissionView(&cache.Mission, answer.Mission, now)
 	mergeInbox(cache, answer.Inbox)
 	return err
+}
+
+// syncTitle is the title a sync or a decision ask names for the session's
+// mission: the session's name while the mission is unknown, untitled or still
+// titled by its key, else the key's title for a mission no sync answered yet,
+// else none, and the mission keeps its own.
+func syncTitle(cache *sessionCache) string {
+	keyTitle := boundedLine(collab.MissionKeyTitle(cache.Mission.Key), collab.MaxTitleLength)
+	if !cache.Mission.Known || cache.Mission.Title == "" || cache.Mission.Title == keyTitle {
+		if name := boundedLine(cache.Name, collab.MaxTitleLength); name != "" {
+			return name
+		}
+	}
+	if !cache.Mission.Known {
+		return keyTitle
+	}
+	return ""
 }
 
 // mergeMissionView keeps the view a sync answered, bounded as the sheet

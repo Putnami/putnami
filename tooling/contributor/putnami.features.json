@@ -279,6 +279,19 @@
           }
         },
         {
+          "id": "mission-title",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-session-name-titles-a-key-titled-mission"
+            ]
+          }
+        },
+        {
           "id": "idle-wake",
           "stage": "coded",
           "evidenceKinds": [

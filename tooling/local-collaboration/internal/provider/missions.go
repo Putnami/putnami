@@ -368,9 +368,7 @@ func applySession(m *store.Missions, in *collab.MissionsSyncInput, observed time
 		m.Missions = append(m.Missions, store.Mission{MissionKey: mission, Plan: []collab.PlanStep{}})
 		held = len(m.Missions) - 1
 	}
-	if in.Mission.Title != "" {
-		m.Missions[held].Title = in.Mission.Title
-	}
+	m.Missions[held].Title = collab.SyncedMissionTitle(m.Missions[held].Title, in.Mission.Key, in.Mission.Title)
 	if in.Plan != nil {
 		m.Missions[held].Plan = append([]collab.PlanStep{}, in.Plan.Steps...)
 	}

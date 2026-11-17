@@ -873,10 +873,12 @@ type MissionName struct {
 	// such as "owner/name". It is required.
 	Repository string `json:"repository"`
 	// Key names the mission inside its repository, such as "issue-596". The
-	// contract treats it as opaque.
+	// contract treats it as opaque, except for the title it gives:
+	// MissionKeyTitle.
 	Key string `json:"key"`
 	// Title is the mission's title, for display. It is not part of the
-	// mission's identity.
+	// mission's identity. A sync or an ask applies it as SyncedMissionTitle
+	// says.
 	Title string `json:"title,omitempty"`
 }
 

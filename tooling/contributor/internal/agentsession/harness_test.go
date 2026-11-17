@@ -178,9 +178,7 @@ func (f *fakeMissions) sync(in collab.MissionsSyncInput) collab.Envelope {
 	if in.Plan != nil {
 		f.plan = append([]collab.PlanStep{}, in.Plan.Steps...)
 	}
-	if f.title == "" {
-		f.title = in.Mission.Title
-	}
+	f.title = collab.SyncedMissionTitle(f.title, in.Mission.Key, in.Mission.Title)
 	kept := f.inbox[:0]
 	for _, message := range f.inbox {
 		if !slices.Contains(in.Delivered, message.ID) {

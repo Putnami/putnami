@@ -139,7 +139,10 @@ func TestFindBrowserPrefersTheFlagThenTheEnvironmentThenPath(t *testing.T) {
 	if got, _ := FindBrowser("", env("/y/chrome"), none); got != "/y/chrome" {
 		t.Fatalf("environment: %q", got)
 	}
-	if _, err := os.Stat("/opt/pw-browsers/chromium"); err != nil {
+	// A Chromium installed at a well-known place wins over PATH: walk PATH only without one.
+	if installed := installedBrowser(); installed != "" {
+		t.Logf("PATH lookup not walked: %s is installed", installed)
+	} else {
 		onPath := func(name string) (string, error) {
 			if name == "google-chrome" {
 				return "/usr/bin/google-chrome", nil
