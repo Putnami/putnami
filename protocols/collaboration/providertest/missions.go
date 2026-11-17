@@ -488,8 +488,8 @@ func missionsPlan(t *testing.T, m *missionRun) {
 	}
 }
 
-// status reads a mission's view and sessions, and checks that the answer
-// describes the mission it names.
+// missionsTitle checks that a sync's title names a mission titled by its key,
+// and that neither the key's title nor another title replaces it after that.
 func missionsTitle(t *testing.T, m *missionRun) {
 	keyed := m.other("keyed")
 	keyed.Title = collab.MissionKeyTitle(keyed.Key)
@@ -511,6 +511,8 @@ func missionsTitle(t *testing.T, m *missionRun) {
 	}
 }
 
+// status reads a mission's view and sessions, and checks that the answer
+// describes the mission it names.
 func (m *missionRun) status(mission collab.MissionName, page *collab.PageRequest) collab.MissionsStatusResult {
 	m.t.Helper()
 	var result collab.MissionsStatusResult
