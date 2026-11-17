@@ -59,9 +59,7 @@ func Ask(ctx context.Context, e *Env, args []string, cmd CommandIO) int {
 			return nil, nil
 		}
 		mission = collab.MissionName{Repository: cache.Repository, Key: cache.Mission.Key}
-		if !cache.Mission.Known {
-			mission.Title = boundedLine(missionTitle(cache.Mission.Key), collab.MaxTitleLength)
-		}
+		mission.Title = syncTitle(cache)
 		session = sessionKey(cache.Engine, cache.Session)
 		if inSession {
 			// The host runs this command inside a turn of the session.

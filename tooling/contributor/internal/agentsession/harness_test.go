@@ -178,7 +178,9 @@ func (f *fakeMissions) sync(in collab.MissionsSyncInput) collab.Envelope {
 	if in.Plan != nil {
 		f.plan = append([]collab.PlanStep{}, in.Plan.Steps...)
 	}
-	if f.title == "" {
+	// As the provider does: a title names a mission without one or one still
+	// titled by its key.
+	if f.title == "" || (in.Mission.Title != "" && f.title == missionTitle(in.Mission.Key)) {
 		f.title = in.Mission.Title
 	}
 	kept := f.inbox[:0]

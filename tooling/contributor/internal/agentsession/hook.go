@@ -62,8 +62,8 @@ const (
 	sessionPromptsMax = 20
 	// sessionInboxMax bounds the fetched messages that wait for delivery.
 	sessionInboxMax = collab.MaxInboxMessages
-	// transcriptTailMax bounds the transcript bytes read for the model name
-	// and for the usage of a Codex session.
+	// transcriptTailMax bounds the transcript bytes read for the model name,
+	// the session's name and the usage of a Codex session.
 	transcriptTailMax = 256 << 10
 	// promptReminderMax bounds the text of a prompt a reminder repeats.
 	promptReminderMax = 200
@@ -596,6 +596,11 @@ func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*ho
 				cache.Model = model
 			}
 		}
+		if engine == sessionEngineClaudeCode {
+			if name := transcriptName(cache.Transcript); name != "" {
+				cache.Name = name
+			}
+		}
 		cache.LastMessage = boundedText(input.LastMessage, collab.MaxLastMessageLength)
 		// A reply `agent reply` recorded comes first: the provider keeps the
 		// first reply of a message and refuses another.
@@ -1052,6 +1057,29 @@ func boundedBytes(value string, limit int) string {
 		cut--
 	}
 	return value[:cut]
+}
+
+// transcriptName reads the session's name from the tail of a Claude Code
+// transcript: the last custom-title line, which the host writes again as the
+// session goes on and which its hook payloads do not carry.
+func transcriptName(path string) string {
+	lines := bytes.Split(transcriptTail(path), []byte("\n"))
+	for i := len(lines) - 1; i >= 0; i-- {
+		if !bytes.Contains(lines[i], []byte(`"custom-title"`)) {
+			continue
+		}
+		var line struct {
+			Type        string `json:"type"`
+			CustomTitle string `json:"customTitle"`
+		}
+		if json.Unmarshal(lines[i], &line) != nil || line.Type != "custom-title" {
+			continue
+		}
+		if name := boundedLine(line.CustomTitle, collab.MaxTitleLength); name != "" {
+			return name
+		}
+	}
+	return ""
 }
 
 // transcriptModel reads the model of the last assistant turn from the tail
