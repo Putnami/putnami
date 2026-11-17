@@ -46,6 +46,13 @@
       ]
     },
     {
+      "id": "mission-title",
+      "text": [
+        "On Claude Code, Stop reads the session's name: the last custom-title line of its transcript tail.",
+        "While the mission is unknown, untitled or titled by its key (Issue #<n> or the branch), each sync and decision ask names the session's name as its title; once the mission holds another title, they name none."
+      ]
+    },
+    {
       "id": "idle-wake",
       "text": [
         "The Claude Code idle wake pairs with the Stop of its own event, waits only when that Stop did not continue the turn, syncs at the provider's pace within 5 s to 10 min, and ends after 10 minutes or when a new turn starts.",
