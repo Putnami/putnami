@@ -154,6 +154,20 @@
           }
         },
         {
+          "id": "workspace-root-scope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-root-only-delivery-scopes-the-workspace-root",
+              "a-scopeless-unit-names-the-unowned-files"
+            ]
+          }
+        },
+        {
           "id": "change-language-parity",
           "stage": "coded",
           "evidenceKinds": [

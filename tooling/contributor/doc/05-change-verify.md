@@ -43,6 +43,13 @@ A unit records `id`, `outcome`, `boundary: ref`, `exclusions: [ref]`, qualified
 `nextCycleTasks` native task references, unresolved `decisions: [ref]`, `nextResult`,
 `requiredStage`, and `stage`. Each `projects` entry is `{id, manifest: ref}`;
 its canonical ID is derived from the referenced native `putnami.json` path.
+The workspace root is a scope too: `{id: "/", manifest: ref}` names
+`putnami.workspace.json` at the Git root, for changed files no project owns.
+A unit with no `projects` entry is refused; when the verifier knows the
+change's base, the refusal names the changed files no project owns: no
+directory above them holds a tracked `putnami.json`, except a scope manifest
+(one that lists `includes` or names the `putnami-scope.json` schema) that does
+not set `activate`.
 The feature/spec source's project must belong to the unit. `requiredStage` is
 the mandate's delivery target, among `candidate`, `ready`, `merged`,
 `published`, `deployed`, and `adopted`. `stage` also allows `planned` and

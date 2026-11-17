@@ -462,3 +462,133 @@ func TestHostedWorkflowReadsOnlyTheManifestsOfProjects(t *testing.T) {
 		t.Fatalf("a manifest outside any project blocked a unit with no requirement: %+v, %v", result, err)
 	}
 }
+
+// rootScopedHostedFixture is requirementlessHostedFixture for a change that
+// touches only files no project owns, with its unit and handoff scoped to the
+// workspace root.
+func rootScopedHostedFixture(t *testing.T, edit func(*verifyFixture, fxObj)) (*verifyFixture, HostedWorkflowRequest) {
+	t.Helper()
+	return requirementlessHostedFixture(t, func(f *verifyFixture, workflow fxObj) {
+		f.write("putnami.workspace.json", fxObj{"name": "fixture"})
+		f.write("AGENTS.md", "# AGENTS.md\n")
+		fxObjAt(workflow, "units", 0)["projects"] = fxArr{fxObj{"id": "/", "manifest": f.reference("putnami.workspace.json")}}
+		fxObjAt(workflow, "handoff")["scopes"] = fxArr{"/"}
+		if edit != nil {
+			edit(f, workflow)
+		}
+	})
+}
+
+func TestHostedWorkflowCompletesARootOnlyChangeScopedToTheWorkspaceRoot(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "workspace-root-scope", "a-root-only-delivery-scopes-the-workspace-root")
+	t.Parallel()
+	f, request := rootScopedHostedFixture(t, nil)
+	preflight, err := f.checkHostedWorkflow(request)
+	if err != nil || !preflight.WouldCompleteAfterReady || len(preflight.ReadyUnits) != 1 || preflight.ReadyUnits[0] != "first" {
+		t.Fatalf("hosted preflight of a unit scoped to the workspace root = %+v, %v", preflight, err)
+	}
+	request.SHA256 = preflight.WorkflowSHA256
+	request.Status = hostedPassingStatus(request.HeadSHA)
+	request.ProposalRef = request.Status.Proposal.Ref
+	verified, err := f.checkHostedWorkflow(request)
+	if err != nil || !verified.OutcomeComplete || len(verified.ReadyUnits) != 1 || verified.ReadyUnits[0] != "first" {
+		t.Fatalf("hosted checks did not complete a unit scoped to the workspace root: %+v, %v", verified, err)
+	}
+}
+
+func TestHostedWorkflowRefusesAnotherWorkspaceRootTarget(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "workspace-root-scope", "a-root-only-delivery-scopes-the-workspace-root")
+	t.Parallel()
+	for _, tc := range []struct {
+		name, reason string
+		target       func(*verifyFixture) fxObj
+	}{
+		{"nested workspace manifest", "workflow project manifest must name putnami.json, or putnami.workspace.json at the workspace root",
+			func(f *verifyFixture) fxObj {
+				f.write("nested/putnami.workspace.json", fxObj{"name": "nested"})
+				return fxObj{"id": "/nested", "manifest": f.reference("nested/putnami.workspace.json")}
+			}},
+		{"another ID", "unknown or duplicate workflow project target /root", func(f *verifyFixture) fxObj {
+			return fxObj{"id": "/root", "manifest": f.reference("putnami.workspace.json")}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			f, request := rootScopedHostedFixture(t, func(f *verifyFixture, workflow fxObj) {
+				fxObjAt(workflow, "units", 0)["projects"] = fxArr{tc.target(f)}
+			})
+			_, err := f.checkHostedWorkflow(request)
+			if err == nil || !strings.Contains(err.Error(), tc.reason) {
+				t.Fatalf("workspace root target error = %v, want %q", err, tc.reason)
+			}
+		})
+	}
+}
+
+func TestHostedWorkflowScopelessUnitNamesTheUnownedFiles(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "workspace-root-scope", "a-scopeless-unit-names-the-unowned-files")
+	t.Parallel()
+	f, request := rootScopedHostedFixture(t, func(f *verifyFixture, workflow fxObj) {
+		f.write("app/putnami.json", fxObj{"name": "app"})
+		f.git("add", "app/putnami.json")
+		f.git("commit", "-q", "-m", "A project")
+		f.head = f.git("rev-parse", "HEAD")
+		f.write("lib/putnami.json", fxObj{"includes": fxArr{"core"}})
+		f.write("lib/core/putnami.json", fxObj{"name": "core"})
+		f.write("docs/putnami.json", fxObj{"$schema": "https://putnami.dev/schemas/putnami-scope.json", "tags": fxArr{"docs"}})
+		f.write("infra/putnami.json", fxObj{"$schema": "https://putnami.dev/schemas/putnami-scope.json", "activate": true})
+		f.write("php/putnami.json", fxObj{"extensions": fxArr{"@putnami/php"}})
+		f.git("add", "lib/putnami.json", "lib/core/putnami.json", "docs/putnami.json", "infra/putnami.json", "php/putnami.json")
+		f.git("commit", "-q", "-m", "Scopes and projects")
+		f.head = f.git("rev-parse", "HEAD")
+		f.write("app/main.go", "package main\n")
+		f.write("lib/CHANGELOG.md", "# Changelog\n")
+		f.write("lib/core/core.go", "package core\n")
+		f.write("docs/index.md", "# Docs\n")
+		f.write("infra/main.tf", "# Infra\n")
+		f.write("php/composer.json", "{}\n")
+		fxObjAt(workflow, "units", 0)["projects"] = fxArr{}
+	})
+	_, err := f.checkHostedWorkflow(request)
+	if err == nil {
+		t.Fatal("a unit with no project scope was accepted")
+	}
+	message := err.Error()
+	for _, want := range []string{
+		"workflow unit first has no project scope; changed files no project owns: ",
+		"AGENTS.md", "docs/index.md", "lib/CHANGELOG.md", "putnami.workspace.json",
+		`the workspace root as {"id": "/", "manifest": <ref of putnami.workspace.json>} for files no project owns`,
+	} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("scopeless unit refusal %q lacks %q", message, want)
+		}
+	}
+	for _, owned := range []string{"app/main.go", "lib/core/core.go", "infra/main.tf", "php/composer.json"} {
+		if strings.Contains(message, owned) {
+			t.Fatalf("scopeless unit refusal %q names %s, which a project owns", message, owned)
+		}
+	}
+}
+
+func TestHostedWorkflowAcceptsAWorkspaceManifestWithoutName(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "workspace-root-scope", "a-root-only-delivery-scopes-the-workspace-root")
+	t.Parallel()
+	f, request := rootScopedHostedFixture(t, func(f *verifyFixture, workflow fxObj) {
+		f.write("putnami.workspace.json", fxObj{"extensions": fxArr{}})
+		fxObjAt(workflow, "units", 0)["projects"] = fxArr{fxObj{"id": "/", "manifest": f.reference("putnami.workspace.json")}}
+	})
+	result, err := f.checkHostedWorkflow(request)
+	if err != nil || !result.WouldCompleteAfterReady {
+		t.Fatalf("a workspace manifest without name blocked the root scope: %+v, %v", result, err)
+	}
+}
+
+func TestHostedWorkflowScopelessUnitWithoutBaseNamesTheFix(t *testing.T) {
+	spectest.Proves(t, "tooling/contributor-executable", "workspace-root-scope", "a-scopeless-unit-names-the-unowned-files")
+	t.Parallel()
+	refusal := (&verifyRun{}).workflowScopelessUnit("first", "")
+	if strings.Contains(refusal, "changed files no project owns:") ||
+		!strings.Contains(refusal, `the workspace root as {"id": "/", "manifest": <ref of putnami.workspace.json>}`) {
+		t.Fatalf("scopeless unit refusal without a base = %q", refusal)
+	}
+}

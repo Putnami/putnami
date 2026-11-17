@@ -266,8 +266,10 @@ superseded artifacts are deleted, and no CLI from this release on installs them
 Hosted finalization naming a parent requires `--workflow-file` and native
 completion eligibility before publication, except a partial delivery. A partial
 delivery whose changed paths all belong to projects that declare
-`featureAuthority.none` and author no feature needs no workflow. A partial
-delivery whose workflow has no unit with passing native checks still publishes,
+`featureAuthority.none` and author no feature needs no workflow. A change
+whose files no project owns, such as a root-only change, scopes its workflow
+unit to the workspace root, `{id: "/", manifest}` of `putnami.workspace.json`.
+A partial delivery whose workflow has no unit with passing native checks still publishes,
 with no ready unit and no receipt: the hosted checks never stand for native
 proof. A ready receipt records exact
 required checks and the immutable original workflow; later units and decisions

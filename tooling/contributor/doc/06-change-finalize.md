@@ -157,7 +157,10 @@ rules its impact analysis uses.
 A complete delivery of a change that carries no feature requirement, such as
 an ADR with a `decisions/<id>.json` file, passes a workflow record that names no source and
 one unit with no requirement, at `candidate`. The hosted checks complete that
-unit, and the command closes the task. The record is refused when the change
+unit, and the command closes the task. A change whose files no project owns,
+such as one that touches only `putnami.workspace.json` and `AGENTS.md`, scopes
+that unit to the workspace root: its `projects` entry is `{"id": "/",
+"manifest": <ref of putnami.workspace.json>}`. The record is refused when the change
 edits a native spec, an external spec a feature manifest names, or a feature
 manifest.
 

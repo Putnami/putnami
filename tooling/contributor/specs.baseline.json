@@ -38,6 +38,7 @@
     "tooling/contributor-executable#session-bound-proposal",
     "tooling/contributor-executable#signature-free-publication",
     "tooling/contributor-executable#squash-ready-publication",
+    "tooling/contributor-executable#workspace-root-scope",
     "tooling/epic#epic-cloud-child",
     "tooling/epic#epic-plan-validation",
     "tooling/epic#epic-status",

@@ -124,7 +124,11 @@ touches no file a feature's checks cover: a change to the implementation of a
 declared requirement lists that requirement and supplies its proof. When the
 verifier knows the change's base, it refuses the whole record if the change
 edits a native spec, an external spec a feature manifest names, or a feature
-manifest; fold such a unit into the unit whose requirements it serves. The
+manifest; fold such a unit into the unit whose requirements it serves. A unit
+whose changed files no project owns, such as a root-only change, names the
+workspace root as its project, `{id: "/", manifest: ref}` of
+`putnami.workspace.json`; a unit with no project scope is refused with the
+changed files no project owns. The
 external specs it checks are those the manifest at the workspace root and the
 manifests at project roots, beside a tracked `putnami.json`, name.
 Keep its original workflow file immutable and append a new stage-ready revision

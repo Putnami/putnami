@@ -3,6 +3,7 @@ package verify
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -141,7 +142,8 @@ func workflowNativePath(file, kind string) {
 		require(path.Ext(file) == ".json" && path.Base(path.Dir(file)) == features.SpecDirectory,
 			"workflow spec path must be a direct specs JSON child")
 	} else if kind == "project" {
-		require(path.Base(file) == "putnami.json", "workflow project manifest must name putnami.json")
+		require(path.Base(file) == "putnami.json" || file == workspaceManifest,
+			"workflow project manifest must name putnami.json, or putnami.workspace.json at the workspace root")
 	}
 }
 
@@ -536,9 +538,19 @@ func (r *verifyRun) workflowReadyReceipt(unit *jsObject, expectedBaseSHA string)
 	return true
 }
 
-func (r *verifyRun) workflowProjectTargets(value any) map[string]bool {
+// workspaceManifest is the workspace manifest at the Git root. A workflow
+// project target that names it scopes the workspace root, "/": the scope of
+// the changed files no project owns.
+const workspaceManifest = "putnami.workspace.json"
+
+// workflowProjectTargets returns the project IDs a unit scopes, each derived
+// from the native manifest it names. base is the change's base, or "" when
+// the verifier does not know it.
+func (r *verifyRun) workflowProjectTargets(value any, unit, base string) map[string]bool {
 	items := workflowList(value, "workflow unit projects")
-	require(len(items) > 0, "workflow unit has no project scope")
+	if len(items) == 0 {
+		fail(r.workflowScopelessUnit(unit, base))
+	}
 	projects := map[string]bool{}
 	for _, item := range items {
 		project := workflowObject(item, "workflow project target", []string{"id", "manifest"}, []string{"id", "manifest"})
@@ -547,7 +559,6 @@ func (r *verifyRun) workflowProjectTargets(value any) map[string]bool {
 		workflowEvidencePath(file)
 		workflowNativePath(file, "project")
 		data, _ := r.workflowBytes(project.get("manifest"), "workflow project manifest")
-		require(path.Base(file) == "putnami.json", "workflow project manifest must name putnami.json")
 		derived := "/"
 		if dir := path.Dir(file); dir != "." {
 			derived = "/" + dir
@@ -557,10 +568,85 @@ func (r *verifyRun) workflowProjectTargets(value any) map[string]bool {
 		if err != nil {
 			failErr(err)
 		}
-		workflowText(at(manifest, "name"), "workflow project manifest name")
+		if file == workspaceManifest {
+			// A workspace manifest names no required member.
+			_, object := manifest.(*jsObject)
+			require(object, "workflow workspace manifest must be a JSON object")
+		} else {
+			workflowText(at(manifest, "name"), "workflow project manifest name")
+		}
 		projects[id] = true
 	}
 	return projects
+}
+
+// workflowScopelessUnit is the refusal of a unit that names no project. When
+// base is known, it names the files changed from base that no project owns;
+// it always names the workspace-root scope that admits them.
+func (r *verifyRun) workflowScopelessUnit(unit, base string) string {
+	message := "workflow unit " + unit + " has no project scope"
+	if base != "" {
+		if unowned := r.workflowUnownedFiles(base); len(unowned) > 0 {
+			message += "; changed files no project owns: " + workflowBoundedList(unowned)
+		}
+	}
+	return message + "; name each project that owns its changed files, and the workspace root as " +
+		`{"id": "/", "manifest": <ref of putnami.workspace.json>} for files no project owns`
+}
+
+// workflowUnownedFiles lists the files changed from base that no project
+// owns: no directory above them, below the workspace root, holds a tracked
+// putnami.json other than a scope manifest that does not activate its scope.
+func (r *verifyRun) workflowUnownedFiles(base string) []string {
+	roots := map[string]bool{}
+	for _, manifest := range r.fileList("ls-files", "-z", "--", "putnami.json", "**/putnami.json") {
+		if r.workflowOwningManifest(manifest) {
+			roots[path.Dir(manifest)] = true
+		}
+	}
+	var unowned []string
+	for _, changed := range r.changedFiles(base) {
+		owned := false
+		for dir := path.Dir(changed); dir != "." && !owned; dir = path.Dir(dir) {
+			owned = roots[dir]
+		}
+		if !owned {
+			unowned = append(unowned, changed)
+		}
+	}
+	return unowned
+}
+
+// workflowOwningManifest reports whether the putnami.json at file owns the
+// files below its directory. Every manifest does, except a scope manifest,
+// one that lists includes or names the putnami-scope schema, that does not
+// activate its scope as a project. A manifest that cannot be read or decoded
+// counts as owning, so the refusal never names a file a project may own.
+func (r *verifyRun) workflowOwningManifest(file string) bool {
+	data, err := os.ReadFile(r.path(file))
+	if err != nil {
+		return true
+	}
+	var manifest struct {
+		Schema   any             `json:"$schema"`
+		Includes json.RawMessage `json:"includes"`
+		Activate any             `json:"activate"`
+	}
+	if json.Unmarshal(data, &manifest) != nil {
+		return true
+	}
+	schema, _ := manifest.Schema.(string)
+	scope := manifest.Includes != nil || strings.HasSuffix(schema, "/putnami-scope.json")
+	return !scope || manifest.Activate == true
+}
+
+// workflowBoundedList joins the first ten items and counts the rest.
+func workflowBoundedList(items []string) string {
+	const shown = 10
+	if len(items) <= shown {
+		return strings.Join(items, ", ")
+	}
+	return fmt.Sprintf("%s and %d more", strings.Join(items[:shown], ", "), len(items)-shown)
 }
 
 func workflowDeliveryRank(stage string) int {
@@ -735,7 +821,7 @@ func (r *verifyRun) workflowUnits(value any, requirements map[string]workflowReq
 		for _, exclusion := range workflowList(unit.get("exclusions"), "workflow unit exclusions") {
 			r.workflowCheckRef(exclusion)
 		}
-		projects := r.workflowProjectTargets(unit.get("projects"))
+		projects := r.workflowProjectTargets(unit.get("projects"), id, expectedBaseSHA)
 		for project := range projects {
 			projectIDs[project] = true
 		}

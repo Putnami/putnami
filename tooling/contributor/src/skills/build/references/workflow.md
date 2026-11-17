@@ -30,7 +30,9 @@ completion. The native feature declaration, not this record, owns expected
 verification check IDs.
 
 `units` contain a stable `id`, observable `outcome`, native `projects` as
-`[{id, manifest: ref}]` for each exact project `putnami.json`, exact
+`[{id, manifest: ref}]` for each exact project `putnami.json`, and
+`{id: "/", manifest: ref}` of `putnami.workspace.json` for the changed files
+no project owns, such as a root-only change, exact
 `requirements`, `dependsOn` unit IDs, a `boundary` ref, `exclusions` refs,
 native `nextCycleTasks` references, unresolved `decisions` refs,
 `requiredStage`, current `stage`, `nextResult`, and a `receipt` when the stage

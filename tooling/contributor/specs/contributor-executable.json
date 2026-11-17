@@ -94,6 +94,13 @@
       ]
     },
     {
+      "id": "workspace-root-scope",
+      "text": [
+        "A workflow unit may scope the workspace root as {id: \"/\", manifest: putnami.workspace.json}, so a change whose files no project owns, such as a root-only change, publishes with its task under --gate ci.",
+        "The verifier refuses a unit with no project scope, and the refusal names the workspace-root scope and, when the verifier knows the change's base, the changed files no project owns."
+      ]
+    },
+    {
       "id": "change-language-parity",
       "text": [
         "putnami change language, served by the @putnami/contributor executable, reports the same findings and exit codes as goldens recorded from putnami contributor language, the core command it replaces.",
