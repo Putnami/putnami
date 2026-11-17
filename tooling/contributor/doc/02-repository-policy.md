@@ -61,7 +61,6 @@ binding names another provider, and `taskReference` uses `{url}`.
         "claimAssignees": ["@me"]
       },
       "proposals": { "source": "github:putnami/putnami" },
-      "states": { "claimed": "in_progress", "delivered": "blocked" },
       "profiles": {
         "default": { "review": { "runs": "agent", "agent": "reviewer" } }
       },
@@ -70,7 +69,7 @@ binding names another provider, and `taskReference` uses `{url}`.
         "documentation": ["sites/putnami.dev/doc/"],
         "ciGate": { "checks": ["Putnami CI"], "load": 0.7 }
       },
-      "publication": { "draft": false, "taskReference": "Closes {url}", "bodyMaxBytes": 1500 },
+      "publication": { "draft": false, "taskReference": "Closes {url}", "bodyMaxBytes": 1500, "autoMerge": "squash" },
       "integrations": {
         "contentBump": {
           "lock": "sites/putnami.dev/content.lock.json",
@@ -85,16 +84,15 @@ binding names another provider, and `taskReference` uses `{url}`.
 
 How the pieces combine for one delivery:
 
-- `states.delivered` is `blocked`, and the GitHub provider's first `blocked`
-  label is `status/needs-review`: a published fix leaves its issue awaiting
-  review, as the label workflow expects. The tasks contract has no "awaiting
-  review" state of its own, so `status/needs-design` reads as `blocked` too.
-  An issue that is already blocked through `status/needs-design` (a reviewer
-  added it after the claim, or build ran without a claim) still moves to
-  `status/needs-review`: native finalization sends the transition when authorized, and the
-  provider applies a state's first label whenever another label decided it.
-  No mapping alone avoids that collision: the contract has three open states,
-  and this repository gives four meanings to its status labels.
+- `states` is left to its default: a claim and a published proposal both
+  move the issue to `in_progress`, which the GitHub provider labels
+  `status/in-progress`. `change finalize` turns auto-merge on, and the
+  proposal merges once its checks pass. Nobody reviews it, so the issue does not read
+  as awaiting a review. A person applies `status/needs-review` and
+  `status/needs-design`; the workflow never does. A `status/needs-design`
+  added during the build is removed when `change finalize` moves the issue
+  to `in_progress`. The merge closes the issue through `Closes {url}`, which
+  is not a transition, so its state label stays on the closed issue.
 - `@putnami/cloud` writes each pull request through Putnami Source and the
   Putnami GitHub App, under the signed-in session of `putnami cloud login`
   in a workspace `putnami cloud setup` linked, so publishing needs no GitHub
@@ -127,10 +125,8 @@ How the pieces combine for one delivery:
   a proposal comment instead of appending it.
 - Every authorized proposal opens as a draft when work starts (`putnami change finalize --draft`).
   Putnami CI holds runs on a draft, so checkpoint pushes cost no runner time.
-- The block sets no `publication.autoMerge`, so a build run ends with its
-  proposal ready for review, and a maintainer turns auto-merge on. A
-  repository that sets `"autoMerge": "squash"` has `change finalize` ask the
-  proposals provider to turn auto-merge on once a ready, complete-outcome
+- `publication.autoMerge` is `"squash"`: `change finalize` asks the proposals
+  provider to turn auto-merge on once a ready, complete-outcome
   publication passed its gate. On a branch that merges through a queue, that
   is the request to enter the queue. The setting grants no authority: only a
   run the user authorized to publish sends it, never for a draft or a partial

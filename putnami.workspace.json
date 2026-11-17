@@ -62,9 +62,6 @@
   "name": "putnami",
   "options": {
     "sdd": {
-      "owners": [
-        "@fdumay"
-      ],
       "agentAttribution": "forbid",
       "verification": {
         "architecture": "enforce"
@@ -125,10 +122,6 @@
       "proposals": {
         "source": "github:putnami/putnami"
       },
-      "states": {
-        "claimed": "in_progress",
-        "delivered": "blocked"
-      },
       "profiles": {
         "default": {
           "review": {
@@ -163,7 +156,8 @@
       "publication": {
         "draft": false,
         "taskReference": "Closes {url}",
-        "bodyMaxBytes": 1500
+        "bodyMaxBytes": 1500,
+        "autoMerge": "squash"
       },
       "integrations": {
         "contentBump": {
