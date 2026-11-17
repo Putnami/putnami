@@ -7,7 +7,7 @@
   "dependencies": {
     "@putnami/analytics": "workspace:*",
     "@putnami/application": "workspace:*",
-    "@putnami/cloud": "0.0.0-20260929210146-c834161ac",
+    "@putnami/cloud": "workspace:*",
     "@putnami/database": "workspace:*",
     "@putnami/runtime": "workspace:*",
     "@putnami/ui": "workspace:*",

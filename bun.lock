@@ -44,7 +44,7 @@
       "dependencies": {
         "@putnami/analytics": "workspace:*",
         "@putnami/application": "workspace:*",
-        "@putnami/cloud": "0.0.0-20260929210146-c834161ac",
+        "@putnami/cloud": "workspace:*",
         "@putnami/database": "workspace:*",
         "@putnami/runtime": "workspace:*",
         "@putnami/ui": "workspace:*",
@@ -745,7 +745,5 @@
     "yaml": ["yaml@1.10.3", "", {}, "sha512-vIYeF1u3CjlhAFekPPAk2h/Kv4T3mAkMox5OymRiJQB0spDP10LHvt+K7G9Ny6NuuMAb25/6n1qyUjAcGNf/AA=="],
 
     "zwitch": ["zwitch@2.0.4", "", {}, "sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A=="],
-
-    "putnami.dev/@putnami/cloud": ["@putnami/cloud@0.0.0-20260929210146-c834161ac", "https://npm.putnami.dev/@putnami/cloud/-/cloud-0.0.0-20260929210146-c834161ac.tgz", { "dependencies": { "@putnami/events": "0.0.0-20260928052023-c2cd30187", "@putnami/runtime": "0.0.0-20260928052023-c2cd30187" } }, "sha256-v+k5gSmE9ENICXw+G7IYOdGKFxRmDC23nH50hoxSZIs=="],
   }
 }
