@@ -268,6 +268,10 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		{task: "build-types", id: "types", kind: "directory", root: "command-output", path: "types", optionalEmpty: true},
 		{task: "config-extract-exec", id: "jsonSchema", kind: "file", root: "project", path: "schema/config.jsonschema.json", optionalEmpty: true},
 		{task: "config-extract-exec", id: "schema", kind: "file", root: "project", path: "schema/config.json", optionalEmpty: true},
+		// The extension archive under each registry platform key, and the
+		// publication manifest the archive uploader reads (ADR 0012).
+		{task: "package-archives", id: "archives", kind: "directory", root: "command-output", path: "archives", optionalEmpty: true},
+		{task: "package-archives", id: "publication-manifest", kind: "file", root: "command-output", path: "metadata.json", optionalEmpty: true},
 		// The deployment declaration, inside the .gen/deployment.json
 		// build-generate cedes. Required, so a run that writes none caches
 		// nothing.
@@ -343,16 +347,20 @@ func rowsString(rows []ownerRow) string {
 // of one file is what ONE OWNER PER OUTPUT forbids, so it stayed unclaimed by
 // both — and the whole `package` command lost cache restore with it. Each task
 // now records its channel inside the directory it already owns, and the index is
-// derived over those records, so this extension writes NOTHING at the package
-// root: it has no archive channel, so it does not even own the archive
-// publication manifest that survives there for the other packagers.
+// derived over those records. The one file this extension writes at the
+// package root is the archive publication manifest, metadata.json, which
+// package-archives alone owns and states whole, as every archive packager does.
 func TestPackageTasksWriteOnlyInsideTheDirectoriesTheyOwn(t *testing.T) {
 	spectest.Proves(t, "typescript/typescript-project-toolchain", "package-channel-index", "no-package-task-claims-a-path-outside-the-directory-it-owns")
 	m := loadExtensionManifest(t)
 	commands := commandsByTask(m)
 
-	producers := []string{"package-docker", "package-npm"}
-	owned := map[string]string{"package-docker": "docker", "package-npm": "npm"}
+	producers := []string{"package-archives", "package-docker", "package-npm"}
+	owned := map[string][]string{
+		"package-archives": {"archives", "metadata.json"},
+		"package-docker":   {"docker"},
+		"package-npm":      {"npm"},
+	}
 	for _, name := range producers {
 		task, ok := m.Tasks[name]
 		if !ok {
@@ -365,7 +373,7 @@ func TestPackageTasksWriteOnlyInsideTheDirectoriesTheyOwn(t *testing.T) {
 			if output.Root != proto.OutputRootCommandOutput {
 				continue
 			}
-			if output.Path != owned[name] {
+			if !slices.Contains(owned[name], output.Path) {
 				t.Errorf("task %q declares command-output %q as %q; a TypeScript packager owns only %q, "+
 					"and a second writer at the package root is a merge point this contract forbids",
 					name, output.Path, id, owned[name])
@@ -410,11 +418,14 @@ func TestTaskEffectTable(t *testing.T) {
 		"config-extract-exec": {"toolchain-cache"},
 		"deps-upgrade-exec":   {"network", "toolchain-cache", "workspace-files"},
 		"package-docker":      {"network", "toolchain-cache"},
-		"publish-docker":      {"network", "registry"},
-		"publish-npm":         {"network", "registry"},
-		"run-app":             {"process"},
-		"serve-app":           {"network", "process"},
-		"test-run":            {"toolchain-cache"},
+		// The archive step bundles its entry points with bun, which reads and
+		// writes Bun's machine-global cache, as build-compile does.
+		"package-archives": {"toolchain-cache"},
+		"publish-docker":   {"network", "registry"},
+		"publish-npm":      {"network", "registry"},
+		"run-app":          {"process"},
+		"serve-app":        {"network", "process"},
+		"test-run":         {"toolchain-cache"},
 		// The test type-check keeps its incremental build info in the ts-types
 		// scratch, as build-types does.
 		"test-types": {"toolchain-cache"},
@@ -1211,4 +1222,28 @@ func TestTheTestTypeCheckRunsUnlessTypesIsOff(t *testing.T) {
 			t.Errorf("test types step if = %q, want params.types", step.If)
 		}
 	}
+}
+
+// TestArchivesStepActivatesOnlyOnATypeScriptProject pins the gate that keeps
+// this extension's archive packager off a project another language extension
+// packages. The CLI gives a command with injected publish channels to the
+// project that bears the extension's own name, so without the gate the
+// @putnami/typescript project, a Go project whose archives @putnami/go
+// writes, planned both packagers on the same declared outputs.
+func TestArchivesStepActivatesOnlyOnATypeScriptProject(t *testing.T) {
+	m := loadExtensionManifest(t)
+	command, ok := m.Commands["package"]
+	if !ok {
+		t.Fatal("manifest command package is missing")
+	}
+	for _, step := range command.Run {
+		if step.Task != "package-archives" {
+			continue
+		}
+		if step.Activation == nil || !slices.Contains(step.Activation.Files, "package.json") {
+			t.Fatalf("package step %q must activate on package.json only, got %+v", step.ID, step.Activation)
+		}
+		return
+	}
+	t.Fatal("package command has no package-archives step")
 }

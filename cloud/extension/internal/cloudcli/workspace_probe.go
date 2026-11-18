@@ -29,6 +29,11 @@ const (
 	cloudArchivePackageStep  = "archives"
 	cloudArchivePublishStep  = "cloud-publish-archives"
 	cloudArchivePackageOwner = "@putnami/go"
+	// A TypeScript extension (a package.json, no go.mod, and a manifest with
+	// tasks, commands or hooks) is packaged by @putnami/typescript, whose
+	// archives step bundles the entry points its manifest names (its ADR 0012).
+	cloudTypeScriptPackageOwner = "@putnami/typescript"
+	cloudPackageJSON            = "package.json"
 	// @putnami/scaffold's package-content task emits both archive content
 	// forms, each under its own package step id: a project template, and a
 	// content-only extension whose manifest declares agentContent. Its
@@ -125,24 +130,21 @@ func probeCloudWorkspace(root string, request workspaceproto.ProbeRequest) (work
 				return workspaceproto.ProbeResult{}, fmt.Errorf("read %s archive coordinate: %w", projectFile, err)
 			}
 			if declared {
-				// A content-only extension carries no Go module: @putnami/scaffold
-				// packages it under the step its agentContent key activates. A Go
-				// extension that also declares agentContent stays with the Go
-				// packager, whose archives step builds the binary and stages the
-				// content; scaffold never plans a step for a Go project.
+				// A Go module keeps the Go packager, whose archives step builds
+				// the binary and stages any agent content. Without one, a
+				// TypeScript extension (a package.json and a manifest that runs
+				// something) goes to @putnami/typescript, and a content-only
+				// extension to @putnami/scaffold, under the step its agentContent
+				// key activates. Scaffold never plans a step for a Go project.
 				packagePublisher, packageStep := cloudArchivePackageOwner, cloudArchivePackageStep
-				if manifest.declaresAgentContent() {
-					goModuleFile := workspaceFile(projectPath, cloudGoModule)
-					hasGoModule, err := fileExists(filepath.Join(root, filepath.FromSlash(goModuleFile)))
-					if err != nil {
-						return workspaceproto.ProbeResult{}, fmt.Errorf("read %s: %w", goModuleFile, err)
-					}
-					if hasGoModule {
-						watchedFiles = append(watchedFiles, goModuleFile)
-					} else {
-						packagePublisher, packageStep = cloudContentPackageOwner, cloudAgentContentPackageStep
-					}
+				routed, err := routeArchivePackage(root, projectPath, manifest)
+				if err != nil {
+					return workspaceproto.ProbeResult{}, err
 				}
+				if routed.publisher != "" {
+					packagePublisher, packageStep = routed.publisher, routed.step
+				}
+				watchedFiles = append(watchedFiles, routed.watched...)
 				declarations = append(declarations, releaseset.MemberDeclaration{
 					Ecosystem: cloudArchiveEcosystem, Coordinate: distributioncli.ArchivePackageCoordinate(artifact),
 					PackagePublisher: packagePublisher, PackageStep: packageStep, PublishStep: cloudArchivePublishStep,
@@ -401,8 +403,57 @@ func readCloudProject(filename string) (cloudProjectProbe, bool, error) {
 // archiveExtensionManifest is the part of putnami.extension.json that routes an
 // archive member: its identity, and whether it declares agent content.
 type archiveExtensionManifest struct {
-	Name         string          `json:"name"`
-	AgentContent json.RawMessage `json:"agentContent"`
+	Name         string                     `json:"name"`
+	AgentContent json.RawMessage            `json:"agentContent"`
+	Commands     map[string]json.RawMessage `json:"commands"`
+	Tasks        map[string]json.RawMessage `json:"tasks"`
+	Hooks        map[string]json.RawMessage `json:"hooks"`
+}
+
+// runsSomething reports whether the manifest declares a task, a command or a
+// hook: a surface a content-only packager cannot ship.
+func (m archiveExtensionManifest) runsSomething() bool {
+	return len(m.Commands) > 0 || len(m.Tasks) > 0 || len(m.Hooks) > 0
+}
+
+// archiveRoute is the package publisher and step of an archive member, and the
+// files that decided it. An empty publisher keeps the Go packager.
+type archiveRoute struct {
+	publisher, step string
+	watched         []string
+}
+
+// routeArchivePackage decides which extension packages a project's archive.
+// A Go module keeps the Go packager; a project that changes route when its
+// go.mod appears watches it once it carries agent content, as before. Without
+// a Go module, a package.json beside a manifest that runs something selects
+// @putnami/typescript, and agent content alone selects @putnami/scaffold.
+func routeArchivePackage(root, projectPath string, manifest archiveExtensionManifest) (archiveRoute, error) {
+	goModuleFile := workspaceFile(projectPath, cloudGoModule)
+	hasGoModule, err := fileExists(filepath.Join(root, filepath.FromSlash(goModuleFile)))
+	if err != nil {
+		return archiveRoute{}, fmt.Errorf("read %s: %w", goModuleFile, err)
+	}
+	if hasGoModule {
+		if manifest.declaresAgentContent() {
+			return archiveRoute{watched: []string{goModuleFile}}, nil
+		}
+		return archiveRoute{}, nil
+	}
+	if manifest.runsSomething() {
+		packageFile := workspaceFile(projectPath, cloudPackageJSON)
+		hasPackage, err := fileExists(filepath.Join(root, filepath.FromSlash(packageFile)))
+		if err != nil {
+			return archiveRoute{}, fmt.Errorf("read %s: %w", packageFile, err)
+		}
+		if hasPackage {
+			return archiveRoute{publisher: cloudTypeScriptPackageOwner, step: cloudArchivePackageStep, watched: []string{packageFile}}, nil
+		}
+	}
+	if manifest.declaresAgentContent() {
+		return archiveRoute{publisher: cloudContentPackageOwner, step: cloudAgentContentPackageStep}, nil
+	}
+	return archiveRoute{}, nil
 }
 
 // declaresAgentContent mirrors @putnami/scaffold's activation, which selects

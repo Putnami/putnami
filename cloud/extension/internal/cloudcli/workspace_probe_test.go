@@ -120,15 +120,18 @@ func TestCloudWorkspaceProbeIncludesSourceExtensionsAndTemplates(t *testing.T) {
 	}
 }
 
-// A content-only extension declares agentContent in its manifest and carries
-// no Go module: @putnami/scaffold packages it under its agent-content step.
+// A TypeScript extension carries a package.json and no Go module, and its
+// manifest runs something: @putnami/typescript packages it under its archives
+// step, which bundles the entry points the manifest names. A content-only
+// extension declares agentContent in its manifest and runs nothing:
+// @putnami/scaffold packages it under its agent-content step.
 // Announcing the Go packager instead leaves the member without the package
 // step the release-set coordinator requires, so the extension never publishes.
 // A Go extension that also declares agentContent is the reverse case: scaffold
 // never plans a step for it, and the Go archives step stages the content.
-func TestCloudWorkspaceProbeRoutesContentOnlyExtensionsToScaffold(t *testing.T) {
+func TestCloudWorkspaceProbeRoutesArchivesToTheirPackager(t *testing.T) {
 	for _, tc := range []struct {
-		name, project, manifest, goModule, coordinate, owner, step string
+		name, project, manifest, goModule, packageJSON, coordinate, owner, step string
 	}{
 		{
 			name:       "a Go extension with agent content stays with the Go packager",
@@ -149,6 +152,27 @@ func TestCloudWorkspaceProbeRoutesContentOnlyExtensionsToScaffold(t *testing.T) 
 			project:    `{"name":"@putnami/github-collaboration","options":{"publish":{"archives":true}}}`,
 			manifest:   `{"name":"@putnami/github-collaboration","agentContent":null}`,
 			coordinate: "putnami/github-collaboration", owner: "@putnami/go", step: "archives",
+		},
+		{
+			name:        "a TypeScript extension goes to the TypeScript packager",
+			project:     `{"name":"@putnami/web","publish":["npm","archives"],"options":{"package":{"archives":true}}}`,
+			manifest:    `{"name":"@putnami/web","agentContent":{"path":"agent-content","source":"agent-src"},"commands":{"web-i18n-sync":{"run":[{"id":"sync","task":"t"}]}},"tasks":{"t":{"kind":"command","command":"bun"}}}`,
+			packageJSON: `{"name":"@putnami/web"}`,
+			coordinate:  "putnami/web", owner: "@putnami/typescript", step: "archives",
+		},
+		{
+			name:        "a hook-only TypeScript extension goes to the TypeScript packager",
+			project:     `{"name":"@putnami/application","options":{"publish":{"archives":true}}}`,
+			manifest:    `{"name":"@putnami/application","hooks":{"preBuild":{"kind":"command","command":"bun"}},"commands":{}}`,
+			packageJSON: `{"name":"@putnami/application"}`,
+			coordinate:  "putnami/application", owner: "@putnami/typescript", step: "archives",
+		},
+		{
+			name:        "a content-only extension with a package.json stays with scaffold",
+			project:     `{"name":"@acme/review-workflows","options":{"publish":{"archives":true}}}`,
+			manifest:    `{"name":"@acme/review-workflows","agentContent":{"path":"content"},"commands":{}}`,
+			packageJSON: `{"name":"@acme/review-workflows"}`,
+			coordinate:  "acme/review-workflows", owner: "@putnami/scaffold", step: "agent-content",
 		},
 		{
 			name:       "an extension without content stays with the Go packager",
@@ -172,6 +196,16 @@ func TestCloudWorkspaceProbeRoutesContentOnlyExtensionsToScaffold(t *testing.T) 
 				}
 				// The Go module decides the route, so a change to it re-probes.
 				want = []string{"go.mod", cloudExtensionManifest, cloudProjectMarker}
+			}
+			if tc.packageJSON != "" {
+				if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(tc.packageJSON), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				if tc.owner == "@putnami/typescript" {
+					// The package.json decides the route, so a change to it re-probes.
+					want = []string{cloudExtensionManifest, cloudProjectMarker, "package.json"}
+					slices.Sort(want)
+				}
 			}
 			result, err := probeCloudWorkspace(root, workspaceproto.ProbeRequest{Paths: []string{"."}})
 			if err != nil || len(result.Projects) != 1 {

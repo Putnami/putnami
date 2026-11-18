@@ -197,6 +197,18 @@
       "reversal": "Repoint the extension archive channel at the previous version. Installed workspaces are unaffected because the lock pins a resolved version, so the rollback only changes what a new resolve returns."
     },
     {
+      "id": "typescript-framework-extensions",
+      "channels": [
+        "archives"
+      ],
+      "artifacts": [
+        "@putnami/application",
+        "@putnami/web"
+      ],
+      "rollbackPoint": "the previous @putnami/application and @putnami/web archive channel pointers",
+      "reversal": "Repoint each archive channel at its previous version, @putnami/web before @putnami/application. They publish after the npm framework packages they ship from, and @putnami/application publishes before @putnami/web because @putnami/web names it as an extension dependency, so a fresh resolve of @putnami/web always finds it. Installed workspaces are unaffected because the lock pins a resolved version, so the rollback only changes what a new resolve returns."
+    },
+    {
       "id": "integration-extensions",
       "channels": [
         "archives"

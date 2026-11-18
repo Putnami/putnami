@@ -62,6 +62,14 @@
       "text": "An npm package whose extension manifest declares agent content carries the tree built from its authored source under the package's name and version, bound by the digest the packaged manifest declares and stamped with the agent-content contract; a manifest without agent content keeps the base contract. A files allowlist that would drop the content, content the policy forbids, and a content path the package already holds fail packaging."
     },
     {
+      "id": "extension-archives",
+      "text": "A TypeScript project published on the archives channel whose extension manifest declares tasks, commands or hooks packages one platform-independent archive under each registry platform key: its stamped manifest without the preBuild and configExtract hooks, which the TypeScript extension runs from node_modules, its README, AI.md, license and bound agent content, and each entry point a task or kept hook names under {extensionRoot}, bundled to run with no node_modules."
+    },
+    {
+      "id": "extension-archive-entry-points",
+      "text": "An entry point a manifest names without an extension resolves as Bun resolves it, and its bundle keeps that name with the .js extension. Packaging fails, and writes no archive, when a task or hook names a file under {extensionRoot} that the staged archive does not hold."
+    },
+    {
       "id": "package-channel-index",
       "text": "Packaging records the channel it produced inside the output directory it owns, never at the package root; the index is derived over every owned record, sibling packagers record independently, and a channel is never recorded twice."
     },
@@ -305,6 +313,7 @@
     "tooling/cli/doc/adr/0089-test-outcomes-are-summaries-transcripts-are-session-detail.md",
     "protocols/extension/doc/adr/0004-a-declared-output-may-police-its-own-drift.md",
     "tooling/cli/doc/adr/0069-a-source-bound-entry-is-stored-at-its-binding.md",
-    "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md"
+    "typescript/extension/doc/adr/0010-a-tsc-build-declares-its-outdir-through-pathfrom.md",
+    "typescript/extension/doc/adr/0012-an-extension-archive-bundles-the-entry-points-its-manifest-names.md"
   ]
 }

@@ -185,6 +185,35 @@
           }
         },
         {
+          "id": "extension-archives",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-extension-archive-runs-its-entry-points-without-node-modules",
+              "every-registry-platform-key-gets-the-same-archive",
+              "the-archive-leaves-out-the-hooks-the-typescript-extension-runs-from-node-modules"
+            ]
+          }
+        },
+        {
+          "id": "extension-archive-entry-points",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-extensionless-entry-point-runs-from-its-bundle",
+              "a-task-or-hook-naming-a-missing-file-fails-packaging"
+            ]
+          }
+        },
+        {
           "id": "package-channel-index",
           "stage": "coded",
           "evidenceKinds": [

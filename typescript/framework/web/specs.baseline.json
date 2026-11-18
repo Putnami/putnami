@@ -31,6 +31,7 @@
     "typescript/web-localization#excluded-route-redirect",
     "typescript/web-localization#human-validation",
     "typescript/web-localization#inline-tags",
+    "typescript/web-localization#installable-catalog-commands",
     "typescript/web-localization#locale-choice",
     "typescript/web-localization#locale-configuration",
     "typescript/web-localization#locale-document",

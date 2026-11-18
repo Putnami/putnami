@@ -468,6 +468,15 @@
           }
         },
         {
+          "id": "installable-catalog-commands",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["each-file-the-manifest-names-is-an-entry-point-of-the-project"]
+          }
+        },
+        {
           "id": "human-validation",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

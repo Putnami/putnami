@@ -313,6 +313,11 @@ t.seats({ count: 2 });
 t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
 ```
 
+- The `i18n` commands come from the `@putnami/web` extension. Outside this
+  repository, run `putnami extensions install @putnami/web` (it also installs
+  `@putnami/application`) and name `@putnami/web` in the localized project's
+  `putnami.json` `extensions`: an npm dependency alone does not give a project
+  the extension's commands.
 - Run `putnami i18n sync` after adding, changing or removing a message. It
   writes one file per namespace, `locales/<locale>/<namespace>.json`, and
   deletes the file of a removed namespace; the build never writes them.

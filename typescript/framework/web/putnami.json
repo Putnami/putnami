@@ -8,10 +8,12 @@
   "dependencies": ["/protocols/http-routes", "/protocols/i18n"],
   "options": {
     "package": {
-      "npm": true
+      "npm": true,
+      "archives": true
     },
     "publish": {
-      "npm": true
+      "npm": true,
+      "archives": true
     },
     "sdd": {
       "verification": {

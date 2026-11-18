@@ -1,6 +1,6 @@
 # Package
 
-The package command creates distribution packages from build output. It supports three channels: **npm** (registry tarball), **docker** (container image), and **deployment** (the workload's deployment declaration).
+The package command creates distribution packages from build output. It supports four channels: **npm** (registry tarball), **docker** (container image), **deployment** (the workload's deployment declaration), and **archives** (the extension archive the CLI installs from the registry).
 
 ## Overview
 
@@ -509,10 +509,85 @@ bytes.
 |------|------|---------|-------------|
 | `--deployment` | `boolean` | `false` | Write the workload's deployment declaration to `<project>/.gen/deployment.json` |
 
+## Archives Channel
+
+### What It Does
+
+A TypeScript project that is also a Putnami extension, such as
+`@putnami/web`, ships its commands to other workspaces as an extension
+archive: `putnami extensions install <name>` downloads it from the registry,
+and the CLI loads its manifest from the artifact store. The `archives` step
+writes that archive for a project whose `putnami.extension.json` declares
+tasks, commands or hooks, and skips any other project (see
+[ADR 0012](./adr/0012-an-extension-archive-bundles-the-entry-points-its-manifest-names.md)).
+
+1. Stages the manifest with the archive's version, the workspace's `LICENSE`
+   files as the npm channel does, and the project's `README.md`, `AI.md` and
+   `LICENSE.md` when they exist, the project's `LICENSE.md` over the
+   workspace's. The archived
+   manifest leaves out the `preBuild` and `configExtract` hooks: this
+   extension runs them from the npm package each project installed, and the
+   CLI would otherwise run the archived copy before each of the extension's
+   own jobs. Any other hook, such as `onInstall`, stays. The step's log names
+   the hooks it left out.
+2. Builds and binds the agent content the manifest declares, with the same SDK
+   step as the npm channel.
+3. Collects every path a task or a kept hook names under `{extensionRoot}/`,
+   in its command or its arguments, and resolves it in the project in Bun's
+   order: the file or directory itself, else the name with `.tsx`, `.jsx`,
+   `.mts`, `.ts`, `.mjs`, `.js`, `.cts` or `.cjs`. A TypeScript or JSX source
+   is bundled with `bun build --target bun` into the same name with `.js`: the
+   bundle inlines the project's own modules and every package it imports, so
+   it runs with no `node_modules`. Any other file or directory is copied as
+   is.
+4. Fails, writing no archive, when a name the manifest uses does not resolve in
+   the archive the way `bun run` resolves it. Name an entry point without its
+   extension, `{extensionRoot}/bin/i18n`, so it runs `bin/i18n.ts` from the
+   source and `bin/i18n.js` from the archive.
+5. Gates and stamps the manifest's contract in its archive form, then writes
+   the same reproducible archive under each registry platform key,
+   `<scope>-<name>-<os>-<arch>.tar.gz`, into `archives/`, with
+   `archives/channel.json` and the publication manifest `metadata.json` that
+   `@putnami/cloud packages publish` reads. The archives replace the previous
+   ones only once every one is written: a failed run leaves the last good
+   archives and their metadata.
+
+The step is not cached: a bundle reads the sources of the project's workspace
+dependencies, which no task input names.
+
+### Turning It On
+
+Declare the archives channel in the project's `putnami.json`, as
+`@putnami/web` does:
+
+```json
+{
+  "options": {
+    "package": { "npm": true, "archives": true },
+    "publish": { "npm": true, "archives": true }
+  }
+}
+```
+
+`options.package.archives` turns this step on, for a project with a
+`package.json`: a Go project such as an extension's own runtime keeps the Go
+packager's archives step. `options.publish.archives`
+(or `"archives"` in the `publish` list) is what the `@putnami/cloud` release
+set reads to declare the archive member; this extension's `publish` command
+uploads no archive itself. The release set routes the member of a project
+with a `package.json`, no `go.mod` and a manifest that is not content-only to
+this step. `putnami package . --archives` packages it by hand.
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--archives` | `boolean` | `false` | Write the extension archive, one per registry platform key |
+
 ## Metadata Output
 
 Each channel writes a `channel.json` record INSIDE the output directory it owns
-(`npm/channel.json`, `docker/channel.json`), which downstream CI/CD steps can
+(`npm/channel.json`, `docker/channel.json`, `archives/channel.json`), which downstream CI/CD steps can
 consume:
 
 ```json
@@ -528,7 +603,7 @@ restores its record without the other channel running.
 
 ## Boundaries
 
-- **Scope**: Creating npm tarballs and Docker images from build output, and a workload's deployment declaration from its committed infra files
+- **Scope**: Creating npm tarballs and Docker images from build output, a workload's deployment declaration from its committed infra files, and the extension archive of a TypeScript extension
 - **Out of scope**: Registry publishing (see the publish docs). A `type: "image"` project packages a local OCI candidate for downstream composition; its publish task alone derives a remote target, pushes/verifies the digest, and never assigns release/channel tags.
 - **Dependencies**: Requires build output. npm channel requires transpile + types output. Docker channel needs network on first use to fetch the pinned base (cached afterwards); the `docker` CLI is only needed for `--docker-load`.
 - **Not supported**: Custom Dockerfiles — the image recipe is fixed so digests stay reproducible.

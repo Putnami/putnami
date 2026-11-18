@@ -75,6 +75,13 @@
       ]
     },
     {
+      "id": "installable-catalog-commands",
+      "text": [
+        "@putnami/web publishes an extension archive on every channel the other extensions publish to, so a workspace outside this repository installs it with putnami extensions install @putnami/web and runs putnami i18n sync, translate and validate.",
+        "Each file a task or hook of its manifest names under the extension root is an entry point of the project, named without its extension, so the same name runs from the source and from the archive's bundle."
+      ]
+    },
+    {
       "id": "human-validation",
       "text": [
         "putnami i18n validate shows a person each draft and stale translation of a locale with its default text and locks each one they accept as validated, recording their git user.name and user.email and the date;",
