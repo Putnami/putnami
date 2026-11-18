@@ -186,7 +186,8 @@
           "checks": [
             "the-catalog-declares-no-job-command",
             "a-workspace-without-a-development-extension-shows-no-verb-alias-or-flag",
-            "an-undeclared-job-command-is-refused-once-in-every-entry-point"
+            "an-undeclared-job-command-is-refused-once-in-every-entry-point",
+            "an-empty-plan-names-the-extension-its-projects-do-not-use"
           ]
         }
       },

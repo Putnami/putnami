@@ -248,3 +248,80 @@ func extensionActivatesForProjectUncached(extName, projRoot string, jobMap map[s
 	}
 	return false
 }
+
+// UnusedExtension is an extension that declares a job for some of a run's
+// commands, and the selected projects that do not use it.
+type UnusedExtension struct {
+	Name     string
+	Commands []string
+	Projects []*workspace.Project
+}
+
+// UnusedExtensions explains an empty plan whose commands a loaded extension
+// does declare: a project plans the jobs of an extension only once it uses
+// that extension (workspace.UsesJobExtension), which for most projects means
+// listing it in the `extensions` of its putnami.json. It returns, in name
+// order, each extension serving one of commands that some of projects do not
+// use, with the commands in the order given and those projects in the order
+// given.
+//
+// A job the workspace or the project disables serves nothing. A project that
+// already uses an extension serving a command is never named for it: its plan
+// is empty for another reason, such as an activation file or a library that
+// cannot serve, and no extension to add would fix it.
+func UnusedExtensions(commands []string, projects []*workspace.Project, extensions []*extension.ExtensionDescription, disabledJobs, disabledExtensions []string) []UnusedExtension {
+	jobMap := extension.BuildJobMap(extensions)
+	disabledJobSet, disabledExtSet := toSet(disabledJobs), toSet(disabledExtensions)
+	byName := map[string]*UnusedExtension{}
+	for _, command := range commands {
+		for _, project := range projects {
+			if project == nil {
+				continue
+			}
+			var projectDisabled map[string]bool
+			if project.Config != nil && project.Config.Disable != nil {
+				projectDisabled = toSet(project.Config.Disable.Jobs)
+			}
+			var serving []*extension.JobDefinition
+			used := false
+			for _, job := range jobMap[command] {
+				if job == nil || job.ExtensionName == "" || disabledExtSet[job.ExtensionName] ||
+					disabledJobSet[command] || disabledJobSet[job.ExtensionName+":"+command] ||
+					projectDisabled[command] || projectDisabled[job.ExtensionName+":"+command] {
+					continue
+				}
+				if workspace.UsesJobExtension(project, job, false) {
+					used = true
+					break
+				}
+				serving = append(serving, job)
+			}
+			if used {
+				continue
+			}
+			for _, job := range serving {
+				unused := byName[job.ExtensionName]
+				if unused == nil {
+					unused = &UnusedExtension{Name: job.ExtensionName}
+					byName[job.ExtensionName] = unused
+				}
+				if !slices.Contains(unused.Commands, command) {
+					unused.Commands = append(unused.Commands, command)
+				}
+				if !slices.Contains(unused.Projects, project) {
+					unused.Projects = append(unused.Projects, project)
+				}
+			}
+		}
+	}
+	names := make([]string, 0, len(byName))
+	for name := range byName {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	unused := make([]UnusedExtension, 0, len(names))
+	for _, name := range names {
+		unused = append(unused, *byName[name])
+	}
+	return unused
+}

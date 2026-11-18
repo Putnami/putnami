@@ -705,6 +705,8 @@ type contentRegistry struct {
 	mu       sync.Mutex
 	packages map[string]map[string]*sdkagentartifact.ExtensionPackage
 	latest   map[string]string
+	// channels maps an extension to the version each named channel serves.
+	channels map[string]map[string]string
 	hits     int
 }
 
@@ -713,6 +715,7 @@ func newContentRegistry(t *testing.T) *contentRegistry {
 	registry := &contentRegistry{
 		packages: map[string]map[string]*sdkagentartifact.ExtensionPackage{},
 		latest:   map[string]string{},
+		channels: map[string]map[string]string{},
 	}
 	server := httptest.NewServer(http.HandlerFunc(registry.serve))
 	t.Cleanup(server.Close)
@@ -738,6 +741,21 @@ func (r *contentRegistry) publish(pkg *sdkagentartifact.ExtensionPackage) {
 	r.latest[pkg.Name] = pkg.Version
 }
 
+// publishOn makes pkg resolvable at its version and serves it on channel,
+// leaving `latest` where it is.
+func (r *contentRegistry) publishOn(channel string, pkg *sdkagentartifact.ExtensionPackage) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.packages[pkg.Name] == nil {
+		r.packages[pkg.Name] = map[string]*sdkagentartifact.ExtensionPackage{}
+	}
+	r.packages[pkg.Name][pkg.Version] = pkg
+	if r.channels[pkg.Name] == nil {
+		r.channels[pkg.Name] = map[string]string{}
+	}
+	r.channels[pkg.Name][channel] = pkg.Version
+}
+
 func (r *contentRegistry) serve(w http.ResponseWriter, req *http.Request) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -750,6 +768,8 @@ func (r *contentRegistry) serve(w http.ResponseWriter, req *http.Request) {
 		version := req.URL.Query().Get("channel")
 		if version == "latest" {
 			version = r.latest[name]
+		} else if served, ok := r.channels[name][version]; ok {
+			version = served
 		}
 		pkg := versions[version]
 		if pkg == nil {

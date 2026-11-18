@@ -3,6 +3,7 @@ package agentctx
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	protocolcli "go.putnami.dev/protocol/cli"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -33,7 +34,11 @@ type OptInOutcome struct {
 //
 // Only the extension the user names gets an opt-in. An extension installed
 // because another one depends on it stays undeclared and opted out.
-func OptIntoExtensionAgentContent(wsRoot string, cfg *wsproto.Config, name string) (OptInOutcome, error) {
+//
+// release is the version a new declaration holds, "" for none: the release the
+// lock pins when the user named a channel or a version, so the workspace keeps
+// what the user asked for instead of falling back to latest.
+func OptIntoExtensionAgentContent(wsRoot string, cfg *wsproto.Config, name, release string) (OptInOutcome, error) {
 	var outcome OptInOutcome
 	needsDeclaration := false
 	declared, err := extension.FindDeclaredExtension(wsRoot, cfg, name)
@@ -70,7 +75,7 @@ func OptIntoExtensionAgentContent(wsRoot string, cfg *wsproto.Config, name strin
 			fmt.Errorf("read %s: %w", wsproto.WorkspaceConfigFilename, err), protocolcli.ErrInvalidConfig)
 	}
 	if needsDeclaration {
-		if err := declareExtension(raw, name); err != nil {
+		if err := declareExtension(raw, name, release); err != nil {
 			return outcome, err
 		}
 		outcome.Declared = true
@@ -84,6 +89,62 @@ func OptIntoExtensionAgentContent(wsRoot string, cfg *wsproto.Config, name strin
 	if err := jsonutil.WriteFile(path, raw); err != nil {
 		return OptInOutcome{}, fmt.Errorf("write %s: %w", wsproto.WorkspaceConfigFilename, err)
 	}
+	return outcome, nil
+}
+
+// PinOutcome reports what PinDeclaredExtension found and wrote.
+type PinOutcome struct {
+	// Pinned reports that the call wrote the release to the declaration.
+	Pinned bool
+	// Kept is the constraint a declaration already holds and kept, "" when
+	// it held none or the release itself.
+	Kept string
+}
+
+// PinDeclaredExtension writes release to the declaration of name in the
+// workspace file when that declaration holds no constraint: an empty value of
+// the object form, or an entry of the list form, which becomes an object as
+// declareExtension turns it. A declaration that holds another constraint is
+// kept and reported, and a name the workspace file does not declare is left
+// to OptIntoExtensionAgentContent. Only that file is read and written.
+func PinDeclaredExtension(wsRoot, name, release string) (PinOutcome, error) {
+	var outcome PinOutcome
+	path := wsproto.ResolveFile(wsRoot, wsproto.WorkspaceConfigFilename)
+	raw, err := jsonutil.ReadFile(path)
+	if err != nil {
+		return outcome, protocolcli.Classify(
+			fmt.Errorf("read %s: %w", wsproto.WorkspaceConfigFilename, err), protocolcli.ErrInvalidConfig)
+	}
+	current, _ := raw.Get("extensions")
+	switch value := current.(type) {
+	case []any:
+		if !slices.Contains(value, any(name)) {
+			return outcome, nil
+		}
+		if err := declareExtension(raw, name, release); err != nil {
+			return outcome, err
+		}
+		declared := raw.GetMap("extensions")
+		declared.Set(name, release)
+	case *jsonutil.OrderedMap:
+		constraint, exists := value.Get(name)
+		if !exists {
+			return outcome, nil
+		}
+		if text, _ := constraint.(string); text != "" {
+			if text != release {
+				outcome.Kept = text
+			}
+			return outcome, nil
+		}
+		value.Set(name, release)
+	default:
+		return outcome, nil
+	}
+	if err := jsonutil.WriteFile(path, raw); err != nil {
+		return PinOutcome{}, fmt.Errorf("write %s: %w", wsproto.WorkspaceConfigFilename, err)
+	}
+	outcome.Pinned = true
 	return outcome, nil
 }
 
@@ -104,17 +165,45 @@ func withDeclaredExtension(cfg *wsproto.Config, name string) *wsproto.Config {
 }
 
 // declareExtension adds name to the `extensions` member, in the array form or
-// the name-to-constraint object form, whichever the file uses.
-func declareExtension(raw *jsonutil.OrderedMap, name string) error {
+// the name-to-constraint object form, whichever the file uses. A release
+// needs the object form, the only one that holds a constraint: an array
+// becomes an object whose other members keep their order and declare no
+// constraint, as the config writer turns a list with a constraint into one.
+func declareExtension(raw *jsonutil.OrderedMap, name, release string) error {
 	current, _ := raw.Get("extensions")
 	switch value := current.(type) {
 	case nil:
-		raw.Set("extensions", []any{name})
+		if release == "" {
+			raw.Set("extensions", []any{name})
+			return nil
+		}
+		declared := jsonutil.New()
+		declared.Set(name, release)
+		raw.Set("extensions", declared)
 	case []any:
-		raw.Set("extensions", appendUnique(value, name))
+		if release == "" {
+			raw.Set("extensions", appendUnique(value, name))
+			return nil
+		}
+		declared := jsonutil.New()
+		for _, entry := range value {
+			text, ok := entry.(string)
+			if !ok {
+				return protocolcli.Classify(
+					fmt.Errorf("%s: extensions must list names; add %s to it by hand", wsproto.WorkspaceConfigFilename, name),
+					protocolcli.ErrInvalidConfig)
+			}
+			if _, exists := declared.Get(text); !exists {
+				declared.Set(text, "")
+			}
+		}
+		if _, exists := declared.Get(name); !exists {
+			declared.Set(name, release)
+		}
+		raw.Set("extensions", declared)
 	case *jsonutil.OrderedMap:
 		if _, exists := value.Get(name); !exists {
-			value.Set(name, "")
+			value.Set(name, release)
 		}
 	default:
 		return protocolcli.Classify(

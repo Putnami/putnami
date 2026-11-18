@@ -153,6 +153,16 @@ func buildPlan(
 			"putnami: no job matched command(s) %s over %d selected project(s) (%s) from %d loaded extension(s)\n",
 			strings.Join(req.Commands, ","), len(selectedProjects),
 			summarizeProjectIDs(selectedProjects), len(extensions))
+		// A loaded extension serves the command, but a selected project plans
+		// its jobs only once it uses that extension: name it and the fix.
+		for _, unused := range planner.UnusedExtensions(req.Commands, selectedProjects, extensions, disabledJobs, disabledExts) {
+			subject, verb, owner := "project", "does", "its"
+			if len(unused.Projects) > 1 {
+				subject, verb, owner = "projects", "do", "their"
+			}
+			iox.Fprintf(os.Stderr, "putnami: %s serves %s and the %s %s %s not use it: add %q to \"extensions\" in %s putnami.json\n",
+				unused.Name, strings.Join(unused.Commands, ","), subject, summarizeProjectIDs(unused.Projects), verb, unused.Name, owner)
+		}
 		return nil, ExitUsage
 	}
 

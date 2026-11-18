@@ -986,7 +986,14 @@ them hold nothing else; strict validation refuses any other key. See
   also declares `<name>` in `extensions`, opts into the content in
   `agentArtifacts` and materializes it ([Agent
   Workflows](18-agent-workflows.md#how-a-workspace-opts-in)); a dependency gets
-  neither entry.
+  neither entry. When the command names a channel or a version, as
+  `putnami extensions install @putnami/web --channel canary` does, a new
+  declaration, or one that holds no constraint whether or not `<name>` ships
+  content, takes the release the lock
+  pins, such as `"@putnami/web": "0.5.0-20261118183847-220fec30"`, and a list
+  of names becomes an object to hold it. A declaration with a constraint
+  keeps it, and the command says so. When the registry names no release for
+  the channel, the declaration stays unpinned and the command says so.
 - **Edges.** The CLI follows the dependencies of an extension installed from
   the artifact store or declared by path.
 - **What satisfies a dependency.** Only `putnami.workspace.json` does, by name

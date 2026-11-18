@@ -20,7 +20,8 @@ import (
 // ExtensionsInstallNamed is `putnami extensions install`. Besides installing,
 // it treats naming an extension as the request for that extension's agent
 // content: when the named extension ships content, the workspace declares it
-// in `extensions`, opts into it in `agentArtifacts`, and the content is
+// in `extensions`, at the release the install pinned when the command named a
+// channel or a version, opts into it in `agentArtifacts`, and the content is
 // materialized from the release the install pinned. A second run, or a later
 // `putnami install`, changes nothing.
 //
@@ -51,24 +52,57 @@ func ExtensionsInstallNamed(ctx context.Context, wsRoot string, cfg *wsproto.Con
 	})
 }
 
-// installNamedAgentContent opts the extension named in args into its agent
-// content and materializes that content (ExtensionsInstallNamed).
+// installNamedAgentContent pins the declaration of the extension named in
+// args to the release a named channel or version installed, opts it into its
+// agent content and materializes that content (ExtensionsInstallNamed).
 func installNamedAgentContent(ctx context.Context, wsRoot string, cfg *wsproto.Config, args []string, env LifecycleEnv) error {
-	name := extensions.InstallTargetName(args)
+	name, request := extensions.InstallTarget(args)
 	if name == "" || !installWritesWorkspace() {
-		return nil
-	}
-	outcome, err := agentctx.OptIntoExtensionAgentContent(wsRoot, cfg, name)
-	if err != nil {
-		return fmt.Errorf("opt into the agent content of %s: %w", name, err)
-	}
-	if !outcome.ShipsContent {
 		return nil
 	}
 	out := env.out()
 	record := env.OnAction
 	if record == nil {
 		record = func(action LifecycleAction) { iox.Fprintf(out, "  ✓ %s\n", action.Description) }
+	}
+	// A channel or a version the command names is declared as the release the
+	// install pinned: an empty constraint would resolve latest instead. A
+	// declaration without a constraint takes that release too; one with a
+	// constraint keeps it, and the run says so.
+	release := ""
+	if request != "" && request != latestChannel {
+		var err error
+		if release, err = extensions.LockedRelease(wsRoot, name); err != nil {
+			return fmt.Errorf("read the release %s pins: %w", name, err)
+		}
+		if release == "" {
+			iox.Fprintf(os.Stderr, "  ! %s: the lock pins no release for %s, so %s declares no version for it\n",
+				name, request, wsproto.WorkspaceConfigFilename)
+		}
+	}
+	if release != "" {
+		pin, err := agentctx.PinDeclaredExtension(wsRoot, name, release)
+		if err != nil {
+			return fmt.Errorf("pin %s in %s: %w", name, wsproto.WorkspaceConfigFilename, err)
+		}
+		switch {
+		case pin.Pinned:
+			record(LifecycleAction{
+				Kind: "workspace-config", Name: wsproto.WorkspaceConfigFilename,
+				Description: fmt.Sprintf("Pinned %s to %s in %s", name, release, wsproto.WorkspaceConfigFilename),
+			})
+			cfg = wsproto.Load(wsRoot)
+		case pin.Kept != "":
+			iox.Fprintf(os.Stderr, "  ! %s keeps its constraint %q in %s; the lock pins %s\n",
+				name, pin.Kept, wsproto.WorkspaceConfigFilename, release)
+		}
+	}
+	outcome, err := agentctx.OptIntoExtensionAgentContent(wsRoot, cfg, name, release)
+	if err != nil {
+		return fmt.Errorf("opt into the agent content of %s: %w", name, err)
+	}
+	if !outcome.ShipsContent {
+		return nil
 	}
 	if outcome.OptedIn || outcome.Declared {
 		record(LifecycleAction{

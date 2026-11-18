@@ -92,19 +92,43 @@ func ExtensionsInstallMaterializes(args []string) bool {
 // none, names a workspace-local path, or asks for a packaging materialization,
 // which installs nothing into this workspace.
 func InstallTargetName(args []string) string {
+	name, _ := InstallTarget(args)
+	return name
+}
+
+// InstallTarget returns the registry extension an `extensions install`
+// argument list names and the version or channel it requests after its @, ""
+// when it requests none. It returns two empty strings where InstallTargetName
+// returns "".
+func InstallTarget(args []string) (name, request string) {
 	rest, target, err := parseArtifactTarget("", args)
 	if err != nil || target.Materializes() {
-		return ""
+		return "", ""
 	}
 	_, rest = splitLatestInstallArg(rest)
 	if len(rest) == 0 {
-		return ""
+		return "", ""
 	}
-	name, _ := parseExtensionArg(rest[0])
+	name, request = parseExtensionArg(rest[0])
 	if isLocalExtensionRef(name) {
-		return ""
+		return "", ""
 	}
-	return name
+	return name, request
+}
+
+// LockedRelease returns the release the workspace lock pins name to, "" when
+// the lock pins none or pins no release, such as the 0.0.0 a registry answer
+// without a version falls back to.
+func LockedRelease(wsRoot, name string) (string, error) {
+	lockFile, err := lockfile.ReadLockFile(wsRoot)
+	if err != nil || lockFile == nil {
+		return "", err
+	}
+	entry, ok := lockFile.GetExtension(name)
+	if !ok || entry.Version == "0.0.0" || !isExactPin(entry.Version) {
+		return "", nil
+	}
+	return entry.Version, nil
 }
 
 // parseArtifactTarget splits the materialization flags out of an install

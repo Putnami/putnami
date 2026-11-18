@@ -265,3 +265,44 @@ func TestInstallTargetName(t *testing.T) {
 		}
 	}
 }
+
+// TestInstallTarget covers the request the declaration of a named install
+// follows: the version or channel after the name's @, and none for a scope's @.
+func TestInstallTarget(t *testing.T) {
+	cases := []struct {
+		args          []string
+		name, request string
+	}{
+		{nil, "", ""},
+		{[]string{"@putnami/contributor"}, "@putnami/contributor", ""},
+		{[]string{"@putnami/contributor@1.2.0"}, "@putnami/contributor", "1.2.0"},
+		{[]string{"--latest", "@putnami/web@canary"}, "@putnami/web", "canary"},
+		{[]string{"/tooling/contributor"}, "", ""},
+		{[]string{"--dest", "/tmp/warm", "@putnami/web@canary"}, "", ""},
+	}
+	for _, c := range cases {
+		if name, request := InstallTarget(c.args); name != c.name || request != c.request {
+			t.Errorf("InstallTarget(%v) = %q, %q, want %q, %q", c.args, name, request, c.name, c.request)
+		}
+	}
+}
+
+// TestLockedRelease reads the release the lock pins, and none for a missing
+// entry or the 0.0.0 fallback of an answer without a version.
+func TestLockedRelease(t *testing.T) {
+	root := t.TempDir()
+	if got, err := LockedRelease(root, "@putnami/web"); err != nil || got != "" {
+		t.Fatalf("LockedRelease without a lock = %q, %v", got, err)
+	}
+	lock := lockfile.NewLockFile()
+	lock.SetExtension("@putnami/web", lockfile.LockEntry{Version: "0.5.0-20261118183847-220fec30"})
+	lock.SetExtension("@acme/unnamed", lockfile.LockEntry{Version: "0.0.0"})
+	if err := lockfile.WriteLockFile(root, lock); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{"@putnami/web": "0.5.0-20261118183847-220fec30", "@acme/unnamed": "", "@acme/absent": ""} {
+		if got, err := LockedRelease(root, name); err != nil || got != want {
+			t.Errorf("LockedRelease(%s) = %q, %v, want %q", name, got, err, want)
+		}
+	}
+}

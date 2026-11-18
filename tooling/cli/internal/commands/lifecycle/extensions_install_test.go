@@ -190,6 +190,110 @@ func TestExtensionsInstallNamed_OptsIntoTheContentItShips(t *testing.T) {
 	})
 }
 
+// `extensions install <name> --channel <channel>` declares the release the
+// channel served and the lock pins, in whichever form the workspace file
+// declares its extensions; an array becomes an object. A declaration without
+// a constraint takes the release, one with a constraint keeps it. Without a
+// channel the declaration stays unpinned.
+func TestExtensionsInstallNamed_DeclaresTheReleaseAChannelPins(t *testing.T) {
+	spectest.Proves(t, "cli/agent-workflow-lifecycle", "starter-agent-content-opt-in", "extensions-install-declares-the-release-a-channel-pins")
+	const canary = "1.1.0-canary.1"
+
+	cases := []struct {
+		name, config string
+		want         map[string]string
+	}{
+		{"no extensions member", `{"name":"ws"}`, map[string]string{contentExtensionName: canary}},
+		{"an extensions object", `{"name":"ws","extensions":{}}`, map[string]string{contentExtensionName: canary}},
+		{"an extensions array", `{"name":"ws","extensions":["/tools/local"]}`, map[string]string{"/tools/local": "", contentExtensionName: canary}},
+		{"an unpinned declaration in an object", `{"name":"ws","extensions":{"` + contentExtensionName + `":""}}`, map[string]string{contentExtensionName: canary}},
+		{"an unpinned declaration in an array", `{"name":"ws","extensions":["/tools/local","` + contentExtensionName + `"]}`, map[string]string{"/tools/local": "", contentExtensionName: canary}},
+		{"a declaration with a constraint keeps it", `{"name":"ws","extensions":{"` + contentExtensionName + `":"^1.0.0-0"}}`, map[string]string{contentExtensionName: "^1.0.0-0"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			registry := newContentRegistry(t)
+			registry.publish(packageContentExtension(t, contentExtensionName, "r1", "1.0.0", false))
+			registry.publishOn("canary", packageContentExtension(t, contentExtensionName, "r2", canary, false))
+			root := t.TempDir()
+			writeAgentFile(t, root, wsproto.WorkspaceConfigFilename, tc.config+"\n")
+
+			args, err := ExtensionsInstallChannel([]string{contentExtensionName, "--channel", "canary"})
+			if err != nil {
+				t.Fatalf("ExtensionsInstallChannel: %v", err)
+			}
+			var out string
+			stderr := captureStderr(t, func() { out, err = runExtensionsInstall(t, root, args...) })
+			if err != nil {
+				t.Fatalf("extensions install: %v\n%s", err, out)
+			}
+			if kept := tc.want[contentExtensionName] != canary; kept != strings.Contains(stderr, "keeps its constraint") {
+				t.Errorf("stderr = %q, want the kept-constraint notice only when the constraint is kept", stderr)
+			}
+			pin, ok := extensionPin(t, root, contentExtensionName)
+			if !ok || pin.Version != canary {
+				t.Fatalf("extension pin = %+v (present %v), want %s", pin, ok, canary)
+			}
+			var declared struct {
+				Extensions map[string]string `json:"extensions"`
+			}
+			if err := json.Unmarshal([]byte(readWorkspaceFile(t, root, wsproto.WorkspaceConfigFilename)), &declared); err != nil {
+				t.Fatalf("extensions must be an object that holds the release: %v\n%s", err, readWorkspaceFile(t, root, wsproto.WorkspaceConfigFilename))
+			}
+			if !reflect.DeepEqual(declared.Extensions, tc.want) {
+				t.Fatalf("extensions = %v, want %v", declared.Extensions, tc.want)
+			}
+			if got := readAgentFile(t, root, ".claude/skills/fixture-review/SKILL.md"); !strings.Contains(got, "Review revision r2.") {
+				t.Fatalf("the content is not the canary release's: %q", got)
+			}
+		})
+	}
+
+	t.Run("an unpinned extension without content", func(t *testing.T) {
+		registry := newContentRegistry(t)
+		registry.publishOn("canary", packagePlainExtension(t))
+		root := t.TempDir()
+		writeAgentFile(t, root, wsproto.WorkspaceConfigFilename, `{"name":"ws","extensions":{"`+plainExtensionName+`":""}}`+"\n")
+
+		args, err := ExtensionsInstallChannel([]string{plainExtensionName, "--channel", "canary"})
+		if err != nil {
+			t.Fatalf("ExtensionsInstallChannel: %v", err)
+		}
+		if out, err := runExtensionsInstall(t, root, args...); err != nil {
+			t.Fatalf("extensions install: %v\n%s", err, out)
+		}
+		pin, ok := extensionPin(t, root, plainExtensionName)
+		declared := readDeclarations(t, root)
+		var extensions map[string]string
+		if err := json.Unmarshal(declared.Extensions, &extensions); err != nil || !ok || extensions[plainExtensionName] != pin.Version || pin.Version == "" {
+			t.Fatalf("extensions = %s, lock pin = %+v (present %v), want the declaration to equal the lock version", declared.Extensions, pin, ok)
+		}
+		if len(declared.AgentArtifacts) != 0 {
+			t.Errorf("agentArtifacts = %v, want no opt-in for an extension without content", declared.AgentArtifacts)
+		}
+	})
+
+	t.Run("no channel declares no release", func(t *testing.T) {
+		registry := newContentRegistry(t)
+		registry.publish(packageContentExtension(t, contentExtensionName, "r1", "1.0.0", false))
+		root := t.TempDir()
+		writeAgentFile(t, root, wsproto.WorkspaceConfigFilename, `{"name":"ws","extensions":{}}`+"\n")
+
+		if out, err := runExtensionsInstall(t, root, contentExtensionName); err != nil {
+			t.Fatalf("extensions install: %v\n%s", err, out)
+		}
+		var declared struct {
+			Extensions map[string]string `json:"extensions"`
+		}
+		if err := json.Unmarshal([]byte(readWorkspaceFile(t, root, wsproto.WorkspaceConfigFilename)), &declared); err != nil {
+			t.Fatal(err)
+		}
+		if got, ok := declared.Extensions[contentExtensionName]; !ok || got != "" {
+			t.Fatalf("extensions = %v, want %s declared without a release", declared.Extensions, contentExtensionName)
+		}
+	})
+}
+
 // An extension without agent content installs as before and writes nothing to
 // the workspace file.
 func TestExtensionsInstallNamed_ExtensionWithoutContentWritesNoOptIn(t *testing.T) {

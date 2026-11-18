@@ -58,6 +58,13 @@ For each `(command, project)` pair, the planner finds every compatible extension
 
 Activation files are glob patterns (e.g., `tsconfig.json`, `go.mod`, `**/*.go`) that must exist in the project directory for a job to activate. This enables multi-language workspaces where only the relevant extension handles each project.
 
+A project plans the jobs of an extension only when it uses that extension: its `putnami.json` lists it in `extensions` or `dependencies`, or the job is workspace-wide. When a run over an explicit selection plans nothing because its selected projects use no extension serving the command, it fails with exit 2 and names the fix on stderr; an `--impacted` run exits 0 without the hint:
+
+```
+putnami: no job matched command(s) web-i18n-sync over 1 selected project(s) (/site) from 1 loaded extension(s)
+putnami: @putnami/web serves web-i18n-sync and the project /site does not use it: add "@putnami/web" to "extensions" in its putnami.json
+```
+
 When multiple active contributors define the same flag for a command, the definitions must be byte-for-byte equivalent after manifest parsing. Identical shared flags are accepted and merged once. Incompatible shared flags fail planning with an error naming the command, flag, and extensions. Flags that only one contributor declares remain available to that contributor through normal command params.
 
 ### Pipeline Expansion
