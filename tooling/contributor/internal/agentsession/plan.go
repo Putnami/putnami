@@ -24,6 +24,14 @@ var sessionTaskIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 // status is todo, doing or done.
 type planStep = collab.PlanStep
 
+// desktopPlanTool is the plan tool of the Claude desktop app, which replaces
+// TodoWrite and the task tools there; wrapUpTool ends the app's turn and
+// completes the steps in progress.
+const (
+	desktopPlanTool = "mcp__ccd_turn__update_plan"
+	wrapUpTool      = "mcp__ccd_turn__wrap_up"
+)
+
 // planStatus maps the status of an engine's plan tool to the contract's
 // vocabulary. Claude Code and Codex share pending, in_progress and completed.
 func planStatus(raw string) (collab.PlanStepStatus, bool) {
@@ -41,7 +49,7 @@ func planStatus(raw string) (collab.PlanStepStatus, bool) {
 // isPlanTool reports whether a tool call can change the plan.
 func isPlanTool(toolName string) bool {
 	switch toolName {
-	case "TodoWrite", "update_plan", "TaskCreate", "TaskUpdate":
+	case "TodoWrite", "update_plan", "TaskCreate", "TaskUpdate", desktopPlanTool, wrapUpTool:
 		return true
 	}
 	return false
@@ -55,6 +63,10 @@ func isPlanTool(toolName string) bool {
 //     whole plan, and a step keeps its key while its text stays the same.
 //   - Claude Code TaskCreate and TaskUpdate change one task, keyed by the task
 //     id that TaskCreate answers in tool_response.task.id.
+//   - The Claude desktop app's update_plan sends tool_input.items[{content,
+//     status}], which replaces the whole plan like TodoWrite, or changes the
+//     statuses of the plan the session holds (see applyDesktopPlan), and its
+//     wrap_up completes the steps in progress.
 func applyPlanTool(toolName string, input, response json.RawMessage, plan []planStep) ([]planStep, bool) {
 	switch toolName {
 	case "TodoWrite":
@@ -91,8 +103,90 @@ func applyPlanTool(toolName string, input, response json.RawMessage, plan []plan
 		return applyTaskCreate(input, response, plan)
 	case "TaskUpdate":
 		return applyTaskUpdate(input, response, plan)
+	case desktopPlanTool:
+		return applyDesktopPlan(input, plan)
+	case wrapUpTool:
+		return completeInProgress(plan)
 	}
 	return plan, false
+}
+
+// completeInProgress marks the steps in progress done and keeps the pending
+// ones, and answers false when no step is in progress.
+func completeInProgress(plan []planStep) ([]planStep, bool) {
+	next := clonePlan(plan)
+	changed := false
+	for i := range next {
+		if next[i].Status == collab.PlanStepDoing {
+			next[i].Status = collab.PlanStepDone
+			changed = true
+		}
+	}
+	if !changed {
+		return plan, false
+	}
+	return next, true
+}
+
+// applyDesktopPlan applies one call of the desktop app's plan tool. An items
+// list replaces the plan. Otherwise done completes the listed steps and start
+// starts one, both 1-based, then advance completes every step in progress and
+// starts the first pending step after the last of them, or the first pending
+// step when none was in progress. A step number outside the plan changes
+// nothing.
+func applyDesktopPlan(input json.RawMessage, plan []planStep) ([]planStep, bool) {
+	var body struct {
+		Items []struct {
+			Content string `json:"content"`
+			Status  string `json:"status"`
+		} `json:"items"`
+		Advance bool  `json:"advance"`
+		Done    []int `json:"done"`
+		Start   *int  `json:"start"`
+	}
+	if json.Unmarshal(input, &body) != nil {
+		return plan, false
+	}
+	if body.Items != nil {
+		steps := make([]wholePlanStep, 0, len(body.Items))
+		for _, item := range body.Items {
+			steps = append(steps, wholePlanStep{text: item.Content, status: item.Status})
+		}
+		return replacePlan(steps), true
+	}
+	next := clonePlan(plan)
+	changed := false
+	set := func(index int, status collab.PlanStepStatus) {
+		if index >= 0 && index < len(next) && next[index].Status != status {
+			next[index].Status = status
+			changed = true
+		}
+	}
+	for _, number := range body.Done {
+		set(number-1, collab.PlanStepDone)
+	}
+	if body.Start != nil {
+		set(*body.Start-1, collab.PlanStepDoing)
+	}
+	if body.Advance {
+		from := 0
+		for i, step := range next {
+			if step.Status == collab.PlanStepDoing {
+				set(i, collab.PlanStepDone)
+				from = i + 1
+			}
+		}
+		for i := from; i < len(next); i++ {
+			if next[i].Status == collab.PlanStepTodo {
+				set(i, collab.PlanStepDoing)
+				break
+			}
+		}
+	}
+	if !changed {
+		return plan, false
+	}
+	return next, true
 }
 
 func applyTaskCreate(input, response json.RawMessage, plan []planStep) ([]planStep, bool) {

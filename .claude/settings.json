@@ -38,7 +38,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "TodoWrite|TaskCreate|TaskUpdate",
+        "matcher": "TodoWrite|TaskCreate|TaskUpdate|mcp__ccd_turn__update_plan|mcp__ccd_turn__wrap_up",
         "hooks": [
           {
             "type": "command",

@@ -104,7 +104,7 @@ func TestTheBudgetsFitTheDeclaredTimeouts(t *testing.T) {
 func TestTheManifestHooksOnlyThePlanTools(t *testing.T) {
 	spectest.Proves(t, sessionFeature, toolRequirement, "the-manifest-hooks-only-the-plan-tools")
 	want := map[string][]string{
-		claude: {"TodoWrite", "TaskCreate", "TaskUpdate"},
+		claude: {"TodoWrite", "TaskCreate", "TaskUpdate", desktopPlanTool, wrapUpTool},
 		codex:  {"update_plan"},
 	}
 	hosts := loadManifest(t).HostHooks.Hosts

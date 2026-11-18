@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -276,6 +277,44 @@ func TestPostToolUseRecordsThePlanWithoutGitOrProvider(t *testing.T) {
 		h.hook(tc.engine, "stop", tc.session, lastMessage("Done."))
 		if sync := h.provider.lastSync(t); sync.Plan == nil || !slices.Equal(sync.Plan.Steps, tc.want) {
 			t.Errorf("%v stop sent the plan %+v", tc.fixtures, sync.Plan)
+		}
+	}
+}
+
+func TestTheDesktopPlanToolPublishesEachPlan(t *testing.T) {
+	spectest.Proves(t, sessionFeature, toolRequirement, "the-desktop-plan-tool-changes-the-plan")
+	step := func(text string, status collab.PlanStepStatus) planStep {
+		return planStep{Key: planKey(text), Status: status, Text: text}
+	}
+	h := newHarness(t)
+	h.hook(claude, "session-start", claudeSession, nil)
+	for i, tc := range []struct {
+		fixture string
+		want    []planStep
+	}{
+		{"post-tool-use-desktop-plan-items", []planStep{
+			step("Write one.txt", collab.PlanStepDoing), step("Write two.txt", collab.PlanStepTodo),
+			step("Write three.txt", collab.PlanStepTodo), step("Report", collab.PlanStepTodo),
+		}},
+		{"post-tool-use-desktop-plan-advance", []planStep{
+			step("Write one.txt", collab.PlanStepDone), step("Write two.txt", collab.PlanStepDoing),
+			step("Write three.txt", collab.PlanStepTodo), step("Report", collab.PlanStepTodo),
+		}},
+		{"post-tool-use-desktop-plan-done-start", []planStep{
+			step("Write one.txt", collab.PlanStepDone), step("Write two.txt", collab.PlanStepDone),
+			step("Write three.txt", collab.PlanStepDone), step("Report", collab.PlanStepDoing),
+		}},
+		{"post-tool-use-desktop-wrap-up", []planStep{
+			step("Write one.txt", collab.PlanStepDone), step("Write two.txt", collab.PlanStepDone),
+			step("Write three.txt", collab.PlanStepDone), step("Report", collab.PlanStepDone),
+		}},
+	} {
+		if out := h.hook(claude, tc.fixture, claudeSession, nil); out != nil {
+			t.Errorf("%s printed %+v", tc.fixture, out)
+		}
+		h.hook(claude, "stop", claudeSession, lastMessage(fmt.Sprintf("Turn %d.", i)))
+		if sync := h.provider.lastSync(t); sync.Plan == nil || !slices.Equal(sync.Plan.Steps, tc.want) {
+			t.Errorf("after %s the sync sent the plan %+v, want %+v", tc.fixture, sync.Plan, tc.want)
 		}
 	}
 }

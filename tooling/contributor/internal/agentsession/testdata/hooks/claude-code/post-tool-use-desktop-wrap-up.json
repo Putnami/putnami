@@ -1,0 +1,23 @@
+{
+  "session_id": "ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8",
+  "transcript_path": "/home/agent/.claude/projects/-work-repo/ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8.jsonl",
+  "cwd": "/work/repo",
+  "prompt_id": "50054e58-1cf4-49cf-a268-3df3069ab5e6",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "mcp__ccd_turn__wrap_up",
+  "tool_input": {
+    "recap": "The four steps are done and the report is written. Nothing is committed."
+  },
+  "tool_response": [
+    {
+      "type": "text",
+      "text": "Nothing is pending, so the app draws no box; the recap is the session's status."
+    }
+  ],
+  "tool_use_id": "toolu_01Vb3kRw8NcY5tGz2PqL7hXa",
+  "duration_ms": 1
+}

@@ -1,0 +1,41 @@
+{
+  "session_id": "ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8",
+  "transcript_path": "/home/agent/.claude/projects/-work-repo/ebc08b6f-8d54-47ac-9c30-e5d1b724ebc8.jsonl",
+  "cwd": "/work/repo",
+  "prompt_id": "50054e58-1cf4-49cf-a268-3df3069ab5e6",
+  "permission_mode": "bypassPermissions",
+  "effort": {
+    "level": "medium"
+  },
+  "hook_event_name": "PostToolUse",
+  "tool_name": "mcp__ccd_turn__update_plan",
+  "tool_input": {
+    "items": [
+      {
+        "content": "Write one.txt",
+        "status": "in_progress"
+      },
+      {
+        "content": "Write two.txt",
+        "status": "pending"
+      },
+      {
+        "content": "Write three.txt",
+        "status": "pending"
+      },
+      {
+        "content": "Report",
+        "status": "pending"
+      }
+    ],
+    "scope": "first_task"
+  },
+  "tool_response": [
+    {
+      "type": "text",
+      "text": "Plan shown (4 steps)."
+    }
+  ],
+  "tool_use_id": "toolu_01Q2fT8kVYJb3Lw6PmN4cRzD",
+  "duration_ms": 1
+}

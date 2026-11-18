@@ -23,7 +23,8 @@
     {
       "id": "tool-use-capture",
       "text": [
-        "PostToolUse records a TodoWrite, TaskCreate, TaskUpdate or update_plan plan change.",
+        "PostToolUse records a plan change of TodoWrite, TaskCreate, TaskUpdate, update_plan, and the Claude desktop app's mcp__ccd_turn__update_plan and mcp__ccd_turn__wrap_up.",
+        "Desktop items replace the plan with TodoWrite's step keys; advance, done and start change statuses; wrap_up completes the steps in progress. A call already applied, by tool_use_id, changes nothing.",
         "It runs no git and calls no provider, ignores a subagent's plan, and spools the call when another hook holds the session lock."
       ]
     },

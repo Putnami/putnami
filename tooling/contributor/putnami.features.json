@@ -269,7 +269,9 @@
               "post-tool-use-records-the-plan-without-git-or-provider",
               "a-subagent-plan-is-not-the-session-plan",
               "a-busy-session-spools-the-tool-call",
-              "the-manifest-hooks-only-the-plan-tools"
+              "the-manifest-hooks-only-the-plan-tools",
+              "the-desktop-plan-tool-changes-the-plan",
+              "a-repeated-plan-call-is-applied-once"
             ]
           }
         },

@@ -40,7 +40,8 @@ contract, runs the command path `agent hook`, and lists one entry per host
 event:
 
 - Claude Code: `SessionStart`, `PostToolUse` after `TodoWrite`, `TaskCreate`,
-  `TaskUpdate`, `missions.ask` and `missions.reply`, `Stop`, a second `Stop`
+  `TaskUpdate` and the Claude desktop app's `mcp__ccd_turn__update_plan` and
+  `mcp__ccd_turn__wrap_up`, `missions.ask` and `missions.reply`, `Stop`, a second `Stop`
   with `--idle-wake` that may wake the session, `StopFailure` and
   `SessionEnd`.
 - Codex: `SessionStart`, `PostToolUse` after `update_plan`, `missions.ask`

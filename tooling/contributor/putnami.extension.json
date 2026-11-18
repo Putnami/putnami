@@ -790,7 +790,9 @@
           "tools": [
             "TodoWrite",
             "TaskCreate",
-            "TaskUpdate"
+            "TaskUpdate",
+            "mcp__ccd_turn__update_plan",
+            "mcp__ccd_turn__wrap_up"
           ],
           "args": [
             "--engine",

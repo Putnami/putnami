@@ -103,6 +103,7 @@ type hookInput struct {
 	ToolName       string          `json:"tool_name"`
 	ToolInput      json.RawMessage `json:"tool_input"`
 	ToolResponse   json.RawMessage `json:"tool_response"`
+	ToolUseID      string          `json:"tool_use_id"`
 	StopHookActive bool            `json:"stop_hook_active"`
 	LastMessage    string          `json:"last_assistant_message"`
 	// PromptID names the user prompt the turn answers: Claude Code's, absent
@@ -512,7 +513,7 @@ func lockedUpdate(files sessionFiles, change func(*sessionCache) (*sessionCache,
 // applySpooled applies spooled tool calls in the order they happened.
 func applySpooled(cache *sessionCache, spooled []spooledToolUse) {
 	for _, event := range spooled {
-		observeToolUse(cache, event.ToolName, event.ToolInput, event.ToolResponse)
+		observeToolUse(cache, event)
 	}
 }
 
@@ -533,7 +534,7 @@ func (e *Env) hookPostToolUse(engine string, input hookInput) error {
 	}
 	now := e.Now()
 	files := e.files(engine, input.SessionID)
-	own := spooledToolUse{At: now.UnixNano(), ToolName: input.ToolName, ToolInput: input.ToolInput, ToolResponse: input.ToolResponse}
+	own := spooledToolUse{At: now.UnixNano(), ToolName: input.ToolName, ToolInput: input.ToolInput, ToolResponse: input.ToolResponse, ToolUseID: input.ToolUseID}
 	cache, err := files.read()
 	if err != nil {
 		return err
@@ -850,13 +851,29 @@ func deliveredText(messages []inboxMessage) string {
 	return text
 }
 
+// planToolUseMemory is how many applied plan calls a session remembers by
+// tool_use_id.
+const planToolUseMemory = 16
+
 // observeToolUse records what one plan call changes in the session, and
-// answers whether it changed anything to publish.
-func observeToolUse(cache *sessionCache, toolName string, input, response json.RawMessage) bool {
-	if !isPlanTool(toolName) {
+// answers whether it changed anything to publish. A call whose tool_use_id is
+// among the last planToolUseMemory the session applied changes nothing: two
+// hook sources can deliver one call twice, and a status change such as
+// advance is not idempotent.
+func observeToolUse(cache *sessionCache, event spooledToolUse) bool {
+	if !isPlanTool(event.ToolName) {
 		return false
 	}
-	next, ok := applyPlanTool(toolName, input, response, cache.Plan)
+	if event.ToolUseID != "" {
+		if slices.Contains(cache.PlanToolUses, event.ToolUseID) {
+			return false
+		}
+		cache.PlanToolUses = append(cache.PlanToolUses, event.ToolUseID)
+		if extra := len(cache.PlanToolUses) - planToolUseMemory; extra > 0 {
+			cache.PlanToolUses = slices.Delete(cache.PlanToolUses, 0, extra)
+		}
+	}
+	next, ok := applyPlanTool(event.ToolName, event.ToolInput, event.ToolResponse, cache.Plan)
 	if !ok {
 		return false
 	}

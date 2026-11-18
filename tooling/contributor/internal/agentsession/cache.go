@@ -60,6 +60,9 @@ type sessionCache struct {
 
 	Plan       []planStep `json:"plan,omitempty"`
 	PlanDigest string     `json:"plan_digest,omitempty"`
+	// PlanToolUses are the tool_use_ids of the last plan calls the session
+	// applied, oldest first, at most planToolUseMemory.
+	PlanToolUses []string `json:"plan_tool_uses,omitempty"`
 	// PlanSynced is the digest of the plan the last successful sync sent.
 	PlanSynced string `json:"plan_synced,omitempty"`
 
@@ -296,6 +299,7 @@ type spooledToolUse struct {
 	ToolName     string          `json:"tool_name"`
 	ToolInput    json.RawMessage `json:"tool_input,omitempty"`
 	ToolResponse json.RawMessage `json:"tool_response,omitempty"`
+	ToolUseID    string          `json:"tool_use_id,omitempty"`
 }
 
 // spool writes one tool call to its own file, so it needs no lock. The name
