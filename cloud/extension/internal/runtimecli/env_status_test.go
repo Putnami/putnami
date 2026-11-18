@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
+	"go.putnami.dev/cloud/extension/internal/clicore/hometest"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -238,11 +239,19 @@ func envStatusServerWith(t *testing.T, readinessCalls *int, follow string) *http
 	}))
 }
 
+// envStatusEnv is the environment of a command that reads srv with
+// PUTNAMI_CLOUD_TOKEN, in a user home the test owns: a stored session in the
+// real home outranks the token.
+func envStatusEnv(t *testing.T, srv *httptest.Server) map[string]string {
+	t.Helper()
+	return hometest.Env(t.TempDir(), map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL})
+}
+
 func TestEnvStatusPrintsTheNodeWithoutTheReadinessRoute(t *testing.T) {
 	readiness := 0
 	srv := envStatusServer(t, &readiness)
 	defer srv.Close()
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := envStatusEnv(t, srv)
 
 	cap := &captureIO{}
 	if err := EnvStatus(map[string]any{}, []string{"prod"}, doctorWorkspace(t), env, cap.io(srv.Client())); err != nil {
@@ -282,7 +291,7 @@ func TestEnvStatusNodeNarrowsToTheEnvFlag(t *testing.T) {
 	readiness := 0
 	srv := envStatusServer(t, &readiness)
 	defer srv.Close()
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := envStatusEnv(t, srv)
 	root := doctorWorkspace(t)
 
 	named := EnvStatusNode(map[string]any{"env": "prod"}, root, env, (&captureIO{}).io(srv.Client()))
@@ -316,7 +325,7 @@ func TestEnvStatusLensesKeepTheTable(t *testing.T) {
 	readiness := 0
 	srv := envStatusServer(t, &readiness)
 	defer srv.Close()
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := envStatusEnv(t, srv)
 	root := doctorWorkspace(t)
 	writeDoctorFile(t, filepath.Join(root, "putnami.workspace.json"), map[string]any{
 		"options": map[string]any{"@putnami/cloud": map[string]any{"workspace": map[string]any{
@@ -338,7 +347,7 @@ func TestEnvStatusLensesKeepTheTable(t *testing.T) {
 }
 
 func TestEnvStatusNodeIsUnknownWithoutAWorkspace(t *testing.T) {
-	node := EnvStatusNode(map[string]any{}, t.TempDir(), map[string]string{"HOME": t.TempDir()}, clicore.IO{})
+	node := EnvStatusNode(map[string]any{}, t.TempDir(), hometest.Env(t.TempDir(), nil), clicore.IO{})
 	if node.State != clicore.StatusUnknown || node.Detail == "" || node.ID != "env" {
 		t.Fatalf("node = %+v, want unknown with the reason", node)
 	}
@@ -418,7 +427,7 @@ func TestEnvStatusReadsTheDefinitionWorkloadsFromChannelFollow(t *testing.T) {
 	readiness := 0
 	srv := envStatusServerWith(t, &readiness, `"workloads":["shop/workloads/api"],`)
 	defer srv.Close()
-	env := map[string]string{"PUTNAMI_CLOUD_TOKEN": "user-token", "PUTNAMI_CONTROL_PLANE_URL": srv.URL}
+	env := envStatusEnv(t, srv)
 
 	cap := &captureIO{}
 	if err := EnvStatus(map[string]any{"output": "json"}, []string{"prod"}, doctorWorkspace(t), env, cap.io(srv.Client())); err != nil {
