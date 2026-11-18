@@ -76,15 +76,19 @@ evidence and names the finalization it did not run.
 ## Bind the proposal to the session
 
 A host binds a pull request to its session only when it sees the pull request
-open through the code host's own command line; a proposal that `change
-finalize` publishes through the provider's API opens where the host cannot see
-it. When the host offers a tool that binds a pull request to its session, such
-as Claude Code's `bind_pr`, bind the run's own proposal once per session: the
-first time `change finalize` prints `PROPOSAL_URL=<url>` in the session,
-whether that is the draft of show, a code checkpoint after a resume, or the
-ready finalization. A host without such a tool skips this step, and the run
-goes on as before. A failed bind is named in the end report and never fails
-the delivery. A push-only run publishes nothing and binds nothing, and an epic
+open through the code host's own command line or reads it in the session's
+message; a proposal that `change finalize` publishes through the provider's
+API opens where the host cannot see it. Bind the run's own proposal once per
+session: the first time `change finalize` prints `PROPOSAL_URL=<url>` in the
+session, whether that is the draft of show, a code checkpoint after a resume,
+or the ready finalization. Write `<pr-created><url></pr-created>` as plain
+text on a line of its own, outside any code span, in your next message: the
+tag needs no tool permission, and a host that does not read it shows it as
+text. On Claude Code, which reads the tag, do not also call `bind_pr`. On any
+other host that offers a tool that binds a pull request to its session, also
+call that tool. A host that reads no tag and offers no tool binds nothing, and
+the run goes on as before. A bind tool that refuses or fails is named in the
+end report and never fails the delivery. A push-only run publishes nothing and binds nothing, and an epic
 session that publishes a cloud child's proposal does not bind it: that
 proposal is the child's, not the epic run's own.
 
@@ -156,5 +160,5 @@ adopted are separate receipts; upstream merged is not downstream adopted.
 The end report gives the stage reached, the proposal, the gate and proof
 records, the tokens spent against the estimate, every impacted run beyond the
 final one and every `--projects` gate that followed no edit, with its cause,
-and whether the proposal was bound to the host session, skipped for want of a
-bind tool, or failed to bind. Unavailable tokens or costs stay unavailable.
+and whether the proposal was announced by tag, bound by tool, or the tool
+refused or failed to bind it. Unavailable tokens or costs stay unavailable.

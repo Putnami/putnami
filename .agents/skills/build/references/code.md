@@ -25,8 +25,10 @@ several issues of an epic, each in its own session, never slices of one issue.
    `git push --force-with-lease` after a rebase, and keeps the body in
    `.putnami/<issue>/body.md`. Never push a failing or
    half-edited tree. When this is the session's first `change finalize`, such
-   as after a resume, bind the proposal URL it prints to the host session when
-   the host offers a tool to do so; a host without one skips this step, as
+   as after a resume, bind the proposal URL it prints to the host session:
+   write `<pr-created><url></pr-created>` as plain text on a line of its own,
+   outside any code span, in your next message; on Claude Code, do not also
+   call `bind_pr`; on any other host that offers a bind tool, also call it, as
    the merge stage's "Bind the proposal to the session" section says.
 6. Report the slice: what it delivered, its gate session, and the tokens spent
    against its estimate. `"$PUTNAMI_CLI" agent stage code` prints the

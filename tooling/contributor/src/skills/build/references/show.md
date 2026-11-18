@@ -14,10 +14,12 @@ body that states the intended change, and the task reference. Pass
 `--partial-delivery` when the proposal delivers one unit of a larger task. The
 command adds an empty commit carrying the title when the branch has none; the
 squash removes it. A draft starts no hosted run. Once the command prints the
-proposal URL, bind it to the host session when the host offers a tool that
-binds a pull request to its session, such as Claude Code's `bind_pr`; a host
-without one skips this step. The merge stage's "Bind the proposal to the
-session" section gives the whole rule.
+proposal URL, bind it to the host session: write
+`<pr-created><url></pr-created>` as plain text on a line of its own, outside
+any code span, in your next message, which needs no tool permission. On
+Claude Code, do not also call `bind_pr`; on any other host that offers a bind
+tool, also call it. The merge stage's "Bind the proposal to the session"
+section gives the whole rule.
 
 ## What to show
 
