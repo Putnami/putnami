@@ -811,7 +811,7 @@
     },
     "package": {
       "dependsOn": ["client-generate"],
-      "description": "Create distribution packages (npm, docker).",
+      "description": "Create distribution packages (npm, docker, extension archives).",
       "traits": {
         "injectPublishChannels": true
       },
@@ -863,6 +863,11 @@
           "type": "boolean",
           "default": false,
           "description": "Create npm package"
+        },
+        "archives": {
+          "type": "boolean",
+          "default": false,
+          "description": "Create the extension archive `putnami extensions install` installs, one per registry platform"
         },
         "docker": {
           "type": "boolean",
@@ -988,6 +993,14 @@
             "generate"
           ],
           "if": "params.deployment && !params.image"
+        },
+        {
+          "id": "archives",
+          "task": "package-archives",
+          "dependsOn": [
+            "^transpile"
+          ],
+          "if": "params.archives && !params.image"
         }
       ]
     },
@@ -2645,6 +2658,74 @@
             "path": "npm",
             "optionalEmpty": true,
             "description": "Assembled npm package directory and the npm channel record (npm/channel.json). Sole owner of <command-output>/npm; it reads (never writes) the lib/ and types/ trees its sibling build steps own. Absent when the project has no publishable build output. Recording the channel INSIDE this directory is what keeps the task under ordinary declared capture: the record is restored with the package it describes, and the channel index publish reads is derived over every packager's record (pkgmeta.ReadChannelIndex) instead of kept as a shared file."
+          }
+        }
+      }
+    },
+    "package-archives": {
+      "description": "Package the project's extension as the archive the CLI installs with `putnami extensions install`: the version-stamped manifest, its built agent content, README.md, AI.md, the workspace LICENSE files, and every path the manifest names under {extensionRoot}. A script named without its extension is bundled by Bun, with every module it imports, to that name with .js, so it runs from the artifact store, where no node_modules is. The archive is platform independent and written once per registry platform key with identical bytes. Packaging fails when the manifest names a path the archive would not hold, or does not pass the put archive contract gate. Owns <command-output>/archives, where it records its channel in archives/channel.json, and <command-output>/metadata.json, the archive publication manifest the archive uploader reads.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "package-archives"
+      ],
+      "cwd": "{projectRoot}",
+      "timeoutMs": 600000,
+      "inputs": {
+        "sources": {
+          "from": "project",
+          "files": [
+            "putnami.extension.json",
+            "putnami.json",
+            "package.json",
+            "tsconfig.json",
+            "README.md",
+            "AI.md",
+            "bin/**",
+            "src/**",
+            "agent-src/**"
+          ]
+        },
+        "workspaceConfig": {
+          "from": "workspace",
+          "files": [
+            "package.json",
+            "bun.lock",
+            "bun.lockb",
+            "npm-shrinkwrap.json",
+            "package-lock.json",
+            "pnpm-lock.yaml",
+            "pnpm-workspace.yaml",
+            "yarn.lock",
+            "tsconfig.json",
+            "tsconfig.base.json",
+            "bunfig.toml",
+            "LICENSE",
+            "LICENSE.md"
+          ]
+        },
+        "extensionVersion": {
+          "from": "runtime"
+        }
+      },
+      "cache": {
+        "versionAware": true
+      },
+      "declares": {
+        "outputs": {
+          "archives": {
+            "kind": "directory",
+            "root": "command-output",
+            "path": "archives",
+            "optionalEmpty": true,
+            "description": "Per-platform .tar.gz extension archives and the archive channel record. Sole owner of <command-output>/archives. Absent on a dry run."
+          },
+          "publication-manifest": {
+            "kind": "file",
+            "root": "command-output",
+            "path": "metadata.json",
+            "optionalEmpty": true,
+            "description": "Archive publication manifest read by the archive uploader (@putnami/cloud packages publish): version, artifact, stable, channels. Sole owner of <command-output>/metadata.json. Absent on a dry run."
           }
         }
       }

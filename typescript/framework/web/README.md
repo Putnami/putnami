@@ -8,6 +8,13 @@ React integration with SSR support, client-side hydration, and routing utilities
 putnami deps add @putnami/web
 ```
 
+The `putnami i18n` commands and the `i18n-translate` skill come from the
+`@putnami/web` extension. Install it in a workspace outside this repository:
+
+```bash
+putnami extensions install @putnami/web
+```
+
 ## Features
 
 - **Server-Side Rendering (SSR)** - React 19 HTML rendering with a streamed response body

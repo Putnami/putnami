@@ -125,11 +125,20 @@ func TestCloudWorkspaceProbeIncludesSourceExtensionsAndTemplates(t *testing.T) {
 // Announcing the Go packager instead leaves the member without the package
 // step the release-set coordinator requires, so the extension never publishes.
 // A Go extension that also declares agentContent is the reverse case: scaffold
-// never plans a step for it, and the Go archives step stages the content.
+// never plans a step for it, and the Go archives step stages the content. A
+// TypeScript extension, with a package.json and no Go module, is packaged by
+// @putnami/typescript's archives step.
 func TestCloudWorkspaceProbeRoutesContentOnlyExtensionsToScaffold(t *testing.T) {
 	for _, tc := range []struct {
-		name, project, manifest, goModule, coordinate, owner, step string
+		name, project, manifest, goModule, packageJSON, coordinate, owner, step string
 	}{
+		{
+			name:        "a TypeScript extension goes to the TypeScript packager",
+			project:     `{"name":"@putnami/web","options":{"package":{"npm":true,"archives":true},"publish":{"npm":true,"archives":true}}}`,
+			manifest:    `{"name":"@putnami/web","cliContract":8,"commands":{},"agentContent":{"path":"agent-content","source":"agent-src"}}`,
+			packageJSON: `{"name":"@putnami/web","version":"0.0.0"}`,
+			coordinate:  "putnami/web", owner: "@putnami/typescript", step: "archives",
+		},
 		{
 			name:       "a Go extension with agent content stays with the Go packager",
 			project:    `{"name":"@putnami/intelligence","publish":["archives"],"options":{"package":{"archives":true}}}`,
@@ -172,6 +181,13 @@ func TestCloudWorkspaceProbeRoutesContentOnlyExtensionsToScaffold(t *testing.T) 
 				}
 				// The Go module decides the route, so a change to it re-probes.
 				want = []string{"go.mod", cloudExtensionManifest, cloudProjectMarker}
+			}
+			if tc.packageJSON != "" {
+				if err := os.WriteFile(filepath.Join(root, "package.json"), []byte(tc.packageJSON), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				// Without a Go module, the package.json decides the route.
+				want = []string{"package.json", cloudExtensionManifest, cloudProjectMarker}
 			}
 			result, err := probeCloudWorkspace(root, workspaceproto.ProbeRequest{Paths: []string{"."}})
 			if err != nil || len(result.Projects) != 1 {

@@ -271,6 +271,10 @@ func TestDeclaredOutputOwnerTable(t *testing.T) {
 		// The deployment declaration, inside the .gen/deployment.json
 		// build-generate cedes. Required, so a run that writes none caches
 		// nothing.
+		// The extension archives and the archive publication manifest the
+		// archive uploader reads.
+		{task: "package-archives", id: "archives", kind: "directory", root: "command-output", path: "archives", optionalEmpty: true},
+		{task: "package-archives", id: "publication-manifest", kind: "file", root: "command-output", path: "metadata.json", optionalEmpty: true},
 		{task: "package-deployment", id: "deployment", kind: "file", root: "project", path: ".gen/deployment.json"},
 		{task: "package-docker", id: "docker", kind: "directory", root: "command-output", path: "docker", optionalEmpty: true},
 		{task: "package-npm", id: "npm", kind: "directory", root: "command-output", path: "npm", optionalEmpty: true},

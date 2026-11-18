@@ -56,7 +56,7 @@ putnami build my-app --compile    # With standalone binary
 | `putnami validate` | Fail an incompatible API change of a stable package without a breaking-change marker | — |
 | `putnami serve` | Start dev server with hot-reload | `--port`, `--debug`, `--inspect` |
 | `putnami run` | Run a workload once and forward its exit code | `--entrypoint`, `--port`, `--args` |
-| `putnami package` | Create npm/Docker packages | `--npm`, `--docker`, `--stable` |
+| `putnami package` | Create npm/Docker packages and extension archives | `--npm`, `--docker`, `--archives`, `--stable` |
 
 ## Architecture
 

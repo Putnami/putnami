@@ -288,6 +288,10 @@
     {
       "id": "tsc-project-does-not-package",
       "text": "The npm packager of package refuses a project that compiles with tsc, naming it, rather than packing a tarball without its compiled code."
+    },
+    {
+      "id": "extension-archive",
+      "text": "The archives channel of package writes the archive `putnami extensions install` installs, the same bytes for every registry platform: the stamped manifest, its agent content, and every path it names under {extensionRoot}. A script named without its extension is bundled with its imports, so it runs with no node_modules. A manifest naming a path the archive would not hold, or a TypeScript source by its extension, fails packaging."
     }
   ],
   "decisions": [

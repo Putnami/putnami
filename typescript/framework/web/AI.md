@@ -313,6 +313,8 @@ t.seats({ count: 2 });
 t.terms({ link: (chunks) => <Link to='/terms'>{chunks}</Link> });
 ```
 
+- The `putnami i18n` commands come from the `@putnami/web` extension: a
+  workspace installs it with `putnami extensions install @putnami/web`.
 - Run `putnami i18n sync` after adding, changing or removing a message. It
   writes one file per namespace, `locales/<locale>/<namespace>.json`, and
   deletes the file of a removed namespace; the build never writes them.

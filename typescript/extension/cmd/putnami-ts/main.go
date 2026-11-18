@@ -43,6 +43,7 @@ var commands = map[string]cli.JobFunc{
 	"run":               runRun,
 	"package-npm":       runPackageNpm,
 	"package-docker":    runPackageDocker,
+	"package-archives":  runPackageArchives,
 	"publish-npm":       runPublishNpm,
 	"publish-docker":    runPublishDocker,
 	"workspace-fetch":   runWorkspaceFetch,

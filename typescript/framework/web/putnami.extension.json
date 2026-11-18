@@ -2,7 +2,6 @@
   "$schema": "https://putnami.dev/schemas/putnami-extension.json",
   "cliContract": 8,
   "name": "@putnami/web",
-  "extensionDependencies": ["@putnami/application"],
   "hooks": {
     "preBuild": {
       "kind": "command",
@@ -102,7 +101,7 @@
       "description": "Write locales/<locale>/<namespace>.json for each namespace whose synced catalog differs from its file, and delete the files of undeclared namespaces",
       "kind": "command",
       "command": "bun",
-      "args": ["run", "{extensionRoot}/bin/i18n.ts", "sync"],
+      "args": ["run", "{extensionRoot}/bin/i18n", "sync"],
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
       "inputs": {
@@ -135,7 +134,7 @@
       "description": "Write the translation work file, or apply its answers to locales/<locale>/<namespace>.json as drafts",
       "kind": "command",
       "command": "bun",
-      "args": ["run", "{extensionRoot}/bin/i18n.ts", "translate"],
+      "args": ["run", "{extensionRoot}/bin/i18n", "translate"],
       "cwd": "{projectRoot}",
       "timeoutMs": 120000,
       "inputs": {
@@ -172,7 +171,7 @@
       "description": "Ask a person about each draft and stale translation and write the validated entries. Interactive: it reads the terminal and writes its own output.",
       "kind": "command",
       "command": "bun",
-      "args": ["run", "{extensionRoot}/bin/i18n.ts", "validate"],
+      "args": ["run", "{extensionRoot}/bin/i18n", "validate"],
       "cwd": "{workspaceRoot}",
       "timeoutMs": 3600000,
       "writes": ["sources"],

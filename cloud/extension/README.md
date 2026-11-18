@@ -821,9 +821,11 @@ source extension manifests may inherit the authored project name. Templates
 declare their archive through `template-archives` and bind packaging to the
 scaffold extension's `template` step. The native coordinate resolver maps the
 CLI binary name `putnami` to `putnami/cli`. The Cloud workspace probe keeps
-publication ownership under `@putnami/cloud`, while its
-`packagePublisher: "@putnami/go"` route selects the real `package~archives`
-producer and that job's dependency closure. The resulting
+publication ownership under `@putnami/cloud`, while its package publisher
+selects the real `package~archives` producer and that job's dependency
+closure: `@putnami/go` for a project with a `go.mod`, `@putnami/typescript`
+for one with a `package.json` and no `go.mod`, and `@putnami/scaffold`'s
+`agent-content` step for an extension that ships only agent content. The resulting
 `publish~cloud-publish-archives` step uploads the immutable Put manifest and
 emits a `published-member` fact only after Put accepts it or confirms an exact
 idempotent readback. Before credentials or uploads, the archive publisher

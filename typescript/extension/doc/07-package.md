@@ -1,6 +1,6 @@
 # Package
 
-The package command creates distribution packages from build output. It supports three channels: **npm** (registry tarball), **docker** (container image), and **deployment** (the workload's deployment declaration).
+The package command creates distribution packages from build output. It supports four channels: **npm** (registry tarball), **docker** (container image), **deployment** (the workload's deployment declaration), and **archives** (the extension archive `putnami extensions install` installs).
 
 ## Overview
 
@@ -27,6 +27,9 @@ putnami package . --npm --docker
 
 # Deployment declaration
 putnami package . --deployment
+
+# Extension archive
+putnami package . --archives
 
 # Preview what would be packaged
 putnami package . --npm --dry-run
@@ -56,7 +59,8 @@ and candidate digest. No registry is needed between the two package tasks. See
 ```text
 generate ──→ transpile ──→ types ──→ npm
          ├──→ compile ──→ docker
-         └──→ deployment
+         ├──→ deployment
+         └──→ archives
 ```
 
 The package command runs the full build pipeline first, then packages the output. The npm channel requires transpile + types output. The docker channel requires compile output. The deployment channel requires only the committed infra files that `generate` reconciles.
@@ -509,6 +513,50 @@ bytes.
 |------|------|---------|-------------|
 | `--deployment` | `boolean` | `false` | Write the workload's deployment declaration to `<project>/.gen/deployment.json` |
 
+## Archives Channel
+
+### What It Does
+
+The `archives` step packages a project that ships a Putnami extension, one
+with a `putnami.extension.json`, as the archive `putnami extensions install`
+installs from the registry. The CLI runs an installed extension from its
+artifact store, where no `node_modules` is, so the archive holds everything
+its manifest runs:
+
+1. The manifest, stamped with the project's version and the CLI contract it
+   earns, and its built agent content when it declares any.
+2. `README.md`, `AI.md` and the workspace `LICENSE` files.
+3. Every path the manifest names under `{extensionRoot}`, in any task, hook
+   or other field. A file or a directory is copied as it is. A script named
+   without its extension, such as `{extensionRoot}/bin/i18n` for
+   `bin/i18n.ts`, is bundled by Bun with every module it imports to
+   `bin/i18n.js`. `bun run` resolves the same name to the source in the
+   workspace and to the bundle in the archive.
+
+Packaging fails when the manifest names a path the project does not hold,
+names a TypeScript source by its extension, or does not pass the contract
+gate. The archive is platform independent: the step writes the same bytes once
+per registry platform, as `<artifact>-<platform>.tar.gz` in
+`<command-output>/archives`, with the channel record `archives/channel.json`
+and the publication manifest `<command-output>/metadata.json` that
+`putnami publish` uploads.
+
+### Turning It On
+
+| Where | Setting |
+|-------|---------|
+| Command line | `putnami package . --archives` |
+| `putnami.json` options | `"options": { "package": { "archives": true }, "publish": { "archives": true } }` |
+
+A cloud workspace publishes the archive under the `@putnami/typescript`
+packager when the project holds a `package.json` and no `go.mod`.
+
+### Flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--archives` | `boolean` | `false` | Package the project's extension as its installable archive |
+
 ## Metadata Output
 
 Each channel writes a `channel.json` record INSIDE the output directory it owns
@@ -528,7 +576,7 @@ restores its record without the other channel running.
 
 ## Boundaries
 
-- **Scope**: Creating npm tarballs and Docker images from build output, and a workload's deployment declaration from its committed infra files
+- **Scope**: Creating npm tarballs and Docker images from build output, a workload's deployment declaration from its committed infra files, and an extension's installable archive
 - **Out of scope**: Registry publishing (see the publish docs). A `type: "image"` project packages a local OCI candidate for downstream composition; its publish task alone derives a remote target, pushes/verifies the digest, and never assigns release/channel tags.
 - **Dependencies**: Requires build output. npm channel requires transpile + types output. Docker channel needs network on first use to fetch the pinned base (cached afterwards); the `docker` CLI is only needed for `--docker-load`.
 - **Not supported**: Custom Dockerfiles — the image recipe is fixed so digests stay reproducible.

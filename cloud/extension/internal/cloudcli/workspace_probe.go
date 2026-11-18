@@ -29,6 +29,11 @@ const (
 	cloudArchivePackageStep  = "archives"
 	cloudArchivePublishStep  = "cloud-publish-archives"
 	cloudArchivePackageOwner = "@putnami/go"
+	// An extension without a Go module and with a package.json is a
+	// TypeScript extension: @putnami/typescript's package command packages
+	// its archive under the same archives step id.
+	cloudNodePackage            = "package.json"
+	cloudTypeScriptPackageOwner = "@putnami/typescript"
 	// @putnami/scaffold's package-content task emits both archive content
 	// forms, each under its own package step id: a project template, and a
 	// content-only extension whose manifest declares agentContent. Its
@@ -125,21 +130,33 @@ func probeCloudWorkspace(root string, request workspaceproto.ProbeRequest) (work
 				return workspaceproto.ProbeResult{}, fmt.Errorf("read %s archive coordinate: %w", projectFile, err)
 			}
 			if declared {
-				// A content-only extension carries no Go module: @putnami/scaffold
-				// packages it under the step its agentContent key activates. A Go
-				// extension that also declares agentContent stays with the Go
-				// packager, whose archives step builds the binary and stages the
-				// content; scaffold never plans a step for a Go project.
+				// An extension with a Go module is packaged by @putnami/go, whose
+				// archives step builds the binary and stages any agent content.
+				// Without one, an extension with a package.json is a TypeScript
+				// extension, packaged by @putnami/typescript's archives step, and
+				// a content-only extension (agentContent alone) is packaged by
+				// @putnami/scaffold under the step its agentContent key activates.
 				packagePublisher, packageStep := cloudArchivePackageOwner, cloudArchivePackageStep
-				if manifest.declaresAgentContent() {
-					goModuleFile := workspaceFile(projectPath, cloudGoModule)
-					hasGoModule, err := fileExists(filepath.Join(root, filepath.FromSlash(goModuleFile)))
-					if err != nil {
-						return workspaceproto.ProbeResult{}, fmt.Errorf("read %s: %w", goModuleFile, err)
-					}
-					if hasGoModule {
+				goModuleFile := workspaceFile(projectPath, cloudGoModule)
+				hasGoModule, err := fileExists(filepath.Join(root, filepath.FromSlash(goModuleFile)))
+				if err != nil {
+					return workspaceproto.ProbeResult{}, fmt.Errorf("read %s: %w", goModuleFile, err)
+				}
+				switch {
+				case hasGoModule:
+					if manifest.declaresAgentContent() {
 						watchedFiles = append(watchedFiles, goModuleFile)
-					} else {
+					}
+				default:
+					packageFile := workspaceFile(projectPath, cloudNodePackage)
+					hasPackage, err := fileExists(filepath.Join(root, filepath.FromSlash(packageFile)))
+					if err != nil {
+						return workspaceproto.ProbeResult{}, fmt.Errorf("read %s: %w", packageFile, err)
+					}
+					if hasPackage {
+						packagePublisher, packageStep = cloudTypeScriptPackageOwner, cloudArchivePackageStep
+						watchedFiles = append(watchedFiles, packageFile)
+					} else if manifest.declaresAgentContent() {
 						packagePublisher, packageStep = cloudContentPackageOwner, cloudAgentContentPackageStep
 					}
 				}

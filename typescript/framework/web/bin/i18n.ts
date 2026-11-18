@@ -20,7 +20,7 @@
  * ones they accept with their git identity and the day. It needs an
  * interactive terminal and refuses to run inside an agent session.
  *
- * Usage: bun run bin/i18n.ts sync|translate|validate [--putnamiContext <path>]
+ * Usage: bun run bin/i18n sync|translate|validate [--putnamiContext <path>]
  */
 
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs';

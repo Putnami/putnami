@@ -7,7 +7,7 @@
       "id": "typescript/typescript-project-toolchain",
       "type": "feature",
       "name": "TypeScript project toolchain",
-      "outcome": "A TypeScript project builds, tests and lints on Bun and Biome through independently cached phases, serves, runs and packages its workload on Bun or on Node, installs its workspace dependencies with the package manager the repository declares, from one shared version catalog where that manager reads one, and ships an npm or Docker artifact that loads exactly as it did in the workspace",
+      "outcome": "A TypeScript project builds, tests and lints on Bun and Biome through independently cached phases, serves, runs and packages its workload on Bun or on Node, installs its workspace dependencies with the package manager the repository declares, from one shared version catalog where that manager reads one, and ships an npm, Docker or extension-archive artifact that loads exactly as it did in the workspace",
       "owner": "typescript",
       "target": "coded",
       "requirements": [
@@ -1072,6 +1072,21 @@
             "kind": "acceptance",
             "checks": [
               "package-refuses-a-tsc-project"
+            ]
+          }
+        },
+        {
+          "id": "extension-archive",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-extension-archive-holds-every-file-its-manifest-runs",
+              "a-manifest-naming-a-file-the-archive-lacks-fails-packaging",
+              "a-script-named-with-its-typescript-extension-fails-packaging"
             ]
           }
         }
