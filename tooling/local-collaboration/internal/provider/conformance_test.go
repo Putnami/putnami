@@ -52,8 +52,9 @@ func TestTheMissionsScenarios(t *testing.T) {
 		s := store.Open(filepath.Join(workspace, filepath.FromSlash(DefaultRoot)))
 		posted := 0
 		return providertest.Target{
-			Handlers:      p.Handlers(),
-			WorkspaceRoot: workspace,
+			Handlers:       p.Handlers(),
+			WorkspaceRoot:  workspace,
+			MissionMembers: collab.MissionMembers,
 			Post: func(t *testing.T, mission collab.MissionName, kind collab.InboxKind, text string) string {
 				posted++
 				name := "post-" + strconv.Itoa(posted) + ".json"

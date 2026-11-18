@@ -402,6 +402,23 @@ func TestASessionThatMovesRetiresTheEmptyMissionItLeft(t *testing.T) {
 	}
 }
 
+// TestASessionKeepsItsMissedSyncs: the store holds the missed syncs of the
+// last applied sync that carried them, a sync without them keeps them, an
+// older sync changes nothing, and status answers them with the session.
+func TestASessionKeepsItsMissedSyncs(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "declared-missed-syncs", "the-local-provider-keeps-the-missed-syncs-of-a-session")
+	h := newMissionsHarness(t)
+	h.sync(10, `,"missedSyncs":{"count":3,"reason":"auth.unavailable","lastAt":"2026-09-24T07:00:05Z"}`)
+	h.sync(20, "")
+	h.sync(5, `,"missedSyncs":{"count":9,"reason":"timeout","lastAt":"2026-09-24T07:00:01Z"}`)
+	want := collab.MissedSyncs{Count: 3, Reason: "auth.unavailable", LastAt: "2026-09-24T07:00:05Z"}
+	var status collab.MissionsStatusResult
+	h.ok("missions", "status", `{"mission":`+missionArguments+`}`, &status)
+	if len(status.Sessions) != 1 || status.Sessions[0].MissedSyncs == nil || *status.Sessions[0].MissedSyncs != want {
+		t.Fatalf("status answered %+v; want one session with missedSyncs %+v", status.Sessions, want)
+	}
+}
+
 // TestStatusReadsTheStoreWithoutTakingOwnerFiles: status answers the mission
 // the request names, pages its sessions newest first and then by engine and
 // id, loses none across a sync between two pages, leaves an owner file

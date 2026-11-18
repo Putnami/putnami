@@ -52,6 +52,8 @@ type syncSnapshot struct {
 	acks       []string
 	decisions  []string
 	replies    []string
+	// missed is the count of missed syncs the request carried.
+	missed int64
 }
 
 // buildSyncRequest is the missions.sync request of the cache. The plan goes
@@ -119,6 +121,10 @@ func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncIn
 	}
 	request.Decisions = append([]string(nil), cache.Decisions[:min(len(cache.Decisions), collab.MaxSyncDecisions)]...)
 	snapshot.decisions = request.Decisions
+	if cache.Missed != nil {
+		missed := *cache.Missed
+		request.MissedSyncs, snapshot.missed = &missed, missed.Count
+	}
 	return request, snapshot
 }
 
@@ -127,6 +133,49 @@ func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncIn
 // session sent a plan to that mission.
 func planUnsent(cache *sessionCache) bool {
 	return cache.PlanDigest != cache.PlanSynced && (cache.PlanSynced != "" || len(cache.Plan) > 0)
+}
+
+// recordMissedSync counts one failed sync, with its reason and time.
+func recordMissedSync(cache *sessionCache, failure error, now time.Time) {
+	count := int64(1)
+	if cache.Missed != nil {
+		count = min(cache.Missed.Count+1, collab.MaxMissedSyncs)
+	}
+	cache.Missed = &collab.MissedSyncs{Count: count, Reason: missedReason(failure), LastAt: now.UTC().Format(time.RFC3339Nano)}
+}
+
+// settleMissedSyncs clears the missed syncs a successful sync carried. A
+// sync that failed while this one ran stays counted for the next one.
+func settleMissedSyncs(cache *sessionCache, carried int64) {
+	if cache.Missed == nil {
+		return
+	}
+	if left := cache.Missed.Count - carried; left > 0 {
+		cache.Missed.Count = left
+		return
+	}
+	cache.Missed = nil
+}
+
+// missedReason is the one-line reason a failed sync reports: the reason
+// code and message of an answer that is not ok, timeout for a call that
+// timed out, else the error.
+func missedReason(failure error) string {
+	var outcome *outcomeFailure
+	reason := failure.Error()
+	switch {
+	case errors.As(failure, &outcome):
+		reason = string(outcome.envelope.Outcome)
+		if outcome.envelope.Error != nil {
+			reason = firstString(outcome.envelope.Error.Reason, reason)
+			if message := lineText(outcome.envelope.Error.Message); message != "" {
+				reason += ": " + message
+			}
+		}
+	case errors.Is(failure, context.DeadlineExceeded):
+		reason = "timeout: the provider did not answer in time"
+	}
+	return firstString(boundedLine(reason, collab.MaxMissedSyncReasonLength), "unknown")
 }
 
 // mergeSyncAnswer applies a sync answer to the cache as it is now. A message
@@ -304,9 +353,13 @@ func without(values, drop []string) []string {
 // failed call and any other outcome keep the acknowledgements, the replies
 // and the decisions for the next sync, which sends them again; the provider
 // applies each id once. A sync the provider refuses as invalid while it
-// carries the plan goes once more without the plan, so a plan the provider
-// refuses never blocks every later sync; when that one passes, the plan
-// counts as sent until it changes.
+// carries the plan or missed syncs goes once more without either, so a plan
+// or a member the provider refuses never blocks every later sync; when that
+// one passes, the plan counts as sent until it changes and the missed syncs
+// are dropped.
+//
+// Every failed sync counts in the cache's missed syncs, with its reason;
+// the next sync carries them, and an ok answer clears what it carried.
 func (e *Env) syncSession(ctx context.Context, files sessionFiles) error {
 	var request collab.MissionsSyncInput
 	var snapshot syncSnapshot
@@ -342,11 +395,19 @@ func (e *Env) prepareSync(cache *sessionCache) (collab.MissionsSyncInput, syncSn
 func (e *Env) sendSync(ctx context.Context, files sessionFiles, request collab.MissionsSyncInput, snapshot syncSnapshot) error {
 	envelope, callErr := e.call(ctx, collab.ContractMissions, collab.OperationSync, request)
 	var planRefused error
-	if callErr == nil && envelope.Outcome == collab.OutcomeInvalid && request.Plan != nil && ctx.Err() == nil {
+	if callErr == nil && envelope.Outcome == collab.OutcomeInvalid && (request.Plan != nil || request.MissedSyncs != nil) && ctx.Err() == nil {
 		first := outcomeError(envelope)
-		request.Plan = nil
+		plan, missed := request.Plan != nil, request.MissedSyncs != nil
+		request.Plan, request.MissedSyncs = nil, nil
 		if envelope, callErr = e.call(ctx, collab.ContractMissions, collab.OperationSync, request); callErr == nil && envelope.Outcome == collab.OutcomeOK {
-			planRefused = fmt.Errorf("the provider refused the plan; it goes again once it changes: %w", first)
+			var refused []string
+			if plan {
+				refused = append(refused, "the plan, which goes again once it changes")
+			}
+			if missed {
+				refused = append(refused, fmt.Sprintf("the report of %d missed syncs, which is dropped", snapshot.missed))
+			}
+			planRefused = fmt.Errorf("the sync went without %s: %w", strings.Join(refused, " and "), first)
 		}
 	}
 	var answer collab.MissionsSyncResult
@@ -367,8 +428,10 @@ func (e *Env) sendSync(ctx context.Context, files sessionFiles, request collab.M
 		}
 		if callErr == nil {
 			refused = mergeSyncAnswer(cache, snapshot, answer, e.Now())
+			settleMissedSyncs(cache, snapshot.missed)
 		} else {
 			markSyncFailed(cache, snapshot, e.Now())
+			recordMissedSync(cache, callErr, e.Now())
 		}
 		return cache, nil
 	})

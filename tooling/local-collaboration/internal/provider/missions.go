@@ -353,7 +353,7 @@ func applySession(m *store.Missions, in *collab.MissionsSyncInput, observed time
 	applied := store.Session{
 		Engine: in.Session.Engine, ID: in.Session.ID, Mission: mission, State: in.State, ObservedAt: in.ObservedAt,
 		Event: in.Event, Model: in.Model, Branch: in.Branch, LastMessage: in.LastMessage, Error: in.Error, WaitUntil: in.WaitUntil,
-		Stage: in.Stage, Usage: in.Usage,
+		Stage: in.Stage, Usage: in.Usage, MissedSyncs: in.MissedSyncs,
 	}
 	if index >= 0 {
 		if applied.Stage == "" {
@@ -361,6 +361,9 @@ func applySession(m *store.Missions, in *collab.MissionsSyncInput, observed time
 		}
 		if applied.Usage == nil {
 			applied.Usage = m.Sessions[index].Usage
+		}
+		if applied.MissedSyncs == nil {
+			applied.MissedSyncs = m.Sessions[index].MissedSyncs
 		}
 	}
 	if index < 0 {
@@ -665,7 +668,7 @@ func missionSessions(m *store.Missions, mission store.MissionKey, after *session
 	for _, session := range held {
 		sessions = append(sessions, collab.MissionSession{
 			Session: collab.SessionRef{Engine: session.Engine, ID: session.ID}, State: session.State, ObservedAt: session.ObservedAt,
-			Stage: session.Stage, Usage: session.Usage, Branch: session.Branch, Error: session.Error, WaitUntil: session.WaitUntil,
+			Stage: session.Stage, Usage: session.Usage, MissedSyncs: session.MissedSyncs, Branch: session.Branch, Error: session.Error, WaitUntil: session.WaitUntil,
 		})
 	}
 	return sessions, page

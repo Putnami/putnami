@@ -252,7 +252,7 @@
           "type": "array",
           "uniqueItems": true,
           "items": { "type": "string", "minLength": 1 },
-          "description": "The optional result members the bound provider fills, as its manifest declares them. A member of the catalog's list for the operation that is absent here never appears in the operation's result. Absent when it fills none."
+          "description": "The optional members the bound provider supports, as its manifest declares them. A result member of the catalog's list for the operation that is absent here never appears in the operation's result, and such a request member never reaches the provider. Absent when it supports none."
         }
       }
     },

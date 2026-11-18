@@ -547,3 +547,62 @@ func TestTheStorageStateReachesTheBrowserWithoutChromium(t *testing.T) {
 	}
 	spectest.Proves(t, screensFeature, capturesReq, "the-storage-state-signs-the-browser-in")
 }
+
+// TestEachCaptureFreezesMotionFirstWithoutChromium drives two captures
+// against a scripted DevTools peer: before each Page.captureScreenshot, the
+// page evaluates the freeze, which pauses every animation, a finite one at
+// its end and an endless one at its start, and turns transitions off, so they
+// stand at their end value. TestAnimationsAndTransitionsAreFrozenBeforeCapture
+// checks the frames a real Chromium paints.
+func TestEachCaptureFreezesMotionFirstWithoutChromium(t *testing.T) {
+	t.Parallel()
+	for _, rule := range []string{
+		"animation-play-state: paused", "transition: none", "document.getAnimations",
+		"getComputedTiming().endTime", "Number.isFinite(end) ? Math.max(0, end - 0.001) : 0", "animation.pause()",
+	} {
+		if !strings.Contains(freezeMotion, rule) {
+			t.Fatalf("the freeze script lacks %q", rule)
+		}
+	}
+	toPeerR, toPeerW := io.Pipe()
+	fromPeerR, fromPeerW := io.Pipe()
+	peer := &scriptedBrowser{}
+	go peer.serve(t, toPeerR, fromPeerW)
+	defer func() { _ = toPeerW.Close(); _ = fromPeerW.Close() }()
+	b := &Browser{client: newClient(fromPeerR, toPeerW), Timeout: 10 * time.Second}
+	for _, shot := range []Shot{
+		{URL: "http://127.0.0.1:4000/whoami", Viewport: Viewports[0], Scheme: "light"},
+		{URL: "http://127.0.0.1:4000/whoami", Viewport: Viewports[1], Scheme: "dark"},
+	} {
+		if _, err := b.Capture(context.Background(), shot); err != nil {
+			t.Fatal(err)
+		}
+	}
+	peer.mu.Lock()
+	calls := append([]message(nil), peer.calls...)
+	peer.mu.Unlock()
+	captures, frozen := 0, false
+	for _, call := range calls {
+		switch call.Method {
+		case "Page.navigate":
+			frozen = false
+		case "Runtime.evaluate":
+			var params struct {
+				Expression string `json:"expression"`
+			}
+			if err := json.Unmarshal(call.Params, &params); err != nil {
+				t.Fatal(err)
+			}
+			frozen = frozen || params.Expression == freezeMotion
+		case "Page.captureScreenshot":
+			if !frozen {
+				t.Fatalf("capture %d ran before the freeze", captures)
+			}
+			captures++
+		}
+	}
+	if captures != 2 {
+		t.Fatalf("%d captures, want 2", captures)
+	}
+	spectest.Proves(t, screensFeature, frozenMotion, "animations-and-transitions-are-frozen-before-capture")
+}

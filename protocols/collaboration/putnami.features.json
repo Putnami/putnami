@@ -389,6 +389,24 @@
           }
         },
         {
+          "id": "declared-missed-syncs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-missions-sync-and-status-declare-missed-syncs",
+              "missed-syncs-bounds-are-validated",
+              "the-cli-drops-an-undeclared-request-member",
+              "the-cli-sends-a-declared-request-member",
+              "the-missions-scenarios-check-missed-syncs",
+              "the-local-provider-keeps-the-missed-syncs-of-a-session"
+            ]
+          }
+        },
+        {
           "id": "scenarios-normalize-requests",
           "stage": "coded",
           "evidenceKinds": [

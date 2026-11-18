@@ -77,6 +77,9 @@ type fakeMissions struct {
 
 	// refusePlan answers invalid to a sync that carries a plan.
 	refusePlan bool
+	// refuseMissed answers invalid to a sync that carries missedSyncs, as a
+	// CLI that does not know the member does.
+	refuseMissed bool
 	// broken fails each call on the channel while it is set.
 	broken error
 	// failSync answers this envelope to a sync instead of the result.
@@ -170,6 +173,10 @@ func (f *fakeMissions) sync(in collab.MissionsSyncInput) collab.Envelope {
 	if f.refusePlan && in.Plan != nil {
 		f.syncs = append(f.syncs, in)
 		return f.envelope(collab.ContractMissions, collab.OperationSync, collab.OutcomeInvalid, nil, &collab.Error{Message: "plan.steps[0].text is refused", Reason: collab.ReasonRequestInvalid})
+	}
+	if f.refuseMissed && in.MissedSyncs != nil {
+		f.syncs = append(f.syncs, in)
+		return f.envelope(collab.ContractMissions, collab.OperationSync, collab.OutcomeInvalid, nil, &collab.Error{Message: "missedSyncs: unknown field", Reason: collab.ReasonRequestInvalid})
 	}
 	f.syncs = append(f.syncs, in)
 	if f.failSync != nil {

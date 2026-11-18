@@ -53,6 +53,7 @@ engine.
   | `doctor.vc_runtime_missing` | On Windows, the Microsoft Visual C++ runtime (`vcruntime140.dll`) is not in the system directory, so Biome cannot start. | Install the Visual C++ Redistributable for x64 with `winget install --id Microsoft.VCRedist.2015+.x64` or its installer. |
   | `doctor.missing_readme` | A project has no `README.md` at its root. | Add one with a one-line purpose, the project's commands, and where its docs live. |
   | `doctor.agent_hooks_unreachable` | An agent host would run none of the hooks a workspace's install writes: the user's hook file of that host lacks them, or `putnami` is not on the `PATH`. | Run `putnami install` with `putnami` on the `PATH`, from a cloud environment's setup script there, and trust new Codex hooks with `/hooks`. |
+  | `doctor.agent_hook_failed` | An agent session hook of the workspace failed in the last 24 hours, per the hook log under the Putnami home. | Fix the cause the failure names, such as `putnami cloud login`; the next sync that succeeds reports the updates the mission missed. |
 
   The IDs are frozen once merged: config and capability evidence is produced
   targeted at these exact codes (notably `doctor.ephemeral_signing_key`), and a

@@ -56,12 +56,16 @@ when it resolves a binding:
   take `projects`, `impacted` and `baseline`: Putnami resolves them and puts
   the resolved `selection` and the workspace membership on your request. Never
   resolve a selector yourself.
-- `members` names the optional result members you fill, and only members the
-  catalog lists for the operation: on `tasks.get`, `parentProgress`,
-  `blockedBy`, `blocking` and `comments` ([task context](01-operations.md#task-context)).
-  Return a listed member only when you declare it, and always when you do,
-  `[]` or a count of 0 when there is none. `<contract> capabilities` reports
-  them. Declaring members needs `cliContract` 24.
+- `members` names the optional members you support, and only members the
+  catalog lists for the operation: on `tasks.get`, the result members
+  `parentProgress`, `blockedBy`, `blocking` and `comments`
+  ([task context](01-operations.md#task-context)); on `missions.sync`, the
+  request member `missedSyncs`, and on `missions.status`, the same result
+  member. Return a listed result member only when you declare it, and always
+  when you do, `[]` or a count of 0 when there is none. You receive a request
+  member only when you declare it: Putnami removes it from a request to a
+  provider that does not. `<contract> capabilities` reports them. Declaring
+  members needs `cliContract` 24.
 - Every required operation of the version you declare, and no operation the
   version does not have. Any error withdraws that contract version from your
   offer, so a workspace binding it fails clearly rather than half-working.
@@ -205,6 +209,10 @@ write.
   declares on `tasks.get`: the scenarios check that `get` returns each of them
   and no other, and that `create`, `update`, `transition`, and `assign` and
   `link` where you offer them, return none.
+- A missions target names in `MissionMembers` the members your manifest
+  declares on both `missions.sync` and `missions.status`: the scenarios send
+  `missedSyncs` only when it is declared, and check that `status` answers the
+  report of the last sync that carried one, and none when it is not declared.
 - A memory target also names `Workspace`, the name the orchestrator fills
   into an identity, and `Reopen`, which returns a second provider instance on
   the same store. `RunMemory` checks creation with `mustNotExist`, the replay

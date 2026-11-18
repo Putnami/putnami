@@ -89,6 +89,7 @@
     "cli/diagnostics-results#doctor-gate",
     "cli/diagnostics-results#doctor-machine",
     "cli/diagnostics-results#doctor-names-a-missing-readme",
+    "cli/diagnostics-results#doctor-names-the-last-agent-hook-failure",
     "cli/diagnostics-results#doctor-names-unreachable-agent-hooks",
     "cli/diagnostics-results#failure-presentation",
     "cli/diagnostics-results#gated-tree-identity",

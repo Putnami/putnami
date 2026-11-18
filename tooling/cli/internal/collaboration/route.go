@@ -88,12 +88,23 @@ func prepareCall(document collabDocument, resolution collabResolution, operation
 			"%s cannot check preconditions on %s.%s, so the request's %s cannot be honored; nothing was sent",
 			resolution.Provider.Name, resolution.Contract, operation, precondition)
 	}
+	dropUndeclaredMembers(input, provided.Members())
 	normalize(input, document.Name)
 	encoded, err := json.Marshal(input)
 	if err != nil {
 		return nil, failure(resolution, operation, collab.OutcomeInvalid, collab.ReasonRequestInvalid, false, "encode the request: %v", err)
 	}
 	return &providerCall{Resolution: resolution, Operation: op, Provided: provided, Input: input, Arguments: encoded}, nil
+}
+
+// dropUndeclaredMembers removes from a request each declared request member
+// that the provider's operation does not declare, so a provider never
+// receives a member it does not know (collaboration ADR 0009). The rest of
+// the request goes unchanged.
+func dropUndeclaredMembers(input any, declared []string) {
+	if in, ok := input.(*collab.MissionsSyncInput); ok && !slices.Contains(declared, collab.MissionMemberMissedSyncs) {
+		in.MissedSyncs = nil
+	}
 }
 
 // requestPrecondition names the write precondition a request carries — an

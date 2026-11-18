@@ -445,12 +445,13 @@ func severityFor(code doctor.CheckCode, profile doctor.Profile, sensitive bool) 
 // The workstation codes are advisory for the same reason: a CRLF checkout, a
 // host without long paths or without the Visual C++ runtime concerns the
 // machine, not the deployed workload, and so do agent hooks the host would not
-// run. So is a missing README: it concerns the reader of the repository.
+// run or that failed. So is a missing README: it concerns the reader of the
+// repository.
 func advisoryCode(code doctor.CheckCode) bool {
 	switch code {
 	case doctor.CheckCommittedManifestStability, doctor.CheckUndeclaredSchemaCommit,
 		doctor.CheckCRLFCheckout, doctor.CheckLongPathsDisabled, doctor.CheckGitLongPathsDisabled,
-		doctor.CheckVCRuntimeMissing, doctor.CheckMissingReadme, doctor.CheckAgentHooksUnreachable:
+		doctor.CheckVCRuntimeMissing, doctor.CheckMissingReadme, doctor.CheckAgentHooksUnreachable, doctor.CheckAgentHookFailed:
 		return true
 	default:
 		return false

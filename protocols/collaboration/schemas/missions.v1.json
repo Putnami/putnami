@@ -62,6 +62,17 @@
         "cacheReadTokens": { "type": "integer", "minimum": 0, "maximum": 1000000000000, "description": "Input tokens read from the prompt cache." }
       }
     },
+    "missedSyncs": {
+      "type": "object",
+      "description": "The syncs of a session that failed since the last one that succeeded. A declared member: only a provider whose operation declares missedSyncs receives or answers it.",
+      "additionalProperties": false,
+      "required": ["count", "reason", "lastAt"],
+      "properties": {
+        "count": { "type": "integer", "minimum": 1, "maximum": 1000000, "description": "How many syncs failed." },
+        "reason": { "type": "string", "minLength": 1, "maxLength": 256, "description": "Why the last one failed. One line." },
+        "lastAt": { "$ref": "#/$defs/utcTimestamp", "description": "When the last one failed." }
+      }
+    },
     "planStep": {
       "type": "object",
       "additionalProperties": false,
@@ -110,7 +121,8 @@
         "decisions": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/id" }, "description": "Decisions this session asked: sending them binds them to the session. A repeated id counts once. A provider ignores an id it does not know or that is not the caller's." },
         "replies": { "type": "array", "maxItems": 20, "items": { "$ref": "#/$defs/messageReply" }, "description": "One reply per message. A refused reply gets its own entry in the result and never refuses the sync." },
         "stage": { "$ref": "#/$defs/loopStage", "description": "The loop stage the session's change is at. Absent keeps the stage the provider holds." },
-        "usage": { "$ref": "#/$defs/sessionUsage", "description": "The tokens the session used so far. Replaces the usage the provider holds; absent keeps it." }
+        "usage": { "$ref": "#/$defs/sessionUsage", "description": "The tokens the session used so far. Replaces the usage the provider holds; absent keeps it." },
+        "missedSyncs": { "$ref": "#/$defs/missedSyncs", "description": "The syncs that failed since the last one that succeeded. Sent only to a provider that declares it; replaces the report the provider holds, and absent keeps it." }
       }
     },
     "openDecision": {
@@ -312,6 +324,7 @@
         "observedAt": { "$ref": "#/$defs/utcTimestamp", "description": "The observation time of the last sync applied for the session." },
         "stage": { "$ref": "#/$defs/loopStage", "description": "Present when the provider holds a stage for the session." },
         "usage": { "$ref": "#/$defs/sessionUsage", "description": "Present when the provider holds a usage for the session." },
+        "missedSyncs": { "$ref": "#/$defs/missedSyncs", "description": "Present when the provider declares missedSyncs and holds a report for the session." },
         "branch": { "type": "string", "maxLength": 256, "description": "One line." },
         "error": { "type": "string", "maxLength": 1024, "description": "The error that stopped the session. Only when state is failed." },
         "waitUntil": { "$ref": "collaboration.json#/$defs/timestamp", "description": "When the session stops waiting. Required when state is waiting, and only then." }

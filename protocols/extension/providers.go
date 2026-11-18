@@ -76,10 +76,11 @@ type ProviderOperation struct {
 	// already holds the answer, publishes it, exactly as it does for a job
 	// subprocess (`selection` and `workspaceProjects` in protocols/job).
 	WorkspaceSelection bool `json:"workspaceSelection,omitempty"`
-	// Members names the optional members of the operation's result that the
-	// provider fills. The contract's catalog lists the members each operation
-	// may declare; a provider returns such a member only when it names it
-	// here. Declaring one raises the manifest's contract to
+	// Members names the optional members of the operation that the provider
+	// supports: a result member it fills, or a request member it reads. The
+	// contract's catalog lists the members each operation may declare; a
+	// provider returns a result member, and receives a request member, only
+	// when it names it here. Declaring one raises the manifest's contract to
 	// protocolcli.ProviderMembersContract.
 	Members []string `json:"members,omitempty"`
 }
@@ -200,7 +201,7 @@ func validateProviderOperation(field, name string, operation ProviderOperation) 
 		switch {
 		case !providerMemberFormat.MatchString(member):
 			diags = append(diags, diag.Errorf("invalid-value", item,
-				"member %q must name a result member of the operation (for example, blockedBy)", member))
+				"member %q must name a member of the operation (for example, blockedBy)", member))
 		case seen[member]:
 			diags = append(diags, diag.Errorf("invalid-value", item, "member %q is repeated", member))
 		}

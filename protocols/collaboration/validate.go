@@ -56,6 +56,10 @@ const (
 	MaxSyncIntervalMs     = 600000
 	// MaxUsageTokens bounds each token count of a session's usage.
 	MaxUsageTokens = 1_000_000_000_000
+	// MaxMissedSyncs bounds the count of a session's missed syncs, and
+	// MaxMissedSyncReasonLength the reason of the last one.
+	MaxMissedSyncs            = 1_000_000
+	MaxMissedSyncReasonLength = 256
 )
 
 var (
@@ -1233,6 +1237,7 @@ func (c *checker) syncInput(in *MissionsSyncInput) {
 	}
 	c.loopStage("stage", in.Stage)
 	c.usage("usage", in.Usage)
+	c.missedSyncs("missedSyncs", in.MissedSyncs)
 	c.missionIDs("delivered", in.Delivered, MaxListMembers)
 	c.missionIDs("decisions", in.Decisions, MaxSyncDecisions)
 	if len(in.Replies) > MaxSyncReplies {
@@ -1275,6 +1280,19 @@ func (c *checker) usage(field string, usage *SessionUsage) {
 			c.errorf(ErrorCodeInvalidValue, count.field, "%s must be between 0 and %d", count.field, int64(MaxUsageTokens))
 		}
 	}
+}
+
+// missedSyncs checks an optional report of missed syncs: a count of 1 to
+// MaxMissedSyncs, a one-line reason and the UTC time of the last one.
+func (c *checker) missedSyncs(field string, missed *MissedSyncs) {
+	if missed == nil {
+		return
+	}
+	if missed.Count < 1 || missed.Count > MaxMissedSyncs {
+		c.errorf(ErrorCodeInvalidValue, field+".count", "count must be between 1 and %d", MaxMissedSyncs)
+	}
+	c.bounded(field+".reason", missed.Reason, MaxMissedSyncReasonLength, true)
+	c.utcTimestamp(field+".lastAt", missed.LastAt)
 }
 
 func (c *checker) askInput(in *MissionsAskInput) {
@@ -1374,6 +1392,7 @@ func (c *checker) statusResult(r *MissionsStatusResult) {
 		c.utcTimestamp(entry+".observedAt", session.ObservedAt)
 		c.loopStage(entry+".stage", session.Stage)
 		c.usage(entry+".usage", session.Usage)
+		c.missedSyncs(entry+".missedSyncs", session.MissedSyncs)
 		c.bounded(entry+".branch", session.Branch, MaxBranchLength, false)
 		c.sessionOutcome(entry, session.State, session.Error, session.WaitUntil)
 	}

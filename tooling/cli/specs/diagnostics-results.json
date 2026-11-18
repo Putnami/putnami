@@ -120,6 +120,13 @@
         "Doctor reports doctor.agent_hooks_unreachable for a workspace whose explicit install writes extension hooks: per host, a user hook file without a Putnami handler for an event the workspace asks for; a repository no Putnami command recorded; putnami off the PATH.",
         "The finding is advisory and scoped to the workspace root; its remediation names putnami install, a cloud environment's setup script and Codex's /hooks trust step."
       ]
+    },
+    {
+      "id": "doctor-names-the-last-agent-hook-failure",
+      "text": [
+        "Doctor reports doctor.agent_hook_failed when the agent session hook log under the Putnami home holds a failure of this workspace, matched by its workspace root, less than 24 hours old: the finding names the last one, with its time, host, event and error.",
+        "The finding is advisory and scoped to the workspace root; an older failure, another workspace's or a log line without a root reports nothing."
+      ]
     }
   ],
   "decisions": [

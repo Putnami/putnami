@@ -88,6 +88,9 @@ type Session struct {
 	// without one keeps them.
 	Stage collab.LoopStage     `json:"stage,omitempty"`
 	Usage *collab.SessionUsage `json:"usage,omitempty"`
+	// MissedSyncs is the last report of failed syncs an applied sync
+	// carried: a sync without one keeps it.
+	MissedSyncs *collab.MissedSyncs `json:"missedSyncs,omitempty"`
 }
 
 // Decision is one decision an agent asked the mission's owner.

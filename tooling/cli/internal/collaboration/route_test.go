@@ -891,3 +891,50 @@ func TestCapabilities_ReportTheDeclaredMembers(t *testing.T) {
 		}
 	}
 }
+
+// TestPrepare_DropsAnUndeclaredRequestMember: a sync's missedSyncs reaches a
+// provider whose sync operation declares it, and the CLI removes it from a
+// request to any other, sending the rest unchanged.
+func TestPrepare_DropsAnUndeclaredRequestMember(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "declared-missed-syncs", "the-cli-drops-an-undeclared-request-member")
+	spectest.Proves(t, "collaboration/provider-contract", "declared-missed-syncs", "the-cli-sends-a-declared-request-member")
+	sync := `{"session":{"engine":"claude-code","id":"s1"},"mission":{"repository":"putnami/putnami","key":"issue-1250"},` +
+		`"event":"stop","state":"handed_back","observedAt":"2026-11-18T09:00:00Z",` +
+		`"missedSyncs":{"count":3,"reason":"auth.unavailable","lastAt":"2026-11-18T08:59:00Z"}}`
+	route := func(members ...string) *providerCall {
+		t.Helper()
+		read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"missions":{"provider":"@a/one","version":1}}}}`)
+		providers := collabProviders(t, collab.ContractMissions)
+		operation := providers[collab.ContractMissions].Operations[collab.OperationSync]
+		operation.Members = members
+		providers[collab.ContractMissions].Operations[collab.OperationSync] = operation
+		resolution := resolveCollab(read, collab.ContractMissions, []*extension.ExtensionDescription{provider("@a/one", providers)}, nil)
+		call, envelope := prepareCall(read, resolution, collab.OperationSync, json.RawMessage(sync))
+		if envelope != nil {
+			t.Fatalf("prepareCall refused the sync: %s %+v", envelope.Outcome, envelope.Error)
+		}
+		return call
+	}
+
+	declared := route(collab.MissionMemberMissedSyncs)
+	var sent collab.MissionsSyncInput
+	if err := json.Unmarshal(declared.Arguments, &sent); err != nil {
+		t.Fatal(err)
+	}
+	want := collab.MissedSyncs{Count: 3, Reason: "auth.unavailable", LastAt: "2026-11-18T08:59:00Z"}
+	if sent.MissedSyncs == nil || *sent.MissedSyncs != want {
+		t.Fatalf("a provider that declares missedSyncs received %+v; want %+v", sent.MissedSyncs, want)
+	}
+
+	undeclared := route()
+	if strings.Contains(string(undeclared.Arguments), "missedSyncs") {
+		t.Fatalf("a provider that does not declare missedSyncs received it: %s", undeclared.Arguments)
+	}
+	sent = collab.MissionsSyncInput{}
+	if err := json.Unmarshal(undeclared.Arguments, &sent); err != nil {
+		t.Fatal(err)
+	}
+	if sent.Session.ID != "s1" || sent.Mission.Key != "issue-1250" || sent.State != collab.SessionStateHandedBack {
+		t.Fatalf("the rest of the sync changed: %+v", sent)
+	}
+}

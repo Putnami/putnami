@@ -217,6 +217,15 @@
       ]
     },
     {
+      "id": "declared-missed-syncs",
+      "text": [
+        "missions.sync and missions.status declare missedSyncs, a request member of version 1: count, reason and lastAt.",
+        "The CLI removes it from a request to a provider that does not declare it.",
+        "A provider that declares it keeps each session's missedSyncs of the last applied sync that carried one, and status answers it.",
+        "providertest checks that a declaring provider answers the one it kept."
+      ]
+    },
+    {
       "id": "scenarios-normalize-requests",
       "text": "The scenarios normalize each request before it reaches Serve: a list request without a page gets page.size 20 and an explicit size is kept, a memory request without a workspace gets the served one and one naming its own keeps it, and a request the contract refuses is sent unchanged."
     },
@@ -290,6 +299,7 @@
     "protocols/collaboration/doc/adr/0006-version-1-is-stable.md",
     "tooling/contributor/doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md",
     "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md",
-    "protocols/collaboration/doc/adr/0008-a-session-leaves-no-empty-mission-behind.md"
+    "protocols/collaboration/doc/adr/0008-a-session-leaves-no-empty-mission-behind.md",
+    "protocols/collaboration/doc/adr/0009-a-declared-request-member-may-join-version-1.md"
   ]
 }

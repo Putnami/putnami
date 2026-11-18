@@ -1041,6 +1041,32 @@ type MissionsSyncInput struct {
 	// usage it holds with the one of the last sync it applied that carried
 	// one: absent keeps it.
 	Usage *SessionUsage `json:"usage,omitempty"`
+	// MissedSyncs reports the syncs of the session that failed since the
+	// last one that succeeded; a sync with no failure before it carries
+	// none. It is a declared member (MissionMemberMissedSyncs): the CLI
+	// sends it only to a provider whose sync operation declares it, and
+	// that provider keeps the one of the last sync it applied that carried
+	// one: absent keeps it.
+	MissedSyncs *MissedSyncs `json:"missedSyncs,omitempty"`
+}
+
+// MissionMemberMissedSyncs is the declared member of missions.sync and
+// missions.status that reports a session's failed syncs (ADR 0009).
+const MissionMemberMissedSyncs = "missedSyncs"
+
+// MissionMembers is the closed vocabulary of the declared members of
+// missions.sync and missions.status, in canonical order.
+var MissionMembers = []string{MissionMemberMissedSyncs}
+
+// MissedSyncs is the syncs of a session that failed since the last one that
+// succeeded.
+type MissedSyncs struct {
+	// Count is how many syncs failed, 1 to MaxMissedSyncs.
+	Count int64 `json:"count"`
+	// Reason is why the last one failed, one line.
+	Reason string `json:"reason"`
+	// LastAt is when the last one failed, in RFC 3339 UTC.
+	LastAt string `json:"lastAt"`
 }
 
 // SessionStatus is the session as the provider holds it.
@@ -1317,6 +1343,11 @@ type MissionSession struct {
 	// Usage is the tokens the provider holds for the session, when it holds
 	// them.
 	Usage *SessionUsage `json:"usage,omitempty"`
+	// MissedSyncs is the failed syncs the provider holds for the session,
+	// from the last applied sync that carried them, when it holds them. Only
+	// a provider whose status operation declares MissionMemberMissedSyncs
+	// answers it.
+	MissedSyncs *MissedSyncs `json:"missedSyncs,omitempty"`
 	// Branch is the branch the session works on, when known.
 	Branch string `json:"branch,omitempty"`
 	// Error is the error that stopped a failed session; only a failed

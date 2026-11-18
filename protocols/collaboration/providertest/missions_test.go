@@ -48,6 +48,7 @@ type missionsSession struct {
 	observed time.Time
 	stage    collab.LoopStage
 	usage    *collab.SessionUsage
+	missed   *collab.MissedSyncs
 	branch   string
 	failure  string
 	wait     string
@@ -173,6 +174,10 @@ func (s *missionsStore) sync(_ context.Context, call collab.Call) (any, *collab.
 		if in.Usage != nil {
 			usage := *in.Usage
 			session.usage = &usage
+		}
+		if in.MissedSyncs != nil {
+			missed := *in.MissedSyncs
+			session.missed = &missed
 		}
 		held := s.missions[mission]
 		if held == nil {
@@ -334,7 +339,7 @@ func (s *missionsStore) status(_ context.Context, call collab.Call) (any, *colla
 	for _, session := range held {
 		result.Sessions = append(result.Sessions, collab.MissionSession{
 			Session: session.ref, State: session.state, ObservedAt: session.observed.UTC().Format(time.RFC3339Nano),
-			Stage: session.stage, Usage: session.usage, Branch: session.branch, Error: session.failure, WaitUntil: session.wait,
+			Stage: session.stage, Usage: session.usage, MissedSyncs: session.missed, Branch: session.branch, Error: session.failure, WaitUntil: session.wait,
 		})
 	}
 	return result, nil
@@ -429,5 +434,23 @@ func TestTheMissionsStatusScenarioPassesAgainstACorrectProvider(t *testing.T) {
 		if ran != offered {
 			t.Errorf("offered %v: the status scenario ran %v", offered, ran)
 		}
+	}
+}
+
+// TestTheMissionsScenariosCheckMissedSyncs: the missed-syncs scenario passes
+// against a provider that keeps the report it declares, and against one that
+// declares none and receives none.
+func TestTheMissionsScenariosCheckMissedSyncs(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "declared-missed-syncs", "the-missions-scenarios-check-missed-syncs")
+	for _, declared := range []bool{true, false} {
+		t.Run(fmt.Sprintf("declared %v", declared), func(t *testing.T) {
+			RunMissions(t, func(t *testing.T) Target {
+				target := missionsTarget(t, newMissionsStore())
+				if declared {
+					target.MissionMembers = collab.MissionMembers
+				}
+				return target
+			})
+		})
 	}
 }

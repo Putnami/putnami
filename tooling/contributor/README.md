@@ -181,7 +181,12 @@ to the session; the input is a `missions.ask` document without its `mission`.
 `putnami agent reply --message <id> --reply <text>` records a reply through
 `missions.reply`, and the session's next Stop then sends no `[ack <id>]` line
 for that message. A hook never fails a turn: a failure leaves one line in
-`hook.log` under `<Putnami home>/contributor/sessions`. When the missions
+`hook.log` under `<Putnami home>/contributor/sessions`, which names the
+workspace root, and `putnami doctor` reports the workspace's last one from
+the last day. The session counts the syncs that failed since the last one
+that succeeded, with the last reason, and the next sync that succeeds
+carries them as `missedSyncs`, so a missions provider that declares the
+member shows on the mission how many updates it missed and why. When the missions
 provider refuses the SessionStart sync for want of a signed-in session, the
 hook also shows the user one line, as the host's system message: reporting is
 off, run `putnami cloud login`.

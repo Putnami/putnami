@@ -33,8 +33,8 @@ func (p ProvidedOperation) Preconditions() Preconditions {
 	return Preconditions(p.Operation.Preconditions)
 }
 
-// Members returns the optional result members the provider declares it
-// fills, nil when it declares none.
+// Members returns the optional members the provider declares it supports,
+// result or request, nil when it declares none.
 func (p ProvidedOperation) Members() []string {
 	if len(p.Operation.Members) == 0 {
 		return nil

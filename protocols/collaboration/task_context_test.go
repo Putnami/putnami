@@ -107,29 +107,6 @@ func TestInvalidTaskContextIsRefused(t *testing.T) {
 	}
 }
 
-// TestOnlyTasksGetDeclaresTheContextMembers: the catalog lists the context
-// members on tasks.get, in canonical order, and no other operation of any
-// contract lists a member.
-func TestOnlyTasksGetDeclaresTheContextMembers(t *testing.T) {
-	spectest.Proves(t, "collaboration/provider-contract", "declared-task-context", "only-tasks-get-declares-the-context-members")
-	if !slices.IsSorted(TaskContextMembers) {
-		t.Errorf("TaskContextMembers %v is not in canonical order", TaskContextMembers)
-	}
-	for _, spec := range Catalog() {
-		for _, op := range spec.Operations {
-			if spec.Name == ContractTasks && op.Name == OperationGet {
-				if !slices.Equal(op.Members, TaskContextMembers) {
-					t.Errorf("tasks.get members = %v, want %v", op.Members, TaskContextMembers)
-				}
-				continue
-			}
-			if len(op.Members) > 0 {
-				t.Errorf("%s.%s lists members %v", spec.Name, op.Name, op.Members)
-			}
-		}
-	}
-}
-
 // TestReadProviderOffer_DeclaredMembers: a provider offers the members the
 // catalog lists for the operation, and any other member withdraws the
 // contract version.

@@ -171,7 +171,8 @@ func maximalStatusResult() *MissionsStatusResult {
 		result.Sessions = append(result.Sessions, MissionSession{
 			Session: SessionRef{Engine: strings.Repeat("e", 32), ID: strings.Repeat("s", 128-len(strconv.Itoa(i))) + strconv.Itoa(i)}, State: SessionStateFailed,
 			ObservedAt: maximalUTC, Stage: LoopStageValidate, Branch: fill(MaxBranchLength), Error: fill(MaxErrorLength),
-			Usage: &SessionUsage{InputTokens: MaxUsageTokens, OutputTokens: MaxUsageTokens, CacheWriteTokens: MaxUsageTokens, CacheReadTokens: MaxUsageTokens},
+			Usage:       &SessionUsage{InputTokens: MaxUsageTokens, OutputTokens: MaxUsageTokens, CacheWriteTokens: MaxUsageTokens, CacheReadTokens: MaxUsageTokens},
+			MissedSyncs: &MissedSyncs{Count: MaxMissedSyncs, Reason: fill(MaxMissedSyncReasonLength), LastAt: maximalUTC},
 		})
 	}
 	return result
@@ -183,7 +184,8 @@ func maximalSyncInput() *MissionsSyncInput {
 		Session: maximalSession(), Mission: maximalMissionName(), Event: strings.Repeat("e", 32),
 		State: SessionStateFailed, ObservedAt: maximalUTC, Model: fill(MaxModelLength), Branch: fill(MaxBranchLength),
 		LastMessage: fill(MaxLastMessageLength), Error: fill(MaxErrorLength), Plan: &plan, Stage: LoopStageValidate,
-		Usage: &SessionUsage{InputTokens: MaxUsageTokens, OutputTokens: MaxUsageTokens, CacheWriteTokens: MaxUsageTokens, CacheReadTokens: MaxUsageTokens},
+		Usage:       &SessionUsage{InputTokens: MaxUsageTokens, OutputTokens: MaxUsageTokens, CacheWriteTokens: MaxUsageTokens, CacheReadTokens: MaxUsageTokens},
+		MissedSyncs: &MissedSyncs{Count: MaxMissedSyncs, Reason: fill(MaxMissedSyncReasonLength), LastAt: maximalUTC},
 	}
 	for i := range MaxListMembers {
 		input.Delivered = append(input.Delivered, maximalID(i))

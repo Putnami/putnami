@@ -238,6 +238,20 @@
             "doctor-is-quiet-when-hooks-reach-the-host"
           ]
         }
+      },
+      {
+        "id": "doctor-names-the-last-agent-hook-failure",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "doctor-reports-the-last-hook-failure-of-the-workspace",
+            "doctor-is-quiet-without-a-recent-hook-failure-of-the-workspace"
+          ]
+        }
       }
     ]
   }

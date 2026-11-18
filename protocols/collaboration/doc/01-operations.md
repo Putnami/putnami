@@ -195,7 +195,7 @@ operation must declare `workspaceSelection`.
 
 | Operation | Access | Required | Destructive | Preconditions | Host-only | Request | Result |
 |---|---|---|---|---|---|---|---|
-| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage` | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
+| `sync` | mutating | yes | yes | — | yes | `session`, `mission`, `event`, `state`, `observedAt`, `model`, `branch`, `lastMessage`, `error`, `waitUntil`, `plan`, `delivered`, `decisions`, `replies`, `stage`, `usage`, `missedSyncs` (declared) | `session`, `mission`, `inbox`, `decisions`, `replies`, `minIntervalMs`, `now` |
 | `ask` | mutating | yes | no | — | no | `mission`, `question`, `context`, `options`, `recommendation`, `blocks`, `idempotencyKey` | `decision`, `replayed` |
 | `reply` | mutating | yes | no | — | no | `message`, `reply` | `message`, `replayed` |
 | `status` | read | no | no | — | no | `mission`, `page` | `mission`, `sessions`, `page` |
@@ -260,6 +260,16 @@ sync names it, and it holds no decision and no message. A provider that also
 serves memory keeps a mission whose memory holds a record. A retired mission
 reads as one the provider does not hold, and a later sync that names it holds
 it again ([ADR 0008](adr/0008-a-session-leaves-no-empty-mission-behind.md)).
+
+`missedSyncs` is a declared member
+([ADR 0009](adr/0009-a-declared-request-member-may-join-version-1.md)): the
+syncs of the session that failed since the last one that succeeded,
+`{count, reason, lastAt}`, with `count` from 1 to 10^6, `reason` one line of
+at most 256 characters, and `lastAt` the RFC 3339 UTC time of the last one.
+The CLI sends it only to a provider whose `sync` operation names it under
+`members`, and removes it from a request to any other. A provider that
+declares it keeps the `missedSyncs` of the last applied sync that carried
+one: an absent one keeps what it holds.
 
 - `delivered` (at most 100) lists the inbox messages the host gave the agent;
   they leave the inbox. Delivering an answer message moves its decision to
@@ -331,8 +341,9 @@ stage and usage as unavailable. The request names the mission,
 `{repository, key}`, and takes a `page`; a `title` changes nothing. The
 result's `mission` is the view `sync` answers. `sessions` lists, each once,
 the sessions whose last applied sync named this mission, in every state,
-`ended` included: `{session, state, observedAt, stage, usage, branch, error,
-waitUntil}`, as that sync left them. `stage`, `usage` and `branch` are absent
+`ended` included: `{session, state, observedAt, stage, usage, missedSyncs,
+branch, error, waitUntil}`, as that sync left them; only a provider whose
+`status` operation declares `missedSyncs` answers it. `stage`, `usage` and `branch` are absent
 when the provider holds none; `error` goes only with `failed`, and
 `waitUntil` with `waiting` and always with it. `observedAt` is in UTC. The
 list runs newest `observedAt` first, then by engine and id, a page at a time

@@ -177,6 +177,7 @@ func TestDrift_EntitySchemasMatchGoTypes(t *testing.T) {
 		{"MissionDecision", missions.Defs["askResult"].Properties["decision"], MissionDecision{}},
 		{"RepliedMessage", missions.Defs["replyResult"].Properties["message"], RepliedMessage{}},
 		{"MissionSession", missions.Defs["missionSession"], MissionSession{}},
+		{"MissedSyncs", missions.Defs["missedSyncs"], MissedSyncs{}},
 	}
 	for _, tc := range cases {
 		if tc.node == nil {

@@ -79,6 +79,15 @@
       ]
     },
     {
+      "id": "missed-syncs",
+      "text": [
+        "The session cache counts the syncs that failed since the last one that succeeded, with the reason and time of the last one.",
+        "The next sync carries them as missedSyncs, and an ok answer clears them; a sync with no failure before it carries none.",
+        "A sync refused as invalid while it carries missedSyncs or a plan goes once more without either, and when that one passes the count is dropped.",
+        "Each hook.log line names the workspace root."
+      ]
+    },
+    {
       "id": "bounded-calls",
       "text": "Each event stops 5 s before the timeout its manifest entry declares, each call takes at most 10 s of what is left, a git command takes what is left with no bound of its own, and the calls and waits of the common longest path of each event fit that budget."
     },
@@ -128,6 +137,7 @@
   ],
   "decisions": [
     "tooling/contributor/doc/adr/0007-the-contributor-declares-agent-session-hooks.md",
-    "tooling/contributor/doc/adr/0018-a-plan-change-syncs-within-the-turn.md"
+    "tooling/contributor/doc/adr/0018-a-plan-change-syncs-within-the-turn.md",
+    "protocols/collaboration/doc/adr/0009-a-declared-request-member-may-join-version-1.md"
   ]
 }

@@ -75,10 +75,10 @@ A local mission has one owner: you, the person who works in the workspace.
 Agent sessions publish their state and plan with `missions sync`, ask you
 decisions with `missions ask`, and reply to your messages with
 `missions reply`. `missions status` reads a mission's view and a page of its
-sessions: each session's state, loop stage, token usage and branch, and its
-error or `waitUntil` when it failed or waits, newest first. Its cursor names
-the last session of a page, so a sync between two pages repeats no session
-and skips none that did not sync.
+sessions: each session's state, loop stage, token usage, missed syncs and
+branch, and its error or `waitUntil` when it failed or waits, newest first.
+Its cursor names the last session of a page, so a sync between two pages
+repeats no session and skips none that did not sync.
 A session that moves to another mission, such as from its branch mission to
 its issue mission after `putnami agent attach`, retires the mission it left
 when no other session, decision or message holds it.

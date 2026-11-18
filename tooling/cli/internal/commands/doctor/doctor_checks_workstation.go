@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"time"
 
 	doctor "go.putnami.dev/protocol/doctor"
 	wsproto "go.putnami.dev/protocol/workspace"
@@ -54,6 +55,9 @@ type workstationProbe struct {
 	// agentHookGaps reports where an agent host would run none of the hooks
 	// the workspace's install writes (CLI ADR 0098).
 	agentHookGaps func() []shared.HostHookGap
+	// lastHookFailure answers the last agent session hook failure of the
+	// workspace less than a day old, and whether there is one.
+	lastHookFailure func() (hookFailure, bool)
 }
 
 // systemWorkstationProbe returns the probe of the running host for the
@@ -68,6 +72,9 @@ func systemWorkstationProbe(wsRoot string) workstationProbe {
 		},
 		longPathsEnabled:   readLongPathsEnabled,
 		vcRuntimeInstalled: vcRuntimeInstalled,
+		lastHookFailure: func() (hookFailure, bool) {
+			return readLastHookFailure(hookLogPath(wsRoot, os.Getenv), wsRoot, time.Now())
+		},
 	}
 }
 
@@ -77,6 +84,7 @@ func checkWorkstation(profile doctor.Profile, probe workstationProbe) []doctor.F
 	var findings []doctor.Finding
 	findings = append(findings, checkCRLFCheckout(profile, probe)...)
 	findings = append(findings, checkAgentHooks(profile, probe)...)
+	findings = append(findings, checkHookFailure(profile, probe)...)
 	if probe.goos == "windows" {
 		findings = append(findings, checkLongPaths(profile, probe)...)
 		findings = append(findings, checkGitLongPaths(profile, probe)...)

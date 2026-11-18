@@ -116,6 +116,10 @@ type sessionCache struct {
 	// toolSyncInterval after it, no other tool call syncs.
 	ToolSyncAt    time.Time `json:"tool_sync_at"`
 	MinIntervalMS int64     `json:"min_interval_ms,omitempty"`
+	// Missed counts the syncs that failed since the last one that
+	// succeeded, with the reason and time of the last one; the next sync
+	// carries it as missedSyncs.
+	Missed *collab.MissedSyncs `json:"missed_syncs,omitempty"`
 
 	// Stage is the loop stage `agent stage` recorded last; every sync
 	// carries it.
@@ -372,10 +376,11 @@ func appendBounded(values []string, value string, limit int) []string {
 	return values
 }
 
-// logHookFailure appends one line to hook.log. The hook never reports a
-// failure to the engine, so this file is the only trace. It never holds a
-// message text or a credential.
-func logHookFailure(dir string, now time.Time, engine, event string, failure error) {
+// logHookFailure appends one line to hook.log, naming the workspace root the
+// hook ran in. The hook never reports a failure to the engine, so this file,
+// read by putnami doctor, is its local trace. It never holds a message text
+// or a credential.
+func logHookFailure(dir string, now time.Time, root, engine, event string, failure error) {
 	if failure == nil {
 		return
 	}
@@ -386,7 +391,7 @@ func logHookFailure(dir string, now time.Time, engine, event string, failure err
 	if info, err := os.Stat(path); err == nil && info.Size() > hookLogMaxBytes {
 		_ = os.Rename(path, path+".1")
 	}
-	entry := map[string]string{"at": now.UTC().Format(time.RFC3339Nano), "engine": engine, "event": event, "error": failure.Error()}
+	entry := map[string]string{"at": now.UTC().Format(time.RFC3339Nano), "root": root, "engine": engine, "event": event, "error": failure.Error()}
 	line, err := json.Marshal(entry)
 	if err != nil {
 		return

@@ -366,6 +366,22 @@
           }
         },
         {
+          "id": "missed-syncs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-sync-is-counted-and-the-next-ok-sync-carries-it",
+              "a-sync-with-no-failure-before-it-carries-no-missed-syncs",
+              "a-sync-refused-for-missed-syncs-goes-once-without-them",
+              "the-hook-log-names-the-workspace-root"
+            ]
+          }
+        },
+        {
           "id": "bounded-calls",
           "stage": "coded",
           "evidenceKinds": [

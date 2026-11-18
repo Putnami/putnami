@@ -25,7 +25,8 @@
 // and its delivery acknowledges the decision, that a sync ignores ids it does
 // not know and answers each reply it carries, that a session acknowledges a
 // message of the mission it left, and that an older sync never overwrites a
-// newer one and still describes the mission it names.
+// newer one and still describes the mission it names, and that a provider
+// declaring missedSyncs keeps the last report a sync carried.
 //
 // The scenarios name nothing a particular backend defines: they scope what
 // they create with labels, titles and mission names unique to the run, so
@@ -66,6 +67,12 @@ type Target struct {
 	// lists them). RunTasks checks that get returns each of them and no other,
 	// and that no other operation returns one.
 	TaskMembers []string
+	// MissionMembers are the members the provider's manifest declares under
+	// the members of both its missions.sync and missions.status operations
+	// (collab.MissionMembers lists them). RunMissions sends missedSyncs only
+	// when it is declared, as the CLI does, and checks that status answers
+	// the one the provider kept, and none when it is not declared.
+	MissionMembers []string
 	// Settle is how long a read may take to observe a write the provider
 	// acknowledged, for a backend whose search index is eventually consistent.
 	// Zero means every read observes every acknowledged write at once.

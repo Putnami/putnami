@@ -161,10 +161,12 @@ type OperationSpec struct {
 	// agent, never by the agent itself. The command line and the host
 	// channel route them like any other operation.
 	HostOnly bool
-	// Members are the optional result members a provider may declare under
-	// the operation's members, in canonical order: it returns one only when
-	// it declares it. A member that joins version 1 this way keeps every
-	// version 1 document valid (ADR 0007).
+	// Members are the optional members a provider may declare under the
+	// operation's members, in canonical order. A result member is returned
+	// only by a provider that declares it (ADR 0007); a request member is
+	// sent only to a provider that declares it, since the CLI removes it
+	// from a request to any other (ADR 0009). A member that joins version 1
+	// this way keeps every version 1 document valid.
 	Members []string
 	// Summary is the provider-neutral, agent-facing description.
 	Summary string
@@ -303,6 +305,7 @@ var catalog = []ContractSpec{
 			},
 			{
 				Name: OperationStatus, Access: AccessRead,
+				Members: MissionMembers,
 				Summary: "Read a mission's view and its sessions: each session's state, loop stage, token usage and " +
 					"branch, as its last sync reported them, newest first. Take the mission's repository and key from " +
 					"the session sheet, or name another mission to follow its sessions. Optional capability.",
@@ -310,6 +313,7 @@ var catalog = []ContractSpec{
 			},
 			{
 				Name: OperationSync, Access: AccessMutating, Required: true, Destructive: true, HostOnly: true,
+				Members: MissionMembers,
 				Summary: "Publish an agent session's state and plan to its mission, acknowledge the messages delivered, " +
 					"bind the decisions the session asked and record its replies, then read the mission and the messages " +
 					"no session received yet. A sync older than the last one applied for the session changes nothing, " +

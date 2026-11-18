@@ -325,12 +325,15 @@ read every layer, so it refuses the stamp instead. The floor binds a manifest
 wherever it loads from. Only a manifest whose step declares the field is
 stamped 23.
 Contract `24` (`ProviderMembersContract`) is additive for a provider operation
-that declares `members`, the optional result members the provider fills. From
-24 on, the CLI checks each member against the collaboration catalog, reports it
-in the operation's `capabilities` and accepts it in the operation's answers. A
-reader below 24 would refuse every answer that carries such a member, so it
-refuses the stamp instead. The floor binds a manifest wherever it loads from.
-Only a manifest whose provider operation declares members is stamped 24.
+that declares `members`, the optional result members the provider fills and
+request members it reads. From 24 on, the CLI checks each member against the
+collaboration catalog, reports it in the operation's `capabilities`, accepts a
+result member in the operation's answers and sends a request member only to a
+provider that declares it. A reader below 24 would refuse every answer that
+carries such a member and could not tell which request members the provider
+reads, so it refuses the stamp instead. The floor binds a manifest wherever it
+loads from. Only a manifest whose provider operation declares members is
+stamped 24.
 Contract `6` was additive for `go-embed:build` and `go-embed:test` in an
 extension's project task inputs, which the CLI expanded itself. Contract 14
 retires that meaning; the number stays taken.

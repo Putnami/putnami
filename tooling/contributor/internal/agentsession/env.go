@@ -85,7 +85,7 @@ func (e *Env) files(engine, session string) sessionFiles {
 }
 
 func (e *Env) log(engine, event string, failure error) {
-	logHookFailure(e.sessionsDir(), e.Now(), engine, event, failure)
+	logHookFailure(e.sessionsDir(), e.Now(), e.Root, engine, event, failure)
 }
 
 // The time each hook may take. A call into the host starts the bound

@@ -977,7 +977,7 @@ func TestAnInvalidPlanGoesOnceWithoutThePlan(t *testing.T) {
 	if len(syncs) != 3 || syncs[1].Plan == nil || syncs[2].Plan != nil {
 		t.Fatalf("syncs %+v", syncs)
 	}
-	if !logSays(h.hookLog(), "the provider refused the plan") {
+	if !logSays(h.hookLog(), "the sync went without the plan, which goes again once it changes") {
 		t.Errorf("hook.log %v", h.hookLog())
 	}
 	h.hook(claude, "stop", claudeSession, nil)

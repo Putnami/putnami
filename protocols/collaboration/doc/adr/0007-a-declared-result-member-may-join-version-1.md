@@ -1,6 +1,8 @@
 # 0007: A result member a provider declares may join version 1
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0009](0009-a-declared-request-member-may-join-version-1.md): decision 1.
+  A request member a provider declares may join version 1.
 - **Date**: 2026-11-16
 - **Scope**: `go.putnami.dev/protocol/collaboration` (`protocols/collaboration`),
   the `members` of a provider operation in `go.putnami.dev/protocol/extension`,

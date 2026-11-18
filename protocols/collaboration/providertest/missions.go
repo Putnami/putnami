@@ -45,6 +45,7 @@ func RunMissions(t *testing.T, newTarget func(t *testing.T) Target) {
 		{"a session reports its stage, its usage and its end", missionsEnded},
 		{"status lists the sessions of a mission, newest first", missionsStatus},
 		{"a session leaves no empty mission behind", missionsLeftMissionRetired},
+		{"status answers the missed syncs a session reported last", missionsMissedSyncs},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -621,6 +622,39 @@ func missionsStatus(t *testing.T, m *missionRun) {
 	empty := m.status(m.other("unknown"), nil)
 	if len(empty.Mission.Plan.Steps) != 0 || len(empty.Mission.OpenDecisions) != 0 || len(empty.Sessions) != 0 || empty.Page.Next != "" {
 		t.Fatalf("status of a mission no sync named answered %+v; want its empty view and no session", empty)
+	}
+}
+
+// missionsMissedSyncs checks that a provider declaring missedSyncs keeps the
+// report of the last sync that carried one, that a sync without one keeps
+// it, and that a provider that does not declare it answers none.
+func missionsMissedSyncs(t *testing.T, m *missionRun) {
+	if !m.offers(collab.ContractMissions, collab.OperationStatus) {
+		t.Skip("the provider does not offer missions.status")
+	}
+	declared := slices.Contains(m.target.MissionMembers, collab.MissionMemberMissedSyncs)
+	first := collab.MissedSyncs{Count: 2, Reason: "pt-first-" + m.run, LastAt: m.start.Add(30 * time.Second).Format(time.RFC3339)}
+	last := collab.MissedSyncs{Count: 3, Reason: "pt-last-" + m.run, LastAt: m.start.Add(90 * time.Second).Format(time.RFC3339)}
+	for i, report := range []collab.MissedSyncs{first, last} {
+		m.sync(time.Duration(i+1)*time.Minute, func(in *collab.MissionsSyncInput) {
+			if declared {
+				in.MissedSyncs = &report
+			}
+		})
+	}
+	m.sync(3*time.Minute, nil)
+
+	status := m.status(m.mission, nil)
+	index := slices.IndexFunc(status.Sessions, func(session collab.MissionSession) bool { return session.Session == m.session })
+	if index < 0 {
+		t.Fatalf("status answered no session %s/%s", m.session.Engine, m.session.ID)
+	}
+	got := status.Sessions[index].MissedSyncs
+	switch {
+	case !declared && got != nil:
+		t.Fatalf("a provider that does not declare missedSyncs answered %+v", *got)
+	case declared && (got == nil || got.Count != last.Count || got.Reason != last.Reason || !sameInstant(got.LastAt, m.start.Add(90*time.Second))):
+		t.Fatalf("status answered missedSyncs %+v; want the last one a sync carried, %+v", got, last)
 	}
 }
 

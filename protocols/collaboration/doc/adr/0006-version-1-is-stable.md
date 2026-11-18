@@ -3,6 +3,8 @@
 - **Status**: accepted, amended by
   [ADR 0007](0007-a-declared-result-member-may-join-version-1.md): decision 2.
   A result member a provider declares may join version 1.
+  [ADR 0009](0009-a-declared-request-member-may-join-version-1.md): decision 2.
+  A request member a provider declares may join version 1.
 - **Scope**: `go.putnami.dev/protocol/collaboration` (`protocols/collaboration`)
 - **Amends**: [ADR 0002](0002-the-contracts-are-published-as-preview.md), decision 2
 
