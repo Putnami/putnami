@@ -19,6 +19,12 @@ const START_CARDS = [
     title: `${tool.short} start`,
     desc: tool.startBlurb ?? tool.blurb,
   })),
+  {
+    href: '/docs/getting-started/existing-repository',
+    code: 'RE',
+    title: 'Existing repository',
+    desc: 'Observe each change in the CI you already run, then bring your specs and the verdict to the repository.',
+  },
 ];
 
 // The cross-cutting model pages, in reading order: the bet, the layers, the
@@ -414,6 +420,12 @@ const Hub = styled.div`
 
   .start-step:nth-child(odd) {
     border-right: 1px solid var(--color-border);
+  }
+
+  /* An odd last card spans the row, so the two-column grid keeps no hole. */
+  .start-step:last-child:nth-child(odd) {
+    grid-column: 1 / -1;
+    border-right: none;
   }
 
   .start-step:hover {

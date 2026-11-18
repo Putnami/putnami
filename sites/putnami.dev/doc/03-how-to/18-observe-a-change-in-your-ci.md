@@ -44,12 +44,32 @@ On GitHub Actions, the step is the action `Putnami/observe-action@v1`, from the 
 | `export PATH="$HOME/.putnami/bin:$PATH"` | Makes `putnami` reachable in the rest of the step. A script piped into `bash` cannot change the `PATH` of the shell that runs it. |
 | `putnami extensions install --user @putnami/observe` | Installs the extension in the user scope, so its command runs outside any workspace. `--user` takes one extension per command. |
 | `putnami extensions install --user @putnami/cloud` | Installs the extension that uploads the evidence to Putnami Cloud. The action runs this line only when its `token` input is set. |
-| `putnami observe --evidence observe-evidence.json` | Prints the summary and writes the evidence document. It exits `0` whatever it observes: only a usage error, or an evidence file it cannot write, fails it. |
+| `putnami observe --evidence observe-evidence.json` | Prints the summary and writes the evidence document. It exits `0` whatever it observes: only a usage error fails it. An evidence file it cannot write is a warning in the summary. |
 | `putnami observe --evidence observe-evidence.json --upload --publish` | Also uploads the evidence, then posts a commit status and a summary note on the pull or merge request that link to the report, or to the CI run when the reporter answers no report URL. `--publish` needs `--upload`. The action runs this line in place of the one above when its `token` input is set. |
 
 `putnami observe` finds the base of the change from the CI: the pull request base on GitHub, the merge request diff base on GitLab, and on a branch push the commit before the push. It deepens a shallow clone itself, so you do not change `fetch-depth` or `GIT_DEPTH`. It finds JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports by their content, anywhere in the checkout except `.git`, `node_modules`, `vendor` and the Gradle and Maven build outputs that hold no report, and the reports of Bazel through its `bazel-testlogs` and `bazel-out` links.
 
 The install needs the network: when the installer or the registry cannot be reached, the GitHub step or the GitLab job fails.
+
+## What leaves the CI
+
+`putnami observe` reads the checkout and the reports on the machine that runs it. Without `--upload` or `--open`, nothing about the change leaves that machine: it prints the summary and writes the evidence document where `--evidence` names it, and your CI keeps that file as an artifact. Its only other network use is Git, which fetches from your `origin` remote the history the base of the change needs, deepening a shallow clone.
+
+`--open` uploads too. With either flag, `putnami observe` first asks the GitHub or GitLab API for the repository's numeric id when it runs outside a CI, with `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set; GitHub Actions and GitLab CI state that id themselves. It then hands the evidence document to the `@putnami/cloud` extension, which sends Putnami Cloud these fields, with `PUTNAMI_CLOUD_TOKEN` or your signed-in session as the credential:
+
+| Part | Fields |
+|---|---|
+| The run | The code host and its host name; the repository's path, such as `owner/name`, and its numeric id; the commit SHA and the branch; the pull or merge request number; where it ran: GitHub Actions, GitLab CI, another CI or a laptop; an upload id built from the CI run, attempt and job ids, or a random one on a laptop; whether a test failed; the Git tree id the job tested and the merge base of the change |
+| Tests | For each component: the passed, failed and skipped counts, and for each failing test case its name, its test file and its failure message |
+| Coverage | For each component: the covered and the total lines |
+| Components | For each component: its directory, its name, its ecosystem, how it was found, whether the change touches it or depends on it, and the components it depends on |
+| Changed-line coverage | The covered and total changed lines, and for each changed file the coverage instruments: its path, its counts and its uncovered line numbers |
+| Dependency changes | For each package a lockfile moved: its ecosystem, its lockfile, its name, its versions before and after, and its component; with an SBOM, its licences and its known vulnerabilities, by advisory id and severity |
+| Specs and declarations | Only in a repository that holds a Putnami workspace: the spec verification record its CI wrote, and each declaration file the change touches, such as a spec, an architecture manifest, a decision record, a CI configuration or a `CODEOWNERS` file, with its content before and after the change |
+
+Your source code apart from those declaration files, the full list of changed files, which decision records govern the change, the architecture rules and the diagnostics of the summary stay in the evidence document, on your CI. The CLI is public: [`tooling/observe`](https://github.com/Putnami/putnami/tree/main/tooling/observe) writes the document, and [`cloud/extension`](https://github.com/Putnami/putnami/tree/main/cloud/extension) sends it, so you can check this list against the code. `PUTNAMI_EVIDENCE_REPORTER` names another extension to hand the document to instead.
+
+`--publish` writes to your code host, not to Putnami Cloud: with the code host token, it posts the commit status and the summary note that [step 5](#5-read-the-pull-or-merge-request) describes. The CLI's own usage telemetry is separate, and [CLI telemetry](/docs/concepts/cli-telemetry) lists its fields and how to turn it off.
 
 ## Steps
 
@@ -350,7 +370,7 @@ Without `--upload`, after a failed upload, without the code host token, or on a 
 
 ### 6) Upload the evidence to Putnami Cloud
 
-To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the workspace. Signed in on your laptop, `putnami cloud token create --name ci --scopes delivery.ingest` creates it and prints it once.
+To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the Putnami Cloud workspace that receives the uploads. `putnami cloud token create --name ci --scopes delivery.ingest` creates it and prints it once; it runs, signed in, in a Putnami workspace that `putnami cloud setup --workspace <id>` linked to that Cloud workspace, which does not have to be the repository you observe.
 
 On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`, as step 2 shows. With a token, the action uploads the evidence and publishes unless you set `publish` to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload --publish` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
 

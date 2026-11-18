@@ -2,13 +2,14 @@
 
 Putnami starts with one workspace model, then lets you choose the runtime surface that fits the first thing you want to build.
 
-Use this page to get the CLI and workspace in place. If you already know the language you want, jump straight to the framework start guide:
+Use this page to get the CLI and workspace in place. If you already know the language you want, jump straight to the framework start guide. If your team wants Putnami on a repository it already has, start from [an existing repository](/docs/getting-started/existing-repository) instead: it goes from a first `putnami observe` to a note on each pull request, without turning the repository into a workspace.
 
 | You want to build... | Start here |
 |----------------------|------------|
 | React SSR, API routes, or a TypeScript library | [TypeScript getting started](/docs/frameworks/typescript/getting-started) |
 | A Go service or Go library | [Go getting started](/docs/frameworks/go/getting-started) |
 | An experimental Python service, library, or data workload | [Python getting started](/docs/frameworks/python/getting-started) |
+| Putnami on a repository your team already has, from its CI to its pull requests | [Start from an existing repository](/docs/getting-started/existing-repository) |
 | Putnami on a Rust, Java or Kotlin, Swift, Dart, .NET, Ruby or PHP repository you already have | Its reference, from [Languages and monorepo tools](/docs/languages) |
 | Putnami on a repository Bazel, moon, Nx, Pants, Rush or Turborepo already builds | [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo) |
 
@@ -173,6 +174,7 @@ Choose the path closest to your first project:
 - [TypeScript getting started](/docs/frameworks/typescript/getting-started) - full-stack web apps, API services, and TypeScript packages
 - [Go getting started](/docs/frameworks/go/getting-started) - compiled services, workers, and Go packages
 - [Python getting started](/docs/frameworks/python/getting-started) - Experimental, explicit opt-in FastAPI services, libraries, and data workloads
+- [Start from an existing repository](/docs/getting-started/existing-repository) - observe each change in your CI, then bring your specs and the verdict to the repository you already have
 - [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo) - keep the build tool a repository already uses, and put Putnami's runner and verdict on it
 - [Languages and monorepo tools](/docs/languages) - every language and tool Putnami runs, each with its reference
 - [Develop with AI assistants](/docs/how-to/develop-with-ai) - keep the same structure readable by humans and agents

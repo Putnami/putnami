@@ -1580,6 +1580,21 @@
     },
     {
       "match": "exact",
+      "path": "/docs/getting-started/existing-repository",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/docs/how-to",
       "methods": [
         "GET",
@@ -4579,6 +4594,21 @@
     },
     {
       "match": "exact",
+      "path": "/fr/docs/getting-started/existing-repository",
+      "methods": [
+        "GET",
+        "HEAD"
+      ],
+      "publicEdge": true,
+      "provenance": {
+        "project": "putnami.dev",
+        "package": "@putnami/web",
+        "sourceKind": "file-route",
+        "evidencePath": "src/app/docs/[...page]/page.tsx"
+      }
+    },
+    {
+      "match": "exact",
       "path": "/fr/docs/how-to",
       "methods": [
         "GET",
@@ -6326,5 +6356,5 @@
       }
     }
   ],
-  "digest": "sha256:838a2d80551888107a0c9c0e90cd019219f242be6f67c07092ead0a66b97b0b5"
+  "digest": "sha256:7021de0b508bc87026fc0f015a7d7b076fb6be6a16bf40d58118a9a7c69c969b"
 }

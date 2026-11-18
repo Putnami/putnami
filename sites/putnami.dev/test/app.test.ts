@@ -688,6 +688,21 @@ describe('putnami.dev', () => {
       expect(text).not.toMatch(/powershell(\.exe)?\s[^\n]*-c(ommand)?\s+(["']|&quot;|&#39;|&#x27;)?[^\n]*\birm\b/i);
     });
 
+    it('should lead a team with an existing repository from the docs home to its starting page', async () => {
+      const startHref = '/docs/getting-started/existing-repository';
+      for (const from of ['/docs', '/docs/getting-started']) {
+        const res = await fetch(`${baseUrl}${from}`);
+        expect(res.status).toBe(200);
+        expect(await res.text()).toContain(`href="${startHref}"`);
+      }
+
+      const res = await fetch(`${baseUrl}${startHref}`);
+      expect(res.status).toBe(200);
+      const text = (await res.text()).replace(/<[^>]+>/g, '');
+      expect(text).toContain('Start from an existing repository');
+      expect(text).toContain('putnami observe');
+    });
+
     it('should include breadcrumb navigation on doc pages', async () => {
       const res = await fetch(`${baseUrl}/docs/getting-started`);
       const html = await res.text();
