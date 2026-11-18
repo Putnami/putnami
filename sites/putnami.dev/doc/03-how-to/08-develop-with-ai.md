@@ -82,7 +82,8 @@ reports local check capacity. `putnami tree fingerprint` supplies the native
 tree binding, and `putnami change finalize` publishes through the configured
 proposals provider without running another local gate. For a change that
 touches a page of a web project, `putnami change screenshots` captures each
-touched page before and after, desktop and mobile, light and dark, the agent
+page that proves a requirement the change touches, or whose own file it
+changes, before and after, desktop and mobile, light and dark, the agent
 reads the captures and fixes what they show, the reviewer receives them, and
 `change finalize` marks the change ready only with their manifest or a waiver
 that names its reason, and sends the screenshots to the proposals provider

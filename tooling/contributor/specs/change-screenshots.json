@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "tooling/change-screenshots",
   "outcomes": [
-    "putnami change screenshots captures every page a change touches in a web project, before and after, desktop and mobile, light and dark, into PNG files and one manifest bound to the committed head",
+    "putnami change screenshots captures the pages that prove a requirement a change touches, and the pages whose own file it changes, in a web project, before and after, desktop and mobile, light and dark, into PNG files and one manifest bound to the committed head",
     "putnami change finalize marks a change that touches a web page ready only with the screenshots of its head, or with a waiver that names its reason",
     "putnami change finalize sends the screenshots it accepted to the bound proposals provider, so a reviewer sees them on the change",
     "The build workflow has the agent read its own screenshots and fix what they show before it finalizes, and the independent reviewer receives them with the diff"
@@ -18,9 +18,15 @@
     {
       "id": "touched-pages",
       "text": [
-        "A web project's pages are the file-route GET routes of its committed schema/http-routes.json; a page file is their evidencePath.",
-        "A changed page file touches its page; another changed file under the project's src/ that is no route's evidencePath touches every page.",
-        "A touched page is captured at its first route, or at each --route; a template takes its values from --fixtures, and a touched template without one is refused with exit 1."
+        "A page is a file-route GET route of the project's committed schema/http-routes.json; its page file is its evidencePath.",
+        "A touched requirement is one the change adds, or whose declaration it changes, in a putnami.features.json or a features/<feature>.json between the merge base and the head.",
+        "A page route whose proves at the head names a touched requirement is touched, a changed page file touches its first route, and --route adds a route. No other changed file touches a page."
+      ]
+    },
+    {
+      "id": "visited-path",
+      "text": [
+        "A touched page is visited at its --fixtures values, else at the at of a touched requirement it proves, else at the at of its first proof. A touched template with none of them is refused with exit 1."
       ]
     },
     {
@@ -33,16 +39,22 @@
       ]
     },
     {
+      "id": "frozen-motion",
+      "text": [
+        "Before each capture, the page's motion stops: a finite CSS or scripted animation at its end, an endless one at its start, and a transition at its end value, so an animated element shows the same frame on both sides."
+      ]
+    },
+    {
       "id": "the-manifest-is-a-protocol-document",
       "text": [
-        "The manifest is a go.putnami.dev/protocol/screenshots document: the command writes it through the protocol types, and its output validates against the published schema.",
+        "The manifest is a version 2 go.putnami.dev/protocol/screenshots document whose pages name the requirements they prove at the head: the command writes it through the protocol types, and its output validates against the published schema.",
         "change screenshots and change finalize read a manifest with the protocol decoder, which refuses one the contract does not allow."
       ]
     },
     {
       "id": "finalize-asks-for-screenshots",
       "text": [
-        "A ready publication of a change that touches a page of a web project needs a --screenshots manifest of the published head for that project, holding the after captures of every touched page with intact files, or --waive-screenshots <reason>.",
+        "A ready publication of a change that touches a page of a web project needs a version 2 --screenshots manifest of the head for that project, with the intact after captures of every touched page, each naming the touched requirements it proves; or --waive-screenshots <reason>.",
         "Otherwise it stops before any write and names what is missing. The verification line names the manifests or the waiver.",
         "A draft, and a change that touches no page, need none."
       ]

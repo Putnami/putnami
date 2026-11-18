@@ -14,7 +14,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 )
 
-// Stable diagnostic codes of the version 1 decoder.
+// Stable diagnostic codes of the decoder.
 const (
 	ErrorCodeParseError             = "screenshots.parse_error"
 	ErrorCodeTooLarge               = "screenshots.too_large"
@@ -44,6 +44,10 @@ const (
 	ErrorCodeUnexpectedSide         = "screenshots.unexpected_side"
 	ErrorCodeDuplicateCapture       = "screenshots.duplicate_capture"
 	ErrorCodeMissingCapture         = "screenshots.missing_capture"
+	ErrorCodeInvalidProves          = "screenshots.invalid_proves"
+	ErrorCodeInvalidProof           = "screenshots.invalid_proof"
+	ErrorCodeDuplicateProof         = "screenshots.duplicate_proof"
+	ErrorCodeTooManyProofs          = "screenshots.too_many_proofs"
 )
 
 // ValidErrorCodes is the closed set of codes the decoder emits.
@@ -57,18 +61,21 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeUnknownRoute: true, ErrorCodeInvalidSide: true, ErrorCodeInvalidViewport: true,
 	ErrorCodeInvalidScheme: true, ErrorCodeInvalidSHA256: true, ErrorCodeInvalidStatus: true,
 	ErrorCodeInvalidURL: true, ErrorCodeUnexpectedSide: true, ErrorCodeDuplicateCapture: true,
-	ErrorCodeMissingCapture: true,
+	ErrorCodeMissingCapture: true, ErrorCodeInvalidProves: true, ErrorCodeInvalidProof: true,
+	ErrorCodeDuplicateProof: true, ErrorCodeTooManyProofs: true,
 }
 
 var (
-	commitPattern = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
-	sha256Pattern = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	commitPattern      = regexp.MustCompile(`^([0-9a-f]{40}|[0-9a-f]{64})$`)
+	sha256Pattern      = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	featurePattern     = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*(?:/[a-z0-9]+(?:-[a-z0-9]+)*)+$`)
+	requirementPattern = regexp.MustCompile(`^[a-z0-9]+(?:-[a-z0-9]+)*$`)
 )
 
 // Parse strictly decodes a manifest: one JSON object within MaxManifestBytes,
-// with every member present, no unknown member, no member twice, and no list
-// past MaxPages or MaxCaptures: it reads no item past the bound. It
-// does not judge the values; Validate does.
+// with every required member present, no unknown member, no member twice,
+// and no list past MaxPages, MaxCaptures or MaxProofs: it reads no item past
+// the bound. It does not judge the values; Validate does.
 func Parse(data []byte) (*Manifest, []diag.Diagnostic) {
 	if len(data) > MaxManifestBytes {
 		return nil, []diag.Diagnostic{diag.Errorf(ErrorCodeTooLarge, "",
@@ -77,12 +84,17 @@ func Parse(data []byte) (*Manifest, []diag.Diagnostic) {
 	if finding := scan(data); finding != nil {
 		return nil, []diag.Diagnostic{*finding}
 	}
+	type proofWire struct {
+		Feature     *string `json:"feature"`
+		Requirement *string `json:"requirement"`
+	}
 	type pageWire struct {
-		File   *string `json:"file"`
-		Route  *string `json:"route"`
-		Path   *string `json:"path"`
-		Before *bool   `json:"before"`
-		After  *bool   `json:"after"`
+		File   *string         `json:"file"`
+		Route  *string         `json:"route"`
+		Path   *string         `json:"path"`
+		Before *bool           `json:"before"`
+		After  *bool           `json:"after"`
+		Proves json.RawMessage `json:"proves"`
 	}
 	type captureWire struct {
 		File     *string `json:"file"`
@@ -121,13 +133,33 @@ func Parse(data []byte) (*Manifest, []diag.Diagnostic) {
 	manifest.Pages = []Page{}
 	for i, page := range required(wire.Pages, "pages", missing) {
 		field := fmt.Sprintf("pages[%d].", i)
-		manifest.Pages = append(manifest.Pages, Page{
+		parsed := Page{
 			File:   required(page.File, field+"file", missing),
 			Route:  required(page.Route, field+"route", missing),
 			Path:   required(page.Path, field+"path", missing),
 			Before: required(page.Before, field+"before", missing),
 			After:  required(page.After, field+"after", missing),
-		})
+		}
+		// proves is optional: an absent member stays nil, and a present one,
+		// even empty, is kept for Validate to judge.
+		var proofs []proofWire
+		if string(page.Proves) == "null" {
+			diags = append(diags, diag.Errorf(ErrorCodeInvalidProves, field+"proves",
+				"%sproves is null: a page that proves nothing omits it", field))
+		} else if page.Proves != nil {
+			if err := json.Unmarshal(page.Proves, &proofs); err != nil {
+				return nil, []diag.Diagnostic{decodeDiagnostic(fmt.Errorf("%sproves: %w", field, err))}
+			}
+			parsed.Proves = []Proof{}
+			for j, proof := range proofs {
+				at := fmt.Sprintf("%sproves[%d].", field, j)
+				parsed.Proves = append(parsed.Proves, Proof{
+					Feature:     required(proof.Feature, at+"feature", missing),
+					Requirement: required(proof.Requirement, at+"requirement", missing),
+				})
+			}
+		}
+		manifest.Pages = append(manifest.Pages, parsed)
 	}
 	manifest.Captures = []Capture{}
 	for i, capture := range required(wire.Captures, "captures", missing) {
@@ -174,7 +206,8 @@ func Decode(data []byte) (*Manifest, []diag.Diagnostic) {
 }
 
 // Marshal validates a manifest and serializes it as indented JSON with one
-// trailing newline. It refuses a manifest Decode would refuse.
+// trailing newline, in the version the manifest names. It refuses a manifest
+// Decode would refuse.
 func Marshal(manifest Manifest) ([]byte, error) {
 	if manifest.Pages == nil {
 		manifest.Pages = []Page{}
@@ -216,9 +249,9 @@ func Validate(manifest *Manifest) []diag.Diagnostic {
 		return true
 	}
 
-	if manifest.ProtocolVersion != ProtocolVersion {
+	if manifest.ProtocolVersion != ProtocolVersion && manifest.ProtocolVersion != ProtocolVersionV1 {
 		report(ErrorCodeInvalidProtocolVersion, "protocolVersion",
-			"protocolVersion %d is not supported (want %d)", manifest.ProtocolVersion, ProtocolVersion)
+			"protocolVersion %d is not supported (want %d or %d)", manifest.ProtocolVersion, ProtocolVersionV1, ProtocolVersion)
 	}
 	if text("project", manifest.Project) && manifest.Project != "." && !relativePath(manifest.Project) {
 		report(ErrorCodeInvalidProject, "project",
@@ -255,6 +288,9 @@ func Validate(manifest *Manifest) []diag.Diagnostic {
 		}
 		if !page.Before && !page.After {
 			report(ErrorCodeInvalidPageSides, field, "neither side holds the page %s", page.Route)
+		}
+		if page.Proves != nil {
+			proves(field+".proves", manifest.ProtocolVersion, page.Proves, report, text)
 		}
 		if _, listed := pages[page.Route]; listed {
 			report(ErrorCodeDuplicateRoute, field+".route", "the route %s is listed twice", page.Route)
@@ -344,6 +380,38 @@ func Validate(manifest *Manifest) []diag.Diagnostic {
 	return diags
 }
 
+// proves applies the rules of a page's proves: a member of version 2 only,
+// never empty, at most MaxProofs pairs, each in the feature grammar, no pair
+// twice.
+func proves(field string, version int, list []Proof, report func(code, field, format string, args ...any), text func(field, value string) bool) {
+	if version == ProtocolVersionV1 {
+		report(ErrorCodeUnknownField, field, "the member %s is unknown in a version %d manifest", field, ProtocolVersionV1)
+		return
+	}
+	if len(list) == 0 {
+		report(ErrorCodeInvalidProves, field, "%s is empty: a page that proves nothing omits it", field)
+		return
+	}
+	if len(list) > MaxProofs {
+		report(ErrorCodeTooManyProofs, field, "%d proofs, more than %d", len(list), MaxProofs)
+		return
+	}
+	seen := map[Proof]bool{}
+	for i, proof := range list {
+		at := fmt.Sprintf("%s[%d]", field, i)
+		if text(at+".feature", proof.Feature) && !featurePattern.MatchString(proof.Feature) {
+			report(ErrorCodeInvalidProof, at+".feature", "feature %q is no feature ID", proof.Feature)
+		}
+		if text(at+".requirement", proof.Requirement) && !requirementPattern.MatchString(proof.Requirement) {
+			report(ErrorCodeInvalidProof, at+".requirement", "requirement %q is no requirement ID", proof.Requirement)
+		}
+		if seen[proof] {
+			report(ErrorCodeDuplicateProof, at, "%s#%s is listed twice", proof.Feature, proof.Requirement)
+		}
+		seen[proof] = true
+	}
+}
+
 // relativePath reports whether name is a normalized slash-separated path that
 // stays under the directory it is relative to.
 func relativePath(name string) bool {
@@ -364,24 +432,44 @@ func absoluteURL(text string) bool {
 	return err == nil && (strings.HasPrefix(text, "http://") || strings.HasPrefix(text, "https://")) && parsed.Host != ""
 }
 
-// The members of each object of a manifest, by their exact names.
-var (
-	manifestMembers = map[string]bool{"protocolVersion": true, "project": true, "baseSHA": true, "headSHA": true, "pages": true, "captures": true}
-	pageMembers     = map[string]bool{"file": true, "route": true, "path": true, "before": true, "after": true}
-	captureMembers  = map[string]bool{"file": true, "route": true, "side": true, "viewport": true, "scheme": true, "sha256": true, "status": true, "url": true}
-)
+// shape is what the contract holds at one place of a manifest: an object
+// with its members by their exact names, a list of items up to a bound, or,
+// for a nil shape, a scalar.
+type shape struct {
+	members map[string]*shape
+	item    *shape
+	limit   int
+	code    string
+}
 
-// maxDepth is the nesting of a manifest: an object, a list, an object.
-const maxDepth = 3
+// manifestShape is the whole manifest: an object whose pages, captures and
+// page proves are lists of objects.
+var manifestShape = func() *shape {
+	scalars := func(names ...string) map[string]*shape {
+		members := map[string]*shape{}
+		for _, name := range names {
+			members[name] = nil
+		}
+		return members
+	}
+	proof := &shape{members: scalars("feature", "requirement")}
+	page := &shape{members: scalars("file", "route", "path", "before", "after")}
+	page.members["proves"] = &shape{item: proof, limit: MaxProofs, code: ErrorCodeTooManyProofs}
+	capture := &shape{members: scalars("file", "route", "side", "viewport", "scheme", "sha256", "status", "url")}
+	manifest := &shape{members: scalars("protocolVersion", "project", "baseSHA", "headSHA")}
+	manifest.members["pages"] = &shape{item: page, limit: MaxPages, code: ErrorCodeTooManyPages}
+	manifest.members["captures"] = &shape{item: capture, limit: MaxCaptures, code: ErrorCodeTooManyCaptures}
+	return manifest
+}()
 
 // scan walks the token stream before the typed decode, for what
 // encoding/json lets through: it keeps the last occurrence of a member
 // listed twice, matches a member name whatever its case, and reads one value
-// where a file holds two. It also bounds the nesting, so a file of brackets
-// costs nothing.
+// where a file holds two. It also bounds the nesting to the manifest's own,
+// so a file of brackets costs nothing.
 func scan(data []byte) *diag.Diagnostic {
 	decoder := json.NewDecoder(bytes.NewReader(data))
-	if finding := scanValue(decoder, "", 1, manifestMembers, 0); finding != nil {
+	if finding := scanValue(decoder, "", manifestShape); finding != nil {
 		return finding
 	}
 	if _, err := decoder.Token(); err != io.EOF {
@@ -391,10 +479,8 @@ func scan(data []byte) *diag.Diagnostic {
 	return nil
 }
 
-// scanValue reads one value at field. members are the names an object there
-// may hold; nil where the contract holds no object. limit is the most items a
-// list there may hold.
-func scanValue(decoder *json.Decoder, field string, depth int, members map[string]bool, limit int) *diag.Diagnostic {
+// scanValue reads one value at field, which the contract holds as want.
+func scanValue(decoder *json.Decoder, field string, want *shape) *diag.Diagnostic {
 	refuse := func(code, at, format string, args ...any) *diag.Diagnostic {
 		finding := diag.Errorf(code, at, format, args...)
 		return &finding
@@ -405,19 +491,17 @@ func scanValue(decoder *json.Decoder, field string, depth int, members map[strin
 	}
 	delim, nested := token.(json.Delim)
 	if !nested {
-		if depth == 1 {
+		if field == "" {
 			return refuse(ErrorCodeParseError, "", "the manifest is no JSON object")
 		}
 		return nil
 	}
-	if depth > maxDepth {
+	// An object or a list where the contract holds none is a value of the
+	// wrong type, refused before anything inside it is read.
+	if want == nil {
 		return refuse(ErrorCodeParseError, field, "%s nests deeper than a manifest does", field)
 	}
-	// A manifest is an object whose pages and captures are lists of objects:
-	// an object or a list anywhere else is a value of the wrong type.
-	wantList := depth == 2 && members != nil
-	wantObject := depth == 1 || depth == 3 && members != nil
-	if delim == '[' && !wantList || delim == '{' && !wantObject {
+	if delim == '[' && want.item == nil || delim == '{' && want.members == nil {
 		at, kind := field, "a list"
 		if delim == '{' {
 			kind = "an object"
@@ -429,19 +513,15 @@ func scanValue(decoder *json.Decoder, field string, depth int, members map[strin
 	}
 	if delim == '[' {
 		for index := 0; decoder.More(); index++ {
-			if index == limit {
+			if index == want.limit {
 				// More peeks at one byte: a trailing comma is a syntax error,
 				// not an item past the bound.
 				if _, err := decoder.Token(); err != nil {
 					return refuse(ErrorCodeParseError, "", "the manifest is not JSON: %v", err)
 				}
-				code := ErrorCodeTooManyPages
-				if field == "captures" {
-					code = ErrorCodeTooManyCaptures
-				}
-				return refuse(code, field, "%s holds more than %d items", field, limit)
+				return refuse(want.code, field, "%s holds more than %d items", field, want.limit)
 			}
-			if finding := scanValue(decoder, fmt.Sprintf("%s[%d]", field, index), depth+1, members, 0); finding != nil {
+			if finding := scanValue(decoder, fmt.Sprintf("%s[%d]", field, index), want.item); finding != nil {
 				return finding
 			}
 		}
@@ -457,21 +537,15 @@ func scanValue(decoder *json.Decoder, field string, depth int, members map[strin
 			if field != "" {
 				member = field + "." + key
 			}
-			if !members[key] {
+			inner, known := want.members[key]
+			if !known {
 				return refuse(ErrorCodeUnknownField, member, "the member %s is unknown", member)
 			}
 			if seen[key] {
 				return refuse(ErrorCodeDuplicateField, member, "the member %s is listed twice", member)
 			}
 			seen[key] = true
-			var inner map[string]bool
-			limit := 0
-			if depth == 1 && key == "pages" {
-				inner, limit = pageMembers, MaxPages
-			} else if depth == 1 && key == "captures" {
-				inner, limit = captureMembers, MaxCaptures
-			}
-			if finding := scanValue(decoder, member, depth+1, inner, limit); finding != nil {
+			if finding := scanValue(decoder, member, inner); finding != nil {
 				return finding
 			}
 		}

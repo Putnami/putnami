@@ -13,8 +13,9 @@ needs `"$PUTNAMI_CLI" build --projects <id>` first, otherwise the verdict is
 `tree.fingerprint`.
 
 - A web change, one that touches a page of a web project (its committed
-  `schema/http-routes.json` declares `file-route` GET routes): the screens
-  section below.
+  `schema/http-routes.json` declares `file-route` GET routes): a page whose
+  `proves` names a requirement the change adds or modifies, or whose own page
+  file changed. The screens section below.
 - A generated client: exercise the provider declaration, the generation, the
   emitted client and a real consumer call.
 - An unsupported qualifier is a missing adapter, not success: use an existing
@@ -25,7 +26,7 @@ needs `"$PUTNAMI_CLI" build --projects <id>` first, otherwise the verdict is
 ## Screens
 
 Screenshots are the proof of a web change. On the committed tree of the
-final gate, for each web project the change touches:
+final gate, for each web project with a touched page:
 
 1. Serve the head with `"$PUTNAMI_CLI" serve <project> --port <head port>`,
    and the base from a worktree of `git merge-base origin/<base> HEAD` on
@@ -34,7 +35,10 @@ final gate, for each web project the change touches:
    --base-url <base URL> --head-url <head URL> --out
    .putnami/<issue>/screenshots/<project>`. Pass `--storage-state` with a
    Playwright `storageState` file when the pages need a sign-in, and
-   `--fixtures` with the values of each touched template route. A template
+   `--fixtures` with the values of each touched template route that declares
+   no `proves`: a page that proves a requirement is visited at its `at`. A
+   shared component the change edits touches no page: name with `--route` a
+   page you want to see it on. A template
    it refuses, an error status or a failed navigation is a proof to repair,
    not a page to skip.
 3. Read every capture it lists, before and after, desktop and mobile, light

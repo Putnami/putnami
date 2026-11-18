@@ -93,10 +93,11 @@ func TestConformance_InvalidFixtures(t *testing.T) {
 	}
 }
 
-// boundCodes are the codes of the three size bounds. Their cases are built
+// boundCodes are the codes of the four size bounds. Their cases are built
 // by TestAManifestPastABoundIsRefused: a fixture past one of them would be a
 // file of several hundred kilobytes.
-var boundCodes = map[string]bool{ErrorCodeTooLarge: true, ErrorCodeTooManyPages: true, ErrorCodeTooManyCaptures: true}
+var boundCodes = map[string]bool{ErrorCodeTooLarge: true, ErrorCodeTooManyPages: true, ErrorCodeTooManyCaptures: true,
+	ErrorCodeTooManyProofs: true}
 
 func TestConformance_ErrorTaxonomy(t *testing.T) {
 	expectations := loadExpectations(t)

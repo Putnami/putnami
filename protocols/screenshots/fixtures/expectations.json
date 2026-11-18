@@ -3,7 +3,9 @@
     "full.json",
     "minimal.json",
     "no-page.json",
-    "root-project-sha256.json"
+    "root-project-sha256.json",
+    "v2-page-proves-nothing.json",
+    "v2-page-proves.json"
   ],
   "invalid": {
     "base-sha-short.json": "screenshots.invalid_sha",
@@ -33,7 +35,7 @@
     "project-absolute.json": "screenshots.invalid_project",
     "project-escapes.json": "screenshots.invalid_project",
     "project-not-normalized.json": "screenshots.invalid_project",
-    "protocol-version-2.json": "screenshots.invalid_protocol_version",
+    "protocol-version-3.json": "screenshots.invalid_protocol_version",
     "route-listed-twice.json": "screenshots.duplicate_route",
     "scheme-outside-the-set.json": "screenshots.invalid_scheme",
     "sha256-short.json": "screenshots.invalid_sha256",
@@ -50,6 +52,15 @@
     "unknown-page-member.json": "screenshots.unknown_field",
     "url-not-http.json": "screenshots.invalid_url",
     "url-relative.json": "screenshots.invalid_url",
+    "v1-page-with-proves.json": "screenshots.unknown_field",
+    "v2-proof-bad-feature.json": "screenshots.invalid_proof",
+    "v2-proof-bad-requirement.json": "screenshots.invalid_proof",
+    "v2-proof-missing-requirement.json": "screenshots.missing_field",
+    "v2-proof-twice.json": "screenshots.duplicate_proof",
+    "v2-proof-unknown-member.json": "screenshots.unknown_field",
+    "v2-proves-empty.json": "screenshots.invalid_proves",
+    "v2-proves-not-a-list.json": "screenshots.parse_error",
+    "v2-proves-null.json": "screenshots.invalid_proves",
     "viewport-outside-the-set.json": "screenshots.invalid_viewport"
   }
 }

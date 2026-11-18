@@ -3,6 +3,7 @@ package screenshots
 import (
 	"encoding/json"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -16,6 +17,7 @@ type schemaNode struct {
 	Const       any                   `json:"const"`
 	Enum        []string              `json:"enum"`
 	Required    []string              `json:"required"`
+	MinItems    int                   `json:"minItems"`
 	MaxItems    int                   `json:"maxItems"`
 	MaxLength   int                   `json:"maxLength"`
 	Properties  map[string]schemaNode `json:"properties"`
@@ -24,8 +26,13 @@ type schemaNode struct {
 
 func loadSchema(t *testing.T) schemaNode {
 	t.Helper()
+	return parseSchema(t, Schema())
+}
+
+func parseSchema(t *testing.T, data []byte) schemaNode {
+	t.Helper()
 	var schema schemaNode
-	if err := json.Unmarshal(Schema(), &schema); err != nil {
+	if err := json.Unmarshal(data, &schema); err != nil {
 		t.Fatal(err)
 	}
 	return schema
@@ -33,36 +40,51 @@ func loadSchema(t *testing.T) schemaNode {
 
 func TestVersionIdentifiersArePinned(t *testing.T) {
 	spectest.Proves(t, feature, "the-identifiers-are-pinned", "the-version-identifiers-are-pinned")
-	if ProtocolVersion != 1 {
-		t.Fatalf("ProtocolVersion = %d; a wire change needs a new version, a new schema URL and a new corpus", ProtocolVersion)
+	if ProtocolVersion != 2 || ProtocolVersionV1 != 1 {
+		t.Fatalf("ProtocolVersion = %d, ProtocolVersionV1 = %d; a wire change needs a new version, a new schema URL and a new corpus",
+			ProtocolVersion, ProtocolVersionV1)
 	}
-	if SchemaURL != "https://putnami.dev/schemas/putnami-screenshots-v1.json" {
-		t.Fatalf("SchemaURL = %q, want the pinned v1 URL", SchemaURL)
+	if SchemaURL != "https://putnami.dev/schemas/putnami-screenshots-v2.json" {
+		t.Fatalf("SchemaURL = %q, want the pinned v2 URL", SchemaURL)
+	}
+	if SchemaURLV1 != "https://putnami.dev/schemas/putnami-screenshots-v1.json" {
+		t.Fatalf("SchemaURLV1 = %q, want the pinned v1 URL", SchemaURLV1)
 	}
 	if ManifestFile != "screenshots.json" {
 		t.Fatalf("ManifestFile = %q", ManifestFile)
 	}
-	schema := loadSchema(t)
-	if schema.ID != SchemaURL {
-		t.Errorf("schema $id = %q, want %q", schema.ID, SchemaURL)
-	}
-	if version, _ := schema.Properties["protocolVersion"].Const.(float64); int(version) != ProtocolVersion {
-		t.Errorf("schema protocolVersion const = %v, want %d", schema.Properties["protocolVersion"].Const, ProtocolVersion)
-	}
-	if first, second := Schema(), Schema(); &first[0] == &second[0] {
-		t.Error("Schema returns the embedded bytes, which a caller could change")
+	for _, published := range []struct {
+		schema  func() []byte
+		url     string
+		version int
+	}{{Schema, SchemaURL, ProtocolVersion}, {SchemaV1, SchemaURLV1, ProtocolVersionV1}} {
+		schema := parseSchema(t, published.schema())
+		if schema.ID != published.url {
+			t.Errorf("schema $id = %q, want %q", schema.ID, published.url)
+		}
+		if version, _ := schema.Properties["protocolVersion"].Const.(float64); int(version) != published.version {
+			t.Errorf("schema %s protocolVersion const = %v, want %d", published.url, schema.Properties["protocolVersion"].Const, published.version)
+		}
+		if first, second := published.schema(), published.schema(); &first[0] == &second[0] {
+			t.Errorf("the schema %s is returned as the embedded bytes, which a caller could change", published.url)
+		}
 	}
 }
 
 func TestSchemaMembersMatchTheGoTypes(t *testing.T) {
 	spectest.Proves(t, feature, "the-identifiers-are-pinned", "the-schema-members-match-the-go-types")
 	schema := loadSchema(t)
+	v1 := parseSchema(t, SchemaV1())
+	// The optional members of each object: a page proves nothing when it
+	// omits proves.
+	optional := map[string][]string{"Page": {"proves"}}
 	for name, pair := range map[string]struct {
 		node  schemaNode
 		value any
 	}{
 		"Manifest": {schema, Manifest{}},
 		"Page":     {schema.Defs["page"], Page{}},
+		"Proof":    {schema.Defs["proof"], Proof{}},
 		"Capture":  {schema.Defs["capture"], Capture{}},
 	} {
 		var want []string
@@ -79,11 +101,33 @@ func TestSchemaMembersMatchTheGoTypes(t *testing.T) {
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("%s members differ: Go=%v schema=%v", name, got, want)
 		}
-		// Every member is required: the decoder refuses a manifest without one.
+		// Every other member is required: the decoder refuses a manifest
+		// without one.
+		var mandatory []string
+		for _, member := range want {
+			if !slices.Contains(optional[name], member) {
+				mandatory = append(mandatory, member)
+			}
+		}
 		required := append([]string(nil), pair.node.Required...)
 		sort.Strings(required)
-		if !reflect.DeepEqual(required, want) {
-			t.Errorf("%s required members = %v, want every member %v", name, required, want)
+		if !reflect.DeepEqual(required, mandatory) {
+			t.Errorf("%s required members = %v, want every member but %v: %v", name, required, optional[name], mandatory)
+		}
+	}
+	// Version 1 holds the same members, but a page that proves nothing.
+	for name, pair := range map[string][2]schemaNode{
+		"Manifest": {schema, v1},
+		"Page":     {schema.Defs["page"], v1.Defs["page"]},
+		"Capture":  {schema.Defs["capture"], v1.Defs["capture"]},
+	} {
+		for member := range pair[0].Properties {
+			if _, held := pair[1].Properties[member]; !held && !(name == "Page" && member == "proves") {
+				t.Errorf("the version 1 %s lacks the member %s", name, member)
+			}
+		}
+		if len(pair[1].Properties) != len(pair[0].Properties)-len(optional[name]) {
+			t.Errorf("the version 1 %s holds %d members, want those of version 2 but %v", name, len(pair[1].Properties), optional[name])
 		}
 	}
 }
@@ -122,6 +166,10 @@ func TestSchemaClosedSetsMatchTheGoSets(t *testing.T) {
 		"capture.route": {capture["route"].MaxLength, MaxTextBytes},
 		"capture.url":   {capture["url"].MaxLength, MaxTextBytes},
 		"capture.file":  {capture["file"].MaxLength, MaxFileNameBytes},
+		"page.proves":   {schema.Defs["page"].Properties["proves"].MaxItems, MaxProofs},
+		"proves.min":    {schema.Defs["page"].Properties["proves"].MinItems, 1},
+		"proof.feature": {schema.Defs["proof"].Properties["feature"].MaxLength, MaxTextBytes},
+		"proof.req":     {schema.Defs["proof"].Properties["requirement"].MaxLength, MaxTextBytes},
 	}
 	for name, bound := range bounds {
 		if bound[0] != bound[1] {

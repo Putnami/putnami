@@ -153,7 +153,7 @@ func TestEachEnvelopeRuleHasAStableCode(t *testing.T) {
 		"a head of another length": ErrorCodeInvalidSHA,
 	}
 	assertRules(t, map[string]func(*Manifest){
-		"another version":          func(m *Manifest) { m.ProtocolVersion = 2 },
+		"another version":          func(m *Manifest) { m.ProtocolVersion = 3 },
 		"an absolute project":      func(m *Manifest) { m.Project = "/apps/web" },
 		"an escaping project":      func(m *Manifest) { m.Project = "../web" },
 		"a backslash project":      func(m *Manifest) { m.Project = `apps\web` },
@@ -399,7 +399,22 @@ func TestAManifestPastABoundIsRefused(t *testing.T) {
 	if _, diags := Decode(padded[:MaxManifestBytes]); len(diags) != 0 {
 		t.Errorf("a manifest of %d bytes: %v", MaxManifestBytes, diags)
 	}
-	if MaxManifestBytes != 4<<20 || MaxCaptureBytes != 64<<20 || MaxPages != 512 || MaxTextBytes != 2048 || MaxFileNameBytes != 255 {
+	proofs := manifestOf(1)
+	for i := range MaxProofs + 1 {
+		proofs.Pages[0].Proves = append(proofs.Pages[0].Proves, Proof{Feature: "acme/home", Requirement: fmt.Sprintf("r%d", i)})
+	}
+	if got := codes(Validate(&proofs)); !reflect.DeepEqual(got, []string{ErrorCodeTooManyProofs}) {
+		t.Errorf("%d proofs: %v", MaxProofs+1, got)
+	}
+	proofs.Pages[0].Proves = proofs.Pages[0].Proves[:MaxProofs]
+	if got := codes(Validate(&proofs)); len(got) != 0 {
+		t.Errorf("%d proofs: %v", MaxProofs, got)
+	}
+	empty = `{"pages": [{"proves": [` + strings.Repeat(`{},`, MaxProofs) + `{}]}]}`
+	if _, diags := Parse([]byte(empty)); !reflect.DeepEqual(codes(diags), []string{ErrorCodeTooManyProofs}) {
+		t.Errorf("%d empty proofs: %v", MaxProofs+1, diags)
+	}
+	if MaxManifestBytes != 4<<20 || MaxCaptureBytes != 64<<20 || MaxPages != 512 || MaxTextBytes != 2048 || MaxFileNameBytes != 255 || MaxProofs != 256 {
 		t.Error("a bound moved: a bound is part of the contract, and moving one needs a new protocolVersion")
 	}
 }
@@ -441,7 +456,7 @@ func TestAMarshaledManifestParsesToTheSameValue(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !bytes.HasPrefix(data, []byte("{\n  \"protocolVersion\": 1,\n")) || !bytes.HasSuffix(data, []byte("\n}\n")) || bytes.HasSuffix(data, []byte("\n\n")) {
+		if !bytes.HasPrefix(data, []byte("{\n  \"protocolVersion\": 2,\n")) || !bytes.HasSuffix(data, []byte("\n}\n")) || bytes.HasSuffix(data, []byte("\n\n")) {
 			t.Errorf("the manifest is not indented JSON with one trailing newline:\n%s", data)
 		}
 		got, diags := Decode(data)
@@ -473,5 +488,99 @@ func TestAMarshaledManifestParsesToTheSameValue(t *testing.T) {
 		if second, _ := Decode(data); second == nil || !reflect.DeepEqual(first, second) {
 			t.Errorf("%s does not survive a round trip", name)
 		}
+	}
+}
+
+func TestEachProofRuleHasAStableCode(t *testing.T) {
+	spectest.Proves(t, feature, "a-page-names-what-it-proves", "each-proof-rule-has-a-stable-code")
+	proof := Proof{Feature: "acme/home", Requirement: "lists-recent-changes"}
+	want := map[string]string{
+		"an empty list":         ErrorCodeInvalidProves,
+		"a feature of one part": ErrorCodeInvalidProof,
+		"an uppercase feature":  ErrorCodeInvalidProof,
+		"a requirement path":    ErrorCodeInvalidProof,
+		"an empty requirement":  ErrorCodeInvalidProof,
+		"a long feature":        ErrorCodeTextTooLong,
+		"a proof listed twice":  ErrorCodeDuplicateProof,
+	}
+	assertRules(t, map[string]func(*Manifest){
+		"an empty list":         func(m *Manifest) { m.Pages[0].Proves = []Proof{} },
+		"a feature of one part": func(m *Manifest) { m.Pages[0].Proves = []Proof{{Feature: "home", Requirement: proof.Requirement}} },
+		"an uppercase feature":  func(m *Manifest) { m.Pages[0].Proves = []Proof{{Feature: "Acme/home", Requirement: proof.Requirement}} },
+		"a requirement path":    func(m *Manifest) { m.Pages[0].Proves = []Proof{{Feature: proof.Feature, Requirement: "a/b"}} },
+		"an empty requirement":  func(m *Manifest) { m.Pages[0].Proves = []Proof{{Feature: proof.Feature}} },
+		"a long feature": func(m *Manifest) {
+			m.Pages[0].Proves = []Proof{{Feature: "acme/" + strings.Repeat("a", MaxTextBytes), Requirement: proof.Requirement}}
+		},
+		"a proof listed twice": func(m *Manifest) { m.Pages[0].Proves = []Proof{proof, proof} },
+	}, want)
+	manifest := manifestOf(2)
+	manifest.Pages[0].Proves = []Proof{proof, {Feature: "acme/change-review", Requirement: proof.Requirement}}
+	manifest.Pages[1].Proves = []Proof{proof}
+	if diags := Validate(&manifest); len(diags) > 0 {
+		t.Errorf("two pages that prove requirements, one of them both: %v", diags)
+	}
+}
+
+func TestAVersion1PageCarriesNoProof(t *testing.T) {
+	spectest.Proves(t, feature, "a-page-names-what-it-proves", "a-version-1-page-carries-no-proof")
+	manifest := manifestOf(1)
+	manifest.ProtocolVersion = ProtocolVersionV1
+	manifest.Pages[0].Proves = []Proof{{Feature: "acme/home", Requirement: "lists-recent-changes"}}
+	diags := Validate(&manifest)
+	if !reflect.DeepEqual(codes(diags), []string{ErrorCodeUnknownField}) || diags[0].Field != "pages[0].proves" {
+		t.Fatalf("a version 1 page with proves: %v", diags)
+	}
+	if _, err := Marshal(manifest); err == nil {
+		t.Fatal("Marshal wrote a version 1 page with proves")
+	}
+}
+
+func TestAVersion1ManifestStillDecodes(t *testing.T) {
+	spectest.Proves(t, feature, "both-versions-decode", "a-version-1-manifest-still-decodes")
+	for _, name := range []string{"full.json", "minimal.json", "no-page.json", "root-project-sha256.json"} {
+		manifest, diags := Decode(readFixture(t, "valid", name))
+		if len(diags) > 0 || manifest == nil || manifest.ProtocolVersion != ProtocolVersionV1 {
+			t.Fatalf("%s: %v", name, diags)
+		}
+		for _, page := range manifest.Pages {
+			if page.Proves != nil {
+				t.Errorf("%s: the version 1 page %s proves %v", name, page.Route, page.Proves)
+			}
+		}
+	}
+	manifest, diags := Decode(readFixture(t, "valid", "v2-page-proves.json"))
+	if len(diags) > 0 || manifest.ProtocolVersion != ProtocolVersion || len(manifest.Pages[0].Proves) != 2 {
+		t.Fatalf("the version 2 fixture: %+v %v", manifest, diags)
+	}
+}
+
+func TestMarshalWritesTheVersionTheManifestNames(t *testing.T) {
+	spectest.Proves(t, feature, "both-versions-decode", "marshal-writes-the-version-the-manifest-names")
+	for _, version := range []int{ProtocolVersionV1, ProtocolVersion} {
+		manifest := manifestOf(1)
+		manifest.ProtocolVersion = version
+		if version == ProtocolVersion {
+			manifest.Pages[0].Proves = []Proof{{Feature: "acme/home", Requirement: "lists-recent-changes"}}
+		}
+		data, err := Marshal(manifest)
+		if err != nil {
+			t.Fatalf("version %d: %v", version, err)
+		}
+		if !bytes.HasPrefix(data, fmt.Appendf(nil, "{\n  \"protocolVersion\": %d,\n", version)) {
+			t.Errorf("version %d wrote:\n%s", version, data)
+		}
+		if bytes.Contains(data, []byte(`"proves"`)) != (version == ProtocolVersion) {
+			t.Errorf("version %d: proves written %v", version, bytes.Contains(data, []byte(`"proves"`)))
+		}
+		got, diags := Decode(data)
+		if len(diags) > 0 || !reflect.DeepEqual(*got, manifest) {
+			t.Errorf("version %d does not read back: %v", version, diags)
+		}
+	}
+	// A page that proves nothing omits the member.
+	data, err := Marshal(manifestOf(1))
+	if err != nil || bytes.Contains(data, []byte(`"proves"`)) {
+		t.Errorf("a page that proves nothing: %v\n%s", err, data)
 	}
 }

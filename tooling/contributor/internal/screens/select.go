@@ -7,6 +7,8 @@ import (
 	"path"
 	"slices"
 	"strings"
+
+	"go.putnami.dev/protocol/screenshots"
 )
 
 // InventoryPath is where a project commits its route inventory, relative to
@@ -14,7 +16,8 @@ import (
 const InventoryPath = "schema/http-routes.json"
 
 // Inventory is the part of a putnami.http-routes.v1 document that selects
-// pages: each route's match, path, methods, source kind and evidence path.
+// pages: each route's match, path, methods, source kind, evidence path, and
+// the requirements a page route proves.
 type Inventory struct {
 	Routes []Route `json:"routes"`
 }
@@ -28,6 +31,22 @@ type Route struct {
 		SourceKind   string `json:"sourceKind"`
 		EvidencePath string `json:"evidencePath"`
 	} `json:"provenance"`
+	// Proves lists the feature requirements the page proves, each with a
+	// concrete path that renders it with fixture data.
+	Proves []RouteProof `json:"proves,omitempty"`
+}
+
+// RouteProof is one requirement a page route proves, and the path, at, that
+// renders the page with fixture data.
+type RouteProof struct {
+	Feature     string `json:"feature"`
+	Requirement string `json:"requirement"`
+	At          string `json:"at"`
+}
+
+// Key returns the requirement the proof names.
+func (p RouteProof) Key() Requirement {
+	return Requirement{Feature: p.Feature, Requirement: p.Requirement}
 }
 
 // ParseInventory reads a route inventory.
@@ -61,12 +80,18 @@ func (inv *Inventory) Pages() []Route {
 
 // HasPage reports whether the inventory holds a page at the route path.
 func (inv *Inventory) HasPage(route string) bool {
+	_, ok := inv.page(route)
+	return ok
+}
+
+// page returns the page route at a route path.
+func (inv *Inventory) page(route string) (Route, bool) {
 	for _, page := range inv.Pages() {
 		if page.Path == route {
-			return true
+			return page, true
 		}
 	}
-	return false
+	return Route{}, false
 }
 
 // Selection is what selects a project's touched pages.
@@ -80,28 +105,20 @@ type Selection struct {
 	Base, Head *Inventory
 	// Routes are the routes the run names with --route.
 	Routes []string
+	// Touched are the requirements the change adds or changes.
+	Touched map[Requirement]bool
 }
 
 // TouchedRoutes returns the page routes a change touches, without their
-// visited paths: a page file the change touches is captured at its first
-// route, the head's when the head holds the page, and every --route is
-// added. A changed file under the project's src/ that is no route's evidence
-// touches every page.
+// visited paths: each head page route whose proves names a touched
+// requirement, in inventory order; then each page whose file the change
+// touches, at its first route, the head's when the head holds the page; then
+// every --route. No other changed file touches a page. Each page names the
+// requirements its head route proves.
 func TouchedRoutes(sel Selection) ([]Page, error) {
 	prefix := strings.TrimSuffix(path.Clean(sel.Project), "/") + "/"
 	if sel.Project == "." || sel.Project == "" {
 		prefix = ""
-	}
-	evidence := map[string]bool{}
-	for _, inv := range []*Inventory{sel.Head, sel.Base} {
-		if inv == nil {
-			continue
-		}
-		for _, route := range inv.Routes {
-			if route.Provenance.EvidencePath != "" {
-				evidence[route.Provenance.EvidencePath] = true
-			}
-		}
 	}
 	// The page files in order, each with its first route: the head's pages,
 	// then the pages only the base holds.
@@ -115,19 +132,10 @@ func TouchedRoutes(sel Selection) ([]Page, error) {
 		first[file] = route
 		files = append(files, file)
 	}
-	touchAll := false
 	touched := map[string]bool{}
 	for _, changed := range sel.Changed {
-		rel, ok := strings.CutPrefix(changed, prefix)
-		if !ok {
-			continue
-		}
-		if _, isPage := first[rel]; isPage {
+		if rel, ok := strings.CutPrefix(changed, prefix); ok {
 			touched[rel] = true
-			continue
-		}
-		if strings.HasPrefix(rel, "src/") && !evidence[rel] {
-			touchAll = true
 		}
 	}
 	var pages []Page
@@ -137,11 +145,19 @@ func TouchedRoutes(sel Selection) ([]Page, error) {
 			return
 		}
 		seen[route.Path] = true
-		pages = append(pages, Page{File: file, Route: route.Path,
-			Before: sel.Base.HasPage(route.Path), After: sel.Head.HasPage(route.Path)})
+		page := Page{File: file, Route: route.Path, Before: sel.Base.HasPage(route.Path), After: sel.Head.HasPage(route.Path)}
+		if head, ok := sel.Head.page(route.Path); ok {
+			page.Proves = proofsOf(head)
+		}
+		pages = append(pages, page)
+	}
+	for _, route := range sel.Head.Pages() {
+		if provesAny(route, sel.Touched) {
+			add(route.Provenance.EvidencePath, route)
+		}
 	}
 	for _, file := range files {
-		if touchAll || touched[file] {
+		if touched[file] {
 			add(file, first[file])
 		}
 	}
@@ -155,6 +171,42 @@ func TouchedRoutes(sel Selection) ([]Page, error) {
 	return pages, nil
 }
 
+// Proves reports whether a page route of the inventory proves one of the
+// requirements. A nil inventory proves none.
+func (inv *Inventory) Proves(requirements map[Requirement]bool) bool {
+	for _, route := range inv.Pages() {
+		if provesAny(route, requirements) {
+			return true
+		}
+	}
+	return false
+}
+
+// provesAny reports whether a route proves one of the requirements.
+func provesAny(route Route, requirements map[Requirement]bool) bool {
+	for _, proof := range route.Proves {
+		if requirements[proof.Key()] {
+			return true
+		}
+	}
+	return false
+}
+
+// proofsOf returns the requirements a route proves, each once, in the
+// route's order; nil when it proves none.
+func proofsOf(route Route) []screenshots.Proof {
+	var proofs []screenshots.Proof
+	seen := map[Requirement]bool{}
+	for _, proof := range route.Proves {
+		if seen[proof.Key()] {
+			continue
+		}
+		seen[proof.Key()] = true
+		proofs = append(proofs, screenshots.Proof{Feature: proof.Feature, Requirement: proof.Requirement})
+	}
+	return proofs
+}
+
 func findPage(path string, inventories ...*Inventory) (Route, bool) {
 	for _, inv := range inventories {
 		for _, page := range inv.Pages() {
@@ -166,10 +218,12 @@ func findPage(path string, inventories ...*Inventory) (Route, bool) {
 	return Route{}, false
 }
 
-// Select returns the touched pages with the path each is visited at: an
-// exact route as is, a template with each parameter taken from fixtures,
-// keyed by the template path. A touched template with a missing value is
-// refused, and the error names every one.
+// Select returns the touched pages with the path each is visited at: the
+// route filled with its fixtures, keyed by the template path, when the
+// fixtures name the route; else the at of a touched requirement the head
+// route proves, else the at of its first proof; else the route filled with
+// no value, which an exact route needs. A touched template with a missing
+// value is refused, and the error names every one.
 func Select(sel Selection, fixtures map[string]map[string]string) ([]Page, error) {
 	pages, err := TouchedRoutes(sel)
 	if err != nil {
@@ -177,7 +231,14 @@ func Select(sel Selection, fixtures map[string]map[string]string) ([]Page, error
 	}
 	var missing []string
 	for i := range pages {
-		visit, lacking := Instantiate(pages[i].Route, fixtures[pages[i].Route])
+		values, named := fixtures[pages[i].Route]
+		if !named {
+			if at := proofPath(sel, pages[i].Route); at != "" {
+				pages[i].Path = at
+				continue
+			}
+		}
+		visit, lacking := Instantiate(pages[i].Route, values)
 		if len(lacking) > 0 {
 			missing = append(missing, fmt.Sprintf("%s (%s)", pages[i].Route, strings.Join(lacking, ", ")))
 			continue
@@ -185,9 +246,25 @@ func Select(sel Selection, fixtures map[string]map[string]string) ([]Page, error
 		pages[i].Path = visit
 	}
 	if len(missing) > 0 {
-		return nil, fmt.Errorf("--fixtures gives no value for the touched template routes %s", strings.Join(missing, "; "))
+		return nil, fmt.Errorf("--fixtures gives no value, and no proves gives an at, for the touched template routes %s", strings.Join(missing, "; "))
 	}
 	return pages, nil
+}
+
+// proofPath returns the at a page is visited at: that of the first
+// requirement its head route proves that the change touches, else that of
+// its first proof; "" when the head route proves nothing.
+func proofPath(sel Selection, route string) string {
+	head, ok := sel.Head.page(route)
+	if !ok || len(head.Proves) == 0 {
+		return ""
+	}
+	for _, proof := range head.Proves {
+		if sel.Touched[proof.Key()] {
+			return proof.At
+		}
+	}
+	return head.Proves[0].At
 }
 
 // Instantiate fills a route path's parameters from values: a {name} segment

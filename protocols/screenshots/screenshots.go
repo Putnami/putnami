@@ -6,12 +6,19 @@ package screenshots
 
 import _ "embed"
 
-// ProtocolVersion is the version every manifest of this contract carries. A
-// change to a member, a closed set or a rule needs a new version.
-const ProtocolVersion = 1
+// ProtocolVersion is the version a writer writes. A change to a member, a
+// closed set or a rule needs a new version.
+const ProtocolVersion = 2
 
-// SchemaURL is where the JSON Schema of a version 1 manifest is published.
-const SchemaURL = "https://putnami.dev/schemas/putnami-screenshots-v1.json"
+// ProtocolVersionV1 is the first version, which a reader still accepts. Its
+// pages name no requirement.
+const ProtocolVersionV1 = 1
+
+// SchemaURL is where the JSON Schema of a version 2 manifest is published.
+const SchemaURL = "https://putnami.dev/schemas/putnami-screenshots-v2.json"
+
+// SchemaURLV1 is where the JSON Schema of a version 1 manifest is published.
+const SchemaURLV1 = "https://putnami.dev/schemas/putnami-screenshots-v1.json"
 
 // ManifestFile is the name of the manifest in the directory that holds the
 // captures.
@@ -51,6 +58,8 @@ const (
 	MaxTextBytes = 2048
 	// MaxFileNameBytes is the longest capture file name.
 	MaxFileNameBytes = 255
+	// MaxProofs is the most requirements a page names in proves.
+	MaxProofs = 256
 )
 
 // Viewport is one of the sizes a page is captured at: a name of the closed
@@ -84,7 +93,7 @@ func Schemes() []string { return []string{SchemeLight, SchemeDark} }
 // project, the two commits it compares, the pages the change touches and one
 // capture per page, side, viewport and scheme.
 type Manifest struct {
-	// ProtocolVersion is 1.
+	// ProtocolVersion is 1 or 2.
 	ProtocolVersion int `json:"protocolVersion"`
 	// Project is the project directory, relative to the workspace root.
 	Project string `json:"project"`
@@ -99,8 +108,8 @@ type Manifest struct {
 }
 
 // Page is one touched page: its page file, relative to the project, the
-// route it is captured at, the path visited for that route, and the sides
-// that hold the page.
+// route it is captured at, the path visited for that route, the sides that
+// hold the page, and, from version 2, the requirements it proves.
 type Page struct {
 	// File is the page file, a normalized path relative to the project.
 	File string `json:"file"`
@@ -113,6 +122,19 @@ type Page struct {
 	Before bool `json:"before"`
 	// After tells whether the head holds the page.
 	After bool `json:"after"`
+	// Proves lists the feature requirements the page proves at the head. It
+	// exists only from version 2, is omitted when the page proves none, and
+	// is never empty when present.
+	Proves []Proof `json:"proves,omitempty"`
+}
+
+// Proof names one feature requirement a page proves, with the feature and
+// requirement keys a test binds with.
+type Proof struct {
+	// Feature is the feature ID, such as "acme/change-review".
+	Feature string `json:"feature"`
+	// Requirement is the requirement ID within Feature.
+	Requirement string `json:"requirement"`
 }
 
 // Capture is one PNG file in the manifest's directory.
@@ -135,9 +157,17 @@ type Capture struct {
 	URL string `json:"url"`
 }
 
-//go:embed schemas/screenshots.json
-var schema []byte
+var (
+	//go:embed schemas/screenshots-v2.json
+	schema []byte
+	//go:embed schemas/screenshots.json
+	schemaV1 []byte
+)
 
-// Schema returns the JSON Schema of a manifest, the document published at
-// SchemaURL.
+// Schema returns the JSON Schema of a version 2 manifest, the document
+// published at SchemaURL.
 func Schema() []byte { return append([]byte(nil), schema...) }
+
+// SchemaV1 returns the JSON Schema of a version 1 manifest, the document
+// published at SchemaURLV1.
+func SchemaV1() []byte { return append([]byte(nil), schemaV1...) }

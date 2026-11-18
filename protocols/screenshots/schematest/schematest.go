@@ -23,21 +23,35 @@ import (
 	"go.putnami.dev/protocol/screenshots"
 )
 
-// Check returns the first reason the published schema refuses document, or
-// nil when the schema accepts it. It fails the test when the schema itself
-// cannot be evaluated.
+// Check returns the first reason the published schema of the document's
+// version refuses document, or nil when that schema accepts it: the version 1
+// schema for a document whose protocolVersion is 1, the current schema for
+// any other. It fails the test when the schema itself cannot be evaluated.
 func Check(tb testing.TB, document []byte) error {
 	tb.Helper()
-	var root map[string]any
-	if err := decode(screenshots.Schema(), &root); err != nil {
-		tb.Fatalf("the schema is not JSON: %v", err)
-	}
 	var value any
 	if err := decode(document, &value); err != nil {
 		return fmt.Errorf("the document is not JSON: %w", err)
 	}
+	var root map[string]any
+	if err := decode(SchemaOf(value), &root); err != nil {
+		tb.Fatalf("the schema is not JSON: %v", err)
+	}
 	e := &evaluator{tb: tb, root: root}
 	return e.check(root, value, "$")
+}
+
+// SchemaOf returns the published schema that judges a decoded document: the
+// version 1 schema when its protocolVersion is 1, the current one otherwise.
+func SchemaOf(document any) []byte {
+	if object, ok := document.(map[string]any); ok {
+		if version, ok := object["protocolVersion"].(json.Number); ok {
+			if value, err := version.Float64(); err == nil && value == screenshots.ProtocolVersionV1 {
+				return screenshots.SchemaV1()
+			}
+		}
+	}
+	return screenshots.Schema()
 }
 
 // decode reads the first JSON value of data, keeping each number as written.
@@ -155,6 +169,23 @@ func (e *evaluator) keyword(node map[string]any, keyword string, argument, value
 				return refuse("holds %d items, more than %v", len(value), argument)
 			}
 			return nil
+		case "minItems":
+			if float64(len(value)) < number(argument) {
+				return refuse("holds %d items, fewer than %v", len(value), argument)
+			}
+			return nil
+		case "uniqueItems":
+			if unique, ok := argument.(bool); !ok || !unique {
+				e.tb.Fatalf("the schema uses uniqueItems with %v, which this evaluator does not implement", argument)
+			}
+			for i := range value {
+				for j := range i {
+					if equal(value[i], value[j]) {
+						return refuse("holds the item %d twice", j)
+					}
+				}
+			}
+			return nil
 		case "items":
 			for i, item := range value {
 				if err := e.check(argument, item, fmt.Sprintf("%s[%d]", at, i)); err != nil {
@@ -193,7 +224,7 @@ func (e *evaluator) keyword(node map[string]any, keyword string, argument, value
 	}
 	// A keyword that does not apply to the type of the value accepts it.
 	switch keyword {
-	case "required", "properties", "additionalProperties", "maxItems", "items", "maxLength", "pattern", "minimum", "maximum":
+	case "required", "properties", "additionalProperties", "maxItems", "minItems", "uniqueItems", "items", "maxLength", "pattern", "minimum", "maximum":
 		return nil
 	}
 	e.tb.Fatalf("the schema uses %q, which this evaluator does not implement", keyword)

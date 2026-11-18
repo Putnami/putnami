@@ -316,9 +316,31 @@ func (b *Browser) Close() error {
 	return os.RemoveAll(b.dataDir)
 }
 
+// freezeMotion stops the motion of the page, so a capture shows the same
+// frame whenever it is taken: a style pauses the animations and turns
+// transitions off, which ends each at its end value; each animation, CSS or
+// scripted, with a finite end is paused at its last frame, so an entrance
+// shows the content it brings in, and an endless one, such as a spinner, is
+// paused at time zero. No animation reaches its end phase, so no handler of
+// the page runs on its end. It resolves after two frames, once the frozen frame is painted.
+const freezeMotion = `(() => {
+  const style = document.createElement("style");
+  style.textContent = "*, *::before, *::after { animation-play-state: paused !important; transition: none !important; caret-color: transparent !important; }";
+  (document.head || document.documentElement).appendChild(style);
+  for (const animation of document.getAnimations ? document.getAnimations() : []) {
+    try {
+      const end = animation.effect ? animation.effect.getComputedTiming().endTime : Infinity;
+      animation.pause();
+      animation.currentTime = Number.isFinite(end) ? Math.max(0, end - 0.001) : 0;
+    } catch (_) {}
+  }
+  return new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))));
+})()`
+
 // Capture opens shot.URL in a new tab sized and colored as the shot says,
-// waits for its load event and its fonts, and returns a full-page PNG and the
-// HTTP status of the document, and the URL the page ended at.
+// waits for its load event and its fonts, freezes its animations and
+// transitions, and returns a full-page PNG and the HTTP status of the
+// document, and the URL the page ended at.
 func (b *Browser) Capture(ctx context.Context, shot Shot) (Captured, error) {
 	ctx, cancel := context.WithTimeout(ctx, b.Timeout)
 	defer cancel()
@@ -385,6 +407,9 @@ func (b *Browser) Capture(ctx context.Context, shot Shot) (Captured, error) {
 	}
 	settle := "document.fonts ? document.fonts.ready.then(() => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))) : true"
 	if err := call("Runtime.evaluate", map[string]any{"expression": settle, "awaitPromise": true}, nil); err != nil {
+		return Captured{}, err
+	}
+	if err := call("Runtime.evaluate", map[string]any{"expression": freezeMotion, "awaitPromise": true}, nil); err != nil {
 		return Captured{}, err
 	}
 	var location struct {

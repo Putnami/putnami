@@ -5,24 +5,26 @@ the manifest `putnami change screenshots` writes beside the PNG captures of a
 web change. A consumer that stores or reads the manifest decodes it against
 this module, not against a copy of the writer's types.
 
-The normative artifacts are the JSON Schema
-[`schemas/screenshots.json`](schemas/screenshots.json) (its `$id` is
-`https://putnami.dev/schemas/putnami-screenshots-v1.json`), the Go decoder,
-and the shared corpus under [`fixtures/`](fixtures/).
+The normative artifacts are the JSON Schemas of its two versions,
+[`schemas/screenshots-v2.json`](schemas/screenshots-v2.json) (its `$id` is
+`https://putnami.dev/schemas/putnami-screenshots-v2.json`) and
+[`schemas/screenshots.json`](schemas/screenshots.json) for version 1 (its
+`$id` is `https://putnami.dev/schemas/putnami-screenshots-v1.json`), the Go
+decoder, and the shared corpus under [`fixtures/`](fixtures/).
 
 ## Producers and consumers
 
 | Role | Implementation |
 | --- | --- |
-| Producer | `putnami change screenshots`, served by `@putnami/contributor`, writes the manifest with `Marshal` (`tooling/contributor/internal/screens`). |
-| Consumer (in repo) | `putnami change finalize` reads the manifest of each touched web project with `Decode`, then checks it against the head and hashes each capture file. |
+| Producer | `putnami change screenshots`, served by `@putnami/contributor`, writes a version 2 manifest with `Marshal` (`tooling/contributor/internal/screens`). |
+| Consumer (in repo) | `putnami change finalize` reads the manifest of each touched web project with `Decode`, requires version 2, then checks it against the head and hashes each capture file. |
 | Consumer (out of repo) | A service that stores or shows the screenshots of a change. |
 
 ## Wire shape
 
 ```json
 {
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "project": "apps/web",
   "baseSHA": "1f0e2d3c4b5a69788796a5b4c3d2e1f001234567",
   "headSHA": "89abcdef0123456789abcdef0123456789abcdef",
@@ -32,7 +34,10 @@ and the shared corpus under [`fixtures/`](fixtures/).
       "route": "/tasks",
       "path": "/tasks",
       "before": true,
-      "after": true
+      "after": true,
+      "proves": [
+        { "feature": "acme/tasks", "requirement": "lists-open-tasks" }
+      ]
     }
   ],
   "captures": [
@@ -50,18 +55,21 @@ and the shared corpus under [`fixtures/`](fixtures/).
 }
 ```
 
-The example lists one of the eight captures of its page. Every member is
-required, and no other member is allowed.
+The example lists one of the eight captures of its page. Every member but
+`proves` is required, and no other member is allowed.
 
 | Member | Rule |
 | --- | --- |
-| `protocolVersion` | `1`. |
+| `protocolVersion` | `2`, or `1` for a manifest written before `proves`. |
 | `project` | The project directory, relative to the workspace root: a normalized slash-separated path, or `.` for a project at the root. |
 | `baseSHA`, `headSHA` | The merge base and the head the captures were taken at: full lowercase commit shas of 40 or 64 hexadecimal characters. |
 | `pages[].file` | The page file, a normalized path relative to the project. |
 | `pages[].route` | The route the page is captured at. It starts with a slash, and no two pages share it. |
 | `pages[].path` | The path visited for the route: the route itself, or a template with its parameters filled. It starts with a slash. |
 | `pages[].before`, `pages[].after` | Whether the base and the head hold the page. At least one is true. |
+| `pages[].proves` | Version 2 only, optional: the feature requirements the page proves at the head. Omitted when the page proves none, never empty, at most 256 entries, no entry twice. |
+| `pages[].proves[].feature` | A feature ID, as a test binds it: lowercase words joined by hyphens, in two or more slash-separated parts, such as `acme/tasks`. |
+| `pages[].proves[].requirement` | A requirement ID within the feature: lowercase words joined by hyphens. |
 | `captures[].file` | A `.png` file name in the manifest's directory, with no directory part. No two captures share it. |
 | `captures[].route` | The route of one of the pages. |
 | `captures[].side` | `before` or `after`, a side that holds the page. |
@@ -84,6 +92,7 @@ one.
 | Bound | Value | Go constant |
 | --- | --- | --- |
 | Pages per manifest | 512 | `MaxPages` |
+| Proofs per page | 256 | `MaxProofs` |
 | Captures per manifest | 4096, eight per page | `MaxCaptures` |
 | Bytes of the manifest file | 4 MiB (4 194 304) | `MaxManifestBytes` |
 | Bytes of a capture file | 64 MiB (67 108 864) | `MaxCaptureBytes` |
@@ -106,8 +115,9 @@ if manifest == nil {
 `Decode` parses strictly, then validates. It returns the manifest only when no
 rule refuses it; otherwise each finding carries a stable code and the path of
 its member. `Parse` alone applies the shape and the list bounds: one JSON object,
-every member present, no unknown member, no member twice, and no more than
-`MaxPages` pages or `MaxCaptures` captures: no item past a bound is read. Member names match by their
+every required member present, no unknown member, no member twice, and no
+more than `MaxPages` pages, `MaxCaptures` captures or `MaxProofs` proofs in a
+page: no item past a bound is read. Member names match by their
 exact case, and a value that nests deeper than a manifest does is refused
 before it is read. `Marshal` validates before it
 serializes, so a writer that goes through the protocol cannot write a manifest
@@ -119,7 +129,7 @@ the decoder refuses.
 | `screenshots.too_large` | The file is more than `MaxManifestBytes`. |
 | `screenshots.unknown_field`, `screenshots.duplicate_field`, `screenshots.missing_field` | A member is unknown, listed twice, or absent or null. |
 | `screenshots.text_too_long` | A text member is more than `MaxTextBytes`. |
-| `screenshots.invalid_protocol_version` | `protocolVersion` is not 1. |
+| `screenshots.invalid_protocol_version` | `protocolVersion` is neither 1 nor 2. |
 | `screenshots.invalid_project`, `screenshots.invalid_sha` | `project`, `baseSHA` or `headSHA` breaks its rule. |
 | `screenshots.too_many_pages`, `screenshots.too_many_captures` | A list is past its bound. |
 | `screenshots.invalid_page_file`, `screenshots.invalid_route`, `screenshots.invalid_path`, `screenshots.invalid_page_sides` | A page member breaks its rule, or neither side holds the page. |
@@ -129,6 +139,10 @@ the decoder refuses.
 | `screenshots.invalid_sha256`, `screenshots.invalid_status`, `screenshots.invalid_url` | A capture member breaks its rule. |
 | `screenshots.unknown_route`, `screenshots.unexpected_side` | A capture names no page, or a side that does not hold its page. |
 | `screenshots.duplicate_capture`, `screenshots.missing_capture` | A route, side, viewport and scheme has two captures, or none. |
+| `screenshots.invalid_proves`, `screenshots.too_many_proofs` | A page's `proves` is null or empty, or past its bound. |
+| `screenshots.invalid_proof`, `screenshots.duplicate_proof` | A proof's feature or requirement breaks the grammar, or the page lists a proof twice. |
+
+A version 1 page that carries `proves` fails with `screenshots.unknown_field`.
 
 ## Schema and decoder
 
@@ -138,8 +152,8 @@ member listed twice, trailing data, the byte bounds, a route or a file listed
 twice, and the rules that relate a capture to its page. A consumer that
 validates with the schema alone applies those rules itself.
 
-`schematest.Check` judges a document against the published schema in a Go
-test, without a JSON Schema library. `putnami change screenshots` uses it to
+`schematest.Check` judges a document against the published schema of its
+version in a Go test, without a JSON Schema library. `putnami change screenshots` uses it to
 prove that its output validates.
 
 ## Support
@@ -153,5 +167,14 @@ screenshots of a change, and an explicit compatibility window.
 ## Versioning
 
 A change to a member, a closed set, a rule or a bound needs a new
-`protocolVersion`, a new schema URL and a new corpus. A reader refuses a
+`protocolVersion`, a new schema URL and new fixtures. A reader refuses a
 version it does not know.
+
+| Version | Change | Schema |
+| --- | --- | --- |
+| 1 | The first manifest. | `putnami-screenshots-v1.json` |
+| 2 | A page names the requirements it proves in `proves`. `Decode` still reads version 1, and `Marshal` writes the version the manifest names. | `putnami-screenshots-v2.json` |
+
+The corpus holds the fixtures of both versions: a `v2-` fixture is a version
+2 manifest, and every other fixture a version 1 manifest, except where its
+name says it carries another version.

@@ -599,7 +599,7 @@
       "id": "tooling/change-screenshots",
       "type": "feature",
       "name": "Change screenshots",
-      "outcome": "A contributor captures the pages a web change touches, before and after, desktop and mobile, light and dark, with putnami change screenshots, and change finalize marks a web change ready only with those screenshots or a waiver, and sends them to the proposals provider",
+      "outcome": "A contributor captures the pages that prove a requirement a web change touches, before and after, desktop and mobile, light and dark, with putnami change screenshots, and change finalize marks a web change ready only with those screenshots or a waiver, and sends them to the proposals provider",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -613,7 +613,21 @@
             "kind": "acceptance",
             "checks": [
               "a-page-file-in-the-diff-touches-its-page",
-              "a-shared-source-file-touches-every-page",
+              "a-page-proving-a-touched-requirement-is-touched",
+              "a-shared-source-file-touches-no-page"
+            ]
+          }
+        },
+        {
+          "id": "visited-path",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-template-page-is-visited-at-its-proof",
               "a-template-page-takes-its-values-from-the-fixtures",
               "a-touched-template-without-a-value-is-refused"
             ]
@@ -638,6 +652,19 @@
           }
         },
         {
+          "id": "frozen-motion",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "animations-and-transitions-are-frozen-before-capture"
+            ]
+          }
+        },
+        {
           "id": "the-manifest-is-a-protocol-document",
           "stage": "coded",
           "evidenceKinds": [
@@ -647,7 +674,8 @@
             "kind": "acceptance",
             "checks": [
               "the-written-manifest-validates-against-the-published-schema",
-              "a-manifest-the-protocol-refuses-is-not-read"
+              "a-manifest-the-protocol-refuses-is-not-read",
+              "each-page-names-the-requirements-it-proves"
             ]
           }
         },
@@ -662,6 +690,8 @@
             "checks": [
               "a-ready-web-change-without-screenshots-is-refused",
               "a-manifest-of-the-head-covering-the-touched-pages-is-accepted",
+              "a-manifest-missing-a-touched-requirement-is-refused",
+              "a-version-1-manifest-is-refused",
               "a-stale-or-incomplete-manifest-is-refused",
               "a-waiver-is-named-in-the-verification",
               "a-draft-or-a-change-without-pages-needs-none"

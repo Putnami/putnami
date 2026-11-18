@@ -96,7 +96,7 @@ func TestAManifestTheProtocolRefusesIsNotWrittenOrRead(t *testing.T) {
 	if err != nil || string(after) != string(before) {
 		t.Fatalf("the refused run changed the manifest of the run before it: %v", err)
 	}
-	if kept, err := ReadManifest(file); err != nil || len(Check(kept, out, kept.HeadSHA, "apps/web", kept.Pages)) != 0 {
+	if kept, err := ReadManifest(file); err != nil || len(Check(kept, out, kept.HeadSHA, "apps/web", kept.Pages, nil)) != 0 {
 		t.Fatalf("the refused run changed the captures of the run before it: %v", err)
 	}
 
@@ -111,7 +111,7 @@ func TestAManifestTheProtocolRefusesIsNotWrittenOrRead(t *testing.T) {
 		"an unknown member":  {`"project":`, `"tool": "x", "project":`, "the member tool is unknown (screenshots.unknown_field)"},
 		"a missing capture":  {`"scheme": "dark"`, `"scheme": "light"`, "(screenshots.missing_capture)"},
 		"an abbreviated sha": {`"headSHA": "`, `"headSHA": "abc`, "(screenshots.invalid_sha)"},
-		"another version":    {`"protocolVersion": 1`, `"protocolVersion": 2`, "protocolVersion 2 is not supported (want 1) (screenshots.invalid_protocol_version)"},
+		"another version":    {`"protocolVersion": 2`, `"protocolVersion": 3`, "protocolVersion 3 is not supported (want 1 or 2) (screenshots.invalid_protocol_version)"},
 	} {
 		edited := filepath.Join(t.TempDir(), ManifestFile)
 		if err := os.WriteFile(edited, []byte(strings.Replace(string(before), c.old, c.new, 1)), 0o644); err != nil {
@@ -152,4 +152,74 @@ func TestARunRemovesTheFilesOfAPreviousManifestTheContractRefuses(t *testing.T) 
 	if _, err := ReadManifest(filepath.Join(out, ManifestFile)); err != nil {
 		t.Errorf("the new manifest does not read: %v", err)
 	}
+}
+
+// featureDoc writes a feature document of acme/tasks whose requirements carry
+// the given stages.
+func featureDoc(t *testing.T, stages map[string]string) string {
+	t.Helper()
+	var requirements []string
+	for _, id := range []string{"lists-open-tasks", "filters-by-owner", "shows-one-task"} {
+		if stage, ok := stages[id]; ok {
+			requirements = append(requirements, `{"id": "`+id+`", "stage": "`+stage+`", "evidenceKinds": ["attestation"]}`)
+		}
+	}
+	return `{"protocolVersion": 2, "namespace": "acme", "feature": {"id": "acme/tasks", "type": "feature", "name": "Tasks",
+  "outcome": "A person sees the tasks", "owner": "web", "target": "coded", "requirements": [` + strings.Join(requirements, ", ") + `]}}
+`
+}
+
+// TestEachPageNamesTheRequirementsItProves runs the command on a change that
+// edits one requirement of a feature document and adds another: the pages
+// that prove them are captured at their at, the page that proves only an
+// unchanged requirement is not, and the version 2 manifest names what each
+// captured page proves.
+func TestEachPageNamesTheRequirementsItProves(t *testing.T) {
+	t.Parallel()
+	dir := t.TempDir()
+	git(t, dir, "init", "-q", "-b", "main")
+	inv := sampleWeb(t)
+	prove(t, inv, "/", "acme/tasks", "lists-open-tasks", "/")
+	prove(t, inv, "/tasks", "acme/tasks", "filters-by-owner", "/tasks")
+	prove(t, inv, "/tasks/{id}", "acme/tasks", "shows-one-task", "/tasks/42")
+	write(t, dir, "apps/web/schema/http-routes.json", inventoryJSON(t, inv))
+	write(t, dir, "apps/tasks/features/tasks.json", featureDoc(t, map[string]string{"lists-open-tasks": "coded", "filters-by-owner": "coded"}))
+	write(t, dir, "apps/web/features/notes.json", "not a feature document\n")
+	git(t, dir, "add", ".")
+	git(t, dir, "commit", "-q", "-m", "base")
+	git(t, dir, "checkout", "-q", "-b", "topic")
+	write(t, dir, "apps/tasks/features/tasks.json", featureDoc(t, map[string]string{"lists-open-tasks": "coded",
+		"filters-by-owner": "operated", "shows-one-task": "coded"}))
+	write(t, dir, "apps/web/features/notes.json", "still not a feature document\n")
+	write(t, dir, "apps/web/src/components/header.tsx", "export default 2\n")
+	git(t, dir, "add", ".")
+	git(t, dir, "commit", "-q", "-m", "change")
+	got := runCommand(t, dir, nil, serverArgs...)
+	if got.code != 0 {
+		t.Fatalf("exit %d: %s", got.code, got.stderr)
+	}
+	data, err := os.ReadFile(filepath.Join(dir, ".putnami", "screenshots", "apps-web", screenshots.ManifestFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if refusal := schematest.Check(t, data); refusal != nil {
+		t.Fatalf("the published schema refuses the manifest: %v\n%s", refusal, data)
+	}
+	manifest, diags := screenshots.Decode(data)
+	if manifest == nil || manifest.ProtocolVersion != screenshots.ProtocolVersion {
+		t.Fatalf("the manifest is no version 2 document: %v", diags)
+	}
+	want := []Page{
+		{File: "src/app/tasks/page.tsx", Route: "/tasks", Path: "/tasks", Before: true, After: true,
+			Proves: []Proof{{Feature: "acme/tasks", Requirement: "filters-by-owner"}}},
+		{File: "src/app/tasks/[id]/page.tsx", Route: "/tasks/{id}", Path: "/tasks/42", Before: true, After: true,
+			Proves: []Proof{{Feature: "acme/tasks", Requirement: "shows-one-task"}}},
+	}
+	if !reflect.DeepEqual(manifest.Pages, want) {
+		t.Fatalf("pages = %+v", manifest.Pages)
+	}
+	if !strings.Contains(got.stdout, "/tasks/42 (src/app/tasks/[id]/page.tsx): before and after, proves acme/tasks#shows-one-task") {
+		t.Fatalf("the report does not name what a page proves:\n%s", got.stdout)
+	}
+	spectest.Proves(t, screensFeature, protocolReq, "each-page-names-the-requirements-it-proves")
 }

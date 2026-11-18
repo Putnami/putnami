@@ -31,6 +31,8 @@ type (
 	// Page is one touched page: its page file, the route it is captured at,
 	// the path visited for that route, and the sides that hold the page.
 	Page = screenshots.Page
+	// Proof is one feature requirement a page proves.
+	Proof = screenshots.Proof
 	// Capture is one PNG file of the manifest, relative to the manifest's
 	// directory, with the status and the final URL of its document.
 	Capture = screenshots.Capture
@@ -86,12 +88,16 @@ func WriteManifest(dir string, manifest Manifest) (string, error) {
 	return file, os.WriteFile(file, data, 0o644)
 }
 
-// Check verifies a manifest read from dir against a change: it names head and
-// project, it holds every capture each of its pages needs on each side that
-// holds it, each capture file is intact, and every touched route holds its
-// after captures. It returns every problem it finds.
-func Check(m Manifest, dir, head, project string, touched []Page) []string {
+// Check verifies a manifest read from dir against a change: it is a version 2
+// manifest that names head and project, it holds every capture each of its
+// pages needs on each side that holds it, each capture file is intact, every
+// touched route holds its after captures, and names each touched requirement
+// its head route proves. It returns every problem it finds.
+func Check(m Manifest, dir, head, project string, touched []Page, requirements map[Requirement]bool) []string {
 	var problems []string
+	if m.ProtocolVersion != screenshots.ProtocolVersion {
+		problems = append(problems, fmt.Sprintf("it is a version %d manifest, which names no requirement: run putnami change screenshots again", m.ProtocolVersion))
+	}
 	if m.HeadSHA != head {
 		problems = append(problems, fmt.Sprintf("it captures %s, not the head %s", short(m.HeadSHA), short(head)))
 	}
@@ -143,6 +149,16 @@ func Check(m Manifest, dir, head, project string, touched []Page) []string {
 		recorded, ok := pages[page.Route]
 		if !ok || !recorded.After {
 			problems = append(problems, fmt.Sprintf("the touched page %s (%s) is not captured", page.Route, page.File))
+			continue
+		}
+		named := map[screenshots.Proof]bool{}
+		for _, proof := range recorded.Proves {
+			named[proof] = true
+		}
+		for _, proof := range page.Proves {
+			if requirements[Requirement{Feature: proof.Feature, Requirement: proof.Requirement}] && !named[proof] {
+				problems = append(problems, fmt.Sprintf("the page %s does not name the touched requirement %s#%s it proves", page.Route, proof.Feature, proof.Requirement))
+			}
 		}
 	}
 	return problems

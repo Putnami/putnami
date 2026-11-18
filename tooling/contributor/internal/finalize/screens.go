@@ -18,11 +18,14 @@ import (
 )
 
 // TouchedProject is one web project whose pages a change touches, with
-// those pages.
+// those pages and the requirements the change touches.
 type TouchedProject struct {
 	// Project is the project's workspace-relative directory.
 	Project string
 	Pages   []screens.Page
+	// Touched are the requirements the change adds or changes, in the whole
+	// workspace.
+	Touched map[screens.Requirement]bool
 }
 
 // TouchedScreens names the web projects whose pages the paths changed
@@ -32,7 +35,9 @@ type TouchedProject struct {
 type TouchedScreens func(ctx context.Context, base, head string, paths []string) ([]TouchedProject, error)
 
 // HostScreens resolves TouchedScreens with the projects that own each path
-// taken from owners, and their route inventories read from git in root.
+// taken from owners, and the projects whose committed route inventory at the
+// head proves a requirement the change touches, with their route
+// inventories read from git in root.
 func HostScreens(root string, owners WorkspaceOwners) TouchedScreens {
 	return func(ctx context.Context, base, head string, paths []string) ([]TouchedProject, error) {
 		prefix, err := workspacePrefix(root)
@@ -58,6 +63,20 @@ func HostScreens(root string, owners WorkspaceOwners) TouchedScreens {
 				projects[path.Clean(project.Path)] = true
 			}
 		}
+		read := func(revision, file string) ([]byte, bool, error) { return fileAt(root, revision, file) }
+		requirements, err := screens.TouchedRequirements(relative, base, head, read)
+		if err != nil {
+			return nil, fmt.Errorf("resolve the requirements a change touches: %w", err)
+		}
+		if len(requirements) > 0 {
+			proving, err := provingProjects(root, head, requirements)
+			if err != nil {
+				return nil, err
+			}
+			for _, project := range proving {
+				projects[project] = true
+			}
+		}
 		names := make([]string, 0, len(projects))
 		for project := range projects {
 			names = append(names, project)
@@ -79,16 +98,58 @@ func HostScreens(root string, owners WorkspaceOwners) TouchedScreens {
 				}
 			}
 			pages, err := screens.TouchedRoutes(screens.Selection{Project: project, Changed: relative,
-				Base: inventories[0], Head: inventories[1]})
+				Base: inventories[0], Head: inventories[1], Touched: requirements})
 			if err != nil {
 				return nil, err
 			}
 			if needsCaptures(pages) {
-				touched = append(touched, TouchedProject{Project: project, Pages: pages})
+				touched = append(touched, TouchedProject{Project: project, Pages: pages, Touched: requirements})
 			}
 		}
 		return touched, nil
 	}
+}
+
+// provingProjects returns the directories of the projects whose route
+// inventory, committed at head, holds a page that proves one of the
+// requirements.
+func provingProjects(root, head string, requirements map[screens.Requirement]bool) ([]string, error) {
+	listed, err := gitOutput(root, "ls-tree", "-r", "-z", "--name-only", head, "--", ".")
+	if err != nil {
+		return nil, fmt.Errorf("list the route inventories at the head: %w", err)
+	}
+	var projects []string
+	for _, file := range strings.Split(listed, "\x00") {
+		project, ok := inventoryProject(file)
+		if !ok {
+			continue
+		}
+		data, found, err := fileAt(root, head, file)
+		if err != nil {
+			return nil, fmt.Errorf("read the route inventory %s: %w", file, err)
+		}
+		if !found {
+			continue
+		}
+		inventory, err := screens.ParseInventory(data)
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", file, err)
+		}
+		if inventory.Proves(requirements) {
+			projects = append(projects, project)
+		}
+	}
+	return projects, nil
+}
+
+// inventoryProject returns the project directory of a workspace-relative
+// route inventory path.
+func inventoryProject(file string) (string, bool) {
+	if file == screens.InventoryPath {
+		return ".", true
+	}
+	project, ok := strings.CutSuffix(file, "/"+screens.InventoryPath)
+	return project, ok && project != ""
 }
 
 // needsCaptures reports whether a touched page exists at the head: a change
@@ -195,7 +256,7 @@ func (f Finalizer) checkScreenshots(ctx context.Context, c *publicationCandidate
 			problems = append(problems, fmt.Sprintf("%s has no --screenshots manifest for its touched pages %s", project.Project, boundedList(routes)))
 			continue
 		}
-		if found := screens.Check(entry.manifest, filepath.Dir(entry.file), c.head, project.Project, project.Pages); len(found) > 0 {
+		if found := screens.Check(entry.manifest, filepath.Dir(entry.file), c.head, project.Project, project.Pages, project.Touched); len(found) > 0 {
 			problems = append(problems, fmt.Sprintf("the manifest of %s does not prove the head: %s", project.Project, boundedList(found)))
 			continue
 		}

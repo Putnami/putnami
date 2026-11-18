@@ -25,6 +25,8 @@ import (
 const (
 	screensFeature = "tooling/change-screenshots"
 	touchedPages   = "touched-pages"
+	visitedPath    = "visited-path"
+	frozenMotion   = "frozen-motion"
 	capturesReq    = "captures"
 	finalizeReq    = "finalize-asks-for-screenshots"
 	agentReq       = "agent-reviews-its-screens"
@@ -213,6 +215,22 @@ html,body{margin:0;background:#ffffff;height:100%}
 @media (prefers-color-scheme: dark){html,body{background:#000000}}
 </style></head><body></body></html>`)
 	})
+	mux.HandleFunc("/animated", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>
+@keyframes fade{from{background:#ffffff}to{background:#000000}}
+html,body{margin:0;height:100%;background:#ffffff;animation:fade 1s linear infinite}
+</style></head><body></body></html>`)
+	})
+	mux.HandleFunc("/entering", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `<!doctype html><html><head><meta name="viewport" content="width=device-width"><style>
+@keyframes appear{from{opacity:0}to{opacity:1}}
+html,body{margin:0;height:100%;background:#ffffff}
+.quick,.slow{position:fixed;top:0;bottom:0;width:50%;background:#000000;opacity:0;animation:appear forwards}
+.quick{left:0;animation-duration:50ms}
+.slow{right:0;animation-duration:20s}
+</style></head><body><div class="quick"></div><div class="slow"></div>
+<script>document.querySelector(".slow").addEventListener("animationend", () => { location.href = "/missing" })</script></body></html>`)
+	})
 	mux.HandleFunc("/elsewhere", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusFound)
 	})
@@ -274,6 +292,42 @@ func TestTheBrowserCapturesEachViewportAndScheme(t *testing.T) {
 		}
 	}
 	spectest.Proves(t, screensFeature, capturesReq, "one-page-gets-eight-captures")
+}
+
+// TestAnimationsAndTransitionsAreFrozenBeforeCapture captures a page whose
+// background fades from white to black every second, at several moments: each
+// capture shows the first frame of the animation.
+func TestAnimationsAndTransitionsAreFrozenBeforeCapture(t *testing.T) {
+	browser := testBrowser(t, nil)
+	server := colorPage(t)
+	for i := range 3 {
+		time.Sleep(time.Duration(i) * 330 * time.Millisecond)
+		got, err := browser.Capture(context.Background(), Shot{URL: server.URL + "/animated", Viewport: Viewports[0], Scheme: "light"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if luma := centerLuma(t, got.PNG); luma < 250 {
+			t.Fatalf("capture %d shows a frame of luma %d, not the first frame of the animation", i, luma)
+		}
+	}
+	// An entrance, ended or still running, shows the content it brings in,
+	// and the freeze runs no handler of its end, here a navigation.
+	got, err := browser.Capture(context.Background(), Shot{URL: server.URL + "/entering", Viewport: Viewports[0], Scheme: "light"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, err := png.Decode(bytes.NewReader(got.PNG))
+	if err != nil {
+		t.Fatal(err)
+	}
+	b := img.Bounds()
+	for _, x := range []int{b.Dx() / 4, 3 * b.Dx() / 4} {
+		r, g, bl, _ := img.At(x, b.Dy()/2).RGBA()
+		if luma := (r + g + bl) / 3 >> 8; luma > 5 {
+			t.Fatalf("the entrance at x=%d shows luma %d, not its end", x, luma)
+		}
+	}
+	spectest.Proves(t, screensFeature, frozenMotion, "animations-and-transitions-are-frozen-before-capture")
 }
 
 // TestTheBrowserReportsTheDocumentStatus reads a 404 as the status of its
@@ -478,6 +532,13 @@ func TestTheStorageStateReachesTheBrowserWithoutChromium(t *testing.T) {
 	scripts := peer.params("Page.addScriptToEvaluateOnNewDocument")
 	if len(scripts) != 1 || !strings.Contains(string(scripts[0]), `\"token\":\"xyz\"`) {
 		t.Fatalf("init scripts %s", scripts)
+	}
+	var frozen bool
+	for _, params := range peer.params("Runtime.evaluate") {
+		frozen = frozen || strings.Contains(string(params), "getAnimations") && strings.Contains(string(params), "transition: none")
+	}
+	if !frozen {
+		t.Fatal("no evaluation froze the animations and transitions before the capture")
 	}
 	media := peer.params("Emulation.setEmulatedMedia")
 	metrics := peer.params("Emulation.setDeviceMetricsOverride")

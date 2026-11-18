@@ -2,7 +2,9 @@
 
 - **Status**: accepted
 - **Amended by**: [ADR 0015](0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md),
-  on consequence 2
+  on consequence 2, and
+  [ADR 0017](0017-screenshots-select-the-pages-that-prove-a-touched-requirement.md),
+  on decisions 1 and 4
 - **Scope**: `@putnami/contributor`: a new `change screenshots` command,
   `change finalize`, and the `build` skill's prove and check stages
 - **Extends**: [ADR 0005](0005-the-contributor-executable-serves-the-change-noun.md),

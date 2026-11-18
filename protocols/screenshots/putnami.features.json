@@ -81,6 +81,35 @@
           }
         },
         {
+          "id": "a-page-names-what-it-proves",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-proof-rule-has-a-stable-code",
+              "a-version-1-page-carries-no-proof"
+            ]
+          }
+        },
+        {
+          "id": "both-versions-decode",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-version-1-manifest-still-decodes",
+              "marshal-writes-the-version-the-manifest-names",
+              "each-fixture-is-judged-by-the-schema-of-its-version"
+            ]
+          }
+        },
+        {
           "id": "the-corpus-is-the-contract",
           "stage": "coded",
           "evidenceKinds": [

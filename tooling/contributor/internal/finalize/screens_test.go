@@ -38,11 +38,18 @@ func webScreens(context.Context, string, string, []string) ([]TouchedProject, er
 // returns its path.
 func writeManifest(t *testing.T, dir, project, head string) string {
 	t.Helper()
+	return writeManifestOf(t, dir, project, head, screenshots.ProtocolVersion)
+}
+
+// writeManifestOf writes a complete manifest of /tasks, in a version, whose
+// page proves the requirements given.
+func writeManifestOf(t *testing.T, dir, project, head string, version int, proves ...screens.Proof) string {
+	t.Helper()
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	page := screens.Page{File: "src/app/tasks/page.tsx", Route: "/tasks", Path: "/tasks", Before: true, After: true}
-	manifest := screens.Manifest{ProtocolVersion: screenshots.ProtocolVersion, Project: project, BaseSHA: strings.Repeat("b", 40), HeadSHA: head,
+	page := screens.Page{File: "src/app/tasks/page.tsx", Route: "/tasks", Path: "/tasks", Before: true, After: true, Proves: proves}
+	manifest := screens.Manifest{ProtocolVersion: version, Project: project, BaseSHA: strings.Repeat("b", 40), HeadSHA: head,
 		Pages: []screens.Page{page}}
 	for _, side := range []string{screens.SideBefore, screens.SideAfter} {
 		for _, viewport := range screens.Viewports {
@@ -166,6 +173,57 @@ func TestAStaleOrIncompleteManifestIsRefused(t *testing.T) {
 	spectest.Proves(t, screensFeature, finalizeScreens, "a-stale-or-incomplete-manifest-is-refused")
 }
 
+// TestAManifestMissingATouchedRequirementIsRefused refuses a manifest whose
+// page does not name a touched requirement it proves at the head, and
+// accepts the manifest that names it.
+func TestAManifestMissingATouchedRequirementIsRefused(t *testing.T) {
+	filters := screens.Proof{Feature: "acme/tasks", Requirement: "filters-by-owner"}
+	lists := screens.Proof{Feature: "acme/tasks", Requirement: "lists-open-tasks"}
+	touched := func(context.Context, string, string, []string) ([]TouchedProject, error) {
+		return []TouchedProject{{Project: "apps/web", Pages: []screens.Page{
+			{File: "src/app/tasks/page.tsx", Route: "/tasks", Before: true, After: true, Proves: []screens.Proof{lists, filters}}},
+			Touched: map[screens.Requirement]bool{{Feature: filters.Feature, Requirement: filters.Requirement}: true}}}, nil
+	}
+	for _, tc := range []struct {
+		name   string
+		proves []screens.Proof
+		want   string
+	}{
+		{"no proof", nil, "the page /tasks does not name the touched requirement acme/tasks#filters-by-owner it proves"},
+		{"another proof", []screens.Proof{lists}, "does not name the touched requirement acme/tasks#filters-by-owner"},
+		{"the touched proof", []screens.Proof{filters}, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f, git, _, opts := finalizerFixture(t)
+			f.Screens = touched
+			opts.Screenshots = []string{"shots/screenshots.json"}
+			writeManifestOf(t, filepath.Join(f.Root, "shots"), "apps/web", git.head, screenshots.ProtocolVersion, tc.proves...)
+			_, err := f.Run(context.Background(), opts)
+			if tc.want == "" && err != nil || tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want)) {
+				t.Fatalf("err = %v, want %q", err, tc.want)
+			}
+		})
+	}
+	spectest.Proves(t, screensFeature, finalizeScreens, "a-manifest-missing-a-touched-requirement-is-refused")
+}
+
+// TestAVersion1ManifestIsRefused refuses a manifest written before pages
+// named the requirements they prove, and says to capture again.
+func TestAVersion1ManifestIsRefused(t *testing.T) {
+	f, git, provider, opts := finalizerFixture(t)
+	f.Screens = webScreens
+	opts.Screenshots = []string{"shots/screenshots.json"}
+	writeManifestOf(t, filepath.Join(f.Root, "shots"), "apps/web", git.head, screenshots.ProtocolVersionV1)
+	_, err := f.Run(context.Background(), opts)
+	if err == nil || !strings.Contains(err.Error(), "it is a version 1 manifest, which names no requirement: run putnami change screenshots again") {
+		t.Fatalf("err = %v", err)
+	}
+	if git.pushes != 0 || provider.upserts != 0 {
+		t.Fatalf("a refused run wrote: pushes=%d upserts=%d", git.pushes, provider.upserts)
+	}
+	spectest.Proves(t, screensFeature, finalizeScreens, "a-version-1-manifest-is-refused")
+}
+
 // TestAWaiverIsNamedInTheVerification publishes a web change with a waiver
 // and writes its reason into the verification comment; a malformed waiver,
 // or one with screenshots, is refused.
@@ -266,8 +324,9 @@ func TestHostScreensReadsTheInventoriesOfTheOwningProjects(t *testing.T) {
 	head := run("rev-parse", "HEAD")
 
 	h := newOwnersHost(t, map[string][]wire.OwningProject{
-		"apps/web/src/app/page.tsx": {{ID: "@acme/web", Path: "apps/web"}},
-		"lib/src/x.ts":              {{ID: "@acme/lib", Path: "lib"}},
+		"apps/web/src/app/page.tsx":      {{ID: "@acme/web", Path: "apps/web"}},
+		"lib/src/x.ts":                   {{ID: "@acme/lib", Path: "lib"}},
+		"apps/tasks/features/tasks.json": {{ID: "@acme/tasks", Path: "apps/tasks"}},
 	}, nil)
 	t.Setenv(wire.SocketEnv, h.socket)
 	t.Setenv(wire.TokenEnv, h.token)
@@ -282,4 +341,37 @@ func TestHostScreensReadsTheInventoriesOfTheOwningProjects(t *testing.T) {
 		!touched[0].Pages[0].Before || !touched[0].Pages[0].After {
 		t.Fatalf("touched = %+v", touched)
 	}
+
+	// A change to a requirement of another project touches the web page that
+	// proves it, though the change holds no file of the web project.
+	proving, _ := json.Marshal(map[string]any{"routes": []map[string]any{
+		{"match": "exact", "path": "/", "methods": []string{"GET", "HEAD"}, "publicEdge": true,
+			"provenance": map[string]any{"sourceKind": "file-route", "evidencePath": "src/app/page.tsx"},
+			"proves":     []map[string]string{{"feature": "acme/tasks", "requirement": "lists-open-tasks", "at": "/"}}},
+	}})
+	feature := func(stage string) string {
+		return `{"protocolVersion": 2, "namespace": "acme", "feature": {"id": "acme/tasks", "type": "feature", "name": "Tasks",
+  "outcome": "A person sees the tasks", "owner": "web", "target": "coded", "requirements": [
+  {"id": "lists-open-tasks", "stage": "` + stage + `", "evidenceKinds": ["attestation"]}]}}`
+	}
+	writeFile("ws/apps/web/schema/http-routes.json", string(proving))
+	writeFile("ws/apps/tasks/features/tasks.json", feature("coded"))
+	run("add", ".")
+	run("commit", "-qam", "proves")
+	base = run("rev-parse", "HEAD")
+	writeFile("ws/apps/tasks/features/tasks.json", feature("operated"))
+	run("commit", "-qam", "requirement")
+	head = run("rev-parse", "HEAD")
+	touched, err = HostScreens(filepath.Join(repo, "ws"), channel.Owners)(context.Background(), base, head,
+		[]string{"ws/apps/tasks/features/tasks.json"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := screens.Proof{Feature: "acme/tasks", Requirement: "lists-open-tasks"}
+	if len(touched) != 1 || touched[0].Project != "apps/web" || len(touched[0].Pages) != 1 || touched[0].Pages[0].Route != "/" ||
+		len(touched[0].Pages[0].Proves) != 1 || touched[0].Pages[0].Proves[0] != want ||
+		!touched[0].Touched[screens.Requirement{Feature: want.Feature, Requirement: want.Requirement}] {
+		t.Fatalf("a requirement change touched %+v", touched)
+	}
+	spectest.Proves(t, screensFeature, "touched-pages", "a-page-proving-a-touched-requirement-is-touched")
 }

@@ -120,13 +120,25 @@ func (c Command) Run(ctx context.Context, args []string) int {
 	}
 	fmt.Fprintf(c.Stdout, "Captured %s of %s in %s.\n", Plural(len(result.Pages), "page"), result.Project, Plural(result.Captures, "file"))
 	for _, page := range result.Pages {
-		fmt.Fprintf(c.Stdout, "  %s (%s): %s\n", page.Path, page.File, sidesText(page))
+		fmt.Fprintf(c.Stdout, "  %s (%s): %s%s\n", page.Path, page.File, sidesText(page), provesText(page))
 	}
 	for _, note := range result.Notes {
 		fmt.Fprintf(c.Stdout, "  note: %s\n", note)
 	}
 	fmt.Fprintf(c.Stdout, "Manifest: %s\n", result.Manifest)
 	return 0
+}
+
+// provesText names the requirements a page proves, after its sides.
+func provesText(page Page) string {
+	if len(page.Proves) == 0 {
+		return ""
+	}
+	names := make([]string, len(page.Proves))
+	for i, proof := range page.Proves {
+		names[i] = proof.Feature + "#" + proof.Requirement
+	}
+	return ", proves " + strings.Join(names, ", ")
 }
 
 func sidesText(page Page) string {
@@ -188,6 +200,9 @@ func (c Command) run(ctx context.Context, opts options, invocation string) (Resu
 		}
 	}
 	sel := Selection{Project: project, Changed: changed, Routes: opts.routes}
+	if sel.Touched, err = TouchedRequirements(changed, mergeBase, head, c.fileAt(ctx)); err != nil {
+		return result, err
+	}
 	if sel.Head, err = c.inventoryAt(ctx, head, project); err != nil {
 		return result, err
 	}
@@ -370,20 +385,31 @@ func (c Command) baseRef(ctx context.Context, base string) (string, error) {
 	return sha, nil
 }
 
+// fileAt reads a workspace-relative file at a commit.
+func (c Command) fileAt(ctx context.Context) ReadAt {
+	return func(commit, file string) ([]byte, bool, error) {
+		// A ./ path is relative to the workspace root, which may lie below
+		// the repository's top level.
+		if _, err := c.Git(ctx, "cat-file", "-e", commit+":./"+file); err != nil {
+			return nil, false, nil
+		}
+		data, err := c.Git(ctx, "show", commit+":./"+file)
+		if err != nil {
+			return nil, false, err
+		}
+		return []byte(data), true, nil
+	}
+}
+
 // inventoryAt reads the project's route inventory at a commit; nil when the
 // commit has none.
 func (c Command) inventoryAt(ctx context.Context, commit, project string) (*Inventory, error) {
-	// A ./ path is relative to the workspace root, which may lie below the
-	// repository's top level.
 	file := path.Join(project, InventoryPath)
-	if _, err := c.Git(ctx, "cat-file", "-e", commit+":./"+file); err != nil {
-		return nil, nil
-	}
-	data, err := c.Git(ctx, "show", commit+":./"+file)
-	if err != nil {
+	data, found, err := c.fileAt(ctx)(commit, file)
+	if err != nil || !found {
 		return nil, err
 	}
-	inventory, err := ParseInventory([]byte(data))
+	inventory, err := ParseInventory(data)
 	if err != nil {
 		return nil, fmt.Errorf("%s at %s: %w", file, short(commit), err)
 	}

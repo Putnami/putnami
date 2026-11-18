@@ -5,7 +5,8 @@
   "outcomes": [
     "A consumer that stores or reads a screenshots manifest decodes it against the published schema or the Go decoder, not against a copy of the writer's types",
     "The schema, the Go decoder and the fixture corpus accept and refuse the same manifests, except for the rules the schema names as ones it cannot express",
-    "A consumer knows the largest manifest and the largest capture file it has to accept"
+    "A consumer knows the largest manifest and the largest capture file it has to accept",
+    "A page in the manifest names the feature requirements it proves, so a consumer shows a capture as the proof of a requirement"
   ],
   "nonGoals": [
     "The PNG files: the manifest names and hashes them, and a reader checks the bytes it holds against sha256",
@@ -17,15 +18,15 @@
     {
       "id": "the-identifiers-are-pinned",
       "text": [
-        "The manifest is the file screenshots.json; its protocolVersion is 1 and its schema is published at https://putnami.dev/schemas/putnami-screenshots-v1.json.",
-        "The schema carries that $id and pins that version. Its members match the Go types, and its closed sets match the Go sets: the sides before and after, the viewports desktop (1440x900 at scale 1) and mobile (390x844 at scale 2), the schemes light and dark."
+        "The manifest is the file screenshots.json. A writer writes protocolVersion 2, whose schema is published at https://putnami.dev/schemas/putnami-screenshots-v2.json; version 1 keeps its schema at https://putnami.dev/schemas/putnami-screenshots-v1.json.",
+        "Each schema carries its $id and pins its version. Its members match the Go types, and its closed sets match the Go sets: the sides before and after, the viewports desktop (1440x900 at scale 1) and mobile (390x844 at scale 2), the schemes light and dark."
       ]
     },
     {
       "id": "a-manifest-parses-strictly",
       "text": [
         "A manifest fails as a whole, with stable codes, on an unknown, a duplicate or a missing member, and on trailing data.",
-        "It fails on another protocolVersion, on a project that is no normalized workspace-relative directory, and on a baseSHA or a headSHA that is no full lowercase commit sha of 40 or 64 hexadecimal characters."
+        "It fails on a protocolVersion other than 1 or 2, on a project that is no normalized workspace-relative directory, and on a baseSHA or a headSHA that is no full lowercase commit sha of 40 or 64 hexadecimal characters."
       ]
     },
     {
@@ -49,16 +50,30 @@
       ]
     },
     {
+      "id": "a-page-names-what-it-proves",
+      "text": [
+        "In a version 2 manifest, a page may carry proves: the feature requirements it proves, each a feature ID and a requirement ID in the grammar a test binds with.",
+        "proves is omitted when the page proves nothing, is never empty when present, holds no pair twice and at most 256 pairs. A version 1 page that carries proves is refused."
+      ]
+    },
+    {
+      "id": "both-versions-decode",
+      "text": [
+        "Decode accepts a version 1 and a version 2 manifest, and Marshal writes the version the manifest names, so a reader reads the manifests stored before version 2.",
+        "Each fixture of the corpus is judged by the schema of its own version."
+      ]
+    },
+    {
       "id": "the-corpus-is-the-contract",
       "text": [
-        "Every valid fixture validates, every invalid fixture fails with its expected code, every expected code is registered, and every registered code but the three size bounds has a fixture.",
+        "Every valid fixture validates, every invalid fixture fails with its expected code, every expected code is registered, and every registered code but the four size bounds has a fixture.",
         "The schema accepts every valid fixture and refuses every invalid one, except those whose rule its description names as one a schema cannot express."
       ]
     },
     {
       "id": "the-bounds-are-published",
       "text": [
-        "A manifest holds at most 512 pages and 4096 captures, and its file is at most 4 MiB. A capture file is at most 64 MiB. A text member is at most 2048 bytes, and a capture file name at most 255.",
+        "A manifest holds at most 512 pages, 4096 captures and 256 proofs per page, and its file is at most 4 MiB. A capture file is at most 64 MiB. A text member is at most 2048 bytes, and a capture file name at most 255.",
         "The decoder refuses a manifest past a bound, and Marshal refuses to write one."
       ]
     },

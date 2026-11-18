@@ -1,11 +1,13 @@
 # Capture the screens of a change
 
 `putnami change screenshots`, which the `@putnami/contributor` executable
-serves, captures the pages a change touches in a web project: before and
-after, desktop and mobile, light and dark. The captures are the proof of a
+serves, captures the pages a change touches in a web project: the pages that
+prove a requirement the change adds or modifies, and the pages whose own file
+it changes, before and after, desktop and mobile, light and dark. The captures are the proof of a
 web change: the agent reads them before it finalizes, the reviewer receives
 them with the diff, and `putnami change finalize` asks for them
-([ADR 0014](adr/0014-screenshots-are-the-proof-of-a-web-change.md)).
+([ADR 0014](adr/0014-screenshots-are-the-proof-of-a-web-change.md),
+[ADR 0017](adr/0017-screenshots-select-the-pages-that-prove-a-touched-requirement.md)).
 
 ```bash
 putnami change screenshots --project apps/web --base main \
@@ -34,31 +36,41 @@ alone.
 
 A web project is a project whose committed `schema/http-routes.json` declares
 a page: a `file-route` route that serves `GET`. Its page file is the route's
-`evidencePath`, relative to the project. The changed paths are those between
-the merge base of `--base` (`origin/<base>` when that remote branch exists) and
-`HEAD`.
+`evidencePath`, relative to the project, and its `proves` lists the feature
+requirements the page proves, each with `at`, a path that renders it with
+fixture data ([What a page proves](../../../typescript/framework/web/doc/file-based-routing.md#what-a-page-proves)).
+The changed paths are those between the merge base of `--base`
+(`origin/<base>` when that remote branch exists) and `HEAD`.
 
-| Changed path | Touches |
+A requirement the change touches is one it adds, or whose declaration it
+changes, in a `putnami.features.json` or a `features/<feature>.json` anywhere
+in the workspace. A change to a requirement's text in `specs/` alone touches
+none. A requirement the head no longer declares touches no page.
+
+| Change | Touches |
 |---|---|
-| A page file | That page |
-| Another file under the project's `src/`, such as a component, a layout or a style | Every page of the project |
-| A file that is the evidence of a route, such as an action or an API handler | No page |
-| A file outside `src/`, such as a test under `test/`, a doc or the route inventory | No page |
+| A requirement that a page route's `proves` names at the head | That route, whatever project declares the requirement |
+| A page file | That page, at its first route |
+| `--route <path>` | That route, as the inventory writes it; it may repeat |
+| Any other file, such as a shared component, a layout, a style, an action or an API handler | No page |
 
-A test kept under `src/`, such as `src/page.test.tsx`, counts as a source file
-and touches every page.
+A shared component touches no page by itself: the requirement the change
+declares names the pages that show it. Name with `--route` a page you want to
+see the component on.
 
-Each touched page is captured at its first route in inventory order. A page
-file that a finite catch-all expands into many routes is captured once, at its
-first route; `--route <path>` adds a route, as the inventory writes it, and may
-repeat. A template route takes its parameter values from `--fixtures`, an
-object keyed by the template:
+A touched page is visited at:
+
+1. its `--fixtures` values, when the fixtures name its route: an object keyed
+   by the template, as the inventory writes it;
+2. else the `at` of the first touched requirement its head route proves;
+3. else the `at` of its first proof;
+4. else the route itself, which a template cannot be.
 
 ```json
 { "/tasks/{id}": { "id": "1" }, "/docs/{slug...}": { "slug": "guide/intro" } }
 ```
 
-A touched template with no value is refused, and the error names each one.
+A touched template with none of them is refused, and the error names each one.
 
 ## The captures
 
@@ -67,11 +79,17 @@ A touched template with no value is refused, and the error names each one.
 | Viewports | desktop 1440x900, mobile 390x844 at device scale 2 with touch |
 | Color schemes | `prefers-color-scheme: light`, then `dark` |
 | Sides | before, at `--base-url`, where the merge base holds the page; after, at `--head-url`, where the head does |
+| Motion | Finite animations at their end, endless ones at their start, transitions at their end value |
 
 A page both sides hold gets eight PNG files; a new or a removed page gets
 four. Each capture is a full page, up to 10000 CSS pixels high, taken after
 the document's load event, its fonts, and at most three seconds of network
-activity. A failed navigation, or a document status of 400 or more, fails the
+activity. The command then stops the motion of the page: an animation, CSS or
+scripted, with an end is held at its last frame, so an entrance shows the
+content it brings in, and no handler of the page runs on its end; an endless one, such as a spinner, is paused at its start; and a
+transition jumps to its end value. An animated element shows the same frame
+on both sides and in every run. A failed
+navigation, or a document status of 400 or more, fails the
 run and writes no manifest. A page that redirects is captured where it ends:
 each capture records its status and final URL, and the run prints a `note:`
 line for a page that ended elsewhere, such as a sign-in page, which shows no
@@ -95,7 +113,9 @@ directory in lowercase with each other character run turned into `-`, such as
 `apps-web` for `apps/web`. A new run there first removes
 the files the previous manifest lists, and nothing else.
 
-The manifest is a `go.putnami.dev/protocol/screenshots` document. The
+The manifest is a version 2 `go.putnami.dev/protocol/screenshots` document:
+each page names in `proves` the requirements its route proves at the head,
+and omits it when it proves none. The
 [protocol](../../../protocols/screenshots/README.md) owns its members, its
 rules and the bounds a consumer may apply. The command writes the manifest
 through the protocol, so a run whose manifest the contract refuses fails with
@@ -104,12 +124,13 @@ exit 1 and writes nothing: a page that ends at a URL that is not `http` or
 
 ```json
 {
-  "protocolVersion": 1,
+  "protocolVersion": 2,
   "project": "apps/web",
   "baseSHA": "<merge base>",
   "headSHA": "<HEAD>",
   "pages": [
-    { "file": "src/app/tasks/page.tsx", "route": "/tasks", "path": "/tasks", "before": true, "after": true }
+    { "file": "src/app/tasks/page.tsx", "route": "/tasks", "path": "/tasks", "before": true, "after": true,
+      "proves": [{ "feature": "acme/tasks", "requirement": "lists-open-tasks" }] }
   ],
   "captures": [
     { "file": "01-tasks-after-desktop-light.png", "route": "/tasks", "side": "after",
@@ -120,7 +141,8 @@ exit 1 and writes nothing: a page that ends at a URL that is not `http` or
 ```
 
 `--output=json` prints the result: the manifest path, the project, the pages
-and the number of captures. A change that touches no page writes nothing and
+with what each proves, and the number of captures. The text output names
+what each page proves after its sides. A change that touches no page writes nothing and
 exits 0. A usage error exits 2; a failure exits 1.
 
 ## Finalize
@@ -138,4 +160,5 @@ The captures leave the machine that took them only through
 `change finalize`, and only when the bound proposals provider offers
 `proposals.screenshots`. `@putnami/cloud` does, under a signed-in person's
 session; a hosted run on a machine token uploads nothing. A route an application registers only at runtime is absent from the
-inventory and never selected.
+inventory and never selected. A page that declares no `proves` is captured
+only when its own file changes or `--route` names it.

@@ -170,10 +170,12 @@ A ready publication, local or hosted, of a change that touches a page of a web
 project needs the screenshots of its head
 ([Capture the screens of a change](09-change-screenshots.md)). A web project
 commits `schema/http-routes.json` with pages. The command asks the putnami
-process for the projects that own each changed path, reads each one's route
-inventory at the merge base and the head, and selects the touched pages with
-the rule `putnami change screenshots` applies. A change that only removes
-pages needs none.
+process for the projects that own each changed path, adds each project whose
+committed route inventory at the head has a page that proves a requirement
+the change adds or modifies, reads each one's route inventory at the merge
+base and the head, and selects the touched pages with the rule
+`putnami change screenshots` applies. A change that only removes pages needs
+none.
 
 ```bash
 putnami change finalize --base main --branch topic --title "feat(web): a lighter task list" --body-file body.md \
@@ -183,12 +185,14 @@ putnami change finalize --base main --branch topic --title "refactor(web): renam
 ```
 
 - `--screenshots <manifest>`, once per touched web project, names the
-  manifest `putnami change screenshots` wrote. It counts when its `headSHA` is
-  the published head, its `project` is the touched project, it holds the after
-  captures of every touched page in both viewports and both schemes, each page
-  it lists holds its captures on each side it exists on, and each file next to
-  it holds the bytes its `sha256` records. A relative path resolves against
-  the workspace root.
+  manifest `putnami change screenshots` wrote. It counts when it is a version 2
+  manifest, its `headSHA` is the published head, its `project` is the touched
+  project, it holds the after captures of every touched page in both viewports
+  and both schemes, each touched page names in `proves` each touched
+  requirement it proves, each page it lists holds its captures on each side it
+  exists on, and each file next to it holds the bytes its `sha256` records. A
+  version 1 manifest names no requirement: capture again. A relative path
+  resolves against the workspace root.
 - `--waive-screenshots <reason>` publishes without them. The reason is one
   line of at most 300 bytes.
 
