@@ -7,6 +7,9 @@
   the reply for the session.
   Amended by [ADR 0016](0016-an-event-two-hook-sources-send-is-handled-once.md):
   `agent hook` handles an event once when two hook sources send it.
+  Amended by [ADR 0018](0018-a-plan-change-syncs-within-the-turn.md):
+  `PostToolUse` syncs a plan change when the last sync is at least 60 seconds
+  old.
 - **Scope**: `@putnami/contributor` (`tooling/contributor`): its manifest, its
   runtime and the host files the core writes for it
 - **Follows**: [ADR 0006](0006-the-contributor-executable-serves-change-finalize.md),

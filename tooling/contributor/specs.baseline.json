@@ -11,6 +11,7 @@
     "tooling/agent-session-hooks#idle-wake",
     "tooling/agent-session-hooks#mission-target",
     "tooling/agent-session-hooks#mission-title",
+    "tooling/agent-session-hooks#plan-sync-in-turn",
     "tooling/agent-session-hooks#session-end",
     "tooling/agent-session-hooks#session-start-sheet",
     "tooling/agent-session-hooks#stop-publication",

@@ -56,7 +56,7 @@ const (
 	// characters.
 	messageTextMax = collab.MaxInboxTextLength
 	// hookLockWait is how long a hook that is not a tool call waits for the
-	// session lock. A tool call never waits.
+	// session lock. A tool call never waits for it to record a plan change.
 	hookLockWait = 500 * time.Millisecond
 	// sessionPromptsMax bounds the delivered prompts that wait for a reply.
 	sessionPromptsMax = 20
@@ -339,7 +339,7 @@ func (e *Env) handleHookEvent(ctx context.Context, engine string, input hookInpu
 	case hookEventSessionStart:
 		return e.hookSessionStart(ctx, engine, input)
 	case hookEventPostToolUse:
-		return nil, pendingDelivery{}, e.hookPostToolUse(engine, input)
+		return nil, pendingDelivery{}, e.hookPostToolUse(ctx, engine, input)
 	case hookEventStop:
 		return e.hookStop(ctx, engine, input)
 	case hookEventStopFailure:
@@ -487,7 +487,8 @@ func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInp
 
 // lockedUpdate reads the cache under the lock, applies change and writes
 // what it answers. A nil answer writes nothing. It waits at most
-// hookLockWait, so a tool call never uses it.
+// hookLockWait, so a tool call uses it only to merge the answer of the sync
+// it sent, never to record its plan change.
 func lockedUpdate(files sessionFiles, change func(*sessionCache) (*sessionCache, error)) error {
 	lock, err := files.lockWithin(hookLockWait)
 	if err != nil {
@@ -520,13 +521,24 @@ func applySpooled(cache *sessionCache, spooled []spooledToolUse) {
 	}
 }
 
+// toolSyncInterval is how old the last sync, and the last sync a tool call
+// started, must both be at least before a plan change syncs within the turn;
+// a longer pace the provider set is the interval instead (toolSyncDue).
+const toolSyncInterval = 60 * time.Second
+
 // hookPostToolUse records a plan change. The hook entry runs it on the plan
-// tools only, and it ignores any other tool at once. It runs no git and calls
-// no provider: what it records goes with the next sync, at the end of the
-// turn. It never delivers a message: the models ignore or refuse a message
-// that follows a tool call. When another hook holds the lock, it spools what
-// it observed and returns at once.
-func (e *Env) hookPostToolUse(engine string, input hookInput) error {
+// tools only, and it ignores any other tool at once. It runs no git. When the
+// plan differs from the one the last sync sent and toolSyncDue holds, it
+// sends one sync before it returns, with the usage the transcripts added; any
+// other plan change goes with the next sync. It claims that sync under the
+// lock it holds, recording ToolSyncAt before it releases the lock for the
+// call, so two tool calls never both sync within the interval. Merging the
+// answer waits for the lock as every sync does. It never delivers a
+// message: the models ignore or refuse a message that follows a tool call,
+// so the messages the sync answers wait for the end of the turn. When
+// another hook holds the lock, it spools what it observed and returns at
+// once, without a sync.
+func (e *Env) hookPostToolUse(ctx context.Context, engine string, input hookInput) error {
 	if !isPlanTool(input.ToolName) {
 		return nil
 	}
@@ -554,12 +566,25 @@ func (e *Env) hookPostToolUse(engine string, input hookInput) error {
 	if err != nil {
 		return err
 	}
-	defer lock.release()
-	if cache, err = files.read(); err != nil || cache == nil {
+	request, snapshot, syncing, err := e.recordToolUse(files, own, now)
+	lock.release()
+	if err != nil || !syncing {
+		return err
+	}
+	return e.sendSync(ctx, files, request, snapshot)
+}
+
+// recordToolUse applies the spool and the tool call own to the cache, whose
+// lock its caller holds, and answers the sync to send when toolSyncDue holds.
+func (e *Env) recordToolUse(files sessionFiles, own spooledToolUse, now time.Time) (collab.MissionsSyncInput, syncSnapshot, bool, error) {
+	var request collab.MissionsSyncInput
+	var snapshot syncSnapshot
+	cache, err := files.read()
+	if err != nil || cache == nil {
 		if err == nil {
 			err = files.spool(own)
 		}
-		return err
+		return request, snapshot, false, err
 	}
 	spooled, paths := files.readSpool()
 	spooled = append(spooled, own)
@@ -567,11 +592,33 @@ func (e *Env) hookPostToolUse(engine string, input hookInput) error {
 	applySpooled(cache, spooled)
 	setSessionState(cache, collab.SessionStateWorking, sessionEventToolUse)
 	cache.ActiveAt = now
+	syncing := false
+	if toolSyncDue(cache, now) {
+		if request, snapshot, syncing = e.prepareSync(cache); syncing {
+			cache.ToolSyncAt = now
+		}
+	}
 	if err := files.write(cache); err != nil {
-		return err
+		return request, snapshot, false, err
 	}
 	removeFiles(paths)
-	return nil
+	return request, snapshot, syncing, nil
+}
+
+// toolSyncDue reports whether a tool call syncs the cache: the next sync
+// carries its plan (planUnsent), and both the last sync and the last sync a
+// tool call started are at least toolSyncInterval old, or the pace the last
+// sync answer set when it is longer. The contract exempts only the syncs at
+// session start, at stop and during a wait from that pace.
+func toolSyncDue(cache *sessionCache, now time.Time) bool {
+	if !planUnsent(cache) {
+		return false
+	}
+	last := cache.LastSyncAt
+	if cache.ToolSyncAt.After(last) {
+		last = cache.ToolSyncAt
+	}
+	return now.Sub(last) >= max(toolSyncInterval, syncInterval(cache))
 }
 
 // hookStop publishes the end of the turn with the agent's last message, its

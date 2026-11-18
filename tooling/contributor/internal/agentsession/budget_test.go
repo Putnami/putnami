@@ -83,6 +83,8 @@ func TestTheBudgetsFitTheDeclaredTimeouts(t *testing.T) {
 		// republish after a message the sync answered.
 		{"stop", eventBudget(claude, hookEventStop, false), 2 * callTimeout},
 		{"stop failure", eventBudget(claude, hookEventStopFailure, false), callTimeout},
+		// the sync of a plan change and its retry without the plan.
+		{"post tool use", eventBudget(claude, hookEventPostToolUse, false), 2 * callTimeout},
 		// the identity of a session no start opened and sync.
 		{"session end", eventBudget(claude, hookEventSessionEnd, false), callTimeout},
 		// the identity, sync, the wait, the sync in flight at its end and

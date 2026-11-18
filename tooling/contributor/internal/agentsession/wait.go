@@ -190,10 +190,10 @@ func (e *Env) waitForOwner(ctx context.Context, files sessionFiles, wait ownerWa
 
 // workingAgain ends a wait because the session works again: a new turn
 // started or one of its hooks ran. It reports whether the wait publishes the
-// working state. A new prompt runs no hook and a tool call publishes
-// nothing, so without that publish a provider reads the session as waiting
-// until the wait's end. A hook that published since the session became
-// active needs no repeat.
+// working state. A new prompt runs no hook and a tool call publishes at
+// most one plan change a minute, so without that publish a provider reads
+// the session as waiting until the wait's end. A hook that published since
+// the session became active needs no repeat.
 func workingAgain(cache *sessionCache) bool {
 	cache.Waiter = ""
 	if cache.State == collab.SessionStateWaiting {

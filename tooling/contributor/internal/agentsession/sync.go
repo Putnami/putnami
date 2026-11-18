@@ -100,7 +100,7 @@ func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncIn
 	case collab.SessionStateFailed:
 		request.Error = firstString(cache.Error, "unknown")
 	}
-	if cache.PlanDigest != cache.PlanSynced && (cache.PlanSynced != "" || len(cache.Plan) > 0) {
+	if planUnsent(cache) {
 		steps := clonePlan(cache.Plan)
 		if steps == nil {
 			steps = []planStep{}
@@ -120,6 +120,13 @@ func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncIn
 	request.Decisions = append([]string(nil), cache.Decisions[:min(len(cache.Decisions), collab.MaxSyncDecisions)]...)
 	snapshot.decisions = request.Decisions
 	return request, snapshot
+}
+
+// planUnsent reports whether the next sync carries the plan: it differs from
+// the last plan sent to the session's mission, and it is not empty, or this
+// session sent a plan to that mission.
+func planUnsent(cache *sessionCache) bool {
+	return cache.PlanDigest != cache.PlanSynced && (cache.PlanSynced != "" || len(cache.Plan) > 0)
 }
 
 // mergeSyncAnswer applies a sync answer to the cache as it is now. A message
@@ -304,20 +311,35 @@ func (e *Env) syncSession(ctx context.Context, files sessionFiles) error {
 	var request collab.MissionsSyncInput
 	var snapshot syncSnapshot
 	publishable := false
-	dir := e.sessionsDir()
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		if cache == nil {
 			return nil, nil
 		}
-		refreshMissionKey(cache, dir)
-		if publishable = sessionPublishable(cache); publishable {
-			refreshUsage(cache)
-			request, snapshot = buildSyncRequest(cache, e.Now())
-		}
+		request, snapshot, publishable = e.prepareSync(cache)
 		return cache, nil
 	}); err != nil || !publishable {
 		return err
 	}
+	return e.sendSync(ctx, files, request, snapshot)
+}
+
+// prepareSync refreshes the mission key of the cache, which its caller holds
+// under the session lock, and, when the session names a mission, reads its
+// usage and answers its sync request. It answers false for a session that
+// names no mission.
+func (e *Env) prepareSync(cache *sessionCache) (collab.MissionsSyncInput, syncSnapshot, bool) {
+	refreshMissionKey(cache, e.sessionsDir())
+	if !sessionPublishable(cache) {
+		return collab.MissionsSyncInput{}, syncSnapshot{}, false
+	}
+	refreshUsage(cache)
+	request, snapshot := buildSyncRequest(cache, e.Now())
+	return request, snapshot, true
+}
+
+// sendSync sends a request prepareSync built, without the session lock, and
+// merges the answer under it.
+func (e *Env) sendSync(ctx context.Context, files sessionFiles, request collab.MissionsSyncInput, snapshot syncSnapshot) error {
 	envelope, callErr := e.call(ctx, collab.ContractMissions, collab.OperationSync, request)
 	var planRefused error
 	if callErr == nil && envelope.Outcome == collab.OutcomeInvalid && request.Plan != nil && ctx.Err() == nil {

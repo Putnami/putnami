@@ -23,6 +23,7 @@ import (
 const (
 	startRequirement    = "session-start-sheet"
 	toolRequirement     = "tool-use-capture"
+	toolSyncRequirement = "plan-sync-in-turn"
 	decisionRequirement = "decision-commands"
 	stopRequirement     = "stop-publication"
 	wakeRequirement     = "idle-wake"
@@ -241,6 +242,8 @@ func TestAMessageLongerThanTheBoundIsCutAndSaysSo(t *testing.T) {
 
 func TestPostToolUseRecordsThePlanWithoutGitOrProvider(t *testing.T) {
 	spectest.Proves(t, sessionFeature, toolRequirement, "post-tool-use-records-the-plan-without-git-or-provider")
+	// The clock stays at the session start's sync, so no plan change is due
+	// for a sync: TestAPlanChangeSyncsWithinTheTurnOncePerMinute covers it.
 	for _, tc := range []struct {
 		engine, session string
 		fixtures        []string
@@ -361,6 +364,152 @@ func TestABusySessionSpoolsTheToolCall(t *testing.T) {
 	h.hook(claude, "stop", claudeSession, nil)
 	if sync := h.provider.lastSync(t); sync.Plan == nil || len(sync.Plan.Steps) != planned+1 {
 		t.Errorf("the stop did not send the spooled plan change: %+v", sync.Plan)
+	}
+	if spooled, paths := h.files(claude, claudeSession).readSpool(); len(spooled) != 0 || len(paths) != 0 {
+		t.Errorf("the spool was not emptied: %v", paths)
+	}
+}
+
+func TestAPlanChangeSyncsWithinTheTurnOncePerMinute(t *testing.T) {
+	spectest.Proves(t, sessionFeature, toolSyncRequirement, "a-plan-change-syncs-within-the-turn-once-per-minute")
+	h := newHarness(t)
+	h.hook(claude, "session-start", claudeSession, nil)
+	syncs := len(h.provider.syncs)
+	// Within a minute of the session start's sync, a plan change waits.
+	h.advance(59 * time.Second)
+	h.hook(claude, "post-tool-use-task-create-1", claudeSession, nil)
+	if len(h.provider.syncs) != syncs {
+		t.Fatalf("a plan change 59 s after a sync synced: %+v", h.provider.syncs[syncs:])
+	}
+	// A minute after it, a plan change syncs the whole plan, once, and the
+	// message the sync answers waits for the end of the turn.
+	h.advance(time.Second)
+	h.provider.post(promptMessage())
+	h.provider.onSync = func(collab.MissionsSyncInput) {
+		files := h.files(claude, claudeSession)
+		lock, err := files.tryLock()
+		if err != nil {
+			t.Errorf("the hook holds the session lock during the call: %v", err)
+			return
+		}
+		cache, err := files.read()
+		lock.release()
+		if err != nil || cache == nil || !cache.ToolSyncAt.Equal(h.now) {
+			t.Errorf("the hook did not claim the sync before the call: %+v, %v", cache, err)
+		}
+	}
+	if out := h.hook(claude, "post-tool-use-task-create-2", claudeSession, nil); out != nil {
+		t.Errorf("the tool call printed %+v", out)
+	}
+	h.provider.onSync = nil
+	if len(h.provider.syncs) != syncs+1 {
+		t.Fatalf("%d syncs after a plan change a minute after the last sync, want 1", len(h.provider.syncs)-syncs)
+	}
+	sync := h.provider.lastSync(t)
+	want := []planStep{
+		{Key: "task-1", Status: collab.PlanStepTodo, Text: "write a.txt"},
+		{Key: "task-2", Status: collab.PlanStepTodo, Text: "report"},
+	}
+	if sync.Event != sessionEventToolUse || sync.State != collab.SessionStateWorking || sync.Plan == nil || !slices.Equal(sync.Plan.Steps, want) || len(sync.Delivered) != 0 {
+		t.Errorf("the tool call synced %+v", sync)
+	}
+	cache := h.cache(claude, claudeSession)
+	if len(cache.Inbox) != 1 || len(cache.Seen) != 0 {
+		t.Errorf("the message the sync answered: inbox %+v, seen %v", cache.Inbox, cache.Seen)
+	}
+	// Another plan change within the minute waits for the next sync.
+	h.advance(30 * time.Second)
+	h.hook(claude, "post-tool-use-task-update-1", claudeSession, nil)
+	if len(h.provider.syncs) != syncs+1 {
+		t.Errorf("a second plan change within a minute synced: %+v", h.provider.syncs[syncs+1:])
+	}
+	// The end of the turn sends it and delivers the message.
+	if out := h.hook(claude, "stop", claudeSession, lastMessage("Done.")); !strings.Contains(contextOf(t, out), promptMessage().Text) {
+		t.Errorf("the stop did not deliver the message: %+v", out)
+	}
+	if sync := h.provider.lastSync(t); sync.Plan == nil || sync.Plan.Steps[0].Status != collab.PlanStepDone {
+		t.Errorf("the stop did not send the plan change the tool call kept: %+v", sync.Plan)
+	}
+}
+
+func TestAToolCallSyncsOnlyWhenTheLastSyncsAreAMinuteOld(t *testing.T) {
+	spectest.Proves(t, sessionFeature, toolSyncRequirement, "a-tool-call-syncs-only-when-the-last-syncs-are-a-minute-old")
+	for _, tc := range []struct {
+		name             string
+		lastSync, toolAt time.Duration
+		synced           bool
+		want             bool
+	}{
+		{"both old", 2 * time.Minute, 2 * time.Minute, false, true},
+		{"never synced", 0, 0, false, true},
+		{"another tool call claimed a sync 10 s ago", 2 * time.Minute, 10 * time.Second, false, false},
+		{"a sync 10 s ago", 10 * time.Second, 2 * time.Minute, false, false},
+		{"the plan already sent", 2 * time.Minute, 2 * time.Minute, true, false},
+		{"a provider pace of 5 min, 2 min after the last sync", 2 * time.Minute, 0, false, false},
+		{"a provider pace of 5 min, 5 min after the last sync", 5 * time.Minute, 0, false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			now := time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)
+			cache := &sessionCache{PlanDigest: "next", PlanSynced: "sent"}
+			if strings.HasPrefix(tc.name, "a provider pace") {
+				cache.MinIntervalMS = (5 * time.Minute).Milliseconds()
+			}
+			if tc.synced {
+				cache.PlanSynced = cache.PlanDigest
+			}
+			if tc.lastSync > 0 {
+				cache.LastSyncAt = now.Add(-tc.lastSync)
+			}
+			if tc.toolAt > 0 {
+				cache.ToolSyncAt = now.Add(-tc.toolAt)
+			}
+			if got := toolSyncDue(cache, now); got != tc.want {
+				t.Errorf("toolSyncDue %v, want %v", got, tc.want)
+			}
+		})
+	}
+	// An empty plan no sync sent to the mission goes with no sync either.
+	if toolSyncDue(&sessionCache{PlanDigest: planDigest(nil)}, time.Date(2026, 11, 18, 10, 0, 0, 0, time.UTC)) {
+		t.Error("an empty plan never sent is due for a tool sync")
+	}
+	// A claim another tool call recorded holds this one back, through the hook.
+	h := newHarness(t)
+	h.hook(claude, "session-start", claudeSession, nil)
+	h.advance(2 * time.Minute)
+	h.seed(claude, claudeSession, func(cache *sessionCache) { cache.ToolSyncAt = h.now.Add(-10 * time.Second) })
+	syncs := len(h.provider.syncs)
+	h.hook(claude, "post-tool-use-task-create-1", claudeSession, nil)
+	if len(h.provider.syncs) != syncs {
+		t.Errorf("a plan change 10 s after another tool call's claim synced")
+	}
+}
+
+func TestABusySessionSpoolsTheToolCallWithoutASync(t *testing.T) {
+	spectest.Proves(t, sessionFeature, toolSyncRequirement, "a-busy-session-spools-the-tool-call-without-a-sync")
+	h := newHarness(t)
+	h.hook(claude, "session-start", claudeSession, nil)
+	h.advance(2 * time.Minute)
+	syncs := len(h.provider.recordedCalls())
+	lock, err := h.files(claude, claudeSession).tryLock()
+	if err != nil {
+		t.Fatal(err)
+	}
+	started := time.Now()
+	h.hook(claude, "post-tool-use-task-create-1", claudeSession, nil)
+	if elapsed := time.Since(started); elapsed >= hookLockWait {
+		t.Errorf("the tool call waited %v for the lock", elapsed)
+	}
+	lock.release()
+	if calls := h.provider.recordedCalls(); len(calls) != syncs {
+		t.Errorf("a busy session synced: %v", calls[syncs:])
+	}
+	if spooled, _ := h.files(claude, claudeSession).readSpool(); len(spooled) != 1 {
+		t.Fatalf("spooled %+v", spooled)
+	}
+	// The next plan change applies the spool and syncs both changes.
+	h.hook(claude, "post-tool-use-task-create-2", claudeSession, nil)
+	if sync := h.provider.lastSync(t); len(h.provider.recordedCalls()) != syncs+1 || sync.Plan == nil || len(sync.Plan.Steps) != 2 {
+		t.Errorf("the next tool call did not sync the spooled change: %+v", sync.Plan)
 	}
 	if spooled, paths := h.files(claude, claudeSession).readSpool(); len(spooled) != 0 || len(paths) != 0 {
 		t.Errorf("the spool was not emptied: %v", paths)

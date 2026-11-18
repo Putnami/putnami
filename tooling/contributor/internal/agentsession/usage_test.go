@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	collab "go.putnami.dev/protocol/collaboration"
 	"go.putnami.dev/protocol/features/spectest"
@@ -136,6 +137,28 @@ func TestCodexReportsTheUsageOfItsRollout(t *testing.T) {
 	h.hook(codex, "stop", codexSession, withTranscript(rollout))
 	if got, want := usageOf(t, h.provider.lastSync(t)), (collab.SessionUsage{InputTokens: 700, OutputTokens: 80, CacheWriteTokens: 300, CacheReadTokens: 4000}); got != want {
 		t.Fatalf("usage %+v, want %+v", got, want)
+	}
+}
+
+func TestAToolCallSyncCarriesTheUsage(t *testing.T) {
+	spectest.Proves(t, sessionFeature, usageRequirement, "a-tool-call-sync-carries-the-usage")
+	h := newHarness(t)
+	main := filepath.Join(t.TempDir(), claudeSession+".jsonl")
+	appendLines(t, main, assistantLine("msg_1", 10, 5, 100, 1000)+"\n")
+	h.hook(claude, "session-start", claudeSession, withTranscript(main))
+	appendLines(t, main, assistantLine("msg_2", 1, 1, 1, 1)+"\n")
+	h.advance(time.Minute)
+	syncs := len(h.provider.syncs)
+	h.hook(claude, "post-tool-use-todo-write", claudeSession, nil)
+	if len(h.provider.syncs) != syncs+1 {
+		t.Fatalf("the plan change a minute after the last sync sent %d syncs", len(h.provider.syncs)-syncs)
+	}
+	sync := h.provider.lastSync(t)
+	if sync.Event != sessionEventToolUse {
+		t.Errorf("event %q", sync.Event)
+	}
+	if got, want := usageOf(t, sync), (collab.SessionUsage{InputTokens: 11, OutputTokens: 6, CacheWriteTokens: 101, CacheReadTokens: 1001}); got != want {
+		t.Errorf("usage %+v, want %+v", got, want)
 	}
 }
 

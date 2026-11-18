@@ -111,7 +111,10 @@ type sessionCache struct {
 	StopContinued bool      `json:"stop_continued,omitempty"`
 	StopKey       string    `json:"stop_key,omitempty"`
 
-	LastSyncAt    time.Time `json:"last_sync_at"`
+	LastSyncAt time.Time `json:"last_sync_at"`
+	// ToolSyncAt is when a tool call last claimed a sync: until
+	// toolSyncInterval after it, no other tool call syncs.
+	ToolSyncAt    time.Time `json:"tool_sync_at"`
 	MinIntervalMS int64     `json:"min_interval_ms,omitempty"`
 
 	// Stage is the loop stage `agent stage` recorded last; every sync
@@ -272,7 +275,8 @@ func (f sessionFiles) tryLock() (*sessionLock, error) {
 }
 
 // lockWithin takes the session lock, waiting at most wait. A tool call never
-// waits for it: only SessionStart, Stop, StopFailure, a wait and a sync do.
+// waits for it to record a plan change: only SessionStart, Stop, StopFailure,
+// a wait and a sync do, the sync a tool call sends included.
 func (f sessionFiles) lockWithin(wait time.Duration) (*sessionLock, error) {
 	deadline := time.Now().Add(wait)
 	for {

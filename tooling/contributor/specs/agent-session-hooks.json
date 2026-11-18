@@ -25,7 +25,15 @@
       "text": [
         "PostToolUse records a plan change of TodoWrite, TaskCreate, TaskUpdate, update_plan, and the Claude desktop app's mcp__ccd_turn__update_plan and mcp__ccd_turn__wrap_up.",
         "Desktop items replace the plan with TodoWrite's step keys; advance, done and start change statuses; wrap_up completes the steps in progress. A call already applied, by tool_use_id, changes nothing.",
-        "It runs no git and calls no provider, ignores a subagent's plan, and spools the call when another hook holds the session lock."
+        "It runs no git, ignores a subagent's plan, and spools the call when another hook holds the session lock."
+      ]
+    },
+    {
+      "id": "plan-sync-in-turn",
+      "text": [
+        "PostToolUse sends one sync when it records a plan the last sync did not send and both the last sync and the last sync a tool call started are 60 s old or more, or the provider's pace when longer.",
+        "It claims that sync under the session lock it took without waiting, so two plan changes within that interval send at most one sync.",
+        "The sync keeps to the event's budget, one that does not fit goes with the next, and the messages it answers wait for the turn end."
       ]
     },
     {
@@ -95,7 +103,7 @@
     {
       "id": "usage-report",
       "text": [
-        "Every sync but post_tool_use's carries the session's token usage: for Claude Code, the sum of the usage of each assistant message of the session's transcript and of its subagents' transcripts, each message once, read incrementally within a per-hook byte bound;",
+        "Every sync carries the session's token usage: for Claude Code, the sum of the usage of each assistant message of the session's transcript and of its subagents' transcripts, each message once, read incrementally within a per-hook byte bound;",
         "for Codex, the last cumulative count of its rollout, without its subagent threads."
       ]
     },
@@ -119,6 +127,7 @@
     }
   ],
   "decisions": [
-    "tooling/contributor/doc/adr/0007-the-contributor-declares-agent-session-hooks.md"
+    "tooling/contributor/doc/adr/0007-the-contributor-declares-agent-session-hooks.md",
+    "tooling/contributor/doc/adr/0018-a-plan-change-syncs-within-the-turn.md"
   ]
 }

@@ -276,6 +276,21 @@
           }
         },
         {
+          "id": "plan-sync-in-turn",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-plan-change-syncs-within-the-turn-once-per-minute",
+              "a-tool-call-syncs-only-when-the-last-syncs-are-a-minute-old",
+              "a-busy-session-spools-the-tool-call-without-a-sync"
+            ]
+          }
+        },
+        {
           "id": "decision-commands",
           "stage": "coded",
           "evidenceKinds": [
@@ -414,6 +429,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
+              "a-tool-call-sync-carries-the-usage",
               "the-usage-sums-each-message-of-the-session-and-its-subagents-once",
               "each-hook-reads-a-bounded-part-of-the-transcripts",
               "codex-reports-the-usage-of-its-rollout"

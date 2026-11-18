@@ -147,8 +147,11 @@ nothing ([ADR 0016](doc/adr/0016-an-event-two-hook-sources-send-is-handled-once.
 
 - At session start, the agent receives its mission sheet and the owner's
   waiting messages.
-- A plan change is kept locally. So are an asked decision and a recorded
-  reply, which `putnami agent ask` and `putnami agent reply` record.
+- A plan change is kept locally, and syncs during the turn when the last
+  sync is at least a minute old, or the provider's pace when it is longer
+  ([ADR 0018](doc/adr/0018-a-plan-change-syncs-within-the-turn.md)). An
+  asked decision and a recorded reply, which `putnami agent ask` and
+  `putnami agent reply` record, are kept locally.
 - At the end of a turn, one sync publishes the state, the plan, the delivered
   messages, the decisions and the `[ack <id>] <reply>` lines of the last
   message. A waiting message continues the turn once.
