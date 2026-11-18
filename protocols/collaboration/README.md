@@ -180,6 +180,9 @@ implementation proves the rest in its own tests:
   the `stable` status from 0.5.0, what never changes within a version, the
   frozen version 1 corpus and the support window. It amends ADR 0002
   decision 2.
+- [ADR 0008 — A session leaves no empty mission behind](doc/adr/0008-a-session-leaves-no-empty-mission-behind.md):
+  a missions provider retires the mission a session leaves once nothing else
+  holds it, with no document change.
 
 ## Stability
 

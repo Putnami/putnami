@@ -121,7 +121,10 @@ func TestEverySyncRequestHoldsTheContractRules(t *testing.T) {
 				t.Errorf("stage %q, usage %+v", r.Stage, r.Usage)
 			}
 		}},
-		{"cleared plan", func(c *sessionCache) { c.PlanDigest = planDigest(nil) }, func(t *testing.T, r collab.MissionsSyncInput) {
+		{"cleared plan", func(c *sessionCache) {
+			c.PlanSynced = planDigest(replacePlan([]wholePlanStep{{text: "Sent", status: "pending"}}))
+			c.PlanDigest = planDigest(nil)
+		}, func(t *testing.T, r collab.MissionsSyncInput) {
 			if r.Plan == nil || r.Plan.Steps == nil || len(r.Plan.Steps) != 0 {
 				t.Errorf("plan %+v", r.Plan)
 			}
@@ -156,6 +159,67 @@ func TestEverySyncRequestHoldsTheContractRules(t *testing.T) {
 			t.Errorf("%s: observed at %q", tc.name, request.ObservedAt)
 		}
 		tc.check(t, request)
+	}
+}
+
+// TestAMissionChangeSendsThePlanAgain: once the session moves to another
+// mission, its next sync carries the plan, which the provider may have
+// retired with the mission the session left; an answer about the mission it
+// left does not count the plan as sent to the new one; and an empty plan does
+// not go to the new mission, where it would clear another session's plan.
+func TestAMissionChangeSendsThePlanAgain(t *testing.T) {
+	spectest.Proves(t, sessionFeature, targetRequirement, "a-mission-change-sends-the-plan-again")
+	dir, root := t.TempDir(), "/checkout"
+	plan := replacePlan([]wholePlanStep{{text: "Work", status: "in_progress"}})
+	cache := &sessionCache{Engine: claude, Session: claudeSession, Repository: sessionRepo, Root: root, Branch: sessionBranch,
+		Mission: sessionMissionState{Key: sessionBranchKey}, State: collab.SessionStateWorking, LastEvent: sessionEventToolUse,
+		Plan: plan, PlanDigest: planDigest(plan)}
+	cache.PlanSynced = cache.PlanDigest
+	if request, _ := buildSyncRequest(cache, sessionEpoch); request.Plan != nil {
+		t.Fatalf("a plan already sent goes again: %+v", request.Plan)
+	}
+	if err := declareMissionIssue(dir, root, sessionBranch, 7, sessionEpoch); err != nil {
+		t.Fatal(err)
+	}
+	refreshMissionKey(cache, dir)
+	request, _ := buildSyncRequest(cache, sessionEpoch)
+	if request.Mission.Key != "issue-7" || request.Plan == nil || len(request.Plan.Steps) != 1 {
+		t.Fatalf("the first sync of the new mission sent mission %q and plan %+v; want issue-7 and the plan", request.Mission.Key, request.Plan)
+	}
+
+	cache.Mission, cache.PlanSynced = sessionMissionState{Key: sessionBranchKey}, ""
+	_, snapshot := buildSyncRequest(cache, sessionEpoch)
+	refreshMissionKey(cache, dir)
+	answer := collab.MissionsSyncResult{Mission: collab.MissionView{Key: sessionBranchKey}, MinIntervalMs: collab.MinSyncIntervalMs}
+	if err := mergeSyncAnswer(cache, snapshot, answer, sessionEpoch); err != nil {
+		t.Fatal(err)
+	}
+	if request, _ := buildSyncRequest(cache, sessionEpoch); request.Plan == nil {
+		t.Fatal("an answer about the mission the session left counted the plan as sent to the new one")
+	}
+
+	empty := replacePlan(nil)
+	cache.Plan, cache.PlanDigest = empty, planDigest(empty)
+	if request, _ := buildSyncRequest(cache, sessionEpoch); request.Plan != nil {
+		t.Fatalf("an emptied plan went to a mission that has none from the session: %+v", request.Plan)
+	}
+	cache.PlanSynced = planDigest(plan)
+	if request, _ := buildSyncRequest(cache, sessionEpoch); request.Plan == nil || len(request.Plan.Steps) != 0 {
+		t.Fatalf("an emptied plan did not clear the plan the session sent to its mission: %+v", request.Plan)
+	}
+
+	cache.Plan, cache.PlanDigest, cache.PlanSynced = plan, planDigest(plan), ""
+	_, snapshot = buildSyncRequest(cache, sessionEpoch)
+	markSyncFailed(cache, snapshot, sessionEpoch)
+	cache.Plan, cache.PlanDigest = empty, planDigest(empty)
+	if request, _ := buildSyncRequest(cache, sessionEpoch); request.Plan == nil || len(request.Plan.Steps) != 0 {
+		t.Fatalf("an emptied plan did not clear a plan a failed sync may have applied: %+v", request.Plan)
+	}
+
+	cache.PlanSynced = ""
+	markSyncFailed(cache, syncSnapshot{missionKey: sessionBranchKey, planSent: true}, sessionEpoch)
+	if cache.PlanSynced != "" {
+		t.Fatalf("a failed sync about the mission the session left counted a plan as sent to the new one: %q", cache.PlanSynced)
 	}
 }
 

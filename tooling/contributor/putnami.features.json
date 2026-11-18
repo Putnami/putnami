@@ -374,7 +374,8 @@
             "checks": [
               "attach-declares-the-mission-of-the-branch",
               "a-git-failure-is-not-a-detached-head",
-              "the-repository-comes-from-origin-without-host-or-credential"
+              "the-repository-comes-from-origin-without-host-or-credential",
+              "a-mission-change-sends-the-plan-again"
             ]
           }
         },

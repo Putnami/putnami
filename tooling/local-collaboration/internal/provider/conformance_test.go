@@ -40,6 +40,7 @@ func TestTheSharedContractScenarios(t *testing.T) {
 func TestTheMissionsScenarios(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-local-provider-passes-the-missions-scenarios")
 	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-local-provider-passes-the-missions-status-scenario")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-left-mission-retired", "the-local-provider-passes-the-left-mission-scenarios")
 	statusRan := false
 	providertest.RunMissions(t, func(t *testing.T) providertest.Target {
 		if strings.HasSuffix(t.Name(), "status_lists_the_sessions_of_a_mission,_newest_first") {

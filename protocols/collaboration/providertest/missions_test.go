@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"slices"
 	"strings"
 	"sync"
@@ -28,6 +29,9 @@ type missionsStore struct {
 	decisions map[string]*missionsDecision
 	// asks maps an idempotency key to the decision it recorded.
 	asks map[string]string
+	// memory, when set, is the memory store the same provider serves: a
+	// mission whose memory holds a record is never retired.
+	memory *memoryStore
 }
 
 // missionsMission is what the store holds of a mission once a sync applied:
@@ -157,7 +161,11 @@ func (s *missionsStore) sync(_ context.Context, call collab.Call) (any, *collab.
 		s.sessions[in.Session.Engine+"/"+in.Session.ID] = session
 	}
 	if session.observed.IsZero() || observed.After(session.observed) {
+		left := session.mission
 		session.state, session.observed, session.mission, session.branch = in.State, observed, mission, in.Branch
+		if left != "" && left != mission {
+			s.retire(left)
+		}
 		session.failure, session.wait = in.Error, in.WaitUntil
 		if in.Stage != "" {
 			session.stage = in.Stage
@@ -224,6 +232,30 @@ func (s *missionsStore) sync(_ context.Context, call collab.Call) (any, *collab.
 	slices.SortFunc(result.Inbox, func(a, b collab.InboxMessage) int { return s.messages[a.ID].seq - s.messages[b.ID].seq })
 	slices.SortFunc(result.Mission.OpenDecisions, func(a, b collab.OpenDecision) int { return strings.Compare(a.ID, b.ID) })
 	return result, nil
+}
+
+// retire drops a mission a session left when no session, decision or
+// message holds it.
+func (s *missionsStore) retire(mission string) {
+	for _, session := range s.sessions {
+		if session.mission == mission {
+			return
+		}
+	}
+	for _, decision := range s.decisions {
+		if decision.mission == mission {
+			return
+		}
+	}
+	for _, message := range s.messages {
+		if message.mission == mission {
+			return
+		}
+	}
+	if s.memory != nil && s.memory.holds(mission) {
+		return
+	}
+	delete(s.missions, mission)
 }
 
 // view is a decision as missions.ask answers it.
@@ -353,8 +385,24 @@ func missionsTarget(t *testing.T, store *missionsStore) Target {
 	return Target{Handlers: store.handlers(), WorkspaceRoot: t.TempDir(), Post: store.post, Answer: store.answer}
 }
 
+// TestTheLeftMissionScenarioKeepsAMissionWithAMemoryRecord: against a
+// provider that serves missions and memory, the left-mission scenario also
+// moves a session out of a mission whose memory holds a record, which stays.
+func TestTheLeftMissionScenarioKeepsAMissionWithAMemoryRecord(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-left-mission-retired", "the-left-mission-scenarios-keep-a-mission-with-a-memory-record")
+	RunMissions(t, func(t *testing.T) Target {
+		missions, memory := newMissionsStore(), newMemoryStore()
+		missions.memory = memory
+		target := missionsTarget(t, missions)
+		target.Workspace = "providertest"
+		maps.Copy(target.Handlers, memory.handlers())
+		return target
+	})
+}
+
 func TestTheMissionsScenariosPassAgainstACorrectProvider(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-missions-scenarios-pass-against-a-correct-provider")
+	spectest.Proves(t, "collaboration/provider-contract", "missions-left-mission-retired", "the-left-mission-scenarios-pass-against-a-correct-provider")
 	RunMissions(t, func(t *testing.T) Target { return missionsTarget(t, newMissionsStore()) })
 }
 

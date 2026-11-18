@@ -49,6 +49,20 @@ func missionID(identity collab.MemoryIdentity) string {
 	return hex.EncodeToString(sum[:16])
 }
 
+// holds reports whether a record belongs to a mission of the missions
+// store, named "<repository>\x00<key>".
+func (m *memoryStore) holds(mission string) bool {
+	repository, key, _ := strings.Cut(mission, "\x00")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	for _, record := range m.records {
+		if record.Identity.Repository == repository && record.Identity.Mission == key {
+			return true
+		}
+	}
+	return false
+}
+
 func (m *memoryStore) find(id string) int {
 	for i, record := range m.records {
 		if record.Ref.ID == id {

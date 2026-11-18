@@ -365,6 +365,43 @@ func TestASessionKeepsItsStageItsUsageAndItsEnd(t *testing.T) {
 	}
 }
 
+// TestASessionThatMovesRetiresTheEmptyMissionItLeft: a session that starts on
+// its branch mission and moves to its issue mission leaves only the issue
+// mission in the store; an older sync of the branch mission brings nothing
+// back; a mission that holds a decision stays when the session leaves it.
+func TestASessionThatMovesRetiresTheEmptyMissionItLeft(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-left-mission-retired", "the-local-provider-retires-the-empty-mission-a-session-leaves")
+	h := newMissionsHarness(t)
+	syncTo := func(key, observed string) {
+		t.Helper()
+		var result collab.MissionsSyncResult
+		h.ok("missions", "sync", `{"session":`+sessionArguments+`,"mission":{"repository":"acme/app","key":"`+key+`"},`+
+			`"event":"post_tool_use","state":"working","observedAt":"`+observed+`","plan":{"steps":[{"key":"a","status":"doing","text":"Work"}]}}`, &result)
+	}
+	held := func() []string {
+		t.Helper()
+		var keys []string
+		for _, mission := range h.missions().Missions {
+			keys = append(keys, mission.Key)
+		}
+		return keys
+	}
+	syncTo("branch:topic", "2026-09-24T07:00:00Z")
+	h.sync(10, "")
+	if keys := held(); !slices.Equal(keys, []string{"issue-7"}) {
+		t.Fatalf("after the move, the store holds missions %v; want [issue-7]", keys)
+	}
+	syncTo("branch:topic", "2026-09-24T07:00:05Z")
+	if keys := held(); !slices.Equal(keys, []string{"issue-7"}) {
+		t.Fatalf("an older sync of the left mission left missions %v; want [issue-7]", keys)
+	}
+	h.ask("left-decision")
+	syncTo("issue-8", "2026-09-24T07:00:20Z")
+	if keys := held(); !slices.Equal(keys, []string{"issue-7", "issue-8"}) {
+		t.Fatalf("a mission that holds a decision left missions %v; want [issue-7 issue-8]", keys)
+	}
+}
+
 // TestStatusReadsTheStoreWithoutTakingOwnerFiles: status answers the mission
 // the request names, pages its sessions newest first and then by engine and
 // id, loses none across a sync between two pages, leaves an owner file

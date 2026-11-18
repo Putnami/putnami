@@ -232,8 +232,14 @@ write.
   and that an older sync still describes the mission it names. When the
   target answers `status`, it also checks that two sessions synced to one
   mission are listed with their state, stage, usage and branch, newest first,
-  that a session that moved to another mission leaves the list, and that an
-  unknown mission answers its empty view and no session.
+  that a session that moved to another mission leaves the list, that an
+  unknown mission answers its empty view and no session, and that a session
+  leaves no empty mission behind: the mission it left reads empty unless
+  another session, a decision, a message or, on a provider that also serves
+  memory, a memory record holds it
+  ([ADR 0008](adr/0008-a-session-leaves-no-empty-mission-behind.md)). The
+  memory-record case runs only when the target's `Handlers` also serve
+  `memory.checkpoint`, and it needs the target's `Workspace`.
 - Drive your handlers through `collab.Serve` with the request a routed call
   carries (`tooling/local-collaboration/internal/provider/provider_test.go`),
   so every answer passes the same validation a real call does.

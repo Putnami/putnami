@@ -409,7 +409,9 @@ func (e *Env) openSession(cache *sessionCache, engine string, input hookInput, i
 }
 
 // refreshMissionKey reads the mission declared for the cached checkout and
-// branch: a file read, no git. A new key starts a new mission.
+// branch: a file read, no git. A new key starts a new mission, and the next
+// sync sends it the session's plan, unless empty: the provider may retire the
+// mission the session left, plan included.
 func refreshMissionKey(cache *sessionCache, dir string) {
 	key := ""
 	if cache.Root != "" {
@@ -417,6 +419,7 @@ func refreshMissionKey(cache *sessionCache, dir string) {
 	}
 	if key != cache.Mission.Key {
 		cache.Mission = sessionMissionState{Key: key}
+		cache.PlanSynced = ""
 	}
 }
 

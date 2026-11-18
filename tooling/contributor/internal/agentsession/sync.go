@@ -55,8 +55,12 @@ type syncSnapshot struct {
 }
 
 // buildSyncRequest is the missions.sync request of the cache. The plan goes
-// only when it changed since the last successful sync, and the last message
-// with a Stop only.
+// when it differs from the last plan sent to the session's mission. An empty
+// plan goes only to a mission this session sent a plan to, so it does not
+// clear a plan another session published there. A plan the provider refused
+// and a plan a failed call carried count as sent: in those two cases an empty
+// plan can still clear another session's plan. The last message goes with a
+// Stop only.
 func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncInput, syncSnapshot) {
 	request := collab.MissionsSyncInput{
 		Session:    collab.SessionRef{Engine: cache.Engine, ID: cache.Session},
@@ -96,7 +100,7 @@ func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncIn
 	case collab.SessionStateFailed:
 		request.Error = firstString(cache.Error, "unknown")
 	}
-	if cache.PlanDigest != cache.PlanSynced {
+	if cache.PlanDigest != cache.PlanSynced && (cache.PlanSynced != "" || len(cache.Plan) > 0) {
 		steps := clonePlan(cache.Plan)
 		if steps == nil {
 			steps = []planStep{}
@@ -120,12 +124,13 @@ func buildSyncRequest(cache *sessionCache, now time.Time) (collab.MissionsSyncIn
 
 // mergeSyncAnswer applies a sync answer to the cache as it is now. A message
 // already delivered is never queued again, and an answer about a mission the
-// session left changes nothing but the pace and what the sync sent. It
+// session left changes nothing but the pace and what the sync sent; the plan
+// it carried does not count as sent to the mission the session moved to. It
 // answers the replies the provider refused: a refused reply is final, so the
 // cache drops it and sends no other reply to that message.
 func mergeSyncAnswer(cache *sessionCache, snapshot syncSnapshot, answer collab.MissionsSyncResult, now time.Time) error {
 	cache.LastSyncAt = now
-	if snapshot.planSent {
+	if snapshot.planSent && snapshot.missionKey == cache.Mission.Key {
 		cache.PlanSynced = snapshot.planDigest
 	}
 	cache.Acks = without(cache.Acks, snapshot.acks)
@@ -341,11 +346,26 @@ func (e *Env) syncSession(ctx context.Context, files sessionFiles) error {
 		if callErr == nil {
 			refused = mergeSyncAnswer(cache, snapshot, answer, e.Now())
 		} else {
-			cache.LastSyncAt = e.Now()
+			markSyncFailed(cache, snapshot, e.Now())
 		}
 		return cache, nil
 	})
 	return errors.Join(callErr, planRefused, refused, err)
+}
+
+// planUncertain is the PlanSynced of a mission a failed sync may have sent a
+// plan to. It equals no digest, so the next sync sends the plan again, even
+// empty.
+const planUncertain = "uncertain"
+
+// markSyncFailed applies a failed sync to the cache: the call may have
+// applied the plan it carried to the session's mission, so the next sync
+// sends the plan again, whatever it is.
+func markSyncFailed(cache *sessionCache, snapshot syncSnapshot, now time.Time) {
+	cache.LastSyncAt = now
+	if snapshot.planSent && snapshot.missionKey == cache.Mission.Key {
+		cache.PlanSynced = planUncertain
+	}
 }
 
 // readCheckpoint reads the mission's checkpoint through memory.mission for

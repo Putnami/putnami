@@ -63,7 +63,9 @@ type sessionCache struct {
 	// PlanToolUses are the tool_use_ids of the last plan calls the session
 	// applied, oldest first, at most planToolUseMemory.
 	PlanToolUses []string `json:"plan_tool_uses,omitempty"`
-	// PlanSynced is the digest of the plan the last successful sync sent.
+	// PlanSynced is the digest of the plan the last successful sync sent to
+	// the session's mission, planUncertain after a failed sync that may have
+	// sent one, or empty when none went there.
 	PlanSynced string `json:"plan_synced,omitempty"`
 
 	// Inbox holds the messages a sync answered and no hook delivered yet.

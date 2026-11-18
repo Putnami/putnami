@@ -373,6 +373,22 @@
           }
         },
         {
+          "id": "missions-left-mission-retired",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-left-mission-scenarios-pass-against-a-correct-provider",
+              "the-left-mission-scenarios-keep-a-mission-with-a-memory-record",
+              "the-local-provider-passes-the-left-mission-scenarios",
+              "the-local-provider-retires-the-empty-mission-a-session-leaves"
+            ]
+          }
+        },
+        {
           "id": "scenarios-normalize-requests",
           "stage": "coded",
           "evidenceKinds": [

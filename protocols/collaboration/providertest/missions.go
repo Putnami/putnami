@@ -3,6 +3,7 @@ package providertest
 import (
 	"encoding/json"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -13,8 +14,10 @@ import (
 // in a mission of its own. A missions target can Post an inbox message and
 // Answer a decision. Every scenario calls as one caller, so none covers an id
 // that is another caller's or a reply refused as message.denied: a provider
-// with more than one caller tests those itself. The status scenario runs
-// only when the target answers missions.status.
+// with more than one caller tests those itself. The status scenario and the
+// left-mission scenario run only when the target answers missions.status. The
+// left-mission scenario also checks that a memory record keeps a mission when
+// the target's Handlers serve memory.checkpoint too, which needs a Workspace.
 func RunMissions(t *testing.T, newTarget func(t *testing.T) Target) {
 	t.Helper()
 	scenarios := []struct {
@@ -41,6 +44,7 @@ func RunMissions(t *testing.T, newTarget func(t *testing.T) Target) {
 		{"a sync's title names a mission still titled by its key, and no other", missionsTitle},
 		{"a session reports its stage, its usage and its end", missionsEnded},
 		{"status lists the sessions of a mission, newest first", missionsStatus},
+		{"a session leaves no empty mission behind", missionsLeftMissionRetired},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -627,4 +631,70 @@ func statusSessions(sessions []collab.MissionSession) []collab.SessionRef {
 		refs = append(refs, session.Session)
 	}
 	return refs
+}
+
+// missionsLeftMissionRetired moves a session out of a mission of its own, once
+// per holder: the mission it left reads empty when nothing else holds it, and
+// keeps its title and plan while another session, a decision or a message
+// holds it, or a memory record when the target also serves memory. A later
+// sync that names a retired mission holds it again, with no plan.
+func missionsLeftMissionRetired(t *testing.T, m *missionRun) {
+	if !m.offers(collab.ContractMissions, collab.OperationStatus) {
+		t.Skip("the provider does not offer missions.status")
+	}
+	plan := collab.MissionPlan{Steps: []collab.PlanStep{{Key: "a", Status: collab.PlanStepDoing, Text: "Left mission"}}}
+	holders := []struct {
+		name string
+		hold func(left collab.MissionName)
+	}{
+		{"nothing", nil},
+		{"another session", func(left collab.MissionName) {
+			m.sync(90*time.Second, func(in *collab.MissionsSyncInput) {
+				in.Session, in.Mission = collab.SessionRef{Engine: m.session.Engine, ID: m.session.ID + "-stays"}, left
+			})
+		}},
+		{"a decision", func(left collab.MissionName) {
+			var asked collab.MissionsAskResult
+			m.OK(collab.ContractMissions, collab.OperationAsk, m.askDocument(m.askKey()+"-left", func(in *collab.MissionsAskInput) { in.Mission = left }), &asked)
+		}},
+		{"a message", func(left collab.MissionName) { m.target.Post(t, left, collab.InboxKindInfo, "Read the gate first.") }},
+	}
+	if m.offers(collab.ContractMemory, collab.OperationCheckpoint) {
+		holders = append(holders, struct {
+			name string
+			hold func(left collab.MissionName)
+		}{"a memory record", func(left collab.MissionName) {
+			identity := map[string]any{"repository": left.Repository}
+			m.checkpoint(left.Key, "Left checkpoint", checkpointArguments(left.Key, m.askKey()+"-memory", "Left checkpoint", "", map[string]any{"identity": identity}))
+		}})
+	}
+	for i, holder := range holders {
+		left := m.other("left-" + strconv.Itoa(i))
+		left.Title = "Left mission " + m.run
+		session := collab.SessionRef{Engine: m.session.Engine, ID: m.session.ID + "-moves-" + strconv.Itoa(i)}
+		m.sync(time.Minute, func(in *collab.MissionsSyncInput) { in.Session, in.Mission, in.Plan = session, left, &plan })
+		if holder.hold != nil {
+			holder.hold(left)
+		}
+		m.sync(2*time.Minute, func(in *collab.MissionsSyncInput) { in.Session, in.Mission = session, m.other("next-"+strconv.Itoa(i)) })
+		status := m.status(left, nil)
+		if slices.Contains(statusSessions(status.Sessions), session) {
+			t.Fatalf("held by %s: status of the mission a session left lists it: %+v", holder.name, status.Sessions)
+		}
+		if holder.hold == nil {
+			if status.Mission.Title != "" || len(status.Mission.Plan.Steps) != 0 || len(status.Mission.OpenDecisions) != 0 || len(status.Sessions) != 0 {
+				t.Fatalf("status of a mission its only session left answered %+v; want its empty view and no session", status)
+			}
+			back := m.sync(3*time.Minute, func(in *collab.MissionsSyncInput) { in.Session, in.Mission = session, left })
+			if back.Mission.Title != left.Title || len(back.Mission.Plan.Steps) != 0 {
+				t.Fatalf("a sync back to a retired mission answered title %q and plan %+v; want %q and no plan",
+					back.Mission.Title, back.Mission.Plan.Steps, left.Title)
+			}
+			continue
+		}
+		if status.Mission.Title != left.Title || !slices.Equal(status.Mission.Plan.Steps, plan.Steps) {
+			t.Fatalf("held by %s: status of the mission a session left answered title %q and plan %+v; want %q and %+v",
+				holder.name, status.Mission.Title, status.Mission.Plan.Steps, left.Title, plan.Steps)
+		}
+	}
 }

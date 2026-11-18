@@ -72,11 +72,13 @@ type Target struct {
 	Settle time.Duration
 	// Track, when set, is told every item a scenario creates, so a test
 	// against a real backend can clean up after it. RunMissions tells it
-	// nothing: a missions item has a bare id, not a reference, and every
-	// missions scenario works in a mission of its own.
+	// nothing: a missions item has a bare id, not a reference, every missions
+	// scenario works in a mission of its own, and the memory record of the
+	// left-mission scenario is a checkpoint, which has no reference either.
 	Track func(contract string, ref collab.Ref)
 	// Workspace is the workspace name the orchestrator fills into a memory
-	// identity that names none. RunMemory requires it.
+	// identity that names none. RunMemory requires it, and so does the
+	// memory-record case of RunMissions.
 	Workspace string
 	// Reopen returns another instance of the provider on the same store: it
 	// shares nothing with Handlers but the stored state, as a second provider

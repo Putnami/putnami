@@ -210,6 +210,13 @@
       ]
     },
     {
+      "id": "missions-left-mission-retired",
+      "text": [
+        "When an applied missions.sync names another mission than the session's last applied sync, the session leaves that mission, and a missions provider retires it once nothing else holds it: no other session's last applied sync names it, and it holds no decision and no message; a provider that also serves memory keeps a mission whose memory holds a record.",
+        "A retired mission reads as one the provider does not hold: its key, an empty title, an empty plan, no open decision and no session."
+      ]
+    },
+    {
       "id": "scenarios-normalize-requests",
       "text": "The scenarios normalize each request before it reaches Serve: a list request without a page gets page.size 20 and an explicit size is kept, a memory request without a workspace gets the served one and one naming its own keeps it, and a request the contract refuses is sent unchanged."
     },
@@ -282,6 +289,7 @@
     "protocols/collaboration/doc/adr/0005-missions-status-reads-a-missions-sessions.md",
     "protocols/collaboration/doc/adr/0006-version-1-is-stable.md",
     "tooling/contributor/doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md",
-    "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md"
+    "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md",
+    "protocols/collaboration/doc/adr/0008-a-session-leaves-no-empty-mission-behind.md"
   ]
 }

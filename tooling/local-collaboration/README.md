@@ -79,6 +79,9 @@ sessions: each session's state, loop stage, token usage and branch, and its
 error or `waitUntil` when it failed or waits, newest first. Its cursor names
 the last session of a page, so a sync between two pages repeats no session
 and skips none that did not sync.
+A session that moves to another mission, such as from its branch mission to
+its issue mission after `putnami agent attach`, retires the mission it left
+when no other session, decision or message holds it.
 Decision ids are `D-<n>`, message ids `M-<n>`.
 
 You answer a decision and write a message as **files in the store

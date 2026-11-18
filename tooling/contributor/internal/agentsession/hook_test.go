@@ -763,6 +763,43 @@ func TestATransportErrorRedialsAndKeepsTheQueue(t *testing.T) {
 	}
 }
 
+// TestAFailedSyncSendsThePlanAgain: a failed sync may have applied the plan it
+// carried, so the next sync sends the plan again, even when the session
+// emptied it, and even when it is back to the plan the last ok sync sent.
+func TestAFailedSyncSendsThePlanAgain(t *testing.T) {
+	spectest.Proves(t, sessionFeature, failOpenRequirement, "a-transport-error-redials-and-keeps-the-queue")
+	first := replacePlan([]wholePlanStep{{text: "First", status: "in_progress"}})
+	second := replacePlan([]wholePlanStep{{text: "Second", status: "in_progress"}})
+	empty := replacePlan(nil)
+	for _, c := range []struct {
+		name         string
+		synced, next []planStep
+	}{
+		{"an emptied plan", nil, empty},
+		{"the plan the last ok sync sent", first, first},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			h := newHarness(t)
+			h.hook(claude, "session-start", claudeSession, nil)
+			h.seed(claude, claudeSession, func(cache *sessionCache) {
+				cache.Plan, cache.PlanDigest, cache.PlanSynced = second, planDigest(second), ""
+				if c.synced != nil {
+					cache.PlanSynced = planDigest(c.synced)
+				}
+			})
+			h.provider.broken = errors.New("broken pipe")
+			h.hook(claude, "stop", claudeSession, lastMessage("Done."))
+			h.provider.broken = nil
+			h.seed(claude, claudeSession, func(cache *sessionCache) { cache.Plan, cache.PlanDigest = c.next, planDigest(c.next) })
+			h.advance(time.Minute)
+			h.hook(claude, "stop", claudeSession, lastMessage("Done."))
+			if sync := h.provider.lastSync(t); sync.Plan == nil || len(sync.Plan.Steps) != len(c.next) {
+				t.Errorf("the sync after a failed one sent plan %+v; want %d steps", sync.Plan, len(c.next))
+			}
+		})
+	}
+}
+
 func TestTheSyncAnswerKeepsWhatHooksAddedDuringTheCall(t *testing.T) {
 	spectest.Proves(t, sessionFeature, failOpenRequirement, "a-transport-error-redials-and-keeps-the-queue")
 	h := newHarness(t)

@@ -253,6 +253,14 @@ A provider keeps the `stage` and the `usage` of the last applied sync that
 carried them: an absent one keeps what it holds, and a present `usage`
 replaces it whole.
 
+A session reports to the mission its last applied sync named. An applied sync
+that names another mission moves the session, and the provider retires the
+mission it left once nothing else holds it: no other session's last applied
+sync names it, and it holds no decision and no message. A provider that also
+serves memory keeps a mission whose memory holds a record. A retired mission
+reads as one the provider does not hold, and a later sync that names it holds
+it again ([ADR 0008](adr/0008-a-session-leaves-no-empty-mission-behind.md)).
+
 - `delivered` (at most 100) lists the inbox messages the host gave the agent;
   they leave the inbox. Delivering an answer message moves its decision to
   `acknowledged`.

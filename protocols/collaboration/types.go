@@ -994,7 +994,9 @@ type MessageReply struct {
 // MissionsSyncInput is the missions.sync request. Its natural key is the
 // session and ObservedAt: a provider applies State, Stage, Usage and Plan only
 // from a sync observed later than the last one it applied for the session, so
-// a repeat changes nothing.
+// a repeat changes nothing. An applied sync that names another mission moves
+// the session, and the provider retires the mission it left once no other
+// session, decision, message or memory record holds it.
 type MissionsSyncInput struct {
 	// Session is the session that publishes.
 	Session SessionRef `json:"session"`

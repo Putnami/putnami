@@ -336,7 +336,8 @@ func (p *Provider) syncMission(_ context.Context, call collab.Call) (any, *colla
 
 // applySession applies a sync's observation of its session and its mission
 // when it is later than the last one applied for the session, and returns the
-// state the store holds for the session.
+// state the store holds for the session. A session that moves to another
+// mission retires the one it left when nothing else holds it.
 func applySession(m *store.Missions, in *collab.MissionsSyncInput, observed time.Time) collab.SessionState {
 	index := slices.IndexFunc(m.Sessions, func(session store.Session) bool {
 		return session.Engine == in.Session.Engine && session.ID == in.Session.ID
@@ -345,6 +346,10 @@ func applySession(m *store.Missions, in *collab.MissionsSyncInput, observed time
 		return m.Sessions[index].State
 	}
 	mission := keyOf(in.Mission)
+	var left store.MissionKey
+	if index >= 0 {
+		left = m.Sessions[index].Mission
+	}
 	applied := store.Session{
 		Engine: in.Session.Engine, ID: in.Session.ID, Mission: mission, State: in.State, ObservedAt: in.ObservedAt,
 		Event: in.Event, Model: in.Model, Branch: in.Branch, LastMessage: in.LastMessage, Error: in.Error, WaitUntil: in.WaitUntil,
@@ -372,7 +377,21 @@ func applySession(m *store.Missions, in *collab.MissionsSyncInput, observed time
 	if in.Plan != nil {
 		m.Missions[held].Plan = append([]collab.PlanStep{}, in.Plan.Steps...)
 	}
+	if index >= 0 && left != mission {
+		retire(m, left)
+	}
 	return in.State
+}
+
+// retire drops a mission a session left when no session, decision or
+// message holds it. A later sync that names it holds it again.
+func retire(m *store.Missions, mission store.MissionKey) {
+	if slices.ContainsFunc(m.Sessions, func(session store.Session) bool { return session.Mission == mission }) ||
+		slices.ContainsFunc(m.Decisions, func(decision store.Decision) bool { return decision.Mission == mission }) ||
+		slices.ContainsFunc(m.Messages, func(message store.Message) bool { return message.Mission == mission }) {
+		return
+	}
+	m.Missions = slices.DeleteFunc(m.Missions, func(held store.Mission) bool { return held.MissionKey == mission })
 }
 
 // deliver marks a message delivered. Delivering an answer moves its decision
