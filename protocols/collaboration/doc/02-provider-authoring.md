@@ -63,7 +63,8 @@ when it resolves a binding:
   request member `missedSyncs`, and on `missions.status`, the same result
   member; on the proposals operations that answer a proposal (`find`,
   `status`, `upsert`, `merge`, `automerge`), the result member `pageUrl`, the
-  link to the proposal's change in your own console. Return a listed result member only when you declare it, and always
+  link to the proposal's change in your own console, declared on every one of
+  them you offer or on none. Return a listed result member only when you declare it, and always
   when you do, `[]` or a count of 0 when there is none. You receive a request
   member only when you declare it: Putnami removes it from a request to a
   provider that does not. `<contract> capabilities` reports them. Declaring

@@ -1,7 +1,9 @@
 package collaboration
 
 import (
+	"fmt"
 	"slices"
+	"strings"
 	"testing"
 
 	diag "go.putnami.dev/protocol/diagnostic"
@@ -109,5 +111,49 @@ func TestMissedSyncs_Bounds(t *testing.T) {
 				t.Fatalf("status codes = %v, want %v", got, tc.codes)
 			}
 		})
+	}
+}
+
+// TestReadProviderOffer_PageURLAllOrNone: a proposals provider offers pageUrl
+// when it declares it on every operation it offers that answers a proposal,
+// and a declaration on some of them withdraws its proposals version.
+func TestReadProviderOffer_PageURLAllOrNone(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "proposal-page-url", "a-partial-page-url-declaration-withdraws-the-version")
+	declare := func(on ...string) map[string]extension.ProviderDeclaration {
+		proposals := fullProvider(ContractProposals)
+		for _, operation := range on {
+			declared := proposals.Operations[operation]
+			declared.Members = []string{ProposalMemberPageURL}
+			proposals.Operations[operation] = declared
+		}
+		return map[string]extension.ProviderDeclaration{ContractProposals: proposals}
+	}
+	var answering []string
+	full := fullProvider(ContractProposals)
+	spec, _ := Lookup(ContractProposals, 1)
+	for _, op := range spec.Operations {
+		if _, offered := full.Operations[op.Name]; offered && slices.Contains(op.Members, ProposalMemberPageURL) {
+			answering = append(answering, op.Name)
+		}
+	}
+	if len(answering) < 2 {
+		t.Fatalf("the full provider offers %v; the test needs two operations that answer a proposal", answering)
+	}
+	offer, diags := ReadProviderOffer(declare(answering...))
+	if diag.HasErrors(diags) {
+		t.Fatalf("pageUrl declared on %v was refused: %v", answering, diags)
+	}
+	ops, _ := offer.Operations(ContractProposals, 1)
+	for _, operation := range answering {
+		if got := ops[operation].Members(); !slices.Equal(got, ProposalMembers) {
+			t.Errorf("%s offers members %v, want %v", operation, got, ProposalMembers)
+		}
+	}
+	if none, diags := ReadProviderOffer(declare()); diag.HasErrors(diags) || len(none.Versions(ContractProposals)) != 1 {
+		t.Fatalf("a provider without pageUrl lost its proposals version: %v", diags)
+	}
+	partial, diags := ReadProviderOffer(declare(answering[0]))
+	if len(partial.Versions(ContractProposals)) != 0 || !strings.Contains(fmt.Sprint(diags), "on every operation that answers a proposal") {
+		t.Fatalf("pageUrl declared on %s only is still offered: %v", answering[0], diags)
 	}
 }

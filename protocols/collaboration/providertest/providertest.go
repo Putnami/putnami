@@ -13,8 +13,9 @@
 // item asked for, that an idempotent repeat returns the first result instead
 // of a second item, that a stale revision is a conflict, that pages cover a
 // result set exactly once, that a reference another source issued is not
-// found, and that tasks.get returns each context member the target declares
-// in TaskMembers and no other. The memory scenarios check that a checkpoint lands only against the
+// found, that tasks.get returns each context member the target declares
+// in TaskMembers and no other, and that every proposal answered carries the
+// pageUrl the target declares in ProposalMembers, and none undeclared. The memory scenarios check that a checkpoint lands only against the
 // revision it names, that of concurrent writers at one revision exactly one
 // lands, that a repeated idempotency key replays the write that landed, that
 // another provider instance resumes from the store alone, that a record

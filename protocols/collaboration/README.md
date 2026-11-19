@@ -192,12 +192,23 @@ implementation proves the rest in its own tests:
   the `stable` status from 0.5.0, what never changes within a version, the
   frozen version 1 corpus and the support window. It amends ADR 0002
   decision 2.
+- [ADR 0007 — A result member a provider declares may join version 1](doc/adr/0007-a-declared-result-member-may-join-version-1.md):
+  an optional result member listed in an operation's `members` and returned
+  only by a provider that declares it; `tasks.get` declares the task context.
+  It amends ADR 0006 decision 2.
 - [ADR 0008 — A session leaves no empty mission behind](doc/adr/0008-a-session-leaves-no-empty-mission-behind.md):
   a missions provider retires the mission a session leaves once nothing else
   holds it, with no document change.
+- [ADR 0009 — A request member a provider declares may join version 1](doc/adr/0009-a-declared-request-member-may-join-version-1.md):
+  the CLI removes a declared request member from a request to a provider
+  that does not declare it; `missions.sync` and `missions.status` declare
+  `missedSyncs`. It amends ADR 0006 decision 2 and ADR 0007 decision 1.
 - [ADR 0010 — Missions version 2 adds typed runs](doc/adr/0010-missions-version-2-adds-typed-runs.md):
   v2 includes v1, the run document, its kinds and findings, the `start`,
   `report` and `runs` semantics and the CLI's identity checks.
+- [ADR 0011 — Proposals declare a page link in version 1](doc/adr/0011-proposals-declare-page-url.md):
+  `pageUrl` on the proposals operations that answer a proposal, declared on
+  all of them or none, outside the revision, and how it rolls out.
 
 ## Stability
 
@@ -208,7 +219,10 @@ Version 1 of every contract is `stable` from release 0.5.0
   request, result, response, envelope, binding block or provider declaration
   that is valid under version 1 stays valid and keeps its meaning. A new
   member, a new required operation, a narrowed value or a new outcome opens
-  version 2 of its contract.
+  version 2 of its contract, except an optional member the catalog lists
+  under an operation's `members`: a provider returns or receives it only when
+  it declares it, and an older CLI withdraws a contract version that
+  declares a member it does not know (ADRs 0007, 0009 and 0011).
 - **May change within a version:** new optional operations and their
   documents, the Go helpers (`Serve`, `ReadProviderOffer`, `providertest`)
   before 1.0, and the guides.

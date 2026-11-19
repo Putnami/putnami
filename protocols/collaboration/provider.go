@@ -180,6 +180,7 @@ func readProvidedOperations(field, contract string, declaration extension.Provid
 		}
 		operations[name] = ProvidedOperation{Provider: declaration, Operation: operation, Spec: op}
 	}
+	pageURLAllOrNone(c, field, contract, declaration, spec)
 	var missing []string
 	for _, required := range spec.RequiredOperations() {
 		if _, declared := declaration.Operations[required]; !declared {
@@ -192,6 +193,32 @@ func readProvidedOperations(field, contract string, declaration extension.Provid
 			contract, declaration.Version, strings.Join(missing, ", "))
 	}
 	return operations, c.diags
+}
+
+// pageURLAllOrNone refuses a proposals declaration that names pageUrl on
+// some of the operations that answer a proposal and not on others: a caller
+// reads the link from whichever of them it calls (ADR 0011).
+func pageURLAllOrNone(c *checker, field, contract string, declaration extension.ProviderDeclaration, spec ContractSpec) {
+	if contract != ContractProposals {
+		return
+	}
+	var with, without []string
+	for _, op := range spec.Operations {
+		operation, offered := declaration.Operations[op.Name]
+		if !offered || !slices.Contains(op.Members, ProposalMemberPageURL) {
+			continue
+		}
+		if slices.Contains(operation.Members, ProposalMemberPageURL) {
+			with = append(with, op.Name)
+		} else {
+			without = append(without, op.Name)
+		}
+	}
+	if len(with) > 0 && len(without) > 0 {
+		c.errorf(ErrorCodeInvalidDeclaration, field+".operations",
+			"%s declares %s on %s and not on %s; declare it on every operation that answers a proposal, or on none",
+			contract, ProposalMemberPageURL, strings.Join(with, ", "), strings.Join(without, ", "))
+	}
 }
 
 func validateProvidedOperation(c *checker, field, contract string, operation extension.ProviderOperation, op OperationSpec) {

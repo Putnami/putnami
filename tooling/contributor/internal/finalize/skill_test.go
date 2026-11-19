@@ -85,8 +85,11 @@ func TestTheEndReportLeadsWithTheChangePage(t *testing.T) {
 	t.Parallel()
 	required := map[string][]string{
 		"references/merge.md": {
-			"When `change finalize` printed `CHANGE_URL=<url>`, the end report leads with that change page and what waits there for the owner: the declarations to approve, the gaps to accept and the findings to decide, or that nothing waits.",
-			"Take them from the run's own records: its declarations commit, the gaps its dossier keeps open and the review findings it left open; say so of what it did not read.",
+			"When `change finalize` printed `CHANGE_URL=<url>`, the end report leads with that change page and what the owner does there: approve the declarations, accept the gaps of the hosted verdict and decide the review findings.",
+			"Never derive what waits there from local records: a ready dossier holds no gap and no open finding while the hosted verdict may.",
+			"Where the session can read the change, through the Putnami connector's `get_change`, report its pending declarations, verdict gaps and open review findings.",
+			"Otherwise say the page was not read, and add only what the run itself knows, such as a change to declarations, which waits for approval.",
+			"Never write that nothing waits without having read the page.",
 			"The pull request link follows it. Without a `CHANGE_URL`, the report is unchanged.",
 		},
 		"SKILL.md": {
@@ -100,6 +103,9 @@ func TestTheEndReportLeadsWithTheChangePage(t *testing.T) {
 				t.Errorf("%s lacks %q", path, sentence)
 			}
 		}
+	}
+	if text := buildSkillText(t, "references/merge.md"); strings.Contains(text, "the gaps its dossier keeps open") || strings.Contains(text, "or that nothing waits") {
+		t.Error("references/merge.md still derives what waits on the change page from local records")
 	}
 	spectest.Proves(t, "tooling/contributor-executable", "change-page-link", "the-end-report-leads-with-the-change-page")
 }

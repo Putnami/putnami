@@ -164,9 +164,13 @@ and whether the proposal was announced by tag, bound by tool, or the tool
 refused or failed to bind it. Unavailable tokens or costs stay unavailable.
 
 When `change finalize` printed `CHANGE_URL=<url>`, the end report leads with
-that change page and what waits there for the owner: the declarations to
-approve, the gaps to accept and the findings to decide, or that nothing
-waits. Take them from the run's own records: its declarations commit, the
-gaps its dossier keeps open and the review findings it left open; say so of
-what it did not read. The pull request link follows it. Without a `CHANGE_URL`, the report
-is unchanged.
+that change page and what the owner does there: approve the declarations,
+accept the gaps of the hosted verdict and decide the review findings. Never
+derive what waits there from local records: a ready dossier holds no gap and
+no open finding while the hosted verdict may. Where the session can read the
+change, through the Putnami connector's `get_change`, report its pending
+declarations, verdict gaps and open review findings. Otherwise say the page
+was not read, and add only what the run itself knows, such as a change to
+declarations, which waits for approval. Never write that nothing waits
+without having read the page. The pull request link follows it. Without a
+`CHANGE_URL`, the report is unchanged.
