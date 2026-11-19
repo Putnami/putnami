@@ -287,6 +287,7 @@ func (t *EventServerTransport) Publish(ctx context.Context, env Envelope) error 
 	publishCtx, cancel := context.WithTimeout(ctx, t.timeout)
 	defer cancel()
 
+	env, attributeTrace := takeTraceAttributes(env)
 	body, request, err := t.buildRequest(env)
 	if err != nil {
 		return err
@@ -302,7 +303,7 @@ func (t *EventServerTransport) Publish(ctx context.Context, env Envelope) error 
 		return newEventServerPublishError(EventServerPublishPermanent, 0, "", CodeEventsEventServerCredential,
 			"Event Server credential source returned an invalid token")
 	}
-	traceContext, err := t.traceHeaders(publishCtx)
+	traceContext, err := t.traceHeaders(publishCtx, attributeTrace)
 	if err != nil {
 		return err
 	}
@@ -392,8 +393,30 @@ func (t *EventServerTransport) buildRequest(env Envelope) ([]byte, eventServerPu
 	return body, request, nil
 }
 
-func (t *EventServerTransport) traceHeaders(ctx context.Context) (W3CTraceContext, error) {
-	var trace W3CTraceContext
+// takeTraceAttributes moves the traceparent and tracestate a publisher wrote
+// into the event attributes out of them: the managed profile carries the trace
+// context in the W3C request headers, and reserves both names in the frame.
+// The caller's map is never modified.
+func takeTraceAttributes(env Envelope) (Envelope, W3CTraceContext) {
+	traceparent, hasParent := env.Attributes[traceparentAttribute]
+	tracestate, hasState := env.Attributes[tracestateAttribute]
+	if !hasParent && !hasState {
+		return env, W3CTraceContext{}
+	}
+	attributes := make(map[string]string, len(env.Attributes))
+	for key, value := range env.Attributes {
+		if key != traceparentAttribute && key != tracestateAttribute {
+			attributes[key] = value
+		}
+	}
+	env.Attributes = attributes
+	return env, W3CTraceContext{Traceparent: traceparent, Tracestate: tracestate}
+}
+
+// traceHeaders resolves the W3C headers of a publish: a TraceContextSource
+// first, then WithW3CTraceContext, then the trace attributes of the event.
+func (t *EventServerTransport) traceHeaders(ctx context.Context, attributes W3CTraceContext) (W3CTraceContext, error) {
+	trace := attributes
 	if t.traceContext != nil {
 		trace = t.traceContext.TraceContext(ctx)
 	} else if value, ok := ctx.Value(w3cTraceContextKey{}).(W3CTraceContext); ok {

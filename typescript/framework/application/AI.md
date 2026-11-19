@@ -630,6 +630,16 @@ returns, and the last `stop()` or failed start detaches and closes it. The sink 
 environment's resource and asks the same token source. See
 `doc/telemetry.md` and ADR 0007.
 
+`event-trace.ts` holds the event trace convention `@putnami/events` applies:
+`eventPublishAttributes()` writes the active span's `traceparent` and
+`tracestate` into event attributes (`activeTelemetryContext()` reads that
+span), `readEventTraceAttributes()` reads them back, and
+`startEventConsumerSpan()` starts the `process <topic>` consumer span, a child
+of that context or a new root. `startTelemetrySpan()` takes `kind: 'consumer'`,
+a `remoteContext` parent and `newRoot`; `attachTelemetryContext(target, span,
+{ correlate: false })` attaches a span and keeps the target's `traceId`. These
+run without the telemetry plugin too: the spans are then recorded nowhere.
+
 ## Testing
 
 ```ts

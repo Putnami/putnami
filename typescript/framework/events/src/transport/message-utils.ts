@@ -139,3 +139,21 @@ export async function invokeWithTimeout(
     }
   }
 }
+
+/**
+ * Take the trace context a provider carries in its message attributes, such
+ * as the one the managed Event Server stamps, when the envelope carries none
+ * of its own: the consumer span then continues that trace. The push receiver
+ * and the Pub/Sub pull transport both apply it.
+ */
+export function adoptMessageTraceContext(
+  attributes: Record<string, string>,
+  pushed: Record<string, string> | undefined,
+): void {
+  const traceparent = pushed?.['traceparent'];
+  if (attributes['traceparent'] !== undefined || typeof traceparent !== 'string') return;
+  attributes['traceparent'] = traceparent;
+  const tracestate = pushed?.['tracestate'];
+  if (typeof tracestate === 'string') attributes['tracestate'] = tracestate;
+  else Reflect.deleteProperty(attributes, 'tracestate');
+}

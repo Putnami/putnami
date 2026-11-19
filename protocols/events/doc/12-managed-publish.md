@@ -51,7 +51,10 @@ used to invent a cloud-only envelope.
 - `workspace_id`, `environment`, `workload`, `service`, `channel`,
   `topology_generation_id`, `traceparent`, `tracestate`, `auth.*`, and
   `putnami.*` are reserved attributes. Caller-supplied reserved attributes are
-  rejected with `invalid_frame`; they are never silently trusted.
+  rejected with `invalid_frame`; they are never silently trusted. The Go and
+  TypeScript publishers move the `traceparent` and `tracestate` event
+  attributes, whatever wrote them, out of the frame and into the W3C headers
+  before they send it, so a frame never carries either.
 - W3C HTTP trace headers are authoritative when present. `traceId` remains an
   accepted v1 compatibility field, not an authorization or routing source.
 

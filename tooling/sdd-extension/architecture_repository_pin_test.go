@@ -362,6 +362,7 @@ func authoredGoFrameworkDomain() *arch.Builder {
 				arch.Bind("/go/framework/telemetry", "/protocols/http-routes"),
 				arch.Bind("/go/framework/telemetry", "/protocols/identity"),
 				arch.Bind("/go/framework/telemetry", "/protocols/infra"),
+				arch.Bind("/go/framework/telemetry", "/protocols/keyring"),
 				arch.Bind("/go/framework/telemetry", "/protocols/migration"),
 				arch.Bind("/go/framework/telemetry", "/protocols/runtime"),
 				arch.Bind("/go/framework/telemetry", "/protocols/storage"),

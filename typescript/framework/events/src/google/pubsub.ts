@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { type DetachedScope, useLogger } from '@putnami/runtime';
 import { asError } from '../transport/delivery-logging';
 import { dispatchToHandler } from '../transport/dispatch';
+import { adoptMessageTraceContext } from '../transport/message-utils';
 import type { HandlerDefinition } from '../handler/handler';
 import type { Message } from '../topic/message';
 import { createTransportMessage, type Envelope, type Transport } from '../transport';
@@ -204,6 +205,7 @@ export class GooglePubSubTransport implements Transport {
 function decodeEnvelope(message: GooglePubSubMessage): Envelope {
   const raw = typeof message.data === 'string' ? message.data : new TextDecoder().decode(message.data);
   const envelope = JSON.parse(raw) as Envelope;
+  if (envelope.attributes) adoptMessageTraceContext(envelope.attributes, message.attributes);
   return {
     ...envelope,
     id: envelope.id || message.id || randomUUID(),

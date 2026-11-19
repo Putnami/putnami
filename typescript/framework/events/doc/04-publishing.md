@@ -49,7 +49,7 @@ await publish(
 | `dedupeKey` | Optional idempotency key for handlers or transports that support deduplication. |
 | `attributes` | Key-value pairs attached to the message envelope. Used for server-side filtering. |
 | `traceId` | Correlation ID for distributed tracing. Inherited from the current async context if omitted. Falls back to a random UUID when no context exists. |
-| `traceparent` / `tracestate` | W3C trace headers used by HTTP-based transports. Inbound request headers are propagated automatically when present. |
+| `traceparent` / `tracestate` | W3C trace headers used by HTTP-based transports. A publish inside a telemetry span writes the span's context into the event attributes, which the managed transport sends as these headers; inbound request headers are the fallback. |
 | `signal` | Cancels publication. Cancellation after a network send has an ambiguous outcome. |
 | `deadline` | Absolute deadline as epoch milliseconds or a `Date`; an earlier transport deadline still wins. |
 

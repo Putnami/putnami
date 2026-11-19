@@ -89,6 +89,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/sites/telemetry.putnami.dev",
+          "producerProject": "/go/framework/events"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/sites/telemetry.putnami.dev",
           "producerProject": "/go/framework/http"
         },
         {

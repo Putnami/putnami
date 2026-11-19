@@ -593,3 +593,76 @@ func TestPullModeSubscribesAndStarts(t *testing.T) {
 		t.Errorf("pull mode must Start the transport, got %d", tr.started)
 	}
 }
+
+// TestHandlePushStartsTheDeliverySpanFromThePushedAttributes: the push handler
+// hands the attributes the provider pushed, the publisher's traceparent among
+// them, to the consumer span, and runs the handler inside it.
+func TestHandlePushStartsTheDeliverySpanFromThePushedAttributes(t *testing.T) {
+	recorder := &recordingDeliveryTelemetry{}
+	defer InstallDeliveryTelemetry(recorder)()
+	traceparent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	var spanOfHandler any
+	p := Events(PluginConfig{Delivery: DeliveryPush})
+	p.Register(&HandlerDefinition{
+		Topic: "order.created",
+		Handler: func(ctx context.Context, _ *Envelope) error {
+			spanOfHandler = ctx.Value(deliverySpanKey{})
+			return nil
+		},
+	})
+	raw, err := json.Marshal(Envelope{ID: "evt-1", Topic: "order.created", Payload: map[string]any{"id": "o-1"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := json.Marshal(protoevents.PushEnvelope{
+		Message: protoevents.PushMessage{
+			Data:       base64.StdEncoding.EncodeToString(raw),
+			Attributes: map[string]string{"traceparent": traceparent},
+		},
+		Subscription: "projects/p/subscriptions/s",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resp := p.handlePush(pushContext(body)); resp.Status != 204 {
+		t.Fatalf("status = %d, want 204", resp.Status)
+	}
+	if len(recorder.started) != 1 || recorder.started[0].Attributes["traceparent"] != traceparent {
+		t.Fatalf("started = %+v, want one delivery carrying the traceparent", recorder.started)
+	}
+	if spanOfHandler != "evt-1" {
+		t.Errorf("the handler ran outside the delivery span: %v", spanOfHandler)
+	}
+	if len(recorder.ended) != 1 || recorder.ended[0] != nil {
+		t.Errorf("ended = %v, want one success", recorder.ended)
+	}
+}
+
+func TestDecodePushEnvelopeAdoptsThePushedTraceContext(t *testing.T) {
+	traceparent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	decode := func(envAttributes, pushed map[string]string) map[string]string {
+		raw, err := json.Marshal(Envelope{ID: "evt-1", Topic: "order.created", Attributes: envAttributes})
+		if err != nil {
+			t.Fatal(err)
+		}
+		env, err := decodePushEnvelope(protoevents.PushEnvelope{
+			Message:      protoevents.PushMessage{Data: base64.StdEncoding.EncodeToString(raw), Attributes: pushed},
+			Subscription: "projects/p/subscriptions/s",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return env.Attributes
+	}
+	got := decode(map[string]string{"region": "eu", "tracestate": "stale=1"}, map[string]string{"traceparent": traceparent})
+	if got["traceparent"] != traceparent || got["region"] != "eu" {
+		t.Errorf("attributes = %v, want the pushed traceparent beside the envelope's", got)
+	}
+	if _, ok := got["tracestate"]; ok {
+		t.Errorf("a tracestate without its traceparent survived: %v", got)
+	}
+	own := "00-11111111111111111111111111111111-2222222222222222-01"
+	if got := decode(map[string]string{"traceparent": own}, map[string]string{"traceparent": traceparent}); got["traceparent"] != own {
+		t.Errorf("the envelope's own traceparent was replaced: %v", got)
+	}
+}

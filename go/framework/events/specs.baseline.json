@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "go/event-delivery#delivery-semantics",
+    "go/event-delivery#event-trace-context",
     "go/event-delivery#ingress-authority",
     "go/event-delivery#provider-publish",
     "go/event-delivery#provider-publish-retry",

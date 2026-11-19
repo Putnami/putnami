@@ -125,6 +125,27 @@ type Transport interface {
 
 `Envelope` follows the canonical events protocol fields: `protocol`, `id`, `topic`, `channel`, `payload`, `key`, `dedupeKey`, `topicVersion`, `timestamp`, `attributes`, `attempt`, and `traceId`.
 
+## Trace context
+
+With the telemetry plugin configured (`go.putnami.dev/telemetry`), a publish
+inside a span writes the span's W3C `traceparent` and `tracestate` into the
+event attributes, replacing any caller value of either; a publish outside a
+span writes neither. Every delivery, whatever the transport, runs its handler
+in a consumer span named `process <topic>`, of kind consumer, with the
+attributes `messaging.operation.name`, `messaging.destination.name` and
+`messaging.message.id`. That span is the child of the publisher's span when
+the event carries a valid `traceparent`, so one trace links a request to the
+work its events start; an event without one starts a new root, whatever span
+delivers it, such as a push request's. A failed handler ends the span with
+status error and the message `events.handler_failed`; a handler that panics
+ends it with the error code `events.handler_panicked` before the panic goes
+on. A pushed or pulled Pub/Sub message whose envelope carries attributes but
+no `traceparent` takes the trace context from the message attributes, where a
+managed Event Server stamps it. The TypeScript runtime
+follows the same rule, so a Go publisher and a TypeScript consumer share a
+trace: the telemetry protocol pins it in
+`protocols/telemetry/fixtures/conventions/event-trace-context.json`.
+
 ## Managed Event Server Conformance
 
 Go framework conformance consumes the managed-workload v1 request and outcome
@@ -321,10 +342,13 @@ corpus. TypeScript conformance and transport tests use the same canonical profil
 so both publishers agree on required fields, server-owned authority, exact `200`
 acceptance, explicit retryability, and ambiguous failures without fixture copies.
 
-Attach W3C headers with `WithW3CTraceContext`, or provide a
-`TraceContextSource`. Managed frames reject `channel` and reserved authority
-attributes (`workspace_id`, `environment`, `workload`, `service`, `channel`,
-`topology_generation_id`, `traceparent`, `tracestate`, `auth.*`, `putnami.*`).
+The publisher's trace context travels as the W3C `traceparent` and
+`tracestate` headers: the transport moves those two event attributes, which a
+publish inside a span carries (see [Trace context](#trace-context)), out of the
+frame and into the headers, whatever wrote them. `WithW3CTraceContext` or a
+`TraceContextSource` names the headers instead. Managed frames reject `channel` and reserved
+authority attributes (`workspace_id`, `environment`, `workload`, `service`,
+`channel`, `topology_generation_id`, `auth.*`, `putnami.*`).
 Event Server stamps those values from authenticated state.
 
 Resolved managed config uses:

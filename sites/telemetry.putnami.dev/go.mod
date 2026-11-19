@@ -21,6 +21,7 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
@@ -39,6 +40,7 @@ require (
 	go.putnami.dev/client v0.0.1 // indirect
 	go.putnami.dev/ctxutil v0.0.0 // indirect
 	go.putnami.dev/errors v0.1.0-405dcd542 // indirect
+	go.putnami.dev/events v0.0.1 // indirect
 	go.putnami.dev/protocol/clientcontract v0.0.0 // indirect
 	go.putnami.dev/protocol/config v0.0.0 // indirect
 	go.putnami.dev/protocol/database v0.0.0 // indirect
@@ -50,6 +52,7 @@ require (
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	go.putnami.dev/protocol/transaction v0.0.0 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	golang.org/x/text v0.37.0 // indirect
@@ -112,3 +115,5 @@ replace go.putnami.dev/protocol/architecture => ../../protocols/architecture
 replace go.putnami.dev/client => ../../go/framework/client
 
 replace go.putnami.dev/protocol/clientcontract => ../../protocols/clientcontract
+
+replace go.putnami.dev/events => ../../go/framework/events

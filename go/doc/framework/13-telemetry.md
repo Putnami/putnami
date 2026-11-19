@@ -220,6 +220,12 @@ malformed or on another trace, the server uses `traceparent`. The plugin
 installs this as `telemetry.ProxySafeTraceContext`; the TypeScript runtime
 applies the same rule.
 
+The plugin also carries a trace across events: a publish inside a span writes
+the span's `traceparent` and `tracestate` into the event attributes, and each
+delivery runs its handler in a consumer span, `process <topic>`, that continues
+that trace, or starts a new root for an event without one. A Go publisher and a
+TypeScript consumer share the trace.
+
 ## Error bridge
 
 When the telemetry plugin is active, structured errors from `go.putnami.dev/errors` automatically emit an `errors_total` counter with labels:

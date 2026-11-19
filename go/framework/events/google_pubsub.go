@@ -245,6 +245,8 @@ func decodeGooglePubSubEnvelope(message GooglePubSubMessage) (Envelope, error) {
 	}
 	if env.Attributes == nil {
 		env.Attributes = message.MessageAttributes()
+	} else {
+		adoptMessageTraceContext(env.Attributes, message.MessageAttributes())
 	}
 	if env.Attributes == nil {
 		env.Attributes = map[string]string{}

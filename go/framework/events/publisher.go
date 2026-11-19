@@ -57,7 +57,9 @@ func (p *Publisher[T]) Publish(ctx context.Context, payload T, opts ...PublishOp
 		DedupeKey:    options.DedupeKey,
 		TopicVersion: p.topic.Version,
 		Timestamp:    time.Now(),
-		Attributes:   options.Attributes,
+		// With telemetry installed, a publish inside a span carries the span's
+		// traceparent and tracestate, so the consumer continues its trace.
+		Attributes: publishAttributes(ctx, options.Attributes),
 		// Attempt is the 1-based delivery count: the first delivery is attempt 1.
 		Attempt: 1,
 		TraceID: options.TraceID,

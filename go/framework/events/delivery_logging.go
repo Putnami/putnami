@@ -144,10 +144,23 @@ func dispatchDelivery(
 	reportFailure failureReporter,
 ) (context.Context, time.Duration, error) {
 	deliveryCtx, bag := newDeliveryContext(ctx, *env)
+	// The handler runs inside the delivery's consumer span, which continues the
+	// trace the event attributes carry, or starts a new root without one.
+	deliveryCtx, endSpan := startDeliverySpan(deliveryCtx, *env)
+	spanEnded := false
+	defer func() {
+		// A handler that panics still ends its span, as failed, before the panic
+		// goes on to whoever recovers it.
+		if !spanEnded {
+			endSpan(errDeliveryPanicked)
+		}
+	}()
 
 	start := time.Now()
 	err := invoke(deliveryCtx, env)
 	duration := time.Since(start)
+	spanEnded = true
+	endSpan(err)
 
 	redelivery := IsRedeliver(err)
 	outcome := outcomeSuccess

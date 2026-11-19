@@ -1,6 +1,6 @@
 import type { InferSchema, SchemaDefinition } from '@putnami/runtime';
 import { useLogger, validateSchema } from '@putnami/runtime';
-import { incCounter } from '@putnami/application';
+import { eventPublishAttributes, incCounter } from '@putnami/application';
 import { getExternalCaller, getProjectRoot } from '@putnami/utils';
 import type { PublishOptions } from '../topic/message';
 import type { TopicDefinition } from '../topic/topic';
@@ -161,6 +161,9 @@ export function getPublisher<S extends SchemaDefinition>(topicDef: TopicDefiniti
     }
 
     const envelope = buildEnvelope(topicDef, payload, options);
+    // A publish inside a telemetry span carries the span's traceparent and
+    // tracestate, so the consumer continues its trace.
+    envelope.attributes = eventPublishAttributes(envelope.attributes);
     await transport.publish(topicDef.name, envelope, options);
 
     // Accumulate onto the CALLER's boundary, and only once the transport has

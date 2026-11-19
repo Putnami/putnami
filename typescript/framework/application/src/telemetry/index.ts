@@ -1,5 +1,6 @@
 export {
   type ActiveTelemetrySpan,
+  activeTelemetryContext,
   attachTelemetryContext,
   startTelemetrySpan,
   type TelemetrySpanOptions,
@@ -42,6 +43,23 @@ export {
   TelemetryCollector,
   type TelemetrySpanRecord,
 } from './telemetry.collector';
+export {
+  ATTR_EVENT_TRACEPARENT,
+  ATTR_EVENT_TRACESTATE,
+  ATTR_MESSAGING_DESTINATION,
+  ATTR_MESSAGING_MESSAGE_ID,
+  ATTR_MESSAGING_OPERATION,
+  EVENT_CONSUMER_FAILURE_MESSAGE,
+  EVENT_CONSUMER_SPAN_KIND,
+  EVENT_CONSUMER_SPAN_NAME_PREFIX,
+  eventConsumerSpanName,
+  eventPublishAttributes,
+  MAX_EVENT_TRACESTATE_LENGTH,
+  MESSAGING_OPERATION_PROCESS,
+  readEventTraceAttributes,
+  startEventConsumerSpan,
+  writeEventTraceAttributes,
+} from './event-trace';
 export { TelemetryConfig, type TelemetryOptions } from './telemetry.config';
 export {
   ENV_OTLP_ENDPOINT,

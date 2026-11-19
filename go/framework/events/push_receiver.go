@@ -295,6 +295,8 @@ func decodePushEnvelope(wrapper protoevents.PushEnvelope) (Envelope, error) {
 	}
 	if env.Attributes == nil {
 		env.Attributes = wrapper.Message.Attributes
+	} else {
+		adoptMessageTraceContext(env.Attributes, wrapper.Message.Attributes)
 	}
 	if env.Attributes == nil {
 		env.Attributes = map[string]string{}

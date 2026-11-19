@@ -152,6 +152,12 @@ can use `RegisterBindingTransportFactory` to attach credentials. Managed publish
 stable id/dedupe identity, byte-stable bounded retries, W3C trace headers, and
 typed permanent/retryable/ambiguous errors. They never fall back or dual-publish.
 
+With the telemetry plugin configured, a publish inside a span writes the span's
+`traceparent` and `tracestate` into the event attributes (the managed transport
+sends them as the W3C headers), and every delivery runs its handler in a
+consumer span, `process <topic>`, that continues that trace, or starts a new
+root without one. `InstallDeliveryTelemetry` is the seam the plugin uses.
+
 The plugin emits a build-time infra-requirements scratch fragment at `.gen/infra/events.json` from subscribed handlers and declared `Publishes`/`RegisterPublisher` topics. The Go generator syncs that fragment into committed `infra/requirements.json`, and a project with neither emits no fragment.
 
 ## Managed Event Server Conformance

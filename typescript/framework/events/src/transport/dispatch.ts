@@ -1,4 +1,10 @@
-import { incCounter, observeHistogram } from '@putnami/application';
+import {
+  attachTelemetryContext,
+  EVENT_CONSUMER_FAILURE_MESSAGE,
+  incCounter,
+  observeHistogram,
+  startEventConsumerSpan,
+} from '@putnami/application';
 import { type DetachedScope, runInContext, useLogger } from '@putnami/runtime';
 import { SCOPE_CONTAINER_KEY } from '@putnami/runtime/inject';
 import type { EventContext } from '../context';
@@ -60,6 +66,12 @@ export async function dispatchToHandler(
     eventMessageId: envelope.id,
     eventAttempt: envelope.attempt,
   };
+  // The handler runs in the delivery's consumer span, which continues the
+  // trace the event attributes carry, or starts a new root without one. The
+  // event context keeps its own traceId, the one its log records carry.
+  const span = startEventConsumerSpan(envelope);
+  attachTelemetryContext(ctx as unknown as Record<string, unknown>, span, { correlate: false });
+  let failed = false;
 
   let detachedScope: DetachedScope | undefined;
 
@@ -105,6 +117,7 @@ export async function dispatchToHandler(
         logger.with('event', { outcome: OUTCOME_FAILURE, durationMs });
         logger.error('message handling failed', asError(error));
 
+        failed = true;
         incCounter(`events.handle.${envelope.topic}.failure`);
         observeHistogram(`events.handle.${envelope.topic}.duration`, durationMs);
 
@@ -116,6 +129,7 @@ export async function dispatchToHandler(
       }
     });
   } finally {
+    span.finish(failed ? { code: EVENT_CONSUMER_FAILURE_MESSAGE } : {});
     await detachedScope?.close();
   }
 }

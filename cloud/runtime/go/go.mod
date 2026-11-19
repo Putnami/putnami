@@ -30,8 +30,11 @@ require (
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/sdk v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
+	go.putnami.dev/cache v0.0.1 // indirect
 	go.putnami.dev/client v0.0.1 // indirect
+	go.putnami.dev/ctxutil v0.0.0 // indirect
 	go.putnami.dev/errors v0.0.1 // indirect
+	go.putnami.dev/events v0.0.1 // indirect
 	go.putnami.dev/http v0.0.1 // indirect
 	go.putnami.dev/inject v0.0.1 // indirect
 	go.putnami.dev/logger v0.0.1 // indirect
@@ -45,10 +48,12 @@ require (
 	go.putnami.dev/protocol/http-routes v0.0.0 // indirect
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
 	go.putnami.dev/protocol/infra v0.0.0 // indirect
+	go.putnami.dev/protocol/keyring v0.0.0 // indirect
 	go.putnami.dev/protocol/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/runtime v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	go.putnami.dev/protocol/telemetry v0.0.0 // indirect
+	go.putnami.dev/security v0.0.1 // indirect
 	golang.org/x/crypto v0.49.0 // indirect
 	golang.org/x/net v0.52.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
@@ -89,3 +94,13 @@ replace (
 replace go.putnami.dev/protocol/architecture => ../../../protocols/architecture
 
 replace go.putnami.dev/protocol/contracts => ../../../protocols/contracts
+
+replace go.putnami.dev/events => ../../../go/framework/events
+
+replace go.putnami.dev/security => ../../../go/framework/security
+
+replace go.putnami.dev/cache => ../../../go/framework/cache
+
+replace go.putnami.dev/ctxutil => ../../../go/framework/ctxutil
+
+replace go.putnami.dev/protocol/keyring => ../../../protocols/keyring

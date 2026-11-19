@@ -12,6 +12,7 @@ require (
 	go.putnami.dev/client v0.0.1
 	go.putnami.dev/config v0.0.1
 	go.putnami.dev/errors v0.0.1
+	go.putnami.dev/events v0.0.1
 	go.putnami.dev/http v0.0.1
 	go.putnami.dev/inject v0.0.1
 	go.putnami.dev/logger v0.0.1
@@ -19,6 +20,15 @@ require (
 	go.putnami.dev/protocol/diagnostic v0.0.0
 	go.putnami.dev/protocol/features v0.0.0
 	go.putnami.dev/protocol/telemetry v0.0.0
+)
+
+require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
+	go.putnami.dev/cache v0.0.1 // indirect
+	go.putnami.dev/ctxutil v0.0.0 // indirect
+	go.putnami.dev/protocol/keyring v0.0.0 // indirect
+	go.putnami.dev/security v0.0.1 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 )
 
 require (
@@ -94,3 +104,13 @@ retract [v0.1.0-0, v0.1.99999] // Pre-open-source builds; public history starts 
 replace go.putnami.dev/protocol/architecture => ../../../protocols/architecture
 
 replace go.putnami.dev/protocol/clientcontract => ../../../protocols/clientcontract
+
+replace go.putnami.dev/events => ../events
+
+replace go.putnami.dev/security => ../security
+
+replace go.putnami.dev/cache => ../cache
+
+replace go.putnami.dev/ctxutil => ../ctxutil
+
+replace go.putnami.dev/protocol/keyring => ../../../protocols/keyring

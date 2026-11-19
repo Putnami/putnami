@@ -3,6 +3,7 @@ package events
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"sync"
 	"testing"
 	"time"
@@ -287,5 +288,24 @@ func TestRedisPubSubTransportFanout(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timeout waiting for redis pubsub handler")
+	}
+}
+
+func TestDecodeGooglePubSubEnvelopeAdoptsTheMessageTraceContext(t *testing.T) {
+	// The pull path adopts the trace context the message carries, as the push
+	// receiver does, when the envelope's own attributes hold none.
+	traceparent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	msg := &fakeGoogleMessage{
+		id:         "m-1",
+		data:       []byte(`{"topic":"t","payload":{},"attributes":{"region":"eu"}}`),
+		attributes: map[string]string{"traceparent": traceparent, "tracestate": "vendor=v"},
+	}
+	env, err := decodeGooglePubSubEnvelope(msg)
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	want := map[string]string{"region": "eu", "traceparent": traceparent, "tracestate": "vendor=v"}
+	if !maps.Equal(env.Attributes, want) {
+		t.Errorf("attributes = %v, want %v", env.Attributes, want)
 	}
 }

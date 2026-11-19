@@ -8,6 +8,7 @@
     "typescript/event-messaging#browser-surface",
     "typescript/event-messaging#cross-language-records",
     "typescript/event-messaging#dead-letter-or-drop",
+    "typescript/event-messaging#event-trace-context",
     "typescript/event-messaging#graceful-drain",
     "typescript/event-messaging#isolated-invocation",
     "typescript/event-messaging#no-silent-loss",

@@ -15,7 +15,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -45,7 +45,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -75,7 +75,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -105,7 +105,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -135,7 +135,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -165,7 +165,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -195,7 +195,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -225,7 +225,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -255,7 +255,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -285,7 +285,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",
@@ -315,7 +315,7 @@
       "source": {
         "root": "project",
         "ownerProject": "telemetry.putnami.dev",
-        "binding": "source-v1:sha256:2fee3138863bceaffae4922d3513b67590289e700ffe38b0dd8d0fe6b067e72c"
+        "binding": "source-v1:sha256:11a56764c283a563bcdabe38d3188e4b852553fe3ca37588a16b2e7be7a19bdd"
       },
       "subject": {
         "kind": "capability",

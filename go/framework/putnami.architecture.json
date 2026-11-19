@@ -1333,6 +1333,11 @@
         {
           "kind": "project-dependency",
           "consumerProject": "/go/framework/telemetry",
+          "producerProject": "/protocols/keyring"
+        },
+        {
+          "kind": "project-dependency",
+          "consumerProject": "/go/framework/telemetry",
           "producerProject": "/protocols/migration"
         },
         {

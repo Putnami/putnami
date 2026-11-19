@@ -175,12 +175,13 @@ export class EventServerPublisherTransport implements Transport {
   }
 
   async publish(topic: string, envelope: Envelope, options?: PublishOptions): Promise<void> {
-    const frame = managedPublishFrame(topic, envelope);
+    const { envelope: framed, trace } = takeTraceAttributes(envelope);
+    const frame = managedPublishFrame(topic, framed);
     const body = encodeFrame(frame, this.config.maxRequestBytes);
     const context = tryContext<PublishContext>();
     const signal = options?.signal ?? context?.signal;
     const deadline = resolveDeadline(options?.deadline, this.config.requestTimeoutMs);
-    const traceHeaders = resolveTraceHeaders(options, context);
+    const traceHeaders = resolveTraceHeaders(options, trace, context);
     const requestSignal = deadlineSignal(signal, deadline);
 
     try {
@@ -469,12 +470,53 @@ function resolveDeadline(deadline: PublishOptions['deadline'], timeoutMs: number
   return Math.min(configured, requested);
 }
 
+/** The event attributes that carry a trace: the telemetry protocol's names, the W3C header names. */
+const ATTR_EVENT_TRACEPARENT = 'traceparent';
+const ATTR_EVENT_TRACESTATE = 'tracestate';
+
+interface TraceAttributes {
+  traceparent?: string;
+  tracestate?: string;
+}
+
+/**
+ * Move the traceparent and tracestate a publisher wrote into the event
+ * attributes out of them: the managed profile carries the trace context in the
+ * W3C request headers, and reserves both names in the frame. The envelope is
+ * never modified.
+ */
+function takeTraceAttributes(envelope: Envelope): { envelope: Envelope; trace: TraceAttributes } {
+  const {
+    [ATTR_EVENT_TRACEPARENT]: traceparent,
+    [ATTR_EVENT_TRACESTATE]: tracestate,
+    ...attributes
+  } = envelope.attributes ?? {};
+  if (traceparent === undefined && tracestate === undefined) return { envelope, trace: {} };
+  return { envelope: { ...envelope, attributes }, trace: { traceparent, tracestate } };
+}
+
+/**
+ * The W3C headers of a publish: the publish options first, then the trace
+ * attributes of the event, then the ambient request headers.
+ */
 function resolveTraceHeaders(
   options: PublishOptions | undefined,
+  trace: TraceAttributes,
   context: PublishContext | undefined,
 ): Record<string, string> {
-  const traceparent = options?.traceparent ?? headerValue(context, 'traceparent') ?? context?.['traceparent'];
-  const tracestate = options?.tracestate ?? headerValue(context, 'tracestate') ?? context?.['tracestate'];
+  let traceparent: string | undefined;
+  let tracestate: string | undefined;
+  if (options?.traceparent !== undefined) {
+    // An explicit parent travels with its own state, never another span's.
+    traceparent = options.traceparent;
+    tracestate = options.tracestate;
+  } else if (trace.traceparent !== undefined) {
+    traceparent = trace.traceparent;
+    tracestate = options?.tracestate ?? trace.tracestate;
+  } else {
+    traceparent = headerValue(context, 'traceparent') ?? context?.['traceparent'];
+    tracestate = options?.tracestate ?? headerValue(context, 'tracestate') ?? context?.['tracestate'];
+  }
   const headers: Record<string, string> = {};
   if (safeHeaderValue(traceparent)) headers['traceparent'] = traceparent;
   if (safeHeaderValue(tracestate)) headers['tracestate'] = tracestate;

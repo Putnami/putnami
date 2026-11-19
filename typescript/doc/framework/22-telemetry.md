@@ -183,6 +183,12 @@ malformed or on another trace, the server uses `traceparent`. The Go runtime
 applies the same rule. A WebSocket stream carries its context in the init
 frame, which proxies do not rewrite, so it needs no second header.
 
+An event carries the trace too: a publish inside a span writes the span's
+`traceparent` and `tracestate` into the event attributes, and `@putnami/events`
+runs each handler in a consumer span, `process <topic>`, that continues that
+trace, or starts a new root for an event without one. A TypeScript publisher
+and a Go consumer share the trace.
+
 `TelemetryPlugin.sampler` (or `getTraceSampler()`) returns the installed
 `TraceSampler`. Its `settings` are its own, without an export directive's
 limits, which `inForce()` adds. Its `update()` tightens the settings at

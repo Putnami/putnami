@@ -100,7 +100,12 @@ stable event ID through the normal publisher and uses that ID as the dedupe key
 when none is supplied. It encodes the managed v1 frame once, omits caller-owned
 channel and legacy `auth.*` identity, rejects tenancy/routing-reserved
 attributes, and preserves the exact body across bounded jittered retries. W3C
-`traceparent` and `tracestate` headers are propagated separately.
+`traceparent` and `tracestate` headers are propagated separately: the
+publish options first, then the two event attributes, whatever wrote them,
+which the transport moves out of the frame, then the inbound request headers.
+An explicit `traceparent` option travels with its own `tracestate` option and
+never with the event's; a `tracestate` option alone goes with the
+`traceparent` that the attributes or the request supply.
 
 Failures are typed as `EventServerPermanentPublishError`,
 `EventServerRetryablePublishError`, or `EventServerAmbiguousPublishError`.

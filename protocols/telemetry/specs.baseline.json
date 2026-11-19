@@ -5,6 +5,7 @@
     "telemetry/otlp-push-contract#a-client-sends-both-headers",
     "telemetry/otlp-push-contract#cli-usage-vocabulary-is-closed",
     "telemetry/otlp-push-contract#equivalent-input-serializes-to-the-same-bytes",
+    "telemetry/otlp-push-contract#event-trace-context-is-shared",
     "telemetry/otlp-push-contract#export-directives-are-shared",
     "telemetry/otlp-push-contract#http-server-metrics-are-shared",
     "telemetry/otlp-push-contract#log-records-are-shared",

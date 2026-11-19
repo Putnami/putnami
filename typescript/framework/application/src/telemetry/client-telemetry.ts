@@ -15,6 +15,8 @@ const ZERO_TRACE_ID = '00000000000000000000000000000000';
 const ZERO_SPAN_ID = '0000000000000000';
 const MAX_TRACESTATE_LENGTH = 512;
 const MAX_BAGGAGE_LENGTH = 8192;
+/** OTLP span kinds. */
+const SPAN_KINDS = { server: 2, client: 3, consumer: 5 } as const;
 
 export interface TelemetryTraceContext {
   traceId: string;
@@ -30,10 +32,14 @@ interface AmbientTelemetryContext extends Record<string, unknown> {
 
 export interface TelemetrySpanOptions {
   name: string;
-  kind: 'server' | 'client';
+  kind: 'server' | 'client' | 'consumer';
   attributes?: TelemetryAttributes;
   /** Standard W3C headers on an inbound request. */
   remoteHeaders?: Headers;
+  /** A parent read from another carrier, such as the attributes of an event. */
+  remoteContext?: TelemetryTraceContext;
+  /** Without a remote parent, start a new root instead of a child of the ambient span. */
+  newRoot?: boolean;
 }
 
 export interface TelemetrySpanResult {
@@ -59,8 +65,9 @@ export interface ActiveTelemetrySpan {
  */
 export function startTelemetrySpan(options: TelemetrySpanOptions): ActiveTelemetrySpan {
   const ambient = tryContext<AmbientTelemetryContext>();
-  const remote = options.remoteHeaders ? readRemoteContext(options.remoteHeaders) : undefined;
-  const parent = remote ?? ambient?.__putnamiTrace;
+  const remote =
+    options.remoteContext ?? (options.remoteHeaders ? readRemoteContext(options.remoteHeaders) : undefined);
+  const parent = remote ?? (options.newRoot ? undefined : ambient?.__putnamiTrace);
   const traceId = parent?.traceId ?? randomHex(16);
   const context: TelemetryTraceContext = {
     traceId,
@@ -92,7 +99,7 @@ export function startTelemetrySpan(options: TelemetrySpanOptions): ActiveTelemet
         spanId: context.spanId,
         ...(parent?.spanId ? { parentSpanId: parent.spanId } : {}),
         name: options.name,
-        kind: options.kind === 'server' ? 2 : 3,
+        kind: SPAN_KINDS[options.kind],
         startTimeUnixNano: nanoFromMillis(started),
         endTimeUnixNano: nanoFromMillis(Date.now()),
         attributes: { ...(options.attributes ?? {}), ...(result.attributes ?? {}) },
@@ -103,10 +110,22 @@ export function startTelemetrySpan(options: TelemetrySpanOptions): ActiveTelemet
   };
 }
 
-/** Attach a started span to an existing request context without replacing its DI identity. */
-export function attachTelemetryContext(target: Record<string, unknown>, span: ActiveTelemetrySpan): void {
+/**
+ * Attach a started span to an existing request context without replacing its DI identity.
+ * With `correlate: false` the context keeps its own `traceId`, the one its log records carry.
+ */
+export function attachTelemetryContext(
+  target: Record<string, unknown>,
+  span: ActiveTelemetrySpan,
+  options: { correlate?: boolean } = {},
+): void {
   target['__putnamiTrace'] = span.context;
-  target['traceId'] = span.context.traceId;
+  if (options.correlate !== false) target['traceId'] = span.context.traceId;
+}
+
+/** The trace context of the span active in the current async context, if any. */
+export function activeTelemetryContext(): TelemetryTraceContext | undefined {
+  return tryContext<AmbientTelemetryContext>()?.__putnamiTrace;
 }
 
 function rootTraceFlags(traceId: string): string {

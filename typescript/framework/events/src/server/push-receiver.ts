@@ -14,7 +14,7 @@ import type { HandlerDefinition } from '../handler/handler';
 import type { AttributeFilter } from '../handler/handler.type';
 import { PUTNAMI_EVENTS_PROTOCOL } from '../protocol';
 import { dispatchToHandler } from '../transport/dispatch';
-import { createTransportMessage } from '../transport/message-utils';
+import { adoptMessageTraceContext, createTransportMessage } from '../transport/message-utils';
 import type { Envelope } from '../transport/transport';
 import { isValidEnvelope, sanitizeRemoteEnvelope } from './remote-protocol';
 
@@ -206,6 +206,8 @@ export function decodePushEnvelope(wrapper: PushWrapper | undefined): Envelope |
   }
   if (!envelope.attributes || typeof envelope.attributes !== 'object') {
     envelope.attributes = wrapper?.message?.attributes ?? {};
+  } else {
+    adoptMessageTraceContext(envelope.attributes, wrapper?.message?.attributes);
   }
 
   sanitizeRemoteEnvelope(envelope);

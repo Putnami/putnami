@@ -79,6 +79,11 @@ err := publisher.Publish(ctx, payload,
 - `WithAttributes` sets key-value pairs used for routing and filtering.
 - `WithTraceID` attaches a trace identifier for distributed tracing.
 
+With the telemetry plugin configured, a publish inside a span also writes the
+span's W3C `traceparent` and `tracestate` into the event attributes, and every
+delivery runs its handler in a consumer span, `process <topic>`, that continues
+that trace; an event without a valid `traceparent` starts a new root.
+
 ## Subscribing to Events
 
 Use the `Handle` function to create a typed handler for a topic. The handler receives a `*Message[T]` with the payload already deserialized to the correct type.
@@ -399,8 +404,9 @@ transport, err := events.NewEventServerTransport(events.EventServerTransportConf
 
 The credential hook receives the exact configured audience. Token acquisition
 failures occur before any publish request and token material is never included
-in the returned error. `WithW3CTraceContext` carries `traceparent` and
-`tracestate` as HTTP headers.
+in the returned error. The `traceparent` and `tracestate` event attributes,
+whatever wrote them, travel as the W3C HTTP headers, outside the frame;
+`WithW3CTraceContext` names those headers instead.
 
 Retries remain pinned to the same endpoint with a stable id, dedupe key, and
 byte-identical body. Inspect `*events.EventServerPublishError` (or call

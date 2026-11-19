@@ -177,6 +177,21 @@
               "a-scope-creation-failure-reaches-the-failure-router-with-its-record"
             ]
           }
+        },
+        {
+          "id": "event-trace-context",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-publish-inside-a-span-writes-the-trace-attributes",
+              "a-publish-outside-a-span-writes-no-trace-attribute",
+              "the-consumer-span-continues-the-publishers-trace",
+              "an-event-without-trace-attributes-starts-a-root",
+              "the-managed-publisher-sends-the-trace-attributes-as-headers"
+            ]
+          }
         }
       ]
     }

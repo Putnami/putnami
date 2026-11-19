@@ -32,6 +32,28 @@ HTTP Request (traceId: abc-123)
       → useLogger() logs with abc-123
 ```
 
+### Trace Context
+
+A publish inside a telemetry span (the HTTP middleware opens one per request)
+writes the span's W3C `traceparent` and `tracestate` into the event
+attributes, replacing any caller value of either; a publish outside a span
+writes neither. Every dispatch, whatever the transport, runs the handler in a
+consumer span named `process <topic>`, of kind consumer, with the attributes
+`messaging.operation.name`, `messaging.destination.name` and
+`messaging.message.id`. It is the child of the publisher's span when the event
+carries a valid `traceparent`, so one trace links the request to the work its
+events start, and a publish or a service call inside the handler is its child
+in turn. An event without one starts a new root, whatever span delivers it. A
+failed handler ends the span with the status message `events.handler_failed`.
+The handler context keeps the envelope's `traceId` for its log records. A
+pushed or pulled Pub/Sub message whose envelope carries attributes but no
+`traceparent` takes the trace context from the message attributes, where a
+managed Event Server stamps it.
+
+The Go runtime follows the same rule, so a Go publisher and a TypeScript
+consumer share a trace: the telemetry protocol pins it in
+`protocols/telemetry/fixtures/conventions/event-trace-context.json`.
+
 ### Auth Context on Messages
 
 The publisher also auto-captures authenticated user claims (`sub`, `email`, `azp`, `client_id`) as `auth.*` attributes on the envelope. Handlers can read these to know which user or client triggered the event:

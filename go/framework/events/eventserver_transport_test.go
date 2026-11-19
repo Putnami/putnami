@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -494,7 +495,7 @@ func TestEventServerTransportPreflightRejectsAuthorityAndInvalidFrames(t *testin
 		preflightTest{name: "blank version", mutate: func(env *Envelope) { env.TopicVersion = " " }},
 		preflightTest{name: "physical topic", mutate: func(env *Envelope) { env.Topic = "projects/p/topics/orders" }},
 	)
-	for _, key := range []string{"workspace_id", "environment", "workload", "service", "channel", "topology_generation_id", "traceparent", "tracestate", "auth.subject", "putnami.route"} {
+	for _, key := range []string{"workspace_id", "environment", "workload", "service", "channel", "topology_generation_id", "auth.subject", "putnami.route"} {
 		key := key
 		tests = append(tests, preflightTest{
 			name: "reserved " + key,
@@ -647,4 +648,109 @@ func ExampleEventServerTransport() {
 	})
 	fmt.Println(transport != nil, err)
 	// Output: true <nil>
+}
+
+// TestEventServerTransportSendsTheTraceAttributesAsHeaders: a publisher writes
+// the trace context into the event attributes, and the managed profile carries
+// it in the W3C headers, outside the frame that reserves both names.
+func TestEventServerTransportSendsTheTraceAttributesAsHeaders(t *testing.T) {
+	spectest.Proves(t, "go/event-delivery", "event-trace-context", "the-managed-publisher-sends-the-trace-attributes-as-headers")
+	traceparent := "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"
+	explicit := "00-11111111111111111111111111111111-2222222222222222-01"
+	cases := []struct {
+		name            string
+		ctx             func(context.Context) context.Context
+		wantTraceparent string
+		wantTracestate  string
+	}{
+		{name: "from the attributes", ctx: func(ctx context.Context) context.Context { return ctx }, wantTraceparent: traceparent, wantTracestate: "vendor=value"},
+		{name: "WithW3CTraceContext wins", ctx: func(ctx context.Context) context.Context {
+			return WithW3CTraceContext(ctx, explicit, "")
+		}, wantTraceparent: explicit},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if got := r.Header.Get("traceparent"); got != tc.wantTraceparent {
+					t.Errorf("traceparent = %q, want %q", got, tc.wantTraceparent)
+				}
+				if got := r.Header.Get("tracestate"); got != tc.wantTracestate {
+					t.Errorf("tracestate = %q, want %q", got, tc.wantTracestate)
+				}
+				var request eventServerPublishRequest
+				if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+					t.Errorf("decode request: %v", err)
+					return
+				}
+				if want := map[string]string{"region": "eu"}; !maps.Equal(request.Attributes, want) {
+					t.Errorf("frame attributes = %v, want %v", request.Attributes, want)
+				}
+				writeEventServerAccepted(t, w, request)
+			}))
+			defer server.Close()
+			transport := newTestEventServerTransport(t, server.URL, server.Client(), staticEventServerCredential())
+			attributes := map[string]string{"region": "eu", "traceparent": traceparent, "tracestate": "vendor=value"}
+			env := validEventServerEnvelope()
+			env.Attributes = attributes
+			if err := transport.Publish(tc.ctx(t.Context()), env); err != nil {
+				t.Fatalf("Publish: %v", err)
+			}
+			if len(attributes) != 3 {
+				t.Errorf("the caller's attributes changed: %v", attributes)
+			}
+		})
+	}
+}
+
+func TestDeliveryTelemetryInstallsAndRemoves(t *testing.T) {
+	first := &recordingDeliveryTelemetry{}
+	removeFirst := InstallDeliveryTelemetry(first)
+	second := &recordingDeliveryTelemetry{}
+	removeSecond := InstallDeliveryTelemetry(second)
+	if currentDeliveryTelemetry() != second {
+		t.Fatal("the latest installation is not current")
+	}
+	removeFirst() // replaced since: nothing changes
+	if currentDeliveryTelemetry() != second {
+		t.Fatal("removing a replaced installation removed the current one")
+	}
+	removeSecond()
+	if currentDeliveryTelemetry() != first {
+		t.Fatal("removal did not restore the previous installation")
+	}
+	removeFirst()
+	if currentDeliveryTelemetry() != nil {
+		t.Fatal("removal left an installation")
+	}
+}
+
+func TestADeliveryThatPanicsEndsItsSpan(t *testing.T) {
+	recorder := &recordingDeliveryTelemetry{}
+	defer InstallDeliveryTelemetry(recorder)()
+	func() {
+		defer func() { _ = recover() }()
+		env := Envelope{ID: "evt-1", Topic: "orders.created", Attempt: 1}
+		_, _, _ = dispatchDelivery(t.Context(), newEventLoggers(), &env, func(context.Context, *Envelope) error {
+			panic("boom")
+		}, nil)
+	}()
+	if len(recorder.ended) != 1 || !stderrors.Is(recorder.ended[0], errDeliveryPanicked) {
+		t.Fatalf("ended = %v, want the panic error once", recorder.ended)
+	}
+}
+
+type recordingDeliveryTelemetry struct {
+	started []Envelope
+	ended   []error
+}
+
+type deliverySpanKey struct{}
+
+func (r *recordingDeliveryTelemetry) PublishAttributes(_ context.Context, attributes map[string]string) map[string]string {
+	return attributes
+}
+
+func (r *recordingDeliveryTelemetry) StartDelivery(ctx context.Context, env Envelope) (context.Context, func(error)) {
+	r.started = append(r.started, env)
+	return context.WithValue(ctx, deliverySpanKey{}, env.ID), func(err error) { r.ended = append(r.ended, err) }
 }

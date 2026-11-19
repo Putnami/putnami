@@ -71,6 +71,14 @@
     {
       "id": "push-refusal-envelope",
       "text": "The push receiver answers 400 in the canonical error envelope, with the code http.bad_request, to a push body or an envelope it cannot decode."
+    },
+    {
+      "id": "event-trace-context",
+      "text": [
+        "With the telemetry plugin configured, a publish inside a span writes its traceparent and tracestate event attributes by the telemetry/otlp-push-contract rule.",
+        "Every delivery runs its handler in a consumer span that continues that trace, or starts a new root without it.",
+        "The managed publisher sends both attributes as the W3C headers, outside the frame."
+      ]
     }
   ],
   "decisions": [

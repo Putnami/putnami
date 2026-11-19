@@ -197,6 +197,21 @@
           }
         },
         {
+          "id": "event-trace-context-is-shared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-event-trace-convention-matches-its-fixture",
+              "the-go-runtime-follows-the-event-trace-fixture",
+              "the-typescript-runtime-follows-the-event-trace-fixture"
+            ]
+          }
+        },
+        {
           "id": "cli-usage-vocabulary-is-closed",
           "stage": "coded",
           "evidenceKinds": [

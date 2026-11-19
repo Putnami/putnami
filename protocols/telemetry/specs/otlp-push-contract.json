@@ -108,6 +108,14 @@
       ]
     },
     {
+      "id": "event-trace-context-is-shared",
+      "text": [
+        "A publish inside a span sets the event attributes traceparent, 00-<trace id>-<span id>-<flags>, and tracestate when the span has one, replacing caller values.",
+        "Delivery starts a consumer span, process <topic>, that is the child of a valid traceparent, or a new root; a failed handler ends it with error events.handler_failed.",
+        "Both runtimes test against fixtures/conventions/event-trace-context.json."
+      ]
+    },
+    {
       "id": "cli-usage-vocabulary-is-closed",
       "text": [
         "cliusage pins the closed vocabulary of CLI usage records: the event names, the attributes each event allows and requires with their value kinds, the error categories and the command names.",

@@ -22,6 +22,7 @@ import (
 	"go.putnami.dev/app"
 	"go.putnami.dev/client"
 	"go.putnami.dev/errors"
+	"go.putnami.dev/events"
 	"go.putnami.dev/inject"
 	"go.putnami.dev/logger"
 	otlp "go.putnami.dev/protocol/telemetry"
@@ -187,6 +188,7 @@ type Plugin struct {
 	log                *logger.Logger
 	removeErrorBridge  func()
 	removeClientBridge func()
+	removeEventBridge  func()
 	autoTraceExporter  sdktrace.SpanExporter
 	autoMetricReader   sdkmetric.Reader
 	sampler            *Sampler
@@ -365,6 +367,8 @@ func (p *Plugin) configureLocked() error {
 		return errors.Wrapf(err, CodeConfigure, "configure generated client telemetry")
 	}
 	p.removeClientBridge = client.InstallServiceCallTelemetry(clientBridge)
+	// Events carry the publisher's trace, and each delivery continues it.
+	p.removeEventBridge = events.InstallDeliveryTelemetry(newEventTelemetry(p.tp))
 
 	// Last, so a Configure error leaves no refresh running: the application
 	// never calls Stop after one.
@@ -405,6 +409,7 @@ func (p *Plugin) Stop(ctx context.Context, _ *app.Module) error {
 	removeErrorBridge := p.removeErrorBridge
 	removeLogRecordsBridge := p.removeLogRecordsBridge
 	removeClientBridge := p.removeClientBridge
+	removeEventBridge := p.removeEventBridge
 	tp := p.tp
 	mp := p.mp
 	p.mu.RUnlock()
@@ -428,6 +433,12 @@ func (p *Plugin) Stop(ctx context.Context, _ *app.Module) error {
 		removeClientBridge()
 		p.mu.Lock()
 		p.removeClientBridge = nil
+		p.mu.Unlock()
+	}
+	if removeEventBridge != nil {
+		removeEventBridge()
+		p.mu.Lock()
+		p.removeEventBridge = nil
 		p.mu.Unlock()
 	}
 

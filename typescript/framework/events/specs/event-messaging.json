@@ -73,6 +73,14 @@
     {
       "id": "cross-language-records",
       "text": "The delivery lifecycle records match the shared cross-language corpus, so the TypeScript and Go brokers cannot drift on record vocabulary, ordering, or the attempt numbers they report."
+    },
+    {
+      "id": "event-trace-context",
+      "text": [
+        "A publish inside a telemetry span writes its traceparent and tracestate event attributes by the telemetry/otlp-push-contract rule.",
+        "Every dispatch runs its handler in a consumer span that continues that trace, or starts a new root without it; work inside the handler is that span's child.",
+        "The managed publisher sends both attributes as the W3C headers, outside the frame."
+      ]
     }
   ],
   "decisions": ["typescript/framework/events/doc/adr/0001-delivery-is-at-least-once-and-loss-is-recorded.md"]

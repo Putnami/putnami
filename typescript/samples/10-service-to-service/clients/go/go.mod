@@ -19,13 +19,17 @@ require (
 )
 
 require (
+	cloud.google.com/go/compute/metadata v0.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/go-logr/logr v1.4.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
+	go.putnami.dev/cache v0.0.1 // indirect
 	go.putnami.dev/config v0.0.1 // indirect
+	go.putnami.dev/ctxutil v0.0.0 // indirect
+	go.putnami.dev/events v0.0.1 // indirect
 	go.putnami.dev/logger v0.0.1 // indirect
 	go.putnami.dev/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
@@ -36,9 +40,12 @@ require (
 	go.putnami.dev/protocol/http-routes v0.0.0 // indirect
 	go.putnami.dev/protocol/identity v0.0.0 // indirect
 	go.putnami.dev/protocol/infra v0.0.0 // indirect
+	go.putnami.dev/protocol/keyring v0.0.0 // indirect
 	go.putnami.dev/protocol/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/storage v0.0.0 // indirect
 	go.putnami.dev/protocol/telemetry v0.0.0 // indirect
+	go.putnami.dev/security v0.0.1 // indirect
+	golang.org/x/oauth2 v0.36.0 // indirect
 	golang.org/x/sys v0.44.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
@@ -93,3 +100,13 @@ replace go.putnami.dev/protocol/storage => ../../../../../protocols/storage
 replace go.putnami.dev/telemetry => ../../../../../go/framework/telemetry
 
 replace go.putnami.dev/protocol/telemetry => ../../../../../protocols/telemetry
+
+replace go.putnami.dev/events => ../../../../../go/framework/events
+
+replace go.putnami.dev/security => ../../../../../go/framework/security
+
+replace go.putnami.dev/cache => ../../../../../go/framework/cache
+
+replace go.putnami.dev/ctxutil => ../../../../../go/framework/ctxutil
+
+replace go.putnami.dev/protocol/keyring => ../../../../../protocols/keyring

@@ -216,6 +216,7 @@ func authoredObservabilityDomain() *arch.Builder {
 				arch.Bind("/sites/telemetry.putnami.dev", "/go/framework/ctxutil"),
 				arch.Bind("/sites/telemetry.putnami.dev", "/go/framework/database"),
 				arch.Bind("/sites/telemetry.putnami.dev", "/go/framework/errors"),
+				arch.Bind("/sites/telemetry.putnami.dev", "/go/framework/events"),
 				arch.Bind("/sites/telemetry.putnami.dev", "/go/framework/http"),
 				arch.Bind("/sites/telemetry.putnami.dev", "/go/framework/inject"),
 				arch.Bind("/sites/telemetry.putnami.dev", "/go/framework/logger"),

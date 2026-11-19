@@ -124,7 +124,7 @@ The [telemetry protocol](https://github.com/putnami/putnami/tree/main/protocols/
 ## What you get
 
 - **Metrics** — framework metrics out of the box, plus your own counters, gauges, and histograms.
-- **Traces** — request spans from both runtimes.
+- **Traces** — request spans from both runtimes, and one consumer span per event delivery, `process <topic>`, that continues the trace of the span that published the event. A request and the work its events start share one trace, even when a Go service publishes and a TypeScript service consumes.
 - **Logs** — structured logs forwarded to the collector through the OTLP log sink, attached from the environment on the TypeScript runtime.
 
 Any standard OTLP/HTTP collector accepts this data. Collector errors are dropped by design — telemetry never affects the workload's request path.

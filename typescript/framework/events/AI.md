@@ -256,6 +256,7 @@ Failed messages use exponential backoff with jitter and can be routed to `{topic
 When publishing from an HTTP request or another active context:
 
 - `traceId` is propagated automatically
+- a publish inside a telemetry span writes the span's `traceparent` and `tracestate` into the event attributes, and the handler runs in a consumer span, `process <topic>`, that continues that trace (a new root without one)
 - authenticated user claims are copied into `auth.*` attributes
 - caller-supplied `auth.*` attributes are ignored to avoid spoofing claims
 

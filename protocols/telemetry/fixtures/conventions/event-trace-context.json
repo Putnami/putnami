@@ -1,0 +1,115 @@
+{
+  "attributes": {"traceparent": "traceparent", "tracestate": "tracestate"},
+  "maxTracestateLength": 512,
+  "consumerSpan": {
+    "namePrefix": "process ",
+    "kind": 5,
+    "attributes": {
+      "operation": "messaging.operation.name",
+      "destination": "messaging.destination.name",
+      "messageId": "messaging.message.id"
+    },
+    "operation": "process",
+    "failureMessage": "events.handler_failed"
+  },
+  "publish": [
+    {
+      "name": "a sampled span writes its traceparent",
+      "span": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "flags": "01"},
+      "callerAttributes": {"tenant": "acme"},
+      "attributes": {"tenant": "acme", "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}
+    },
+    {
+      "name": "an unsampled span writes its traceparent with its flags",
+      "span": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "flags": "00"},
+      "callerAttributes": {},
+      "attributes": {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00"}
+    },
+    {
+      "name": "a span with a tracestate writes both",
+      "span": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "flags": "01", "tracestate": "vendor=opaque"},
+      "callerAttributes": {},
+      "attributes": {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", "tracestate": "vendor=opaque"}
+    },
+    {
+      "name": "the span replaces a caller traceparent and tracestate",
+      "span": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "flags": "01"},
+      "callerAttributes": {"traceparent": "00-11111111111111111111111111111111-2222222222222222-01", "tracestate": "stale=1"},
+      "attributes": {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}
+    },
+    {
+      "name": "outside a span the caller attributes stay as they are",
+      "callerAttributes": {"tenant": "acme"},
+      "attributes": {"tenant": "acme"}
+    }
+  ],
+  "consume": [
+    {
+      "name": "a valid traceparent is continued",
+      "attributes": {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
+      "continues": true,
+      "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "flags": "01"}
+    },
+    {
+      "name": "an unsampled parent is continued unsampled",
+      "attributes": {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00"},
+      "continues": true,
+      "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "flags": "00"}
+    },
+    {
+      "name": "the tracestate is carried with its traceparent",
+      "attributes": {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01", "tracestate": "vendor=opaque"},
+      "continues": true,
+      "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "flags": "01", "tracestate": "vendor=opaque"}
+    },
+    {
+      "name": "an oversized tracestate is dropped and the trace continues",
+      "attributes": {
+        "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+        "tracestate": "vendor=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      },
+      "continues": true,
+      "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "flags": "01"}
+    },
+    {
+      "name": "no traceparent starts a root",
+      "attributes": {"tenant": "acme"},
+      "continues": false
+    },
+    {
+      "name": "a tracestate alone starts a root",
+      "attributes": {"tracestate": "vendor=opaque"},
+      "continues": false
+    },
+    {
+      "name": "an all-zero trace id starts a root",
+      "attributes": {"traceparent": "00-00000000000000000000000000000000-00f067aa0ba902b7-01"},
+      "continues": false
+    },
+    {
+      "name": "an all-zero span id starts a root",
+      "attributes": {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01"},
+      "continues": false
+    },
+    {
+      "name": "another version starts a root",
+      "attributes": {"traceparent": "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"},
+      "continues": false
+    },
+    {
+      "name": "uppercase hex starts a root",
+      "attributes": {"traceparent": "00-4BF92F3577B34DA6A3CE929D0E0E4736-00F067AA0BA902B7-01"},
+      "continues": false
+    },
+    {
+      "name": "a short trace id starts a root",
+      "attributes": {"traceparent": "00-4bf92f3577b34da6a3ce929d0e0e47-00f067aa0ba902b7-01"},
+      "continues": false
+    },
+    {
+      "name": "a malformed value starts a root",
+      "attributes": {"traceparent": "not-a-traceparent"},
+      "continues": false
+    }
+  ]
+}
