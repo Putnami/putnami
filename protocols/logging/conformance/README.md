@@ -60,8 +60,9 @@ them:
   *propagates* the error; the boundary terminal record owns ERROR, exactly
   once, only if the failure actually bubbles. A retried-and-recovered query
   never produces error-level noise.
-- HTTP terminal: INFO below 500, ERROR at ≥ 500 (with the real handler error
-  in `error`).
+- HTTP terminal: DEBUG below 500, ERROR at ≥ 500 (with the real handler error
+  in `error`). A served request is counted by the `http.server.*` metrics, so
+  its access line stays out of INFO.
 - Event terminal: INFO on success, ERROR on failure. A handler that asks for
   a later redelivery is not a failure: its terminal record is WARNING
   `message redelivery requested` with outcome `skipped`. Retry scheduling is

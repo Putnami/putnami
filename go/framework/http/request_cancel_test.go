@@ -48,8 +48,8 @@ func TestHandlerReturningItsCanceledContextAnswers499BelowError(t *testing.T) {
 		t.Fatalf("status = %d, want %d", w.Code, perrors.StatusClientClosedRequest)
 	}
 	record := terminalRecord(t, rec, "/orders")
-	if record["severity"] != "INFO" {
-		t.Errorf("severity = %v, want INFO", record["severity"])
+	if record["severity"] != "DEBUG" {
+		t.Errorf("severity = %v, want DEBUG", record["severity"])
 	}
 	group, _ := record["http"].(map[string]any)
 	if group["outcome"] != "canceled" {

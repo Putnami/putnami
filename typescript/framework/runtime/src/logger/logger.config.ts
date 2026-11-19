@@ -7,13 +7,16 @@ const DEFAULT_LEVEL: LogLevel = 'info';
 const warnedInvalidLevels = new Set<string>();
 
 /**
- * Normalize a raw LOG_LEVEL string to a valid LogLevel.
- * Unknown values fall back to 'info' with a one-time console warning so that
- * a typo or bad env var never silently drops error logs.
+ * Normalize a raw level string to a valid LogLevel, like Go's ParseLevel: case
+ * is ignored and `warning` means `warn`. Unknown values fall back to 'info'
+ * with a one-time console warning so that a typo or bad env var never silently
+ * drops error logs.
  */
 export function normalizeLogLevel(raw: string | undefined): LogLevel {
-  if (raw && (VALID_LOG_LEVELS as readonly string[]).includes(raw)) {
-    return raw as LogLevel;
+  const lower = raw?.toLowerCase();
+  const level = lower === 'warning' ? 'warn' : lower;
+  if (level && (VALID_LOG_LEVELS as readonly string[]).includes(level)) {
+    return level as LogLevel;
   }
   if (raw && !warnedInvalidLevels.has(raw)) {
     warnedInvalidLevels.add(raw);
@@ -32,6 +35,7 @@ export const LoggerConfig = Config('logger', {
   buffer: Default(Boolean, false),
   bufferMaxSize: Default(Number, 100),
   bufferFlushInterval: Default(Number, 5000),
+  refreshSeconds: Default(Number, 30),
 });
 
 type LoggerConfigType = {
@@ -40,6 +44,7 @@ type LoggerConfigType = {
   buffer: boolean;
   bufferMaxSize: number;
   bufferFlushInterval: number;
+  refreshSeconds: number;
 };
 
 const defaultConfig: LoggerConfigType = {
@@ -48,6 +53,7 @@ const defaultConfig: LoggerConfigType = {
   buffer: false,
   bufferMaxSize: 100,
   bufferFlushInterval: 5000,
+  refreshSeconds: 30,
 };
 
 let _loggerConfig: LoggerConfigType | undefined;
@@ -73,13 +79,42 @@ export const getLoggerConfig = (): LoggerConfigType => {
   return _loggerConfig;
 };
 
-/** Reset the cached logger config (for tests). */
+// liveLevel is the level setLogLevel set. Until a call, the level is the one
+// logger.level and LOG_LEVEL give.
+let liveLevel: LogLevel | undefined;
+
+/**
+ * Changes the minimum level of every logger that checks its level, process-wide.
+ * The next record follows it.
+ *
+ * setLogLevel is the runtime control of the level: a started application calls
+ * it when `logger.level` changes, and an export directive may call it to
+ * tighten the level. The last call wins.
+ */
+export const setLogLevel = (level: LogLevel): void => {
+  liveLevel = normalizeLogLevel(level);
+};
+
+/**
+ * Returns the live minimum level: the last {@link setLogLevel} value, otherwise
+ * `logger.level`, then `LOG_LEVEL`, then `info`.
+ */
+export const currentLogLevel = (): LogLevel => liveLevel ?? getLoggerConfig().level;
+
+/** Reset the cached logger config and the live level (for tests). */
 export const resetLoggerConfig = (): void => {
   _loggerConfig = undefined;
+  liveLevel = undefined;
   warnedInvalidLevels.clear();
 };
 
+/**
+ * Reports whether a record at `messageLevel` passes the live minimum level. A
+ * record at `error` always passes.
+ */
 export const shouldLog = (messageLevel: LogLevel): boolean => {
-  const config = getLoggerConfig();
-  return LEVEL_PRIORITY[messageLevel] >= LEVEL_PRIORITY[config.level];
+  if (messageLevel === 'error') {
+    return true;
+  }
+  return LEVEL_PRIORITY[messageLevel] >= LEVEL_PRIORITY[currentLogLevel()];
 };

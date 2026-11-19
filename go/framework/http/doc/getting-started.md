@@ -344,7 +344,7 @@ server.Use(http.Logging(http.LoggerOptions{
 }))
 ```
 
-Requests resulting in 5xx status codes are logged at error level; all others at info level.
+Requests resulting in 5xx status codes are logged at error level; all others at debug level, a `499` with the outcome `canceled`. The `http.server.*` metrics count every request.
 
 #### Rate Limiting
 

@@ -335,8 +335,8 @@ func TestHandlePushRedeliverAnswers429AndLogsNoError(t *testing.T) {
 		t.Errorf("delivery event group = %v, want outcome skipped for m-held", group)
 	}
 	request := oneRecordOf(t, sink, "http", "[POST] /_putnami/events/s")
-	if request.Level != logger.LevelInfo {
-		t.Errorf("request level = %v, want INFO", request.Level)
+	if request.Level != logger.LevelDebug {
+		t.Errorf("request level = %v, want DEBUG", request.Level)
 	}
 }
 

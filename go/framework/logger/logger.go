@@ -2,16 +2,17 @@
 // It wraps log/slog with pluggable sinks, context-aware logging, and
 // support for console, JSON, and buffered output modes.
 //
-// The default output is JSON (matching the TypeScript runtime).
-// Configuration is read from environment variables:
-//   - LOG_LEVEL: debug, info, warn, error (default: info)
+// The default output is JSON (matching the TypeScript runtime). The default
+// logger follows one live, process-wide minimum level: LOG_LEVEL seeds it, a
+// started application sets it from the config key logger.level, and SetLevel
+// changes it at any time. A record at error or above is always emitted, and
+// every record counts in RecordCounts (see level.go).
 package logger
 
 import (
 	"context"
 	stderrors "errors"
 	"log/slog"
-	"os"
 	"reflect"
 	"strings"
 	"sync"
@@ -83,15 +84,23 @@ type Sink interface {
 // Logger provides structured logging with pluggable sinks and context support.
 type Logger struct {
 	name    string
-	level   Level
+	level   *slog.LevelVar
 	sinks   []Sink
 	context map[string]any
 	mu      sync.RWMutex
 }
 
-// New creates a new logger with the given name and sinks.
-// If no sinks are provided, it uses the default sink (JSON to stdout).
+// New creates a new logger with the given name, a fixed minimum level and
+// sinks. If no sinks are provided, it uses the default sink (JSON to stdout).
+// SetLevel does not change the level of a logger New builds; Default returns
+// the logger that follows it.
 func New(name string, level Level, sinks ...Sink) *Logger {
+	fixed := new(slog.LevelVar)
+	fixed.Set(level)
+	return newLogger(name, fixed, sinks...)
+}
+
+func newLogger(name string, level *slog.LevelVar, sinks ...Sink) *Logger {
 	if len(sinks) == 0 {
 		sinks = []Sink{NewJSONSink()}
 	}
@@ -225,7 +234,7 @@ func (l *Logger) Close() error {
 }
 
 func (l *Logger) emit(level Level, msg string, err error, attrs []slog.Attr) {
-	if level < l.level {
+	if !l.admit(level) {
 		return
 	}
 
@@ -269,7 +278,7 @@ func (l *Logger) emit(level Level, msg string, err error, attrs []slog.Attr) {
 // Call-site attrs and framework-reserved keys still win at the sink, so the
 // overall precedence is With < bag < attrs < reserved.
 func (l *Logger) emitCtx(ctx context.Context, level Level, msg string, err error, attrs []slog.Attr) {
-	if level < l.level {
+	if !l.admit(level) {
 		return
 	}
 
@@ -459,16 +468,14 @@ var (
 	defaultLoggerInst *Logger
 )
 
-// Default returns the shared default logger.
-// The logger is configured from environment variables:
-//   - LOG_LEVEL: sets the minimum log level (default: info)
+// Default returns the shared default logger. It and every logger derived
+// from it follow the live level: LOG_LEVEL seeds it, and SetLevel changes it.
 //
 // The default output format is JSON (matching the TypeScript runtime).
 // Console (text) output is used only when explicitly requested.
 func Default() *Logger {
 	defaultLoggerOnce.Do(func() {
-		level := ParseLevel(os.Getenv("LOG_LEVEL"))
-		defaultLoggerInst = New("", level)
+		defaultLoggerInst = newLogger("", liveLevel)
 	})
 	return defaultLoggerInst
 }

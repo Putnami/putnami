@@ -212,6 +212,20 @@
               "the-receiver-keeps-a-conforming-record"
             ]
           }
+        },
+        {
+          "id": "log-records-are-shared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-logger-records-the-log-records-convention",
+              "the-typescript-logger-records-the-log-records-convention"
+            ]
+          }
         }
       ]
     }

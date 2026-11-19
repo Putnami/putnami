@@ -97,7 +97,8 @@ type LoggerOptions struct {
 // Logging middleware logs each request with method, path, status, and duration.
 // The status is the one written to the wire: a status the handler writes to
 // ctx.Writer wins over the response it returns, and the record's level and
-// outcome follow that status.
+// outcome follow that status: a failure logs at error, any other request at
+// debug.
 //
 //	server.Use(http.Logging(http.LoggerOptions{
 //	    Exclude: []string{"/_/health"},
@@ -185,7 +186,9 @@ func Logging(opts LoggerOptions) Middleware {
 			// handler returned a bare 500); ErrorCtx then emits no error field.
 			log.ErrorCtx(reqCtx, msg, logger.RequestError(reqCtx), httpGroup)
 		default:
-			log.InfoCtx(reqCtx, msg, httpGroup)
+			// The access line is debug: a served request is counted by the
+			// http.server.* metrics, and info stays readable under load.
+			log.DebugCtx(reqCtx, msg, httpGroup)
 		}
 
 		return resp

@@ -12,14 +12,14 @@
       "id": "http.terminal.success",
       "level": "required",
       "boundary": "http",
-      "summary": "HTTP terminal record for a 2xx response: one INFO record with the http group and top-level traceId.",
+      "summary": "HTTP terminal record for a 2xx response: one DEBUG record with the http group and top-level traceId.",
       "drive": {
         "route": "GET /conformance/orders",
         "handler": "return 200",
         "middleware": "request-id/trace + logging middleware installed"
       },
       "record": {
-        "severity": "INFO",
+        "severity": "DEBUG",
         "message": "[GET] /conformance/orders",
         "timestamp": "<iso8601-millis-utc>",
         "logger": "http",
@@ -74,7 +74,7 @@
         "middleware": "request-id/trace + logging middleware installed"
       },
       "record": {
-        "severity": "INFO",
+        "severity": "DEBUG",
         "message": "[POST] /conformance/orders",
         "timestamp": "<iso8601-millis-utc>",
         "logger": "http",

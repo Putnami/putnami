@@ -27,7 +27,7 @@ Four levels, in order of severity:
 | `warn` | Recoverable problems: deprecated usage, slow query, retry triggered |
 | `error` | Failures: unhandled exceptions, external service down, data corruption |
 
-The default level is `info`. Messages below the configured level are filtered out.
+The default level is `info`. Messages below the configured level are filtered out, except an `error` record, which is always emitted. The level is live: change `logger.level` and a started service follows within `logger.refreshSeconds` (see [Configuration](#configuration)).
 
 ## Named loggers
 
@@ -92,7 +92,7 @@ useLogger('events.publish')
 A request that publishes twice then ends with an HTTP terminal record like:
 
 ```json
-{"severity":"INFO","message":"[POST] /orders","logger":"http","traceId":"…",
+{"severity":"DEBUG","message":"[POST] /orders","logger":"http","traceId":"…",
  "http":{"method":"POST","routePath":"/orders","status":200,"outcome":"success","durationMs":12},
  "event":{"publishCount":2,"publishes":[{"topic":"orders","messageId":"m-1"},{"topic":"orders","messageId":"m-2"}]}}
 ```
@@ -181,7 +181,7 @@ into a message, so log-based metrics can match on it: `[<METHOD>] <routePath>`,
 
 | Record | Severity | Why |
 |---|---|---|
-| HTTP terminal | `INFO` < 500, `ERROR` ≥ 500 | the handler error travels in `error` |
+| HTTP terminal | `DEBUG` < 500, `ERROR` ≥ 500 | the handler error travels in `error`; the `http.server.*` metrics count every request |
 | Event terminal | `INFO` handled, `ERROR` failed | one per delivery |
 | Event retry | `WARNING` | recoverable; the error travels as a field |
 | Event dead-letter / drop | `ERROR` | the message left the happy path or is lost |
@@ -215,20 +215,29 @@ Human-readable text for local development:
 
 ## Configuration
 
-Via environment variables:
-
-```bash
-LOG_LEVEL=debug          # debug | info | warn | error (default: info)
-LOGGER_JSON=false        # true for JSON, false for console (default: true)
-```
-
 Via YAML (`conf/.env.local.yaml`):
 
 ```yaml
 logger:
-  level: debug
+  level: debug          # debug | info | warn | error (default: info)
+  refreshSeconds: 30    # how often a started app re-reads logger.level; 0 turns it off
   json: false
 ```
+
+Via environment variables:
+
+```bash
+LOG_LEVEL=debug          # the level when logger.level is absent
+LOGGER_JSON=false        # true for JSON, false for console (default: true)
+```
+
+The level rule is the same in Go and TypeScript: `logger.level` wins, then
+`LOG_LEVEL`, then `info`. A started application re-reads `logger.level` from
+its config files and `CONFIG_DATA` every `logger.refreshSeconds` and applies a
+change without a restart; remote config sources are read at start only.
+`setLogLevel(level)` changes the level at runtime, and the last change wins.
+Every record counts once in the telemetry counter
+`log.records{level, outcome}`, with `outcome` `emitted` or `dropped`.
 
 ### Buffered logging
 

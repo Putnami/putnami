@@ -152,7 +152,8 @@ from a bare context with `http.RequestIDFromContext(ctx)`. A telemetry-provided
 #### Logging
 
 Logs each request once with method, path, status code, and duration. Server errors
-use `error`; handled non-5xx responses use `info`:
+use `error`; handled non-5xx responses use `debug`, a `499` with the outcome
+`canceled`. The `http.server.*` metrics count every request:
 
 ```go
 server.Use(http.Logging(http.LoggerOptions{

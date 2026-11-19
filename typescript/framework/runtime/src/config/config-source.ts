@@ -233,17 +233,26 @@ function loadFromFile(folder: string, prefix = '.env'): Record<string, unknown> 
  * depend on and activate with a static import.
  */
 export function getDefaultSources(): ConfigSource[] {
-  const sources: ConfigSource[] = [
+  const sources = getLocalSources();
+
+  sources.push(...discoverRegisteredSources());
+
+  return sources;
+}
+
+/**
+ * Returns the built-in sources that load without the network: the `conf/`
+ * files, `.gen/conf` and `CONFIG_DATA`. It leaves out the registered extension
+ * sources of {@link getDefaultSources}, which may call a remote server.
+ */
+export function getLocalSources(): ConfigSource[] {
+  return [
     new BaseConfFileSource(),
     new ConfFileSource(),
     new GenConfFileSource(),
     new SecretsFileSource(),
     new EnvDataSource(),
   ];
-
-  sources.push(...discoverRegisteredSources());
-
-  return sources;
 }
 
 /**

@@ -100,7 +100,7 @@ server.Use(MyMiddleware)
 
 **Built-in:** `Recovery()`, `RequestID()`, `Logging()`, `RateLimit()`, `Compression()`.
 
-`Logging()` writes one record per request: ERROR at 5xx, INFO below. A `499`
+`Logging()` writes one record per request: ERROR at 5xx, DEBUG below. A `499`
 answer has the outcome `canceled`; any other status under 500 has `success`.
 A handler that writes to `ctx.Writer`, such as a gateway-mounted Connect
 handler, is logged with the status it wrote, not the response it returns. A

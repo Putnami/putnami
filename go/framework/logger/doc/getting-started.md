@@ -28,9 +28,19 @@ log := logger.New("app", logger.LevelInfo,
 )
 ```
 
-A shared default logger is available via `logger.Default()`. It reads configuration from environment variables:
+A shared default logger is available via `logger.Default()`. Its minimum level is live: the default logger and every logger derived from it read one process-wide level on each record.
 
-- `LOG_LEVEL` -- sets the minimum log level (default: `info`)
+- The config key `logger.level` sets the level: `debug`, `info`, `warn` or `error`. An unknown value counts as `info`.
+- Without the key, `LOG_LEVEL` sets it; otherwise it is `info`.
+- A started `go.putnami.dev/app` application re-reads `logger.level` from its conf files and `CONFIG_DATA` every `logger.refreshSeconds` seconds (default 30; 0 turns the re-read off). It applies the value only when it changed since the last read, so edit a mounted config file and the service follows without a restart. Remote config sources are read at start only.
+- `logger.SetLevel(level)` changes the level at runtime, and `logger.CurrentLevel()` reads it. The last change wins, whether it came from the config or from `SetLevel`.
+
+```yaml
+# conf/.env.yaml
+logger:
+  level: debug
+  refreshSeconds: 30
+```
 
 ```go
 log := logger.Default()
@@ -48,7 +58,7 @@ Four severity levels are available, mapped to `log/slog` levels:
 | Warn | `logger.LevelWarn` | Unexpected conditions that are not errors |
 | Error | `logger.LevelError` | Failures that need attention |
 
-Messages below the logger's configured level are silently discarded.
+Messages below the logger's configured level are discarded, except a record at error or above, which is always emitted.
 
 ```go
 log := logger.New("app", logger.LevelWarn)
@@ -58,6 +68,8 @@ log.Info("ignored")   // discarded (below Warn)
 log.Warn("visible")   // written
 log.Error("visible", nil) // written
 ```
+
+Every record a logger receives counts once. `logger.RecordCounts()` returns the cumulative counts by level and outcome (`emitted` or `dropped`), and the telemetry plugin exports them as the counter `log.records{level, outcome}`. A rising `debug/dropped` count tells you what `logger.level: debug` would show.
 
 Parse a level from a string with `ParseLevel`. Unrecognized values default to `LevelInfo`:
 
@@ -168,7 +180,7 @@ sink := logger.NewJSONSink()
 Output example:
 
 ```json
-{"severity":"INFO","message":"request handled","timestamp":"2024-01-15T10:30:00.000Z","logger":"http","method":"GET","status":200}
+{"severity":"DEBUG","message":"[GET] /orders","timestamp":"2024-01-15T10:30:00.000Z","logger":"http","http":{"method":"GET","routePath":"/orders","status":200}}
 ```
 
 Context fields are spread at the top level (Cloud Logging convention). When the `GOOGLE_CLOUD_PROJECT` or `GCP_PROJECT` environment variable is set, trace IDs are formatted as `projects/{project}/traces/{traceId}` under the `logging.googleapis.com/trace` key.
@@ -226,13 +238,14 @@ log.Flush()
 - **Use `logger.Default()` for application bootstrapping**, then create named child loggers for each subsystem (`log.Named("http")`, `log.Named("db")`).
 - **Pass loggers through `context.Context`** in request handlers rather than using package-level globals. This enables per-request fields like trace IDs and user IDs.
 - **Prefer `With` for request-scoped fields** (request ID, user ID) and `slog.Attr` for event-specific data (status codes, latencies).
-- **Set `LOG_LEVEL` via environment variable** to control verbosity without code changes. Use `debug` during development and `info` or `warn` in production.
+- **Set `logger.level` in config** to control verbosity without code changes or a restart. Use `debug` during development and `info` or `warn` in production. The per-request HTTP access line logs at `debug`; failures stay at `error`.
 - **Always defer `log.Close()`** to flush remaining entries and release sink resources on shutdown.
 
 ## Contract and compatibility
 
 See the [structured logging specification](../specs/structured-logging.json),
 [record precedence ADR](adr/0001-record-precedence-and-failure-isolation.md),
+[live level ADR](adr/0002-the-log-level-is-live.md),
 and [support evidence](../README.md#support-and-contract). The package is stable
 and maintained, with the workspace's [pre-1.0 migration
 policy](../../../../RELEASE.md), not strict compatibility between every `0.x`

@@ -27,6 +27,7 @@ import { type InferConfig, readConfig, useConfig, useLogger } from '@putnami/run
 import type { Module, Plugin } from '../application';
 import type { HttpMiddleware } from '../http/http-middleware.type';
 import { HttpPlugin } from '../http/http.plugin';
+import { countLogRecords } from './log-records';
 import type { MetricDescription, MetricsBucket, TelemetrySpanRecord } from './telemetry.collector';
 import {
   cadenceMs,
@@ -76,6 +77,8 @@ export class TelemetryPlugin implements Plugin {
   private target: TelemetryTarget | undefined;
   private middleware: HttpMiddleware | undefined;
   private readonly environment: boolean;
+  /** Stops counting log.records on stop. */
+  private stopCountingLogRecords: (() => void) | undefined;
   private traceSampler: TraceSampler | undefined;
   private samplingBase: TraceSampling = DEFAULT_TRACE_SAMPLING;
   private samplingTimer: ReturnType<typeof setInterval> | undefined;
@@ -143,6 +146,7 @@ export class TelemetryPlugin implements Plugin {
       onSpanBatchFull: () => this.background(this.pushSpans()),
     });
     setCollector(this.collector);
+    this.stopCountingLogRecords = countLogRecords(this.collector);
 
     this.middleware = TelemetryMiddleware(this.collector);
     this.instrument(app);
@@ -214,6 +218,8 @@ export class TelemetryPlugin implements Plugin {
     }
     this.collector = undefined;
     this.middleware = undefined;
+    this.stopCountingLogRecords?.();
+    this.stopCountingLogRecords = undefined;
   }
 
   /**

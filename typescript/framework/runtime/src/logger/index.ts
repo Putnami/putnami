@@ -7,7 +7,16 @@ export { installExceptionHandler } from './exception-handler';
 // the real sink path rather than intercepting console.log.
 export { buildJsonRecord, JsonSink } from './json.sink';
 export { Logger, useLogger, resetDefaultLogger, setRootLogger, MAX_APPENDED_FIELD_VALUES } from './logger';
-export { LoggerConfig, getLoggerConfig, resetLoggerConfig, shouldLog } from './logger.config';
+export { readLocalLogLevel, resolveLogLevel, watchLogLevel } from './log-level';
+export { type LogRecordListener, type LogRecordOutcome, observeLogRecords } from './log-records';
+export {
+  LoggerConfig,
+  currentLogLevel,
+  getLoggerConfig,
+  resetLoggerConfig,
+  setLogLevel,
+  shouldLog,
+} from './logger.config';
 export { REDACTED, redact, setSensitiveKeys, addSensitiveKeys } from './redact';
 export { type LogEntry, type LogLevel, type LogSink, type WithOptions, LEVEL_PRIORITY } from './logger.type';
 // MemoryLogger/MemorySink are test helpers — import from `@putnami/runtime/testing`.

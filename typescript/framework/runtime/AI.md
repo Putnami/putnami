@@ -284,6 +284,15 @@ logger.debug('Query', { sql, params });
 derived from it, before or after the call; it returns a function that removes
 the sink. `logger.sinks` lists the current sinks.
 
+The level is live and process-wide. The config key `logger.level` sets it;
+without the key, `LOG_LEVEL`; otherwise `info`. A started application
+re-reads `logger.level` from its local config every `logger.refreshSeconds`
+(default 30, 0 turns it off). `setLogLevel(level)` changes it at runtime and
+`currentLogLevel()` reads it. An `error` record is always emitted, and
+`observeLogRecords(listener)` sees every record with its outcome (`emitted`
+or `dropped`), which telemetry exports as `log.records`. See
+[`doc/logging.md`](doc/logging.md).
+
 ## Error Handling
 
 ```ts

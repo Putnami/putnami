@@ -65,6 +65,48 @@
               "record-trace-identity"
             ]
           }
+        },
+        {
+          "id": "live-level",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-level-reads-the-config-key",
+              "set-level-applies-to-the-next-record",
+              "the-watcher-applies-a-changed-level",
+              "the-application-watches-the-level"
+            ]
+          }
+        },
+        {
+          "id": "errors-always-emitted",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-error-record-ignores-the-level"
+            ]
+          }
+        },
+        {
+          "id": "records-counted",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "records-are-counted-per-level-and-outcome"
+            ]
+          }
         }
       ]
     }

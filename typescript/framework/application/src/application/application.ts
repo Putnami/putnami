@@ -9,12 +9,14 @@ import {
   type ContainerContext,
   type ContainerContextOptions,
   type ContainerDescription,
+  getLoggerConfig,
   getRegisteredConfigDefinitions,
   installExceptionHandler,
   isConfigContributor,
   type Registration,
   registerContributedConfig,
   useLogger,
+  watchLogLevel,
 } from '@putnami/runtime';
 import {
   compareReadyEndpoints,
@@ -140,6 +142,8 @@ export class Application extends Module {
   private _removeExceptionHandler?: () => void;
   private _logSink?: LogSinkHold;
   private _removeSignalHandlers?: () => void;
+  /** Stops the logger.level watcher start() runs; see ADR 0002 of go.putnami.dev/logger. */
+  private _stopLevelWatch?: () => void;
   private _migrationRegistry = new MigrationRegistry();
 
   constructor(options: ContainerContextOptions = {}) {
@@ -507,12 +511,18 @@ export class Application extends Module {
 
       this.running = true;
 
+      // Re-read logger.level from the local config sources every
+      // logger.refreshSeconds and apply a change without a restart.
+      this._stopLevelWatch?.();
+      this._stopLevelWatch = watchLogLevel(getLoggerConfig().refreshSeconds);
+
       // Execute the runner if defined
       if (this.runner) {
         await this.runner();
         await this._logSink?.flush();
       }
     } catch (error) {
+      this.stopWatchingLogLevel();
       const detail = error instanceof Error ? error.message : String(error);
       logger.error(`‼️ startup failed: ${detail}`, error);
       // Tag the error so a downstream bootstrap guard (bootstrapServe) does not
@@ -523,6 +533,11 @@ export class Application extends Module {
       // failure. A library must not terminate its host process.
       throw error;
     }
+  }
+
+  private stopWatchingLogLevel(): void {
+    this._stopLevelWatch?.();
+    this._stopLevelWatch = undefined;
   }
 
   /**
@@ -538,6 +553,8 @@ export class Application extends Module {
 
     const logger = useLogger('putnami');
     logger.debug('🛑 Shutting down...');
+
+    this.stopWatchingLogLevel();
 
     // Remove signal and exception handlers
     this._removeSignalHandlers?.();

@@ -108,6 +108,13 @@
         "The CLI encodes a session into exactly those bytes and refuses to record an event outside the vocabulary.",
         "The receiver keeps a conforming record and rewrites its integers in canonical decimal form."
       ]
+    },
+    {
+      "id": "log-records-are-shared",
+      "text": [
+        "Every runtime counts each log record as log.records, a counter labeled level, one of debug, info, warn and error, and outcome, emitted or dropped.",
+        "Both runtimes test against fixtures/conventions/log-records.json."
+      ]
     }
   ],
   "decisions": [

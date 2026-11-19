@@ -44,7 +44,9 @@ export const LoggerMiddleware = (options: LoggerOptions = {}): HttpMiddleware =>
         (context as HttpRequestContextInternal).__requestErrorLogged = true;
         logger.error(`[${method}] ${routePath}`, requestError);
       } else {
-        logger.info(`[${method}] ${routePath}`);
+        // The http.server.* metrics count every served request, so the access
+        // line stays out of info (ADR 0002 of go.putnami.dev/logger).
+        logger.debug(`[${method}] ${routePath}`);
       }
       return response;
     } catch (error) {

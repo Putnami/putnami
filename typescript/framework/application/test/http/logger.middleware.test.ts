@@ -51,7 +51,7 @@ describe('LoggerMiddleware', () => {
     expect(typeof payload['durationMs']).toBe('number');
     // Closed schema: durationMs replaces the old `duration` key.
     expect(payload).not.toHaveProperty('duration');
-    expect(entry?.level).toBe('info');
+    expect(entry?.level).toBe('debug');
     expect(entry?.message).toBe('[GET] /react/chunk.panpew1h.js');
     expect(entry?.data).toBeUndefined();
   });

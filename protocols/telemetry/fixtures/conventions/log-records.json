@@ -1,0 +1,12 @@
+{
+  "metrics": [
+    {
+      "name": "log.records",
+      "kind": "counter",
+      "description": "Log records by level and outcome",
+      "attributes": ["level", "outcome"]
+    }
+  ],
+  "levels": ["debug", "info", "warn", "error"],
+  "outcomes": ["emitted", "dropped"]
+}

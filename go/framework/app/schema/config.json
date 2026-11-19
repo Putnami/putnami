@@ -1,0 +1,21 @@
+{
+  "appName": "go.putnami.dev/app",
+  "version": "0.0.0",
+  "schemaHash": "sha256:a79a7496fcf72394",
+  "configs": [
+    {
+      "path": "logger",
+      "fields": [
+        {
+          "name": "level",
+          "type": "string"
+        },
+        {
+          "name": "refreshSeconds",
+          "type": "int",
+          "default": "30"
+        }
+      ]
+    }
+  ]
+}

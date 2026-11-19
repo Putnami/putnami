@@ -191,19 +191,33 @@ child.info('Token validated'); // logger: 'auth'
 
 ### Log Level
 
-The default log level is `info`. Messages below the configured level are dropped.
+The minimum level is live: every logger reads one process-wide level on each
+record. Messages below it are dropped, except an `error` record, which is
+always emitted.
 
-Set the log level via the `LOG_LEVEL` environment variable:
+- The config key `logger.level` sets the level: `debug`, `info`, `warn` or
+  `error`. An unknown value counts as `info`.
+- Without the key, the `LOG_LEVEL` environment variable sets it; otherwise it
+  is `info`.
+- A started application re-reads `logger.level` from its config files and
+  `CONFIG_DATA` every `logger.refreshSeconds` seconds (default 30; 0 turns the
+  re-read off). It applies the value only when it changed since the last read,
+  so you edit a mounted config file and the service follows without a
+  restart. Remote config sources are read at start only.
+- `setLogLevel(level)` changes the level at runtime, and `currentLogLevel()`
+  reads it. The last change wins, whether it came from the config or from
+  `setLogLevel`.
+
+```yaml
+# conf/.env.yaml
+logger:
+  level: debug
+  refreshSeconds: 30
+```
 
 ```bash
-# Show all logs including debug
+# Without logger.level in config, LOG_LEVEL sets the level
 LOG_LEVEL=debug bun run src/main.ts
-
-# Default — info and above
-LOG_LEVEL=info bun run src/main.ts
-
-# Warnings and errors only
-LOG_LEVEL=warn bun run src/main.ts
 ```
 
 When using `putnami serve`, the `--debug` flag automatically sets `LOG_LEVEL=debug` in the served application:
@@ -213,12 +227,19 @@ When using `putnami serve`, the `--debug` flag automatically sets `LOG_LEVEL=deb
 bunx putnami serve my-app --debug
 ```
 
-You can also configure the level in YAML config files (`conf/.env.local.yaml`):
+The per-request HTTP access line logs at `debug`; a failure stays at `error`.
+The `http.server.*` metrics count every request.
 
-```yaml
-logger:
-  level: debug
-```
+### Record counts
+
+Every record a logger receives counts once. With the telemetry plugin, the
+counter `log.records{level, outcome}` reports them, with `outcome` `emitted`
+or `dropped`. A rising `debug/dropped` count tells you what `logger.level:
+debug` would show. `observeLogRecords(listener)` receives each record's level
+and outcome and returns a function that removes the listener.
+
+The rule is the same in Go; see
+[ADR 0002 of go.putnami.dev/logger](../../../../go/framework/logger/doc/adr/0002-the-log-level-is-live.md).
 
 ### Other Options
 

@@ -12,12 +12,19 @@ log.Info("server started")
 log.Error("connection failed", err)
 ```
 
-The default logger reads configuration from environment variables:
+The default logger reads its level live, on each record:
 
-| Env var | Description |
+| Setting | Description |
 |---------|-------------|
-| `LOG_LEVEL` | Minimum log level: `debug`, `info`, `warn`, `error` (default: `info`) |
-| `K_SERVICE` | When set (Cloud Run), uses JSON sink automatically |
+| `logger.level` (config) | Minimum log level: `debug`, `info`, `warn`, `error` |
+| `logger.refreshSeconds` (config) | How often a started app re-reads `logger.level` from its conf files and `CONFIG_DATA` (default `30`; `0` turns it off) |
+| `LOG_LEVEL` (env) | The level when `logger.level` is absent (default: `info`) |
+| `K_SERVICE` (env) | When set (Cloud Run), uses JSON sink automatically |
+
+A change to `logger.level` applies without a restart, and `logger.SetLevel`
+changes the level at runtime; the last change wins. A record at error is
+always emitted. Every record counts once in the telemetry counter
+`log.records{level, outcome}`.
 
 ## Creating loggers
 

@@ -223,6 +223,48 @@
           }
         }
       ]
+    },
+    {
+      "id": "typescript/structured-logging",
+      "type": "feature",
+      "name": "TypeScript structured logging",
+      "outcome": "An operator changes a running TypeScript service's log level through its configuration, never loses an error record, and sees how many records each level hides",
+      "owner": "typescript",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "live-level",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-level-reads-the-config-key",
+              "set-log-level-applies-to-the-next-record",
+              "the-watcher-applies-a-changed-level",
+              "the-application-watches-the-level"
+            ]
+          }
+        },
+        {
+          "id": "errors-always-emitted",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-error-record-ignores-the-level"]
+          }
+        },
+        {
+          "id": "records-counted",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["records-are-counted-per-level-and-outcome"]
+          }
+        }
+      ]
     }
   ]
 }

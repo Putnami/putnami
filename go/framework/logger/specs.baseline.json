@@ -2,9 +2,12 @@
   "$schema": "https://putnami.dev/schemas/putnami-specs-baseline.json",
   "protocolVersion": 2,
   "executableRequirements": [
+    "go/structured-logging#errors-always-emitted",
     "go/structured-logging#failure-isolation",
     "go/structured-logging#field-precedence",
     "go/structured-logging#lifecycle",
-    "go/structured-logging#record"
+    "go/structured-logging#live-level",
+    "go/structured-logging#record",
+    "go/structured-logging#records-counted"
   ]
 }

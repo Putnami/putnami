@@ -103,7 +103,7 @@
       "id": "caller-withdrawal",
       "text": [
         "Each request context ends with context.DeadlineExceeded at nine tenths of the write timeout: a stalled handler answers 5xx at ERROR, and a success returned after the deadline rolled its work back answers 500.",
-        "A handler that answers its canceled context answers 499 with the code canceled, logged at INFO with the outcome canceled.",
+        "A handler that answers its canceled context answers 499 with the code canceled, logged at DEBUG with the outcome canceled.",
         "WebSocket upgrades, Server-Sent Events, and gRPC or Connect streams run without the deadline."
       ]
     },
@@ -127,7 +127,7 @@
       "id": "request-log-status",
       "text": [
         "A handler that writes to the response writer, such as a gateway-mounted Connect handler, is logged with the status it wrote, not the response it returns.",
-        "A 5xx logs at ERROR with the outcome failure, a 499 at INFO with the outcome canceled, any other status at INFO with the outcome success.",
+        "A 5xx logs at ERROR with the outcome failure, a 499 at DEBUG with the outcome canceled, any other status at DEBUG with the outcome success.",
         "A body written without a status logs 200.",
         "A 5xx returned after a lower written status logs that status at ERROR with the outcome failure."
       ]

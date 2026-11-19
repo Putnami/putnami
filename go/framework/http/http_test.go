@@ -651,8 +651,8 @@ func TestLoggingMiddleware(t *testing.T) {
 	if entries[0].Message != "[GET] /users" {
 		t.Errorf("expected message %q, got %q", "[GET] /users", entries[0].Message)
 	}
-	if entries[0].Level != logger.LevelInfo {
-		t.Errorf("expected INFO level for 2xx, got %v", entries[0].Level)
+	if entries[0].Level != logger.LevelDebug {
+		t.Errorf("expected DEBUG level for 2xx, got %v", entries[0].Level)
 	}
 
 	group := httpTerminalGroup(t, entries[0])
@@ -854,7 +854,7 @@ func TestLoggingMiddlewareRecoveryError(t *testing.T) {
 }
 
 // TestLoggingMiddlewareTerminalJSON pins the fully-rendered terminal records to
-// the frozen conformance shape: a success INFO record and a 5xx ERROR record,
+// the frozen conformance shape: a success DEBUG record and a 5xx ERROR record,
 // both with the closed http group, top-level traceId, and error text absent
 // from the message; the 5xx record additionally carries a structured error.
 func TestLoggingMiddlewareTerminalJSON(t *testing.T) {
@@ -876,8 +876,8 @@ func TestLoggingMiddlewareTerminalJSON(t *testing.T) {
 
 	success := render(func(ctx *Context) *Response { return JSON("ok") }, "GET", "/conformance/orders", "trace-1")
 	t.Logf("success terminal record: %s", mustJSON(t, success))
-	if success["severity"] != "INFO" {
-		t.Errorf("severity = %v, want INFO", success["severity"])
+	if success["severity"] != "DEBUG" {
+		t.Errorf("severity = %v, want DEBUG", success["severity"])
 	}
 	if success["message"] != "[GET] /conformance/orders" {
 		t.Errorf("message = %v", success["message"])

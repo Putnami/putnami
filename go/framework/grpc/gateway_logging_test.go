@@ -19,7 +19,7 @@ func TestGatewayRequestLogRecordsTheStatusTheHandlerWrote(t *testing.T) {
 		outcome  string
 	}{
 		{name: "server error", status: http.StatusInternalServerError, severity: "ERROR", outcome: "failure"},
-		{name: "success", status: http.StatusOK, severity: "INFO", outcome: "success"},
+		{name: "success", status: http.StatusOK, severity: "DEBUG", outcome: "success"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -6,7 +6,8 @@
     "Application code emits one structured record to one or more interchangeable sinks",
     "Request and event boundaries accumulate context fields without sharing mutable logger state",
     "Trace and structured-error metadata remain machine-readable in JSON output",
-    "A panicking logged value cannot unwind the application call that attempted to log it"
+    "A panicking logged value cannot unwind the application call that attempted to log it",
+    "An operator changes a running service's log level through its configuration, never loses an error record, and sees how many records each level hides"
   ],
   "nonGoals": [
     "Shipping, retaining, or querying logs in a remote service",
@@ -29,9 +30,27 @@
     {
       "id": "record",
       "text": "Every emitted record carries level, message, timestamp, logger name, attributes, optional context, optional trace identity, and optional structured error information."
+    },
+    {
+      "id": "live-level",
+      "text": [
+        "The minimum level comes from the config key logger.level, one of debug, info, warn and error; without the key, LOG_LEVEL sets it, and otherwise it is info.",
+        "An unknown value counts as info.",
+        "SetLevel changes the minimum level of the default logger and of every logger derived from it, and the next record follows it.",
+        "Every logger.refreshSeconds, 30 by default and never when 0, a started application re-reads logger.level from its config files and CONFIG_DATA and applies a value that changed since the last read."
+      ]
+    },
+    {
+      "id": "errors-always-emitted",
+      "text": "A record at error or above is emitted whatever the minimum level."
+    },
+    {
+      "id": "records-counted",
+      "text": "Every record a logger receives counts once in log.records, labeled with its level and the outcome emitted or dropped, the outcome dropped meaning the minimum level filtered it."
     }
   ],
   "decisions": [
-    "go/framework/logger/doc/adr/0001-record-precedence-and-failure-isolation.md"
+    "go/framework/logger/doc/adr/0001-record-precedence-and-failure-isolation.md",
+    "go/framework/logger/doc/adr/0002-the-log-level-is-live.md"
   ]
 }

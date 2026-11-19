@@ -18,7 +18,8 @@ later wins: persistent `With` context, request `FieldBag`, call-site
 attributes, framework-reserved fields. JSON output protects severity, message,
 timestamp, logger name, trace keys, and error data from user collisions; a
 colliding user field is not emitted under that key. The default logger writes
-newline-delimited JSON and reads its level once from `LOG_LEVEL`.
+newline-delimited JSON and reads its level once from `LOG_LEVEL` (superseded
+by [ADR 0002](0002-the-log-level-is-live.md): the level is live).
 
 Every sink write recovers panics; the panicking value or sink is dropped for
 that sink. `Flush` and `Close` visit every sink and return the first error.

@@ -18,8 +18,15 @@ log := logger.Default().Named("my-service")
 defer log.Close()
 ```
 
-Environment variables:
-- `LOG_LEVEL`: `debug`, `info`, `warn`, `error` (default: `info`)
+The minimum level of the default logger is live:
+- The config key `logger.level`: `debug`, `info`, `warn`, `error`.
+- Without the key, `LOG_LEVEL`; otherwise `info`.
+- A started application re-reads `logger.level` every `logger.refreshSeconds`
+  (default 30) and applies a change without a restart.
+- `logger.SetLevel` changes it at runtime.
+
+A record at error or above is always emitted, and every record counts in
+`log.records{level, outcome}`.
 
 ## Creating a Custom Logger
 
@@ -192,9 +199,9 @@ Before v1.0.0, a minor `0.x` release may still contain a breaking change; the
 [release policy](../../../RELEASE.md) requires release notes and migration
 documentation rather than strict compatibility between every pre-1.0 minor.
 
-The [structured logging specification](specs/structured-logging.json) and
+The [structured logging specification](specs/structured-logging.json),
 [record precedence ADR](doc/adr/0001-record-precedence-and-failure-isolation.md)
-define the package contract. Regression evidence covers [logger
+and [live level ADR](doc/adr/0002-the-log-level-is-live.md) define the package contract. Regression evidence covers [logger
 behavior](logger_test.go), [field accumulation](fields_test.go), [sink
 isolation and lifecycle](coverage_test.go), and the [`logtest` conformance
 adapter](logtest/logtest_test.go). The corpus is scoped evidence; it is not a

@@ -193,6 +193,9 @@ type Plugin struct {
 	stopRefresh        context.CancelFunc
 	refreshDone        chan struct{}
 
+	// removeLogRecordsBridge unregisters the log.records callback on Stop.
+	removeLogRecordsBridge func() error
+
 	mu           sync.RWMutex
 	configured   bool
 	configureErr error
@@ -355,6 +358,7 @@ func (p *Plugin) configureLocked() error {
 	// Keep the deregister handle so Stop can remove the hook; otherwise it
 	// outlives the plugin and double-counts across lifecycles.
 	p.removeErrorBridge = initErrorBridge(p.mp.Meter("errors"))
+	p.removeLogRecordsBridge = initLogRecordsBridge(p.mp.Meter("logs"))
 	clientBridge, err := newGeneratedClientTelemetry(p.tp, p.mp, otel.GetTextMapPropagator())
 	if err != nil {
 		return errors.Wrapf(err, CodeConfigure, "configure generated client telemetry")
@@ -396,6 +400,7 @@ func (p *Plugin) Stop(ctx context.Context, _ *app.Module) error {
 
 	p.mu.RLock()
 	removeErrorBridge := p.removeErrorBridge
+	removeLogRecordsBridge := p.removeLogRecordsBridge
 	removeClientBridge := p.removeClientBridge
 	tp := p.tp
 	mp := p.mp
@@ -409,6 +414,13 @@ func (p *Plugin) Stop(ctx context.Context, _ *app.Module) error {
 		p.removeErrorBridge = nil
 		p.mu.Unlock()
 	}
+	var logRecordsErr error
+	if removeLogRecordsBridge != nil {
+		logRecordsErr = removeLogRecordsBridge()
+		p.mu.Lock()
+		p.removeLogRecordsBridge = nil
+		p.mu.Unlock()
+	}
 	if removeClientBridge != nil {
 		removeClientBridge()
 		p.mu.Lock()
@@ -417,6 +429,11 @@ func (p *Plugin) Stop(ctx context.Context, _ *app.Module) error {
 	}
 
 	var errs []error
+	if logRecordsErr != nil {
+		errs = append(errs, errors.Wrapf(logRecordsErr, CodeShutdown, "log.records unregister failed",
+			errors.String("component", "logs"),
+		))
+	}
 
 	if tp != nil {
 		if err := tp.Shutdown(ctx); err != nil {

@@ -55,6 +55,7 @@ type Application struct {
 	stopTimeout                     time.Duration
 	migrationRegistry               *migration.Registry
 	capabilityMigrationAssociations []capabilityMigrationSourceAssociation
+	stopLevelWatch                  func(wait context.Context)
 	mu                              sync.RWMutex
 }
 
@@ -213,6 +214,10 @@ func (a *Application) Start(ctx context.Context) error {
 	startedAt := time.Now()
 	allPlugins := a.CollectPlugins()
 
+	// The startup records follow logger.level; the watcher starts once
+	// startup completes.
+	loggerOpts := a.applyLogLevel(ctx)
+
 	// Phase 1: Modules.PreConfigure (top-down), before the DI container exists.
 	if err := a.runModulePreConfigure(ctx); err != nil {
 		return err
@@ -276,6 +281,7 @@ func (a *Application) Start(ctx context.Context) error {
 
 	// Startup completed: the StartupObservers learn it, then the ready record
 	// announces it.
+	a.watchLogLevel(loggerOpts)
 	notifyStartupCompleted(allPlugins)
 	durationMs := time.Since(startedAt).Milliseconds()
 	a.log.Info("🤖 ready",
@@ -593,6 +599,7 @@ func (a *Application) Stop(ctx context.Context) error {
 	a.running = false
 	a.mu.Unlock()
 
+	a.stopWatchingLogLevel(ctx)
 	a.log.Debug("stopping application")
 
 	var errs []error

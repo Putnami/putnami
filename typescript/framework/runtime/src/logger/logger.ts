@@ -1,15 +1,9 @@
 import { type Context, tryContext } from '../context';
 import type { ConsoleSink } from './console.sink';
 import type { JsonSink } from './json.sink';
-import { getLoggerConfig } from './logger.config';
-import {
-  LEVEL_PRIORITY,
-  type LogEntry,
-  type LogLevel,
-  type LogSink,
-  type SerializedError,
-  type WithOptions,
-} from './logger.type';
+import { countLogRecord } from './log-records';
+import { getLoggerConfig, shouldLog } from './logger.config';
+import type { LogEntry, LogLevel, LogSink, SerializedError, WithOptions } from './logger.type';
 import { redact } from './redact';
 
 /**
@@ -167,7 +161,9 @@ export class Logger {
   }
 
   private emit(level: LogLevel, message: unknown, params: unknown[]): void {
-    if (!this.skipLevelCheck && !shouldLog(level)) {
+    const emitted = this.skipLevelCheck || shouldLog(level);
+    countLogRecord(level, emitted);
+    if (!emitted) {
       return;
     }
 
@@ -184,12 +180,6 @@ export class Logger {
       sink.write(entry);
     }
   }
-}
-
-function shouldLog(level: LogLevel): boolean {
-  const config = getLoggerConfig();
-  // config.level is always a valid LogLevel (normalised by getLoggerConfig).
-  return LEVEL_PRIORITY[level] >= LEVEL_PRIORITY[config.level];
 }
 
 /**

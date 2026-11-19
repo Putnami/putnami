@@ -1,0 +1,32 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "typescript/structured-logging",
+  "outcomes": [
+    "An operator changes a running service's log level through its configuration, never loses an error record, and sees how many records each level hides"
+  ],
+  "nonGoals": [
+    "Reloading any configuration block other than logger.level in a running process",
+    "Shipping, retaining, or querying logs in a remote service"
+  ],
+  "requirements": [
+    {
+      "id": "live-level",
+      "text": [
+        "The minimum level comes from the config key logger.level, one of debug, info, warn and error; without the key, LOG_LEVEL sets it, and otherwise it is info.",
+        "An unknown value counts as info.",
+        "setLogLevel changes the minimum level of every logger that checks the level, and the next record follows it.",
+        "Every logger.refreshSeconds, 30 by default and never when 0, a started application re-reads logger.level from its config files and CONFIG_DATA and applies a value that changed since the last read."
+      ]
+    },
+    {
+      "id": "errors-always-emitted",
+      "text": "A record at error is emitted whatever the minimum level."
+    },
+    {
+      "id": "records-counted",
+      "text": "Every record a logger receives counts once in log.records, labeled with its level and the outcome emitted or dropped, the outcome dropped meaning the minimum level filtered it."
+    }
+  ],
+  "decisions": ["go/framework/logger/doc/adr/0002-the-log-level-is-live.md"]
+}
