@@ -5,6 +5,7 @@
     "cloud/go-runtime-destination#cancellation",
     "cloud/go-runtime-destination#default-telemetry",
     "cloud/go-runtime-destination#prepared-boot",
+    "cloud/go-runtime-destination#refresh",
     "cloud/go-runtime-destination#requests-without-credentials",
     "cloud/go-runtime-destination#resolve-requests",
     "cloud/go-runtime-destination#retries",

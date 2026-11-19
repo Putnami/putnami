@@ -6,7 +6,8 @@
     "A Go workload on Putnami Cloud receives remote configuration and secrets through the go.putnami.dev/config loader once its main package imports the activate package",
     "Each request carries the workload identity of the process, or no credential at all when the contract allows it",
     "A required source stops startup on failure, while an optional source leaves local configuration in place",
-    "A Go workload on Putnami Cloud exports request metrics and traces to the platform collector once its main package imports the activate package"
+    "A Go workload on Putnami Cloud exports request metrics and traces to the platform collector once its main package imports the activate package",
+    "A running Go workload sees a changed Cloud config or secret value without a restart once the operator sets a refresh period, at one request per source and period"
   ],
   "nonGoals": [
     "Serving or storing configuration, which the platform's configuration service owns",
@@ -37,6 +38,15 @@
       ]
     },
     {
+      "id": "refresh",
+      "text": [
+        "Without a positive CONFIG_SERVER_REFRESH, a remote source keeps its first load for the process.",
+        "Once the period ends, a load returns the held tree at once and starts one background fetch shared by every caller.",
+        "That fetch makes one attempt: on any failure, a revoked config included, the source keeps the held tree and warns.",
+        "The config, secrets and prepared boot sources refresh alike; a pinned config never does."
+      ]
+    },
+    {
       "id": "requests-without-credentials",
       "text": [
         "A config or secrets request still goes out without an Authorization header when the token source fails, and off GCP discovery wires the environment token source without a configured token.",
@@ -62,7 +72,7 @@
     {
       "id": "single-fetch",
       "text": [
-        "The config source fetches once and shares the result with every later load.",
+        "The config source fetches once and shares the result with every later load until its refresh period ends.",
         "A completed load is reused.",
         "Discovery returns the same remote source each time, so the retry budget is spent once.",
         "A load canceled in the middle of a fetch is not cached: the next load fetches again."

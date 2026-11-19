@@ -163,9 +163,11 @@ The `traces` option of `telemetry()` sets the same three values in code; each
 key of the config section overrides its field. While it runs, the plugin
 reloads the config sources every 30 seconds with `readConfig()` and applies a
 changed value to the next root decision, without a restart. A change to a file
-under `conf/` applies within 30 seconds. `CONFIG_DATA` and the Putnami Cloud
-remote sources keep their first load for the life of the process: to change a
-running process there, call `sampler.update()`. A value out of range, or a
+under `conf/` applies within 30 seconds. `CONFIG_DATA` keeps its first load
+for the life of the process, and so do the Putnami Cloud remote sources unless
+`CONFIG_SERVER_REFRESH` sets a refresh period: a Cloud config change then
+applies within that period plus a minute. To change a running process
+otherwise, call `sampler.update()`. A value out of range, or a
 section that fails to load, keeps the settings in force and logs a warning.
 
 A dropped span records nothing, and still injects its `traceparent` with the

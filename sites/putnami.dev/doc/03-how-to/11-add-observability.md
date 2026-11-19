@@ -45,7 +45,9 @@ Traces follow a budget: each instance keeps its first 100 root traces, then
 1 % of them, with at least 1 root each minute. Set `telemetry.traces.budget`,
 `ratio` and `floorPerMinute` to change it, in Go and in TypeScript. A change
 to a file under `conf/` applies within 30 seconds, without a restart; a change
-in `CONFIG_DATA` or Putnami Cloud config applies at the next start.
+in `CONFIG_DATA` applies at the next start, and so does a change in Putnami
+Cloud config, unless the workload sets `CONFIG_SERVER_REFRESH` (for example
+`1m`): the change then applies within that period plus a minute.
 
 The collector can tighten every service from its export responses, without a
 redeploy: a `Putnami-Export-Directive: trace-ratio=0.001, log-level=warn,

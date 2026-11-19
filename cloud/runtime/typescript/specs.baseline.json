@@ -7,6 +7,7 @@
     "cloud/typescript-runtime-destination#event-server-tokens-are-cached-and-checked",
     "cloud/typescript-runtime-destination#register-activates-the-sources",
     "cloud/typescript-runtime-destination#register-authenticates-telemetry",
+    "cloud/typescript-runtime-destination#remote-sources-refresh-on-a-period",
     "cloud/typescript-runtime-destination#required-sources-retry-within-a-budget",
     "cloud/typescript-runtime-destination#required-sources-stop-startup",
     "cloud/typescript-runtime-destination#secrets-source-resolves-remote-secrets",

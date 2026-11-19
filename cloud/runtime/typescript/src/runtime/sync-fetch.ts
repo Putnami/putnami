@@ -85,6 +85,31 @@ export function syncFetch(request: SyncFetchRequest): SyncFetchResponse {
   return workerSyncFetch(request);
 }
 
+/**
+ * Sends a request without blocking the event loop and answers like
+ * {@link syncFetch}, through the same test seam. A response body over the
+ * synchronous transport's limit fails.
+ */
+export async function asyncFetch(request: SyncFetchRequest): Promise<SyncFetchResponse> {
+  if (testSyncFetch) {
+    return testSyncFetch(request);
+  }
+  const response = await fetch(request.url, {
+    method: request.method || 'GET',
+    headers: request.headers,
+    body: request.body,
+    signal: AbortSignal.timeout(request.timeoutMs ?? 5000),
+  });
+  const body = await response.text();
+  if (new TextEncoder().encode(body).length > maxBodyBytes) {
+    throw new Error(`fetch response exceeded ${maxBodyBytes} bytes`);
+  }
+  if (!response.ok && request.throwOnHttpError !== false) {
+    throw new Error(`fetch returned HTTP ${response.status}`);
+  }
+  return { status: response.status, body };
+}
+
 interface SyncFetchWorkerState {
   shared: SharedArrayBuffer;
   control: Int32Array;

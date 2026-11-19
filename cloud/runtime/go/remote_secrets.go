@@ -28,6 +28,11 @@ type RemoteSecretsSourceConfig struct {
 	Timeout     time.Duration // per-attempt timeout, defaults to 5s
 	RetryBudget time.Duration // total retry budget for required sources, defaults to 30s; negative disables retries
 	Required    bool          // fail startup on fetch/resolve failures
+	// RefreshPeriod is how long a loaded tree stays current. Once it has
+	// passed, a load returns the held tree and starts one background fetch
+	// whose tree later loads return; a failed fetch keeps the held tree. Zero
+	// keeps the first load for the life of the process.
+	RefreshPeriod time.Duration
 }
 
 // RemoteSecretsSource fetches secrets from a Putnami config server.
@@ -48,7 +53,12 @@ func NewRemoteSecretsSource(cfg RemoteSecretsSourceConfig) *RemoteSecretsSource 
 	if cfg.Timeout == 0 {
 		cfg.Timeout = defaultRemoteSourceTimeout
 	}
-	return &RemoteSecretsSource{config: cfg}
+	s := &RemoteSecretsSource{config: cfg}
+	s.loaded.period = cfg.RefreshPeriod
+	s.loaded.refresh = s.refreshOnce
+	s.loaded.source = s.Name()
+	s.loaded.timeout = cfg.Timeout
+	return s
 }
 
 // Name returns the source identifier used in logging and diagnostics.
@@ -57,8 +67,9 @@ func (s *RemoteSecretsSource) Name() string { return "secrets-server" }
 // Priority returns the source priority (55: just above RemoteConfigSource).
 func (s *RemoteSecretsSource) Priority() int { return 55 }
 
-// Load fetches the resolved secrets tree from the secrets server.
-// Results are cached for the process lifetime.
+// Load fetches the resolved secrets tree from the secrets server. The result
+// is kept for the process, or refreshed in the background once RefreshPeriod
+// has passed.
 func (s *RemoteSecretsSource) Load() (map[string]any, error) {
 	return s.LoadContext(context.Background())
 }
@@ -123,16 +134,33 @@ func (s *RemoteSecretsSource) fetch(ctx context.Context) (map[string]any, error)
 	return nil, s.fail(failure.message, failure.err)
 }
 
-func (s *RemoteSecretsSource) fetchRemote(ctx context.Context) (map[string]any, *remoteAttemptFailure) {
-	reqBody := resolveSecretsRequest{
+// refreshOnce resolves secrets from the secrets server in one attempt, with
+// no retry.
+func (s *RemoteSecretsSource) refreshOnce(ctx context.Context) (map[string]any, *remoteAttemptFailure) {
+	body, failure := s.requestBody()
+	if failure != nil {
+		return nil, failure
+	}
+	return s.fetchOnce(ctx, body, s.config.Timeout)
+}
+
+func (s *RemoteSecretsSource) requestBody() ([]byte, *remoteAttemptFailure) {
+	body, err := json.Marshal(resolveSecretsRequest{
 		AppName:     s.config.AppName,
 		Version:     s.config.Version,
 		Environment: s.config.Environment,
 		SchemaHash:  s.config.SchemaHash,
-	}
-	body, err := json.Marshal(reqBody)
+	})
 	if err != nil {
 		return nil, terminalRemoteFailure("marshal secrets resolve request", err)
+	}
+	return body, nil
+}
+
+func (s *RemoteSecretsSource) fetchRemote(ctx context.Context) (map[string]any, *remoteAttemptFailure) {
+	body, failure := s.requestBody()
+	if failure != nil {
+		return nil, failure
 	}
 
 	retryBudget := remoteRetryBudget(s.config.Required, s.config.RetryBudget)
@@ -281,14 +309,15 @@ func DiscoverRemoteSecretsSource() *RemoteSecretsSource {
 	}
 	warnIfInsecureServerURL(serverURL, "secrets-server")
 	return NewRemoteSecretsSource(RemoteSecretsSourceConfig{
-		ServerURL:   serverURL,
-		AppName:     os.Getenv("APP_NAME"),
-		Version:     os.Getenv("APP_VERSION"),
-		Environment: Environment(),
-		SchemaHash:  os.Getenv("SCHEMA_HASH"),
-		TokenSource: discoverTokenSource(serverURL),
-		Timeout:     configServerTimeoutFromEnv(),
-		RetryBudget: configServerRetryBudgetFromEnv(),
-		Required:    remoteConfigRequired(),
+		ServerURL:     serverURL,
+		AppName:       os.Getenv("APP_NAME"),
+		Version:       os.Getenv("APP_VERSION"),
+		Environment:   Environment(),
+		SchemaHash:    os.Getenv("SCHEMA_HASH"),
+		TokenSource:   discoverTokenSource(serverURL),
+		Timeout:       configServerTimeoutFromEnv(),
+		RetryBudget:   configServerRetryBudgetFromEnv(),
+		Required:      remoteConfigRequired(),
+		RefreshPeriod: configServerRefreshFromEnv(),
 	})
 }

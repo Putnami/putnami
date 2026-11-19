@@ -53,6 +53,12 @@ type RemoteSourceConfig struct {
 	// SnapshotKMSKey is the Cloud KMS cryptoKey resource name that decrypts the
 	// snapshot object. Ignored when SnapshotURI is empty.
 	SnapshotKMSKey string
+	// RefreshPeriod is how long a loaded tree stays current. Once it has
+	// passed, a load returns the held tree and starts one background fetch
+	// whose tree later loads return; a failed fetch keeps the held tree. Zero
+	// keeps the first load for the life of the process, and a config pinned
+	// to Version is never refreshed.
+	RefreshPeriod time.Duration
 }
 
 // RemoteConfigSource fetches configuration from a Putnami config server.
@@ -70,7 +76,14 @@ func NewRemoteConfigSource(cfg RemoteSourceConfig) *RemoteConfigSource {
 	if cfg.Timeout == 0 {
 		cfg.Timeout = defaultRemoteSourceTimeout
 	}
-	return &RemoteConfigSource{config: cfg}
+	s := &RemoteConfigSource{config: cfg}
+	if !(cfg.Pinned && cfg.Version != "") && !urlPinsVersion(cfg.URL) {
+		s.loaded.period = cfg.RefreshPeriod
+	}
+	s.loaded.refresh = s.refreshOnce
+	s.loaded.source = s.Name()
+	s.loaded.timeout = cfg.Timeout
+	return s
 }
 
 // Name returns the source identifier used in logging and diagnostics.
@@ -79,8 +92,9 @@ func (s *RemoteConfigSource) Name() string { return "config-server" }
 // Priority returns the source priority (50: between file sources and CONFIG_DATA).
 func (s *RemoteConfigSource) Priority() int { return 50 }
 
-// Load fetches the resolved config tree from the config server.
-// Results are cached for the process lifetime.
+// Load fetches the resolved config tree from the config server. The result
+// is kept for the process, or refreshed in the background once RefreshPeriod
+// has passed.
 func (s *RemoteConfigSource) Load() (map[string]any, error) {
 	return s.LoadContext(context.Background())
 }
@@ -161,16 +175,9 @@ func (s *RemoteConfigSource) fetch(ctx context.Context) (map[string]any, error) 
 // could not be resolved, or when ctx ended; the caller decides whether to fall
 // back or fail.
 func (s *RemoteConfigSource) fetchRemote(ctx context.Context) (map[string]any, *remoteAttemptFailure) {
-	reqBody := resolveRequest{
-		AppName:     s.config.AppName,
-		Version:     s.config.Version,
-		Pinned:      s.config.Pinned && s.config.Version != "",
-		Environment: s.config.Environment,
-		SchemaHash:  s.config.SchemaHash,
-	}
-	body, err := json.Marshal(reqBody)
-	if err != nil {
-		return nil, terminalRemoteFailure("marshal config resolve request", err)
+	body, failure := s.requestBody()
+	if failure != nil {
+		return nil, failure
 	}
 
 	retryBudget := remoteRetryBudget(s.config.Required, s.config.RetryBudget)
@@ -216,6 +223,30 @@ func (s *RemoteConfigSource) fetchRemote(ctx context.Context) (map[string]any, *
 			return nil, failure
 		}
 	}
+}
+
+// refreshOnce resolves config from the config server in one attempt, with no
+// retry and no snapshot fallback.
+func (s *RemoteConfigSource) refreshOnce(ctx context.Context) (map[string]any, *remoteAttemptFailure) {
+	body, failure := s.requestBody()
+	if failure != nil {
+		return nil, failure
+	}
+	return s.fetchOnce(ctx, body, s.config.Timeout)
+}
+
+func (s *RemoteConfigSource) requestBody() ([]byte, *remoteAttemptFailure) {
+	body, err := json.Marshal(resolveRequest{
+		AppName:     s.config.AppName,
+		Version:     s.config.Version,
+		Pinned:      s.config.Pinned && s.config.Version != "",
+		Environment: s.config.Environment,
+		SchemaHash:  s.config.SchemaHash,
+	})
+	if err != nil {
+		return nil, terminalRemoteFailure("marshal config resolve request", err)
+	}
+	return body, nil
 }
 
 // loadSnapshotFallback attempts the durable last-known-good config snapshot
@@ -398,6 +429,20 @@ func (s *RemoteConfigSource) newRequest(ctx context.Context, body []byte) (*http
 	return http.NewRequestWithContext(ctx, http.MethodPost, base+"/api/configs/resolve", bytes.NewReader(body))
 }
 
+// urlPinsVersion reports whether an exact resolve URL pins a frozen config
+// revision itself, with a version and pinned=true in its query.
+func urlPinsVersion(rawURL string) bool {
+	if rawURL == "" {
+		return false
+	}
+	u, err := neturl.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	q := u.Query()
+	return q.Get("version") != "" && q.Get("pinned") == "true"
+}
+
 // withVersionQuery adds version=<version> (and pinned=true when pinned) to an
 // exact resolve URL's query string so the config server pins the resolve to a
 // frozen revision. An existing version query is left untouched (an
@@ -515,6 +560,7 @@ func DiscoverRemoteSource() *RemoteConfigSource {
 		AudienceFallback: strings.TrimSpace(os.Getenv("CONFIG_SERVER_AUDIENCE")),
 		SnapshotURI:      strings.TrimSpace(os.Getenv("CONFIG_SNAPSHOT_URI")),
 		SnapshotKMSKey:   strings.TrimSpace(os.Getenv("CONFIG_SNAPSHOT_KMS_KEY")),
+		RefreshPeriod:    configServerRefreshFromEnv(),
 	}
 	if exactURL {
 		cfg.URL = serverURL

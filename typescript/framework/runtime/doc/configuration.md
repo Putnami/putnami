@@ -136,6 +136,10 @@ Required remote config and secrets sources retry transient network, timeout,
 and 5xx/429 failures before giving up. `CONFIG_SERVER_TIMEOUT` controls the
 per-attempt timeout (default `5s`), and `CONFIG_SERVER_RETRY_BUDGET` controls
 the total retry budget (default `30s`; set `0ms` to disable retries).
+`CONFIG_SERVER_REFRESH`, such as `1m`, lets a running process see a changed
+remote value: once the period has passed, a read returns the held values and
+the sources fetch new ones in the background. Unset, they keep their first
+load for the process.
 
 For local `putnami serve`, set the same exact `CONFIG_SERVER_URL` plus a user or
 session bearer in `PUTNAMI_CLOUD_TOKEN` (or `CONFIG_SERVER_TOKEN` /

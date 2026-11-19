@@ -14,8 +14,14 @@ import {
   terminalRemoteFailure,
   type RemoteAttemptFailure,
 } from './remote-retry';
-import { syncFetch, type SyncFetchRequest } from './sync-fetch';
-import { discoverTokenSource, type TokenSource } from './token-source';
+import {
+  configServerRefreshFromEnv,
+  RemoteRefreshCache,
+  type RemoteRefreshResult,
+  remoteRefreshKey,
+} from './remote-refresh';
+import { asyncFetch, syncFetch, type SyncFetchRequest, type SyncFetchResponse } from './sync-fetch';
+import { discoverTokenSource, resolveBearerAsync, type TokenSource } from './token-source';
 
 interface RemoteSecretsSourceOptions {
   serverUrl: string;
@@ -36,6 +42,13 @@ interface RemoteSecretsSourceOptions {
   timeout?: number;
   retryBudget?: number;
   required?: boolean;
+  /**
+   * Milliseconds a loaded tree stays current. Once they have passed, a load
+   * returns the held tree and starts one asynchronous fetch whose tree later
+   * loads return; a failed fetch keeps the held tree. Zero or unset keeps the
+   * first load for the life of the process.
+   */
+  refreshPeriod?: number;
 }
 
 /** Matches the protocol ResolveSecretsResponse shape. */
@@ -53,6 +66,11 @@ type RemoteSecretsCacheEntry =
   | { status: 'failed'; cause: unknown };
 
 const remoteSecretsCache = new Map<string, RemoteSecretsCacheEntry>();
+const remoteSecretsRefresh = new RemoteRefreshCache<Record<string, unknown> | undefined>('secrets-server');
+
+type ResolveSecretsResult =
+  | { secrets: Record<string, unknown>; response: ResolveSecretsResponse }
+  | { failure: RemoteAttemptFailure; notResolved?: boolean };
 
 /**
  * Fetches secrets from a Putnami config server.
@@ -80,6 +98,16 @@ export class RemoteSecretsSource implements ConfigSource {
   }
 
   load(): Record<string, unknown> | undefined {
+    const periodMs = this.options.refreshPeriod ?? 0;
+    if (periodMs > 0) {
+      const timeoutMs = this.options.timeout ?? DEFAULT_CONFIG_SERVER_TIMEOUT_MS;
+      return remoteSecretsRefresh.get(
+        remoteRefreshKey(this.buildRequest({}, timeoutMs)),
+        periodMs,
+        () => this.fetch(),
+        () => this.refreshOnce(),
+      );
+    }
     if (this.cached !== null) {
       return this.cached;
     }
@@ -105,7 +133,10 @@ export class RemoteSecretsSource implements ConfigSource {
         }
       }
 
-      const request = this.buildRequest(this.buildHeaders(), timeoutMs);
+      const request = this.buildRequest(
+        this.buildHeaders(this.options.tokenSource?.token() ?? this.options.token),
+        timeoutMs,
+      );
       const cacheKey = remoteRequestCacheKey(request);
       const cached = remoteSecretsCache.get(cacheKey);
       if (cached) {
@@ -139,48 +170,76 @@ export class RemoteSecretsSource implements ConfigSource {
     }
   }
 
+  /** Resolves secrets from the secrets server in one attempt, with no retry. */
+  private async refreshOnce(): Promise<RemoteRefreshResult<Record<string, unknown> | undefined>> {
+    const bearer = await resolveBearerAsync(this.options.tokenSource, this.options.token);
+    const request = this.buildRequest(
+      this.buildHeaders(bearer),
+      this.options.timeout ?? DEFAULT_CONFIG_SERVER_TIMEOUT_MS,
+    );
+    try {
+      const result = this.readResponse(await asyncFetch(request));
+      return 'failure' in result ? { failure: result.failure } : { tree: result.secrets };
+    } catch (cause) {
+      return { failure: retryableRemoteFailure('secrets-server fetch failed', cause) };
+    }
+  }
+
   private fetchOnce(
     request: SyncFetchRequest,
     cacheKey: string,
   ): { secrets: Record<string, unknown> } | { failure: RemoteAttemptFailure } {
     try {
-      const fetched = syncFetch(request);
-      if (fetched.status !== 200) {
-        const failure =
-          fetched.status === 408 || fetched.status === 425 || fetched.status === 429 || fetched.status >= 500
-            ? retryableRemoteFailure('secrets-server returned non-200', `status ${fetched.status}`)
-            : terminalRemoteFailure('secrets-server returned non-200', `status ${fetched.status}`);
-        return { failure };
-      }
-      const response = JSON.parse(fetched.body) as ResolveSecretsResponse;
-      if (!response.resolved) {
-        remoteSecretsCache.set(cacheKey, { status: 'not-resolved' });
-        return { failure: terminalRemoteFailure('secrets-server did not resolve secrets') };
-      }
-
-      remoteSecretsCache.set(cacheKey, { status: 'resolved', secrets: response.secrets, response });
-      if (response.schemaMatch === false) {
-        const logger = useLogger('secrets-server');
-        logger.warn('secrets-server schema mismatch', {
-          appName: this.options.appName,
-          environment: this.options.environment,
-        });
-      }
-      if (response.warnings?.length) {
-        const logger = useLogger('secrets-server');
-        for (const warning of response.warnings) {
-          logger.warn('secrets-server warning', {
-            appName: this.options.appName,
-            environment: this.options.environment,
-            warning,
-          });
+      const result = this.readResponse(syncFetch(request));
+      if ('failure' in result) {
+        if (result.notResolved) {
+          remoteSecretsCache.set(cacheKey, { status: 'not-resolved' });
         }
+        return { failure: result.failure };
       }
-
-      return { secrets: response.secrets };
+      remoteSecretsCache.set(cacheKey, { status: 'resolved', secrets: result.secrets, response: result.response });
+      return { secrets: result.secrets };
     } catch (cause) {
       return { failure: retryableRemoteFailure('secrets-server fetch failed', cause) };
     }
+  }
+
+  /**
+   * Reads one resolve answer: the secrets it resolves, or the failure it
+   * reports. It logs a schema mismatch and every server warning, and throws on
+   * a body that is not JSON.
+   */
+  private readResponse(fetched: SyncFetchResponse): ResolveSecretsResult {
+    if (fetched.status !== 200) {
+      const failure =
+        fetched.status === 408 || fetched.status === 425 || fetched.status === 429 || fetched.status >= 500
+          ? retryableRemoteFailure('secrets-server returned non-200', `status ${fetched.status}`)
+          : terminalRemoteFailure('secrets-server returned non-200', `status ${fetched.status}`);
+      return { failure };
+    }
+    const response = JSON.parse(fetched.body) as ResolveSecretsResponse;
+    if (!response.resolved) {
+      return { failure: terminalRemoteFailure('secrets-server did not resolve secrets'), notResolved: true };
+    }
+
+    if (response.schemaMatch === false) {
+      const logger = useLogger('secrets-server');
+      logger.warn('secrets-server schema mismatch', {
+        appName: this.options.appName,
+        environment: this.options.environment,
+      });
+    }
+    if (response.warnings?.length) {
+      const logger = useLogger('secrets-server');
+      for (const warning of response.warnings) {
+        logger.warn('secrets-server warning', {
+          appName: this.options.appName,
+          environment: this.options.environment,
+          warning,
+        });
+      }
+    }
+    return { secrets: response.secrets, response };
   }
 
   private buildRequest(headers: Record<string, string>, timeoutMs: number): SyncFetchRequest {
@@ -201,9 +260,8 @@ export class RemoteSecretsSource implements ConfigSource {
     };
   }
 
-  private buildHeaders(): Record<string, string> {
+  private buildHeaders(bearer: string | undefined): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const bearer = this.options.tokenSource?.token() ?? this.options.token;
     if (bearer) {
       headers['Authorization'] = `Bearer ${bearer}`;
     }
@@ -243,6 +301,15 @@ export class RemoteSecretsSource implements ConfigSource {
 
 export function resetRemoteSecretsSourceCacheForTest(): void {
   remoteSecretsCache.clear();
+  remoteSecretsRefresh.clear();
+}
+
+/**
+ * Resolves once every background refresh of the secrets source has ended.
+ * @internal
+ */
+export function remoteSecretsRefreshSettledForTest(): Promise<void> {
+  return remoteSecretsRefresh.settled();
 }
 
 /**
@@ -273,6 +340,7 @@ export function discoverRemoteSecretsSource(): RemoteSecretsSource | undefined {
     timeout: configServerTimeoutFromEnv(),
     retryBudget: configServerRetryBudgetFromEnv(),
     required: remoteSecretsRequired(),
+    refreshPeriod: configServerRefreshFromEnv(),
   });
 }
 

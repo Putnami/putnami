@@ -59,9 +59,11 @@ telemetry:
 `Config.TraceSampling` sets the same three values in code; each key of the
 config section overrides its field. While it runs, the plugin reloads the
 config sources every 30 seconds and applies a changed value without a restart.
-A change to a file under `conf/` applies within 30 seconds. `CONFIG_DATA` and
-the Putnami Cloud remote sources keep their first load for the life of the
-process: to change a running process there, call `plugin.Sampler().Update`.
+A change to a file under `conf/` applies within 30 seconds. `CONFIG_DATA` keeps
+its first load for the life of the process, and so do the Putnami Cloud remote
+sources unless `CONFIG_SERVER_REFRESH` sets a refresh period: a Cloud config
+change then applies within that period plus a minute. To change a running
+process otherwise, call `plugin.Sampler().Update`.
 A value out of range keeps the settings in force and logs a warning.
 
 The counter `trace.decisions`, labeled `outcome` `kept` or `dropped`, counts

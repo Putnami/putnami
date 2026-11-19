@@ -16,7 +16,7 @@
           "path": "cloud/runtime/go/boot.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "8bb117dbf52f00966c053c82842dcaca74a481c8d948cb3f6a7e9373792b2c28"
+          "fingerprint": "f7d3bb72f9a16e17898937d59ff3965e362274ab434c8fc464055943a93c10d6"
         }
       ],
       "owner": "go.putnami.dev/cloud/runtime",
@@ -34,7 +34,7 @@
           "path": "cloud/runtime/go/remote.go",
           "transport": "http",
           "symbol": "http.Client",
-          "fingerprint": "0e9b13743474bcd180747ccb54f24f8f0710a04af82fb93a5ba72f083a9d2b6a"
+          "fingerprint": "97350261f1fd9b5bd983483c88f6c60cc72710fac6925a87461071838e068124"
         },
         {
           "path": "cloud/runtime/go/remote.go",
@@ -70,13 +70,13 @@
           "path": "cloud/runtime/go/remote_secrets.go",
           "transport": "http",
           "symbol": "http.Client",
-          "fingerprint": "0e9b13743474bcd180747ccb54f24f8f0710a04af82fb93a5ba72f083a9d2b6a"
+          "fingerprint": "97350261f1fd9b5bd983483c88f6c60cc72710fac6925a87461071838e068124"
         },
         {
           "path": "cloud/runtime/go/remote_secrets.go",
           "transport": "http",
           "symbol": "http.NewRequestWithContext",
-          "fingerprint": "0da7c436bb598afb6ad3649c00765f5a2b9fa6eb65277f61cb9f1884e890e706"
+          "fingerprint": "89752d3872859f36877421b28717f31c9cbd7df426fc20c85f5390ac3a187c76"
         }
       ],
       "owner": "go.putnami.dev/cloud/runtime",

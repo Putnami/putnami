@@ -313,7 +313,8 @@ export function useConfig<S extends SchemaDefinition>(
  * `useConfig()` keeps, so every `useConfig()` result stays the same. A setting
  * a long-running process applies without a restart reads through it, on a
  * period. A source that keeps its first load for the process, such as
- * `CONFIG_DATA` or a Cloud remote source, answers the same on every call.
+ * `CONFIG_DATA`, or a Cloud remote source without `CONFIG_SERVER_REFRESH`,
+ * answers the same on every call.
  *
  * @example
  * ```typescript

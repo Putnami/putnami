@@ -71,8 +71,9 @@ type Config struct {
 	// floorPerMinute) overrides its field. While it runs, the plugin reloads
 	// the config sources every 30 seconds and applies a changed value without
 	// a restart. A source that keeps its first load for the process, such as
-	// CONFIG_DATA or a Cloud remote source, shows no change: Sampler().Update
-	// changes the settings of a running process.
+	// CONFIG_DATA, or a Cloud remote source without CONFIG_SERVER_REFRESH,
+	// shows no change: Sampler().Update changes the settings of a running
+	// process.
 	// A span with a parent follows its parent's sampled flag.
 	TraceSampling *TraceSampling
 

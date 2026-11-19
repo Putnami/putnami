@@ -83,6 +83,7 @@ remote source: `config-server` and `secrets-server` stay off.
 | `K_SERVICE`, `GOOGLE_CLOUD_PROJECT` | all sources | Either one marks the process as running on GCP. Without them, a 200 ms TCP probe to `metadata.google.internal:80` decides. On GCP, tokens come from the metadata server. |
 | `CONFIG_SERVER_TIMEOUT` | all sources | Timeout of one attempt, as a Go duration. Default `5s`. |
 | `CONFIG_SERVER_RETRY_BUDGET` | all sources | Total retry time of a required source. Default `30s`. `0` turns retries off. |
+| `CONFIG_SERVER_REFRESH` | all sources | Refresh period, as a Go duration, such as `1m`. Unset or `0` keeps the first load for the process. |
 | `CONFIG_SERVER_REQUIRED` | `config-server`, `secrets-server` | `1`, `true`, `yes` or `on` makes a failure stop startup. When unset, a source is required if `K_SERVICE` is set, `NODE_ENV` is `production` or `prod`, or `APP_ENV` is `prod` or `production`. |
 | `APP_NAME` | `config-server`, `secrets-server` | Application name sent in the resolve request. |
 | `APP_ENV` | `config-server`, `secrets-server` | Environment sent in the resolve request. Default `local`. |
@@ -97,6 +98,15 @@ remote source: `config-server` and `secrets-server` stay off.
 
 - **One fetch per process.** Each source loads once and shares the result with
   every `config.Load` call, while the process environment does not change.
+- **Refresh.** With a positive `CONFIG_SERVER_REFRESH`, a load after the period
+  returns the held tree at once and starts one background fetch that every
+  caller shares; later loads return its tree, so a setting the framework
+  re-reads, such as `telemetry.traces`, changes without a restart. The fetch
+  makes one attempt, with no retry and no snapshot fallback. On any failure,
+  a `401`, `403`, `404` or `resolved: false` included, the source keeps the
+  tree it holds, logs a warning for each new failure, and tries again after
+  the next period. A config pinned by `CONFIG_VERSION` never refreshes.
+  `RefreshPeriod` sets the period on a source built by hand.
 - **Cancellation.** Every source implements `config.ContextSource`.
   `config.LoadContext` stops requests, retry waits and the snapshot fallback
   when its context ends, and returns an error that wraps `ctx.Err()`.

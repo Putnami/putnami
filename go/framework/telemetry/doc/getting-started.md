@@ -92,8 +92,9 @@ no root trace. A span with a parent follows its parent's sampled flag.
 
 The plugin reloads the config sources every 30 seconds and applies a changed
 `telemetry.traces` key (`budget`, `ratio`, `floorPerMinute`) without a restart.
-A file under `conf/` that changes applies; `CONFIG_DATA` and the Putnami Cloud
-remote sources keep their first load for the process. It
+A file under `conf/` that changes applies; `CONFIG_DATA` keeps its first load
+for the process, and so do the Putnami Cloud remote sources unless
+`CONFIG_SERVER_REFRESH` sets a refresh period. It
 counts each root decision in `trace.decisions{outcome=kept|dropped}`.
 `plugin.Sampler().Update(settings)` changes the settings at runtime until the
 config section changes.
@@ -287,7 +288,7 @@ This requires no manual instrumentation. Any code that creates errors via the `e
 
 3. **Use `SetSpanErrorStructured` over `SetSpanError`** when working with `go.putnami.dev/errors` to capture structured metadata (code, category, retryable).
 
-4. **Tune the trace budget, not the code.** The default keeps 100 roots, then 1 %, with at least 1 root per minute. Change the `telemetry.traces` keys in a `conf/` file: the plugin applies them without a restart. In `CONFIG_DATA` or Putnami Cloud config, a change applies at the next start.
+4. **Tune the trace budget, not the code.** The default keeps 100 roots, then 1 %, with at least 1 root per minute. Change the `telemetry.traces` keys in a `conf/` file: the plugin applies them without a restart. In `CONFIG_DATA`, a change applies at the next start, and so does one in Putnami Cloud config unless the workload sets `CONFIG_SERVER_REFRESH`.
 
 5. **Use the HTTP middleware early in the middleware chain** so that spans capture the full request lifecycle, including downstream middleware processing time.
 

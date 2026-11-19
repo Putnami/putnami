@@ -37,11 +37,17 @@ type PreparedBootSourceConfig struct {
 	Timeout     time.Duration
 	RetryBudget time.Duration
 	HTTPClient  *http.Client
+	// RefreshPeriod is how long a loaded tree stays current. Once it has
+	// passed, a load returns the held tree and starts one background fetch
+	// whose tree later loads return; a failed fetch keeps the held tree. Zero
+	// keeps the first load for the life of the process.
+	RefreshPeriod time.Duration
 }
 
-// PreparedBootSource fetches the complete current prepared tree once during
-// startup. It has no snapshot or legacy endpoint fallback because either would
-// bypass current Config revocation and owner-generation checks.
+// PreparedBootSource fetches the complete current prepared tree during startup,
+// and again in the background on its refresh period. It has no snapshot or
+// legacy endpoint fallback because either would bypass current Config
+// revocation and owner-generation checks.
 type PreparedBootSource struct {
 	config PreparedBootSourceConfig
 	origin string
@@ -63,7 +69,12 @@ func NewPreparedBootSource(cfg PreparedBootSourceConfig) *PreparedBootSource {
 		client = &copy
 	}
 	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
-	return &PreparedBootSource{config: cfg, origin: origin, client: client}
+	s := &PreparedBootSource{config: cfg, origin: origin, client: client}
+	s.loaded.period = cfg.RefreshPeriod
+	s.loaded.refresh = s.refreshOnce
+	s.loaded.source = s.Name()
+	s.loaded.timeout = cfg.Timeout
+	return s
 }
 
 // Name identifies the prepared configuration source.
@@ -73,7 +84,8 @@ func (s *PreparedBootSource) Name() string { return "prepared-config-boot" }
 // the framework's established higher-priority local emergency override.
 func (s *PreparedBootSource) Priority() int { return 50 }
 
-// Load fetches the prepared configuration once and retains its result.
+// Load fetches the prepared configuration and retains its result for the
+// process, or refreshes it in the background once RefreshPeriod has passed.
 func (s *PreparedBootSource) Load() (map[string]any, error) {
 	return s.LoadContext(context.Background())
 }
@@ -85,16 +97,9 @@ func (s *PreparedBootSource) LoadContext(ctx context.Context) (map[string]any, e
 }
 
 func (s *PreparedBootSource) fetch(ctx context.Context) (map[string]any, error) {
-	if s == nil || s.client == nil || s.origin == "" || !serverURLIsSecure(s.origin) ||
-		!validPreparedBootAudience(s.config.Audience) || !validPreparedBootReference(s.config.Reference) ||
-		(s.config.TokenSource == nil && strings.TrimSpace(s.config.Token) == "") {
-		return nil, errors.New("prepared configuration boot is not fully configured")
-	}
-	body, err := json.Marshal(struct {
-		Reference string `json:"reference"`
-	}{Reference: s.config.Reference})
+	body, err := s.requestBody()
 	if err != nil {
-		return nil, errors.New("encode prepared configuration boot request")
+		return nil, err
 	}
 
 	retryBudget := remoteRetryBudget(true, s.config.RetryBudget)
@@ -136,6 +141,31 @@ func (s *PreparedBootSource) fetch(ctx context.Context) (map[string]any, error) 
 			return nil, remoteLoadCanceled(s.Name(), ctx.Err())
 		}
 	}
+}
+
+// refreshOnce fetches the prepared configuration in one attempt, with no
+// retry.
+func (s *PreparedBootSource) refreshOnce(ctx context.Context) (map[string]any, *remoteAttemptFailure) {
+	body, err := s.requestBody()
+	if err != nil {
+		return nil, terminalRemoteFailure(err.Error(), nil)
+	}
+	return s.fetchOnce(ctx, body, s.config.Timeout)
+}
+
+func (s *PreparedBootSource) requestBody() ([]byte, error) {
+	if s == nil || s.client == nil || s.origin == "" || !serverURLIsSecure(s.origin) ||
+		!validPreparedBootAudience(s.config.Audience) || !validPreparedBootReference(s.config.Reference) ||
+		(s.config.TokenSource == nil && strings.TrimSpace(s.config.Token) == "") {
+		return nil, errors.New("prepared configuration boot is not fully configured")
+	}
+	body, err := json.Marshal(struct {
+		Reference string `json:"reference"`
+	}{Reference: s.config.Reference})
+	if err != nil {
+		return nil, errors.New("encode prepared configuration boot request")
+	}
+	return body, nil
 }
 
 func (s *PreparedBootSource) fetchOnce(ctx context.Context, body []byte, timeout time.Duration) (map[string]any, *remoteAttemptFailure) {
@@ -233,6 +263,7 @@ func DiscoverPreparedBootSource() *PreparedBootSource {
 	return NewPreparedBootSource(PreparedBootSourceConfig{
 		ServerURL: serverURL, Audience: audience, Reference: reference,
 		TokenSource: tokenSource, Timeout: configServerTimeoutFromEnv(), RetryBudget: configServerRetryBudgetFromEnv(),
+		RefreshPeriod: configServerRefreshFromEnv(),
 	})
 }
 

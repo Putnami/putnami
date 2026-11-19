@@ -131,8 +131,10 @@ or the default sources without one — and neither reads nor fills the caches
 `useConfig()` keeps. A long-running process calls it on a period to apply a
 setting without a restart, as the telemetry plugin does for `telemetry.traces`
 every 30 seconds. A source that keeps its first load for the process, such as
-`CONFIG_DATA` or a Putnami Cloud remote source, answers the same on every call,
-so only a changed file shows. Each call reads every file again, so never call
+`CONFIG_DATA`, answers the same on every call. A Putnami Cloud remote source
+answers the same until `CONFIG_SERVER_REFRESH` sets a refresh period; then a
+read after the period starts a background fetch, and a later read shows its
+values. Each call reads every file again, so never call
 it on a request path.
 
 ### Client / Browser build
@@ -219,6 +221,8 @@ Required remote config and secrets sources retry transient network, timeout,
 and 5xx/429 failures before failing startup. `CONFIG_SERVER_TIMEOUT` controls
 the per-attempt timeout (default `5s`), and `CONFIG_SERVER_RETRY_BUDGET`
 controls the total retry budget (default `30s`; set `0ms` to disable retries).
+`CONFIG_SERVER_REFRESH` (for example `1m`) refreshes the remote values of a
+running process in the background; unset, they keep their first load.
 
 > **Breaking change** (TS framework only): `CONFIG_DATA` priority moved
 > from 80 → 60 to align with Go. Field-level `Env(...)` now wins over

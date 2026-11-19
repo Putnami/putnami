@@ -1,9 +1,15 @@
 import type { ConfigSource } from '@putnami/runtime';
 import { getEnv } from '@putnami/runtime';
 import { useLogger } from '@putnami/runtime';
-import { discoverTokenSource, type TokenSource } from './token-source';
-import { syncFetch, type SyncFetchRequest } from './sync-fetch';
+import { discoverTokenSource, resolveBearerAsync, type TokenSource } from './token-source';
+import { asyncFetch, syncFetch, type SyncFetchRequest, type SyncFetchResponse } from './sync-fetch';
 import { loadConfigSnapshot } from './remote-snapshot';
+import {
+  configServerRefreshFromEnv,
+  RemoteRefreshCache,
+  type RemoteRefreshResult,
+  remoteRefreshKey,
+} from './remote-refresh';
 import {
   DEFAULT_CONFIG_SERVER_RETRY_BUDGET_MS,
   DEFAULT_CONFIG_SERVER_TIMEOUT_MS,
@@ -65,6 +71,14 @@ interface RemoteConfigSourceOptions {
    * when `snapshotUri` is empty.
    */
   snapshotKmsKey?: string;
+  /**
+   * Milliseconds a loaded tree stays current. Once they have passed, a load
+   * returns the held tree and starts one asynchronous fetch whose tree later
+   * loads return; a failed fetch keeps the held tree. Zero or unset keeps the
+   * first load for the life of the process, and a config pinned to `version`
+   * is never refreshed.
+   */
+  refreshPeriod?: number;
 }
 
 type RemoteConfigErrorContext = Record<string, unknown> & {
@@ -116,6 +130,11 @@ type RemoteConfigCacheEntry =
   | { status: 'failed'; failure: RemoteAttemptFailure };
 
 const remoteConfigCache = new Map<string, RemoteConfigCacheEntry>();
+const remoteConfigRefresh = new RemoteRefreshCache<Record<string, unknown> | undefined>('config-server');
+
+type ResolveResult =
+  | { config: Record<string, unknown>; response: ResolveResponse }
+  | { failure: RemoteAttemptFailure; notResolved?: boolean };
 
 /**
  * Fetches configuration from a Putnami config server.
@@ -142,11 +161,52 @@ export class RemoteConfigSource implements ConfigSource {
   }
 
   load(): Record<string, unknown> | undefined {
+    const periodMs = this.refreshPeriodMs();
+    if (periodMs > 0) {
+      const timeoutMs = this.options.timeout ?? DEFAULT_CONFIG_SERVER_TIMEOUT_MS;
+      return remoteConfigRefresh.get(
+        remoteRefreshKey(this.buildRequest({}, timeoutMs)),
+        periodMs,
+        () => this.fetch(),
+        () => this.refreshOnce(),
+      );
+    }
     if (this.cached !== null) {
       return this.cached;
     }
     this.cached = this.fetch();
     return this.cached;
+  }
+
+  private refreshPeriodMs(): number {
+    if ((this.options.pinned && this.options.version) || urlPinsVersion(this.options.url)) {
+      return 0;
+    }
+    return this.options.refreshPeriod ?? 0;
+  }
+
+  /** Resolves config from the config server in one attempt, with no retry and no snapshot fallback. */
+  private async refreshOnce(): Promise<RemoteRefreshResult<Record<string, unknown> | undefined>> {
+    const bearer = await resolveBearerAsync(this.options.tokenSource, this.options.token);
+    const request: SyncFetchRequest = this.buildRequest(
+      this.buildHeaders(bearer),
+      this.options.timeout ?? DEFAULT_CONFIG_SERVER_TIMEOUT_MS,
+    );
+    try {
+      let effectiveRequest = request;
+      let fetched = await asyncFetch(effectiveRequest);
+      if (fetched.status === 404) {
+        const fallbackRequest = audienceFallbackRequest(effectiveRequest, this.options.audienceFallback);
+        if (fallbackRequest) {
+          effectiveRequest = fallbackRequest;
+          fetched = await asyncFetch(effectiveRequest);
+        }
+      }
+      const result = this.readResponse(fetched, effectiveRequest, request);
+      return 'failure' in result ? { failure: result.failure } : { tree: result.config };
+    } catch (cause) {
+      return { failure: retryableRemoteFailure('config-server fetch failed', cause, this.failureContext(request)) };
+    }
   }
 
   private fetch(): Record<string, unknown> | undefined {
@@ -167,7 +227,10 @@ export class RemoteConfigSource implements ConfigSource {
         }
       }
 
-      const request = this.buildRequest(this.buildHeaders(), timeoutMs);
+      const request = this.buildRequest(
+        this.buildHeaders(this.options.tokenSource?.token() ?? this.options.token),
+        timeoutMs,
+      );
       const cacheKey = remoteRequestCacheKey(request);
       const cached = remoteConfigCache.get(cacheKey);
       if (cached) {
@@ -215,56 +278,74 @@ export class RemoteConfigSource implements ConfigSource {
           fetched = syncFetch(effectiveRequest);
         }
       }
-      if (fetched.status !== 200) {
-        const cause = new Error(`status ${fetched.status}`);
-        const context = this.failureContext(effectiveRequest, fetched.status);
-        const failure =
-          fetched.status === 408 || fetched.status === 425 || fetched.status === 429 || fetched.status >= 500
-            ? retryableRemoteFailure('config-server returned non-200', cause, context)
-            : terminalRemoteFailure('config-server returned non-200', cause, context);
-        return { failure };
-      }
-      const response = JSON.parse(fetched.body) as ResolveResponse;
-      if (!response.resolved) {
-        if (isEmptySchemaMatch(response)) {
-          const config = {};
-          remoteConfigCache.set(cacheKey, { status: 'resolved', config, response });
-          return { config };
+      const result = this.readResponse(fetched, effectiveRequest, request);
+      if ('failure' in result) {
+        if (result.notResolved) {
+          remoteConfigCache.set(cacheKey, { status: 'not-resolved', failure: result.failure });
         }
-        const failure = terminalRemoteFailure(
-          'config-server did not resolve config',
-          undefined,
-          this.failureContext(request, 200),
-        );
-        remoteConfigCache.set(cacheKey, { status: 'not-resolved', failure });
-        return { failure };
+        return { failure: result.failure };
       }
-
-      remoteConfigCache.set(cacheKey, { status: 'resolved', config: response.config, response });
-      if (response.schemaMatch === false) {
-        const logger = useLogger('config-server');
-        logger.warn('config-server schema mismatch', {
-          serverUrl: this.options.serverUrl,
-          appName: this.options.appName,
-          environment: this.options.environment,
-        });
-      }
-      if (response.warnings?.length) {
-        const logger = useLogger('config-server');
-        for (const warning of response.warnings) {
-          logger.warn('config-server warning', {
-            serverUrl: this.options.serverUrl,
-            appName: this.options.appName,
-            environment: this.options.environment,
-            warning,
-          });
-        }
-      }
-
-      return { config: response.config };
+      remoteConfigCache.set(cacheKey, { status: 'resolved', config: result.config, response: result.response });
+      return { config: result.config };
     } catch (cause) {
       return { failure: retryableRemoteFailure('config-server fetch failed', cause, this.failureContext(request)) };
     }
+  }
+
+  /**
+   * Reads one resolve answer: the config it resolves, or the failure it
+   * reports. It logs a schema mismatch and every server warning, and throws on
+   * a body that is not JSON.
+   */
+  private readResponse(
+    fetched: SyncFetchResponse,
+    effectiveRequest: SyncFetchRequest,
+    request: SyncFetchRequest,
+  ): ResolveResult {
+    if (fetched.status !== 200) {
+      const cause = new Error(`status ${fetched.status}`);
+      const context = this.failureContext(effectiveRequest, fetched.status);
+      const failure =
+        fetched.status === 408 || fetched.status === 425 || fetched.status === 429 || fetched.status >= 500
+          ? retryableRemoteFailure('config-server returned non-200', cause, context)
+          : terminalRemoteFailure('config-server returned non-200', cause, context);
+      return { failure };
+    }
+    const response = JSON.parse(fetched.body) as ResolveResponse;
+    if (!response.resolved) {
+      if (isEmptySchemaMatch(response)) {
+        return { config: {}, response };
+      }
+      return {
+        failure: terminalRemoteFailure(
+          'config-server did not resolve config',
+          undefined,
+          this.failureContext(request, 200),
+        ),
+        notResolved: true,
+      };
+    }
+
+    if (response.schemaMatch === false) {
+      const logger = useLogger('config-server');
+      logger.warn('config-server schema mismatch', {
+        serverUrl: this.options.serverUrl,
+        appName: this.options.appName,
+        environment: this.options.environment,
+      });
+    }
+    if (response.warnings?.length) {
+      const logger = useLogger('config-server');
+      for (const warning of response.warnings) {
+        logger.warn('config-server warning', {
+          serverUrl: this.options.serverUrl,
+          appName: this.options.appName,
+          environment: this.options.environment,
+          warning,
+        });
+      }
+    }
+    return { config: response.config, response };
   }
 
   private resolveCached(cached: RemoteConfigCacheEntry): Record<string, unknown> | undefined {
@@ -337,9 +418,8 @@ export class RemoteConfigSource implements ConfigSource {
     }
   }
 
-  private buildHeaders(): Record<string, string> {
+  private buildHeaders(bearer: string | undefined): Record<string, string> {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    const bearer = this.options.tokenSource?.token() ?? this.options.token;
     if (bearer) {
       headers['Authorization'] = `Bearer ${bearer}`;
     }
@@ -426,6 +506,15 @@ export class RemoteConfigSource implements ConfigSource {
 
 export function resetRemoteConfigSourceCacheForTest(): void {
   remoteConfigCache.clear();
+  remoteConfigRefresh.clear();
+}
+
+/**
+ * Resolves once every background refresh of the config source has ended.
+ * @internal
+ */
+export function remoteConfigRefreshSettledForTest(): Promise<void> {
+  return remoteConfigRefresh.settled();
 }
 
 /**
@@ -464,6 +553,7 @@ export function discoverRemoteSource(): RemoteConfigSource | undefined {
     audienceFallback: process.env['CONFIG_SERVER_AUDIENCE']?.trim() || undefined,
     snapshotUri: process.env['CONFIG_SNAPSHOT_URI']?.trim() || undefined,
     snapshotKmsKey: process.env['CONFIG_SNAPSHOT_KMS_KEY']?.trim() || undefined,
+    refreshPeriod: configServerRefreshFromEnv(),
   });
 }
 
@@ -525,6 +615,19 @@ function withVersionQuery(rawUrl: string, version: string, pinned: boolean): str
     return parsed.toString();
   } catch {
     return rawUrl;
+  }
+}
+
+/** Reports whether an exact resolve URL pins a frozen config revision itself. */
+function urlPinsVersion(rawUrl: string | undefined): boolean {
+  if (!rawUrl) {
+    return false;
+  }
+  try {
+    const { searchParams } = new URL(rawUrl);
+    return Boolean(searchParams.get('version')) && searchParams.get('pinned') === 'true';
+  } catch {
+    return false;
   }
 }
 

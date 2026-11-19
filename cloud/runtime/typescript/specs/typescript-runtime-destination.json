@@ -5,7 +5,8 @@
   "outcomes": [
     "A TypeScript workload that sets CONFIG_SERVER_URL boots on config and secrets resolved by Putnami Cloud, and a required source stops startup instead of running on partial config",
     "A TypeScript workload publishes events through the managed Event Server with a short-lived token bound to the server audience, and no error message carries a token or provider text",
-    "A TypeScript workload on Google Cloud authenticates every telemetry push to its workspace collector with a short-lived Google ID token for that collector, with no secret to configure"
+    "A TypeScript workload on Google Cloud authenticates every telemetry push to its workspace collector with a short-lived Google ID token for that collector, with no secret to configure",
+    "A running TypeScript workload sees a changed Cloud config or secret value without a restart once the operator sets a refresh period, at one request per source and period"
   ],
   "nonGoals": [
     "Serving config, secrets or events: the Cloud server owns the endpoints this package calls",
@@ -58,6 +59,15 @@
         "register also registers the telemetry token source with @putnami/runtime.",
         "On Google Cloud, where K_SERVICE or GOOGLE_CLOUD_PROJECT is set, the source returns a Google ID token whose audience is the collector endpoint, cached until shortly before it expires.",
         "Off Google Cloud it supplies no token, so a push carries no Authorization header."
+      ]
+    },
+    {
+      "id": "remote-sources-refresh-on-a-period",
+      "text": [
+        "Without a positive CONFIG_SERVER_REFRESH, the config and secrets sources keep their first load for the process.",
+        "Once the period ends, a load returns the held tree at once and starts one asynchronous fetch shared by every source instance.",
+        "That fetch makes one attempt: on any failure, a revoked config included, the source keeps the held tree and warns.",
+        "A pinned config is never refreshed."
       ]
     },
     {

@@ -91,6 +91,22 @@
           }
         },
         {
+          "id": "remote-sources-refresh-on-a-period",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-refresh-keeps-the-held-tree",
+              "a-pinned-config-is-never-refreshed",
+              "a-stale-load-returns-the-held-tree-and-refreshes",
+              "discovery-reads-the-refresh-period",
+              "refresh-off-keeps-the-first-load",
+              "the-secrets-source-refreshes"
+            ]
+          }
+        },
+        {
           "id": "required-sources-retry-within-a-budget",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

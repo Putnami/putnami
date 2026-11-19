@@ -32,8 +32,9 @@ func DefaultTraceSampling() TraceSampling { return otlp.DefaultTraceSampling() }
 
 // DefaultSamplingRefresh is how often the plugin reloads the config sources
 // and re-reads the telemetry.traces section while it runs. A source that keeps
-// its first load for the process, such as CONFIG_DATA or a Cloud remote
-// source, shows no change; Sampler.Update changes a running process.
+// its first load for the process, such as CONFIG_DATA, or a Cloud remote
+// source without CONFIG_SERVER_REFRESH, shows no change; Sampler.Update
+// changes a running process.
 const DefaultSamplingRefresh = 30 * time.Second
 
 // samplingMeterName names the meter trace.decisions is recorded on.

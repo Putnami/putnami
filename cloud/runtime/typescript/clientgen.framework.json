@@ -1,0 +1,23 @@
+{
+  "protocolVersion": 2,
+  "transports": [
+    {
+      "runtime": "@putnami/cloud",
+      "status": "pending-provider-contract",
+      "adapter": "cloud/runtime/typescript/src/runtime/sync-fetch.ts",
+      "callsites": [
+        {
+          "path": "cloud/runtime/typescript/src/runtime/sync-fetch.ts",
+          "transport": "http",
+          "symbol": "fetch",
+          "fingerprint": "ad15f9b0df7d91229a76c0e3527744c3fe8a09815fe5af0bd8c01421617d51ae"
+        }
+      ],
+      "owner": "@putnami/cloud",
+      "tests": ["cloud/runtime/typescript/test/remote-refresh.test.ts"],
+      "reason": "Background refresh of the remote configuration and secrets sources against the Putnami Cloud configuration service. The sources own the request, its single attempt and its failure classification, shared with their synchronous boot fetch. No provider in this repository declares a client for the configuration service.",
+      "operations": ["config.configs.resolve", "config.secrets.resolve"],
+      "pendingWork": "Putnami Cloud provider-side client declaration"
+    }
+  ]
+}

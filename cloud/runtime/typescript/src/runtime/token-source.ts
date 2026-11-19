@@ -1,15 +1,19 @@
 import { useLogger } from '@putnami/runtime';
-import { syncFetch } from './sync-fetch';
+import { asyncFetch, syncFetch, type SyncFetchRequest } from './sync-fetch';
 
 /**
  * Resolves the bearer token sent on each request to the config / secrets
  * resolve endpoints. Implementations may cache, refresh, or read env on
  * every call — callers must not assume a stable string.
  *
- * `token()` is synchronous to match `ConfigSource.load()`.
+ * `token()` is synchronous to match `ConfigSource.load()`. A source whose
+ * token can need a network round trip also offers `tokenAsync()`, which the
+ * background refresh of a remote source awaits instead, so a refresh never
+ * blocks the event loop.
  */
 export interface TokenSource {
   token(): string | undefined;
+  tokenAsync?(): Promise<string | undefined>;
 }
 
 /**
@@ -47,40 +51,71 @@ export class GcpMetadataTokenSource implements TokenSource {
   ) {}
 
   token(): string | undefined {
-    const nowSec = Math.floor(Date.now() / 1000);
-    if (this.cached && this.expiry - nowSec > 300) {
-      return this.cached;
+    const cached = this.fresh();
+    if (cached) {
+      return cached;
     }
-    const tok = this.fetch();
+    try {
+      return this.keep(syncFetch(this.request()).body);
+    } catch {
+      return this.failed();
+    }
+  }
+
+  /** Answers like {@link token} without blocking the event loop. */
+  async tokenAsync(): Promise<string | undefined> {
+    const cached = this.fresh();
+    if (cached) {
+      return cached;
+    }
+    try {
+      return this.keep((await asyncFetch(this.request())).body);
+    } catch {
+      return this.failed();
+    }
+  }
+
+  private fresh(): string | undefined {
+    const nowSec = Math.floor(Date.now() / 1000);
+    return this.cached && this.expiry - nowSec > 300 ? this.cached : undefined;
+  }
+
+  private request(): SyncFetchRequest {
+    const url = new URL(
+      'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity',
+    );
+    url.searchParams.set('audience', this.audience);
+    url.searchParams.set('format', 'full');
+    return { url: url.toString(), method: 'GET', headers: { 'Metadata-Flavor': 'Google' }, timeoutMs: this.timeoutMs };
+  }
+
+  private keep(body: string): string | undefined {
+    const tok = body.trim();
     if (!tok) {
       return undefined;
     }
-    const exp = parseJWTExpiry(tok);
     this.cached = tok;
-    this.expiry = exp || nowSec + 50 * 60;
+    this.expiry = parseJWTExpiry(tok) || Math.floor(Date.now() / 1000) + 50 * 60;
     return tok;
   }
 
-  private fetch(): string | undefined {
-    try {
-      const url = new URL(
-        'http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/identity',
-      );
-      url.searchParams.set('audience', this.audience);
-      url.searchParams.set('format', 'full');
-      const response = syncFetch({
-        url: url.toString(),
-        method: 'GET',
-        headers: { 'Metadata-Flavor': 'Google' },
-        timeoutMs: this.timeoutMs,
-      });
-      const token = response.body.trim();
-      return token || undefined;
-    } catch {
-      useLogger('config-server').warn('metadata token fetch failed', { audience: this.audience });
-      return undefined;
-    }
+  private failed(): undefined {
+    useLogger('config-server').warn('metadata token fetch failed', { audience: this.audience });
+    return undefined;
   }
+}
+
+/**
+ * Resolves the bearer of a background request: through `tokenAsync()` when
+ * the source offers it, otherwise `token()`, and `fallback` without a source
+ * token.
+ */
+export async function resolveBearerAsync(
+  source: TokenSource | undefined,
+  fallback: string | undefined,
+): Promise<string | undefined> {
+  const token = source?.tokenAsync ? await source.tokenAsync() : source?.token();
+  return token ?? fallback;
 }
 
 /**

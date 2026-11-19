@@ -77,15 +77,46 @@ func remoteLoadCanceled(source string, err error) error {
 	return fmt.Errorf("%s load canceled: %w", source, err)
 }
 
+// remoteRefresh fetches a source's tree once, with no retry and no fallback.
+type remoteRefresh func(ctx context.Context) (map[string]any, *remoteAttemptFailure)
+
 // remoteLoad shares one completed remote load with every caller. A load that
 // its caller's cancellation cut short is not a result: the next caller fetches
 // again with its own context instead of inheriting the canceled error.
+//
+// With a positive period and a refresh function, a successful load older than
+// the period is still returned at once, and it starts one background refresh
+// that every caller shares. A refresh that answers a tree replaces the held
+// tree; a refresh that fails, or answers none, keeps it, logs a warning for each new failure, and the
+// next refresh starts once another period has passed.
 type remoteLoad struct {
-	mu       sync.Mutex
-	done     bool
-	cached   map[string]any
-	err      error
-	inflight chan struct{}
+	// period is how long a completed load stays current. Zero keeps the first
+	// completed load for the life of the process.
+	period time.Duration
+	// refresh fetches the tree in the background once period has passed.
+	refresh remoteRefresh
+	// source names the source in the refresh warnings.
+	source string
+	// timeout bounds one background refresh.
+	timeout time.Duration
+	// now returns the current time; nil means time.Now.
+	now func() time.Time
+
+	mu         sync.Mutex
+	done       bool
+	cached     map[string]any
+	err        error
+	inflight   chan struct{}
+	loadedAt   time.Time
+	refreshing chan struct{}
+	refreshErr string
+}
+
+func (l *remoteLoad) clock() time.Time {
+	if l.now != nil {
+		return l.now()
+	}
+	return time.Now()
 }
 
 func (l *remoteLoad) load(ctx context.Context, fetch func(context.Context) (map[string]any, error)) (map[string]any, error) {
@@ -93,6 +124,9 @@ func (l *remoteLoad) load(ctx context.Context, fetch func(context.Context) (map[
 		l.mu.Lock()
 		if l.done {
 			cached, err := l.cached, l.err
+			if err == nil {
+				l.startRefreshLocked()
+			}
 			l.mu.Unlock()
 			return cached, err
 		}
@@ -122,6 +156,7 @@ func (l *remoteLoad) run(ctx context.Context, fetch func(context.Context) (map[s
 		l.inflight = nil
 		if err == nil || ctx.Err() == nil {
 			l.done, l.cached, l.err = true, data, err
+			l.loadedAt = l.clock()
 		}
 		l.mu.Unlock()
 		close(wait)
@@ -129,8 +164,60 @@ func (l *remoteLoad) run(ctx context.Context, fetch func(context.Context) (map[s
 	return fetch(ctx)
 }
 
+// startRefreshLocked starts the background refresh when the held load is older
+// than the period and no refresh runs. l.mu must be held by the caller.
+func (l *remoteLoad) startRefreshLocked() {
+	if l.period <= 0 || l.refresh == nil || l.refreshing != nil || l.clock().Sub(l.loadedAt) < l.period {
+		return
+	}
+	done := make(chan struct{})
+	l.refreshing = done
+	go l.runRefresh(done)
+}
+
+func (l *remoteLoad) runRefresh(done chan struct{}) {
+	defer close(done)
+	timeout := l.timeout
+	if timeout <= 0 {
+		timeout = defaultRemoteSourceTimeout
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	data, failure := l.refresh(ctx)
+	if failure == nil && data == nil {
+		failure = terminalRemoteFailure(l.source+" answered no tree", nil)
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.refreshing = nil
+	l.loadedAt = l.clock()
+	if failure == nil {
+		l.cached = data
+		l.refreshErr = ""
+		return
+	}
+	detail := remoteFailureDetail(failure)
+	if detail == l.refreshErr {
+		return
+	}
+	l.refreshErr = detail
+	slog.Warn("remote source refresh failed; keeping the configuration it holds",
+		slog.String("source", l.source),
+		slog.Duration("period", l.period),
+		slog.String("error", detail),
+	)
+}
+
 func retryableRemoteStatus(status int) bool {
 	return status == 408 || status == 425 || status == 429 || status >= 500
+}
+
+// configServerRefreshFromEnv reads CONFIG_SERVER_REFRESH, the period after
+// which a remote source refreshes its tree in the background. Unset, zero or
+// invalid keeps the first load for the life of the process.
+func configServerRefreshFromEnv() time.Duration {
+	return configServerDurationFromEnv("CONFIG_SERVER_REFRESH", 0)
 }
 
 func configServerTimeoutFromEnv() time.Duration {

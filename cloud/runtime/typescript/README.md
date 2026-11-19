@@ -65,6 +65,7 @@ discovers sources. Nothing is read at import time.
 | `SCHEMA_HASH` | Schema hash sent to both endpoints. |
 | `CONFIG_SERVER_TIMEOUT` | Per-request timeout, such as `1500ms` or `2s`. Default `5s`. |
 | `CONFIG_SERVER_RETRY_BUDGET` | Total retry time for a required source. Default `30s`. `0` turns retries off. |
+| `CONFIG_SERVER_REFRESH` | Refresh period, such as `30s` or `5m`. Unset or `0` keeps the first load for the process. |
 | `CONFIG_SERVER_REQUIRED` | `1`, `true`, `yes` or `on` make a failure stop startup. Unset, a source is required when `K_SERVICE` is set or `NODE_ENV` or `APP_ENV` is `production` or `prod`. |
 | `CONFIG_SNAPSHOT_URI`, `CONFIG_SNAPSHOT_KMS_KEY` | `gs://<bucket>/<object>` of an encrypted last-known-good config, and the Cloud KMS key that decrypts it. |
 
@@ -83,6 +84,16 @@ discovers sources. Nothing is read at import time.
   falls back to the snapshot.
 - **Cache.** One resolve per distinct request per process. Once registered,
   `resetConfigLoader()` from `@putnami/runtime` clears these caches.
+- **Refresh.** With a positive `CONFIG_SERVER_REFRESH`, a load after the period
+  returns the held tree at once and starts one asynchronous fetch that every
+  instance of the source shares; later loads return its tree, so
+  `readConfig()` sees a changed value without a restart. The fetch makes one
+  attempt, with no retry and no snapshot fallback, and never blocks the event
+  loop on the response. On any failure, a `401`, `403`, `404` or
+  `resolved: false` included, the source keeps the tree it holds, logs a
+  warning for each new failure, and tries again after the next period. A
+  config pinned by `CONFIG_VERSION` never refreshes. `refreshPeriod`, in
+  milliseconds, sets the period on a source built by hand.
 - **Event Server.** `eventServerDestination` accepts only
   `transport: 'eventserver'`, contract version 1 and protocol
   `putnami.events.v1`, with HTTPS origins for `endpoint` and `audience`. It

@@ -64,6 +64,24 @@
           }
         },
         {
+          "id": "refresh",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "discovery-reads-the-refresh-period",
+              "failed-refresh-keeps-the-held-tree",
+              "pinned-config-is-never-refreshed",
+              "refresh-off-keeps-the-first-load",
+              "secrets-and-prepared-sources-refresh",
+              "stale-load-returns-the-held-tree-and-refreshes"
+            ]
+          }
+        },
+        {
           "id": "requests-without-credentials",
           "stage": "coded",
           "evidenceKinds": [
