@@ -217,6 +217,19 @@
           }
         },
         {
+          "id": "proposal-page-url",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "page-url-is-an-optional-display-link"
+            ]
+          }
+        },
+        {
           "id": "task-scenarios",
           "stage": "coded",
           "evidenceKinds": [
