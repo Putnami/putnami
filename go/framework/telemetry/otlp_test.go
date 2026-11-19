@@ -680,3 +680,56 @@ func hasAttr(attrs []otlp.KeyValue, key, val string) bool {
 	}
 	return false
 }
+
+func TestOTLPMetricReader_ExportsEveryMinuteByDefault(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "export-cadence", "metrics-leave-every-60-seconds-by-default")
+	t.Setenv(EnvMetricExportInterval, "")
+	if got := (OTLPConfig{}).metricInterval(); got != time.Minute {
+		t.Fatalf("metric interval = %v, want 1m", got)
+	}
+	// FlushInterval tunes the log sink only.
+	if got := (OTLPConfig{FlushInterval: time.Second}).metricInterval(); got != time.Minute {
+		t.Fatalf("metric interval with FlushInterval set = %v, want 1m", got)
+	}
+}
+
+func TestOTLPMetricReader_ConfigAndEnvironmentOverrideTheInterval(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "export-cadence", "config-and-environment-override-the-cadence")
+	t.Setenv(EnvMetricExportInterval, "15000")
+	if got := (OTLPConfig{}).metricInterval(); got != 15*time.Second {
+		t.Errorf("metric interval from the environment = %v, want 15s", got)
+	}
+	if got := (OTLPConfig{MetricInterval: 5 * time.Second}).metricInterval(); got != 5*time.Second {
+		t.Errorf("configured metric interval = %v, want 5s", got)
+	}
+	t.Setenv(EnvSpanBatchDelay, "2000")
+	if got := (Config{}).spanBatchDelay(); got != 2*time.Second {
+		t.Errorf("span batch delay from the environment = %v, want 2s", got)
+	}
+	if got := (Config{SpanBatchDelay: time.Second}).spanBatchDelay(); got != time.Second {
+		t.Errorf("configured span batch delay = %v, want 1s", got)
+	}
+	for _, bad := range []string{"soon", "-5", "0", "+15000", "1.5"} {
+		t.Setenv(EnvSpanBatchDelay, bad)
+		if got := (Config{}).spanBatchDelay(); got != 30*time.Second {
+			t.Errorf("span batch delay with %s=%q = %v, want the 30s default", EnvSpanBatchDelay, bad, got)
+		}
+	}
+
+	// The configured interval drives the reader: a short one pushes before
+	// shutdown.
+	col := &testCollector{}
+	srv := col.server(t)
+	reader := NewOTLPMetricReader(OTLPConfig{Endpoint: srv.URL, MetricInterval: 10 * time.Millisecond})
+	mp := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader), sdkmetric.WithResource(testResource()))
+	t.Cleanup(func() { _ = mp.Shutdown(context.Background()) })
+	ctr, _ := mp.Meter("test").Int64Counter("jobs.done")
+	ctr.Add(context.Background(), 1)
+	deadline := time.Now().Add(5 * time.Second)
+	for col.count() == 0 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if col.count() == 0 {
+		t.Fatal("expected a periodic push at the configured interval, got none")
+	}
+}

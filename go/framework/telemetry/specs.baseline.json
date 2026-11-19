@@ -7,6 +7,7 @@
     "go/service-telemetry#duration-precision",
     "go/service-telemetry#endpoint-required",
     "go/service-telemetry#explicit-sampling",
+    "go/service-telemetry#export-cadence",
     "go/service-telemetry#generated-client-telemetry",
     "go/service-telemetry#lifecycle-purity",
     "go/service-telemetry#never-fails-the-workload",

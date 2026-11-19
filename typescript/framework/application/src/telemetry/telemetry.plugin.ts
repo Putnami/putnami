@@ -3,12 +3,14 @@
  *
  * Lifecycle:
  *   warmup  → resolve the collector, init the collector, instrument HTTP outermost
- *   start   → start periodic flush timer
- *   stop    → final flush, clear timer, tear down collector
+ *   start   → start the metric and span timers
+ *   stop    → final flush, clear timers, tear down collector
  *
- * The flush timer drains completed per-second buckets from the collector,
- * renders them as OTLP/JSON, and POSTs them to a standard OTLP/HTTP collector's
- * /v1/metrics and /v1/traces. Each push asks the registered telemetry token
+ * The metric timer drains completed per-second buckets from the collector every
+ * 60 seconds and POSTs them as OTLP/JSON to a standard OTLP/HTTP collector's
+ * /v1/metrics. The span timer drains completed spans at most 30 seconds apart
+ * to /v1/traces, and a batch of 512 spans leaves at once (telemetry.cadence.ts
+ * says how to change both). Each push asks the registered telemetry token
  * source for its bearer. Logs go through an OtlpLogSink on the root logger,
  * which `application()` attaches when the environment names a collector.
  *
@@ -21,6 +23,14 @@ import type { Module, Plugin } from '../application';
 import type { HttpMiddleware } from '../http/http-middleware.type';
 import { HttpPlugin } from '../http/http.plugin';
 import type { MetricDescription, MetricsBucket, TelemetrySpanRecord } from './telemetry.collector';
+import {
+  cadenceMs,
+  DEFAULT_METRIC_INTERVAL_MS,
+  DEFAULT_SPAN_BATCH_DELAY_MS,
+  ENV_METRIC_EXPORT_INTERVAL,
+  ENV_SPAN_BATCH_DELAY,
+  spanBatchSize,
+} from './telemetry.cadence';
 import { TelemetryCollector } from './telemetry.collector';
 import { TelemetryConfig, type TelemetryOptions } from './telemetry.config';
 import { CollectorAccess } from './telemetry.credential';
@@ -41,14 +51,17 @@ interface TelemetryTarget {
 /** Orchestrates telemetry collection, periodic flushing, and shutdown draining. */
 export class TelemetryPlugin implements Plugin {
   private collector: TelemetryCollector | undefined;
-  private flushTimer: ReturnType<typeof setInterval> | undefined;
+  private metricTimer: ReturnType<typeof setInterval> | undefined;
+  private spanTimer: ReturnType<typeof setInterval> | undefined;
   private options: TelemetryOptions;
   private target: TelemetryTarget | undefined;
   private middleware: HttpMiddleware | undefined;
   private readonly environment: boolean;
 
-  /** Runtime flush interval. */
-  private flushIntervalS = 30;
+  /** Milliseconds between two metric pushes. */
+  private metricIntervalMs = DEFAULT_METRIC_INTERVAL_MS;
+  /** Longest wait, in milliseconds, of a completed span before its batch is pushed. */
+  private spanBatchDelayMs = DEFAULT_SPAN_BATCH_DELAY_MS;
 
   constructor(options: TelemetryOptions = {}, internal: { fromEnvironment?: boolean } = {}) {
     this.options = options;
@@ -70,9 +83,13 @@ export class TelemetryPlugin implements Plugin {
     if (!target) return;
 
     this.target = target;
-    this.flushIntervalS = config.flushIntervalS;
+    this.metricIntervalMs = cadenceMs(config.metricIntervalS, ENV_METRIC_EXPORT_INTERVAL, DEFAULT_METRIC_INTERVAL_MS);
+    this.spanBatchDelayMs = cadenceMs(config.spanBatchDelayS, ENV_SPAN_BATCH_DELAY, DEFAULT_SPAN_BATCH_DELAY_MS);
 
-    this.collector = new TelemetryCollector();
+    this.collector = new TelemetryCollector({
+      spanBatchSize: spanBatchSize(),
+      onSpanBatchFull: () => this.background(this.pushSpans()),
+    });
     setCollector(this.collector);
 
     this.middleware = TelemetryMiddleware(this.collector);
@@ -99,18 +116,12 @@ export class TelemetryPlugin implements Plugin {
     if (!this.collector || !this.target) return;
     const endpoint = this.target.access.endpoint;
 
-    this.flushTimer = setInterval(() => {
-      this.flush().catch((error) => {
-        useLogger('telemetry').warn('Flush failed', { endpoint, error });
-      });
-    }, this.flushIntervalS * 1000);
+    this.metricTimer = this.every(this.metricIntervalMs, () => this.pushMetrics());
+    this.spanTimer = this.every(this.spanBatchDelayMs, () => this.pushSpans());
 
-    // Ensure the timer does not keep the process alive
-    if (this.flushTimer && typeof this.flushTimer === 'object' && 'unref' in this.flushTimer) {
-      this.flushTimer.unref();
-    }
-
-    useLogger('telemetry').debug(`telemetry flush every ${this.flushIntervalS}s → ${endpoint}`);
+    useLogger('telemetry').debug(
+      `telemetry pushes metrics every ${this.metricIntervalMs}ms and spans at most ${this.spanBatchDelayMs}ms apart → ${endpoint}`,
+    );
 
     // Final flush on shutdown
     app.onStop(async () => {
@@ -119,10 +130,10 @@ export class TelemetryPlugin implements Plugin {
   }
 
   async stop(): Promise<void> {
-    if (this.flushTimer) {
-      clearInterval(this.flushTimer);
-      this.flushTimer = undefined;
-    }
+    clearInterval(this.metricTimer);
+    clearInterval(this.spanTimer);
+    this.metricTimer = undefined;
+    this.spanTimer = undefined;
 
     // Drain everything (including the current second) on shutdown
     if (this.collector) {
@@ -178,10 +189,29 @@ export class TelemetryPlugin implements Plugin {
   // Flush
   // -----------------------------------------------------------------------
 
-  private async flush(): Promise<void> {
+  /** Run `task` every `ms`, on a timer that does not keep the process alive. */
+  private every(ms: number, task: () => Promise<void>): ReturnType<typeof setInterval> {
+    const timer = setInterval(() => this.background(task()), ms);
+    if (typeof timer === 'object' && 'unref' in timer) timer.unref();
+    return timer;
+  }
+
+  /** Let a push run on its own: a failure is logged, never thrown. */
+  private background(push: Promise<void>): void {
+    push.catch((error) => {
+      useLogger('telemetry').warn('Flush failed', { endpoint: this.target?.access.endpoint, error });
+    });
+  }
+
+  private async pushMetrics(): Promise<void> {
     if (!this.collector) return;
     // Everything the push renders is read now, before it awaits a credential.
-    await this.push(this.collector.drain(), this.collector.drainSpans(), this.collector.metricDescriptions());
+    await this.push(this.collector.drain(), [], this.collector.metricDescriptions());
+  }
+
+  private async pushSpans(): Promise<void> {
+    if (!this.collector) return;
+    await this.push([], this.collector.drainSpans(), {});
   }
 
   private async push(

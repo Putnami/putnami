@@ -66,6 +66,13 @@ type Config struct {
 	// could not. Use the SampleRate helper to set it.
 	TraceSampleRate *float64
 
+	// SpanBatchDelay is the longest a completed span waits before the batcher
+	// exports its batch; a batch of 512 spans, or OTEL_BSP_MAX_EXPORT_BATCH_SIZE,
+	// leaves at once. When zero,
+	// OTEL_BSP_SCHEDULE_DELAY in milliseconds sets it, else the protocol's 30s.
+	// Shutdown exports what remains.
+	SpanBatchDelay time.Duration
+
 	// ShutdownTimeout is the maximum time to wait for exporters to flush.
 	// Defaults to 5 seconds.
 	ShutdownTimeout time.Duration
@@ -289,7 +296,9 @@ func (p *Plugin) configureLocked() error {
 		tpOpts = append(tpOpts, sdktrace.WithResource(res))
 	}
 	if traceExporter != nil {
-		tpOpts = append(tpOpts, sdktrace.WithBatcher(traceExporter))
+		tpOpts = append(tpOpts, sdktrace.WithBatcher(traceExporter,
+			sdktrace.WithBatchTimeout(p.cfg.spanBatchDelay()),
+			sdktrace.WithMaxExportBatchSize(spanBatchSize())))
 	}
 	p.tp = sdktrace.NewTracerProvider(tpOpts...)
 	otel.SetTracerProvider(p.tp)

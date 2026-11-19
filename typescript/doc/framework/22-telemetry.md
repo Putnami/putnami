@@ -14,6 +14,9 @@ When the environment sets `OTEL_EXPORTER_OTLP_ENDPOINT`, every `application()` a
 | `OTEL_SDK_DISABLED=true` | Turns this default telemetry off, whatever the endpoint says. |
 | `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option or the log sink's `serviceName` option. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Comma-separated `key=value` pairs added to every pushed resource. |
+| `OTEL_METRIC_EXPORT_INTERVAL` | Milliseconds between two metric pushes when the plugin sets no interval. Default 60000. |
+| `OTEL_BSP_SCHEDULE_DELAY` | Longest wait, in milliseconds, of a completed span before its batch is pushed, when the plugin sets no delay. Default 30000. |
+| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Spans that make a full batch, pushed at once. Default 512. |
 
 The same variables export logs. `application()` attaches an `OtlpLogSink` to the root logger when it starts, so every record reaches `<endpoint>/v1/logs` with the resource and the credentials of metrics and traces. Applications started in one process share that sink, a `run()` runner flushes it when it returns, and the last application to stop closes it. A root logger that already holds an `OtlpLogSink` the application configured keeps it alone.
 
@@ -103,7 +106,8 @@ telemetry({
   enabled: true,
   endpoint: 'https://collector.example:4318',
   bearer: 'my-token',
-  flushIntervalS: 30,
+  metricIntervalS: 60,
+  spanBatchDelayS: 30,
   app: 'my-service',
 });
 ```
@@ -113,8 +117,11 @@ telemetry({
 | `enabled` | `boolean` | `false` | Enable the explicit plugin (opt-in) |
 | `endpoint` | `string` | — | OTLP/HTTP collector base URL; metrics go to `<endpoint>/v1/metrics`, spans to `<endpoint>/v1/traces`. Required when enabled |
 | `bearer` | `string` | — | Static bearer token; wins over the registered token source |
-| `flushIntervalS` | `number` | `30` | Seconds between flushes |
+| `metricIntervalS` | `number` | `60` | Seconds between two metric pushes; `OTEL_METRIC_EXPORT_INTERVAL` (milliseconds) sets it when unset |
+| `spanBatchDelayS` | `number` | `30` | Longest wait, in seconds, of a span before its batch is pushed; 512 spans push at once. `OTEL_BSP_SCHEDULE_DELAY` (milliseconds) sets it when unset |
 | `app` | `string` | — | `service.name` when neither `OTEL_SERVICE_NAME` nor a `service.name` resource attribute is set; `unknown` without all three |
+
+`metricIntervalS` and `spanBatchDelayS` replace `flushIntervalS`, which pushed metrics and spans together every 30 seconds. The configuration ignores a `flushIntervalS` key: rename it to `metricIntervalS`.
 
 If `enabled` is `true` but `endpoint` is missing, the plugin logs a warning and stays inert. It never falls back to a hardcoded destination.
 
@@ -124,13 +131,13 @@ Or via YAML:
 telemetry:
   enabled: true
   endpoint: "https://collector.example:4318"
-  flushIntervalS: 30
+  metricIntervalS: 60
   app: "my-service"
 ```
 
 ## How aggregation works
 
-Metrics are bucketed by Unix second in memory. A periodic timer drains completed buckets, renders them as an OTLP/JSON request, and POSTs it to `<endpoint>/v1/metrics`; completed spans go to `<endpoint>/v1/traces`. On shutdown, all remaining buckets (including the current second) are flushed immediately.
+Metrics are bucketed by Unix second in memory. Every 60 seconds a timer drains completed buckets, renders them as an OTLP/JSON request, and POSTs it to `<endpoint>/v1/metrics`; completed spans go to `<endpoint>/v1/traces` in batches at most 30 seconds apart, or at once when 512 wait. On shutdown, all remaining buckets (including the current second) and spans are flushed immediately.
 
 Telemetry failures never affect application behavior.
 

@@ -69,6 +69,22 @@
           }
         },
         {
+          "id": "export-cadence",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "metrics-leave-every-60-seconds-by-default",
+              "spans-leave-in-30-second-batches-by-default",
+              "a-full-span-batch-leaves-early",
+              "config-and-environment-override-the-cadence"
+            ]
+          }
+        },
+        {
           "id": "explicit-sampling",
           "stage": "coded",
           "evidenceKinds": [

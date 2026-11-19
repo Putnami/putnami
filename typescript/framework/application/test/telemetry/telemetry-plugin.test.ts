@@ -168,7 +168,7 @@ describe('TelemetryPlugin', () => {
     });
 
     it('should accept options', () => {
-      const plugin = telemetry({ enabled: false, flushIntervalS: 60 });
+      const plugin = telemetry({ enabled: false, metricIntervalS: 60 });
       expect(plugin).toBeInstanceOf(TelemetryPlugin);
     });
   });

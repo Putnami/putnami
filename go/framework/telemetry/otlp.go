@@ -56,9 +56,14 @@ type OTLPConfig struct {
 	// caller owns the injected client's timeout; Timeout below is ignored.
 	HTTPClient *http.Client
 
-	// FlushInterval is the periodic flush cadence. Defaults to the protocol's
-	// 10s when zero. A final flush always runs on shutdown.
+	// FlushInterval is the log sink's periodic flush cadence. Defaults to the
+	// protocol's 10s when zero. A final flush always runs on shutdown.
 	FlushInterval time.Duration
+
+	// MetricInterval is the metric reader's periodic export cadence. When zero,
+	// OTEL_METRIC_EXPORT_INTERVAL in milliseconds sets it, else the protocol's
+	// 60s. A final export always runs on shutdown.
+	MetricInterval time.Duration
 
 	// Timeout bounds each HTTP request. Defaults to the protocol's 5s when zero.
 	Timeout time.Duration

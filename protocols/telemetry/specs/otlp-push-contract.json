@@ -33,7 +33,8 @@
     {
       "id": "the-exporter-never-hurts-the-workload",
       "text": [
-        "The contract pins an exporter's defaults: a flush every 10 seconds with a 5-second timeout, one more flush on shutdown, a batch dropped when the collector fails, and an in-memory queue capped at 10000 records.",
+        "The contract pins an exporter's defaults: logs flush every 10 s, metrics every 60 s, and spans leave in batches of at most 512 at most 30 s apart; a request times out after 5 s, shutdown flushes once more, a failed batch is dropped, and the queue holds at most 10000 records.",
+        "Both runtimes test their export defaults against fixtures/conventions/export-contract.json.",
         "The Go metric reader flushes once more on shutdown, and the Go exporter swallows a collector error rather than return it."
       ]
     },

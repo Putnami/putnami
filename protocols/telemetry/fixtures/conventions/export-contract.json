@@ -1,0 +1,10 @@
+{
+  "defaultFlushIntervalMs": 10000,
+  "defaultMetricIntervalMs": 60000,
+  "defaultSpanBatchDelayMs": 30000,
+  "maxSpanBatchSize": 512,
+  "defaultTimeoutMs": 5000,
+  "finalFlushOnShutdown": true,
+  "dropOnCollectorError": true,
+  "maxQueueRecords": 10000
+}

@@ -45,6 +45,14 @@
       ]
     },
     {
+      "id": "export-cadence",
+      "text": [
+        "The OTLP metric reader exports every 60 seconds, and the span batcher exports at most 30 seconds apart, earlier once 512 spans wait; shutdown flushes both.",
+        "OTLPConfig.MetricInterval and Config.SpanBatchDelay override those defaults, then OTEL_METRIC_EXPORT_INTERVAL and OTEL_BSP_SCHEDULE_DELAY in milliseconds; OTEL_BSP_MAX_EXPORT_BATCH_SIZE overrides the batch size; OTLPConfig.FlushInterval sets the log sink's cadence only.",
+        "An environment value that is not a positive integer of digits is ignored."
+      ]
+    },
+    {
       "id": "explicit-sampling",
       "text": "An unset sample rate samples every trace, while an explicit rate of zero samples none, so \"not configured\" and \"deliberately disabled\" stay distinguishable."
     },

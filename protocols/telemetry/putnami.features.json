@@ -62,6 +62,7 @@
             "kind": "acceptance",
             "checks": [
               "the-export-defaults-are-pinned",
+              "the-export-defaults-match-their-fixture",
               "the-go-metric-reader-flushes-once-more-on-shutdown",
               "the-go-exporter-swallows-a-collector-error"
             ]

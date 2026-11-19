@@ -108,14 +108,27 @@ const (
 
 // ExportContract pins the behavior every conformant exporter implements,
 // regardless of language. The values are deliberate: serverless workloads live
-// briefly, so the default cadence is short and a final flush on shutdown is
-// mandatory; telemetry must never block or fail the workload, so collector
-// errors are dropped; and the in-memory queue is bounded so a wedged collector
-// cannot grow memory without limit.
+// briefly, so a final flush on shutdown is mandatory, which lets the periodic
+// cadence stay long and an idle service send few requests; telemetry must never
+// block or fail the workload, so collector errors are dropped; and the
+// in-memory queue is bounded so a wedged collector cannot grow memory without
+// limit.
 type ExportContract struct {
-	// DefaultFlushIntervalMS is the default periodic flush cadence. Short on
-	// purpose — serverless containers may only live a few seconds.
+	// DefaultFlushIntervalMS is the default periodic flush cadence of log
+	// records.
 	DefaultFlushIntervalMS int `json:"defaultFlushIntervalMs"`
+
+	// DefaultMetricIntervalMS is the default periodic metric export cadence.
+	// OTEL_METRIC_EXPORT_INTERVAL overrides it in every runtime.
+	DefaultMetricIntervalMS int `json:"defaultMetricIntervalMs"`
+
+	// DefaultSpanBatchDelayMS is the longest a completed span waits before its
+	// batch is exported. OTEL_BSP_SCHEDULE_DELAY overrides it in every runtime.
+	DefaultSpanBatchDelayMS int `json:"defaultSpanBatchDelayMs"`
+
+	// MaxSpanBatchSize is the largest span batch. A batch that reaches it is
+	// exported without waiting for the delay.
+	MaxSpanBatchSize int `json:"maxSpanBatchSize"`
 
 	// DefaultTimeoutMS is the per-request HTTP timeout. A slow collector must
 	// not stall the flush loop or the shutdown path.
@@ -157,11 +170,14 @@ func DefaultContract() Contract {
 		ContentType:        ContentType,
 		ResourceAttributes: CanonicalResourceAttrs,
 		Export: ExportContract{
-			DefaultFlushIntervalMS: 10000,
-			DefaultTimeoutMS:       5000,
-			FinalFlushOnShutdown:   true,
-			DropOnCollectorError:   true,
-			MaxQueueRecords:        10000,
+			DefaultFlushIntervalMS:  10000,
+			DefaultMetricIntervalMS: 60000,
+			DefaultSpanBatchDelayMS: 30000,
+			MaxSpanBatchSize:        512,
+			DefaultTimeoutMS:        5000,
+			FinalFlushOnShutdown:    true,
+			DropOnCollectorError:    true,
+			MaxQueueRecords:         10000,
 		},
 	}
 }

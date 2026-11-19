@@ -88,8 +88,18 @@ export interface MetricsBucket {
 // Collector
 // ---------------------------------------------------------------------------
 
+/** Options of a collector. */
+export interface TelemetryCollectorOptions {
+  /** Spans that make a full batch. */
+  spanBatchSize?: number;
+  /** Called when the queued spans reach `spanBatchSize`, so the batch can leave at once. */
+  onSpanBatchFull?: () => void;
+}
+
 /** In-memory metrics collector that aggregates counters, gauges, and histograms into per-second buckets. */
 export class TelemetryCollector {
+  constructor(private readonly options: TelemetryCollectorOptions = {}) {}
+
   private buckets = new Map<number, MetricsBucket>();
   /** Attributed series of each bucket by series key, so a record finds its series in O(1). */
   private seriesIndex = new Map<number, Map<string, AttributedCounterAggregate | AttributedHistogramAggregate>>();
@@ -208,6 +218,8 @@ export class TelemetryCollector {
   /** Queue an immutable completed span for the next trace flush. */
   addSpan(span: TelemetrySpanRecord): void {
     this.spans.push(Object.freeze({ ...span, attributes: normalizeAttributes(span.attributes) }));
+    const { spanBatchSize, onSpanBatchFull } = this.options;
+    if (onSpanBatchFull && spanBatchSize !== undefined && this.spans.length >= spanBatchSize) onSpanBatchFull();
   }
 
   /** Drain every completed span. Spans are complete records and need no time-bucket delay. */

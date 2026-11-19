@@ -33,7 +33,7 @@ telemetry:
   enabled: true
   endpoint: "${TELEMETRY_ENDPOINT}"
   bearer: "${OTLP_TOKEN}" # sensitive — kept in the environment, never in the file
-  flushIntervalS: 30
+  metricIntervalS: 60
 ```
 
 Config string values interpolate `${VAR}` references from the environment when

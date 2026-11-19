@@ -100,6 +100,15 @@
       ]
     },
     {
+      "id": "export-cadence",
+      "text": [
+        "The plugin pushes metrics every 60 s and spans at most 30 s apart, or at once when 512 wait; stopping pushes the rest of both.",
+        "metricIntervalS and spanBatchDelayS override the defaults, then OTEL_METRIC_EXPORT_INTERVAL and OTEL_BSP_SCHEDULE_DELAY in ms; OTEL_BSP_MAX_EXPORT_BATCH_SIZE sets the batch size.",
+        "An environment value other than a positive integer of digits is ignored, and a period beyond a timer's limit is capped.",
+        "The defaults equal the protocol's export contract fixture."
+      ]
+    },
+    {
       "id": "log-record-mapping",
       "text": [
         "The OTLP log sink posts its buffered records as one logs request to <endpoint>/v1/logs on close.",

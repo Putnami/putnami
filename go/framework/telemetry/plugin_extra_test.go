@@ -5,6 +5,7 @@ import (
 	stderrors "errors"
 	"net/http/httptest"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -817,5 +818,106 @@ func isNilInterface(v any) bool {
 		return rv.IsNil()
 	default:
 		return false
+	}
+}
+
+// --- export cadence ---
+
+func TestPluginSpanBatchDelayDefaultsToThirtySeconds(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "export-cadence", "spans-leave-in-30-second-batches-by-default")
+	t.Setenv(EnvSpanBatchDelay, "")
+	if got := (Config{}).spanBatchDelay(); got != 30*time.Second {
+		t.Fatalf("span batch delay = %v, want 30s", got)
+	}
+
+	// With the default delay, a finished span waits for its batch: nothing is
+	// exported until shutdown flushes it.
+	saveOTelGlobals(t)
+	exporter := &countingSpanExporter{}
+	p := NewPlugin(Config{ServiceName: "batch-svc", TraceExporter: exporter})
+	if err := p.Configure(context.Background(), nil); err != nil {
+		t.Fatalf("Configure() error: %v", err)
+	}
+	_, span := p.tp.Tracer("test").Start(context.Background(), "work")
+	span.End()
+	time.Sleep(50 * time.Millisecond)
+	if got := exporter.count(); got != 0 {
+		t.Fatalf("exported %d spans before the batch delay, want 0", got)
+	}
+	if err := p.Stop(context.Background(), nil); err != nil {
+		t.Fatalf("Stop() error: %v", err)
+	}
+	if got := exporter.count(); got != 1 {
+		t.Fatalf("exported %d spans on shutdown, want 1", got)
+	}
+}
+
+func TestPluginSpanBatchDelayIsConfigurable(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "export-cadence", "config-and-environment-override-the-cadence")
+	saveOTelGlobals(t)
+	exporter := tracetest.NewInMemoryExporter()
+	p := NewPlugin(Config{ServiceName: "batch-svc", TraceExporter: exporter, SpanBatchDelay: 10 * time.Millisecond})
+	if err := p.Configure(context.Background(), nil); err != nil {
+		t.Fatalf("Configure() error: %v", err)
+	}
+	t.Cleanup(func() { _ = p.Stop(context.Background(), nil) })
+	_, span := p.tp.Tracer("test").Start(context.Background(), "work")
+	span.End()
+	deadline := time.Now().Add(5 * time.Second)
+	for len(exporter.GetSpans()) == 0 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := len(exporter.GetSpans()); got != 1 {
+		t.Fatalf("exported %d spans after the configured delay, want 1", got)
+	}
+}
+
+// countingSpanExporter counts exported spans and, unlike the tracetest
+// in-memory exporter, keeps the count across Shutdown.
+type countingSpanExporter struct {
+	mu    sync.Mutex
+	spans int
+}
+
+func (e *countingSpanExporter) ExportSpans(_ context.Context, spans []sdktrace.ReadOnlySpan) error {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	e.spans += len(spans)
+	return nil
+}
+
+func (e *countingSpanExporter) Shutdown(context.Context) error { return nil }
+
+func (e *countingSpanExporter) count() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.spans
+}
+
+func TestPluginFullSpanBatchLeavesEarly(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "export-cadence", "a-full-span-batch-leaves-early")
+	t.Setenv(EnvSpanBatchSize, "")
+	if got := spanBatchSize(); got != 512 {
+		t.Fatalf("span batch size = %d, want 512", got)
+	}
+	t.Setenv(EnvSpanBatchSize, "4")
+	saveOTelGlobals(t)
+	exporter := &countingSpanExporter{}
+	p := NewPlugin(Config{ServiceName: "batch-svc", TraceExporter: exporter, SpanBatchDelay: time.Hour})
+	if err := p.Configure(context.Background(), nil); err != nil {
+		t.Fatalf("Configure() error: %v", err)
+	}
+	t.Cleanup(func() { _ = p.Stop(context.Background(), nil) })
+	tracer := p.tp.Tracer("test")
+	for range 4 {
+		_, span := tracer.Start(context.Background(), "work")
+		span.End()
+	}
+	deadline := time.Now().Add(5 * time.Second)
+	for exporter.count() < 4 && time.Now().Before(deadline) {
+		time.Sleep(5 * time.Millisecond)
+	}
+	if got := exporter.count(); got != 4 {
+		t.Fatalf("exported %d spans of a full batch before the delay, want 4", got)
 	}
 }

@@ -1,6 +1,8 @@
 package telemetry
 
 import (
+	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -73,6 +75,15 @@ func TestConformance_ExportContract(t *testing.T) {
 	e := DefaultContract().Export
 	if e.DefaultFlushIntervalMS != 10000 {
 		t.Errorf("DefaultFlushIntervalMS = %d, want 10000", e.DefaultFlushIntervalMS)
+	}
+	if e.DefaultMetricIntervalMS != 60000 {
+		t.Errorf("DefaultMetricIntervalMS = %d, want 60000", e.DefaultMetricIntervalMS)
+	}
+	if e.DefaultSpanBatchDelayMS != 30000 {
+		t.Errorf("DefaultSpanBatchDelayMS = %d, want 30000", e.DefaultSpanBatchDelayMS)
+	}
+	if e.MaxSpanBatchSize != 512 {
+		t.Errorf("MaxSpanBatchSize = %d, want 512", e.MaxSpanBatchSize)
 	}
 	if e.DefaultTimeoutMS != 5000 {
 		t.Errorf("DefaultTimeoutMS = %d, want 5000", e.DefaultTimeoutMS)
@@ -172,5 +183,25 @@ func runFixtureDir(t *testing.T, signal, kind string, parse parseFunc, wantError
 				t.Errorf("valid fixture %s produced errors: %v", path, diags)
 			}
 		})
+	}
+}
+
+// TestConformance_ExportContractMatchesItsFixture keeps the export defaults
+// equal to the committed fixture the TypeScript runtime reads, so neither
+// runtime can change a cadence alone.
+func TestConformance_ExportContractMatchesItsFixture(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "the-exporter-never-hurts-the-workload", "the-export-defaults-match-their-fixture")
+	data, err := os.ReadFile("fixtures/conventions/export-contract.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture ExportContract
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&fixture); err != nil {
+		t.Fatalf("decode fixture: %v", err)
+	}
+	if got := DefaultContract().Export; got != fixture {
+		t.Fatalf("DefaultContract().Export = %+v, fixture = %+v", got, fixture)
 	}
 }

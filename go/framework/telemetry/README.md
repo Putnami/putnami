@@ -75,12 +75,12 @@ app.New("my-service").
         OTLP: &telemetry.OTLPConfig{
             Endpoint:    "https://collector.example:4318", // OTLP/HTTP collector base URL
             BearerToken: os.Getenv("OTLP_TOKEN"),          // optional
-            // HTTPClient, Headers, FlushInterval (default 10s), Timeout (default 5s) optional
+            // HTTPClient, Headers, FlushInterval (logs, default 10s), MetricInterval (default 60s), Timeout (default 5s) optional
         },
     }))
 ```
 
-`OTLP` only fills `MetricReader`/`TraceExporter` when they are nil, so an explicit reader/exporter still wins. The metric reader flushes periodically and once more on shutdown (driven by `MeterProvider.Shutdown`), so short-lived containers do not drop their last batch. Collector errors are dropped — telemetry never affects the workload.
+`OTLP` only fills `MetricReader`/`TraceExporter` when they are nil, so an explicit reader/exporter still wins. The metric reader exports every 60 seconds, and the span batcher exports at most 30 seconds apart, or at once when 512 spans wait. `OTLPConfig.MetricInterval` and `Config.SpanBatchDelay` override those defaults; when they are zero, `OTEL_METRIC_EXPORT_INTERVAL` and `OTEL_BSP_SCHEDULE_DELAY`, in milliseconds, do. The metric reader flushes once more on shutdown (driven by `MeterProvider.Shutdown`), so short-lived containers do not drop their last batch. Collector errors are dropped — telemetry never affects the workload.
 
 For collectors that require rotating credentials, set `HTTPClient` to a client
 whose transport authenticates each request. For example,

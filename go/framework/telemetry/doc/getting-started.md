@@ -48,13 +48,16 @@ func main() {
             // resolves the bearer per request and wins over BearerToken. On GCP,
             // telemetry.NewGCPIDTokenSource(collectorURL) authenticates to a
             // private collector with the workload's own identity (no secret).
-            // HTTPClient, Headers, FlushInterval (default 10s), Timeout (default 5s) optional
+            // HTTPClient, Headers, FlushInterval (logs, default 10s), MetricInterval (default 60s), Timeout (default 5s) optional
         },
     }))
 
     application.ListenAndServe()
 }
 ```
+
+Metrics leave every 60 seconds by default; `OTLPConfig.MetricInterval` or, when
+it is zero, `OTEL_METRIC_EXPORT_INTERVAL` (milliseconds) changes that.
 
 `OTLP` only fills `TraceExporter`/`MetricReader` when they are nil, so you can
 still supply your own `sdktrace.SpanExporter` / `sdkmetric.Reader` directly via
@@ -79,6 +82,7 @@ built-in client.
 | `TraceExporter` | `sdktrace.SpanExporter` | `nil` | Explicit span exporter. Tracing is disabled when nil (and `OTLP` is unset). |
 | `MetricReader` | `sdkmetric.Reader` | `nil` | Explicit metric reader. Metrics are disabled when nil (and `OTLP` is unset). |
 | `TraceSampleRate` | `*float64` | `telemetry.SampleRate(1.0)` when nil | Sampling ratio (0.0 to 1.0). Set with `telemetry.SampleRate(rate)`; `telemetry.SampleRate(0)` explicitly samples nothing. |
+| `SpanBatchDelay` | `time.Duration` | `30s` | Longest a completed span waits before its batch is exported; a batch of 512 spans leaves at once. When zero, `OTEL_BSP_SCHEDULE_DELAY` (milliseconds) sets it. |
 | `ShutdownTimeout` | `time.Duration` | `5s` | Maximum time to wait for exporters to flush on shutdown. |
 
 `TraceSampleRate` is a pointer so the plugin can distinguish an omitted value
@@ -218,6 +222,9 @@ It reads the standard OpenTelemetry variables:
 | `OTEL_EXPORTER_OTLP_ENDPOINT` | Collector base URL. Without it, the factory returns nil and the application gets no plugin. |
 | `OTEL_SDK_DISABLED=true` | Turns the default telemetry off, whatever the endpoint says. |
 | `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | Service identity on every metric and span. |
+| `OTEL_METRIC_EXPORT_INTERVAL` | Milliseconds between two metric pushes when `OTLPConfig.MetricInterval` is zero. Default 60000. |
+| `OTEL_BSP_SCHEDULE_DELAY` | Longest wait, in milliseconds, of a completed span before its batch is pushed, when `Config.SpanBatchDelay` is zero. Default 30000. |
+| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Spans that make a full batch, pushed at once. Default 512. |
 
 Every process also names its own instance: the resource carries a random
 `service.instance.id`, drawn once per process, unless `OTEL_RESOURCE_ATTRIBUTES`

@@ -14,6 +14,9 @@ When the environment sets `OTEL_EXPORTER_OTLP_ENDPOINT`, every `application()` a
 | `OTEL_SDK_DISABLED=true` | Turns this default telemetry off, whatever the endpoint says. |
 | `OTEL_SERVICE_NAME` | The `service.name` of every pushed resource; without it, the `service.name` pair of `OTEL_RESOURCE_ATTRIBUTES`, then the plugin's `app` option or the log sink's `serviceName` option. |
 | `OTEL_RESOURCE_ATTRIBUTES` | Comma-separated `key=value` pairs added to every pushed resource. `putnami.framework` keeps the framework's value. |
+| `OTEL_METRIC_EXPORT_INTERVAL` | Milliseconds between two metric pushes when the plugin sets no interval. Default 60000. |
+| `OTEL_BSP_SCHEDULE_DELAY` | Longest wait, in milliseconds, of a completed span before its batch is pushed, when the plugin sets no delay. Default 30000. |
+| `OTEL_BSP_MAX_EXPORT_BATCH_SIZE` | Spans that make a full batch, pushed at once. Default 512. |
 
 Every pushed resource also names its process: a random `service.instance.id`, drawn once per process, unless `OTEL_RESOURCE_ATTRIBUTES` sets one. Two instances of one revision then write two metric series, which a collector that requires points in order accepts.
 
@@ -49,7 +52,7 @@ Before each push, the plugin asks the telemetry token source registered with `re
 
 1. **Collect** — Every HTTP request is counted in `http.server.request_count` and timed in `http.server.duration`, labeled by method, route pattern and status code, and records a span, via a middleware that runs in front of every other one on each HTTP server the application composes, so a refused request is counted too. Telemetry starts no server of its own. Custom metrics are recorded with `incCounter()`, `setGauge()`, and `observeHistogram()`.
 2. **Aggregate** — Metrics are bucketed by Unix second in memory. This keeps the memory footprint small and gives the backend per-second resolution.
-3. **Flush** — A periodic timer drains completed buckets, renders them as an OTLP/JSON metrics request, and POSTs it to `<endpoint>/v1/metrics`, with completed spans to `<endpoint>/v1/traces`. On shutdown, remaining buckets are flushed immediately. Collector errors are dropped — telemetry never affects application behaviour.
+3. **Flush** — Every 60 seconds a timer drains completed buckets, renders them as an OTLP/JSON metrics request, and POSTs it to `<endpoint>/v1/metrics`. Completed spans go to `<endpoint>/v1/traces` in batches at most 30 seconds apart, and a batch of 512 spans leaves at once. On shutdown, remaining buckets and spans are flushed immediately. Collector errors are dropped — telemetry never affects application behaviour.
 
 ## Configuration
 
@@ -58,7 +61,8 @@ telemetry({
   enabled: true,                  // default: false (opt-in)
   endpoint: 'https://collector:4318', // OTLP/HTTP collector base URL — required when enabled, no default
   bearer: 'my-token',
-  flushIntervalS: 30,             // default (seconds)
+  metricIntervalS: 60,            // default (seconds)
+  spanBatchDelayS: 30,            // default (seconds)
   app: 'my-service',              // service.name when OTEL_SERVICE_NAME is unset
 });
 ```
@@ -68,8 +72,11 @@ telemetry({
 | `enabled` | `boolean` | `false` | Enable telemetry collection (explicit opt-in) |
 | `endpoint` | `string` | — (required when enabled) | OTLP/HTTP collector **base URL**; metrics POST to `<endpoint>/v1/metrics`. No default, so data is never shipped to a hardcoded destination |
 | `bearer` | `string` | — | Static bearer token; wins over the registered token source |
-| `flushIntervalS` | `number` | `30` | Flush interval in seconds |
+| `metricIntervalS` | `number` | `60` | Seconds between two metric pushes. When unset, `OTEL_METRIC_EXPORT_INTERVAL` (milliseconds) sets it |
+| `spanBatchDelayS` | `number` | `30` | Longest wait, in seconds, of a completed span before its batch is pushed; 512 spans push at once. When unset, `OTEL_BSP_SCHEDULE_DELAY` (milliseconds) sets it |
 | `app` | `string` | — | The OTLP resource's `service.name` when neither `OTEL_SERVICE_NAME` nor a `service.name` resource attribute is set; `unknown` without all three |
+
+`metricIntervalS` and `spanBatchDelayS` replace `flushIntervalS`, which pushed metrics and spans together every 30 seconds. The configuration ignores a `flushIntervalS` key: rename it to `metricIntervalS`.
 
 If `enabled` is `true` but no `endpoint` is set, the plugin logs a warning and does not start. The endpoint is any standard OTLP/HTTP collector base URL.
 
@@ -81,7 +88,7 @@ telemetry:
   enabled: true
   endpoint: "https://collector:4318"
   bearer: "..."
-  flushIntervalS: 30
+  metricIntervalS: 60
   app: "my-service"
 ```
 

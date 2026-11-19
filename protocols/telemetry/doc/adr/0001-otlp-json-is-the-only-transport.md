@@ -1,6 +1,9 @@
 # ADR 0001 — Hand-rolled OTLP/JSON over HTTP is the only telemetry transport
 
-- **Status**: accepted
+- **Status**: accepted, amended
+- **Amended**: 2026-11-19, decision 5: the default cadence is set per signal.
+  Metrics left every 10 s and spans with them; they now leave every 60 s and
+  in 30 s batches, so an idle service sends about 6 times fewer requests.
 - **Scope**: `go.putnami.dev/protocol/telemetry` (`protocols/telemetry`)
 
 ## Context
@@ -26,9 +29,13 @@ because every workload inherits it.
    sorts attributes by key and `MarshalCanonical` emits a fixed field order.
    Equivalence goldens and pinned SHA-256 digests enforce byte-identical output
    across languages.
-5. **Telemetry never affects the workload.** Default 10 s flush cadence,
-   mandatory final flush on shutdown, bounded in-memory queue, drop on collector
-   error.
+5. **Telemetry never affects the workload.** Default cadence per signal:
+   log records every 10 s, metrics every 60 s, spans in batches at most 30 s
+   apart; mandatory final flush on shutdown, bounded in-memory queue, drop on
+   collector error. The final flush, not a short cadence, keeps a short-lived
+   container's last batch, so an idle service sends few requests. A process
+   that exits without a graceful shutdown loses up to 60 s of metrics and
+   30 s of spans; that loss is accepted.
 
 ## Rejected alternatives
 

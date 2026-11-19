@@ -12,13 +12,14 @@ import (
 
 // NewOTLPMetricReader returns a metric Reader that periodically exports the
 // MeterProvider's metrics to the collector as OTLP/JSON at /v1/metrics. Wire it
-// into Config.MetricReader (or let Config.OTLP do it). The MeterProvider's
+// into Config.MetricReader (or let Config.OTLP do it). It exports every
+// cfg.MetricInterval, 60 seconds by default. The MeterProvider's
 // Shutdown — already called by the plugin's Stop — drives the final flush, so
 // short-lived containers do not drop their last batch.
 func NewOTLPMetricReader(cfg OTLPConfig) sdkmetric.Reader {
 	return sdkmetric.NewPeriodicReader(
 		newOTLPMetricExporter(cfg),
-		sdkmetric.WithInterval(cfg.flushInterval()),
+		sdkmetric.WithInterval(cfg.metricInterval()),
 	)
 }
 
