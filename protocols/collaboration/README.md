@@ -221,8 +221,10 @@ Version 1 of every contract is `stable` from release 0.5.0
   member, a new required operation, a narrowed value or a new outcome opens
   version 2 of its contract, except an optional member the catalog lists
   under an operation's `members`: a provider returns or receives it only when
-  it declares it, and an older CLI withdraws a contract version that
-  declares a member it does not know (ADRs 0007, 0009 and 0011).
+  it declares it. Declaring members needs `cliContract` 24, and a CLI below
+  it refuses the whole extension manifest; a CLI at 24 or above that does
+  not know a declared member withdraws that contract version
+  (ADRs 0007, 0009 and 0011).
 - **May change within a version:** new optional operations and their
   documents, the Go helpers (`Serve`, `ReadProviderOffer`, `providertest`)
   before 1.0, and the guides.

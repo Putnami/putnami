@@ -75,8 +75,9 @@ func (o ProviderOffer) Operations(contract string, version int) (map[string]Prov
 // without a version or a command, an unknown operation, a member the catalog
 // does not list for the operation, a precondition rule
 // the operation does not allow, an operation that takes the canonical
-// selection without declaring workspaceSelection, or a missing required
-// operation.
+// selection without declaring workspaceSelection, a proposals declaration
+// that names pageUrl on some of the operations that answer a proposal and
+// not on others (ADR 0011), or a missing required operation.
 func ReadProviderOffer(providers map[string]extension.ProviderDeclaration) (ProviderOffer, []diag.Diagnostic) {
 	contracts := make([]string, 0, len(providers))
 	for contract := range providers {
