@@ -251,6 +251,19 @@ func MarshalState(state *State) ([]byte, error) {
 	return append(data, '\n'), nil
 }
 
+// writeStateFile stages the ownership state's bytes before WriteState renames
+// them into place.
+var writeStateFile = os.WriteFile
+
+// SetStateWriterForTest makes WriteState stage the ownership state with write
+// instead of os.WriteFile until restore runs. A test that calls it changes the
+// whole process, so it must not run in parallel.
+func SetStateWriterForTest(write func(name string, data []byte, perm os.FileMode) error) (restore func()) {
+	previous := writeStateFile
+	writeStateFile = write
+	return func() { writeStateFile = previous }
+}
+
 // WriteState atomically publishes the ownership state (temp file + rename in
 // the destination directory, never a rewrite in place), so an interrupted write
 // leaves the PREVIOUS state intact rather than a truncated one. A truncated
@@ -266,7 +279,7 @@ func WriteState(workspaceRoot string, state *State) error {
 		return fmt.Errorf("prepare agent-artifact state dir: %w", err)
 	}
 	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	if err := writeStateFile(tmp, data, 0o644); err != nil {
 		return fmt.Errorf("stage agent-artifact ownership state: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {

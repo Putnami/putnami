@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -213,38 +212,24 @@ func TestMaterialize_InterruptedRunIsSafeToRerun(t *testing.T) {
 // parent directory unwritable AFTER the plan was built.
 func TestApply_StagingFailureLeavesZeroMutations(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "record-last", "a-failure-leaves-files-and-record-untouched")
-	if os.Geteuid() == 0 {
-		t.Skip("a root process ignores directory permissions")
-	}
 	files := defaultWorkflowFiles()
 	fixture := newFixture(t, "1.0.0", files)
 	// Pre-create one target with its artifact bytes so the plan carries an
-	// unchanged entry too, and seed a second directory we can lock down.
+	// unchanged entry too.
 	fixture.write(t, ".claude/skills/fix/SKILL.md", files[".claude/skills/fix/SKILL.md"])
 
 	artifact, plan, err := fixture.preflight(t)
 	if err != nil {
 		t.Fatal(err)
 	}
-	locked := filepath.Join(fixture.root, ".agents", "skills", "fix")
-	if runtime.GOOS == "windows" {
-		// A read-only attribute does not deny creating files in a Windows
-		// directory, so a regular file takes the directory's place instead:
-		// the staging write fails on creating the target's directory.
-		if err := os.MkdirAll(filepath.Dir(locked), 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.WriteFile(locked, nil, 0o644); err != nil {
-			t.Fatal(err)
-		}
-	} else {
-		if err := os.MkdirAll(locked, 0o755); err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chmod(locked, 0o500); err != nil {
-			t.Fatal(err)
-		}
-		t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	// A regular file takes the place of a target's directory, so the staging
+	// write fails on creating that directory whatever the process privileges.
+	blocked := filepath.Join(fixture.root, ".agents", "skills", "fix")
+	if err := os.MkdirAll(filepath.Dir(blocked), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(blocked, nil, 0o644); err != nil {
+		t.Fatal(err)
 	}
 
 	before := snapshotTree(t, fixture.root)

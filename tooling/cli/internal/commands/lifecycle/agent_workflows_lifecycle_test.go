@@ -8,7 +8,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -1206,12 +1205,6 @@ func TestExtensionAgentContent_VerifiedPinsRefuseTamperedBytes(t *testing.T) {
 // a crashed run already wrote is adopted rather than reported as foreign.
 func TestExtensionAgentContent_InterruptedRunConvergesOnRerun(t *testing.T) {
 	spectest.Proves(t, "cli/agent-workflow-lifecycle", "extension-agent-content-integrity", "an-interrupted-extension-content-run-converges")
-	if os.Geteuid() == 0 {
-		t.Skip("a read-only directory does not deny root")
-	}
-	if runtime.GOOS == "windows" {
-		t.Skip("Windows has no read-only directory: os.Chmod sets an attribute that does not deny creating files in it")
-	}
 	root, _ := seededContentWorkspace(t)
 	for _, rel := range []string{".agents", ".claude", ".codex", ".putnami/agent-artifacts"} {
 		if err := os.RemoveAll(filepath.Join(root, filepath.FromSlash(rel))); err != nil {
@@ -1230,15 +1223,11 @@ func TestExtensionAgentContent_InterruptedRunConvergesOnRerun(t *testing.T) {
 	writeAgentFile(t, root, ".agents/skills/fixture-review/SKILL.md", string(published))
 
 	// Deny only the ownership-state write, leaving publication intact.
-	stateDir := filepath.Join(root, ".putnami", agentartifacts.StateDirName)
-	if err := os.MkdirAll(stateDir, 0o755); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chmod(stateDir, 0o555); err != nil {
-		t.Fatal(err)
-	}
+	restore := agentartifacts.SetStateWriterForTest(func(string, []byte, os.FileMode) error {
+		return os.ErrPermission
+	})
 	_, err = agentctx.InstallAgentWorkflowsWithResult(context.Background(), root, wsproto.Load(root), nil)
-	_ = os.Chmod(stateDir, 0o755)
+	restore()
 	if err == nil || !strings.Contains(err.Error(), "rerun") {
 		t.Fatalf("error = %v, want the convergent-failure report", err)
 	}

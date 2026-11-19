@@ -76,6 +76,9 @@ func AttachScratch(cmd *exec.Cmd, workspaceRoot string) (*filelock.Lock, error) 
 	return lease, nil
 }
 
+// removeScratchTree deletes the scratch tree name under root during reclamation.
+var removeScratchTree = func(root *os.Root, name string) error { return root.RemoveAll(name) }
+
 // reapScratch runs only under the exclusive lease. A generation is a fixed
 // retention window, not an access-time estimate: stable compiler outputs need
 // not change mtime when read. An old unmarked root starts its first window now.
@@ -116,7 +119,7 @@ func reapScratch(workspaceRoot string, now time.Time) error {
 	// Root.RemoveAll never follows symlinks and confines traversal to this
 	// opened root, even if a path is replaced during deletion. It uses bounded
 	// directory batches: no per-build inventory, byte scan, or in-memory tree.
-	if err := root.RemoveAll(scratchDirName); err != nil {
+	if err := removeScratchTree(root, scratchDirName); err != nil {
 		return err
 	}
 	return root.Chtimes(scratchGenerationName, now, now)

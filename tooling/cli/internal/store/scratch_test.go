@@ -278,18 +278,13 @@ func TestScratchReapingDoesNotFollowSymlinks(t *testing.T) {
 
 func TestScratchReapingFailureDoesNotAdvanceGeneration(t *testing.T) {
 	spectest.Proves(t, "cli/job-planning-execution", "scratch-generation-retention", "failed-reclamation-is-retried")
-	if os.Geteuid() == 0 {
-		t.Skip("root bypasses directory permissions")
-	}
 	ws := t.TempDir()
 	visitScratch(t, ws)
 	file := scratchFile(t, ws, "blocked/file")
 	expireScratch(t, ws)
-	blocked := filepath.Dir(file)
-	if err := os.Chmod(blocked, 0); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { _ = os.Chmod(blocked, 0o755) })
+	remove := removeScratchTree
+	t.Cleanup(func() { removeScratchTree = remove })
+	removeScratchTree = func(*os.Root, string) error { return os.ErrPermission }
 	visitScratch(t, ws) // Reclamation is advisory, but does not grant a new window.
 	stamp, err := os.Stat(filepath.Join(ws, putnamiDir, scratchGenerationName))
 	if err != nil {
@@ -298,9 +293,7 @@ func TestScratchReapingFailureDoesNotAdvanceGeneration(t *testing.T) {
 	if time.Since(stamp.ModTime()) < scratchGenerationLifetime {
 		t.Fatal("failed deletion advanced the generation")
 	}
-	if err := os.Chmod(blocked, 0o755); err != nil {
-		t.Fatal(err)
-	}
+	removeScratchTree = remove
 	visitScratch(t, ws)
 	if _, err := os.Stat(file); !os.IsNotExist(err) {
 		t.Fatalf("reclamation was not retried: %v", err)
