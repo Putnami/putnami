@@ -104,6 +104,11 @@ func (c Command) Run(ctx context.Context, args []string) int {
 	if result.ProposalURL != "" {
 		fmt.Fprintf(c.Stdout, "PROPOSAL_URL=%s\n", result.ProposalURL)
 	}
+	if result.ChangeURL != "" {
+		// CHANGE_URL links the change in the provider's own console, where
+		// the owner approves declarations, accepts gaps and decides findings.
+		fmt.Fprintf(c.Stdout, "CHANGE_URL=%s\n", result.ChangeURL)
+	}
 	if merged {
 		fmt.Fprintf(c.Stdout, "PROPOSAL_STATE=%s\n", result.State)
 	}

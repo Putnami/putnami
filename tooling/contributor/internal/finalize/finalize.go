@@ -118,6 +118,7 @@ const queueGatePrefix = "merge queue of "
 type Result struct {
 	ProposalRef           collab.Ref             `json:"proposalRef"`
 	ProposalURL           string                 `json:"proposalUrl,omitempty"`
+	ChangeURL             string                 `json:"changeUrl,omitempty"`
 	HeadSHA               string                 `json:"headSHA"`
 	State                 collab.ProposalState   `json:"state"`
 	Gate                  string                 `json:"gate,omitempty"`
