@@ -1,6 +1,7 @@
 import { runInContext, tryContext } from '@putnami/runtime';
 import type { TelemetryAttributes } from './telemetry.collector';
 import { getCollector } from './telemetry.utils';
+import { getTraceSampler } from './trace-sampling';
 
 const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/;
 const ZERO_TRACE_ID = '00000000000000000000000000000000';
@@ -41,15 +42,23 @@ export interface ActiveTelemetrySpan {
   finish(result?: TelemetrySpanResult): void;
 }
 
-/** Start a dependency-free W3C span backed by the active Putnami collector. */
+/**
+ * Start a dependency-free W3C span backed by the active Putnami collector.
+ *
+ * A span with a parent, remote or ambient, takes the parent's sampled flag. A
+ * root span asks the trace sampler the telemetry plugin installs; without one
+ * it is sampled. The span records only when sampled, and injects its flag
+ * either way, so the services it calls follow its decision.
+ */
 export function startTelemetrySpan(options: TelemetrySpanOptions): ActiveTelemetrySpan {
   const ambient = tryContext<AmbientTelemetryContext>();
   const remote = options.remoteHeaders ? readRemoteContext(options.remoteHeaders) : undefined;
   const parent = remote ?? ambient?.__putnamiTrace;
+  const traceId = parent?.traceId ?? randomHex(16);
   const context: TelemetryTraceContext = {
-    traceId: parent?.traceId ?? randomHex(16),
+    traceId,
     spanId: randomHex(8),
-    traceFlags: parent?.traceFlags ?? '01',
+    traceFlags: parent?.traceFlags ?? rootTraceFlags(traceId),
     ...(parent?.tracestate ? { tracestate: parent.tracestate } : {}),
     ...(parent?.baggage ? { baggage: parent.baggage } : {}),
   };
@@ -70,6 +79,7 @@ export function startTelemetrySpan(options: TelemetrySpanOptions): ActiveTelemet
     finish: (result = {}) => {
       if (finished) return;
       finished = true;
+      if (!isSampled(context.traceFlags)) return;
       getCollector()?.addSpan({
         traceId: context.traceId,
         spanId: context.spanId,
@@ -90,6 +100,15 @@ export function startTelemetrySpan(options: TelemetrySpanOptions): ActiveTelemet
 export function attachTelemetryContext(target: Record<string, unknown>, span: ActiveTelemetrySpan): void {
   target['__putnamiTrace'] = span.context;
   target['traceId'] = span.context.traceId;
+}
+
+function rootTraceFlags(traceId: string): string {
+  const sampler = getTraceSampler();
+  return !sampler || sampler.decide(traceId) ? '01' : '00';
+}
+
+function isSampled(traceFlags: string): boolean {
+  return (Number.parseInt(traceFlags, 16) & 1) === 1;
 }
 
 function readRemoteContext(headers: Headers): TelemetryTraceContext | undefined {

@@ -10,6 +10,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.43.0
 	go.putnami.dev/app v0.0.1
 	go.putnami.dev/client v0.0.1
+	go.putnami.dev/config v0.0.1
 	go.putnami.dev/errors v0.0.1
 	go.putnami.dev/http v0.0.1
 	go.putnami.dev/inject v0.0.1
@@ -28,7 +29,6 @@ require (
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.putnami.dev/config v0.0.1 // indirect
 	go.putnami.dev/migration v0.0.0 // indirect
 	go.putnami.dev/protocol/capabilities v0.0.0 // indirect
 	go.putnami.dev/protocol/config v0.0.0 // indirect

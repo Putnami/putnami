@@ -13,6 +13,7 @@
     "Running a collector, or defining collector-side retention, sampling, or routing",
     "Exporting via gRPC OTLP or via an OpenTelemetry exporter SDK; the wire is rendered directly as OTLP/JSON over HTTP",
     "Exporting logs implicitly: the log sink is attached to the application logger deliberately",
+    "Sampling a child span by its own budget: a child follows its parent's decision",
     "Promising strict compatibility between every pre-1.0 minor release",
     "Naming the process in service.instance.id for a telemetry Plugin the application builds itself: only the providers FromEnvironment builds name it"
   ],
@@ -53,8 +54,21 @@
       ]
     },
     {
-      "id": "explicit-sampling",
-      "text": "An unset sample rate samples every trace, while an explicit rate of zero samples none, so \"not configured\" and \"deliberately disabled\" stay distinguishable."
+      "id": "trace-budget",
+      "text": [
+        "The tracer provider samples by the telemetry/otlp-push-contract rule, from the plugin's TraceSampling or the protocol defaults, and each telemetry.traces config key overrides its field.",
+        "A span with a parent follows the parent's sampled flag whatever the budget.",
+        "Each root decision counts in trace.decisions on the plugin's meter provider.",
+        "A TraceSampling of zero budget, zero ratio and zero floor samples no root, so \"not configured\" and \"deliberately disabled\" stay distinguishable."
+      ]
+    },
+    {
+      "id": "live-sampling-settings",
+      "text": [
+        "While it runs, the plugin reloads the config sources every 30 seconds and applies a changed telemetry.traces value to the next root decision, without a restart; a source that keeps its first load for the process, such as CONFIG_DATA or a Cloud remote source, shows no change.",
+        "A value out of range, or a section that fails to load, keeps the settings in force and warns.",
+        "Sampler.Update applies settings the same way at runtime, and they hold until the config section itself changes."
+      ]
     },
     {
       "id": "span-always-ends",

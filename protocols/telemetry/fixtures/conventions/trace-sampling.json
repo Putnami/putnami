@@ -1,0 +1,103 @@
+{
+  "configPath": "telemetry.traces",
+  "keys": {"budget": "budget", "ratio": "ratio", "floorPerMinute": "floorPerMinute"},
+  "defaults": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1},
+  "counter": {"name": "trace.decisions", "attribute": "outcome", "kept": "kept", "dropped": "dropped"},
+  "ratioCases": [
+    {"traceId": "4bf92f3577b34da60000000000000000", "ratio": 0, "picked": false},
+    {"traceId": "4bf92f3577b34da60000000000000000", "ratio": 0.01, "picked": true},
+    {"traceId": "4bf92f3577b34da60000000000000000", "ratio": 0.5, "picked": true},
+    {"traceId": "4bf92f3577b34da60000000000000000", "ratio": 1, "picked": true},
+    {"traceId": "4bf92f3577b34da67fffffffffffffff", "ratio": 0, "picked": false},
+    {"traceId": "4bf92f3577b34da67fffffffffffffff", "ratio": 0.01, "picked": false},
+    {"traceId": "4bf92f3577b34da67fffffffffffffff", "ratio": 0.5, "picked": true},
+    {"traceId": "4bf92f3577b34da67fffffffffffffff", "ratio": 1, "picked": true},
+    {"traceId": "4bf92f3577b34da68000000000000000", "ratio": 0, "picked": false},
+    {"traceId": "4bf92f3577b34da68000000000000000", "ratio": 0.01, "picked": false},
+    {"traceId": "4bf92f3577b34da68000000000000000", "ratio": 0.5, "picked": false},
+    {"traceId": "4bf92f3577b34da68000000000000000", "ratio": 1, "picked": true},
+    {"traceId": "4bf92f3577b34da6ffffffffffffffff", "ratio": 0, "picked": false},
+    {"traceId": "4bf92f3577b34da6ffffffffffffffff", "ratio": 0.01, "picked": false},
+    {"traceId": "4bf92f3577b34da6ffffffffffffffff", "ratio": 0.5, "picked": false},
+    {"traceId": "4bf92f3577b34da6ffffffffffffffff", "ratio": 1, "picked": true},
+    {"traceId": "4bf92f3577b34da6028f5c28f5c28f5e", "ratio": 0, "picked": false},
+    {"traceId": "4bf92f3577b34da6028f5c28f5c28f5e", "ratio": 0.01, "picked": true},
+    {"traceId": "4bf92f3577b34da6028f5c28f5c28f5e", "ratio": 0.5, "picked": true},
+    {"traceId": "4bf92f3577b34da6028f5c28f5c28f5e", "ratio": 1, "picked": true},
+    {"traceId": "4bf92f3577b34da6028f5c28f5c28f60", "ratio": 0, "picked": false},
+    {"traceId": "4bf92f3577b34da6028f5c28f5c28f60", "ratio": 0.01, "picked": false},
+    {"traceId": "4bf92f3577b34da6028f5c28f5c28f60", "ratio": 0.5, "picked": true},
+    {"traceId": "4bf92f3577b34da6028f5c28f5c28f60", "ratio": 1, "picked": true}
+  ],
+  "scenarios": [
+    {
+      "name": "the first roots are kept up to the budget",
+      "settings": {"budget": 2, "ratio": 0, "floorPerMinute": 0},
+      "roots": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 2, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
+      ]
+    },
+    {
+      "name": "past the budget the floor keeps roots each minute",
+      "settings": {"budget": 0, "ratio": 0, "floorPerMinute": 1},
+      "roots": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 10, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 60, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 61, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 180, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true}
+      ]
+    },
+    {
+      "name": "roots kept by the budget count against the floor",
+      "settings": {"budget": 2, "ratio": 0, "floorPerMinute": 1},
+      "roots": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 2, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 60, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 61, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
+      ]
+    },
+    {
+      "name": "past the budget and the floor the ratio picks by trace ID",
+      "settings": {"budget": 0, "ratio": 0.5, "floorPerMinute": 0},
+      "roots": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da60000000000000000", "kept": true},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da67fffffffffffffff", "kept": true},
+        {"atSecond": 2, "traceId": "4bf92f3577b34da68000000000000000", "kept": false},
+        {"atSecond": 3, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
+      ]
+    },
+    {
+      "name": "a ratio of 0.01 picks below its bound",
+      "settings": {"budget": 1, "ratio": 0.01, "floorPerMinute": 1},
+      "roots": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 2, "traceId": "4bf92f3577b34da6028f5c28f5c28f5e", "kept": true},
+        {"atSecond": 3, "traceId": "4bf92f3577b34da6028f5c28f5c28f60", "kept": false},
+        {"atSecond": 60, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 61, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
+      ]
+    },
+    {
+      "name": "zero settings keep no root",
+      "settings": {"budget": 0, "ratio": 0, "floorPerMinute": 0},
+      "roots": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da60000000000000000", "kept": false},
+        {"atSecond": 60, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
+      ]
+    },
+    {
+      "name": "a ratio of 1 keeps every root",
+      "settings": {"budget": 0, "ratio": 1, "floorPerMinute": 0},
+      "roots": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true}
+      ]
+    }
+  ]
+}

@@ -14,7 +14,7 @@ a := app.New("my-service")
 a.Module.Use(telemetry.NewPlugin(telemetry.Config{
     ServiceName:    "my-service",
     ServiceVersion: "1.0.0",
-    TraceSampleRate: telemetry.SampleRate(0.1), // Sample 10% of traces
+    TraceSampling:  &telemetry.TraceSampling{Budget: 100, Ratio: 0.1, FloorPerMinute: 1},
 }))
 ```
 
@@ -29,9 +29,46 @@ The plugin:
 |-------|------|---------|-------------|
 | `ServiceName` | `string` | — | Service name for telemetry data |
 | `ServiceVersion` | `string` | — | Service version |
-| `TraceSampleRate` | `*float64` | `telemetry.SampleRate(1.0)` when nil | Trace sampling rate (0.0–1.0), set with `telemetry.SampleRate(rate)` |
+| `TraceSampling` | `*telemetry.TraceSampling` | `telemetry.DefaultTraceSampling()` when nil | Trace budget; see [Trace budget](#trace-budget) |
 | `TraceExporter` | exporter | — | Custom trace exporter |
 | `MetricReader` | reader | — | Custom metric reader |
+
+## Trace budget
+
+Each instance keeps its first `budget` root traces, then keeps a root when
+`ratio` picks its trace ID, and keeps at least `floorPerMinute` roots each UTC
+minute, so a rarely called service still exports traces. A span with a parent,
+remote or local, follows its parent's sampled flag: a service follows its
+caller's decision.
+
+| Key in `telemetry.traces` | Default | Meaning |
+|---|---|---|
+| `budget` | `100` | Root traces the instance keeps first |
+| `ratio` | `0.01` | Share of root traces kept once the budget is spent, from 0 to 1 |
+| `floorPerMinute` | `1` | Root traces kept each minute whatever the ratio picks |
+
+```yaml
+# conf/.env.yaml, or CONFIG_DATA
+telemetry:
+  traces:
+    budget: 100
+    ratio: 0.01
+    floorPerMinute: 1
+```
+
+`Config.TraceSampling` sets the same three values in code; each key of the
+config section overrides its field. While it runs, the plugin reloads the
+config sources every 30 seconds and applies a changed value without a restart.
+A change to a file under `conf/` applies within 30 seconds. `CONFIG_DATA` and
+the Putnami Cloud remote sources keep their first load for the life of the
+process: to change a running process there, call `plugin.Sampler().Update`.
+A value out of range keeps the settings in force and logs a warning.
+
+The counter `trace.decisions`, labeled `outcome` `kept` or `dropped`, counts
+each root decision. `Plugin.Sampler()` returns the sampler: `Settings()` reads
+the settings in force, and `Update(settings)` replaces them at runtime until
+the config section changes. The TypeScript runtime applies the same keys, rule
+and counter, which `go.putnami.dev/protocol/telemetry` defines.
 
 ## Tracing
 

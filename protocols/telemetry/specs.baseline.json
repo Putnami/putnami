@@ -13,6 +13,8 @@
     "telemetry/otlp-push-contract#the-resource-names-the-service",
     "telemetry/otlp-push-contract#the-version-is-pinned",
     "telemetry/otlp-push-contract#three-signals-on-fixed-paths",
+    "telemetry/otlp-push-contract#trace-sampling-defaults",
+    "telemetry/otlp-push-contract#trace-sampling-is-shared",
     "telemetry/otlp-push-contract#values-map-to-otlp-numbers"
   ]
 }

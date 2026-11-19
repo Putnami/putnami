@@ -81,13 +81,22 @@ built-in client.
 | `OTLP` | `*telemetry.OTLPConfig` | `nil` | When set, auto-wires the built-in OTLP/JSON push exporters (metrics + traces) to `OTLPConfig.Endpoint`. Only fills `TraceExporter`/`MetricReader` when they are nil. |
 | `TraceExporter` | `sdktrace.SpanExporter` | `nil` | Explicit span exporter. Tracing is disabled when nil (and `OTLP` is unset). |
 | `MetricReader` | `sdkmetric.Reader` | `nil` | Explicit metric reader. Metrics are disabled when nil (and `OTLP` is unset). |
-| `TraceSampleRate` | `*float64` | `telemetry.SampleRate(1.0)` when nil | Sampling ratio (0.0 to 1.0). Set with `telemetry.SampleRate(rate)`; `telemetry.SampleRate(0)` explicitly samples nothing. |
+| `TraceSampling` | `*telemetry.TraceSampling` | `telemetry.DefaultTraceSampling()` when nil | Trace budget: the first `Budget` roots, then the roots `Ratio` picks, with at least `FloorPerMinute` roots each minute. Each `telemetry.traces` config key overrides its field. |
 | `SpanBatchDelay` | `time.Duration` | `30s` | Longest a completed span waits before its batch is exported; a batch of 512 spans leaves at once. When zero, `OTEL_BSP_SCHEDULE_DELAY` (milliseconds) sets it. |
 | `ShutdownTimeout` | `time.Duration` | `5s` | Maximum time to wait for exporters to flush on shutdown. |
 
-`TraceSampleRate` is a pointer so the plugin can distinguish an omitted value
-from an explicit `0.0`: leave it nil for the default full sampling, or pass
-`telemetry.SampleRate(0)` to disable trace sampling.
+`TraceSampling` is a pointer so the plugin can distinguish an omitted value
+from an explicit zero: leave it nil for the default budget (100 roots, then
+1 %, with 1 root per minute), or pass `&telemetry.TraceSampling{}` to sample
+no root trace. A span with a parent follows its parent's sampled flag.
+
+The plugin reloads the config sources every 30 seconds and applies a changed
+`telemetry.traces` key (`budget`, `ratio`, `floorPerMinute`) without a restart.
+A file under `conf/` that changes applies; `CONFIG_DATA` and the Putnami Cloud
+remote sources keep their first load for the process. It
+counts each root decision in `trace.decisions{outcome=kept|dropped}`.
+`plugin.Sampler().Update(settings)` changes the settings at runtime until the
+config section changes.
 
 ### DI Integration
 
@@ -278,7 +287,7 @@ This requires no manual instrumentation. Any code that creates errors via the `e
 
 3. **Use `SetSpanErrorStructured` over `SetSpanError`** when working with `go.putnami.dev/errors` to capture structured metadata (code, category, retryable).
 
-4. **Set a sample rate below 1.0 in production.** Full sampling generates significant data volume. Start with `0.1` (10%) and adjust based on traffic.
+4. **Tune the trace budget, not the code.** The default keeps 100 roots, then 1 %, with at least 1 root per minute. Change the `telemetry.traces` keys in a `conf/` file: the plugin applies them without a restart. In `CONFIG_DATA` or Putnami Cloud config, a change applies at the next start.
 
 5. **Use the HTTP middleware early in the middleware chain** so that spans capture the full request lifecycle, including downstream middleware processing time.
 

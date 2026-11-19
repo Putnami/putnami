@@ -8,8 +8,10 @@ import {
   resolveEnvValues,
   setActiveConfigServiceGet,
   setActiveConfigServiceRawSection,
+  setActiveConfigServiceRead,
   unsetActiveConfigServiceGet,
   unsetActiveConfigServiceRawSection,
+  unsetActiveConfigServiceRead,
 } from './config';
 import { type ConfigSource, getDefaultSources, loadGlobalConfig } from './config-source';
 
@@ -75,13 +77,19 @@ export class ConfigService {
     params?: ConfigParams<InferSchema<S>>,
   ) => InferSchema<S>;
   private readonly delegateRawSection: (path: string) => Record<string, unknown> | undefined;
+  private readonly delegateRead: <S extends SchemaDefinition>(
+    config: ConfigDefinition<S>,
+    params?: ConfigParams<InferSchema<S>>,
+  ) => InferSchema<S>;
 
   constructor(sources?: ConfigSource[]) {
     this.sources = sources ?? getDefaultSources();
     this.delegateGet = (config, params) => this.get(config, params);
     this.delegateRawSection = (path) => this.rawSection(path);
+    this.delegateRead = (config, params) => this.read(config, params);
     setActiveConfigServiceGet(this.delegateGet);
     setActiveConfigServiceRawSection(this.delegateRawSection);
+    setActiveConfigServiceRead(this.delegateRead);
   }
 
   /**
@@ -104,12 +112,36 @@ export class ConfigService {
       this.globalConfig = loadGlobalConfig(this.sources);
     }
 
-    const rawConfig = (getDeep(this.globalConfig, path) || {}) as Record<string, unknown>;
+    const data = this.validate(config, path, this.globalConfig, params.confInit);
+    this.cache.set(cacheKey, data);
+    return data;
+  }
+
+  /**
+   * Load and validate a typed configuration instance from this service's
+   * sources now — the instance-scoped counterpart of `readConfig()`. Every
+   * call reloads the sources, and neither reads nor fills the cache `get()`
+   * keeps.
+   */
+  read<S extends SchemaDefinition>(
+    config: ConfigDefinition<S>,
+    params: ConfigParams<InferSchema<S>> = {},
+  ): InferSchema<S> {
+    return this.validate(config, params.path || config.path, loadGlobalConfig(this.sources), params.confInit);
+  }
+
+  private validate<S extends SchemaDefinition>(
+    config: ConfigDefinition<S>,
+    path: string,
+    tree: Record<string, unknown> | undefined,
+    confInit: Partial<InferSchema<S>> | undefined,
+  ): InferSchema<S> {
+    const rawConfig = (getDeep(tree, path) || {}) as Record<string, unknown>;
 
     const resolved = resolveEnvValues(config.schema, rawConfig);
 
     // Merge confInit underneath (YAML / env take precedence over programmatic defaults)
-    const merged = params.confInit ? { ...(params.confInit as Record<string, unknown>), ...resolved } : resolved;
+    const merged = confInit ? { ...(confInit as Record<string, unknown>), ...resolved } : resolved;
 
     // Validate against schema (defaults are applied during validation)
     const { data, errors } = validateSchema(config.schema, merged, {
@@ -122,7 +154,6 @@ export class ConfigService {
       throw new Error(`Config validation failed for '${path}': ${redacted}`);
     }
 
-    this.cache.set(cacheKey, data);
     return data as InferSchema<S>;
   }
 
@@ -251,5 +282,6 @@ export class ConfigService {
   close(): void {
     unsetActiveConfigServiceGet(this.delegateGet);
     unsetActiveConfigServiceRawSection(this.delegateRawSection);
+    unsetActiveConfigServiceRead(this.delegateRead);
   }
 }

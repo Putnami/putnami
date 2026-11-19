@@ -1,4 +1,5 @@
 import { Config, Default, Int, Optional, Sensitive } from '@putnami/runtime';
+import type { TraceSampling } from './trace-sampling';
 
 export interface TelemetryOptions {
   /** Enable or disable telemetry collection. Disabled by default (explicit opt-in). */
@@ -24,6 +25,13 @@ export interface TelemetryOptions {
   spanBatchDelayS?: number;
   /** Application identifier reported as the OTLP resource's service.name. Defaults to package name. */
   app?: string;
+  /**
+   * The trace budget: keep the first `budget` root traces, then keep a root
+   * when `ratio` picks its trace ID, and at least `floorPerMinute` roots each
+   * minute. A field left out takes its default (100, 0.01 and 1); each key of
+   * the `telemetry.traces` config section overrides its field, live.
+   */
+  traces?: Partial<TraceSampling>;
 }
 
 export const TelemetryConfig = Config('telemetry', {

@@ -81,6 +81,7 @@
     "typescript/service-telemetry#collector-ownership",
     "typescript/service-telemetry#default-from-environment",
     "typescript/service-telemetry#export-cadence",
+    "typescript/service-telemetry#live-sampling-settings",
     "typescript/service-telemetry#log-record-mapping",
     "typescript/service-telemetry#log-sink-is-best-effort",
     "typescript/service-telemetry#logs-from-environment",
@@ -92,6 +93,7 @@
     "typescript/service-telemetry#process-instance-identity",
     "typescript/service-telemetry#push-transport",
     "typescript/service-telemetry#service-identity-from-environment",
+    "typescript/service-telemetry#trace-budget",
     "typescript/service-telemetry#trace-propagation"
   ]
 }

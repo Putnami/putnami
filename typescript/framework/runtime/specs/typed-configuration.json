@@ -49,6 +49,10 @@
     {
       "id": "browser-surface",
       "text": "The browser entry point applies declared defaults and call-site overrides, reports the browser environment, and never reads files, CONFIG_DATA, or environment variables nor throws on a missing required field."
+    },
+    {
+      "id": "fresh-read",
+      "text": "readConfig() reloads every source of the active ConfigService, or the default sources without one, and validates the definition on each call, without reading or filling the caches useConfig() keeps, so a long-running process sees a changed value while every useConfig() result stays the same."
     }
   ],
   "decisions": ["typescript/framework/runtime/doc/adr/0002-configuration-precedence-and-name-only-secrets.md"]

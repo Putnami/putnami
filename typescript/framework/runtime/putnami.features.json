@@ -212,6 +212,15 @@
               "a-missing-required-field-does-not-throw-in-the-browser"
             ]
           }
+        },
+        {
+          "id": "fresh-read",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["read-config-sees-a-changed-source", "read-config-leaves-the-use-config-cache-alone"]
+          }
         }
       ]
     }

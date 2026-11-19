@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -190,75 +189,13 @@ func TestGaugeCreation(t *testing.T) {
 // --- Plugin lifecycle ---
 
 func TestPluginConfigDefaults(t *testing.T) {
-	spectest.Proves(t, "go/service-telemetry", "explicit-sampling", "an-unset-sample-rate-samples-every-trace")
-	cfg := Config{ServiceName: "test"}
-	cfg = cfg.withDefaults()
-
-	if cfg.TraceSampleRate == nil || *cfg.TraceSampleRate != 1.0 {
-		t.Errorf("TraceSampleRate = %v, want 1.0 when unset", cfg.TraceSampleRate)
-	}
+	cfg := Config{ServiceName: "test"}.withDefaults()
 	if cfg.ShutdownTimeout == 0 {
 		t.Error("ShutdownTimeout should not be zero")
 	}
-
-	// The default is only real if the sampler the provider is built with honors
-	// it: assert the exported spans, not just the resolved config field.
-	if got := sampledSpans(t, Config{ServiceName: "test"}, sampleProbeSpans); got != sampleProbeSpans {
-		t.Errorf("an unset sample rate exported %d/%d spans, want every one", got, sampleProbeSpans)
+	if cfg.samplingRefresh != DefaultSamplingRefresh {
+		t.Errorf("samplingRefresh = %v, want %v", cfg.samplingRefresh, DefaultSamplingRefresh)
 	}
-}
-
-// An explicit SampleRate(0) must be honored as "sample nothing", not
-// silently overridden to full sampling.
-func TestPluginConfigHonorsExplicitZeroSampleRate(t *testing.T) {
-	spectest.Proves(t, "go/service-telemetry", "explicit-sampling", "an-explicit-rate-of-zero-samples-none")
-	cfg := Config{ServiceName: "test", TraceSampleRate: SampleRate(0)}.withDefaults()
-	if cfg.TraceSampleRate == nil || *cfg.TraceSampleRate != 0 {
-		t.Errorf("explicit SampleRate(0) = %v, want 0 (must not be overridden to 1.0)", cfg.TraceSampleRate)
-	}
-
-	// A non-zero explicit rate is preserved too.
-	cfg = Config{ServiceName: "test", TraceSampleRate: SampleRate(0.25)}.withDefaults()
-	if cfg.TraceSampleRate == nil || *cfg.TraceSampleRate != 0.25 {
-		t.Errorf("explicit SampleRate(0.25) = %v, want 0.25", cfg.TraceSampleRate)
-	}
-
-	// "Samples none" is a claim about traces, not about a struct field: a
-	// provider built with a sampler that ignores the rate would keep both
-	// assertions above green while exporting every span.
-	if got := sampledSpans(t, Config{ServiceName: "test", TraceSampleRate: SampleRate(0)}, sampleProbeSpans); got != 0 {
-		t.Errorf("an explicit rate of zero exported %d/%d spans, want none", got, sampleProbeSpans)
-	}
-}
-
-// sampleProbeSpans is large enough that a sampler which honors neither extreme
-// would have to be improbably lucky to produce an all-or-nothing count.
-const sampleProbeSpans = 40
-
-// sampledSpans configures a plugin against an in-memory exporter, starts n
-// root spans through the global tracer, and reports how many were exported —
-// i.e. how many the configured sampler actually sampled.
-func sampledSpans(t *testing.T, cfg Config, n int) int {
-	t.Helper()
-	saveOTelGlobals(t)
-
-	exporter := tracetest.NewInMemoryExporter()
-	cfg.TraceExporter = exporter
-	p := NewPlugin(cfg)
-	if err := p.Configure(context.Background(), nil); err != nil {
-		t.Fatalf("Configure() error: %v", err)
-	}
-	t.Cleanup(func() { _ = p.Stop(context.Background(), nil) })
-
-	tracer := otel.Tracer("sampling-probe")
-	for i := range n {
-		_, span := tracer.Start(context.Background(), fmt.Sprintf("op-%d", i))
-		span.End()
-	}
-	if err := p.tp.ForceFlush(context.Background()); err != nil {
-		t.Fatalf("force flush: %v", err)
-	}
-	return len(exporter.GetSpans())
 }
 
 func TestPluginName(t *testing.T) {

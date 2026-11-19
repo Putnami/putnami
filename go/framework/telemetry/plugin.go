@@ -59,12 +59,21 @@ type Config struct {
 	// exporter still wins. Logs are opt-in via NewOTLPLogSink on the logger.
 	OTLP *OTLPConfig
 
-	// TraceSampleRate controls the sampling ratio (0.0–1.0). A nil pointer means
-	// "unset" and defaults to 1.0 (sample everything). An explicit value is
-	// honored as-is, so SampleRate(0) samples nothing — distinguishing a
-	// deliberate "off" from the unset default, which a bare float64 zero value
-	// could not. Use the SampleRate helper to set it.
-	TraceSampleRate *float64
+	// TraceSampling sets the trace budget: the first Budget root traces are
+	// kept, then a root is kept when Ratio picks its trace ID, with at least
+	// FloorPerMinute roots kept each minute. A nil pointer means "unset" and
+	// takes DefaultTraceSampling. An explicit value is honored as-is, so a
+	// zero TraceSampling samples no root — distinguishing a deliberate "off"
+	// from the unset default.
+	//
+	// Each key of the telemetry.traces config section (budget, ratio,
+	// floorPerMinute) overrides its field. While it runs, the plugin reloads
+	// the config sources every 30 seconds and applies a changed value without
+	// a restart. A source that keeps its first load for the process, such as
+	// CONFIG_DATA or a Cloud remote source, shows no change: Sampler().Update
+	// changes the settings of a running process.
+	// A span with a parent follows its parent's sampled flag.
+	TraceSampling *TraceSampling
 
 	// SpanBatchDelay is the longest a completed span waits before the batcher
 	// exports its batch; a batch of 512 spans, or OTEL_BSP_MAX_EXPORT_BATCH_SIZE,
@@ -77,20 +86,26 @@ type Config struct {
 	// Defaults to 5 seconds.
 	ShutdownTimeout time.Duration
 
+	// samplingRefresh is how often the plugin re-reads the telemetry.traces
+	// section. Zero means DefaultSamplingRefresh.
+	samplingRefresh time.Duration
+
 	// fromEnvironment makes the resource read OTEL_SERVICE_NAME and
 	// OTEL_RESOURCE_ATTRIBUTES when the providers are built, not once per
 	// process as the SDK default resource does. FromEnvironment sets it.
 	fromEnvironment bool
 }
 
-// SampleRate returns a pointer to rate for use as Config.TraceSampleRate.
-// SampleRate(0) samples nothing; leaving TraceSampleRate nil samples everything
-// (the default).
-func SampleRate(rate float64) *float64 { return &rate }
-
 func (c Config) withDefaults() Config {
-	if c.TraceSampleRate == nil {
-		c.TraceSampleRate = SampleRate(1.0)
+	if c.TraceSampling == nil {
+		defaults := DefaultTraceSampling()
+		c.TraceSampling = &defaults
+	} else {
+		explicit := *c.TraceSampling
+		c.TraceSampling = &explicit
+	}
+	if c.samplingRefresh == 0 {
+		c.samplingRefresh = DefaultSamplingRefresh
 	}
 	if c.ShutdownTimeout == 0 {
 		c.ShutdownTimeout = 5 * time.Second
@@ -174,6 +189,9 @@ type Plugin struct {
 	removeClientBridge func()
 	autoTraceExporter  sdktrace.SpanExporter
 	autoMetricReader   sdkmetric.Reader
+	sampler            *Sampler
+	stopRefresh        context.CancelFunc
+	refreshDone        chan struct{}
 
 	mu           sync.RWMutex
 	configured   bool
@@ -182,11 +200,18 @@ type Plugin struct {
 
 // NewPlugin creates a new telemetry plugin.
 func NewPlugin(cfg Config) *Plugin {
+	cfg = cfg.withDefaults()
 	return &Plugin{
-		cfg: cfg.withDefaults(),
-		log: logger.Default().Named("telemetry"),
+		cfg:     cfg,
+		log:     logger.Default().Named("telemetry"),
+		sampler: newSampler(*cfg.TraceSampling),
 	}
 }
+
+// Sampler returns the sampler that decides the root spans of the tracer
+// provider the plugin builds. Its Update tightens or loosens the trace budget
+// at runtime, until the telemetry.traces config section changes.
+func (p *Plugin) Sampler() *Sampler { return p.sampler }
 
 // Name returns the plugin name.
 func (p *Plugin) Name() string { return "telemetry" }
@@ -255,6 +280,9 @@ func (p *Plugin) Configure(_ context.Context, _ *app.Module) error {
 
 // configureLocked does the real wiring. p.mu must be held by the caller.
 func (p *Plugin) configureLocked() error {
+	if err := p.cfg.TraceSampling.Validate(); err != nil {
+		return errors.Wrapf(err, CodeConfigure, "telemetry: invalid TraceSampling")
+	}
 	traceExporter := p.cfg.TraceExporter
 	metricReader := p.cfg.MetricReader
 
@@ -290,7 +318,7 @@ func (p *Plugin) configureLocked() error {
 
 	// Build TracerProvider
 	tpOpts := []sdktrace.TracerProviderOption{
-		sdktrace.WithSampler(sdktrace.TraceIDRatioBased(*p.cfg.TraceSampleRate)),
+		sdktrace.WithSampler(sdktrace.ParentBased(p.sampler)),
 	}
 	if res != nil {
 		tpOpts = append(tpOpts, sdktrace.WithResource(res))
@@ -319,6 +347,9 @@ func (p *Plugin) configureLocked() error {
 	}
 	p.mp = sdkmetric.NewMeterProvider(mpOpts...)
 	otel.SetMeterProvider(p.mp)
+	if err := p.sampler.bindMeter(p.mp.Meter(samplingMeterName)); err != nil {
+		return errors.Wrapf(err, CodeConfigure, "configure the trace decisions counter")
+	}
 
 	// Wire error bridge — increments errors_total on each structured error.
 	// Keep the deregister handle so Stop can remove the hook; otherwise it
@@ -330,13 +361,38 @@ func (p *Plugin) configureLocked() error {
 	}
 	p.removeClientBridge = client.InstallServiceCallTelemetry(clientBridge)
 
+	// Last, so a Configure error leaves no refresh running: the application
+	// never calls Stop after one.
+	p.startSamplingRefresh()
+
 	return nil
+}
+
+// startSamplingRefresh reads the telemetry.traces section, then re-reads it
+// every samplingRefresh until Stop. p.mu must be held by the caller.
+func (p *Plugin) startSamplingRefresh() {
+	refresh := &samplingRefresh{sampler: p.sampler, base: *p.cfg.TraceSampling, log: p.log}
+	refresh.apply(context.Background())
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	p.stopRefresh = cancel
+	p.refreshDone = done
+	go refresh.run(ctx, p.cfg.samplingRefresh, done)
 }
 
 // Stop shuts down the tracer and meter providers, flushing pending data.
 func (p *Plugin) Stop(ctx context.Context, _ *app.Module) error {
 	ctx, cancel := context.WithTimeout(ctx, p.cfg.ShutdownTimeout)
 	defer cancel()
+
+	p.mu.Lock()
+	stopRefresh, refreshDone := p.stopRefresh, p.refreshDone
+	p.stopRefresh, p.refreshDone = nil, nil
+	p.mu.Unlock()
+	if stopRefresh != nil {
+		stopRefresh()
+		<-refreshDone
+	}
 
 	p.mu.RLock()
 	removeErrorBridge := p.removeErrorBridge

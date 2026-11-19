@@ -85,7 +85,7 @@
           }
         },
         {
-          "id": "explicit-sampling",
+          "id": "trace-budget",
           "stage": "coded",
           "evidenceKinds": [
             "attestation"
@@ -93,8 +93,27 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "an-unset-sample-rate-samples-every-trace",
-              "an-explicit-rate-of-zero-samples-none"
+              "unset-sampling-uses-the-protocol-defaults",
+              "the-config-section-overrides-the-plugin-settings",
+              "a-child-follows-its-parents-sampled-flag",
+              "each-root-decision-is-counted",
+              "zero-settings-sample-no-root"
+            ]
+          }
+        },
+        {
+          "id": "live-sampling-settings",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-changed-key-applies-without-a-restart",
+              "an-invalid-section-keeps-the-settings-in-force",
+              "a-cached-source-shows-no-change",
+              "an-update-holds-until-the-section-changes"
             ]
           }
         },

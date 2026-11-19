@@ -123,6 +123,18 @@ validated by their own protocol parsers). It honors the active `ConfigService`
 not an object. Typed operator-facing config should keep using `Config()` +
 `useConfig()`.
 
+### Fresh read
+
+`readConfig(definition, params?)` loads and validates a definition from its
+sources on each call — those of the active `ConfigService` (`service.read()`),
+or the default sources without one — and neither reads nor fills the caches
+`useConfig()` keeps. A long-running process calls it on a period to apply a
+setting without a restart, as the telemetry plugin does for `telemetry.traces`
+every 30 seconds. A source that keeps its first load for the process, such as
+`CONFIG_DATA` or a Putnami Cloud remote source, answers the same on every call,
+so only a changed file shows. Each call reads every file again, so never call
+it on a request path.
+
 ### Client / Browser build
 
 The client entrypoint (`src/index.browser.ts`, used via the package `browser`

@@ -72,6 +72,8 @@ export function resetConfigLoader() {
   _activeConfigServiceGetStack.length = 0;
   _activeConfigServiceRawSection = undefined;
   _activeConfigServiceRawSectionStack.length = 0;
+  _activeConfigServiceRead = undefined;
+  _activeConfigServiceReadStack.length = 0;
   runConfigLoaderResetHooks();
 }
 
@@ -209,6 +211,40 @@ export function unsetActiveConfigServiceRawSection(fn: ConfigServiceRawSectionFn
   _activeConfigServiceRawSection = _activeConfigServiceRawSectionStack[_activeConfigServiceRawSectionStack.length - 1];
 }
 
+let _activeConfigServiceRead: ConfigServiceGetFn | undefined;
+const _activeConfigServiceReadStack: ConfigServiceGetFn[] = [];
+
+/**
+ * Registers the active ConfigService's read function for delegation.
+ * Called by ConfigService constructor.
+ * @internal
+ */
+export function setActiveConfigServiceRead(fn: ConfigServiceGetFn | undefined): void {
+  if (!fn) {
+    _activeConfigServiceRead = undefined;
+    _activeConfigServiceReadStack.length = 0;
+    return;
+  }
+
+  _activeConfigServiceReadStack.push(fn);
+  _activeConfigServiceRead = fn;
+}
+
+/**
+ * Unregisters a ConfigService read function only if it is currently tracked.
+ * If it was the active callback, restores the previous one.
+ * @internal
+ */
+export function unsetActiveConfigServiceRead(fn: ConfigServiceGetFn): void {
+  const idx = _activeConfigServiceReadStack.lastIndexOf(fn);
+  if (idx === -1) {
+    return;
+  }
+
+  _activeConfigServiceReadStack.splice(idx, 1);
+  _activeConfigServiceRead = _activeConfigServiceReadStack[_activeConfigServiceReadStack.length - 1];
+}
+
 // ---------------------------------------------------------------------------
 // useConfig — primary public API
 // ---------------------------------------------------------------------------
@@ -265,6 +301,35 @@ export function useConfig<S extends SchemaDefinition>(
 
   // Standalone path (no DI container, scripts/tests/build-time)
   return loadConfigStandalone(config, _path, confInit);
+}
+
+/**
+ * Loads and validates a typed configuration instance from its sources now,
+ * bypassing every cache.
+ *
+ * Each call reloads every source — those of the active {@link ConfigService},
+ * or the default sources without one — and validates the definition with the
+ * same precedence as {@link useConfig}. It neither reads nor fills the caches
+ * `useConfig()` keeps, so every `useConfig()` result stays the same. A setting
+ * a long-running process applies without a restart reads through it, on a
+ * period. A source that keeps its first load for the process, such as
+ * `CONFIG_DATA` or a Cloud remote source, answers the same on every call.
+ *
+ * @example
+ * ```typescript
+ * import { readConfig } from '@putnami/runtime';
+ *
+ * setInterval(() => applyLimits(readConfig(LimitsConfig)), 30_000).unref();
+ * ```
+ */
+export function readConfig<S extends SchemaDefinition>(
+  config: ConfigDefinition<S>,
+  { path: _path, confInit }: ConfigParams<InferSchema<S>> = {},
+): InferSchema<S> {
+  if (_activeConfigServiceRead) {
+    return _activeConfigServiceRead(config, { path: _path, confInit });
+  }
+  return loadConfigStandalone(config, _path, confInit, new Map(), loadGlobalConfig(getDefaultSources()) ?? {});
 }
 
 /**

@@ -1,4 +1,12 @@
-export { Config, useConfig, useRawConfigSection, getEnv, resetConfigLoader, isConfigDefinition } from './config';
+export {
+  Config,
+  useConfig,
+  readConfig,
+  useRawConfigSection,
+  getEnv,
+  resetConfigLoader,
+  isConfigDefinition,
+} from './config';
 export type { ConfigDefinition, ConfigParams, InferConfig } from './config';
 export { ConfigService } from './config-service';
 export type { ConfigDescription, FieldOrigin } from './config-service';

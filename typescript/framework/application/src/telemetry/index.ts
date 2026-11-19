@@ -43,7 +43,12 @@ export {
   ENV_SERVICE_NAME,
   parseResourceAttributes,
 } from './telemetry.environment';
-export { TelemetryPlugin, telemetry, telemetryFromEnvironment } from './telemetry.plugin';
+export {
+  DEFAULT_SAMPLING_REFRESH_MS,
+  TelemetryPlugin,
+  telemetry,
+  telemetryFromEnvironment,
+} from './telemetry.plugin';
 export {
   buildMetricsBody,
   buildTracesBody,
@@ -63,3 +68,14 @@ export {
   setCollector,
   setGauge,
 } from './telemetry.utils';
+export {
+  ATTR_TRACE_DECISION_OUTCOME,
+  DEFAULT_TRACE_SAMPLING,
+  getTraceSampler,
+  TRACE_DECISIONS,
+  TRACE_SAMPLING_CONFIG_PATH,
+  TraceSampler,
+  type TraceSampling,
+  TraceSamplingConfig,
+  traceRatioPicks,
+} from './trace-sampling';

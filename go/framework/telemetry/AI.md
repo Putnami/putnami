@@ -31,7 +31,7 @@ plugin := telemetry.NewPlugin(telemetry.Config{
 	ServiceVersion: "1.0.0",
 	TraceExporter:  traceExporter, // sdktrace.SpanExporter; nil disables tracing
 	MetricReader:   metricReader,  // sdkmetric.Reader; nil disables metrics
-	TraceSampleRate: telemetry.SampleRate(0.5), // optional; nil defaults to 1.0
+	TraceSampling:  &telemetry.TraceSampling{Budget: 100, Ratio: 0.5, FloorPerMinute: 1}, // optional; nil takes DefaultTraceSampling()
 })
 
 a := app.New("my-service")

@@ -140,6 +140,34 @@
           }
         },
         {
+          "id": "trace-sampling-is-shared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-sampling-convention-matches-its-fixture",
+              "the-go-sampler-decides-the-fixture-scenarios",
+              "the-typescript-sampler-decides-the-fixture-scenarios"
+            ]
+          }
+        },
+        {
+          "id": "trace-sampling-defaults",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-defaults-and-the-counter-match-the-fixture"
+            ]
+          }
+        },
+        {
           "id": "cli-usage-vocabulary-is-closed",
           "stage": "coded",
           "evidenceKinds": [

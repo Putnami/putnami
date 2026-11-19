@@ -12,6 +12,7 @@
   "dependencies": [
     "/go/framework/app",
     "/go/framework/client",
+    "/go/framework/config",
     "/go/framework/errors",
     "/go/framework/http",
     "/go/framework/inject",

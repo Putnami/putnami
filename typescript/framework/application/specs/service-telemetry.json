@@ -130,8 +130,25 @@
     {
       "id": "trace-propagation",
       "text": [
-        "A framework span continues a valid ambient W3C trace context as its child, injects its own traceparent over any existing header along with the caller's tracestate and baggage, and records exactly once with its kind, status and attributes.",
+        "A framework span continues a valid ambient W3C trace context as its child, injects its own traceparent over any existing header along with the caller's tracestate and baggage, and, when sampled, records exactly once with its kind, status and attributes.",
         "A remote context with an all-zero trace ID is refused, and an oversized tracestate or baggage is dropped rather than propagated."
+      ]
+    },
+    {
+      "id": "trace-budget",
+      "text": [
+        "A framework span without a parent samples by the telemetry/otlp-push-contract rule, from the traces option of telemetry() or the protocol defaults, and each telemetry.traces config key overrides its field.",
+        "A span with a parent takes the parent's sampled flag whatever the budget.",
+        "A span records only when sampled, and injects its flag either way.",
+        "Each root decision counts in trace.decisions on the active collector."
+      ]
+    },
+    {
+      "id": "live-sampling-settings",
+      "text": [
+        "While it runs, the plugin reloads the config sources every 30 seconds with readConfig() and applies a changed telemetry.traces value to the next root decision, without a restart; a source that keeps its first load for the process, such as CONFIG_DATA or a Cloud remote source, shows no change.",
+        "A value out of range, or a section that fails to load, keeps the settings in force and warns.",
+        "The sampler's update() applies settings the same way at runtime, and they hold until the config section itself changes."
       ]
     }
   ]

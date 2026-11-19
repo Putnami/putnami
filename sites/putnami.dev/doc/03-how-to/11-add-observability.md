@@ -41,6 +41,12 @@ the config is loaded, so the endpoint and the sensitive `bearer` token come from
 the deployment environment and never land in the file. Use `${VAR:-fallback}` to
 supply a default when the variable is unset.
 
+Traces follow a budget: each instance keeps its first 100 root traces, then
+1 % of them, with at least 1 root each minute. Set `telemetry.traces.budget`,
+`ratio` and `floorPerMinute` to change it, in Go and in TypeScript. A change
+to a file under `conf/` applies within 30 seconds, without a restart; a change
+in `CONFIG_DATA` or Putnami Cloud config applies at the next start.
+
 Telemetry is opt-in and has **no default endpoint**: if it is enabled but no endpoint is set, the plugin logs a warning and stays off, so data is never shipped to a hardcoded collector.
 
 ### 3) Emit your own metrics

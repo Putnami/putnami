@@ -120,6 +120,7 @@ telemetry({
 | `metricIntervalS` | `number` | `60` | Seconds between two metric pushes; `OTEL_METRIC_EXPORT_INTERVAL` (milliseconds) sets it when unset |
 | `spanBatchDelayS` | `number` | `30` | Longest wait, in seconds, of a span before its batch is pushed; 512 spans push at once. `OTEL_BSP_SCHEDULE_DELAY` (milliseconds) sets it when unset |
 | `app` | `string` | — | `service.name` when neither `OTEL_SERVICE_NAME` nor a `service.name` resource attribute is set; `unknown` without all three |
+| `traces` | `Partial<TraceSampling>` | budget `100`, ratio `0.01`, floor `1` per minute | Trace budget; see [Trace budget](#trace-budget) |
 
 `metricIntervalS` and `spanBatchDelayS` replace `flushIntervalS`, which pushed metrics and spans together every 30 seconds. The configuration ignores a `flushIntervalS` key: rename it to `metricIntervalS`.
 
@@ -134,6 +135,47 @@ telemetry:
   metricIntervalS: 60
   app: "my-service"
 ```
+
+## Trace budget
+
+Each instance keeps its first `budget` root traces, then keeps a root when
+`ratio` picks its trace ID, and keeps at least `floorPerMinute` roots each UTC
+minute, so a rarely called service still exports traces. A span with a parent,
+remote or ambient, takes its parent's sampled flag: a service follows its
+caller's decision. The Go runtime applies the same rule to the same keys.
+
+| Key in `telemetry.traces` | Default | Meaning |
+|---|---|---|
+| `budget` | `100` | Root traces the instance keeps first |
+| `ratio` | `0.01` | Share of root traces kept once the budget is spent, from 0 to 1 |
+| `floorPerMinute` | `1` | Root traces kept each minute whatever the ratio picks |
+
+```yaml
+# conf/.env.yaml, or CONFIG_DATA
+telemetry:
+  traces:
+    budget: 100
+    ratio: 0.01
+    floorPerMinute: 1
+```
+
+The `traces` option of `telemetry()` sets the same three values in code; each
+key of the config section overrides its field. While it runs, the plugin
+reloads the config sources every 30 seconds with `readConfig()` and applies a
+changed value to the next root decision, without a restart. A change to a file
+under `conf/` applies within 30 seconds. `CONFIG_DATA` and the Putnami Cloud
+remote sources keep their first load for the life of the process: to change a
+running process there, call `sampler.update()`. A value out of range, or a
+section that fails to load, keeps the settings in force and logs a warning.
+
+A dropped span records nothing, and still injects its `traceparent` with the
+flag `00`, so the services it calls drop the trace too. Each root decision
+counts in the counter `trace.decisions`, labeled `outcome` `kept` or
+`dropped`. Without a telemetry plugin, a root span is sampled.
+
+`TelemetryPlugin.sampler` (or `getTraceSampler()`) returns the `TraceSampler`
+in force. Its `update()` tightens the settings at runtime, and they hold until
+the `telemetry.traces` section changes.
 
 ## How aggregation works
 

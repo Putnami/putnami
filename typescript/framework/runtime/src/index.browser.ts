@@ -55,6 +55,17 @@ export function useConfig<S extends SchemaDefinition>(
 }
 
 /**
+ * Browser stub for `readConfig`. The client build has no config sources to
+ * reload, so it answers as the `useConfig` stub does.
+ */
+export function readConfig<S extends SchemaDefinition>(
+  config: { schema: S },
+  opts?: { confInit?: Partial<Record<string, unknown>> },
+): Record<string, unknown> {
+  return useConfig(config, opts);
+}
+
+/**
  * Browser stub for `getEnv`. The client build always reports `'browser'`;
  * there is no `NODE_ENV` / `K_SERVICE` environment detection client-side.
  */

@@ -75,6 +75,22 @@
       ]
     },
     {
+      "id": "trace-sampling-is-shared",
+      "text": [
+        "Every runtime keeps a root span while the instance has kept fewer than telemetry.traces.budget roots, or while the current UTC minute holds fewer than telemetry.traces.floorPerMinute kept roots, or when telemetry.traces.ratio picks its trace ID, and drops it otherwise.",
+        "The ratio picks a trace ID whose last 8 bytes, read big-endian and shifted right one bit, are below the ratio times 2^63.",
+        "Both runtimes test against fixtures/conventions/trace-sampling.json."
+      ]
+    },
+    {
+      "id": "trace-sampling-defaults",
+      "text": [
+        "The defaults are a budget of 100 roots, a ratio of 0.01 and a floor of 1 root per minute; a budget and a floor are whole numbers of 0 or more, and a ratio lies between 0 and 1.",
+        "A span with a parent, remote or local, follows the parent's sampled flag and makes no decision.",
+        "Each root decision counts once in the counter trace.decisions, labeled outcome kept or dropped."
+      ]
+    },
+    {
       "id": "cli-usage-vocabulary-is-closed",
       "text": [
         "cliusage pins the closed vocabulary of CLI usage records: the event names, the attributes each event allows and requires with their value kinds, the error categories and the command names.",
