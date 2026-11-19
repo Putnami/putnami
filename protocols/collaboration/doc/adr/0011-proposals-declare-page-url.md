@@ -48,10 +48,12 @@ result gain an optional member a provider declares.
 
 ## Consequences
 
-- A CLI older than this version withdraws the whole proposals version 1 of
-  a provider that declares `pageUrl`, and declaring members needs
-  `cliContract` 24. A provider declares it only once its consumers' CLI pins
-  know the member.
+- Declaring members raises the extension's manifest to `cliContract` 24, and
+  a CLI below that contract refuses the whole manifest: for `@putnami/cloud`,
+  the whole extension, not only its proposals provider. A CLI at contract 24
+  or above that does not know `pageUrl` withdraws the whole proposals
+  version 1 of a provider that declares it. A provider declares it only once
+  its consumers' CLI pins know the member.
 - The `@putnami/cloud` provider fills it in a change of its own: its Source
   API schema gains `pageUrl` once Source answers it, its manifest declares it
   on the five operations, and a `providertest.RunProposals` target checks it.
