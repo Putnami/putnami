@@ -24,12 +24,23 @@ export interface ValidationCandidate {
   defect?: string;
 }
 
-/** Every draft and stale translation of the selected locales, in catalog order. */
-export function validationCandidates(build: I18nBuild, locale?: string): ValidationCandidate[] {
+/** The catalogs a validation reads: a locale, some namespaces, or every one when unset. */
+export interface ValidationSelection {
+  locale?: string;
+  namespaces?: readonly string[];
+}
+
+/**
+ * Every draft and stale translation of the selected catalogs, in catalog
+ * order: the translations of one locale's namespace are adjacent.
+ */
+export function validationCandidates(build: I18nBuild, selection: ValidationSelection = {}): ValidationCandidate[] {
+  const { locale, namespaces } = selection;
   const candidates: ValidationCandidate[] = [];
   for (const catalog of build.catalogs) {
     if (locale !== undefined && catalog.locale !== locale) continue;
     for (const [namespace, entries] of Object.entries(catalog.synced)) {
+      if (namespaces !== undefined && namespaces.length > 0 && !namespaces.includes(namespace)) continue;
       const defaults = build.declared.get(namespace) ?? {};
       for (const [key, entry] of Object.entries(entries)) {
         if (entry.state !== 'draft' && entry.state !== 'stale') continue;

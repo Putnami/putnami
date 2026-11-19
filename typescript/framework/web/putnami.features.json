@@ -484,6 +484,8 @@
             "kind": "acceptance",
             "checks": [
               "validate-locks-an-accepted-draft-with-the-git-identity",
+              "validate-a-namespace-with-one-confirmation",
+              "validate-offers-one-by-one-review",
               "validate-refuses-without-a-person-at-a-terminal"
             ]
           }

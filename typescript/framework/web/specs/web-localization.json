@@ -84,8 +84,8 @@
     {
       "id": "human-validation",
       "text": [
-        "putnami i18n validate shows a person each draft and stale translation of a locale with its default text and locks each one they accept as validated, recording their git user.name and user.email and the date;",
-        "it refuses to run without an interactive terminal, inside an agent session, or without a git identity, and validating a stale translation records the current default text as its source."
+        "putnami i18n validate shows a person a catalog's draft and stale translations, narrowed by --locale and a repeatable --namespace, as a table of key, default text and translation, and asks once: validate all, one by one, or skip;",
+        "it records the git user.name, user.email and date, and a stale one's current default text as source, skips wrong ICU or arguments, and refuses without an interactive terminal, in an agent session, or without a git identity."
       ]
     },
     {

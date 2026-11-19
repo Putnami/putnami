@@ -49,6 +49,10 @@
         "locale": {
           "type": "string",
           "description": "Validate this locale only (default: every published locale)."
+        },
+        "namespace": {
+          "type": "array",
+          "description": "Validate this messages namespace only, the catalog locales/<locale>/<namespace>.json; repeatable (default: every namespace)."
         }
       },
       "run": [
@@ -85,12 +89,15 @@
           ]
         },
         "validate": {
-          "description": "Show a person each draft and stale translation next to its default text, and lock as validated the ones they accept, with their git user.name and user.email and the day. Needs an interactive terminal, refuses inside an agent session, and skips a translation whose ICU or arguments are wrong",
+          "description": "Show a person the draft and stale translations of one catalog at a time, a table of key, default text and translation, and ask once: validate them all, review them one by one, or skip the catalog. Locks as validated the ones they accept, with their git user.name and user.email and the day. Needs an interactive terminal, refuses inside an agent session, and lists and skips a translation whose ICU or arguments are wrong",
           "command": "web-i18n-validate",
           "interactive": true,
           "examples": [
             {
               "command": "putnami i18n validate --projects /sites/putnami.dev --locale fr"
+            },
+            {
+              "command": "putnami i18n validate --projects /sites/putnami.dev --locale fr --namespace pricing"
             }
           ]
         }
@@ -169,7 +176,7 @@
       }
     },
     "web-i18n-validate-exec": {
-      "description": "Ask a person about each draft and stale translation and write the validated entries. Interactive: it reads the terminal and writes its own output.",
+      "description": "Ask a person once per catalog about its draft and stale translations, one by one on request, and write the validated entries. Interactive: it reads the terminal and writes its own output.",
       "kind": "command",
       "command": "bun",
       "args": ["run", "{extensionRoot}/bin/i18n", "validate"],
