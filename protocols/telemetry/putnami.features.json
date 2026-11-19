@@ -255,6 +255,48 @@
               "the-typescript-logger-records-the-log-records-convention"
             ]
           }
+        },
+        {
+          "id": "the-export-directive-header",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-header-convention-matches-its-fixture"
+            ]
+          }
+        },
+        {
+          "id": "export-directives-are-shared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-runtime-applies-the-fixture-directives",
+              "the-typescript-runtime-applies-the-fixture-directives"
+            ]
+          }
+        },
+        {
+          "id": "too-many-requests-delays-a-signal",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-retry-after-convention-matches-its-fixture",
+              "the-go-exporters-wait-out-a-retry-after",
+              "the-typescript-exporters-wait-out-a-retry-after"
+            ]
+          }
         }
       ]
     }

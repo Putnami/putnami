@@ -66,9 +66,43 @@ A value out of range keeps the settings in force and logs a warning.
 
 The counter `trace.decisions`, labeled `outcome` `kept` or `dropped`, counts
 each root decision. `Plugin.Sampler()` returns the sampler: `Settings()` reads
-the settings in force, and `Update(settings)` replaces them at runtime until
+its own settings, without an export directive's limits, and `Update(settings)` replaces them at runtime until
 the config section changes. The TypeScript runtime applies the same keys, rule
 and counter, which `go.putnami.dev/protocol/telemetry` defines.
+
+## Export directives
+
+The OTLP endpoint can tighten the limits of every service that pushes to it,
+without a redeploy. Any export response, from the metrics, traces or logs path
+and whatever its status, may carry a `Putnami-Export-Directive` header:
+
+```
+Putnami-Export-Directive: trace-ratio=0.001, trace-floor=1, log-level=warn, ttl=300
+```
+
+| Key | Value | Effect while the directive holds |
+|---|---|---|
+| `trace-ratio` | a number from 0 to 1 | the lower of it and `telemetry.traces.ratio` |
+| `trace-floor` | a whole number of 0 or more | the lower of it and `telemetry.traces.floorPerMinute` |
+| `log-level` | `debug`, `info`, `warn` or `error` | the higher of it and the logger's own level |
+| `ttl` | whole seconds, required, capped at 3600 | how long the directive holds |
+
+A directive only tightens: the service keeps its own `budget`, a looser value
+changes nothing, and a record at error is always emitted. A valid directive
+replaces the one in force; when its `ttl` ends, the service returns to its own
+settings. A member without `=`, a malformed known value, a repeated key or a
+missing `ttl` voids the header, and an unknown key is ignored. The directive limits the sampler of
+each running plugin, whose `Settings()` keep the plugin's own values, and every
+logger through `logger.SetLevelLimit`, without changing the live level. The
+roots and records it drops still count in `trace.decisions` and `log.records`.
+
+A `429 Too Many Requests` with a `Retry-After`, in seconds or as an HTTP date,
+delays the next export of that signal to that collector, from every exporter
+of the process, by at most an hour. A span or
+metrics batch due during the delay is dropped; log records wait in the sink's
+bounded queue, and a shutdown during the delay drops them with a warning. The
+TypeScript runtime reads the same header by the same rule,
+which `go.putnami.dev/protocol/telemetry` defines.
 
 ## Tracing
 

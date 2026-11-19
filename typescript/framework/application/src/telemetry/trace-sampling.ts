@@ -12,6 +12,7 @@
  */
 
 import { Config, Int, Optional } from '@putnami/runtime';
+import { type ExportDirective, getDirectiveReceiver, limitTraceSampling } from './export-directive';
 import { incCounterWithAttributes } from './telemetry.utils';
 
 /** The config section that holds the three keys. */
@@ -108,6 +109,8 @@ export class TraceSampler {
   private kept = 0;
   private minute = Number.NEGATIVE_INFINITY;
   private keptInMinute = 0;
+  private directive: ExportDirective | undefined;
+  private directiveEndsMs = Number.NEGATIVE_INFINITY;
 
   /** @throws when a setting is out of range. */
   constructor(settings: Readonly<TraceSampling> = DEFAULT_TRACE_SAMPLING) {
@@ -116,8 +119,24 @@ export class TraceSampler {
     this.current = Object.freeze({ ...settings });
   }
 
-  /** The settings in force. */
+  /** The settings `update()` or the constructor set, without a directive's limits. */
   get settings(): Readonly<TraceSampling> {
+    return this.current;
+  }
+
+  /**
+   * Applies `directive`, which arrived at `nowMs`, to the decisions until its
+   * ttl ends: each one takes the stricter of the directive and the settings.
+   * It replaces a directive in force; the settings themselves stay.
+   */
+  restrict(directive: ExportDirective, nowMs: number = Date.now()): void {
+    this.directive = directive;
+    this.directiveEndsMs = nowMs + directive.ttlSeconds * 1000;
+  }
+
+  /** The settings a decision at `nowMs` applies: the settings, limited by a directive that still holds. */
+  inForce(nowMs: number = Date.now()): Readonly<TraceSampling> {
+    if (this.directive && nowMs < this.directiveEndsMs) return limitTraceSampling(this.directive, this.current);
     return this.current;
   }
 
@@ -140,7 +159,7 @@ export class TraceSampler {
       this.minute = minute;
       this.keptInMinute = 0;
     }
-    const settings = this.current;
+    const settings = this.inForce(nowMs);
     const keep =
       this.kept < settings.budget ||
       this.keptInMinute < settings.floorPerMinute ||
@@ -166,9 +185,13 @@ export function getTraceSampler(): TraceSampler | undefined {
 /** @internal Used by TelemetryPlugin to install its sampler. */
 export function setTraceSampler(sampler: TraceSampler): void {
   _sampler = sampler;
+  getDirectiveReceiver().follow(sampler);
 }
 
 /** @internal Removes the sampler only if it is still the one installed. */
 export function clearTraceSampler(sampler: TraceSampler): void {
-  if (_sampler === sampler) _sampler = undefined;
+  if (_sampler === sampler) {
+    _sampler = undefined;
+    getDirectiveReceiver().follow(undefined);
+  }
 }

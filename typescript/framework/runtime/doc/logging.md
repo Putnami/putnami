@@ -207,6 +207,10 @@ always emitted.
 - `setLogLevel(level)` changes the level at runtime, and `currentLogLevel()`
   reads it. The last change wins, whether it came from the config or from
   `setLogLevel`.
+- `setLogLevelLimit(() => level)` adds a process-wide floor that every logger
+  that checks the level consults on each record, without changing the level;
+  `setLogLevelLimit(undefined)` removes it. Telemetry sets one from an OTLP
+  export directive's `log-level` until its `ttl` ends.
 
 ```yaml
 # conf/.env.yaml

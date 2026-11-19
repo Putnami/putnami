@@ -7,7 +7,8 @@
     "An unreachable or failing collector degrades observability and nothing else",
     "A container that exits promptly still delivers its last batch of measurements",
     "A request's span is attributed to the right service and joined to the caller's trace",
-    "Every instance of a scaled-out workload writes its own metric series, so the collector accepts what each instance pushes"
+    "Every instance of a scaled-out workload writes its own metric series, so the collector accepts what each instance pushes",
+    "An operator tightens or caps the traces and logs of every service from its OTLP endpoint, without a redeploy, and an overloaded endpoint slows its senders down"
   ],
   "nonGoals": [
     "Running a collector, or defining collector-side retention, sampling, or routing",
@@ -96,6 +97,14 @@
         "FromEnvironment returns no plugin unless OTEL_EXPORTER_OTLP_ENDPOINT is set and OTEL_SDK_DISABLED is not true.",
         "With only that environment, the HTTP server counts, times and traces every request and pushes them to the collector with the identity from OTEL_RESOURCE_ATTRIBUTES and the credential the options name.",
         "An explicit telemetry plugin owns the providers instead, and a request counts once even when the server also installs HTTPMiddleware."
+      ]
+    },
+    {
+      "id": "export-directives",
+      "text": [
+        "Every OTLP exporter, the log sink included, reads the Putnami-Export-Directive header of each collector response and applies it by the telemetry/otlp-push-contract rule: to the sampler of each running plugin and to the level of every logger, until its ttl ends.",
+        "trace.decisions and log.records keep counting the roots and records a directive drops.",
+        "A 429 response with a Retry-After delays the next export of its own signal only."
       ]
     }
   ],

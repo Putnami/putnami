@@ -7,7 +7,8 @@
     "A dashboard finds the HTTP server metrics of a Go and a TypeScript service under the same names, units, labels and buckets",
     "Telemetry never fails or stalls the workload that produces it",
     "The CLI and the usage receiver enforce one closed vocabulary, so a usage record carries no free text",
-    "A server span parents to the client span that called it, even when a proxy between them rewrites the parent ID of traceparent"
+    "A server span parents to the client span that called it, even when a proxy between them rewrites the parent ID of traceparent",
+    "An OTLP endpoint tightens the trace and log limits of every service it receives from, and slows an overloaded signal down, through its export responses"
   ],
   "nonGoals": [
     "A /metrics scrape endpoint, gRPC OTLP, statsd or a Prometheus push gateway: OTLP/JSON over HTTP is the one transport, as ADR 0001 records",
@@ -130,6 +131,31 @@
       "text": [
         "Every runtime counts each log record as log.records, a counter labeled level, one of debug, info, warn and error, and outcome, emitted or dropped.",
         "Both runtimes test against fixtures/conventions/log-records.json."
+      ]
+    },
+    {
+      "id": "the-export-directive-header",
+      "text": [
+        "An export response may carry the Putnami-Export-Directive header: comma-separated key=value members trace-ratio, between 0 and 1, trace-floor, a whole number of 0 or more, log-level, debug, info, warn or error, and ttl.",
+        "ttl is required, in whole seconds of 1 or more, capped at 3600.",
+        "An unknown key is ignored; a member without =, a malformed known value, a repeated key or a missing ttl voids the whole header."
+      ]
+    },
+    {
+      "id": "export-directives-are-shared",
+      "text": [
+        "A valid directive replaces the one in force and holds for ttl seconds from its arrival; then the service returns to its own settings.",
+        "While it holds, the service applies the lower trace ratio, the lower trace floor and the higher log level of the directive and its own settings, keeps its own trace budget, and emits a record at error whatever the directive.",
+        "Both runtimes test against fixtures/conventions/export-directives.json."
+      ]
+    },
+    {
+      "id": "too-many-requests-delays-a-signal",
+      "text": [
+        "A 429 response whose Retry-After holds delta-seconds or an IMF-fixdate delays the next export of that signal to that endpoint, process-wide, until that time, at most 3600 seconds away.",
+        "A batch due during the delay is dropped like a failed batch, except log records, which wait in the bounded queue; a shutdown during the delay sends nothing and warns.",
+        "Another status, or a Retry-After of neither form, delays nothing.",
+        "Both runtimes test against fixtures/conventions/export-directives.json."
       ]
     }
   ],

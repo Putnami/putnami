@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect } from 'bun:test';
 import { readLocalLogLevel, resolveLogLevel, watchLogLevel } from '../../src/logger/log-level';
 import { type LogRecordOutcome, observeLogRecords } from '../../src/logger/log-records';
 import { Logger } from '../../src/logger/logger';
-import { currentLogLevel, resetLoggerConfig, setLogLevel } from '../../src/logger/logger.config';
+import { currentLogLevel, resetLoggerConfig, setLogLevel, setLogLevelLimit } from '../../src/logger/logger.config';
 import type { LogLevel } from '../../src/logger/logger.type';
 import { MemoryLogger, MemorySink } from '../../src/logger/memory.logger';
 import { specTest } from '../../src/spectest';
@@ -156,6 +156,53 @@ describe('live log level', () => {
         'error/emitted': 1,
         'debug/emitted': 1,
       });
+    },
+  );
+
+  specTest(
+    'the level limit raises the level of every logger that checks it',
+    { feature, requirement: 'level-limit', check: 'the-limit-raises-the-level-of-every-logger' },
+    () => {
+      setLogLevel('debug');
+      const sink = new MemorySink();
+      const logger = new Logger([sink], 'limited');
+      let limit: LogLevel | undefined = 'warn';
+      setLogLevelLimit(() => limit);
+      logger.info('hidden');
+      logger.warn('shown');
+      expect(currentLogLevel()).toBe('debug');
+
+      // The limit is read on each record: once it sets none, the live level rules.
+      limit = undefined;
+      logger.debug('back');
+
+      // A limit below the live level never lowers it.
+      setLogLevel('warn');
+      limit = 'debug';
+      logger.info('still hidden');
+      setLogLevelLimit(undefined);
+      logger.info('still hidden');
+      expect(sink.entries.map((e) => e.message)).toEqual(['shown', 'back']);
+    },
+  );
+
+  specTest(
+    'an error record passes the level limit, and a filtered record counts as dropped',
+    { feature, requirement: 'level-limit', check: 'an-error-passes-the-limit' },
+    () => {
+      const counts = new Map<string, number>();
+      const remove = observeLogRecords((level: LogLevel, outcome: LogRecordOutcome) => {
+        counts.set(`${level}/${outcome}`, (counts.get(`${level}/${outcome}`) ?? 0) + 1);
+      });
+      setLogLevel('debug');
+      setLogLevelLimit(() => 'error');
+      const sink = new MemorySink();
+      const logger = new Logger([sink], 'limited');
+      logger.warn('hidden');
+      logger.error('kept');
+      remove();
+      expect(sink.entries.map((e) => e.message)).toEqual(['kept']);
+      expect(Object.fromEntries(counts)).toEqual({ 'warn/dropped': 1, 'error/emitted': 1 });
     },
   );
 });

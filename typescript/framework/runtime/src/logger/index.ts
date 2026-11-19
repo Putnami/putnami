@@ -15,6 +15,7 @@ export {
   getLoggerConfig,
   resetLoggerConfig,
   setLogLevel,
+  setLogLevelLimit,
   shouldLog,
 } from './logger.config';
 export { REDACTED, redact, setSensitiveKeys, addSensitiveKeys } from './redact';

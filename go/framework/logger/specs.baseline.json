@@ -5,6 +5,7 @@
     "go/structured-logging#errors-always-emitted",
     "go/structured-logging#failure-isolation",
     "go/structured-logging#field-precedence",
+    "go/structured-logging#level-limit",
     "go/structured-logging#lifecycle",
     "go/structured-logging#live-level",
     "go/structured-logging#record",

@@ -47,6 +47,12 @@ Traces follow a budget: each instance keeps its first 100 root traces, then
 to a file under `conf/` applies within 30 seconds, without a restart; a change
 in `CONFIG_DATA` or Putnami Cloud config applies at the next start.
 
+The collector can tighten every service from its export responses, without a
+redeploy: a `Putnami-Export-Directive: trace-ratio=0.001, log-level=warn,
+ttl=300` header caps the trace ratio and floor and raises the log level for
+`ttl` seconds, at most an hour, and errors are always emitted. A `429` with a
+`Retry-After` delays the next export of that signal.
+
 Telemetry is opt-in and has **no default endpoint**: if it is enabled but no endpoint is set, the plugin logs a warning and stays off, so data is never shipped to a hardcoded collector.
 
 ### 3) Emit your own metrics

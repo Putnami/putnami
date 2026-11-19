@@ -22,8 +22,10 @@ The default logger reads its level live, on each record:
 | `K_SERVICE` (env) | When set (Cloud Run), uses JSON sink automatically |
 
 A change to `logger.level` applies without a restart, and `logger.SetLevel`
-changes the level at runtime; the last change wins. A record at error is
-always emitted. Every record counts once in the telemetry counter
+changes the level at runtime; the last change wins. `logger.SetLevelLimit`
+adds a process-wide floor that every logger consults on each record, without
+changing a level: the telemetry plugin sets one from an OTLP export
+directive's `log-level` for its `ttl`. A record at error is always emitted. Every record counts once in the telemetry counter
 `log.records{level, outcome}`.
 
 ## Creating loggers

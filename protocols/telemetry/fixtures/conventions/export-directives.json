@@ -1,0 +1,144 @@
+{
+  "header": "Putnami-Export-Directive",
+  "keys": {"traceRatio": "trace-ratio", "traceFloor": "trace-floor", "logLevel": "log-level", "ttl": "ttl"},
+  "maxTtlSeconds": 3600,
+  "parseCases": [
+    {"value": "trace-ratio=0.1, trace-floor=1, log-level=warn, ttl=300", "directive": {"traceRatio": 0.1, "traceFloor": 1, "logLevel": "warn", "ttlSeconds": 300}},
+    {"value": "ttl=60", "directive": {"ttlSeconds": 60}},
+    {"value": "TTL=60, Log-Level=ERROR", "directive": {"logLevel": "error", "ttlSeconds": 60}},
+    {"value": " , trace-ratio=.5 ,ttl=60, ", "directive": {"traceRatio": 0.5, "ttlSeconds": 60}},
+    {"value": "trace-ratio=1, trace-floor=0, ttl=1", "directive": {"traceRatio": 1, "traceFloor": 0, "ttlSeconds": 1}},
+    {"value": "ttl=7200", "directive": {"ttlSeconds": 3600}},
+    {"value": "ttl=99999999999999999999", "directive": {"ttlSeconds": 3600}},
+    {"value": "budget=5, ttl=60", "directive": {"ttlSeconds": 60}},
+    {"value": "", "directive": null},
+    {"value": "trace-ratio=0.5", "directive": null},
+    {"value": "ttl=0", "directive": null},
+    {"value": "ttl=-5", "directive": null},
+    {"value": "ttl=1.5", "directive": null},
+    {"value": "ttl=60, ttl=120", "directive": null},
+    {"value": "ttl=60, garbage", "directive": null},
+    {"value": "trace-ratio=1.5, ttl=60", "directive": null},
+    {"value": "trace-ratio=1e-2, ttl=60", "directive": null},
+    {"value": "trace-ratio=, ttl=60", "directive": null},
+    {"value": "trace-floor=-1, ttl=60", "directive": null},
+    {"value": "trace-floor=2.0, ttl=60", "directive": null},
+    {"value": "log-level=fatal, ttl=60", "directive": null},
+    {"value": "log-level=warning, ttl=60", "directive": null}
+  ],
+  "limitCases": [
+    {
+      "name": "a looser directive changes nothing",
+      "own": {"traces": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1}, "logLevel": "info"},
+      "directive": "trace-ratio=0.5, trace-floor=5, log-level=debug, ttl=60",
+      "effective": {"traces": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1}, "logLevel": "info"}
+    },
+    {
+      "name": "a stricter directive lowers the ratio and the floor and raises the level, and keeps the budget",
+      "own": {"traces": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1}, "logLevel": "info"},
+      "directive": "trace-ratio=0, trace-floor=0, log-level=warn, ttl=60",
+      "effective": {"traces": {"budget": 100, "ratio": 0, "floorPerMinute": 0}, "logLevel": "warn"}
+    },
+    {
+      "name": "a directive without a limit keeps the settings",
+      "own": {"traces": {"budget": 2, "ratio": 0.5, "floorPerMinute": 3}, "logLevel": "debug"},
+      "directive": "ttl=60",
+      "effective": {"traces": {"budget": 2, "ratio": 0.5, "floorPerMinute": 3}, "logLevel": "debug"}
+    },
+    {
+      "name": "error is the highest level a directive sets",
+      "own": {"traces": {"budget": 0, "ratio": 1, "floorPerMinute": 0}, "logLevel": "debug"},
+      "directive": "log-level=error, ttl=60",
+      "effective": {"traces": {"budget": 0, "ratio": 1, "floorPerMinute": 0}, "logLevel": "error"}
+    }
+  ],
+  "traceScenarios": [
+    {
+      "name": "a directive drops roots until its ttl ends, and a void header leaves it in force",
+      "settings": {"budget": 0, "ratio": 1, "floorPerMinute": 0},
+      "events": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 0, "directive": "trace-ratio=0, ttl=60"},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 2, "directive": "trace-ratio=2, ttl=600"},
+        {"atSecond": 59, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 60, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true}
+      ]
+    },
+    {
+      "name": "a new directive replaces the one in force",
+      "settings": {"budget": 0, "ratio": 0, "floorPerMinute": 5},
+      "events": [
+        {"atSecond": 0, "directive": "trace-floor=1, ttl=600"},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 2, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 3, "directive": "ttl=600"},
+        {"atSecond": 4, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true}
+      ]
+    },
+    {
+      "name": "the service keeps its own budget under a directive",
+      "settings": {"budget": 2, "ratio": 0, "floorPerMinute": 0},
+      "events": [
+        {"atSecond": 0, "directive": "trace-ratio=0, trace-floor=0, ttl=60"},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 2, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 3, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
+      ]
+    }
+  ],
+  "logScenarios": [
+    {
+      "name": "a directive raises the level until its ttl ends",
+      "level": "debug",
+      "events": [
+        {"atSecond": 0, "directive": "log-level=warn, ttl=30"},
+        {"atSecond": 1, "record": "info", "emitted": false},
+        {"atSecond": 1, "record": "warn", "emitted": true},
+        {"atSecond": 29, "record": "debug", "emitted": false},
+        {"atSecond": 30, "record": "debug", "emitted": true}
+      ]
+    },
+    {
+      "name": "a directive never lowers the level",
+      "level": "warn",
+      "events": [
+        {"atSecond": 0, "directive": "log-level=debug, ttl=60"},
+        {"atSecond": 1, "record": "info", "emitted": false},
+        {"atSecond": 1, "record": "warn", "emitted": true}
+      ]
+    },
+    {
+      "name": "errors pass the highest directive",
+      "level": "debug",
+      "events": [
+        {"atSecond": 0, "directive": "log-level=error, ttl=60"},
+        {"atSecond": 1, "record": "warn", "emitted": false},
+        {"atSecond": 1, "record": "error", "emitted": true}
+      ]
+    }
+  ],
+  "retryAfter": {
+    "status": 429,
+    "maxSeconds": 3600,
+    "cases": [
+      {"status": 429, "value": "120", "nowSecond": 1700000000, "delaySeconds": 120},
+      {"status": 429, "value": "0", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "86400", "nowSecond": 1700000000, "delaySeconds": 3600},
+      {"status": 429, "value": "99999999999999999999", "nowSecond": 1700000000, "delaySeconds": 3600},
+      {"status": 429, "value": "Tue, 14 Nov 2023 22:15:20 GMT", "nowSecond": 1700000000, "delaySeconds": 120},
+      {"status": 429, "value": "Tue, 14 Nov 2023 22:00:00 GMT", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "Wed, 15 Nov 2023 22:13:20 GMT", "nowSecond": 1700000000, "delaySeconds": 3600},
+      {"status": 429, "value": "tue, 14 nov 2023 22:15:20 GMT", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "Tue, 14 Nov 2023 9:15:20 GMT", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "Mon, 14 Nov 2023 22:15:20 GMT", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "Fri, 31 Feb 2024 22:15:20 GMT", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "-3", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "1e3", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "soon", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 429, "value": "", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 503, "value": "120", "nowSecond": 1700000000, "delaySeconds": 0},
+      {"status": 200, "value": "120", "nowSecond": 1700000000, "delaySeconds": 0}
+    ]
+  }
+}

@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"errors"
 
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -38,7 +39,7 @@ func (e *otlpSpanExporter) ExportSpans(ctx context.Context, spans []sdktrace.Rea
 	if err != nil {
 		return err
 	}
-	if err := e.client.post(ctx, otlp.PathTraces, body); err != nil {
+	if err := e.client.post(ctx, otlp.PathTraces, body); err != nil && !errors.Is(err, errExportDelayed) {
 		e.log.Warn("dropped span batch: " + err.Error())
 	}
 	return nil

@@ -88,8 +88,9 @@ let liveLevel: LogLevel | undefined;
  * The next record follows it.
  *
  * setLogLevel is the runtime control of the level: a started application calls
- * it when `logger.level` changes, and an export directive may call it to
- * tighten the level. The last call wins.
+ * it when `logger.level` changes. The last call wins. An export directive
+ * tightens the level through {@link setLogLevelLimit} instead, and leaves it
+ * alone.
  */
 export const setLogLevel = (level: LogLevel): void => {
   liveLevel = normalizeLogLevel(level);
@@ -101,20 +102,44 @@ export const setLogLevel = (level: LogLevel): void => {
  */
 export const currentLogLevel = (): LogLevel => liveLevel ?? getLoggerConfig().level;
 
-/** Reset the cached logger config and the live level (for tests). */
+// levelLimit is the function setLogLevelLimit installed.
+let levelLimit: (() => LogLevel | undefined) | undefined;
+
+/**
+ * Installs `limit`, a process-wide floor that every logger that checks the
+ * level consults on each record, without changing the live level: a record
+ * passes when it passes both the live level and the level `limit` returns.
+ * `limit` returning `undefined` sets no floor; passing `undefined` removes it.
+ *
+ * An export directive uses it to tighten the level for a while: `limit`
+ * returns the directive's level while the directive holds. A record at
+ * `error` passes whatever the limit, and a record the limit filters counts
+ * as dropped.
+ */
+export const setLogLevelLimit = (limit: (() => LogLevel | undefined) | undefined): void => {
+  levelLimit = limit;
+};
+
+/** Reset the cached logger config, the live level and the level limit (for tests). */
 export const resetLoggerConfig = (): void => {
   _loggerConfig = undefined;
   liveLevel = undefined;
+  levelLimit = undefined;
   warnedInvalidLevels.clear();
 };
 
 /**
- * Reports whether a record at `messageLevel` passes the live minimum level. A
- * record at `error` always passes.
+ * Reports whether a record at `messageLevel` passes the live minimum level and
+ * the level limit. A record at `error` always passes.
  */
 export const shouldLog = (messageLevel: LogLevel): boolean => {
   if (messageLevel === 'error') {
     return true;
   }
-  return LEVEL_PRIORITY[messageLevel] >= LEVEL_PRIORITY[currentLogLevel()];
+  const priority = LEVEL_PRIORITY[messageLevel];
+  if (priority < LEVEL_PRIORITY[currentLogLevel()]) {
+    return false;
+  }
+  const limit = levelLimit?.();
+  return limit === undefined || priority >= LEVEL_PRIORITY[limit];
 };

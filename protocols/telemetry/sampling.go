@@ -107,6 +107,9 @@ type TraceBudget struct {
 	kept         int64
 	minute       int64
 	keptInMinute int64
+	// directive limits settings until directiveEnds.
+	directive     ExportDirective
+	directiveEnds time.Time
 }
 
 // NewTraceBudget returns a budget that applies settings. It reports settings
@@ -131,9 +134,10 @@ func (b *TraceBudget) Decide(traceID [16]byte, now time.Time) bool {
 		b.minute = minute
 		b.keptInMinute = 0
 	}
-	keep := b.kept < b.settings.Budget ||
-		b.keptInMinute < b.settings.FloorPerMinute ||
-		TraceRatioPicks(traceID, b.settings.Ratio)
+	settings := b.inForceLocked(now)
+	keep := b.kept < settings.Budget ||
+		b.keptInMinute < settings.FloorPerMinute ||
+		TraceRatioPicks(traceID, settings.Ratio)
 	if keep {
 		b.kept++
 		b.keptInMinute++
@@ -141,7 +145,34 @@ func (b *TraceBudget) Decide(traceID [16]byte, now time.Time) bool {
 	return keep
 }
 
-// Settings returns the settings in force.
+// Restrict applies directive, which arrived at now, to the decisions until its
+// TTL ends: each one takes the stricter of the directive and the settings. It
+// replaces a directive in force. The settings themselves stay, and Update
+// still changes them.
+func (b *TraceBudget) Restrict(directive ExportDirective, now time.Time) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.directive = directive
+	b.directiveEnds = now.Add(directive.TTL)
+}
+
+// InForce returns the settings a decision at now applies: the settings,
+// limited by a directive that still holds.
+func (b *TraceBudget) InForce(now time.Time) TraceSampling {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.inForceLocked(now)
+}
+
+func (b *TraceBudget) inForceLocked(now time.Time) TraceSampling {
+	if now.Before(b.directiveEnds) {
+		return b.directive.LimitTraceSampling(b.settings)
+	}
+	return b.settings
+}
+
+// Settings returns the settings Update or NewTraceBudget set, without a
+// directive's limits.
 func (b *TraceBudget) Settings() TraceSampling {
 	b.mu.Lock()
 	defer b.mu.Unlock()

@@ -213,3 +213,73 @@ func TestWatchLevelAppliesNothingOnceItsContextEnds(t *testing.T) {
 		t.Fatalf("a read that ended with the context applied %v", CurrentLevel())
 	}
 }
+
+func TestTheLimitRaisesTheLevelOfEveryLogger(t *testing.T) {
+	spectest.Proves(t, "go/structured-logging", "level-limit", "the-limit-raises-the-level-of-every-logger")
+	restoreLiveLevel(t)
+	t.Cleanup(func() { SetLevelLimit(nil) })
+
+	SetLevel(LevelDebug)
+	var live, fixed bytes.Buffer
+	derived := newLogger("live", liveLevel, NewJSONSinkWriter(&live)).Named("child")
+	built := New("fixed", LevelDebug, NewJSONSinkWriter(&fixed))
+
+	limit := LevelWarn
+	SetLevelLimit(func() Level { return limit })
+	derived.Info("hidden-live")
+	built.Info("hidden-fixed")
+	derived.Warn("shown-live")
+	if strings.Contains(live.String(), "hidden-live") || strings.Contains(fixed.String(), "hidden-fixed") {
+		t.Fatalf("an info record passed a warn limit: %q %q", live.String(), fixed.String())
+	}
+	if !strings.Contains(live.String(), "shown-live") {
+		t.Fatalf("a warn record did not pass a warn limit: %q", live.String())
+	}
+	if CurrentLevel() != LevelDebug {
+		t.Fatalf("the limit changed the live level to %v", CurrentLevel())
+	}
+
+	// The limit is read on each record: once it ends, the level is the
+	// logger's own again.
+	limit = LevelDebug
+	derived.Debug("shown-again")
+	if !strings.Contains(live.String(), "shown-again") {
+		t.Fatalf("a debug record did not pass once the limit ended: %q", live.String())
+	}
+
+	// A limit below a logger's own level never lowers it.
+	SetLevel(LevelWarn)
+	derived.Info("still-hidden")
+	SetLevelLimit(nil)
+	derived.Info("still-hidden")
+	if strings.Contains(live.String(), "still-hidden") {
+		t.Fatalf("a limit lowered the level: %q", live.String())
+	}
+}
+
+func TestAnErrorPassesTheLimit(t *testing.T) {
+	spectest.Proves(t, "go/structured-logging", "level-limit", "an-error-passes-the-limit")
+	t.Cleanup(func() { SetLevelLimit(nil) })
+
+	counts := func() map[string]uint64 {
+		m := map[string]uint64{}
+		for _, c := range RecordCounts() {
+			m[c.Level+"/"+c.Outcome] = c.Count
+		}
+		return m
+	}
+	var buf bytes.Buffer
+	log := New("limited", LevelDebug, NewJSONSinkWriter(&buf))
+	SetLevelLimit(func() Level { return LevelError + 4 })
+	before := counts()
+	log.Warn("hidden")
+	log.Error("kept", errors.New("boom"))
+	after := counts()
+	if strings.Contains(buf.String(), "hidden") || !strings.Contains(buf.String(), `"message":"kept"`) {
+		t.Fatalf("the limit did not keep only the error: %q", buf.String())
+	}
+	if after["warn/dropped"]-before["warn/dropped"] != 1 || after["error/emitted"]-before["error/emitted"] != 1 {
+		t.Fatalf("counts moved by warn/dropped %d, error/emitted %d, want 1 and 1",
+			after["warn/dropped"]-before["warn/dropped"], after["error/emitted"]-before["error/emitted"])
+	}
+}

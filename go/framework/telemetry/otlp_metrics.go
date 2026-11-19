@@ -2,6 +2,7 @@ package telemetry
 
 import (
 	"context"
+	"errors"
 
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
@@ -59,7 +60,7 @@ func (e *otlpMetricExporter) Export(ctx context.Context, rm *metricdata.Resource
 	if err != nil {
 		return err // a marshal failure is a bug, not a collector problem
 	}
-	if err := e.client.post(ctx, otlp.PathMetrics, body); err != nil {
+	if err := e.client.post(ctx, otlp.PathMetrics, body); err != nil && !errors.Is(err, errExportDelayed) {
 		e.log.Warn("dropped metrics batch: " + err.Error())
 	}
 	return nil

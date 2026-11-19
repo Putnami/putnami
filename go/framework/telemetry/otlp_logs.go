@@ -67,8 +67,13 @@ func (s *OTLPLogSink) Write(entry logger.LogEntry) {
 }
 
 // Flush drains the buffer and POSTs it. Errors are logged and swallowed
-// (best-effort): telemetry must never affect the workload.
+// (best-effort): telemetry must never affect the workload. While the
+// collector's Retry-After holds, the records stay in the bounded queue for a
+// later flush.
 func (s *OTLPLogSink) Flush() error {
+	if s.client.delayed(otlp.PathLogs) {
+		return nil
+	}
 	s.mu.Lock()
 	if len(s.buf) == 0 {
 		s.mu.Unlock()
@@ -98,12 +103,24 @@ func (s *OTLPLogSink) Flush() error {
 	return nil
 }
 
-// Close stops the background flusher and performs a final flush.
+// Close stops the background flusher and performs a final flush. While the
+// collector's Retry-After for logs holds, the final flush sends nothing: the
+// records left behind are counted in a warning.
 func (s *OTLPLogSink) Close() error {
 	s.closeOnce.Do(func() {
 		close(s.done)
 		s.wg.Wait()
 	})
+	if s.client.delayed(otlp.PathLogs) {
+		s.mu.Lock()
+		left := len(s.buf)
+		s.buf = nil
+		s.mu.Unlock()
+		if left > 0 {
+			s.log.Warn("dropped log records at shutdown: the collector asked to wait", slog.Int("records", left))
+		}
+		return nil
+	}
 	return s.Flush()
 }
 

@@ -140,9 +140,20 @@ malformed or on another trace, the server uses `traceparent`. The Go runtime
 applies the same rule. A WebSocket stream carries its context in the init
 frame, which proxies do not rewrite, so it needs no second header.
 
-`TelemetryPlugin.sampler` (or `getTraceSampler()`) returns the `TraceSampler`
-in force. Its `update()` tightens the settings at runtime, and they hold until
-the `telemetry.traces` section changes.
+`TelemetryPlugin.sampler` (or `getTraceSampler()`) returns the installed
+`TraceSampler`. Its `settings` are its own, without an export directive's
+limits, which `inForce()` adds. Its `update()` tightens the settings at
+runtime, and they hold until the `telemetry.traces` section changes.
+
+### Export directives
+
+A push response may carry `Putnami-Export-Directive: trace-ratio=0.001,
+trace-floor=1, log-level=warn, ttl=300`. For `ttl` seconds, at most an hour,
+the service applies the lower ratio and floor and the higher log level of the
+directive and its own settings, keeps its own budget, and still emits every
+`error` record. `sampler.settings` keeps its own values; `sampler.inForce()`
+returns the limited ones. A `429` with a `Retry-After` delays the next push of
+that signal only; log records wait in the sink's queue.
 
 ## Auto-Collected HTTP Metrics
 

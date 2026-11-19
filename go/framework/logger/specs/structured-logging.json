@@ -47,6 +47,13 @@
     {
       "id": "records-counted",
       "text": "Every record a logger receives counts once in log.records, labeled with its level and the outcome emitted or dropped, the outcome dropped meaning the minimum level filtered it."
+    },
+    {
+      "id": "level-limit",
+      "text": [
+        "SetLevelLimit installs a process-wide limit that every logger consults on each record, without changing the live level: a record passes when it passes both its logger's level and the level the limit returns; nil removes the limit.",
+        "A record at error or above passes whatever the limit, and a record the limit filters counts as dropped."
+      ]
     }
   ],
   "decisions": [

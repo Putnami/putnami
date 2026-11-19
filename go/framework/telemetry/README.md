@@ -58,9 +58,18 @@ A value out of range keeps the settings in force and logs a warning.
 
 The counter `trace.decisions`, labeled `outcome` `kept` or `dropped`, counts
 each root decision. `Plugin.Sampler()` returns the sampler: `Settings()` reads
-the settings in force, and `Update(settings)` replaces them at runtime until
+its own settings, without an export directive's limits, and `Update(settings)` replaces them at runtime until
 the config section changes. The TypeScript runtime applies the same keys, rule
 and counter, which `go.putnami.dev/protocol/telemetry` defines.
+
+### Export directives
+
+An export response may carry `Putnami-Export-Directive: trace-ratio=0.001,
+trace-floor=1, log-level=warn, ttl=300`. For `ttl` seconds, at most an hour,
+the service applies the lower ratio and floor and the higher log level of the
+directive and its own settings, keeps its own budget, and still emits every
+error. A `429` with a `Retry-After` delays the next export of that signal only.
+See [Telemetry](../../doc/framework/13-telemetry.md#export-directives).
 
 ## Default telemetry from the environment
 

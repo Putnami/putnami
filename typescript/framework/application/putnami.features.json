@@ -1434,6 +1434,20 @@
               "an-update-holds-until-the-section-changes"
             ]
           }
+        },
+        {
+          "id": "export-directives",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-directive-tightens-the-sampler-until-its-ttl",
+              "a-directive-raises-the-log-level-until-its-ttl",
+              "a-directive-drop-is-counted",
+              "a-retry-after-delays-only-its-signal"
+            ]
+          }
         }
       ]
     }

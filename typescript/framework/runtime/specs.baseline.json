@@ -10,6 +10,7 @@
     "typescript/dependency-injection#scope-isolation",
     "typescript/dependency-injection#singleton-identity",
     "typescript/structured-logging#errors-always-emitted",
+    "typescript/structured-logging#level-limit",
     "typescript/structured-logging#live-level",
     "typescript/structured-logging#records-counted",
     "typescript/typed-configuration#browser-surface",

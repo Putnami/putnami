@@ -1,4 +1,20 @@
 export {
+  type ActiveTelemetrySpan,
+  attachTelemetryContext,
+  startTelemetrySpan,
+  type TelemetrySpanOptions,
+  type TelemetrySpanResult,
+  type TelemetryTraceContext,
+} from './client-telemetry';
+export {
+  EXPORT_DIRECTIVE_HEADER,
+  type ExportDirective,
+  MAX_DIRECTIVE_TTL_SECONDS,
+  MAX_RETRY_AFTER_SECONDS,
+  parseExportDirective,
+  retryAfterDelayMs,
+} from './export-directive';
+export {
   ATTR_HTTP_METHOD,
   ATTR_HTTP_ROUTE,
   ATTR_HTTP_STATUS_CODE,
@@ -26,16 +42,7 @@ export {
   TelemetryCollector,
   type TelemetrySpanRecord,
 } from './telemetry.collector';
-export {
-  type ActiveTelemetrySpan,
-  attachTelemetryContext,
-  startTelemetrySpan,
-  type TelemetrySpanOptions,
-  type TelemetrySpanResult,
-  type TelemetryTraceContext,
-} from './client-telemetry';
 export { TelemetryConfig, type TelemetryOptions } from './telemetry.config';
-export { TelemetryMiddleware } from './telemetry.middleware';
 export {
   ENV_OTLP_ENDPOINT,
   ENV_RESOURCE_ATTRIBUTES,
@@ -43,6 +50,7 @@ export {
   ENV_SERVICE_NAME,
   parseResourceAttributes,
 } from './telemetry.environment';
+export { TelemetryMiddleware } from './telemetry.middleware';
 export {
   DEFAULT_SAMPLING_REFRESH_MS,
   TelemetryPlugin,

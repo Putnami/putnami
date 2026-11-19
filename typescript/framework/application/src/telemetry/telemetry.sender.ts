@@ -7,6 +7,7 @@
  * affect application behaviour.
  */
 
+import { getDirectiveReceiver, getSignalDelays } from './export-directive';
 import {
   marshalCanonical,
   metricsRequestFromBuckets,
@@ -24,6 +25,8 @@ export interface OtlpSendResult {
   ok: boolean;
   /** HTTP status of the collector's answer; absent when no answer arrived. */
   status?: number;
+  /** True when nothing was sent because the collector's Retry-After for this signal still holds. */
+  delayed?: boolean;
 }
 
 export interface MetricsSendOptions {
@@ -73,7 +76,11 @@ export function joinUrl(base: string, path: string): string {
 /**
  * POST an OTLP/JSON body to a collector signal endpoint with a 5-second
  * timeout. Best-effort: transport errors and non-2xx responses resolve to
- * `{ ok: false }` and are otherwise ignored.
+ * `{ ok: false }` and are otherwise ignored. Every answer, whatever its
+ * status, may carry an export directive, which the process receiver applies.
+ * A 429 with a Retry-After delays the next push of this signal to this
+ * endpoint: until it passes, nothing is sent and the result is
+ * `{ ok: false, delayed: true }`.
  */
 export async function postOtlp(
   endpoint: string,
@@ -81,6 +88,8 @@ export async function postOtlp(
   body: string,
   opts: { bearer?: string; headers?: Record<string, string> } = {},
 ): Promise<OtlpSendResult> {
+  const delays = getSignalDelays();
+  if (delays.delayed(endpoint, path)) return { ok: false, delayed: true };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
   try {
@@ -94,6 +103,8 @@ export async function postOtlp(
       body,
       signal: controller.signal,
     });
+    getDirectiveReceiver().observe(res.headers);
+    delays.observe(endpoint, path, res.status, res.headers.get('Retry-After'));
     return { ok: res.ok, status: res.status };
   } catch {
     return { ok: false };

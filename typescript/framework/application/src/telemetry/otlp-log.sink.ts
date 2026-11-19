@@ -17,7 +17,8 @@
  *   // on shutdown: await sink.close();
  */
 
-import type { LogEntry, LogSink } from '@putnami/runtime';
+import { type LogEntry, type LogSink, useLogger } from '@putnami/runtime';
+import { getSignalDelays } from './export-directive';
 import { logsRequestFromEntries, marshalCanonical, PATH_LOGS } from './otlp';
 import { CollectorAccess } from './telemetry.credential';
 import { type ServiceIdentity, serviceIdentity } from './telemetry.environment';
@@ -79,10 +80,13 @@ export class OtlpLogSink implements LogSink {
 
   /**
    * Drain the buffer and POST it as OTLP/JSON. Best-effort: a batch without a
-   * credential is dropped, and no collector answer rejects.
+   * credential is dropped, and no collector answer rejects. While the
+   * collector's Retry-After for logs holds, the records stay in the bounded
+   * queue for a later flush.
    */
   async flush(): Promise<void> {
     if (this.buf.length === 0) return;
+    if (getSignalDelays().delayed(this.options.endpoint, PATH_LOGS)) return;
     const entries = this.buf;
     this.buf = [];
     const credential = await this.access.credential();
@@ -101,11 +105,24 @@ export class OtlpLogSink implements LogSink {
     this.access.observe(result);
   }
 
-  /** Stop the background flusher and perform a final flush. */
+  /**
+   * Stop the background flusher and perform a final flush. While the
+   * collector's Retry-After for logs holds, the final flush sends nothing: the
+   * records left behind are counted in a warning.
+   */
   async close(): Promise<void> {
     if (this.timer) {
       clearInterval(this.timer);
       this.timer = undefined;
+    }
+    if (this.buf.length > 0 && getSignalDelays().delayed(this.options.endpoint, PATH_LOGS)) {
+      const records = this.buf.length;
+      this.buf = [];
+      useLogger('telemetry').warn('dropped log records at shutdown: the collector asked to wait', {
+        endpoint: this.options.endpoint,
+        records,
+      });
+      return;
     }
     await this.flush();
   }

@@ -24,6 +24,8 @@ The minimum level of the default logger is live:
 - A started application re-reads `logger.level` every `logger.refreshSeconds`
   (default 30) and applies a change without a restart.
 - `logger.SetLevel` changes it at runtime.
+- `logger.SetLevelLimit` adds a process-wide floor every logger consults,
+  which an OTLP export directive uses for its `ttl`.
 
 A record at error or above is always emitted, and every record counts in
 `log.records{level, outcome}`.

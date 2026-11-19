@@ -47,9 +47,13 @@ told the operator how many records a level hid.
 
 - An operator edits `logger.level` in a mounted config file and the service
   follows within `logger.refreshSeconds`, without a restart.
-- Future export directives, which change what a service sends at runtime,
-  tighten the level through `SetLevel` / `setLogLevel`. A later config change still wins over them; a
-  directive that must hold a floor wraps this rule instead of changing it.
+- Export directives, which change what a service sends at runtime, hold a
+  floor and so wrap this rule instead of changing it: they tighten the level
+  through a separate process-wide limit, `SetLevelLimit` /
+  `setLogLevelLimit`, that every logger consults on each record. The live
+  level stays the config's; a config change or a `SetLevel` call during a
+  directive applies, and the stricter of the two holds until the directive's
+  ttl ends.
 - Dashboards that counted info access lines must count `http.server.*`
   metrics, which every request records.
 

@@ -288,7 +288,10 @@ The level is live and process-wide. The config key `logger.level` sets it;
 without the key, `LOG_LEVEL`; otherwise `info`. A started application
 re-reads `logger.level` from its local config every `logger.refreshSeconds`
 (default 30, 0 turns it off). `setLogLevel(level)` changes it at runtime and
-`currentLogLevel()` reads it. An `error` record is always emitted, and
+`currentLogLevel()` reads it. `setLogLevelLimit(() => level)` adds a
+process-wide floor every logger that checks the level consults on each
+record, without changing the level; telemetry sets one from an OTLP export
+directive. An `error` record is always emitted, and
 `observeLogRecords(listener)` sees every record with its outcome (`emitted`
 or `dropped`), which telemetry exports as `log.records`. See
 [`doc/logging.md`](doc/logging.md).

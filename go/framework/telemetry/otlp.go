@@ -93,6 +93,12 @@ type otlpClient struct {
 	bearer       string
 	bearerSource func(ctx context.Context) (string, error)
 	http         *http.Client
+
+	// directives receives the export directive of each response.
+	directives *directiveReceiver
+	// delays holds the Retry-After delays, by endpoint and signal path.
+	delays *signalDelays
+	now    func() time.Time
 }
 
 func newOTLPClient(cfg OTLPConfig) *otlpClient {
@@ -106,12 +112,24 @@ func newOTLPClient(cfg OTLPConfig) *otlpClient {
 		bearer:       cfg.BearerToken,
 		bearerSource: cfg.BearerTokenSource,
 		http:         httpClient,
+		directives:   processDirectives,
+		delays:       processDelays,
+		now:          time.Now,
 	}
 }
 
+// delayed reports whether the collector asked the signal of path to wait, so
+// an export now would be skipped.
+func (c *otlpClient) delayed(path string) bool { return c.delays.delayed(c.endpoint, path, c.now()) }
+
 // post sends body to "<endpoint><path>". Returns an error on transport failure
-// or a non-2xx status; the caller decides whether to drop.
+// or a non-2xx status; the caller decides whether to drop. While a 429's
+// Retry-After holds it sends nothing and returns errExportDelayed. Every
+// response, whatever its status, may carry an export directive.
 func (c *otlpClient) post(ctx context.Context, path string, body []byte) error {
+	if c.delayed(path) {
+		return errExportDelayed
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.endpoint+path, bytes.NewReader(body))
 	if err != nil {
 		return err
@@ -134,6 +152,8 @@ func (c *otlpClient) post(ctx context.Context, path string, body []byte) error {
 		return err
 	}
 	defer resp.Body.Close() //nolint:errcheck // best-effort close on HTTP response
+	c.directives.observe(resp.Header)
+	c.delays.observe(c.endpoint, path, resp.StatusCode, resp.Header, c.now())
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return &collectorError{status: resp.StatusCode}
 	}

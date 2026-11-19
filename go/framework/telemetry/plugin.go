@@ -368,6 +368,7 @@ func (p *Plugin) configureLocked() error {
 
 	// Last, so a Configure error leaves no refresh running: the application
 	// never calls Stop after one.
+	processDirectives.register(p.sampler)
 	p.startSamplingRefresh()
 
 	return nil
@@ -398,6 +399,7 @@ func (p *Plugin) Stop(ctx context.Context, _ *app.Module) error {
 		stopRefresh()
 		<-refreshDone
 	}
+	processDirectives.unregister(p.sampler)
 
 	p.mu.RLock()
 	removeErrorBridge := p.removeErrorBridge

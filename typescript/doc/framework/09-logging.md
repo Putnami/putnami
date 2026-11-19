@@ -236,6 +236,8 @@ The level rule is the same in Go and TypeScript: `logger.level` wins, then
 its config files and `CONFIG_DATA` every `logger.refreshSeconds` and applies a
 change without a restart; remote config sources are read at start only.
 `setLogLevel(level)` changes the level at runtime, and the last change wins.
+`setLogLevelLimit()` adds a process-wide floor every logger consults without
+changing the level; telemetry sets one from an OTLP export directive.
 Every record counts once in the telemetry counter
 `log.records{level, outcome}`, with `outcome` `emitted` or `dropped`.
 

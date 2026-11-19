@@ -71,6 +71,10 @@ from it (`Named`, `With`) read one process-wide level on each record:
 - `logger.SetLevel(level)` changes it at runtime; `logger.CurrentLevel()`
   reads it. The last change wins.
 - A logger `New` builds keeps its own level.
+- `logger.SetLevelLimit(func() Level)` installs a process-wide floor every
+  logger consults on each record, without changing any level; `nil` removes
+  it. The telemetry plugin installs one for an export directive's
+  `log-level`.
 
 A record at error or above is emitted whatever the level.
 `logger.RecordCounts()` returns the cumulative records by level and outcome

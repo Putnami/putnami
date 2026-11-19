@@ -263,6 +263,15 @@
             "kind": "acceptance",
             "checks": ["records-are-counted-per-level-and-outcome"]
           }
+        },
+        {
+          "id": "level-limit",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["the-limit-raises-the-level-of-every-logger", "an-error-passes-the-limit"]
+          }
         }
       ]
     }

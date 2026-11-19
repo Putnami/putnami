@@ -31,8 +31,8 @@ var liveLevel = func() *slog.LevelVar {
 // keeps its own level.
 //
 // SetLevel is the runtime control of the level: a started application calls
-// it when logger.level changes, and an export directive may call it to
-// tighten the level. The last call wins.
+// it when logger.level changes. The last call wins. An export directive
+// tightens the level through SetLevelLimit instead, and leaves it alone.
 func SetLevel(level Level) {
 	liveLevel.Set(level)
 }
@@ -98,13 +98,38 @@ func WatchLevel(ctx context.Context, interval time.Duration, read func(context.C
 	return done
 }
 
-// admit reports whether a record at level passes this logger's minimum level,
-// and counts the record as emitted or dropped. A record at error or above
-// always passes.
+// levelLimit holds the function SetLevelLimit installed, or nil.
+var levelLimit atomic.Pointer[func() Level]
+
+// SetLevelLimit installs limit, a process-wide floor that every logger,
+// whether derived from the default logger or built by New, consults on each
+// record without changing its own level: a record passes when it passes both
+// its logger's level and the level limit returns. A nil limit removes it.
+//
+// An export directive uses it to tighten the level for a while: limit returns
+// the directive's level while the directive holds, and a level at or below
+// debug once it ends. A record at error or above passes whatever the limit,
+// and a record the limit filters counts as dropped.
+func SetLevelLimit(limit func() Level) {
+	if limit == nil {
+		levelLimit.Store(nil)
+		return
+	}
+	levelLimit.Store(&limit)
+}
+
+// admit reports whether a record at level passes this logger's minimum level
+// and the level limit, and counts the record as emitted or dropped. A record
+// at error or above always passes.
 func (l *Logger) admit(level Level) bool {
-	emitted := level >= LevelError || level >= l.level.Level()
+	emitted := level >= LevelError || (level >= l.level.Level() && passesLimit(level))
 	countRecord(level, emitted)
 	return emitted
+}
+
+func passesLimit(level Level) bool {
+	limit := levelLimit.Load()
+	return limit == nil || level >= (*limit)()
 }
 
 // RecordCount is the number of records at one level with one outcome since
