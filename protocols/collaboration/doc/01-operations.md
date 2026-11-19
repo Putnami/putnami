@@ -105,7 +105,10 @@ detect such a change.
 
 A proposal is `ref`, `revision`, `url`, `change` (`repository`, `base`,
 `head`, `headCommit`), `title`, `body`, `state` (`draft`, `open`, `merged`,
-`closed`), `providerState`, `labels`, `assignees`, `updatedAt`. A request may
+`closed`), `providerState`, `labels`, `assignees`, `updatedAt`, and
+`pageUrl`, a display link to the proposal's change in the provider's own
+console, such as a hosted platform's change page; a provider without one
+leaves it absent, and like `url` it is never an identity. A request may
 omit `repository`; the provider applies its configured one, and every
 proposal it returns names it. `labels` and `assignees` include those the
 provider applies from its own settings; a provider reports them on every

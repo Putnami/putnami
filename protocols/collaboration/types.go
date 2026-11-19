@@ -340,6 +340,10 @@ type Proposal struct {
 	Revision string `json:"revision"`
 	// URL is a display link. It is never an identity.
 	URL string `json:"url,omitempty"`
+	// PageURL is a display link to the proposal's change in the provider's
+	// own console, such as the change page of a hosted platform, when the
+	// provider has one. It is never an identity.
+	PageURL string `json:"pageUrl,omitempty"`
 	// Change is the repository/base/head identity the proposal is associated
 	// with.
 	Change Change `json:"change"`
