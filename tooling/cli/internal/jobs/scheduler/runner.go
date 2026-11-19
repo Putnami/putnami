@@ -510,13 +510,32 @@ func withServeStep(ctx context.Context) context.Context {
 
 // serveStepStarted does what a serve-workload step does once its process
 // started: it releases the step's serve keys, its command-output lock when
-// its task declares no command-output output (releaseServeOutputLocks), and
-// announces the step's process group (announceProcessGroup). For a finite
+// its task declares no command-output output (releaseServeOutputLocks), arms
+// the grace after which its ready keys go, and announces the step's process
+// group (announceProcessGroup). For a finite
 // step it does nothing. The release comes first: a process event therefore
 // tells an observer that the serve keys are already released.
 func serveStepStarted(ctx context.Context, group int, onEvent EventHandler) {
 	releaseServeOutputLocks(ctx)
 	announceProcessGroup(ctx, group, onEvent)
+}
+
+// observeServeReadiness returns the handler runJob reads a serve-workload
+// step's events with: a readiness claim (isServeReadyEvent) releases the
+// step's ready keys (releaseServeReadyLocks), then reaches onEvent. Under a
+// context without withServeStep it returns onEvent.
+func observeServeReadiness(ctx context.Context, onEvent EventHandler) EventHandler {
+	if serving, _ := ctx.Value(serveStepKey{}).(bool); !serving {
+		return onEvent
+	}
+	return func(event RawJobEvent) {
+		if isServeReadyEvent(event) {
+			releaseServeReadyLocks(ctx)
+		}
+		if onEvent != nil {
+			onEvent(event)
+		}
+	}
 }
 
 // announceProcessGroup emits the CLI-built process event of a serve-workload
@@ -647,6 +666,7 @@ func runJob(
 	_ = stdoutWriter.Close()
 	_ = stderrWriter.Close()
 	serveStepStarted(ctx, tree.ID(), onEvent)
+	onEvent = observeServeReadiness(ctx, onEvent)
 
 	// Read stdout (JSONL events) and stderr concurrently
 	eventsCh := make(chan jobReadResult, 1)

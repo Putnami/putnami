@@ -664,7 +664,8 @@
           "checks": [
             "a-reader-and-another-sessions-writer-exclude-each-other",
             "readers-in-several-sessions-share-their-lock",
-            "a-wait-behind-readers-names-no-holder"
+            "a-wait-behind-readers-names-no-holder",
+            "a-run-step-never-sees-another-sessions-generate-empty-what-it-reads"
           ]
         }
       },
@@ -682,6 +683,23 @@
             "a-serve-step-keeps-every-other-key-until-capture",
             "a-serve-step-that-declares-a-command-output-keeps-it-until-capture",
             "a-dependents-serve-run-comes-up-beside-its-dependencys-serve-run"
+          ]
+        }
+      },
+      {
+        "id": "a-serve-step-releases-its-reader-locks-once-ready",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "a-serve-step-keeps-its-reader-key-until-its-ready-claim",
+            "a-serve-step-without-a-ready-claim-releases-its-reader-key-after-the-grace",
+            "a-writer-runs-beside-a-ready-serve-step",
+            "a-serve-step-whose-preparation-writes-keeps-its-project-key-until-ready",
+            "the-serve-process-never-sees-its-reader-key-held"
           ]
         }
       },

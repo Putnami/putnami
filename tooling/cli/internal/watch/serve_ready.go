@@ -8,7 +8,8 @@ import (
 	runtimeproto "go.putnami.dev/protocol/runtime"
 )
 
-// This file is THE serve-readiness adapter: the one place that decides a serve
+// This file is THE serve-readiness adapter of the watch loop: it turns the
+// readiness claim (jobs.IsServeReadyEvent) into the signal that a serve
 // iteration's server is up.
 //
 // A serve iteration must not arm the file watcher until the server is actually
@@ -27,31 +28,7 @@ import (
 // (ReadyClaim), which is the listener a `--port 0` serve waits on between
 // restarts: port 0 names none.
 //
-// grep: isServeReadyEvent, serveReadySignal, ReadyClaim.
-
-// isServeReadyEvent reports whether a job event is a readiness claim this
-// iteration can act on.
-//
-// The three conditions are the protocol's, not this package's. The type must be
-// `ready`; the envelope must be v2, because a `ready` stamped v1 is a wire
-// violation rather than an early adopter (only v2 admits the type); and the
-// payload must decode to a claim inside the closed target vocabulary, because a
-// consumer that cannot tell WHAT became ready has not been told anything.
-//
-// Every rejection fails CLOSED — the watcher stays unarmed — which is the same
-// direction the log probe failed in and the safe one: an unarmed watcher costs
-// a serve iteration its hot reload, while arming early restarts a server that
-// is not listening yet and races the port it has not bound.
-func isServeReadyEvent(event jobs.RawJobEvent) bool {
-	if event.Type != jobs.EventTypeReady || event.Version != runtimeproto.ProtocolVersion {
-		return false
-	}
-	data, err := runtimeproto.ExtractReadyData(event.Data)
-	if err != nil || data == nil {
-		return false
-	}
-	return data.Target == runtimeproto.ReadyTargetServer || data.Target == runtimeproto.ReadyTargetWorkload
-}
+// grep: jobs.IsServeReadyEvent, serveReadySignal, ReadyClaim.
 
 // ReadyClaim is the target of a readiness claim and the port a client should
 // reach it on: the first http or https endpoint, because the CLI's consumers
@@ -105,7 +82,7 @@ func (s *serveReadySignal) lastPort() int { return int(s.port.Load()) }
 // signals readiness on a match. Events observed before the first reset, or
 // after the signal already fired, signal nothing.
 func (s *serveReadySignal) observe(event jobs.RawJobEvent) {
-	if !isServeReadyEvent(event) {
+	if !jobs.IsServeReadyEvent(event) {
 		return
 	}
 	if _, port := ReadyClaim(event); port > 0 {

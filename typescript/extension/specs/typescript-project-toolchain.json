@@ -46,6 +46,10 @@
       "text": "A served or run child process forwards its own exit code; an interrupt terminates the whole child process group and reports 130, escalating to SIGKILL when the group does not exit within the grace period."
     },
     {
+      "id": "serve-and-run-read-the-generated-tree",
+      "text": "The serve and run steps read the project's generated tree (.gen), which generate writes. Another session's generate of the project therefore never empties it while a run's program runs, nor while a serve's program loads: until it claims readiness, or for 30 seconds after its first process started when it claims none."
+    },
+    {
       "id": "environment-independent-library-output",
       "text": "Transpiled library output does not depend on the builder's environment: JSX compiles to the production automatic runtime (react/jsx-runtime) whatever NODE_ENV or bunfig.toml the builder has, and process.env reads, NODE_ENV included, stay runtime reads for the consumer."
     },

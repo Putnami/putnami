@@ -110,6 +110,13 @@ in the closed vocabulary. Every rejection fails **closed**: an unarmed watcher
 costs a serve iteration its hot reload, while arming early restarts a server
 that has not bound its port.
 
+The CLI scheduler is the second consumer: a serve-workload step holds the locks
+of the resources it reads, such as its project's `.gen`, until its first `ready`
+claim for a server or a workload, so another session's `generate` never
+empties what the program imports while it starts; a module it imports after
+that claim is not covered. Without a claim, it holds them for 30 seconds after
+its first attempt's process started.
+
 ### Determinism
 
 Endpoints are emitted and validated in one canonical total order — scheme, then
@@ -260,6 +267,8 @@ is therefore announced once per serve **iteration**, which is why more than one
   valid (`fixtures/v2/valid/all-v1-types.jsonl`), because a job that binds
   nothing has no readiness to announce. What a serve job LOSES by not announcing
   it is the watcher: the arming signal is the event, and there is no fallback.
+  The scheduler's read locks do have one: they end 30 seconds after the
+  serve's first process started.
 - **Nothing about readiness is required of this package's v1 corpus.**
   `fixtures/{valid,invalid}` — the cross-language corpus the TypeScript mirror
   validates against too — is untouched, and the v2 corpus lives in

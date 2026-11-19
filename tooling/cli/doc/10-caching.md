@@ -776,10 +776,12 @@ outlive the owner's execution has to be ceded by the owner. The TypeScript
 its JSON Schema companion, which `config-extract` writes when
 `options.generate.schema=false`, so a build keeps them.
 
-A reader in another session that takes no task-output lock, such as a
-development server, can see an owned directory empty while its owner runs. A
-task that declares a read of the resource the owner writes holds a shared lock
-on the owner's key, so it waits for the owner's run to end.
+A reader in another session that takes no task-output lock can see an owned
+directory empty while its owner runs. A task that declares a read of the
+resource the owner writes holds a shared lock on the owner's key, so it waits
+for the owner's run to end. The TypeScript `run` and `serve` steps read `gen`:
+a program they start never imports from a `.gen` that another session's
+`generate` is emptying.
 
 Four outputs are not emptied:
 
@@ -981,6 +983,8 @@ A task holds these locks across a cache restore into its outputs, and for an
 execution from the output preparation through the capture into the cache:
 the version-stamp refresh, the preBuild hook, the subprocess with its
 retries, and the capture. A serve-workload step is the one exception, below.
+A `run` step is not one: a one-shot program keeps the locks it reads under
+until its capture, after it exited.
 A cache restore takes no shared lock: it writes the task's own outputs and
 reads nothing another task writes. A task that adopts the result of another
 command's identical task in the same run (a shared execution) executes
@@ -1009,12 +1013,29 @@ composition that starts the consumer after the provider. Those steps can rewrite
 `.putnami/out/<project>/~serve` while the server runs; a cache hit restores
 the bytes the directory already holds. A finite step of the pipeline keeps
 its lock until its capture, although its command declares the serve
-workload, and the serve-workload step keeps its other locks until its
-capture: its project or the workspace when it declares a durable output
-there, and every lock it reads under.
+workload, and the serve-workload step keeps its project or workspace lock
+until its capture when it declares a durable output there.
+
+A serve-workload step keeps each lock it reads under, such as its project's
+for `reads: ["gen"]`, only until its server is ready: until its process
+claims readiness with the typed `ready` event of the runtime event protocol,
+for a server or a workload, or 30 seconds after its first attempt's process
+started when no claim comes first, retries included. A lock its preparation
+also took ends there too. Its program has then loaded what it imports
+statically from `.gen`, and another session's `generate` of the project runs
+beside the server instead of waiting until it stops. A module the program
+imports later, from a start hook or a lazily loaded route, is not covered. A
+server whose program never claims readiness, such as one that does not use
+the Putnami framework, keeps that lock for its first 30 seconds.
 
 A task that needs one lock both to write and to read, or whose preparation
-writes the project tree, holds that lock exclusively until its capture.
+writes the project tree, holds that lock exclusively until its capture. A
+serve-workload step whose preparation wrote the project tree and that only
+reads under that lock holds it exclusively until its server is ready: other
+sessions' readers of the project, such as a `putnami test`, wait for that
+too. A `run` step whose preparation wrote the project tree holds it
+exclusively until its capture. Such a preparation is the first execution of
+the session in the project, as when every step before it was a cache hit.
 Tasks of one session share one lock, held in the mode of the task that took
 it first: a reader that starts while a task of its session writes joins that
 exclusive lock, which then stays exclusive until the session's last task

@@ -127,6 +127,19 @@
           }
         },
         {
+          "id": "serve-and-run-read-the-generated-tree",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-serve-and-run-steps-read-gen"
+            ]
+          }
+        },
+        {
           "id": "environment-independent-library-output",
           "stage": "coded",
           "evidenceKinds": [

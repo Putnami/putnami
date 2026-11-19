@@ -518,9 +518,10 @@ func TestTaskOutputLockPreparationKeys(t *testing.T) {
 // TestTaskOutputLockServeKeys pins which key a serve-workload step releases
 // once its process started: its command-output key, and only when every task
 // of the acquisition that needs it is a serve-workload step. Its writer key of
-// a durable project-rooted output and its reader key stay held until the
-// capture, the subprocess never receives the released key's id, and another
-// session takes that key while the step still holds the others.
+// a durable project-rooted output stays held until the capture and its reader
+// key until its readiness claim, the subprocess never receives the released
+// keys' ids, and another session takes the command-output key while the step
+// still holds the others.
 func TestTaskOutputLockServeKeys(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "a-serve-step-releases-its-command-output-once-it-started",
@@ -561,8 +562,8 @@ func TestTaskOutputLockServeKeys(t *testing.T) {
 		t.Fatalf("preparation value = %q, want the command-output key the preparation holds", preparing)
 	}
 	ctx := hold.endPreparation(t.Context())
-	if got, want := heldOutputLocksValue(ctx), strings.Join(slices.Sorted(slices.Values([]string{project.id, workspace.id})), ","); got != want {
-		t.Fatalf("subprocess value = %q, want %q: the subprocess never holds the command-output key", got, want)
+	if got := heldOutputLocksValue(ctx); got != project.id {
+		t.Fatalf("subprocess value = %q, want %q: the subprocess never holds the command-output key or the reader key", got, project.id)
 	}
 	releaseServeOutputLocks(ctx)
 	if probeFree(t, session, commandOutput) {
@@ -579,7 +580,7 @@ func TestTaskOutputLockServeKeys(t *testing.T) {
 		t.Fatal("the writer key of a durable project-rooted output was released before the capture")
 	}
 	if probeFree(t, session, workspace) || !probeShared(t, session, workspace) {
-		t.Fatal("the reader key is not held shared until the capture")
+		t.Fatal("the reader key is not held shared once the process started")
 	}
 	finiteHold := awaitAcquired(t, acquireAsync(t.Context(), other, finite), "another session's finite step")
 	finiteHold.release()

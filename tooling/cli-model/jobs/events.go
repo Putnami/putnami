@@ -407,3 +407,24 @@ func NormalizeStatus(s string) string {
 	}
 	return s
 }
+
+// IsServeReadyEvent reports whether a job event is a readiness claim a serve
+// can act on.
+//
+// The three conditions are the protocol's, not this package's. The type must be
+// `ready`; the envelope must be the version the CLI reads back
+// (MaxKnownProtocolVersion), because a `ready` stamped v1 is a wire violation
+// rather than an early adopter (only v2 admits the type); and the
+// payload must decode to a claim inside the closed target vocabulary, because a
+// consumer that cannot tell WHAT became ready has not been told anything.
+// An event that fails any condition is not a readiness claim.
+func IsServeReadyEvent(event RawJobEvent) bool {
+	if event.Type != EventTypeReady || event.Version != runtimeproto.MaxKnownProtocolVersion {
+		return false
+	}
+	data, err := runtimeproto.ExtractReadyData(event.Data)
+	if err != nil || data == nil {
+		return false
+	}
+	return data.Target == runtimeproto.ReadyTargetServer || data.Target == runtimeproto.ReadyTargetWorkload
+}

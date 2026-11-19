@@ -325,6 +325,7 @@ var (
 	eventFloat              = model.EventFloat
 	extractResult           = model.ExtractResult
 	isFinalizerJob          = model.IsFinalizerJob
+	isServeReadyEvent       = model.IsServeReadyEvent
 	jobCommandAndStep       = model.JobCommandAndStep
 	jobCommandName          = model.JobCommandName
 	normalizeStatus         = model.NormalizeStatus

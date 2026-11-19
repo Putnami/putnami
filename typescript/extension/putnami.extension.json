@@ -2614,6 +2614,7 @@
       "cwd": "{projectRoot}",
       "cache": false,
       "timeoutMs": -1,
+      "reads": ["gen"],
       "declares": {
         "effects": [
           "network",
@@ -2630,6 +2631,7 @@
       "cwd": "{projectRoot}",
       "cache": false,
       "timeoutMs": -1,
+      "reads": ["gen"],
       "declares": {
         "effects": [
           "process"

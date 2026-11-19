@@ -175,11 +175,15 @@
     },
     {
       "id": "concurrent-session-read-exclusion",
-      "text": "An executing task that reads a resource it does not write shares the lock its writers hold: its project's, or the workspace's for a workspace-scoped resource, from its preparation through its capture. The sources resource takes none, and a restore reads nothing. Readers in several sessions hold the lock together, a writer in another session waits for all of them, and a reader waits for that writer. A wait behind readers prints one line saying another putnami process is reading, naming no holder."
+      "text": "An executing task reading a resource it does not write shares its writers' lock: its project's, or the workspace's for a workspace resource, from its preparation through its capture, unless a serve step released it once ready. Sources take none; a restore reads nothing. Readers in several sessions hold it together, a writer in another session waits for all of them, and a reader waits for that writer. A wait behind readers prints one line saying another putnami process is reading, naming no one."
     },
     {
       "id": "a-serve-step-releases-its-command-output-once-it-started",
-      "text": "A serve-workload step, the terminal uncacheable step of a serve pipeline, whose task declares no command-output output releases its command-output lock once its process started, through its retries and capture, and keeps every other lock until capture. Another session, such as a dependent's serve run, then runs that project's finite serve steps beside it. A finite step, and a serve step whose task declares a command-output output, keep the lock until capture. The process never sees the released lock held."
+      "text": "A serve-workload step, the terminal uncacheable step of a serve pipeline, whose task declares no command-output output releases its command-output lock once its process started, through its retries and capture, and keeps its writer locks until capture. Another session, such as a dependent's serve run, then runs that project's finite serve steps beside it. A finite step, and a serve step whose task declares a command-output output, keep the lock until capture. The process never sees the released lock held."
+    },
+    {
+      "id": "a-serve-step-releases-its-reader-locks-once-ready",
+      "text": "A serve-workload step that reads a resource it does not write holds that reader lock, and a preparation lock on the same key, until its process claims readiness with a typed ready event for a server or a workload, or 30 seconds after its first attempt's process started when no claim came first. It then releases it through its retries and capture, so another session's writer of that resource, such as a generate, runs beside the server. The process never sees the released lock held."
     },
     {
       "id": "scratch-generation-retention",
