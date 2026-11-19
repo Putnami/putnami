@@ -123,10 +123,9 @@
     {
       "id": "proposal-page-url",
       "text": [
-        "A proposal may carry pageUrl, a display link to its change in the provider's own console, never an identity:",
-        "an absolute http or https link with no credentials, like url, that survives a parse and a re-encoding.",
-        "Every proposals operation that answers a proposal lists it as a declared member (ADR 0007): a provider returns it only when its manifest declares it,",
-        "and providertest.RunProposals checks that a declared pageUrl is on every proposal answered and an undeclared one on none."
+        "A proposal may carry pageUrl, a display link to its change in the provider's own console, never an identity, validated like url.",
+        "It is a declared member of find, status, upsert, merge and automerge (ADR 0011), declared on every one of them a provider offers or on none, or its proposals version is withdrawn;",
+        "a provider that declares it answers it on every proposal, as providertest.RunProposals checks."
       ]
     },
     {
@@ -349,6 +348,7 @@
     "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md",
     "protocols/collaboration/doc/adr/0008-a-session-leaves-no-empty-mission-behind.md",
     "protocols/collaboration/doc/adr/0009-a-declared-request-member-may-join-version-1.md",
-    "protocols/collaboration/doc/adr/0010-missions-version-2-adds-typed-runs.md"
+    "protocols/collaboration/doc/adr/0010-missions-version-2-adds-typed-runs.md",
+    "protocols/collaboration/doc/adr/0011-proposals-declare-page-url.md"
   ]
 }

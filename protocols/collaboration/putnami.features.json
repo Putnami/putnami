@@ -226,7 +226,8 @@
             "kind": "acceptance",
             "checks": [
               "page-url-is-an-optional-display-link",
-              "the-proposal-scenarios-check-the-declared-page-url"
+              "the-proposal-scenarios-check-the-declared-page-url",
+              "a-partial-page-url-declaration-withdraws-the-version"
             ]
           }
         },
