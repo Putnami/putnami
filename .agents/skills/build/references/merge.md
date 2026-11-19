@@ -162,3 +162,9 @@ records, the tokens spent against the estimate, every impacted run beyond the
 final one and every `--projects` gate that followed no edit, with its cause,
 and whether the proposal was announced by tag, bound by tool, or the tool
 refused or failed to bind it. Unavailable tokens or costs stay unavailable.
+
+When `change finalize` printed `CHANGE_URL=<url>`, the end report leads with
+that change page and what waits there for the owner: the declarations to
+approve, the gaps to accept and the findings to decide, or that nothing
+waits. The pull request link follows it. Without a `CHANGE_URL`, the report
+is unchanged.

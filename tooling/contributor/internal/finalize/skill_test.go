@@ -76,3 +76,29 @@ func TestThePublishedProposalBindsToTheHostSession(t *testing.T) {
 	}
 	spectest.Proves(t, "tooling/contributor-executable", "session-bound-proposal", "the-published-proposal-binds-to-the-host-session")
 }
+
+// TestTheEndReportLeadsWithTheChangePage pins the build skill's end report:
+// when change finalize printed a CHANGE_URL, the report opens with that change
+// page and what waits there for the owner, then the pull request link, and
+// without one it stays as it was.
+func TestTheEndReportLeadsWithTheChangePage(t *testing.T) {
+	t.Parallel()
+	required := map[string][]string{
+		"references/merge.md": {
+			"When `change finalize` printed `CHANGE_URL=<url>`, the end report leads with that change page and what waits there for the owner: the declarations to approve, the gaps to accept and the findings to decide, or that nothing waits.",
+			"The pull request link follows it. Without a `CHANGE_URL`, the report is unchanged.",
+		},
+		"SKILL.md": {
+			"When `change finalize` printed a `CHANGE_URL`, the end report opens with that change page and what waits there for the owner (declarations to approve, gaps, findings), then the pull request link, as merge says.",
+		},
+	}
+	for path, sentences := range required {
+		text := buildSkillText(t, path)
+		for _, sentence := range sentences {
+			if !strings.Contains(text, sentence) {
+				t.Errorf("%s lacks %q", path, sentence)
+			}
+		}
+	}
+	spectest.Proves(t, "tooling/contributor-executable", "change-page-link", "the-end-report-leads-with-the-change-page")
+}
