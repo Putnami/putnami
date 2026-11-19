@@ -123,10 +123,10 @@
     {
       "id": "proposal-page-url",
       "text": [
-        "A proposal may carry pageUrl, a display link to its change in the provider's own console, next to url, and never an identity.",
-        "It is a declared member of every proposals operation that answers a proposal, so a provider returns it only when its manifest declares it, and an older CLI refuses that declaration (ADR 0007).",
-        "A pageUrl is an absolute http or https link with no credentials, like url, and survives a parse and a re-encoding;",
-        "providertest.RunProposals checks that a declared pageUrl is on every proposal answered and an undeclared one on none."
+        "A proposal may carry pageUrl, a display link to its change in the provider's own console, never an identity:",
+        "an absolute http or https link with no credentials, like url, that survives a parse and a re-encoding.",
+        "Every proposals operation that answers a proposal lists it as a declared member (ADR 0007): a provider returns it only when its manifest declares it,",
+        "and providertest.RunProposals checks that a declared pageUrl is on every proposal answered and an undeclared one on none."
       ]
     },
     {
