@@ -129,8 +129,6 @@ describe.
 
 Progress, slice and end reports are short lists of the main steps: what was
 done, the stage reached, the exact records, open findings, the next action and
-any unavailable input. When `change finalize` printed a `CHANGE_URL`, the end
-report opens with that change page and what waits there for the owner
-(declarations to approve, gaps, findings), then the pull request link, as
+any unavailable input. A `CHANGE_URL` leads the end report, as
 merge says. A question to the owner states what was being done,
 what is at stake, the options and your pick, never a bare question.

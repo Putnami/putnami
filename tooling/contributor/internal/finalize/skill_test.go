@@ -89,7 +89,7 @@ func TestTheEndReportLeadsWithTheChangePage(t *testing.T) {
 			"The pull request link follows it. Without a `CHANGE_URL`, the report is unchanged.",
 		},
 		"SKILL.md": {
-			"When `change finalize` printed a `CHANGE_URL`, the end report opens with that change page and what waits there for the owner (declarations to approve, gaps, findings), then the pull request link, as merge says.",
+			"A `CHANGE_URL` leads the end report, as merge says.",
 		},
 	}
 	for path, sentences := range required {
