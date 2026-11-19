@@ -46,6 +46,7 @@ afterEach(() => {
 describe('first-party provider to generated consumer', () => {
   test('derives, emits, binds through config/DI, and calls a real Putnami provider', async () => {
     let providerTraceparent: string | null = null;
+    let providerPutnamiTraceparent: string | null = null;
     const providerHttp = http({ port: 0 });
     providerHttp.prepend(authenticate({ anyOf: [apiKeyStrategy({ keys: ['runtime-only-api-key'] })] }));
     const operationSecurity = { alternatives: [{ allOf: [{ profile: 'service-key' }] }] } as const;
@@ -65,6 +66,7 @@ describe('first-party provider to generated consumer', () => {
         .client({ security: operationSecurity, idempotency: { kind: 'safe' } })
         .handle((context) => {
           providerTraceparent = context.req.headers.get('traceparent');
+          providerPutnamiTraceparent = context.req.headers.get('x-putnami-traceparent');
           return { id: context.params.id, name: 'framework-generated' };
         }),
       'GET',
@@ -393,6 +395,7 @@ describe('first-party provider to generated consumer', () => {
       expect(callSpan).toMatchObject({ traceId: incomingTraceId, parentSpanId: serverSpan?.spanId, statusCode: 1 });
       expect(attemptSpan).toMatchObject({ traceId: incomingTraceId, parentSpanId: callSpan?.spanId, statusCode: 1 });
       expect<unknown>(providerTraceparent).toBe(`00-${incomingTraceId}-${attemptSpan?.spanId}-01`);
+      expect<unknown>(providerPutnamiTraceparent).toBe(providerTraceparent);
 
       const buckets = collector?.drainAll() ?? [];
       const counterSeries = buckets.flatMap((bucket) => bucket.counterSeries ?? []);

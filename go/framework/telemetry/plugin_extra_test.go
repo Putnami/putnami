@@ -151,8 +151,8 @@ func TestPluginConfigureInstallsGlobalsAndRegistrations(t *testing.T) {
 		t.Fatal("Configure() did not install a propagator")
 	}
 	fields := prop.Fields()
-	if !containsAll(fields, "traceparent", "baggage") {
-		t.Errorf("propagator fields = %v, want traceparent and baggage", fields)
+	if !containsAll(fields, "traceparent", "x-putnami-traceparent", "baggage") {
+		t.Errorf("propagator fields = %v, want traceparent, x-putnami-traceparent and baggage", fields)
 	}
 
 	// The lazy registrations must resolve to the same provider instances through

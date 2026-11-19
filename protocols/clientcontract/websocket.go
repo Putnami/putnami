@@ -456,7 +456,7 @@ func reservedWebSocketInitHeader(name string) bool {
 	}
 	switch name {
 	case "authorization", "baggage", "connection", "content-length", "cookie", "host", "set-cookie",
-		"traceparent", "tracestate", "upgrade", "x-client-id", "x-request-id":
+		"traceparent", "tracestate", "upgrade", "x-client-id", "x-request-id", "x-putnami-traceparent":
 		return true
 	default:
 		return false

@@ -4,6 +4,13 @@ import { getCollector } from './telemetry.utils';
 import { getTraceSampler } from './trace-sampling';
 
 const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-([0-9a-f]{2})$/;
+/**
+ * The header a client copies its traceparent value into. Proxies leave it
+ * alone, so a server still finds the client span when a proxy rewrote the
+ * parent ID of traceparent. Pinned with the rule that reads it by
+ * protocols/telemetry/fixtures/conventions/proxy-safe-traceparent.json.
+ */
+export const PUTNAMI_TRACEPARENT_HEADER = 'x-putnami-traceparent';
 const ZERO_TRACE_ID = '00000000000000000000000000000000';
 const ZERO_SPAN_ID = '0000000000000000';
 const MAX_TRACESTATE_LENGTH = 512;
@@ -111,22 +118,40 @@ function isSampled(traceFlags: string): boolean {
   return (Number.parseInt(traceFlags, 16) & 1) === 1;
 }
 
+/**
+ * Read the remote parent of a server span from W3C headers.
+ *
+ * Without a valid traceparent there is no parent. When x-putnami-traceparent
+ * carries the same trace ID and another parent ID, a proxy rewrote
+ * traceparent, and the parent is the one in x-putnami-traceparent; otherwise
+ * it is traceparent's.
+ */
 function readRemoteContext(headers: Headers): TelemetryTraceContext | undefined {
-  const match = TRACEPARENT.exec(headers.get('traceparent')?.toLowerCase() ?? '');
-  if (!match || match[1] === ZERO_TRACE_ID || match[2] === ZERO_SPAN_ID) return undefined;
+  const primary = parseTraceparent(headers.get('traceparent')?.toLowerCase());
+  if (!primary) return undefined;
+  const second = parseTraceparent(headers.get(PUTNAMI_TRACEPARENT_HEADER) ?? undefined);
+  const parent = second && second.traceId === primary.traceId && second.spanId !== primary.spanId ? second : primary;
   const tracestate = boundedHeader(headers.get('tracestate'), MAX_TRACESTATE_LENGTH);
   const baggage = boundedHeader(headers.get('baggage'), MAX_BAGGAGE_LENGTH);
   return {
-    traceId: match[1],
-    spanId: match[2],
-    traceFlags: match[3],
+    ...parent,
     ...(tracestate ? { tracestate } : {}),
     ...(baggage ? { baggage } : {}),
   };
 }
 
+function parseTraceparent(
+  value: string | undefined,
+): Pick<TelemetryTraceContext, 'traceId' | 'spanId' | 'traceFlags'> | undefined {
+  const match = TRACEPARENT.exec(value ?? '');
+  if (!match || match[1] === ZERO_TRACE_ID || match[2] === ZERO_SPAN_ID) return undefined;
+  return { traceId: match[1], spanId: match[2], traceFlags: match[3] };
+}
+
 function injectContext(headers: Headers, context: TelemetryTraceContext): void {
-  headers.set('traceparent', `00-${context.traceId}-${context.spanId}-${context.traceFlags}`);
+  const traceparent = `00-${context.traceId}-${context.spanId}-${context.traceFlags}`;
+  headers.set('traceparent', traceparent);
+  headers.set(PUTNAMI_TRACEPARENT_HEADER, traceparent);
   if (context.tracestate) headers.set('tracestate', context.tracestate);
   else headers.delete('tracestate');
   if (context.baggage) headers.set('baggage', context.baggage);

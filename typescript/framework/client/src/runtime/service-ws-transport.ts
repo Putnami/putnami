@@ -507,6 +507,7 @@ class ServiceWebSocketSession<TIn, TOut> {
       'x-client-id',
       'authorization',
       'traceparent',
+      'x-putnami-traceparent',
       'tracestate',
       'baggage',
       'x-request-id',

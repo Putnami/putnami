@@ -6,7 +6,8 @@
     "A workload that spans the Go and TypeScript runtimes points both at one OTLP/HTTP collector",
     "A dashboard finds the HTTP server metrics of a Go and a TypeScript service under the same names, units, labels and buckets",
     "Telemetry never fails or stalls the workload that produces it",
-    "The CLI and the usage receiver enforce one closed vocabulary, so a usage record carries no free text"
+    "The CLI and the usage receiver enforce one closed vocabulary, so a usage record carries no free text",
+    "A server span parents to the client span that called it, even when a proxy between them rewrites the parent ID of traceparent"
   ],
   "nonGoals": [
     "A /metrics scrape endpoint, gRPC OTLP, statsd or a Prometheus push gateway: OTLP/JSON over HTTP is the one transport, as ADR 0001 records",
@@ -88,6 +89,21 @@
         "The defaults are a budget of 100 roots, a ratio of 0.01 and a floor of 1 root per minute; a budget and a floor are whole numbers of 0 or more, and a ratio lies between 0 and 1.",
         "A span with a parent, remote or local, follows the parent's sampled flag and makes no decision.",
         "Each root decision counts once in the counter trace.decisions, labeled outcome kept or dropped."
+      ]
+    },
+    {
+      "id": "the-client-span-survives-a-proxy",
+      "text": [
+        "Without a valid traceparent a server has no remote parent.",
+        "When x-putnami-traceparent is a valid version 00 value with the trace ID of traceparent and another parent ID, the server span parents to it, flags included.",
+        "Otherwise the server uses traceparent.",
+        "Both runtimes test against fixtures/conventions/proxy-safe-traceparent.json."
+      ]
+    },
+    {
+      "id": "a-client-sends-both-headers",
+      "text": [
+        "A client that injects its span context into an outgoing call writes the same version 00 value to traceparent and to x-putnami-traceparent, so a proxy that rewrites traceparent leaves the client's span in the second header."
       ]
     },
     {

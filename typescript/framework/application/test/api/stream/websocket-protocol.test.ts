@@ -152,6 +152,7 @@ describe('closed vocabulary drift against the published schema', () => {
       'cookie',
       'set-cookie',
       'traceparent',
+      'x-putnami-traceparent',
       'tracestate',
       'baggage',
       'x-client-id',

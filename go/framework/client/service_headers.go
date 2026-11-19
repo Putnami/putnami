@@ -71,7 +71,7 @@ func isHeaderSpace(b byte) bool {
 var reservedBindingHeaderNames = []string{
 	"authorization", "cookie", "set-cookie", "host", "connection", "keep-alive", "upgrade",
 	"content-type", "content-length", "content-encoding", "transfer-encoding", "te", "trailer",
-	"accept", "accept-encoding", "traceparent", "tracestate", "baggage",
+	"accept", "accept-encoding", "traceparent", "x-putnami-traceparent", "tracestate", "baggage",
 	"x-forwarded-for", "forwarded", "x-real-ip", "x-cloud-trace-context", "origin",
 	"x-client-id", "x-request-id", "x-putnami-client-id", "x-putnami-service",
 	"x-trace-id", "x-region", "x-experiments",

@@ -176,6 +176,16 @@ The middleware automatically:
 - Emits `http.server.request_count` and `http.server.duration` metrics, the same as the TypeScript runtime: [Add observability](/docs/how-to/add-observability#http-server-metrics) lists them
 - Propagates trace context to downstream services
 
+A proxy between two services may insert a span it never exports and rewrite
+the parent ID of `traceparent`. A generated client therefore writes its
+`traceparent` value twice, the second time in `x-putnami-traceparent`, which
+proxies leave alone. When both headers carry the same trace ID and different
+parent IDs, the server span parents to the one in `x-putnami-traceparent`, so
+the trace keeps the call as one edge. When the second header is absent,
+malformed or on another trace, the server uses `traceparent`. The plugin
+installs this as `telemetry.ProxySafeTraceContext`; the TypeScript runtime
+applies the same rule.
+
 ## Error bridge
 
 When the telemetry plugin is active, structured errors from `go.putnami.dev/errors` automatically emit an `errors_total` counter with labels:

@@ -59,6 +59,7 @@
     "sse-metadata-on-websocket-transport.openapi.json": "client_contract.invalid_transport",
     "sse-transport-without-continuation.openapi.json": "client_contract.required",
     "stream-wire-credential-header.openapi.json": "client_contract.invalid_credential",
+    "trace-copy-credential-header.openapi.json": "client_contract.invalid_credential",
     "unsafe-transport-path.openapi.json": "client_contract.invalid_transport",
     "unsupported-schema.openapi.json": "client_contract.unknown_field"
   }

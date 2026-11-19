@@ -239,6 +239,16 @@ The span is always ended, even if a downstream handler or middleware panics: the
 When two `HTTPMiddleware` wrap the same request, for example the one from
 `FromEnvironment` and one the workload adds, only the outer one records it.
 
+A proxy between two services may insert a span it never exports and rewrite
+the parent ID of `traceparent`. A generated client therefore writes its
+`traceparent` value twice, the second time in `x-putnami-traceparent`, which
+proxies leave alone. When both headers carry the same trace ID and different
+parent IDs, the server span parents to the one in `x-putnami-traceparent`, so
+the trace keeps the call as one edge. When the second header is absent,
+malformed or on another trace, the server uses `traceparent`. The plugin
+installs this as `telemetry.ProxySafeTraceContext`; the TypeScript runtime
+applies the same rule.
+
 ## Configuration
 
 | Field | Default | Description |

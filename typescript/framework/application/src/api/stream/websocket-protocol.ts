@@ -949,6 +949,7 @@ const RESERVED_INIT_HEADERS: ReadonlySet<string> = new Set([
   'tracestate',
   'upgrade',
   'x-client-id',
+  'x-putnami-traceparent',
   'x-request-id',
 ]);
 

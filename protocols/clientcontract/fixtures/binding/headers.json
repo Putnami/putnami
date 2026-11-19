@@ -17,6 +17,7 @@
     "Accept",
     "Accept-Encoding",
     "Traceparent",
+    "X-Putnami-Traceparent",
     "Tracestate",
     "Baggage",
     "X-Forwarded-For",

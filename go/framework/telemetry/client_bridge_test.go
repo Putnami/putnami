@@ -19,6 +19,7 @@ import (
 )
 
 func TestPluginAutomaticallyObservesAndPropagatesGeneratedClientCalls(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "a-client-sends-both-headers", "the-go-client-sends-both-headers")
 	saveOTelGlobals(t)
 
 	spanExporter := tracetest.NewInMemoryExporter()
@@ -34,8 +35,12 @@ func TestPluginAutomaticallyObservesAndPropagatesGeneratedClientCalls(t *testing
 	t.Cleanup(func() { _ = plugin.Stop(context.Background(), nil) })
 
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.Header.Get("traceparent") == "" {
+		traceparent := request.Header.Get("traceparent")
+		if traceparent == "" {
 			t.Error("generated call omitted W3C trace context")
+		}
+		if got := request.Header.Get("x-putnami-traceparent"); got != traceparent {
+			t.Errorf("x-putnami-traceparent = %q, want the traceparent value %q", got, traceparent)
 		}
 		writer.Header().Set("Content-Type", "application/json")
 		_, _ = writer.Write([]byte(`{"value":"ok"}`))

@@ -25,6 +25,8 @@ interface Received {
   readonly sse: (string | null)[];
   /** The propagation context each WebSocket init frame carried. */
   readonly inits: Record<string, unknown>[];
+  /** The lower-case header names each WebSocket init frame carried. */
+  readonly initHeaders: string[][];
 }
 
 const servers: (() => void)[] = [];
@@ -42,7 +44,7 @@ afterEach(() => {
 
 /** A provider serving one path over SSE and the first-party WebSocket wire. */
 function provider(options: { sseStatus?: number } = {}): { url: string; received: Received } {
-  const received: Received = { sse: [], inits: [] };
+  const received: Received = { sse: [], inits: [], initHeaders: [] };
   const server = Bun.serve<Record<string, never>>({
     port: 0,
     fetch(request, target) {
@@ -64,6 +66,8 @@ function provider(options: { sseStatus?: number } = {}): { url: string; received
         const frame = JSON.parse(String(message)) as Record<string, unknown>;
         if (frame['type'] !== 'init') return;
         received.inits.push((frame['context'] as Record<string, unknown> | undefined) ?? {});
+        const headers = (frame['headers'] as Array<{ name: string }> | undefined) ?? [];
+        received.initHeaders.push(headers.map((header) => header.name.toLowerCase()));
         socket.send(JSON.stringify({ v: 1, type: 'ready', resumed: false }));
         socket.send(
           JSON.stringify({
@@ -159,7 +163,11 @@ describe('the call measurement of a generated stream', () => {
         expect(call).toMatchObject({ name: 'watchItems', kind: 3, statusCode: 1 });
         const traceparent = `00-${call?.traceId}-${call?.spanId}-01`;
         if (protocol === 'sse') expect(received.sse).toEqual([traceparent]);
-        else expect(received.inits).toEqual([{ traceparent }]);
+        else {
+          expect(received.inits).toEqual([{ traceparent }]);
+          // The init frame carries the context in band; the proxy-safe copy stays off it.
+          expect(received.initHeaders.flat()).not.toContain('x-putnami-traceparent');
+        }
       }
     },
   );

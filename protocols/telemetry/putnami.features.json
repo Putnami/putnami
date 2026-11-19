@@ -168,6 +168,35 @@
           }
         },
         {
+          "id": "the-client-span-survives-a-proxy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-proxy-safe-rule-matches-its-fixture",
+              "the-go-server-resolves-the-fixture-cases",
+              "the-typescript-server-resolves-the-fixture-cases"
+            ]
+          }
+        },
+        {
+          "id": "a-client-sends-both-headers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-go-client-sends-both-headers",
+              "the-typescript-client-sends-both-headers"
+            ]
+          }
+        },
+        {
           "id": "cli-usage-vocabulary-is-closed",
           "stage": "coded",
           "evidenceKinds": [

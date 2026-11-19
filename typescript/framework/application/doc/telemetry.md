@@ -130,6 +130,16 @@ flag `00`, so the services it calls drop the trace too. Each root decision
 counts in the counter `trace.decisions`, labeled `outcome` `kept` or
 `dropped`. Without a telemetry plugin, a root span is sampled.
 
+A proxy between two services may insert a span it never exports and rewrite
+the parent ID of `traceparent`. A client span therefore injects its
+`traceparent` value twice, the second time in `x-putnami-traceparent`, which
+proxies leave alone. When both headers carry the same trace ID and different
+parent IDs, the server span parents to the one in `x-putnami-traceparent`, so
+the trace keeps the call as one edge. When the second header is absent,
+malformed or on another trace, the server uses `traceparent`. The Go runtime
+applies the same rule. A WebSocket stream carries its context in the init
+frame, which proxies do not rewrite, so it needs no second header.
+
 `TelemetryPlugin.sampler` (or `getTraceSampler()`) returns the `TraceSampler`
 in force. Its `update()` tightens the settings at runtime, and they hold until
 the `telemetry.traces` section changes.

@@ -1425,7 +1425,7 @@ func validHeaderName(value string) bool {
 func reservedCredentialHeader(value string) bool {
 	switch strings.ToLower(value) {
 	case "authorization", "host", "content-length", "connection", "transfer-encoding",
-		"upgrade", "cookie", "set-cookie", "traceparent", "tracestate", "baggage",
+		"upgrade", "cookie", "set-cookie", "traceparent", "x-putnami-traceparent", "tracestate", "baggage",
 		"grpc-timeout", "connect-timeout-ms", "x-client-id", "x-request-id",
 		"x-putnami-client-id", "x-putnami-service", "x-putnami-stream-wire":
 		return true

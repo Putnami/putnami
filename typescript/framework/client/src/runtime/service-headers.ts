@@ -34,6 +34,7 @@ export const RESERVED_BINDING_HEADERS: ReadonlySet<string> = new Set([
   'accept',
   'accept-encoding',
   'traceparent',
+  'x-putnami-traceparent',
   'tracestate',
   'baggage',
   'x-forwarded-for',

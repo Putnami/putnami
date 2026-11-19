@@ -1401,6 +1401,7 @@ function isFrameworkOwnedClientHeader(value: string): boolean {
     'cookie',
     'set-cookie',
     'traceparent',
+    'x-putnami-traceparent',
     'tracestate',
     'baggage',
     'grpc-timeout',

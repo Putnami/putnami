@@ -334,9 +334,10 @@ func (p *Plugin) configureLocked() error {
 	p.tp = sdktrace.NewTracerProvider(tpOpts...)
 	otel.SetTracerProvider(p.tp)
 
-	// Set W3C Trace Context propagator for distributed trace correlation
+	// Set the W3C Trace Context propagator, made proxy-safe, for distributed
+	// trace correlation.
 	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(
-		propagation.TraceContext{},
+		ProxySafeTraceContext{},
 		propagation.Baggage{},
 	))
 

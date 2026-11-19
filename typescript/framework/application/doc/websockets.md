@@ -236,7 +236,7 @@ answers `ready`. The handler never runs before that. See
 [ADR 0003](adr/0003-websocket-admission-runs-the-security-chain-on-the-rebuilt-request.md).
 
 An `init` frame may not carry `Authorization`, `Cookie`, `traceparent`,
-`X-Client-Id` or any `Sec-WebSocket-*` header as an ordinary header: those are
+`x-putnami-traceparent`, `X-Client-Id` or any `Sec-WebSocket-*` header as an ordinary header: those are
 the frame's own members, and an ordinary header that would shadow a declared
 credential is refused.
 
