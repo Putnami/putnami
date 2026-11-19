@@ -25,6 +25,8 @@ type memory struct {
 	keys      map[string]keyed
 	// context fills the blocking links and the comment summary on get.
 	context bool
+	// pages gives every proposal a pageUrl.
+	pages bool
 }
 
 type keyed struct {
@@ -219,6 +221,9 @@ func (m *memory) upsertProposal(_ context.Context, call collab.Call) (any, *coll
 		proposal := collab.Proposal{Ref: collab.Ref{Source: memorySource, ID: "p" + strconv.Itoa(len(m.proposals)+1)}, Revision: "r1",
 			Change: collab.Change{Repository: "memory", Base: in.Change.Base, Head: in.Change.Head},
 			Title:  in.Title, Body: in.Body, State: collab.ProposalStateOpen}
+		if m.pages {
+			proposal.PageURL = "https://console.example/changes/" + proposal.Ref.ID
+		}
 		m.proposals = append(m.proposals, proposal)
 		return &collab.ProposalUpsertResult{Proposal: proposal, Created: true}, nil
 	}
@@ -407,6 +412,38 @@ func TestTheTaskScenariosCheckTheDeclaredContextMembers(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if got := ContextProblem(tc.task, tc.declared); !strings.HasPrefix(got, tc.want) || (tc.want == "") != (got == "") {
 				t.Errorf("ContextProblem = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestTheProposalScenariosCheckTheDeclaredPageURL: the proposal scenarios
+// pass against a provider that answers the pageUrl it declares, and
+// ProposalMembersProblem names a declared pageUrl that is missing, an
+// undeclared one that is present, and a member no operation lists.
+func TestTheProposalScenariosCheckTheDeclaredPageURL(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "proposal-page-url", "the-proposal-scenarios-check-the-declared-page-url")
+	RunProposals(t, func(t *testing.T) Target {
+		m := newMemory()
+		m.pages = true
+		return Target{Handlers: m.withComments(), WorkspaceRoot: t.TempDir(), Base: "main", Heads: [2]string{"topic-a", "topic-b"},
+			ProposalMembers: collab.ProposalMembers}
+	})
+	page := collab.Proposal{PageURL: "https://console.example/changes/p1"}
+	for name, tc := range map[string]struct {
+		proposal collab.Proposal
+		declared []string
+		want     string
+	}{
+		"declared and answered":     {page, collab.ProposalMembers, ""},
+		"neither":                   {collab.Proposal{}, nil, ""},
+		"declared and absent":       {collab.Proposal{}, collab.ProposalMembers, "pageUrl is declared and absent"},
+		"answered and undeclared":   {page, nil, "pageUrl is present, and it is not declared"},
+		"a member no operation has": {collab.Proposal{}, []string{"blockedBy"}, `the target declares "blockedBy"`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if got := ProposalMembersProblem(tc.proposal, tc.declared); !strings.HasPrefix(got, tc.want) || (tc.want == "") != (got == "") {
+				t.Errorf("ProposalMembersProblem = %q, want %q", got, tc.want)
 			}
 		})
 	}

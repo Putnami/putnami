@@ -1,6 +1,7 @@
 package providertest
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -48,7 +49,8 @@ func (s *Session) upsert(head int, title, extra string) collab.ProposalUpsertRes
 }
 
 // sameChange fails unless a proposal is about the exact base and head the
-// scenario named, in a repository the provider named.
+// scenario named, in a repository the provider named, and carries the
+// declared members the target declares and no other.
 func (s *Session) sameChange(proposal collab.Proposal, head int) {
 	s.t.Helper()
 	change := proposal.Change
@@ -56,6 +58,28 @@ func (s *Session) sameChange(proposal collab.Proposal, head int) {
 		s.t.Fatalf("proposal %s/%s is about %s %s...%s, requested %s...%s", proposal.Ref.Source, proposal.Ref.ID,
 			change.Repository, change.Base, change.Head, s.target.Base, s.target.Heads[head])
 	}
+	if problem := ProposalMembersProblem(proposal, s.target.ProposalMembers); problem != "" {
+		s.t.Fatalf("proposal %s/%s: %s", proposal.Ref.Source, proposal.Ref.ID, problem)
+	}
+}
+
+// ProposalMembersProblem says how a proposal's declared members differ from
+// the members declared, empty when they match: a declared pageUrl is present,
+// and an undeclared one is absent. A member outside collab.ProposalMembers is
+// a problem of the declaration itself.
+func ProposalMembersProblem(proposal collab.Proposal, declared []string) string {
+	for _, member := range declared {
+		if !slices.Contains(collab.ProposalMembers, member) {
+			return fmt.Sprintf("the target declares %q, which no proposals operation lists", member)
+		}
+	}
+	switch want := slices.Contains(declared, collab.ProposalMemberPageURL); {
+	case proposal.PageURL != "" && !want:
+		return "pageUrl is present, and it is not declared"
+	case proposal.PageURL == "" && want:
+		return "pageUrl is declared and absent; a provider that declares it answers it on every proposal"
+	}
+	return ""
 }
 
 // sameMembers fails unless two answers about one proposal report its labels

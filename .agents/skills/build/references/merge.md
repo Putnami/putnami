@@ -166,5 +166,7 @@ refused or failed to bind it. Unavailable tokens or costs stay unavailable.
 When `change finalize` printed `CHANGE_URL=<url>`, the end report leads with
 that change page and what waits there for the owner: the declarations to
 approve, the gaps to accept and the findings to decide, or that nothing
-waits. The pull request link follows it. Without a `CHANGE_URL`, the report
+waits. Take them from the run's own records: its declarations commit, the
+gaps its dossier keeps open and the review findings it left open; say so of
+what it did not read. The pull request link follows it. Without a `CHANGE_URL`, the report
 is unchanged.

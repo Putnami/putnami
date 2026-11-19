@@ -107,8 +107,11 @@ A proposal is `ref`, `revision`, `url`, `change` (`repository`, `base`,
 `head`, `headCommit`), `title`, `body`, `state` (`draft`, `open`, `merged`,
 `closed`), `providerState`, `labels`, `assignees`, `updatedAt`, and
 `pageUrl`, a display link to the proposal's change in the provider's own
-console, such as a hosted platform's change page; a provider without one
-leaves it absent, and like `url` it is never an identity. A request may
+console, such as a hosted platform's change page; like `url` it is never an
+identity. `pageUrl` is a declared member of `find`, `status`, `upsert`,
+`merge` and `automerge` (ADR 0007): a provider returns it only when its
+manifest names it under those operations' `members`, and then on every
+proposal it answers. A request may
 omit `repository`; the provider applies its configured one, and every
 proposal it returns names it. `labels` and `assignees` include those the
 provider applies from its own settings; a provider reports them on every

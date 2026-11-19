@@ -73,6 +73,11 @@ type Target struct {
 	// when it is declared, as the CLI does, and checks that status answers
 	// the one the provider kept, and none when it is not declared.
 	MissionMembers []string
+	// ProposalMembers are the members the provider's manifest declares under
+	// the members of every proposals operation that answers a proposal
+	// (collab.ProposalMembers lists them). RunProposals checks that each
+	// answered proposal carries a declared pageUrl and never an undeclared one.
+	ProposalMembers []string
 	// Settle is how long a read may take to observe a write the provider
 	// acknowledged, for a backend whose search index is eventually consistent.
 	// Zero means every read observes every acknowledged write at once.

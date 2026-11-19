@@ -341,8 +341,9 @@ type Proposal struct {
 	// URL is a display link. It is never an identity.
 	URL string `json:"url,omitempty"`
 	// PageURL is a display link to the proposal's change in the provider's
-	// own console, such as the change page of a hosted platform, when the
-	// provider has one. It is never an identity.
+	// own console, such as the change page of a hosted platform. A provider
+	// returns it only when its manifest declares it (ProposalMembers). It is
+	// never an identity.
 	PageURL string `json:"pageUrl,omitempty"`
 	// Change is the repository/base/head identity the proposal is associated
 	// with.
@@ -367,6 +368,16 @@ type Proposal struct {
 	// UpdatedAt is when the proposal last changed, in RFC 3339, when known.
 	UpdatedAt string `json:"updatedAt,omitempty"`
 }
+
+// ProposalMemberPageURL is the declared member that links a proposal's change
+// in the provider's own console. A provider returns it only from the
+// operations whose members its manifest names it under (ADR 0007).
+const ProposalMemberPageURL = "pageUrl"
+
+// ProposalMembers is the closed vocabulary of a proposal's declared members,
+// in canonical order. Every proposals operation that answers a proposal lists
+// it.
+var ProposalMembers = []string{ProposalMemberPageURL}
 
 // ProposalFindInput is the proposals.find request.
 type ProposalFindInput struct {

@@ -677,6 +677,9 @@ func (f Finalizer) publicationEvidence(ctx context.Context, c *publicationCandid
 		if err := c.promoteHosted(ctx, f, &status); err != nil {
 			return err
 		}
+		if status.Proposal.PageURL != "" {
+			result.ChangeURL = status.Proposal.PageURL
+		}
 		result.Gate = "hosted checks passed on " + c.head
 		result.WorkflowSHA256 = c.workflowSHA
 		result.ReadyUnits = c.readyUnits

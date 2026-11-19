@@ -308,6 +308,7 @@ var catalog = []ContractSpec{
 		Operations: []OperationSpec{
 			{
 				Name: OperationAutoMerge, Access: AccessMutating, Destructive: true,
+				Members: ProposalMembers,
 				Summary: "Turn auto-merge on for an open proposal whose head is still the expected commit: the backend " +
 					"merges it, or enters it into its merge queue, once the repository's own rules allow. Repeating the " +
 					"call changes nothing. Optional capability; binding a provider that supports it authorizes nobody to " +
@@ -323,11 +324,13 @@ var catalog = []ContractSpec{
 			},
 			{
 				Name: OperationFind, Access: AccessRead, Required: true,
+				Members:  ProposalMembers,
 				Summary:  "Find the change proposals for an exact repository, base and head. Results are bounded pages.",
 				newInput: alloc[ProposalFindInput](), newResult: alloc[ProposalListResult](),
 			},
 			{
 				Name: OperationMerge, Access: AccessMutating, Destructive: true,
+				Members: ProposalMembers,
 				Summary: "Merge a proposal only when its head is still the expected commit. Optional capability; " +
 					"binding a provider that supports it does not authorize anyone to merge.",
 				newInput: alloc[ProposalMergeInput](), newResult: alloc[ProposalResult](),
@@ -348,12 +351,14 @@ var catalog = []ContractSpec{
 			},
 			{
 				Name: OperationStatus, Access: AccessRead, Required: true,
+				Members: ProposalMembers,
 				Summary: "Read a proposal's state, the checks reported for its head commit and its reviews. A provider " +
 					"without hosted checks reports checks as unsupported.",
 				newInput: alloc[ProposalRefInput](), newResult: alloc[ProposalStatusResult](),
 			},
 			{
 				Name: OperationUpsert, Access: AccessMutating, Required: true, Destructive: true,
+				Members:       ProposalMembers,
 				Preconditions: PreconditionRuleDeclared,
 				Summary: "Find the open proposal for an exact repository, base and head and update it, or create it. " +
 					"Repeating the call never creates a second proposal for the same identity.",

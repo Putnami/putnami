@@ -91,3 +91,43 @@ func TestTheCommandPrintsTheChangePageAfterTheProposal(t *testing.T) {
 		})
 	}
 }
+
+// TestTheHostedGateTakesTheChangePageOfTheFinalRead: a provider that answers
+// the pageUrl only once the hosted checks run still gives the ready run its
+// change page.
+func TestTheHostedGateTakesTheChangePageOfTheFinalRead(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "tooling/contributor-executable", "change-page-link", "finalize-prints-the-change-page-after-the-proposal")
+	f, git, provider, opts := finalizerFixture(t)
+	opts.Gate, opts.VerificationFile = "ci", ""
+	provider.checks = collab.Checks{Commit: git.head,
+		Items: []collab.Check{{Name: "Putnami CI", State: collab.CheckStatePassing}}}
+	provider.statusHook = func(proposal *collab.Proposal) {
+		if provider.statusReads > 1 {
+			proposal.PageURL = testChangePage
+		}
+	}
+	result, err := f.Run(context.Background(), opts)
+	if err != nil || result.ChangeURL != testChangePage {
+		t.Fatalf("changeUrl %q, want %q; err=%v", result.ChangeURL, testChangePage, err)
+	}
+}
+
+// TestASettledProposalReportsItsChangePage: a branch whose proposal already
+// merged reports its change page after its URL, before its state.
+func TestASettledProposalReportsItsChangePage(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "tooling/contributor-executable", "change-page-link", "finalize-prints-the-change-page-after-the-proposal")
+	contextFile := writeContext(t, map[string]any{"output": "text"}, map[string]any{"mode": "all", "scoped": false, "projects": []string{}})
+	command, h, stdout, _, args := draftCommand(t, contextFile)
+	merged := settledProposal(collab.ProposalStateMerged, "7", "0123456789012345678901234567890123456789")
+	merged.PageURL = testChangePage
+	h.provider.settled = []collab.Proposal{merged}
+	if code := command.Run(context.Background(), args); code != 0 {
+		t.Fatalf("exit %d", code)
+	}
+	want := `PROPOSAL_REF={"source":"github:acme/app","id":"7"}` + "\nPROPOSAL_URL=https://github.com/acme/app/pull/7\nCHANGE_URL=" + testChangePage + "\nPROPOSAL_STATE=merged\n"
+	if stdout.String() != want {
+		t.Errorf("stdout %q, want %q", stdout, want)
+	}
+}
