@@ -38,7 +38,7 @@ user's global configuration never bind a provider.
 | Member | Meaning |
 |---|---|
 | `provider` | The provider extension's name. Exactly one installed, enabled extension must carry it. |
-| `version` | The contract version the workspace speaks. The provider must implement it. |
+| `version` | The contract version the workspace speaks. The provider must implement it. A provider of `missions` v2 also serves a workspace bound to v1, called as version 1. |
 | `require` | Optional operations the workspace depends on, such as `["merge"]`. A provider that lacks one makes the binding invalid instead of failing the first call that needs it. |
 | `settings` | The provider's own configuration, passed verbatim on every call. A member whose name looks like a credential (`token`, `secret`, `password`, `apiKey`, …) invalidates the binding: the provider resolves its own credentials. |
 
@@ -140,7 +140,8 @@ tasks, proposals and missions over a store directory inside the workspace
 needs no account and no network. It runs no hosted checks — `proposals status`
 always reports checks `unsupported` — and offers no comments, merge,
 assignment, hierarchy or claim. You own its missions: you answer a decision and send a
-message by writing a file in the store directory. Memory providers are
+message by writing a file in the store directory. It serves missions v2, so a
+workspace bound to v2 also records and reads typed runs. Memory providers are
 separate extensions.
 
 ## Other shipped providers

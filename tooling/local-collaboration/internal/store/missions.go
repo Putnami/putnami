@@ -14,10 +14,21 @@ import (
 	collab "go.putnami.dev/protocol/collaboration"
 )
 
-// MissionsFormatVersion is the version of the missions document this package
-// reads and writes. A document of another version is refused, never
-// reinterpreted.
-const MissionsFormatVersion = 1
+// MissionsFormatVersion is the newest version of the missions document this
+// package reads and writes. Version 2 adds the runs: a document without runs
+// is written as version 1, which an older provider still reads, and a
+// document with runs as version 2, which an older provider refuses rather
+// than drop its runs on its next write. A document of another version is
+// refused, never reinterpreted.
+const MissionsFormatVersion = 2
+
+// formatOf is the version a missions document is written as.
+func formatOf(missions *Missions) int {
+	if len(missions.Runs) > 0 {
+		return 2
+	}
+	return 1
+}
 
 const missionsFile = "missions.json"
 
@@ -49,12 +60,25 @@ type Missions struct {
 	Sessions  []Session       `json:"sessions"`
 	Decisions []Decision      `json:"decisions"`
 	Messages  []Message       `json:"messages"`
+	// Runs holds the missions v2 runs, in start order.
+	Runs []Run `json:"runs,omitempty"`
 }
 
 // MissionCounters allocate decision and message ids; they only grow.
 type MissionCounters struct {
 	Decision int `json:"decision"`
 	Message  int `json:"message"`
+	Run      int `json:"run,omitempty"`
+}
+
+// Run is one run the store started: the run as the missions contract
+// describes it, the idempotency key and content digest of its start, and the
+// digest of the report that ended it.
+type Run struct {
+	collab.Run
+	IdempotencyKey string `json:"idempotencyKey"`
+	Digest         string `json:"digest"`
+	ReportDigest   string `json:"reportDigest,omitempty"`
 }
 
 // MissionKey names a mission: its repository and key, compared exactly.
@@ -151,7 +175,7 @@ type OwnerFile struct {
 }
 
 func emptyMissions() *Missions {
-	return &Missions{Version: MissionsFormatVersion, Missions: []Mission{}, Sessions: []Session{}, Decisions: []Decision{}, Messages: []Message{}}
+	return &Missions{Version: 1, Missions: []Mission{}, Sessions: []Session{}, Decisions: []Decision{}, Messages: []Message{}}
 }
 
 // readMissions returns the missions document. A store whose missions were
@@ -169,9 +193,13 @@ func (s *Store) readMissions() (*Missions, error) {
 	if err := json.Unmarshal(data, missions); err != nil {
 		return nil, fmt.Errorf("the local missions %s are not a valid missions document: %w", path, err)
 	}
-	if missions.Version != MissionsFormatVersion {
-		return nil, fmt.Errorf("%w (missions format %d, this provider reads %d)", ErrUnsupportedFormat, missions.Version, MissionsFormatVersion)
+	if missions.Version < 1 || missions.Version > MissionsFormatVersion {
+		return nil, fmt.Errorf("%w (missions format %d, this provider reads 1 to %d)", ErrUnsupportedFormat, missions.Version, MissionsFormatVersion)
 	}
+	if missions.Version == 1 && len(missions.Runs) > 0 {
+		return nil, fmt.Errorf("the local missions %s are format 1 and hold runs, which format 2 adds", path)
+	}
+	missions.Version = formatOf(missions)
 	return missions, nil
 }
 
@@ -202,6 +230,7 @@ func (s *Store) UpdateMissions(change func(*Missions) error) (*Missions, error) 
 		if err := change(missions); err != nil {
 			return err
 		}
+		missions.Version = formatOf(missions)
 		after, err := json.Marshal(missions)
 		if err != nil {
 			return &WriteError{Err: fmt.Errorf("encode the local missions: %w", err)}

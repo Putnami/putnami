@@ -1,0 +1,22 @@
+{
+  "run": {
+    "id": "R-1",
+    "mission": {
+      "repository": "acme/app",
+      "key": "issue-7"
+    },
+    "kind": "triage",
+    "state": "running",
+    "input": {
+      "triage": {
+        "task": {
+          "source": "github:acme/app",
+          "id": "7"
+        }
+      }
+    },
+    "startedAt": "2026-11-19T09:00:00Z",
+    "endedAt": "2026-11-19T09:05:00Z"
+  },
+  "replayed": false
+}

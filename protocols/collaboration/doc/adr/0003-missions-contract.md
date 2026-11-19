@@ -5,7 +5,9 @@
   the agent reaches `missions.ask` and `missions.reply` through
   `putnami agent ask` and `putnami agent reply`, not as tools; and by
   [ADR 0005](0005-missions-status-reads-a-missions-sessions.md), decisions 1
-  and 8: `status`, an optional read, answers a mission's view and its sessions
+  and 8: `status`, an optional read, answers a mission's view and its sessions;
+  and by [ADR 0010](0010-missions-version-2-adds-typed-runs.md), decision 1:
+  missions version 2 adds `start`, `report` and `runs`
 - **Scope**: `go.putnami.dev/protocol/collaboration` (`protocols/collaboration`)
   and the CLI route that calls it
 - **Amends**: [ADR 0001](0001-collaboration-provider-contracts.md), decisions 5

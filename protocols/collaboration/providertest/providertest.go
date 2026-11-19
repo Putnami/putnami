@@ -100,6 +100,10 @@ type Target struct {
 	// answer. The answer then reaches the decision's mission as an inbox
 	// message of kind answer. RunMissions requires it.
 	Answer func(t *testing.T, decision, option, text string)
+	// MissionsVersion is the missions version every missions call names.
+	// Zero is version 1. RunMissions runs on version 1 or 2; RunMissionRuns
+	// always calls version 2.
+	MissionsVersion int
 }
 
 // Session drives one Target from one test.
@@ -130,9 +134,9 @@ func (s *Session) Call(contract, operation, arguments string) collab.Response {
 // failing the test, so that concurrent callers can collect it.
 func (s *Session) do(contract, operation, arguments string) (collab.Response, error) {
 	request := collab.ProviderRequest{
-		Arguments:     normalize(contract, operation, arguments, s.target.Workspace),
+		Arguments:     normalize(contract, s.version(contract), operation, arguments, s.target.Workspace),
 		WorkspaceRoot: s.target.WorkspaceRoot,
-		Provider:      &collab.ProviderCall{Contract: contract, Version: 1, Operation: operation},
+		Provider:      &collab.ProviderCall{Contract: contract, Version: s.version(contract), Operation: operation},
 	}
 	if len(s.target.Settings) > 0 {
 		request.Provider.Settings = s.target.Settings
@@ -194,9 +198,18 @@ func (s *Session) Eventually(contract, operation, arguments string, into any, ch
 	}
 }
 
-// offers reports whether the provider answers an operation of version 1.
+// version is the version of contract the session calls.
+func (s *Session) version(contract string) int {
+	if contract == collab.ContractMissions && s.target.MissionsVersion > 0 {
+		return s.target.MissionsVersion
+	}
+	return 1
+}
+
+// offers reports whether the provider answers an operation of the version
+// the session calls.
 func (s *Session) offers(contract, operation string) bool {
-	_, offered := s.target.Handlers[collab.OperationKey{Contract: contract, Version: 1, Operation: operation}]
+	_, offered := s.target.Handlers[collab.OperationKey{Contract: contract, Version: s.version(contract), Operation: operation}]
 	return offered
 }
 
@@ -210,8 +223,8 @@ func (s *Session) track(contract string, ref collab.Ref) {
 // carries an explicit page size, and a memory identity that names no
 // workspace names the one served. A request the contract refuses is passed on
 // unchanged, for the provider to refuse.
-func normalize(contract, operation, arguments, workspace string) json.RawMessage {
-	input, diags := collab.ParseRequest(contract, 1, operation, []byte(arguments))
+func normalize(contract string, version int, operation, arguments, workspace string) json.RawMessage {
+	input, diags := collab.ParseRequest(contract, version, operation, []byte(arguments))
 	if diags != nil {
 		return json.RawMessage(arguments)
 	}
@@ -246,6 +259,8 @@ func normalize(contract, operation, arguments, workspace string) json.RawMessage
 	case *collab.MemoryCheckpointInput:
 		identity(&in.Identity)
 	case *collab.MissionsStatusInput:
+		page(&in.Page)
+	case *collab.MissionsRunsInput:
 		page(&in.Page)
 	}
 	encoded, err := json.Marshal(input)

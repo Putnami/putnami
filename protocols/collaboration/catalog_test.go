@@ -44,8 +44,12 @@ func TestCatalog_RequiredOperationsAreTheContract(t *testing.T) {
 		if !slices.Equal(gotOptional, optional[contract]) {
 			t.Errorf("%s v1 optional = %v, want %v", contract, gotOptional, optional[contract])
 		}
-		if got := SupportedVersions(contract); !slices.Equal(got, []int{1}) {
-			t.Errorf("%s supported versions = %v, want [1]", contract, got)
+		versions := []int{1}
+		if contract == ContractMissions {
+			versions = []int{1, 2}
+		}
+		if got := SupportedVersions(contract); !slices.Equal(got, versions) {
+			t.Errorf("%s supported versions = %v, want %v", contract, got, versions)
 		}
 	}
 	if SupportedVersions("issues") != nil {
@@ -108,6 +112,8 @@ func TestCatalog_MutationsThatCreateCarryIdempotencyKeys(t *testing.T) {
 		{ContractProposals, 1, OperationReview},
 		{ContractMemory, 1, OperationCheckpoint},
 		{ContractMissions, 1, OperationAsk},
+		{ContractMissions, 2, OperationAsk},
+		{ContractMissions, 2, OperationStart},
 	} {
 		spec, _ := Lookup(key.Contract, key.Version)
 		op, _ := spec.Operation(key.Operation)
@@ -129,13 +135,13 @@ func TestCatalog_HostOnlyOperations(t *testing.T) {
 			if !op.HostOnly {
 				continue
 			}
-			hostOnly = append(hostOnly, spec.Name+"."+op.Name)
+			hostOnly = append(hostOnly, OperationKey{spec.Name, spec.Version, op.Name}.String())
 			if op.Access != AccessMutating {
 				t.Errorf("%s.%s is host-only and not a mutation", spec.Name, op.Name)
 			}
 		}
 	}
-	if want := []string{ContractMissions + "." + OperationSync}; !slices.Equal(hostOnly, want) {
+	if want := []string{"missions.sync@v1", "missions.sync@v2"}; !slices.Equal(hostOnly, want) {
 		t.Errorf("host-only operations = %v, want %v", hostOnly, want)
 	}
 }

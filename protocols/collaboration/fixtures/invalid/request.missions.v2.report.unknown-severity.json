@@ -1,0 +1,16 @@
+{
+  "run": "R-1",
+  "state": "succeeded",
+  "result": {
+    "review": {
+      "commit": "abc1234",
+      "verdict": "approve",
+      "findings": [
+        {
+          "severity": "critical",
+          "title": "t"
+        }
+      ]
+    }
+  }
+}

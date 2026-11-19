@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"slices"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -21,6 +22,9 @@ import (
 //	response.<case>                        ParseResponse
 //	request.<contract>.<operation>.<case>  ParseRequest(contract, 1, operation)
 //	result.<contract>.<operation>.<case>   ParseResult(contract, 1, operation)
+//
+// A document of a later contract version names it after the contract:
+// request.missions.v2.start.<case> is ParseRequest(missions, 2, start).
 //
 // fixtures/expectations.json lists every valid file and pins the exact
 // distinct codes each invalid file produces.
@@ -58,20 +62,31 @@ func parseFixture(t *testing.T, name string, data []byte) []diag.Diagnostic {
 		_, diags := ParseResponse(data)
 		return diags
 	case "request":
-		if len(parts) < 4 {
-			t.Fatalf("fixture %s must be request.<contract>.<operation>.<case>.json", name)
-		}
-		_, diags := ParseRequest(parts[1], 1, parts[2], data)
+		contract, version, operation := fixtureOperation(t, name, parts)
+		_, diags := ParseRequest(contract, version, operation, data)
 		return diags
 	case "result":
-		if len(parts) < 4 {
-			t.Fatalf("fixture %s must be result.<contract>.<operation>.<case>.json", name)
-		}
-		_, diags := ParseResult(parts[1], 1, parts[2], data)
+		contract, version, operation := fixtureOperation(t, name, parts)
+		_, diags := ParseResult(contract, version, operation, data)
 		return diags
 	}
 	t.Fatalf("fixture %s has no known kind", name)
 	return nil
+}
+
+// fixtureOperation reads the contract, its version and the operation from the
+// parts of a request or result fixture name.
+func fixtureOperation(t *testing.T, name string, parts []string) (string, int, string) {
+	t.Helper()
+	if len(parts) >= 5 && strings.HasPrefix(parts[2], "v") {
+		if version, err := strconv.Atoi(strings.TrimPrefix(parts[2], "v")); err == nil && version > 1 {
+			return parts[1], version, parts[3]
+		}
+	}
+	if len(parts) < 4 {
+		t.Fatalf("fixture %s must be %s.<contract>[.v<version>].<operation>.<case>.json", name, parts[0])
+	}
+	return parts[1], 1, parts[2]
 }
 
 func distinctCodes(diags []diag.Diagnostic) []string {
@@ -175,7 +190,8 @@ func TestConformance_ValidDocumentsRoundTrip(t *testing.T) {
 			if parts[0] == "result" {
 				parse = ParseResult
 			}
-			first, diags := parse(parts[1], 1, parts[2], data)
+			contract, version, operation := fixtureOperation(t, name, parts)
+			first, diags := parse(contract, version, operation, data)
 			if diags != nil {
 				t.Fatalf("parse: %v", diags)
 			}
@@ -183,7 +199,7 @@ func TestConformance_ValidDocumentsRoundTrip(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			second, diags := parse(parts[1], 1, parts[2], encoded)
+			second, diags := parse(contract, version, operation, encoded)
 			if diags != nil {
 				t.Fatalf("re-parse of %s: %v", encoded, diags)
 			}

@@ -1,0 +1,14 @@
+{
+  "mission": {
+    "repository": "acme/app",
+    "key": "issue-7"
+  },
+  "kind": "audit",
+  "input": {
+    "audit": {
+      "scope": "protocols/collaboration",
+      "revision": "abc1234"
+    }
+  },
+  "idempotencyKey": "start-2"
+}

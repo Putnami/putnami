@@ -1,0 +1,11 @@
+{
+  "run": "R-1",
+  "state": "succeeded",
+  "result": {
+    "rebase": {
+      "commit": "def5678",
+      "onto": "abc1234",
+      "force": true
+    }
+  }
+}

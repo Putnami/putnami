@@ -1,0 +1,13 @@
+{
+  "mission": {
+    "repository": "acme/app",
+    "key": "issue-7"
+  },
+  "kind": "deploy",
+  "input": {
+    "build": {
+      "intention": "Add typed runs."
+    }
+  },
+  "idempotencyKey": "start-1"
+}

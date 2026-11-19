@@ -1,0 +1,17 @@
+{
+  "mission": {
+    "repository": "acme/app",
+    "key": "issue-7"
+  },
+  "kind": "audit",
+  "input": {
+    "review": {
+      "change": {
+        "base": "main",
+        "head": "topic"
+      },
+      "commit": "abc1234"
+    }
+  },
+  "idempotencyKey": "start-1"
+}

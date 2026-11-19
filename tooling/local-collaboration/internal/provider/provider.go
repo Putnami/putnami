@@ -61,7 +61,7 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 	key := func(contract, operation string) collab.OperationKey {
 		return collab.OperationKey{Contract: contract, Version: 1, Operation: operation}
 	}
-	return map[collab.OperationKey]collab.Handler{
+	handlers := map[collab.OperationKey]collab.Handler{
 		key(collab.ContractTasks, collab.OperationFind):       p.findTasks,
 		key(collab.ContractTasks, collab.OperationGet):        p.getTask,
 		key(collab.ContractTasks, collab.OperationCreate):     p.createTask,
@@ -76,6 +76,17 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 		key(collab.ContractMissions, collab.OperationReply):   p.replyToMessage,
 		key(collab.ContractMissions, collab.OperationStatus):  p.missionStatus,
 	}
+	// Missions v2 serves the v1 operations unchanged and adds the runs.
+	for _, operation := range []string{collab.OperationSync, collab.OperationAsk, collab.OperationReply, collab.OperationStatus} {
+		handlers[collab.OperationKey{Contract: collab.ContractMissions, Version: 2, Operation: operation}] = handlers[key(collab.ContractMissions, operation)]
+	}
+	v2 := func(operation string) collab.OperationKey {
+		return collab.OperationKey{Contract: collab.ContractMissions, Version: 2, Operation: operation}
+	}
+	handlers[v2(collab.OperationStart)] = p.startRun
+	handlers[v2(collab.OperationReport)] = p.reportRun
+	handlers[v2(collab.OperationRuns)] = p.listRuns
+	return handlers
 }
 
 // inputOf returns a call's validated request document. collab.Serve decodes

@@ -22,7 +22,8 @@
             "checks": [
               "every-version-names-its-required-and-optional-operations",
               "every-creating-mutation-carries-an-idempotency-key",
-              "only-missions-sync-is-host-only"
+              "only-missions-sync-is-host-only",
+              "missions-v2-pins-its-operations"
             ]
           }
         },
@@ -530,6 +531,79 @@
             "checks": [
               "every-frozen-v1-document-parses",
               "every-frozen-v1-document-keeps-its-digest"
+            ]
+          }
+        },
+        {
+          "id": "missions-v2-includes-v1",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "missions-v2-repeats-every-v1-operation-and-document",
+              "a-v2-declaration-is-offered-v1",
+              "the-cli-calls-a-v2-provider-with-the-bound-version"
+            ]
+          }
+        },
+        {
+          "id": "missions-typed-runs",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "every-kind-has-a-closed-input-and-result",
+              "a-run-whose-input-or-result-names-another-kind-is-refused",
+              "findings-are-bounded"
+            ]
+          }
+        },
+        {
+          "id": "missions-run-semantics",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-run-scenarios-pass-against-a-correct-provider",
+              "the-run-scenarios-catch-a-provider-that-reports-twice"
+            ]
+          }
+        },
+        {
+          "id": "missions-run-identity",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-cli-makes-a-run-answer-for-another-run-or-mission-unresolved",
+              "the-cli-makes-a-runs-page-of-another-mission-unavailable"
+            ]
+          }
+        },
+        {
+          "id": "local-provider-serves-missions-v2",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-local-provider-passes-the-run-scenarios",
+              "the-local-provider-passes-the-missions-scenarios-on-both-versions",
+              "the-local-provider-manifest-declares-missions-v2"
             ]
           }
         }

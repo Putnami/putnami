@@ -31,6 +31,13 @@ describes every operation.
 | `proposals` v1 | `find`, `upsert`, `status`, `review` | `automerge`, `comments`, `merge`, `screenshots` |
 | `memory` v1 | `context`, `mission`, `checkpoint` | `search` |
 | `missions` v1 | `sync`, `ask`, `reply` | `status` |
+| `missions` v2 | `sync`, `ask`, `reply`, `start`, `report`, `runs` | `status` |
+
+`missions` v2 includes v1: it repeats every v1 operation and document
+unchanged and adds typed runs. A run is one execution of agent work inside a
+mission, with a kind (`build`, `review`, `rebase`, `audit` or `triage`), a
+closed input and a closed result for that kind. A provider that declares v2 is
+also offered to the workspaces bound to v1.
 
 `capabilities` is reserved in every contract: the orchestrator answers it from
 the binding and the provider's manifest, without running the provider.
@@ -95,11 +102,12 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
 - `schemas/collaboration.json` (envelope, response, binding, declaration,
   capabilities, shared definitions) and one schema per contract version
   (`tasks.v1.json`, `proposals.v1.json`, `memory.v1.json`,
-  `missions.v1.json`) with an `<operation>Input` and `<operation>Result`
+  `missions.v1.json`, `missions.v2.json`) with an `<operation>Input` and `<operation>Result`
   definition per operation.
   `InputSchema` inlines one operation's request schema.
 - `fixtures/valid/` and `fixtures/invalid/` hold the corpus, named
-  `<kind>.<…>.json`; `fixtures/expectations.json` pins the codes of every
+  `<kind>.<…>.json`, a later version after its contract
+  (`request.missions.v2.start.<case>.json`); `fixtures/expectations.json` pins the codes of every
   invalid fixture. `conformance_test.go` runs it, `drift_test.go` keeps the
   schemas, the Go types and the closed vocabularies on one member set, and
   `catalog_test.go` pins what each contract version requires.
@@ -117,12 +125,14 @@ semantics. Every diagnostic code carries the `collaboration.` prefix;
   implements tasks on Linear.
 - [`providertest`](providertest/providertest.go) holds the tasks, proposals,
   memory and missions scenarios every provider runs (`RunTasks`,
-  `RunProposals`, `RunMemory`, `RunMissions`); it names nothing a particular
+  `RunProposals`, `RunMemory`, `RunMissions`, and `RunMissionRuns` for the
+  missions v2 runs); it names nothing a particular
   backend defines, so a provider can run it against a shared one. A scenario
   of an optional operation runs only against a provider that offers it.
   `@putnami/memory-store` runs `RunMemory` against its file backend, its Git
   backend and its Git backend behind a bare remote.
-  `@putnami/local-collaboration` runs `RunMissions` against a fresh store.
+  `@putnami/local-collaboration` runs `RunMissions` on missions v1 and v2,
+  and `RunMissionRuns`, against a fresh store.
 - The CLI routes calls: [`tooling/cli/doc/25-collaboration-providers.md`](../../tooling/cli/doc/25-collaboration-providers.md).
 - [`@putnami/memory-store`](../../tooling/memory-store/README.md) implements
   the memory contract with a file or a Git backend.
@@ -155,7 +165,9 @@ implementation proves the rest in its own tests:
   task scenarios, and their manifests
   draw no diagnostic.
   `@putnami/local-collaboration` also passes the missions scenarios, the
-  status scenario included, across concurrent processes on one store.
+  status scenario included, across concurrent processes on one store, on
+  missions v1 and v2, and the run scenarios; its manifest declares missions
+  v2.
 - `@putnami/memory-store` passes the memory scenarios on every backend, and
   its manifest draws no diagnostic.
 - `@putnami/contributor` stops `putnami change finalize` at an unresolved
@@ -183,6 +195,9 @@ implementation proves the rest in its own tests:
 - [ADR 0008 — A session leaves no empty mission behind](doc/adr/0008-a-session-leaves-no-empty-mission-behind.md):
   a missions provider retires the mission a session leaves once nothing else
   holds it, with no document change.
+- [ADR 0010 — Missions version 2 adds typed runs](doc/adr/0010-missions-version-2-adds-typed-runs.md):
+  v2 includes v1, the run document, its kinds and findings, the `start`,
+  `report` and `runs` semantics and the CLI's identity checks.
 
 ## Stability
 

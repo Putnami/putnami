@@ -173,6 +173,8 @@ func normalize(input any, workspaceName string) {
 		identity(&in.Identity)
 	case *collab.MissionsStatusInput:
 		page(&in.Page)
+	case *collab.MissionsRunsInput:
+		page(&in.Page)
 	}
 }
 
@@ -277,6 +279,8 @@ func requestedPage(input any) *collab.PageRequest {
 		return in.Page
 	case *collab.MissionsStatusInput:
 		return in.Page
+	case *collab.MissionsRunsInput:
+		return in.Page
 	}
 	return nil
 }
@@ -320,6 +324,10 @@ func ReconcileHint(contract, operation string) string {
 		return "repeat missions.ask with the same idempotencyKey and content: the provider returns the decision that key recorded, or records it once"
 	case "missions.reply":
 		return "repeat missions.reply with the same message and reply: the provider returns the reply it recorded, or records it once"
+	case "missions.start":
+		return "repeat missions.start with the same idempotencyKey and content: the provider returns the run that key started, or starts it once"
+	case "missions.report":
+		return "repeat missions.report with the same run and report: the provider returns the run that report ended, or ends it once"
 	}
 	return "read the task with tasks.get and compare its revision before any retry"
 }
@@ -396,7 +404,71 @@ func missionsMismatch(input, result any) (string, bool) {
 		}
 		return "", true
 	}
+	return runsMismatch(input, result)
+}
+
+// runsMismatch checks a missions v2 run answer: a start answers a run of the
+// mission and kind it named, a new one running; a report answers the run it
+// ended, in the state it reported; a runs page lists only runs of the mission
+// and kind it named, and no more than its size.
+func runsMismatch(input, result any) (string, bool) {
+	switch in := input.(type) {
+	case *collab.MissionsStartInput:
+		started, wrong := resultAs[*collab.MissionsRunResult](result)
+		if wrong != "" {
+			return wrong, true
+		}
+		run := started.Run
+		if mismatch := sameMission(run.Mission, in.Mission); mismatch != "" {
+			return mismatch, true
+		}
+		if run.Kind != in.Kind {
+			return fmt.Sprintf("a %s run, requested a %s run", run.Kind, in.Kind), true
+		}
+		if !started.Replayed && run.State != collab.RunStateRunning {
+			return fmt.Sprintf("a new run %s is %s; a run started now is running", run.ID, run.State), true
+		}
+		return "", true
+	case *collab.MissionsReportInput:
+		reported, wrong := resultAs[*collab.MissionsRunResult](result)
+		if wrong != "" {
+			return wrong, true
+		}
+		if reported.Run.ID != in.Run {
+			return fmt.Sprintf("run %s, requested run %s", reported.Run.ID, in.Run), true
+		}
+		if reported.Run.State != in.State {
+			return fmt.Sprintf("run %s is %s, reported %s", in.Run, reported.Run.State, in.State), true
+		}
+		return "", true
+	case *collab.MissionsRunsInput:
+		runs, wrong := resultAs[*collab.MissionsRunsResult](result)
+		if wrong != "" {
+			return wrong, true
+		}
+		if len(runs.Items) > in.Page.Size {
+			return fmt.Sprintf("%d runs for a page of %d", len(runs.Items), in.Page.Size), true
+		}
+		for _, run := range runs.Items {
+			if mismatch := sameMission(run.Mission, in.Mission); mismatch != "" {
+				return fmt.Sprintf("run %s: %s", run.ID, mismatch), true
+			}
+			if in.Kind != "" && run.Kind != in.Kind {
+				return fmt.Sprintf("run %s is a %s run, requested %s runs", run.ID, run.Kind, in.Kind), true
+			}
+		}
+		return "", true
+	}
 	return "", false
+}
+
+// sameMission compares the mission a run names with the requested one: the
+// repository and the key, never the title.
+func sameMission(got, want collab.MissionName) string {
+	if got.Repository != want.Repository || got.Key != want.Key {
+		return fmt.Sprintf("mission %s/%s, requested mission %s/%s", got.Repository, got.Key, want.Repository, want.Key)
+	}
+	return ""
 }
 
 // syncMismatch checks a sync answer: it describes the mission the sync named,

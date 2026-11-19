@@ -253,7 +253,7 @@ func TestAMissionsDocumentOfAnotherVersionIsUnavailable(t *testing.T) {
 	if err := os.MkdirAll(h.store.Root(), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(h.store.Root(), "missions.json"), []byte(`{"version":2}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(h.store.Root(), "missions.json"), []byte(`{"version":9}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if failure := h.fails("missions", "reply", `{"message":"M-1","reply":"x"}`, collab.OutcomeUnavailable); failure.Reason != "store.unwritable" {
@@ -482,7 +482,7 @@ func TestStatusReadsTheStoreWithoutTakingOwnerFiles(t *testing.T) {
 		t.Fatalf("status took an owner file: %+v", messages)
 	}
 
-	if err := os.WriteFile(filepath.Join(h.store.Root(), "missions.json"), []byte(`{"version":2}`), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(h.store.Root(), "missions.json"), []byte(`{"version":9}`), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if failure := h.fails("missions", "status", `{"mission":`+missionArguments+`}`, collab.OutcomeUnavailable); failure.Reason != "store.unreadable" {

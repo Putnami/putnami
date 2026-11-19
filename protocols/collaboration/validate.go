@@ -352,6 +352,12 @@ func ValidateInput(input any) []diag.Diagnostic {
 	case *MissionsStatusInput:
 		c.missionName("mission", in.Mission)
 		c.page(in.Page)
+	case *MissionsStartInput:
+		c.startInput(in)
+	case *MissionsReportInput:
+		c.reportInput(in)
+	case *MissionsRunsInput:
+		c.runsInput(in)
 	case *CapabilitiesInput:
 	default:
 		c.errorf(ErrorCodeUnknownOperation, "", "no request validator for %T", input)
@@ -442,6 +448,10 @@ func ValidateResult(result any) []diag.Diagnostic {
 		}
 	case *MissionsStatusResult:
 		c.statusResult(r)
+	case *MissionsRunResult:
+		c.run("run", r.Run)
+	case *MissionsRunsResult:
+		c.runsResult(r)
 	case *Capabilities:
 		c.diags = append(c.diags, validateCapabilities(r)...)
 	default:

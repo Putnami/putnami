@@ -1,0 +1,20 @@
+{
+  "mission": {
+    "repository": "acme/app",
+    "key": "issue-7"
+  },
+  "kind": "build",
+  "input": {
+    "build": {
+      "change": {
+        "base": "main",
+        "head": "topic"
+      }
+    }
+  },
+  "session": {
+    "engine": "claude",
+    "id": "s-1"
+  },
+  "idempotencyKey": "start-1"
+}

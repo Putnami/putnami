@@ -163,12 +163,12 @@ func TestTheMemoryScenariosPassAgainstACorrectProvider(t *testing.T) {
 
 func TestNormalizeNamesTheServedWorkspace(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "scenarios-normalize-requests", "a-memory-request-names-the-served-workspace")
-	got := string(normalize(collab.ContractMemory, collab.OperationCheckpoint,
+	got := string(normalize(collab.ContractMemory, 1, collab.OperationCheckpoint,
 		`{"mission":"m","idempotencyKey":"k","content":"c","precondition":{"mustNotExist":true}}`, "served"))
 	if !strings.Contains(got, `"identity":{"workspace":"served"}`) {
 		t.Errorf("a checkpoint normalized to %s", got)
 	}
-	got = string(normalize(collab.ContractMemory, collab.OperationContext, `{"identity":{"workspace":"named"}}`, "served"))
+	got = string(normalize(collab.ContractMemory, 1, collab.OperationContext, `{"identity":{"workspace":"named"}}`, "served"))
 	if !strings.Contains(got, `"workspace":"named"`) || !strings.Contains(got, `"size":`+strconv.Itoa(collab.DefaultPageSize)) {
 		t.Errorf("a context request that names its workspace normalized to %s", got)
 	}

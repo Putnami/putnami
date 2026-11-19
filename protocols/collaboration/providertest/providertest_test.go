@@ -350,13 +350,13 @@ func TestTheCommentScenarioPassesAgainstACorrectProvider(t *testing.T) {
 
 func TestNormalizeGivesListsAnExplicitPage(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "scenarios-normalize-requests", "a-list-request-gets-an-explicit-page")
-	if got := string(normalize("tasks", "find", `{}`, "")); got != `{"page":{"size":20}}` {
+	if got := string(normalize("tasks", 1, "find", `{}`, "")); got != `{"page":{"size":20}}` {
 		t.Errorf("tasks.find normalized to %s", got)
 	}
-	if got := string(normalize("proposals", "find", `{"change":{"base":"b","head":"h"},"page":{"size":3}}`, "")); !strings.Contains(got, `"size":3`) {
+	if got := string(normalize("proposals", 1, "find", `{"change":{"base":"b","head":"h"},"page":{"size":3}}`, "")); !strings.Contains(got, `"size":3`) {
 		t.Errorf("an explicit size changed: %s", got)
 	}
-	if got := string(normalize("tasks", "get", `{"ref":"not an object"}`, "")); got != `{"ref":"not an object"}` {
+	if got := string(normalize("tasks", 1, "get", `{"ref":"not an object"}`, "")); got != `{"ref":"not an object"}` {
 		t.Errorf("an invalid request was rewritten: %s", got)
 	}
 }

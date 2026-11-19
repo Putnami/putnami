@@ -22,6 +22,7 @@ type schemaNode struct {
 	Ref        string                 `json:"$ref"`
 	Enum       []string               `json:"enum"`
 	Required   []string               `json:"required"`
+	AnyOf      []*schemaNode          `json:"anyOf"`
 	Minimum    *int                   `json:"minimum"`
 	Maximum    *int                   `json:"maximum"`
 	MaxLength  *int                   `json:"maxLength"`
@@ -52,8 +53,11 @@ func resolve(t *testing.T, node *schemaNode, local, common *schemaNode) *schemaN
 		}
 		file, fragment, _ := strings.Cut(node.Ref, "#")
 		owner := local
-		if file == CommonSchemaFile {
+		switch {
+		case file == CommonSchemaFile:
 			owner = common
+		case file != "":
+			owner = readSchemaNode(t, file)
 		}
 		node = owner.Defs[strings.TrimPrefix(fragment, "/$defs/")]
 		if node == nil {

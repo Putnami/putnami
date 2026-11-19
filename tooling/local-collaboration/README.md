@@ -21,7 +21,7 @@ Declare the extension and bind the contracts in `putnami.workspace.json`:
         "version": 1,
         "settings": { "repository": "acme/app" }
       },
-      "missions": { "provider": "@putnami/local-collaboration", "version": 1 }
+      "missions": { "provider": "@putnami/local-collaboration", "version": 2 }
     }
   }
 }
@@ -46,6 +46,7 @@ extension runtime).
 | tasks v1 | `find`, `get`, `create`, `update`, `transition` | `assign`, `link`, `claim` |
 | proposals v1 | `find`, `upsert`, `status`, `review` | `comments`, `merge` |
 | missions v1 | `sync` (host-only), `ask`, `reply`, `status` | — |
+| missions v2 | the v1 operations, `start`, `report`, `runs` | — |
 
 - It runs **no hosted checks**: `proposals status` always reports
   `checks.state: unsupported`, with a detail that says so. Run the workspace
@@ -84,12 +85,20 @@ its issue mission after `putnami agent attach`, retires the mission it left
 when no other session, decision or message holds it.
 Decision ids are `D-<n>`, message ids `M-<n>`.
 
+The manifest declares missions v2, so a workspace may bind version 1 or 2.
+On version 2, `missions start` records a run of one kind (build, review,
+rebase, audit or triage) with its input, `missions report` ends it once with
+its result, failure or cancellation, and `missions runs` lists a mission's
+runs, latest start first and, of runs started in the same second, the last
+started first. Run ids are `R-<n>`, and a run's times are the
+provider's clock.
+
 You answer a decision and write a message as **files in the store
 directory** (`.putnami/collaboration/local` by default). The provider never
-changes or removes them. Every missions write (`sync`, `ask`, `reply`) first
+changes or removes them. Every missions write (`sync`, `ask`, `reply`, `start`, `report`) first
 takes the files it has not taken yet, under the store lock and in the same
-write as the call, so two processes never take one file twice. `status` is a
-read: it answers the store as the last write left it and takes no file, so
+write as the call, so two processes never take one file twice. `status` and
+`runs` are reads: it answers the store as the last write left it and takes no file, so
 an answer you wrote since shows once the next write takes it.
 
 A file the provider does not take stays as it is, and gets a note beside it:
@@ -145,15 +154,17 @@ added later on top of the same files.
 - `internal/provider` — the operation handlers.
 - `internal/store` — the store: `state.json` for tasks and proposals and
   `missions.json` for missions, each written by atomic rename under the one
-  lock file `lock`; `answers/` and `messages/` hold the owner's files and the
+  lock file `lock`. `missions.json` is format 1 until it holds a run, then
+  format 2, which a provider older than missions v2 refuses rather than drop
+  the runs; `answers/` and `messages/` hold the owner's files and the
   provider's `.refused` notes. The store directory is created with mode 0700
   and every file it writes has mode 0600.
 
 Run `./putnamiw test --projects @putnami/local-collaboration --enforce-coverage`.
 It includes the shared contract scenarios of
 [`providertest`](../../protocols/collaboration/providertest/providertest.go),
-which the GitHub provider runs too, the missions scenarios against a store on
-disk, and two processes that sync, ask and reply on one store at once. The
+which the GitHub provider runs too, the missions scenarios on versions 1 and 2
+and the run scenarios against a store on disk, and two processes that sync, ask and reply on one store at once. The
 end-to-end proof through the command line is
 `tooling/cli/internal/cli/collaboration_local_provider_test.go`: tasks,
 proposals, and a session's stage and usage read back with `missions status`.

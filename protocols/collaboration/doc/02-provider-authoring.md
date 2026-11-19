@@ -198,7 +198,8 @@ write.
 - Run the shared contract scenarios: build a `providertest.Target` from your
   handlers and settings and call `providertest.RunTasks`,
   `providertest.RunProposals`, `providertest.RunMemory` or
-  `providertest.RunMissions` ([`providertest`](../providertest/providertest.go)). They drive the
+  `providertest.RunMissions`, and `providertest.RunMissionRuns` for missions
+  v2 ([`providertest`](../providertest/providertest.go)). They drive the
   handlers through `collab.Serve` and check idempotent replays, stale
   revisions, exact proposal identity and pages against any backend, including
   a shared one. The local provider runs the tasks and proposals scenarios
@@ -247,7 +248,18 @@ write.
   memory, a memory record holds it
   ([ADR 0008](adr/0008-a-session-leaves-no-empty-mission-behind.md)). The
   memory-record case runs only when the target's `Handlers` also serve
-  `memory.checkpoint`, and it needs the target's `Workspace`.
+  `memory.checkpoint`, and it needs the target's `Workspace`. A target whose
+  `MissionsVersion` is 2 runs the same scenarios on version 2.
+- A missions v2 provider registers its handlers under both versions: the v1
+  operations under version 1 and 2, and `start`, `report` and `runs` under
+  version 2. `RunMissionRuns` checks that a repeated `start` replays, also
+  with another mission title, and a changed one is `idempotency.mismatch`;
+  that a report ends a run once with its result or failure, replays, and
+  answers `run.closed` to any other report; that an unknown run is
+  `run.not_found`; that a result of another kind is `run.kind_mismatch` and
+  leaves the run running; and that `runs` lists a mission's runs, latest start
+  first and, at one instant, the last started first, each once, with the kind
+  filter.
 - Drive your handlers through `collab.Serve` with the request a routed call
   carries (`tooling/local-collaboration/internal/provider/provider_test.go`),
   so every answer passes the same validation a real call does.

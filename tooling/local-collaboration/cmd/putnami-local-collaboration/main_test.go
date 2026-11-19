@@ -48,17 +48,21 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 		t.Fatalf("the provider declarations draw diagnostics: %v", diags)
 	}
 	if !slices.Equal(offer.Versions(collab.ContractTasks), []int{1}) || !slices.Equal(offer.Versions(collab.ContractProposals), []int{1}) ||
-		!slices.Equal(offer.Versions(collab.ContractMissions), []int{1}) || len(offer.Versions(collab.ContractMemory)) != 0 {
+		!slices.Equal(offer.Versions(collab.ContractMissions), []int{1, 2}) || len(offer.Versions(collab.ContractMemory)) != 0 {
 		t.Fatalf("offer %v", offer)
 	}
 	answered := map[collab.OperationKey]bool{}
 	for key := range newHandlers() {
 		answered[key] = true
 	}
-	for _, contract := range []string{collab.ContractTasks, collab.ContractProposals, collab.ContractMissions} {
-		operations, _ := offer.Operations(contract, 1)
+	for _, contracted := range []struct {
+		contract string
+		version  int
+	}{{collab.ContractTasks, 1}, {collab.ContractProposals, 1}, {collab.ContractMissions, 1}, {collab.ContractMissions, 2}} {
+		contract := contracted.contract
+		operations, _ := offer.Operations(contract, contracted.version)
 		for name, provided := range operations {
-			key := collab.OperationKey{Contract: contract, Version: 1, Operation: name}
+			key := collab.OperationKey{Contract: contract, Version: contracted.version, Operation: name}
 			if !answered[key] {
 				t.Errorf("the manifest offers %s, which the runtime does not answer", key)
 			}
@@ -83,6 +87,27 @@ func TestTheManifestPassesBothGates(t *testing.T) {
 	if !strings.Contains(missions[collab.OperationAsk].Operation.Description, "answers/<decision>.json") ||
 		!strings.Contains(missions[collab.OperationSync].Operation.Description, "files in the store directory") {
 		t.Error("the missions operations must disclose that the owner answers and writes messages as files")
+	}
+}
+
+// TestTheManifestDeclaresMissionsV2: the local provider declares missions
+// version 2, every run operation with it, and so serves version 1 too.
+func TestTheManifestDeclaresMissionsV2(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "local-provider-serves-missions-v2", "the-local-provider-manifest-declares-missions-v2")
+	manifest := readManifest(t)
+	if declared := manifest.Providers[collab.ContractMissions]; declared.Version != 2 {
+		t.Fatalf("the manifest declares missions version %d", declared.Version)
+	}
+	offer, _ := collab.ReadProviderOffer(manifest.Providers)
+	v2, _ := offer.Operations(collab.ContractMissions, 2)
+	for _, name := range []string{collab.OperationStart, collab.OperationReport, collab.OperationRuns, collab.OperationStatus} {
+		if _, ok := v2[name]; !ok {
+			t.Errorf("the manifest does not offer missions.%s on version 2", name)
+		}
+	}
+	v1, _ := offer.Operations(collab.ContractMissions, 1)
+	if len(v1) != 4 {
+		t.Errorf("version 1 offers %d operations, want sync, ask, reply and status", len(v1))
 	}
 }
 

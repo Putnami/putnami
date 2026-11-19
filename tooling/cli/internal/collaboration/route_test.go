@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -115,8 +116,14 @@ func TestReadDocument_AnUnreadableDocumentIsAnError(t *testing.T) {
 // workspaceSelection where the catalog asks for it.
 func collabOperation(t *testing.T, contract, operation string, preconditions collab.Preconditions) proto.ProviderOperation {
 	t.Helper()
-	spec, _ := collab.Lookup(contract, 1)
-	op, ok := spec.Operation(operation)
+	var op collab.OperationSpec
+	ok := false
+	for _, version := range collab.SupportedVersions(contract) {
+		spec, _ := collab.Lookup(contract, version)
+		if found, has := spec.Operation(operation); has && !ok {
+			op, ok = found, true
+		}
+	}
 	if !ok {
 		t.Fatalf("no operation %s.%s", contract, operation)
 	}
@@ -145,8 +152,15 @@ func catalogPreconditions(op collab.OperationSpec) collab.Preconditions {
 // operation and the extra ones the contract has.
 func collabProviders(t *testing.T, contract string, extra ...string) map[string]proto.ProviderDeclaration {
 	t.Helper()
-	spec, _ := collab.Lookup(contract, 1)
-	declaration := proto.ProviderDeclaration{Version: 1, Command: "provider", TimeoutMs: 20000, Operations: map[string]proto.ProviderOperation{}}
+	return collabProvidersAt(t, contract, 1, extra...)
+}
+
+// collabProvidersAt declares version of contract with every required
+// operation and the extra ones the contract has.
+func collabProvidersAt(t *testing.T, contract string, version int, extra ...string) map[string]proto.ProviderDeclaration {
+	t.Helper()
+	spec, _ := collab.Lookup(contract, version)
+	declaration := proto.ProviderDeclaration{Version: version, Command: "provider", TimeoutMs: 20000, Operations: map[string]proto.ProviderOperation{}}
 	add := func(op collab.OperationSpec) {
 		declaration.Operations[op.Name] = collabOperation(t, contract, op.Name, catalogPreconditions(op))
 	}
@@ -200,8 +214,15 @@ func TestResolve_BindsOnlyTheNamedAvailableProvider(t *testing.T) {
 
 func collabBoundCall(t *testing.T, contract, operation, arguments string) *providerCall {
 	t.Helper()
-	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"`+contract+`":{"provider":"@a/one","version":1}}}}`)
-	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, contract, "automerge", "claim", "comments", "merge", "screenshots", "search", "assign", "link", "status"))}, nil)
+	return collabBoundCallAt(t, contract, 1, 1, operation, arguments)
+}
+
+// collabBoundCallAt prepares a call to a provider that declares version
+// declared of contract, in a workspace bound to version bound.
+func collabBoundCallAt(t *testing.T, contract string, declared, bound int, operation, arguments string) *providerCall {
+	t.Helper()
+	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"`+contract+`":{"provider":"@a/one","version":`+strconv.Itoa(bound)+`}}}}`)
+	resolution := resolveCollab(read, contract, []*extension.ExtensionDescription{provider("@a/one", collabProvidersAt(t, contract, declared, "automerge", "claim", "comments", "merge", "screenshots", "search", "assign", "link", "status"))}, nil)
 	call, answer := prepareCall(read, resolution, operation, json.RawMessage(arguments))
 	if answer != nil {
 		t.Fatalf("prepareCall refused: %+v", answer.Error)
@@ -599,7 +620,7 @@ func TestPrepare_RefusesMissionsStatusAProviderDoesNotOffer(t *testing.T) {
 // envelope carries it.
 func TestReconcileHint_AMissionsWriteNamesItsRepeat(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "missions-identity-and-reconciliation", "the-cli-names-the-repeat-of-an-unresolved-missions-write")
-	spec, _ := collab.Lookup(collab.ContractMissions, 1)
+	spec, _ := collab.Lookup(collab.ContractMissions, 2)
 	for _, op := range spec.Operations {
 		if op.Access != collab.AccessMutating {
 			continue
@@ -609,7 +630,7 @@ func TestReconcileHint_AMissionsWriteNamesItsRepeat(t *testing.T) {
 		if !ok || contract != collab.ContractMissions || operation != op.Name {
 			t.Errorf("the %s hint %q names %s.%s", op.Name, hint, contract, operation)
 		}
-		envelope := collab.Envelope{Contract: collab.ContractMissions, Version: 1, Operation: op.Name, Outcome: collab.OutcomeUnresolved,
+		envelope := collab.Envelope{Contract: collab.ContractMissions, Version: spec.Version, Operation: op.Name, Outcome: collab.OutcomeUnresolved,
 			Error: &collab.Error{Message: "lost", Reconcile: hint}}
 		if diags := collab.ValidateEnvelope(&envelope); diags != nil {
 			t.Errorf("an unresolved %s envelope is refused: %v", op.Name, diags)
@@ -619,6 +640,128 @@ func TestReconcileHint_AMissionsWriteNamesItsRepeat(t *testing.T) {
 	envelope := interpretResult(call, collabRespond(t, collab.Response{Outcome: collab.OutcomeUnresolved, Error: &collab.Error{Message: "lost"}}))
 	if envelope.Error.Reconcile != ReconcileHint(collab.ContractMissions, collab.OperationReply) {
 		t.Errorf("an unresolved reply carries the hint %q", envelope.Error.Reconcile)
+	}
+}
+
+// TestPrepare_CallsAV2ProviderWithTheBoundVersion: a provider that declares
+// missions v2 serves a workspace bound to v1 with the v1 operations, called
+// as version 1, and a workspace bound to v2 with the run operations, called
+// as version 2.
+func TestPrepare_CallsAV2ProviderWithTheBoundVersion(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-v2-includes-v1", "the-cli-calls-a-v2-provider-with-the-bound-version")
+	const reply = `{"message":"M-1","reply":"yes"}`
+	for _, bound := range []int{1, 2} {
+		call := collabBoundCallAt(t, collab.ContractMissions, 2, bound, collab.OperationReply, reply)
+		if member := call.providerMember(); member.Version != bound || call.Resolution.Spec.Version != bound {
+			t.Errorf("bound to v%d: the provider is called as version %d, spec v%d", bound, member.Version, call.Resolution.Spec.Version)
+		}
+	}
+	start := `{"mission":{"repository":"putnami/putnami","key":"issue-596"},"kind":"triage","input":{"triage":{"task":{"source":"github:putnami/putnami","id":"7"}}},"idempotencyKey":"k"}`
+	if call := collabBoundCallAt(t, collab.ContractMissions, 2, 2, collab.OperationStart, start); call.providerMember().Version != 2 {
+		t.Errorf("a start is called as version %d", call.providerMember().Version)
+	}
+	read := readCollabFixture(t, `{"name":"w","options":{"collaboration":{"missions":{"provider":"@a/one","version":1}}}}`)
+	resolution := resolveCollab(read, collab.ContractMissions, []*extension.ExtensionDescription{provider("@a/one", collabProvidersAt(t, collab.ContractMissions, 2))}, nil)
+	if call, envelope := prepareCall(read, resolution, collab.OperationStart, json.RawMessage(start)); call != nil || envelope.Outcome != collab.OutcomeInvalid {
+		t.Fatalf("a start in a workspace bound to v1 was prepared")
+	}
+	v1Only := resolveCollab(readCollabFixture(t, `{"name":"w","options":{"collaboration":{"missions":{"provider":"@a/one","version":2}}}}`),
+		collab.ContractMissions, []*extension.ExtensionDescription{provider("@a/one", collabProviders(t, collab.ContractMissions))}, nil)
+	if v1Only.Status != collab.BindingStatusInvalid {
+		t.Fatalf("a v1 provider bound as v2: %+v", v1Only)
+	}
+}
+
+// runAnswer is a run of mission issue-596 of putnami/putnami.
+func runAnswer(id string, kind collab.RunKind, state collab.RunState) collab.Run {
+	run := collab.Run{ID: id, Mission: collab.MissionName{Repository: "putnami/putnami", Key: "issue-596"}, Kind: kind, State: state,
+		Input: collab.RunInput{Triage: &collab.TriageRunInput{Task: collab.Ref{Source: "github:putnami/putnami", ID: "7"}}}, StartedAt: "2026-11-19T09:00:00Z"}
+	if kind != collab.RunKindTriage {
+		run.Input = collab.RunInput{Audit: &collab.AuditRunInput{Scope: "cli", Revision: "abc1234"}}
+	}
+	switch state {
+	case collab.RunStateRunning:
+	case collab.RunStateFailed:
+		run.EndedAt, run.Failure = "2026-11-19T09:05:00Z", "gate"
+	case collab.RunStateSucceeded:
+		run.EndedAt = "2026-11-19T09:05:00Z"
+		run.Result = &collab.RunResult{Triage: &collab.TriageRunResult{Summary: "Done."}}
+	default:
+		run.EndedAt = "2026-11-19T09:05:00Z"
+	}
+	return run
+}
+
+// TestInterpret_MissionsRunIdentity: a start or report answered for another
+// run, mission, kind or state is unresolved, since the write may have landed.
+func TestInterpret_MissionsRunIdentity(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-run-identity", "the-cli-makes-a-run-answer-for-another-run-or-mission-unresolved")
+	start := collabBoundCallAt(t, collab.ContractMissions, 2, 2, collab.OperationStart,
+		`{"mission":{"repository":"putnami/putnami","key":"issue-596"},"kind":"triage","input":{"triage":{"task":{"source":"github:putnami/putnami","id":"7"}}},"idempotencyKey":"k"}`)
+	report := collabBoundCallAt(t, collab.ContractMissions, 2, 2, collab.OperationReport, `{"run":"R-1","state":"failed","failure":"gate"}`)
+	otherMission := runAnswer("R-1", collab.RunKindTriage, collab.RunStateRunning)
+	otherMission.Mission.Key = "issue-1"
+	cases := []struct {
+		name    string
+		call    *providerCall
+		result  any
+		outcome collab.Outcome
+	}{
+		{"a start answered as asked", start, &collab.MissionsRunResult{Run: runAnswer("R-1", collab.RunKindTriage, collab.RunStateRunning)}, collab.OutcomeOK},
+		{"a replayed start of a run ended since", start, &collab.MissionsRunResult{Run: runAnswer("R-1", collab.RunKindTriage, collab.RunStateSucceeded), Replayed: true}, collab.OutcomeOK},
+		{"a start answered for another mission", start, &collab.MissionsRunResult{Run: otherMission}, collab.OutcomeUnresolved},
+		{"a start answered with another kind", start, &collab.MissionsRunResult{Run: runAnswer("R-1", collab.RunKindAudit, collab.RunStateRunning)}, collab.OutcomeUnresolved},
+		{"a new run already ended", start, &collab.MissionsRunResult{Run: runAnswer("R-1", collab.RunKindTriage, collab.RunStateCanceled)}, collab.OutcomeUnresolved},
+		{"a report answered as asked", report, &collab.MissionsRunResult{Run: runAnswer("R-1", collab.RunKindTriage, collab.RunStateFailed)}, collab.OutcomeOK},
+		{"a report answered for another run", report, &collab.MissionsRunResult{Run: runAnswer("R-2", collab.RunKindTriage, collab.RunStateFailed)}, collab.OutcomeUnresolved},
+		{"a report answered in another state", report, &collab.MissionsRunResult{Run: runAnswer("R-1", collab.RunKindTriage, collab.RunStateCanceled)}, collab.OutcomeUnresolved},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			envelope := interpretResult(tc.call, collabOK(t, tc.result))
+			if envelope.Outcome != tc.outcome {
+				t.Fatalf("outcome %s, want %s: %+v", envelope.Outcome, tc.outcome, envelope.Error)
+			}
+			if tc.outcome == collab.OutcomeUnresolved && (envelope.Error.Reason != collab.ReasonProviderIdentity || envelope.Error.Reconcile != ReconcileHint(collab.ContractMissions, tc.call.Operation.Name)) {
+				t.Errorf("error %+v, want %s with the %s hint", envelope.Error, collab.ReasonProviderIdentity, tc.call.Operation.Name)
+			}
+		})
+	}
+}
+
+// TestInterpret_MissionsRunsIdentity: a runs page that lists a run of another
+// mission or kind, or more runs than asked, is unavailable, since a read
+// changed nothing; a runs request without a page gets the default one.
+func TestInterpret_MissionsRunsIdentity(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "missions-run-identity", "the-cli-makes-a-runs-page-of-another-mission-unavailable")
+	runs := collabBoundCallAt(t, collab.ContractMissions, 2, 2, collab.OperationRuns, `{"mission":{"repository":"putnami/putnami","key":"issue-596"},"kind":"triage"}`)
+	if !strings.Contains(string(runs.Arguments), `"size":20`) {
+		t.Errorf("a runs request without a page was routed as %s", runs.Arguments)
+	}
+	small := collabBoundCallAt(t, collab.ContractMissions, 2, 2, collab.OperationRuns, `{"mission":{"repository":"putnami/putnami","key":"issue-596"},"page":{"size":1}}`)
+	otherMission := runAnswer("R-2", collab.RunKindTriage, collab.RunStateRunning)
+	otherMission.Mission.Repository = "putnami/other"
+	cases := []struct {
+		name    string
+		call    *providerCall
+		items   []collab.Run
+		outcome collab.Outcome
+	}{
+		{"a page of the mission's runs", runs, []collab.Run{runAnswer("R-1", collab.RunKindTriage, collab.RunStateRunning)}, collab.OutcomeOK},
+		{"a page with a run of another mission", runs, []collab.Run{otherMission}, collab.OutcomeUnavailable},
+		{"a page with a run of another kind", runs, []collab.Run{runAnswer("R-2", collab.RunKindAudit, collab.RunStateRunning)}, collab.OutcomeUnavailable},
+		{"two runs for a page of one", small, []collab.Run{runAnswer("R-2", collab.RunKindTriage, collab.RunStateRunning), runAnswer("R-1", collab.RunKindTriage, collab.RunStateRunning)}, collab.OutcomeUnavailable},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			envelope := interpretResult(tc.call, collabOK(t, &collab.MissionsRunsResult{Items: tc.items}))
+			if envelope.Outcome != tc.outcome {
+				t.Fatalf("outcome %s, want %s: %+v", envelope.Outcome, tc.outcome, envelope.Error)
+			}
+			if tc.outcome != collab.OutcomeOK && envelope.Error.Reason != collab.ReasonProviderIdentity {
+				t.Errorf("reason %s, want %s", envelope.Error.Reason, collab.ReasonProviderIdentity)
+			}
+		})
 	}
 }
 

@@ -41,33 +41,65 @@ func TestTheMissionsScenarios(t *testing.T) {
 	spectest.Proves(t, "collaboration/provider-contract", "missions-provider-semantics", "the-local-provider-passes-the-missions-scenarios")
 	spectest.Proves(t, "collaboration/provider-contract", "missions-status", "the-local-provider-passes-the-missions-status-scenario")
 	spectest.Proves(t, "collaboration/provider-contract", "missions-left-mission-retired", "the-local-provider-passes-the-left-mission-scenarios")
-	statusRan := false
-	providertest.RunMissions(t, func(t *testing.T) providertest.Target {
-		if strings.HasSuffix(t.Name(), "status_lists_the_sessions_of_a_mission,_newest_first") {
-			t.Cleanup(func() { statusRan = !t.Skipped() })
-		}
-		clock := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
-		p := &Provider{Now: func() time.Time { return clock }}
-		workspace := t.TempDir()
-		s := store.Open(filepath.Join(workspace, filepath.FromSlash(DefaultRoot)))
-		posted := 0
-		return providertest.Target{
-			Handlers:       p.Handlers(),
-			WorkspaceRoot:  workspace,
-			MissionMembers: collab.MissionMembers,
-			Post: func(t *testing.T, mission collab.MissionName, kind collab.InboxKind, text string) string {
-				posted++
-				name := "post-" + strconv.Itoa(posted) + ".json"
-				writeOwnerFile(t, s, store.MessagesDir, name, ownerMessage{Mission: keyOf(mission), Kind: kind, Text: text})
-				return takenMessage(t, p, s, name)
-			},
-			Answer: func(t *testing.T, decision, option, text string) {
-				writeOwnerFile(t, s, store.AnswersDir, decision+".json", ownerAnswer{Option: option, Text: text})
-			},
-		}
+	spectest.Proves(t, "collaboration/provider-contract", "local-provider-serves-missions-v2", "the-local-provider-passes-the-missions-scenarios-on-both-versions")
+	for _, version := range []int{1, 2} {
+		t.Run("v"+strconv.Itoa(version), func(t *testing.T) {
+			statusRan := false
+			providertest.RunMissions(t, func(t *testing.T) providertest.Target {
+				if strings.HasSuffix(t.Name(), "status_lists_the_sessions_of_a_mission,_newest_first") {
+					t.Cleanup(func() { statusRan = !t.Skipped() })
+				}
+				target := localMissionsTarget(t)
+				target.MissionsVersion = version
+				return target
+			})
+			if !statusRan {
+				t.Error("the missions status scenario did not run against the local provider")
+			}
+		})
+	}
+}
+
+// TestTheRunScenarios runs the missions v2 run scenarios against a fresh
+// local store on disk.
+func TestTheRunScenarios(t *testing.T) {
+	spectest.Proves(t, "collaboration/provider-contract", "local-provider-serves-missions-v2", "the-local-provider-passes-the-run-scenarios")
+	t.Run("one clock instant", func(t *testing.T) { providertest.RunMissionRuns(t, localMissionsTarget) })
+	t.Run("a clock that moves", func(t *testing.T) {
+		providertest.RunMissionRuns(t, func(t *testing.T) providertest.Target {
+			target := localMissionsTarget(t)
+			clock := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
+			target.Handlers = (&Provider{Now: func() time.Time {
+				clock = clock.Add(time.Second)
+				return clock
+			}}).Handlers()
+			return target
+		})
 	})
-	if !statusRan {
-		t.Error("the missions status scenario did not run against the local provider")
+}
+
+// localMissionsTarget is a fresh local store on disk. It posts a message and
+// answers a decision the way the store's owner does: by writing a file to the
+// store directory.
+func localMissionsTarget(t *testing.T) providertest.Target {
+	clock := time.Date(2026, 10, 26, 9, 0, 0, 0, time.UTC)
+	p := &Provider{Now: func() time.Time { return clock }}
+	workspace := t.TempDir()
+	s := store.Open(filepath.Join(workspace, filepath.FromSlash(DefaultRoot)))
+	posted := 0
+	return providertest.Target{
+		Handlers:       p.Handlers(),
+		WorkspaceRoot:  workspace,
+		MissionMembers: collab.MissionMembers,
+		Post: func(t *testing.T, mission collab.MissionName, kind collab.InboxKind, text string) string {
+			posted++
+			name := "post-" + strconv.Itoa(posted) + ".json"
+			writeOwnerFile(t, s, store.MessagesDir, name, ownerMessage{Mission: keyOf(mission), Kind: kind, Text: text})
+			return takenMessage(t, p, s, name)
+		},
+		Answer: func(t *testing.T, decision, option, text string) {
+			writeOwnerFile(t, s, store.AnswersDir, decision+".json", ownerAnswer{Option: option, Text: text})
+		},
 	}
 }
 

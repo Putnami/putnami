@@ -17,7 +17,7 @@
     {
       "id": "one-closed-catalog",
       "text": [
-        "Each contract speaks only version 1. tasks requires find, get, create, update and transition and offers assign, claim and link;",
+        "Contracts speak v1; missions also v2. tasks requires find, get, create, update and transition and offers assign, claim and link;",
         "proposals requires find, review, status and upsert and offers automerge, comments, merge and screenshots;",
         "memory requires checkpoint, context and mission and offers search;",
         "missions requires ask, reply and sync and offers status. tasks.create, proposals.review, memory.checkpoint and missions.ask take an idempotencyKey.",
@@ -287,6 +287,45 @@
         "Every version 1 document frozen in fixtures/v1 on 2026-11-07, at least one per contract and document kind, parses without error under the current module, and its bytes match the SHA-256 the test pins.",
         "A change that would reject or rewrite one opens a new contract version."
       ]
+    },
+    {
+      "id": "missions-v2-includes-v1",
+      "text": [
+        "missions version 2 holds every version 1 operation with the same request and result documents, and also requires report, runs and start; missions.start takes an idempotencyKey.",
+        "A provider that declares missions version 2 is also offered version 1, restricted to the version 1 operations it declares, and the CLI calls it with the version the workspace bound."
+      ]
+    },
+    {
+      "id": "missions-typed-runs",
+      "text": [
+        "A run carries id, mission, kind, state, input, startedAt and, once ended, endedAt; result when succeeded, failure when failed; session optional.",
+        "Kinds: audit, build, rebase, review, triage. input and result hold one member, named by the kind, each closed.",
+        "A finding has severity (high, medium, low, info), title, optional file, line, body; at most 100 per result, texts at most 64 KiB.",
+        "A review result has commit, verdict, findings; an audit result scope, revision, verdict (pass, concerns, fail), findings."
+      ]
+    },
+    {
+      "id": "missions-run-semantics",
+      "text": [
+        "missions.start creates a running run; the same idempotencyKey with the same content replays it, and other content is a conflict (idempotency.mismatch).",
+        "missions.report ends a running run once: the same report replays, another is a conflict (run.closed), an unknown run is not_found (run.not_found), and a result of another kind is invalid (run.kind_mismatch).",
+        "missions.runs pages a mission's runs, optionally of one kind, latest start first (at one instant, the last started first), each once."
+      ]
+    },
+    {
+      "id": "missions-run-identity",
+      "text": [
+        "An ok missions.start answer names the requested mission and kind and, unless replayed, a running run;",
+        "an ok missions.report answer names the requested run in a final state;",
+        "an ok missions.runs page holds only runs of the named mission and kind, no more than the page size.",
+        "Any other answer is provider.identity_mismatch: unresolved for a write, unavailable for a read."
+      ]
+    },
+    {
+      "id": "local-provider-serves-missions-v2",
+      "text": [
+        "@putnami/local-collaboration declares missions version 2, passes the run scenarios, and still passes the missions scenarios on version 1 and version 2."
+      ]
     }
   ],
   "decisions": [
@@ -300,6 +339,7 @@
     "tooling/contributor/doc/adr/0015-finalize-uploads-its-screenshots-through-the-proposals-contract.md",
     "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md",
     "protocols/collaboration/doc/adr/0008-a-session-leaves-no-empty-mission-behind.md",
-    "protocols/collaboration/doc/adr/0009-a-declared-request-member-may-join-version-1.md"
+    "protocols/collaboration/doc/adr/0009-a-declared-request-member-may-join-version-1.md",
+    "protocols/collaboration/doc/adr/0010-missions-version-2-adds-typed-runs.md"
   ]
 }

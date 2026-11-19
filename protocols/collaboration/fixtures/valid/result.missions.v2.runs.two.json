@@ -1,0 +1,46 @@
+{
+  "items": [
+    {
+      "id": "R-2",
+      "mission": {
+        "repository": "acme/app",
+        "key": "issue-7"
+      },
+      "kind": "rebase",
+      "state": "succeeded",
+      "input": {
+        "rebase": {
+          "change": {
+            "base": "main",
+            "head": "topic"
+          }
+        }
+      },
+      "startedAt": "2026-11-19T09:00:00Z",
+      "endedAt": "2026-11-19T09:05:00Z",
+      "result": {
+        "rebase": {
+          "commit": "def5678",
+          "onto": "abc1234"
+        }
+      }
+    },
+    {
+      "id": "R-1",
+      "mission": {
+        "repository": "acme/app",
+        "key": "issue-7"
+      },
+      "kind": "build",
+      "state": "canceled",
+      "input": {
+        "build": {
+          "intention": "Add typed runs."
+        }
+      },
+      "startedAt": "2026-11-19T09:00:00Z",
+      "endedAt": "2026-11-19T09:05:00Z"
+    }
+  ],
+  "page": {}
+}

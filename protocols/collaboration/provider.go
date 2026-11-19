@@ -114,8 +114,41 @@ func ReadProviderOffer(providers map[string]extension.ProviderDeclaration) (Prov
 			offer[contract] = map[int]map[string]ProvidedOperation{}
 		}
 		offer[contract][declaration.Version] = operations
+		if included, ok := includedOperations(spec, operations); ok {
+			offer[contract][spec.Includes] = included
+		}
 	}
 	return offer, diags
+}
+
+// includedOperations returns the offer of the version spec includes: the
+// operations of that version a provider of spec declares, each resolved to
+// the included version's specification. A version repeats the operations
+// and documents of the version it includes, so its provider serves both
+// (ADR 0010). It reports false when spec includes no version, or when the
+// provider leaves out a required operation of the included version.
+func includedOperations(spec ContractSpec, operations map[string]ProvidedOperation) (map[string]ProvidedOperation, bool) {
+	if spec.Includes == 0 {
+		return nil, false
+	}
+	included, ok := Lookup(spec.Name, spec.Includes)
+	if !ok {
+		return nil, false
+	}
+	out := map[string]ProvidedOperation{}
+	for _, op := range included.Operations {
+		provided, declared := operations[op.Name]
+		if !declared && op.Required {
+			// The including version is not complete for the one it
+			// includes: offer only the version it declares.
+			return nil, false
+		}
+		if declared {
+			provided.Spec = op
+			out[op.Name] = provided
+		}
+	}
+	return out, true
 }
 
 // readProvidedOperations checks one contract's declaration against its
@@ -395,6 +428,8 @@ func listItemSizes(result any) ([]int, error) {
 		return encodedSizes(list.Items)
 	case *MemoryListResult:
 		return encodedSizes(list.Items)
+	case *MissionsRunsResult:
+		return encodedSizes(list.Items)
 	}
 	return nil, nil
 }
@@ -425,6 +460,8 @@ func pageRequestOf(input any) *PageRequest {
 	case *MemoryContextInput:
 		page = &in.Page
 	case *MemorySearchInput:
+		page = &in.Page
+	case *MissionsRunsInput:
 		page = &in.Page
 	default:
 		return nil
@@ -471,6 +508,29 @@ func emptyListsAsEmpty(result any) {
 		if list.Items == nil {
 			list.Items = []MemoryRecord{}
 		}
+	case *MissionsRunResult:
+		emptyFindingsAsEmpty(&list.Run)
+	case *MissionsRunsResult:
+		if list.Items == nil {
+			list.Items = []Run{}
+		}
+		for i := range list.Items {
+			emptyFindingsAsEmpty(&list.Items[i])
+		}
+	}
+}
+
+// emptyFindingsAsEmpty turns the nil findings of a run's result into the
+// empty list the contract requires.
+func emptyFindingsAsEmpty(run *Run) {
+	if run.Result == nil {
+		return
+	}
+	if r := run.Result.Review; r != nil && r.Findings == nil {
+		r.Findings = []Finding{}
+	}
+	if r := run.Result.Audit; r != nil && r.Findings == nil {
+		r.Findings = []Finding{}
 	}
 }
 

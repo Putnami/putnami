@@ -128,7 +128,7 @@
       }
     },
     "missions": {
-      "version": 1,
+      "version": 2,
       "command": "{extensionRuntime}",
       "args": [
         "provider"
@@ -157,6 +157,18 @@
           "members": [
             "missedSyncs"
           ]
+        },
+        "start": {
+          "description": "Start a run of one kind (build, review, rebase, audit or triage) inside a local mission, with its typed input. A repeated idempotency key returns the run already started; the same key with other content is a conflict.",
+          "openWorld": false
+        },
+        "report": {
+          "description": "End a running run of a local mission once: succeeded with its typed result, failed with its failure, or canceled. The same report again changes nothing; another report on an ended run is a conflict.",
+          "openWorld": false
+        },
+        "runs": {
+          "description": "Read a page of a local mission's runs, the latest start first, with each run's kind, state, input and result. It reads the store as the last write left it and takes no owner file.",
+          "openWorld": false
         }
       }
     }

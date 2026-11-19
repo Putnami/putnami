@@ -1,0 +1,10 @@
+{
+  "mission": {
+    "repository": "acme/app",
+    "key": "issue-7"
+  },
+  "kind": "review",
+  "page": {
+    "size": 20
+  }
+}

@@ -1,6 +1,9 @@
 # 0004: A provider is declared under `providers` and speaks its own wire
 
-- **Status**: accepted
+- **Status**: accepted, amended by
+  [ADR 0010](0010-missions-version-2-adds-typed-runs.md), decision 2: a
+  provider that declares a version that includes an earlier one is also
+  offered the earlier one
 - **Date**: 2026-10-29
 - **Scope**: `go.putnami.dev/protocol/collaboration` (`protocols/collaboration`),
   `go.putnami.dev/protocol/extension` (`protocols/extension`, the `providers`

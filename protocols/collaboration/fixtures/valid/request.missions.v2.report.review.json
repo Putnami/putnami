@@ -1,0 +1,19 @@
+{
+  "run": "R-1",
+  "state": "succeeded",
+  "result": {
+    "review": {
+      "commit": "abc1234",
+      "verdict": "request_changes",
+      "findings": [
+        {
+          "severity": "high",
+          "title": "Unchecked error",
+          "file": "a.go",
+          "line": 12,
+          "body": "Check it."
+        }
+      ]
+    }
+  }
+}

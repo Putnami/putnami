@@ -1,13 +1,17 @@
 package store
 
 import (
+	"encoding/json"
 	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
+
+	collab "go.putnami.dev/protocol/collaboration"
 )
 
 func TestReadingANewStoreIsEmpty(t *testing.T) {
@@ -222,5 +226,54 @@ func TestRefusalNotesFollowTheRefusedFiles(t *testing.T) {
 	}
 	if err := s.WriteRefusals(MessagesDir, nil); err != nil || read("a.json"+RefusalSuffix) != "<none>" {
 		t.Errorf("the note of a file taken since stays: %v", err)
+	}
+}
+
+// TestTheMissionsFormatFollowsTheRuns: a missions document without runs is
+// written as format 1, which an older provider reads; one with runs as format
+// 2, which an older provider refuses rather than drop the runs; and a format 1
+// document that holds runs is refused.
+func TestTheMissionsFormatFollowsTheRuns(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "store")
+	s := Open(root)
+	format := func() string {
+		data, err := os.ReadFile(filepath.Join(root, missionsFile))
+		if err != nil {
+			t.Fatal(err)
+		}
+		var document struct {
+			Version int `json:"version"`
+		}
+		if err := json.Unmarshal(data, &document); err != nil {
+			t.Fatal(err)
+		}
+		return strconv.Itoa(document.Version)
+	}
+	if _, err := s.UpdateMissions(func(m *Missions) error { m.Next.Message = 1; return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if got := format(); got != "1" {
+		t.Fatalf("a document without runs is format %s", got)
+	}
+	if _, err := s.UpdateMissions(func(m *Missions) error {
+		m.Next.Run = 1
+		m.Runs = append(m.Runs, Run{Run: collab.Run{ID: "R-1", Kind: collab.RunKindTriage, State: collab.RunStateRunning}, IdempotencyKey: "k", Digest: "d"})
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if got := format(); got != "2" {
+		t.Fatalf("a document with runs is format %s", got)
+	}
+	read, err := s.ReadMissions()
+	if err != nil || len(read.Runs) != 1 || read.Runs[0].ID != "R-1" || read.Version != 2 {
+		t.Fatalf("read back %+v, %v", read, err)
+	}
+	data, _ := os.ReadFile(filepath.Join(root, missionsFile))
+	if err := os.WriteFile(filepath.Join(root, missionsFile), []byte(strings.Replace(string(data), `"version": 2`, `"version": 1`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := s.ReadMissions(); err == nil || !strings.Contains(err.Error(), "format 1 and hold runs") {
+		t.Fatalf("a format 1 document with runs: %v", err)
 	}
 }

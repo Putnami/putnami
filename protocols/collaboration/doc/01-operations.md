@@ -358,6 +358,66 @@ requested size `unavailable` too.
 A rate limit is `unavailable` and retryable. An unresolved `sync`, `ask` or
 `reply` is reconciled by repeating the same document.
 
+## missions v2
+
+Version 2 holds every v1 operation with the same documents, and adds runs
+([ADR 0010](adr/0010-missions-version-2-adds-typed-runs.md)). `start`,
+`report` and `runs` are required. A provider that declares v2 also serves the
+workspaces bound to v1, with the v1 operations; it answers each call under
+the version the call names.
+
+A **run** is one execution of agent work inside a mission: `{id, mission,
+kind, state, input, result, failure, session, startedAt, endedAt}`. The id is
+a bare token, like a message id. `state` is `running`, then once
+`succeeded`, `failed` or `canceled`; an ended run never changes again.
+`result` goes with `succeeded` and always with it, `failure` (one line, at
+most 1024 characters) with `failed` and always with it. `startedAt` and
+`endedAt` are the provider's clock, in UTC; every state but `running` has
+`endedAt`, never before `startedAt`.
+
+`input` and `result` carry exactly one member, named by the run's kind:
+
+| Kind | Input | Result |
+|---|---|---|
+| `build` | `task`, `intention` (one of them at least), `change` | `stage`, `proposal`, `commit` |
+| `review` | `change`, `commit`, `proposal` | `commit`, `verdict`, `findings` |
+| `rebase` | `change`, `commit` | `commit`, `onto` |
+| `audit` | `scope`, `revision` | `scope`, `revision`, `verdict` (`pass`, `concerns`, `fail`), `findings` |
+| `triage` | `task` | `summary`, `state`, `labels`, `duplicateOf` |
+
+A **finding** is `{severity, title, file, line, body}`: `severity` is `high`,
+`medium`, `low` or `info`, `title` one line, `line` needs `file`. A result
+carries at most 100 findings, `[]` when there are none, and their titles and
+bodies total at most 64 KiB. A new kind or a new member opens version 3.
+
+**start** starts a run: `{mission, kind, input, session, idempotencyKey}`.
+The key binds the mission's repository and key, the kind, the input and the
+session; the title is not part of it. The same key with the same content
+returns the run already started, `replayed: true`, in its current state; with
+other content it is a `conflict` with reason `idempotency.mismatch`. The
+result is `{run, replayed}`.
+
+**report** ends a running run once: `{run, state, result, failure}`, where
+`state` is `succeeded`, `failed` or `canceled`. The same report again replays.
+Another report on an ended run is a `conflict` with reason `run.closed`, an
+unknown run is `not_found` with reason `run.not_found`, a run the caller may
+not report is `denied` with reason `run.denied`, and a result of another kind
+than the run's is `invalid` with reason `run.kind_mismatch`. The result is
+`{run, replayed}`.
+
+**runs** reads a page of a mission's runs: `{mission, kind, page}`. `kind`
+keeps only the runs of that kind. The list runs the latest `startedAt` first,
+and of runs started at the same instant the one started last first, each
+once, a page at a time with `page.next`. A mission the
+provider does not hold lists none.
+
+The CLI answers an ok `start` for another mission or kind, a new run that is
+not `running`, and an ok `report` for another run or state `unresolved` with
+reason `provider.identity_mismatch`. It answers a `runs` page that lists
+another mission's or kind's run, or more runs than requested, `unavailable`
+with the same reason. An unresolved `start` or `report` is reconciled by
+repeating the same document.
+
 ## Failures
 
 | Outcome | Written? | Retryable | Carries |

@@ -24,6 +24,8 @@ type harness struct {
 	workspace string
 	settings  string
 	provider  *Provider
+	// version is the contract version the harness calls; zero calls 1.
+	version int
 }
 
 func newHarness(t *testing.T, settings string) *harness {
@@ -37,7 +39,7 @@ func (h *harness) call(contract, operation, arguments string) collab.Response {
 	request := collab.ProviderRequest{
 		Arguments:     json.RawMessage(arguments),
 		WorkspaceRoot: h.workspace,
-		Provider:      &collab.ProviderCall{Contract: contract, Version: 1, Operation: operation},
+		Provider:      &collab.ProviderCall{Contract: contract, Version: max(h.version, 1), Operation: operation},
 	}
 	if h.settings != "" {
 		request.Provider.Settings = json.RawMessage(h.settings)

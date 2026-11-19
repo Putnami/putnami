@@ -4,8 +4,12 @@ import (
 	"embed"
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"strings"
 )
+
+// contractSchemaPattern names the schema file of one contract version.
+var contractSchemaPattern = regexp.MustCompile(`^[a-z]+\.v[0-9]+\.json$`)
 
 // schemaFiles are the published JSON Schemas: the common envelope document and
 // one file per contract version. They are the single source of every
@@ -148,10 +152,18 @@ func inlineRefs(node any, document, common schemaDocument, depth int) (any, erro
 func resolveRef(ref string, document, common schemaDocument) (any, schemaDocument, error) {
 	file, fragment, _ := strings.Cut(ref, "#")
 	owner := document
-	switch file {
-	case "":
-	case CommonSchemaFile:
+	switch {
+	case file == "":
+	case file == CommonSchemaFile:
 		owner = common
+	case contractSchemaPattern.MatchString(file):
+		// A version that includes an earlier one references its documents,
+		// and a contract may reference another's shared definitions.
+		loaded, err := loadSchema(file)
+		if err != nil {
+			return nil, nil, fmt.Errorf("schema reference %q: %w", ref, err)
+		}
+		owner = loaded
 	default:
 		return nil, nil, fmt.Errorf("schema reference %q leaves the collaboration schemas", ref)
 	}

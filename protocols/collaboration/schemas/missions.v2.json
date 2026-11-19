@@ -1,0 +1,259 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://putnami.dev/schemas/putnami-collaboration-missions.v2.json",
+  "title": "Putnami missions contract, version 2",
+  "description": "Request (<operation>Input) and result (<operation>Result) documents of every missions v2 operation. Version 2 includes version 1: sync, ask, reply and status keep the version 1 documents, which this file references. Required: sync, ask, reply, start, report, runs. Optional: status. A run is one execution of agent work inside a mission: its kind, its typed input, its typed result. input and result carry exactly one member, named by the run's kind. Run ids are bare tokens, like message ids. Lengths count characters.",
+  "$defs": {
+    "syncInput": { "$ref": "missions.v1.json#/$defs/syncInput" },
+    "syncResult": { "$ref": "missions.v1.json#/$defs/syncResult" },
+    "askInput": { "$ref": "missions.v1.json#/$defs/askInput" },
+    "askResult": { "$ref": "missions.v1.json#/$defs/askResult" },
+    "replyInput": { "$ref": "missions.v1.json#/$defs/replyInput" },
+    "replyResult": { "$ref": "missions.v1.json#/$defs/replyResult" },
+    "statusInput": { "$ref": "missions.v1.json#/$defs/statusInput" },
+    "statusResult": { "$ref": "missions.v1.json#/$defs/statusResult" },
+    "runKind": {
+      "type": "string",
+      "enum": ["audit", "build", "rebase", "review", "triage"],
+      "description": "The kind of agent work a run executes. Each kind has its own closed input and result."
+    },
+    "runState": {
+      "type": "string",
+      "enum": ["canceled", "failed", "running", "succeeded"],
+      "description": "A run starts running and ends once: succeeded with its result, failed with its failure, or canceled. An ended run never changes again."
+    },
+    "findingSeverity": {
+      "type": "string",
+      "enum": ["high", "info", "low", "medium"]
+    },
+    "auditVerdict": {
+      "type": "string",
+      "enum": ["concerns", "fail", "pass"],
+      "description": "pass: the scope meets what the audit checks. concerns: it passes with findings to address. fail: it does not."
+    },
+    "finding": {
+      "type": "object",
+      "description": "One problem a review or an audit reports.",
+      "additionalProperties": false,
+      "required": ["severity", "title"],
+      "properties": {
+        "severity": { "$ref": "#/$defs/findingSeverity" },
+        "title": { "type": "string", "minLength": 1, "maxLength": 256, "description": "The finding, on one line." },
+        "file": { "type": "string", "minLength": 1, "maxLength": 4096, "description": "The repository-relative path the finding points at." },
+        "line": { "type": "integer", "minimum": 1, "maximum": 10000000, "description": "The 1-based line of file. Needs file." },
+        "body": { "type": "string", "maxLength": 8192, "description": "What the problem is and what to do about it." }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/finding" },
+      "description": "The problems found, the most severe first. None is []. Their titles and bodies total at most 65536 bytes."
+    },
+    "buildInput": {
+      "type": "object",
+      "description": "What a build delivers: a task, an intention, or both.",
+      "additionalProperties": false,
+      "anyOf": [{ "required": ["task"] }, { "required": ["intention"] }],
+      "properties": {
+        "task": { "$ref": "collaboration.json#/$defs/ref" },
+        "intention": { "type": "string", "maxLength": 8192, "description": "The outcome in words, when no task names it." },
+        "change": { "$ref": "proposals.v1.json#/$defs/change", "description": "The branch the build works on, when known at start." }
+      }
+    },
+    "buildResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stage"],
+      "properties": {
+        "stage": { "$ref": "missions.v1.json#/$defs/loopStage", "description": "The stage of the contribution loop the change reached." },
+        "proposal": { "$ref": "collaboration.json#/$defs/ref", "description": "The change proposal the build published." },
+        "commit": { "$ref": "collaboration.json#/$defs/commit", "description": "The head commit the build left." }
+      }
+    },
+    "reviewInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["change", "commit"],
+      "properties": {
+        "change": { "$ref": "proposals.v1.json#/$defs/change" },
+        "commit": { "$ref": "collaboration.json#/$defs/commit", "description": "The head commit reviewed." },
+        "proposal": { "$ref": "collaboration.json#/$defs/ref" }
+      }
+    },
+    "reviewResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "verdict", "findings"],
+      "properties": {
+        "commit": { "$ref": "collaboration.json#/$defs/commit", "description": "The head commit the review read." },
+        "verdict": { "$ref": "proposals.v1.json#/$defs/reviewVerdict" },
+        "findings": { "$ref": "#/$defs/findings" }
+      }
+    },
+    "rebaseInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["change"],
+      "properties": {
+        "change": { "$ref": "proposals.v1.json#/$defs/change" },
+        "commit": { "$ref": "collaboration.json#/$defs/commit", "description": "The head commit before the rebase." }
+      }
+    },
+    "rebaseResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "onto"],
+      "properties": {
+        "commit": { "$ref": "collaboration.json#/$defs/commit", "description": "The head commit after the rebase." },
+        "onto": { "$ref": "collaboration.json#/$defs/commit", "description": "The base commit the change now starts from." }
+      }
+    },
+    "auditInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "revision"],
+      "properties": {
+        "scope": { "type": "string", "minLength": 1, "maxLength": 256, "description": "What is audited, on one line, such as a project or a path." },
+        "revision": { "$ref": "collaboration.json#/$defs/commit", "description": "The commit audited." }
+      }
+    },
+    "auditResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scope", "revision", "verdict", "findings"],
+      "properties": {
+        "scope": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "revision": { "$ref": "collaboration.json#/$defs/commit" },
+        "verdict": { "$ref": "#/$defs/auditVerdict" },
+        "findings": { "$ref": "#/$defs/findings" }
+      }
+    },
+    "triageInput": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task"],
+      "properties": {
+        "task": { "$ref": "collaboration.json#/$defs/ref" }
+      }
+    },
+    "triageResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["summary"],
+      "properties": {
+        "summary": { "type": "string", "minLength": 1, "maxLength": 8192, "description": "The decision and its reason." },
+        "state": { "$ref": "tasks.v1.json#/$defs/taskState", "description": "The state the task should take." },
+        "labels": { "$ref": "collaboration.json#/$defs/labels", "description": "The labels the task should carry." },
+        "duplicateOf": { "$ref": "collaboration.json#/$defs/ref", "description": "The task this one duplicates." }
+      }
+    },
+    "runInput": {
+      "type": "object",
+      "description": "A run's input: exactly one member, named by the run's kind.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "audit": { "$ref": "#/$defs/auditInput" },
+        "build": { "$ref": "#/$defs/buildInput" },
+        "rebase": { "$ref": "#/$defs/rebaseInput" },
+        "review": { "$ref": "#/$defs/reviewInput" },
+        "triage": { "$ref": "#/$defs/triageInput" }
+      }
+    },
+    "runResult": {
+      "type": "object",
+      "description": "A succeeded run's result: exactly one member, named by the run's kind.",
+      "additionalProperties": false,
+      "minProperties": 1,
+      "maxProperties": 1,
+      "properties": {
+        "audit": { "$ref": "#/$defs/auditResult" },
+        "build": { "$ref": "#/$defs/buildResult" },
+        "rebase": { "$ref": "#/$defs/rebaseResult" },
+        "review": { "$ref": "#/$defs/reviewResult" },
+        "triage": { "$ref": "#/$defs/triageResult" }
+      }
+    },
+    "run": {
+      "type": "object",
+      "description": "One execution of agent work inside a mission.",
+      "additionalProperties": false,
+      "required": ["id", "mission", "kind", "state", "input", "startedAt"],
+      "properties": {
+        "id": { "$ref": "missions.v1.json#/$defs/id", "description": "The run's id, as the provider issued it." },
+        "mission": { "$ref": "missions.v1.json#/$defs/missionName" },
+        "kind": { "$ref": "#/$defs/runKind" },
+        "state": { "$ref": "#/$defs/runState" },
+        "input": { "$ref": "#/$defs/runInput" },
+        "result": { "$ref": "#/$defs/runResult", "description": "Only, and always, when state is succeeded." },
+        "failure": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "Why the run stopped, on one line. Only, and always, when state is failed." },
+        "session": { "$ref": "missions.v1.json#/$defs/session", "description": "The agent session that ran it, when the caller named one." },
+        "startedAt": { "$ref": "missions.v1.json#/$defs/utcTimestamp", "description": "When the provider started the run." },
+        "endedAt": { "$ref": "missions.v1.json#/$defs/utcTimestamp", "description": "When the provider ended the run. Every state but running carries it." }
+      }
+    },
+    "runResultDocument": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["run", "replayed"],
+      "properties": {
+        "run": { "$ref": "#/$defs/run" },
+        "replayed": { "type": "boolean", "description": "True when the call repeated one already applied, so nothing changed." }
+      }
+    },
+    "startInput": {
+      "type": "object",
+      "description": "Starts a run of one kind inside a mission. Its content is the mission's repository and key, the kind, the input and the session; the mission's title is not part of it. The same idempotencyKey with the same content returns the run already started; with other content it is a conflict (idempotency.mismatch).",
+      "additionalProperties": false,
+      "required": ["mission", "kind", "input", "idempotencyKey"],
+      "properties": {
+        "mission": { "$ref": "missions.v1.json#/$defs/missionName" },
+        "kind": { "$ref": "#/$defs/runKind" },
+        "input": { "$ref": "#/$defs/runInput", "description": "The kind's input, under the member the kind names." },
+        "session": { "$ref": "missions.v1.json#/$defs/session", "description": "The agent session that runs it." },
+        "idempotencyKey": { "$ref": "collaboration.json#/$defs/idempotencyKey" }
+      }
+    },
+    "startResult": { "$ref": "#/$defs/runResultDocument" },
+    "reportInput": {
+      "type": "object",
+      "description": "Ends a running run once. The same report again replays; another report on an ended run is a conflict (run.closed); an unknown run is not_found (run.not_found); a result of another kind than the run's is invalid (run.kind_mismatch).",
+      "additionalProperties": false,
+      "required": ["run", "state"],
+      "properties": {
+        "run": { "$ref": "missions.v1.json#/$defs/id", "description": "The id of the run that ends." },
+        "state": { "type": "string", "enum": ["canceled", "failed", "succeeded"] },
+        "result": { "$ref": "#/$defs/runResult", "description": "Only, and always, when state is succeeded." },
+        "failure": { "type": "string", "minLength": 1, "maxLength": 1024, "description": "Only, and always, when state is failed." }
+      }
+    },
+    "reportResult": { "$ref": "#/$defs/runResultDocument" },
+    "runsInput": {
+      "type": "object",
+      "description": "Reads a page of a mission's runs.",
+      "additionalProperties": false,
+      "required": ["mission"],
+      "properties": {
+        "mission": { "$ref": "missions.v1.json#/$defs/missionName" },
+        "kind": { "$ref": "#/$defs/runKind", "description": "Keeps only the runs of this kind." },
+        "page": { "$ref": "collaboration.json#/$defs/pageRequest" }
+      }
+    },
+    "runsResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items", "page"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "maxItems": 100,
+          "items": { "$ref": "#/$defs/run" },
+          "description": "A page of the mission's runs, the latest start first, and of runs started at the same instant the one started last first, each once."
+        },
+        "page": { "$ref": "collaboration.json#/$defs/page" }
+      }
+    }
+  }
+}

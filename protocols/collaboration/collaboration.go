@@ -21,6 +21,7 @@ package collaboration
 import (
 	"slices"
 	"sort"
+	"strings"
 )
 
 // Contract names. Each names a contract that is bound, versioned and
@@ -38,7 +39,8 @@ const (
 	ContractMemory = "memory"
 	// ContractMissions publishes an agent session's state to its mission,
 	// reads the messages waiting for it, asks the mission's owner a decision,
-	// replies to a message and reads a mission's sessions.
+	// replies to a message and reads a mission's sessions. Version 2 also
+	// starts, reports and reads a mission's runs.
 	ContractMissions = "missions"
 )
 
@@ -189,6 +191,11 @@ type ContractSpec struct {
 	// meaning once published: additions that an older reader could misread
 	// need a new version.
 	Version int
+	// Includes is the earlier version of the contract this one repeats: every
+	// operation of that version belongs to this one, with the same request
+	// and result documents. A provider that declares this version is also
+	// offered the included one (ADR 0010). Zero includes none.
+	Includes int
 	// Operations lists the contract's operations in canonical (sorted) order.
 	// OperationCapabilities is not listed: the orchestrator answers it.
 	Operations []OperationSpec
@@ -285,42 +292,15 @@ var catalog = []ContractSpec{
 		},
 	},
 	{
-		Name:    ContractMissions,
-		Version: 1,
-		Operations: []OperationSpec{
-			{
-				Name: OperationAsk, Access: AccessMutating, Required: true,
-				Summary: "Ask the mission's owner one decision, with 2 to 5 options. Take the mission's repository and key " +
-					"from the session sheet that the session hook prints. A retry with the same idempotencyKey returns the " +
-					"decision already recorded instead of asking twice; the same key with other content is a conflict. The " +
-					"answer reaches you at the end of a turn or while the session waits. Do not poll for it.",
-				newInput: alloc[MissionsAskInput](), newResult: alloc[MissionsAskResult](),
-			},
-			{
-				Name: OperationReply, Access: AccessMutating, Required: true,
-				Summary: "Reply to one message of the mission's inbox. message is the id shown with the owner's message " +
-					"in the session sheet that the session hook prints. A message takes one reply: the same reply again " +
-					"changes nothing, and another reply is a conflict.",
-				newInput: alloc[MissionsReplyInput](), newResult: alloc[MissionsReplyResult](),
-			},
-			{
-				Name: OperationStatus, Access: AccessRead,
-				Members: MissionMembers,
-				Summary: "Read a mission's view and its sessions: each session's state, loop stage, token usage and " +
-					"branch, as its last sync reported them, newest first. Take the mission's repository and key from " +
-					"the session sheet, or name another mission to follow its sessions. Optional capability.",
-				newInput: alloc[MissionsStatusInput](), newResult: alloc[MissionsStatusResult](),
-			},
-			{
-				Name: OperationSync, Access: AccessMutating, Required: true, Destructive: true, HostOnly: true,
-				Members: MissionMembers,
-				Summary: "Publish an agent session's state and plan to its mission, acknowledge the messages delivered, " +
-					"bind the decisions the session asked and record its replies, then read the mission and the messages " +
-					"no session received yet. A sync older than the last one applied for the session changes nothing, " +
-					"so a repeat is safe. The host integration calls it, not the agent.",
-				newInput: alloc[MissionsSyncInput](), newResult: alloc[MissionsSyncResult](),
-			},
-		},
+		Name:       ContractMissions,
+		Version:    1,
+		Operations: missionsV1Operations,
+	},
+	{
+		Name:       ContractMissions,
+		Version:    2,
+		Includes:   1,
+		Operations: withOperations(missionsV1Operations, missionsRunOperations...),
 	},
 	{
 		Name:    ContractProposals,
@@ -436,4 +416,74 @@ var catalog = []ContractSpec{
 			},
 		},
 	},
+}
+
+// missionsV1Operations are the operations of missions version 1. Version 2
+// repeats them, with the same documents (ADR 0010).
+var missionsV1Operations = []OperationSpec{
+	{
+		Name: OperationAsk, Access: AccessMutating, Required: true,
+		Summary: "Ask the mission's owner one decision, with 2 to 5 options. Take the mission's repository and key " +
+			"from the session sheet that the session hook prints. A retry with the same idempotencyKey returns the " +
+			"decision already recorded instead of asking twice; the same key with other content is a conflict. The " +
+			"answer reaches you at the end of a turn or while the session waits. Do not poll for it.",
+		newInput: alloc[MissionsAskInput](), newResult: alloc[MissionsAskResult](),
+	},
+	{
+		Name: OperationReply, Access: AccessMutating, Required: true,
+		Summary: "Reply to one message of the mission's inbox. message is the id shown with the owner's message " +
+			"in the session sheet that the session hook prints. A message takes one reply: the same reply again " +
+			"changes nothing, and another reply is a conflict.",
+		newInput: alloc[MissionsReplyInput](), newResult: alloc[MissionsReplyResult](),
+	},
+	{
+		Name: OperationStatus, Access: AccessRead,
+		Members: MissionMembers,
+		Summary: "Read a mission's view and its sessions: each session's state, loop stage, token usage and " +
+			"branch, as its last sync reported them, newest first. Take the mission's repository and key from " +
+			"the session sheet, or name another mission to follow its sessions. Optional capability.",
+		newInput: alloc[MissionsStatusInput](), newResult: alloc[MissionsStatusResult](),
+	},
+	{
+		Name: OperationSync, Access: AccessMutating, Required: true, Destructive: true, HostOnly: true,
+		Members: MissionMembers,
+		Summary: "Publish an agent session's state and plan to its mission, acknowledge the messages delivered, " +
+			"bind the decisions the session asked and record its replies, then read the mission and the messages " +
+			"no session received yet. A sync older than the last one applied for the session changes nothing, " +
+			"so a repeat is safe. The host integration calls it, not the agent.",
+		newInput: alloc[MissionsSyncInput](), newResult: alloc[MissionsSyncResult](),
+	},
+}
+
+// missionsRunOperations are the run operations missions version 2 adds to
+// version 1 (ADR 0010).
+var missionsRunOperations = []OperationSpec{
+	{
+		Name: OperationReport, Access: AccessMutating, Required: true, Destructive: true,
+		Summary: "End a running run once: succeeded with its result, keyed by the run's kind, failed with its failure, " +
+			"or canceled. The same report again replays; another report on an ended run is a conflict (run.closed), " +
+			"and a result of another kind is invalid (run.kind_mismatch).",
+		newInput: alloc[MissionsReportInput](), newResult: alloc[MissionsRunResult](),
+	},
+	{
+		Name: OperationRuns, Access: AccessRead, Required: true,
+		Summary: "Read a page of a mission's runs, optionally of one kind, the latest start first: each run's kind, " +
+			"state, input, result or failure, session and times. Results are bounded pages.",
+		newInput: alloc[MissionsRunsInput](), newResult: alloc[MissionsRunsResult](),
+	},
+	{
+		Name: OperationStart, Access: AccessMutating, Required: true,
+		Summary: "Start a run of one kind inside a mission, with the kind's input: build, review, rebase, audit or " +
+			"triage. A retry with the same idempotencyKey returns the run already started instead of starting a " +
+			"second one; the same key with other content is a conflict.",
+		newInput: alloc[MissionsStartInput](), newResult: alloc[MissionsRunResult](),
+	},
+}
+
+// withOperations returns base and more, in canonical (sorted) order, without
+// changing base.
+func withOperations(base []OperationSpec, more ...OperationSpec) []OperationSpec {
+	out := append(slices.Clone(base), more...)
+	slices.SortFunc(out, func(a, b OperationSpec) int { return strings.Compare(a.Name, b.Name) })
+	return out
 }
