@@ -18,12 +18,18 @@ import (
 )
 
 // publishedAgentTrees are the paths under the host trees that a published
-// extension's agent content owns: the audit skill and its prune-* workers come
-// from @putnami/intelligence, which no local source builds (.agents/constraints.md,
-// "Agent Workflows").
+// extension's agent content owns: the audit, putnami-routine, routine-build and
+// rebase skills and the prune-* workers come from @putnami/intelligence, which
+// no local source builds (.agents/constraints.md, "Agent Workflows").
 var publishedAgentTrees = []string{
 	".agents/skills/audit/",
 	".claude/skills/audit/",
+	".agents/skills/putnami-routine/",
+	".claude/skills/putnami-routine/",
+	".agents/skills/routine-build/",
+	".claude/skills/routine-build/",
+	".agents/skills/rebase/",
+	".claude/skills/rebase/",
 	".claude/agents/prune-",
 	".codex/agents/prune-",
 }
