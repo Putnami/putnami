@@ -10,6 +10,7 @@ import { proto } from '../../src/proto';
 import { TelemetryCollector } from '../../src/telemetry/telemetry.collector';
 import { TelemetryMiddleware } from '../../src/telemetry/telemetry.middleware';
 import { trace } from '../../src/http/trace.plugin';
+import { requestCount } from '../telemetry/http-server-series';
 
 describe('gRPC observability', () => {
   let app: Application;
@@ -138,11 +139,9 @@ describe('gRPC observability', () => {
       expect(res.status).toBe(200);
 
       const buckets = collector.drainAll();
-      const allCounters = Object.assign({}, ...buckets.map((b) => b.counters));
 
       // The gRPC POST route is tracked under the gRPC path pattern
-      const grpcRouteKey = 'http.POST./test.v1.ItemsService/ListItems.200';
-      expect(allCounters[grpcRouteKey]).toBe(1);
+      expect(requestCount(buckets, { method: 'POST', route: '/test.v1.ItemsService/ListItems', status: 200 })).toBe(1);
     },
   );
 });

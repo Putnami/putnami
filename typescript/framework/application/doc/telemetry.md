@@ -47,7 +47,7 @@ Before each push, the plugin asks the telemetry token source registered with `re
 
 ## How It Works
 
-1. **Collect** — Every HTTP request records per-route counters, duration histograms and a span via a middleware that runs in front of every other one on each HTTP server the application composes, so a refused request is counted too. Telemetry starts no server of its own. Custom metrics are recorded with `incCounter()`, `setGauge()`, and `observeHistogram()`.
+1. **Collect** — Every HTTP request is counted in `http.server.request_count` and timed in `http.server.duration`, labeled by method, route pattern and status code, and records a span, via a middleware that runs in front of every other one on each HTTP server the application composes, so a refused request is counted too. Telemetry starts no server of its own. Custom metrics are recorded with `incCounter()`, `setGauge()`, and `observeHistogram()`.
 2. **Aggregate** — Metrics are bucketed by Unix second in memory. This keeps the memory footprint small and gives the backend per-second resolution.
 3. **Flush** — A periodic timer drains completed buckets, renders them as an OTLP/JSON metrics request, and POSTs it to `<endpoint>/v1/metrics`, with completed spans to `<endpoint>/v1/traces`. On shutdown, remaining buckets are flushed immediately. Collector errors are dropped — telemetry never affects application behaviour.
 
@@ -89,14 +89,7 @@ telemetry:
 
 The plugin registers a middleware that records the following for every request:
 
-| Metric | Type | Name Pattern | Example |
-|---|---|---|---|
-| Request count | Counter | `http.{METHOD}.{route}.{status}` | `http.GET./api/users.200` |
-| Response duration | Histogram | `http.{METHOD}.{route}.duration` | `http.GET./api/users.duration` |
-| Client errors | Counter | `http.error.4xx` | — |
-| Server errors | Counter | `http.error.5xx` | — |
-
-Routes use the **pattern** (`/users/[id]`), not the resolved path (`/users/123`). This keeps cardinality bounded.
+`http.server.request_count` and `http.server.duration`, labeled by method, route pattern and status code, the same as the Go runtime. [Add observability](/docs/how-to/add-observability#http-server-metrics) lists them, with their unit and histogram buckets.
 
 ## Custom Metrics
 
@@ -126,7 +119,7 @@ setGauge('app.connections.active', pool.active);
 
 ### Histogram
 
-A distribution of observed values (tracks count, sum, min, max per second).
+A distribution of observed values: count, sum, min, max and a count per bucket, bounded at 0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500 and 10000, per second.
 
 ```typescript
 import { observeHistogram } from '@putnami/application';
@@ -138,7 +131,7 @@ observeHistogram('app.order.processing.duration', Date.now() - start);
 
 ## Wire Format
 
-Each flush POSTs an OTLP/JSON `ExportMetricsServiceRequest` to `<endpoint>/v1/metrics`. Counters become monotonic delta `Sum`s, gauges become `Gauge`s, and histograms become `Histogram`s (count/sum/min/max). The resource carries `service.name`, optional `service.version`, `putnami.framework: typescript`, and the `service.instance.id` of the process.
+Each flush POSTs an OTLP/JSON `ExportMetricsServiceRequest` to `<endpoint>/v1/metrics`. Counters become monotonic delta `Sum`s, gauges become `Gauge`s, and histograms become `Histogram`s with count, sum, min, max, their explicit bucket bounds and a count per bucket. A metric with a unit, such as `http.server.duration` in `ms`, carries it. The resource carries `service.name`, optional `service.version`, `putnami.framework: typescript`, and the `service.instance.id` of the process.
 
 ```json
 {
@@ -156,9 +149,21 @@ Each flush POSTs an OTLP/JSON `ExportMetricsServiceRequest` to `<endpoint>/v1/me
           "scope": { "name": "putnami" },
           "metrics": [
             {
-              "name": "http.GET./api/users.200",
+              "name": "http.server.request_count",
+              "description": "Total HTTP requests",
               "sum": {
-                "dataPoints": [{ "startTimeUnixNano": "1738800000000000000", "timeUnixNano": "1738800001000000000", "asInt": "42" }],
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      { "key": "http.method", "value": { "stringValue": "GET" } },
+                      { "key": "http.route", "value": { "stringValue": "/api/users" } },
+                      { "key": "http.status_code", "value": { "intValue": "200" } }
+                    ],
+                    "startTimeUnixNano": "1738800000000000000",
+                    "timeUnixNano": "1738800001000000000",
+                    "asInt": "42"
+                  }
+                ],
                 "aggregationTemporality": 1,
                 "isMonotonic": true
               }
@@ -208,7 +213,7 @@ The flush timer is `unref()`'d so it does not keep the process alive. Telemetry 
 
 1. **Use dot-delimited metric names** — e.g. `app.module.metric` for consistent namespacing.
 2. **Keep counter cardinality bounded** — Avoid dynamic segments in metric names. Use route patterns, not resolved paths.
-3. **Use histograms for durations** — They give you count, sum, min, and max in a single metric.
+3. **Use histograms for durations, in milliseconds** — They give you count, sum, min, max and percentiles in a single metric.
 4. **Set the `app` option** — Makes it easy to filter metrics per service in the backend.
 5. **Prefer a token source to a static bearer** — It renews expiring tokens; never hardcode tokens in source code.
 

@@ -87,5 +87,6 @@ The collector buckets metrics per Unix second, so a test that reads only `drainA
 import { drainMetrics } from '@putnami/application/testing';
 
 const bucket = drainMetrics(collector);
-expect(bucket.counters['http.GET./api.200']).toBe(1);
+expect(bucket.counters['orders.placed']).toBe(1);
+expect(bucket.counterSeries?.find((series) => series.name === 'http.server.request_count')?.value).toBe(1);
 ```

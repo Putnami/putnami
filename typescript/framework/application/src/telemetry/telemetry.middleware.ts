@@ -1,23 +1,38 @@
 /**
  * Telemetry Middleware — Automatic HTTP Metrics Collection
  *
- * Collects per-route metrics for every request:
- *   - Counter: `http.{METHOD}.{route}.{status}`  — request count
- *   - Counter: `http.error.{statusClass}`         — 4xx / 5xx totals
- *   - Histogram: `http.{METHOD}.{route}.duration` — response time (ms)
+ * Records every request under the telemetry protocol's HTTP server metrics,
+ * the same the Go runtime records:
+ *   - Counter: `http.server.request_count`
+ *   - Histogram: `http.server.duration`, in ms
+ * both labeled `http.method`, `http.route` (the route pattern) and
+ * `http.status_code`.
  */
 
 import { HttpException } from '@putnami/runtime';
 import type { HttpMiddleware } from '../http/http-middleware.type';
 import { attachTelemetryContext, startTelemetrySpan } from './client-telemetry';
+import {
+  ATTR_HTTP_METHOD,
+  ATTR_HTTP_ROUTE,
+  ATTR_HTTP_STATUS_CODE,
+  HTTP_SERVER_DURATION,
+  HTTP_SERVER_METRIC_DESCRIPTIONS,
+  HTTP_SERVER_REQUEST_COUNT,
+  httpMethodLabel,
+  httpRouteLabel,
+} from './http-server-metrics';
 import type { TelemetryCollector } from './telemetry.collector';
 
-/** Creates an HTTP middleware that records per-route request count, duration, and error metrics. */
+/** Creates an HTTP middleware that counts and times every request, labeled by method, route pattern and status. */
 export const TelemetryMiddleware = (collector: TelemetryCollector): HttpMiddleware => {
+  for (const [name, description] of Object.entries(HTTP_SERVER_METRIC_DESCRIPTIONS)) {
+    collector.describeMetric(name, description);
+  }
   return async (ctx, next) => {
-    const start = Date.now();
-    const method = ctx.method;
-    const route = normalizedRoute(ctx.route);
+    const start = performance.now();
+    const method = httpMethodLabel(ctx.method);
+    const route = httpRouteLabel(ctx.route);
     const span = startTelemetrySpan({
       name: `${method} ${route}`,
       kind: 'server',
@@ -32,7 +47,8 @@ export const TelemetryMiddleware = (collector: TelemetryCollector): HttpMiddlewa
     let status = 200;
     try {
       const res = await next();
-      status = res?.status ?? 404;
+      // A response without a status is served as 200; no response at all as 404.
+      status = res ? res.status || 200 : 404;
       return res;
     } catch (error) {
       if (error instanceof HttpException) {
@@ -42,31 +58,22 @@ export const TelemetryMiddleware = (collector: TelemetryCollector): HttpMiddlewa
       }
       throw error;
     } finally {
-      const duration = Date.now() - start;
+      // Fractional milliseconds, so a sub-millisecond request is not recorded as 0.
+      const duration = performance.now() - start;
       span.finish({
         attributes: { 'http.response.status_code': status },
         ...(status >= 400 ? { code: `http.${status}` } : {}),
       });
 
-      // Counter: per-route request count
-      collector.incCounter(`http.${method}.${route}.${status}`);
-
-      // Histogram: per-route duration
-      collector.observeHistogram(`http.${method}.${route}.duration`, duration);
-
-      // Counter: error class (4xx / 5xx)
-      if (status >= 400 && status < 500) {
-        collector.incCounter('http.error.4xx');
-      } else if (status >= 500) {
-        collector.incCounter('http.error.5xx');
-      }
+      // Read the route again: a HEAD request is matched to its GET route
+      // inside the chain, after the span started.
+      const attributes = {
+        [ATTR_HTTP_METHOD]: method,
+        [ATTR_HTTP_ROUTE]: httpRouteLabel(ctx.route),
+        [ATTR_HTTP_STATUS_CODE]: status,
+      };
+      collector.incCounterWithAttributes(HTTP_SERVER_REQUEST_COUNT, 1, attributes);
+      collector.observeHistogramWithAttributes(HTTP_SERVER_DURATION, duration, attributes);
     }
   };
 };
-
-function normalizedRoute(input: string | undefined): string {
-  // Never use the raw URL: route patterns are provider-owned and bounded,
-  // while unmatched paths are attacker-controlled cardinality.
-  const route = input || '__unmatched__';
-  return route.startsWith('/') ? route : `/${route}`;
-}

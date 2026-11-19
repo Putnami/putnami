@@ -20,7 +20,7 @@ import { type InferConfig, useConfig, useLogger } from '@putnami/runtime';
 import type { Module, Plugin } from '../application';
 import type { HttpMiddleware } from '../http/http-middleware.type';
 import { HttpPlugin } from '../http/http.plugin';
-import type { MetricsBucket, TelemetrySpanRecord } from './telemetry.collector';
+import type { MetricDescription, MetricsBucket, TelemetrySpanRecord } from './telemetry.collector';
 import { TelemetryCollector } from './telemetry.collector';
 import { TelemetryConfig, type TelemetryOptions } from './telemetry.config';
 import { CollectorAccess } from './telemetry.credential';
@@ -126,7 +126,8 @@ export class TelemetryPlugin implements Plugin {
 
     // Drain everything (including the current second) on shutdown
     if (this.collector) {
-      await this.push(this.collector.drainAll(), this.collector.drainSpans()).catch((error) => {
+      const collector = this.collector;
+      await this.push(collector.drainAll(), collector.drainSpans(), collector.metricDescriptions()).catch((error) => {
         useLogger('telemetry').warn('Shutdown flush failed', { endpoint: this.target?.access.endpoint, error });
       });
     }
@@ -179,10 +180,15 @@ export class TelemetryPlugin implements Plugin {
 
   private async flush(): Promise<void> {
     if (!this.collector) return;
-    await this.push(this.collector.drain(), this.collector.drainSpans());
+    // Everything the push renders is read now, before it awaits a credential.
+    await this.push(this.collector.drain(), this.collector.drainSpans(), this.collector.metricDescriptions());
   }
 
-  private async push(buckets: MetricsBucket[], spans: readonly TelemetrySpanRecord[]): Promise<void> {
+  private async push(
+    buckets: MetricsBucket[],
+    spans: readonly TelemetrySpanRecord[],
+    descriptions: Readonly<Record<string, MetricDescription>>,
+  ): Promise<void> {
     const target = this.target;
     if (!target || (buckets.length === 0 && spans.length === 0)) return;
 
@@ -191,7 +197,7 @@ export class TelemetryPlugin implements Plugin {
 
     const endpoint = target.access.endpoint;
     const opts = { app: target.app, bearer: credential.bearer, resourceAttributes: target.resourceAttributes };
-    if (buckets.length > 0) target.access.observe(await sendMetrics(endpoint, buckets, opts));
+    if (buckets.length > 0) target.access.observe(await sendMetrics(endpoint, buckets, { ...opts, descriptions }));
     if (spans.length > 0) target.access.observe(await sendTraces(endpoint, spans, opts));
   }
 }

@@ -56,14 +56,7 @@ A static `bearer` option wins over the source. When the source fails, the batch 
 
 The plugin registers a middleware in front of every other one on each HTTP server the application composes, so a request that an inner middleware refuses (for example the origin guard) is still counted and traced:
 
-| Metric | Type | Name pattern | Example |
-|---|---|---|---|
-| Request count | Counter | `http.{METHOD}.{route}.{status}` | `http.GET./api/users.200` |
-| Response time | Histogram | `http.{METHOD}.{route}.duration` | `http.GET./api/users.duration` |
-| Client errors | Counter | `http.error.4xx` | — |
-| Server errors | Counter | `http.error.5xx` | — |
-
-Routes use the pattern (`/users/[id]`), not the resolved path (`/users/123`), to keep metric cardinality bounded.
+`http.server.request_count` and `http.server.duration`, labeled by method, route pattern and status code, the same as the Go runtime. [Add observability](/docs/how-to/add-observability#http-server-metrics) lists them, with their unit and histogram buckets.
 
 ### SQL metrics (via `@putnami/database`)
 
@@ -97,7 +90,7 @@ incCounter('app.emails.sent', 3);
 // Gauge — point-in-time value
 setGauge('app.queue.size', pendingJobs.length);
 
-// Histogram — distribution (count, sum, min, max per second)
+// Histogram — distribution (count, sum, min, max and bucket counts per second)
 const start = Date.now();
 await processOrder(order);
 observeHistogram('app.order.processing.duration', Date.now() - start);

@@ -239,6 +239,8 @@ The `HTTPMiddleware` function returns a middleware for `go.putnami.dev/http` tha
 - `http.server.request_count` -- total requests, labeled by method, route, and status code
 - `http.server.duration` -- request duration in milliseconds as a histogram
 
+The TypeScript runtime records the same two metrics. [Add observability](/docs/how-to/add-observability#http-server-metrics) lists them, with their labels and histogram buckets.
+
 ```go
 import (
     "go.putnami.dev/telemetry"

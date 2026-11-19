@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, mock } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
-import type { MetricsBucket } from '../../src/telemetry/telemetry.collector';
+import { marshalCanonical, metricsRequestFromBuckets, type RenderBucket } from '../../src/telemetry/otlp';
+import { HISTOGRAM_BOUNDS, type MetricsBucket } from '../../src/telemetry/telemetry.collector';
 import {
   buildMetricsBody,
   buildTracesBody,
@@ -22,6 +23,8 @@ interface OtlpKV {
 }
 interface OtlpMetric {
   name: string;
+  unit?: string;
+  description?: string;
   sum?: {
     dataPoints: Array<{ asInt?: string; asDouble?: number }>;
     isMonotonic?: boolean;
@@ -29,7 +32,14 @@ interface OtlpMetric {
   };
   gauge?: { dataPoints: Array<{ asDouble?: number }> };
   histogram?: {
-    dataPoints: Array<{ count: string; sum?: number; min?: number; max?: number; bucketCounts?: string[] }>;
+    dataPoints: Array<{
+      count: string;
+      sum?: number;
+      min?: number;
+      max?: number;
+      bucketCounts?: string[];
+      explicitBounds?: number[];
+    }>;
   };
 }
 interface OtlpMetricsRequest {
@@ -37,6 +47,10 @@ interface OtlpMetricsRequest {
     resource: { attributes?: OtlpKV[] };
     scopeMetrics: Array<{ scope: { name?: string }; metrics: OtlpMetric[] }>;
   }>;
+}
+
+function metricsBodyFromRender(buckets: RenderBucket[]): string {
+  return marshalCanonical(metricsRequestFromBuckets(buckets, { serviceName: 'svc' }));
 }
 
 function parse(body: string): OtlpMetricsRequest {
@@ -50,10 +64,16 @@ function attrValue(attrs: OtlpKV[] | undefined, key: string): string | undefined
 const sampleBuckets: MetricsBucket[] = [
   {
     ts: 1_700_000_000,
-    counters: { 'http.GET./api.200': 5 },
-    gauges: { 'http.active': 2 },
+    counters: { 'orders.placed': 5 },
+    gauges: { 'queue.depth': 2 },
     histograms: {
-      'http.GET./api.duration': { count: 5, sum: 250, min: 10, max: 120 },
+      'checkout.duration': {
+        count: 5,
+        sum: 250,
+        min: 10,
+        max: 120,
+        bucketCounts: [0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+      },
     },
   },
 ];
@@ -76,9 +96,9 @@ describe('buildMetricsBody', () => {
       const sm = rm.scopeMetrics[0];
       expect(sm.scope.name).toBe('putnami');
       const names = sm.metrics.map((m) => m.name);
-      expect(names).toContain('http.GET./api.200');
-      expect(names).toContain('http.active');
-      expect(names).toContain('http.GET./api.duration');
+      expect(names).toContain('orders.placed');
+      expect(names).toContain('queue.depth');
+      expect(names).toContain('checkout.duration');
     },
   );
 
@@ -91,7 +111,7 @@ describe('buildMetricsBody', () => {
     },
     () => {
       const req = parse(buildMetricsBody(sampleBuckets, { app: 'svc' }));
-      const counter = req.resourceMetrics[0].scopeMetrics[0].metrics.find((m) => m.name === 'http.GET./api.200');
+      const counter = req.resourceMetrics[0].scopeMetrics[0].metrics.find((m) => m.name === 'orders.placed');
       expect(counter?.sum?.isMonotonic).toBe(true);
       expect(counter?.sum?.aggregationTemporality).toBe(1); // delta
       expect(counter?.sum?.dataPoints[0].asInt).toBe('5');
@@ -107,27 +127,88 @@ describe('buildMetricsBody', () => {
     },
     () => {
       const req = parse(buildMetricsBody(sampleBuckets, { app: 'svc' }));
-      const g = req.resourceMetrics[0].scopeMetrics[0].metrics.find((m) => m.name === 'http.active');
+      const g = req.resourceMetrics[0].scopeMetrics[0].metrics.find((m) => m.name === 'queue.depth');
       expect(g?.gauge?.dataPoints[0].asDouble).toBe(2);
     },
   );
 
   specTest(
-    'encodes a histogram with count/sum/min/max',
+    'encodes a histogram with count/sum/min/max, its explicit bounds and its bucket counts',
     {
       feature: 'typescript/service-telemetry',
       requirement: 'otlp-metrics-rendering',
-      check: 'buckets-render-as-otlp-metrics',
+      check: 'a-histogram-renders-its-bounds-and-bucket-counts',
     },
     () => {
       const req = parse(buildMetricsBody(sampleBuckets, { app: 'svc' }));
-      const h = req.resourceMetrics[0].scopeMetrics[0].metrics.find((m) => m.name === 'http.GET./api.duration');
+      const h = req.resourceMetrics[0].scopeMetrics[0].metrics.find((m) => m.name === 'checkout.duration');
       const dp = h?.histogram?.dataPoints[0];
       expect(dp?.count).toBe('5');
       expect(dp?.sum).toBe(250);
       expect(dp?.min).toBe(10);
       expect(dp?.max).toBe(120);
-      expect(dp?.bucketCounts).toEqual(['5']);
+      expect(dp?.explicitBounds).toEqual([...HISTOGRAM_BOUNDS]);
+      expect(dp?.bucketCounts).toEqual([
+        '0',
+        '0',
+        '1',
+        '1',
+        '1',
+        '1',
+        '0',
+        '1',
+        '0',
+        '0',
+        '0',
+        '0',
+        '0',
+        '0',
+        '0',
+        '0',
+      ]);
+    },
+  );
+
+  specTest(
+    'renders a histogram without bucket counts as one bucket with no bounds',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'otlp-metrics-rendering',
+      check: 'a-histogram-renders-its-bounds-and-bucket-counts',
+    },
+    () => {
+      const req = parse(
+        metricsBodyFromRender([
+          { ts: 1_700_000_000, counters: {}, gauges: {}, histograms: { legacy: { count: 2, sum: 3, min: 1, max: 2 } } },
+        ]),
+      );
+      const dp = req.resourceMetrics[0].scopeMetrics[0].metrics[0].histogram?.dataPoints[0];
+      expect(dp?.bucketCounts).toEqual(['2']);
+      expect(dp?.explicitBounds).toBeUndefined();
+    },
+  );
+
+  specTest(
+    'renders the unit and description of a described metric only',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'otlp-metrics-rendering',
+      check: 'a-described-metric-renders-its-unit',
+    },
+    () => {
+      const req = parse(
+        buildMetricsBody(sampleBuckets, {
+          app: 'svc',
+          descriptions: { 'checkout.duration': { unit: 'ms', description: 'Checkout duration' } },
+        }),
+      );
+      const metrics = req.resourceMetrics[0].scopeMetrics[0].metrics;
+      const described = metrics.find((m) => m.name === 'checkout.duration');
+      expect(described?.unit).toBe('ms');
+      expect(described?.description).toBe('Checkout duration');
+      const plain = metrics.find((m) => m.name === 'orders.placed');
+      expect(plain?.unit).toBeUndefined();
+      expect(plain?.description).toBeUndefined();
     },
   );
 

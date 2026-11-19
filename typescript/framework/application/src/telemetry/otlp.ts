@@ -24,6 +24,7 @@
 
 import { createHash } from 'node:crypto';
 import type { LogEntry, LogLevel } from '@putnami/runtime';
+import { HISTOGRAM_BOUNDS } from './telemetry.collector';
 
 // A rendered OTLP node. Builders return plain objects whose key order is the
 // canonical wire order.
@@ -409,7 +410,7 @@ export interface RenderBucket {
   ts: number;
   counters: Record<string, number>;
   gauges: Record<string, number>;
-  histograms: Record<string, { count: number; sum: number; min: number; max: number }>;
+  histograms: Record<string, RenderHistogram>;
   counterSeries?: Array<{
     name: string;
     attributes: Readonly<Record<string, string | number | boolean>>;
@@ -418,8 +419,21 @@ export interface RenderBucket {
   histogramSeries?: Array<{
     name: string;
     attributes: Readonly<Record<string, string | number | boolean>>;
-    aggregate: { count: number; sum: number; min: number; max: number };
+    aggregate: RenderHistogram;
   }>;
+}
+
+/**
+ * One histogram's aggregate. `bucketCounts`, one count per bucket of
+ * HISTOGRAM_BOUNDS plus the overflow bucket, renders as explicit buckets;
+ * without it the point renders as a single bucket.
+ */
+export interface RenderHistogram {
+  count: number;
+  sum: number;
+  min: number;
+  max: number;
+  bucketCounts?: readonly number[];
 }
 
 interface MetricsRenderOptions {
@@ -429,6 +443,8 @@ interface MetricsRenderOptions {
   resourceAttributes?: Readonly<Record<string, string>>;
   scopeName?: string;
   scopeVersion?: string;
+  /** Unit and description of each described metric, by name. */
+  descriptions?: Readonly<Record<string, { unit?: string; description?: string }>>;
 }
 
 /** Build the Putnami resource (framework marker + service identity). */
@@ -480,6 +496,22 @@ function telemetryAttributes(attributes: Readonly<Record<string, string | number
     );
 }
 
+/** Render one histogram aggregate, with explicit buckets when it carries their counts. */
+function renderHistogram(h: RenderHistogram, start: string, end: string, attributes?: OtlpNode[]): OtlpNode {
+  const explicit = h.bucketCounts?.length === HISTOGRAM_BOUNDS.length + 1;
+  return histogramDataPoint({
+    attributes,
+    startTimeUnixNano: start,
+    timeUnixNano: end,
+    count: String(h.count),
+    sum: h.sum,
+    bucketCounts: explicit ? h.bucketCounts?.map(String) : [String(h.count)],
+    explicitBounds: explicit ? [...HISTOGRAM_BOUNDS] : undefined,
+    min: h.min,
+    max: h.max,
+  });
+}
+
 /** Accumulate one bucket's counters, gauges, and histograms into per-name data-point maps. */
 function accumulateBucket(
   b: RenderBucket,
@@ -496,39 +528,13 @@ function accumulateBucket(
     pushDP(gaugeDPs, name, numberDataPoint({ timeUnixNano: end, asDouble: value }));
   }
   for (const [name, h] of Object.entries(b.histograms)) {
-    pushDP(
-      histDPs,
-      name,
-      histogramDataPoint({
-        startTimeUnixNano: start,
-        timeUnixNano: end,
-        count: String(h.count),
-        sum: h.sum,
-        bucketCounts: [String(h.count)],
-        min: h.min,
-        max: h.max,
-      }),
-    );
+    pushDP(histDPs, name, renderHistogram(h, start, end));
   }
   for (const series of b.counterSeries ?? []) {
     pushDP(counterDPs, series.name, counterDataPoint(series.value, start, end, telemetryAttributes(series.attributes)));
   }
   for (const series of b.histogramSeries ?? []) {
-    const h = series.aggregate;
-    pushDP(
-      histDPs,
-      series.name,
-      histogramDataPoint({
-        attributes: telemetryAttributes(series.attributes),
-        startTimeUnixNano: start,
-        timeUnixNano: end,
-        count: String(h.count),
-        sum: h.sum,
-        bucketCounts: [String(h.count)],
-        min: h.min,
-        max: h.max,
-      }),
-    );
+    pushDP(histDPs, series.name, renderHistogram(series.aggregate, start, end, telemetryAttributes(series.attributes)));
   }
 }
 
@@ -547,15 +553,16 @@ export function metricsRequestFromBuckets(buckets: RenderBucket[], opts: Metrics
     accumulateBucket(b, counterDPs, gaugeDPs, histDPs);
   }
 
+  const described = (name: string) => ({ name, ...opts.descriptions?.[name] });
   const metrics: OtlpNode[] = [];
   for (const [name, dps] of counterDPs) {
-    metrics.push(metric({ name, sum: sum(dps, TEMPORALITY_DELTA, true) }));
+    metrics.push(metric({ ...described(name), sum: sum(dps, TEMPORALITY_DELTA, true) }));
   }
   for (const [name, dps] of gaugeDPs) {
-    metrics.push(metric({ name, gauge: gauge(dps) }));
+    metrics.push(metric({ ...described(name), gauge: gauge(dps) }));
   }
   for (const [name, dps] of histDPs) {
-    metrics.push(metric({ name, histogram: histogram(dps, TEMPORALITY_DELTA) }));
+    metrics.push(metric({ ...described(name), histogram: histogram(dps, TEMPORALITY_DELTA) }));
   }
   metrics.sort(byName);
 

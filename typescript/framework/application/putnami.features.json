@@ -1301,7 +1301,8 @@
               "metrics-aggregate-per-second",
               "a-periodic-drain-returns-only-completed-seconds",
               "the-shutdown-drain-returns-every-bucket",
-              "attributed-series-aggregate-by-attribute-set"
+              "attributed-series-aggregate-by-attribute-set",
+              "a-histogram-counts-each-observation-in-its-bucket"
             ]
           }
         },
@@ -1313,7 +1314,7 @@
             "kind": "acceptance",
             "checks": [
               "a-request-is-counted-under-its-route-pattern",
-              "a-client-error-is-counted-by-class",
+              "the-status-code-labels-each-request",
               "an-unmatched-request-never-names-a-series"
             ]
           }
@@ -1324,7 +1325,12 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["buckets-render-as-otlp-metrics", "no-bucket-renders-an-empty-request"]
+            "checks": [
+              "buckets-render-as-otlp-metrics",
+              "a-histogram-renders-its-bounds-and-bucket-counts",
+              "a-described-metric-renders-its-unit",
+              "no-bucket-renders-an-empty-request"
+            ]
           }
         },
         {

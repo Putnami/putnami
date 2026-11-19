@@ -11,6 +11,7 @@ import { OtlpLogSink } from '../../src/telemetry/otlp-log.sink';
 import { parseResourceAttributes } from '../../src/telemetry/telemetry.environment';
 import { TelemetryPlugin, telemetry, telemetryFromEnvironment } from '../../src/telemetry/telemetry.plugin';
 import { getCollector } from '../../src/telemetry/telemetry.utils';
+import { requestCount, requestCounts } from './http-server-series';
 
 const FEATURE = 'typescript/service-telemetry';
 /** The fixture a process-instance-identity test starts as a child process. */
@@ -119,7 +120,7 @@ describe('telemetry from the environment', () => {
 
       const metrics = collector.pushes.filter((push) => push.path === '/v1/metrics');
       expect(metrics).toHaveLength(1);
-      expect(metricNames(metrics[0].body)).toContain('http.GET./ping.200');
+      expect(metricNames(metrics[0].body)).toContain('http.server.request_count');
       expect(collector.pushes.some((push) => push.path === '/v1/traces')).toBe(true);
     },
   );
@@ -192,7 +193,7 @@ describe('telemetry from the environment', () => {
           metrics[0].body['resourceMetrics'] as Array<{
             scopeMetrics: Array<{ metrics: Array<{ name: string; sum?: { dataPoints: Array<{ asInt: string }> } }> }>;
           }>
-        )[0].scopeMetrics[0].metrics.find((m) => m.name === 'http.GET./ping.200');
+        )[0].scopeMetrics[0].metrics.find((m) => m.name === 'http.server.request_count');
         expect(points?.sum?.dataPoints.map((p) => p.asInt)).toEqual(['1']);
       } finally {
         environmentCollector.stop();
@@ -340,9 +341,7 @@ describe('telemetry from the environment', () => {
       expect(res.status).toBe(403);
 
       const buckets = getCollector()?.drainAll() ?? [];
-      const counters = Object.assign({}, ...buckets.map((bucket) => bucket.counters));
-      expect(counters['http.POST./form.403']).toBe(1);
-      expect(counters['http.error.4xx']).toBe(1);
+      expect(requestCount(buckets, { method: 'POST', route: '/form', status: 403 })).toBe(1);
     },
   );
 
@@ -372,7 +371,7 @@ describe('telemetry from the environment', () => {
       app = undefined;
 
       const metrics = collector.pushes.filter((push) => push.path === '/v1/metrics');
-      expect(metricNames(metrics[0].body)).toContain('http.GET./ping.200');
+      expect(metricNames(metrics[0].body)).toContain('http.server.request_count');
     },
   );
 
@@ -399,8 +398,7 @@ describe('telemetry from the environment', () => {
         expect(res.status).toBe(200);
 
         const buckets = getCollector()?.drainAll() ?? [];
-        const counters = Object.assign({}, ...buckets.map((bucket) => bucket.counters));
-        expect(Object.keys(counters).some((name) => name.startsWith('http.GET.') && name.endsWith('.200'))).toBe(true);
+        expect(requestCounts(buckets).some((series) => series.method === 'GET' && series.status === 200)).toBe(true);
       } finally {
         if (savedPort === undefined) delete process.env['PORT'];
         else process.env['PORT'] = savedPort;

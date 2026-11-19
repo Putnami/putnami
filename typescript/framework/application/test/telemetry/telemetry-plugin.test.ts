@@ -5,6 +5,7 @@ import { application } from '../../src/application';
 import { http } from '../../src/http/http.plugin';
 import { TelemetryPlugin, telemetry } from '../../src/telemetry/telemetry.plugin';
 import { getCollector, incCounter } from '../../src/telemetry/telemetry.utils';
+import { requestCount } from './http-server-series';
 
 describe('TelemetryPlugin', () => {
   let app: Application;
@@ -111,8 +112,7 @@ describe('TelemetryPlugin', () => {
       const buckets = collector?.drainAll();
       expect(buckets?.length).toBeGreaterThanOrEqual(1);
 
-      const allCounters = Object.assign({}, ...(buckets?.map((b) => b.counters) ?? []));
-      expect(allCounters['http.GET./api/test.200']).toBe(1);
+      expect(requestCount(buckets ?? [], { method: 'GET', route: '/api/test', status: 200 })).toBe(1);
     },
   );
 

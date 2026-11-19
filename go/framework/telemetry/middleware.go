@@ -15,6 +15,7 @@ import (
 
 	putnami_http "go.putnami.dev/http"
 	"go.putnami.dev/logger"
+	otlp "go.putnami.dev/protocol/telemetry"
 )
 
 // instrumentedKey marks a request an outer HTTPMiddleware already traces and
@@ -48,15 +49,21 @@ func HTTPMiddleware(serviceName string) putnami_http.Middleware {
 		log := logger.Default().Named("telemetry")
 
 		var err error
-		requestCount, err = meter.Int64Counter("http.server.request_count",
-			metric.WithDescription("Total HTTP requests"),
+		// The names, unit, description and bounds are the telemetry protocol's
+		// HTTP server conventions, which the TypeScript runtime records too.
+		conventions := httpServerConventions()
+		count := conventions[otlp.MetricHTTPServerRequestCount]
+		requestCount, err = meter.Int64Counter(count.Name,
+			metric.WithDescription(count.Description),
 		)
 		if err != nil {
 			log.Error("telemetry: failed to create request_count counter, metrics will be unavailable", err)
 		}
-		requestDuration, err = meter.Float64Histogram("http.server.duration",
-			metric.WithDescription("HTTP request duration in milliseconds"),
-			metric.WithUnit("ms"),
+		duration := conventions[otlp.MetricHTTPServerDuration]
+		requestDuration, err = meter.Float64Histogram(duration.Name,
+			metric.WithDescription(duration.Description),
+			metric.WithUnit(duration.Unit),
+			metric.WithExplicitBucketBoundaries(duration.Bounds...),
 		)
 		if err != nil {
 			log.Error("telemetry: failed to create duration histogram, metrics will be unavailable", err)
@@ -140,9 +147,9 @@ func recordMetrics(
 		return
 	}
 	attrs := metric.WithAttributes(
-		attribute.String("http.method", ctx.Method),
-		attribute.String("http.route", ctx.Route),
-		attribute.Int("http.status_code", statusCode),
+		attribute.String(otlp.AttrHTTPMethod, ctx.Method),
+		attribute.String(otlp.AttrHTTPRoute, ctx.Route),
+		attribute.Int(otlp.AttrHTTPStatusCode, statusCode),
 	)
 	if requestCount != nil {
 		requestCount.Add(ctx.Request.Context(), 1, attrs)
@@ -160,4 +167,14 @@ func recordMetrics(
 // the zero bucket and making p50/p99 meaningless.
 func durationMillis(d time.Duration) float64 {
 	return float64(d) / float64(time.Millisecond)
+}
+
+// httpServerConventions indexes the protocol's HTTP server metric conventions
+// by name.
+func httpServerConventions() map[string]otlp.MetricConvention {
+	conventions := make(map[string]otlp.MetricConvention)
+	for _, c := range otlp.HTTPServerMetrics() {
+		conventions[c.Name] = c
+	}
+	return conventions
 }

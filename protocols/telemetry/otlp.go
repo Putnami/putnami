@@ -119,9 +119,9 @@ type NumberDataPoint struct {
 	AsDouble          *float64   `json:"asDouble,omitempty"`
 }
 
-// HistogramDataPoint is one bucketed distribution. Putnami's collectors track
-// count/sum/min/max with no explicit bounds, so BucketCounts carries a single
-// implicit (-inf,+inf) bucket and ExplicitBounds is empty.
+// HistogramDataPoint is one bucketed distribution: BucketCounts holds one count
+// per bucket that ExplicitBounds delimits, plus the bucket above the highest
+// bound, or a single (-inf,+inf) bucket when ExplicitBounds is empty.
 type HistogramDataPoint struct {
 	Attributes        []KeyValue `json:"attributes,omitempty"`
 	StartTimeUnixNano string     `json:"startTimeUnixNano,omitempty"` // uint64 as string

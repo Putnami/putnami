@@ -17,6 +17,7 @@ The canonical push transport is **OTLP/JSON over HTTP** — the documented OpenT
 - **Canonical serialization.** `AttrsFromStrings` sorts attributes by key and `MarshalCanonical` emits compact JSON with HTML escaping off and a fixed field order, so two runtimes produce **byte-identical** bytes for equivalent input. The equivalence goldens + pinned SHA-256 digests guard it.
 - **Resource attributes** every runtime populates: `service.name`, `service.version`, `putnami.framework`, and `service.instance.id`, which names the process that pushes.
 - **Exporter behaviour** (`ExportContract`): default 10s flush cadence, mandatory final flush on shutdown, drop-on-collector-error (telemetry never affects the workload), and a bounded in-memory queue.
+- **HTTP server metrics** every runtime records for each request it serves: `http.server.request_count`, a counter, and `http.server.duration`, a histogram in `ms` with fixed bucket bounds, both labeled `http.method`, `http.route` (the route pattern) and `http.status_code`. `conventions.go` defines them and [`fixtures/conventions/http-server-metrics.json`](fixtures/conventions/http-server-metrics.json) commits them for the TypeScript tests.
 
 Why the transport is hand-rolled OTLP/JSON and nothing else is recorded in [`doc/adr/0001-otlp-json-is-the-only-transport.md`](doc/adr/0001-otlp-json-is-the-only-transport.md).
 

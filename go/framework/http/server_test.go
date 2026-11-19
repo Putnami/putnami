@@ -99,6 +99,32 @@ func TestServerPlugin_CORSPreflightThroughRouter(t *testing.T) {
 	}
 }
 
+func TestServerPlugin_PreflightCarriesTheRoutePattern(t *testing.T) {
+	spectest.Proves(t, "go/http-services", "method-fallbacks", "options-preflight-passes-through-the-middleware-chain")
+	sp := NewServerPlugin(ServerConfig{})
+	sp.GET("/widgets/{id}", func(_ *Context) *Response { return JSON("ok") })
+	var routes []string
+	sp.Use(func(ctx *Context, next func() *Response) *Response {
+		routes = append(routes, ctx.Route)
+		return next()
+	})
+	sp.wrapRoutesOnce()
+	handler := sp.buildHandler()
+
+	// Middleware such as telemetry labels the request with ctx.Route, so a
+	// synthesized preflight names the pattern, never the unbounded path.
+	for _, path := range []string{"/widgets/7", "/widgets/8"} {
+		w := httptest.NewRecorder()
+		handler(w, httptest.NewRequest("OPTIONS", path, nil))
+		if w.Code != 204 {
+			t.Fatalf("OPTIONS %s status = %d, want 204", path, w.Code)
+		}
+	}
+	if len(routes) != 2 || routes[0] != "/widgets/{id}" || routes[1] != "/widgets/{id}" {
+		t.Errorf("preflight routes = %v, want the route pattern twice", routes)
+	}
+}
+
 func TestServerPlugin_OptionsFallbackAndUnknownPath(t *testing.T) {
 	spectest.Proves(t, "go/http-services", "method-fallbacks", "options-fallback-answers-a-known-path")
 	sp := NewServerPlugin(ServerConfig{})

@@ -409,7 +409,9 @@ describe('first-party provider to generated consumer', () => {
         },
       });
       expect(counterSeries.some((series) => series.name === 'rpc.client.attempts' && series.value === 1)).toBe(true);
-      expect(histogramSeries.map((series) => series.name)).toContainAllValues([
+      // The consumer's own HTTP server also records http.server.duration; only the client series are pinned here.
+      const clientHistograms = histogramSeries.filter((series) => series.name.startsWith('rpc.client.'));
+      expect(clientHistograms.map((series) => series.name)).toContainAllValues([
         'rpc.client.duration',
         'rpc.client.attempt.duration',
         'rpc.client.auth.duration',

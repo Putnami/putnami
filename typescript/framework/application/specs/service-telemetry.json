@@ -71,7 +71,7 @@
     {
       "id": "per-second-aggregation",
       "text": [
-        "The collector buckets every measurement by Unix second: a counter sums its increments, a gauge keeps its last value, and a histogram keeps count, sum, min and max.",
+        "The collector buckets every measurement by Unix second: a counter sums its increments, a gauge keeps its last value, and a histogram keeps count, sum, min, max and its count in each bucket of the bounds telemetry/otlp-push-contract sets for http.server.duration.",
         "Attributed counters and histograms aggregate by name and attribute set.",
         "A periodic drain returns only completed seconds, in time order, and the shutdown drain returns every bucket, the current second included."
       ]
@@ -79,15 +79,16 @@
     {
       "id": "bounded-http-metrics",
       "text": [
-        "The HTTP middleware counts each request as http.<method>.<route pattern>.<status> and records its duration histogram under the same route pattern, never the resolved path.",
-        "A 4xx response also counts under http.error.4xx, and an unmatched request counts under the fixed __unmatched__ route, so a request path never names a series."
+        "The HTTP middleware counts each request in http.server.request_count and records its duration in http.server.duration, in ms, labeled http.method, http.route and http.status_code as telemetry/otlp-push-contract defines.",
+        "http.route is the route pattern, never the resolved path: an unmatched request takes __unmatched__ and a nonstandard method takes _OTHER, so no request adds a series of its own, and no metric name carries a route or status."
       ]
     },
     {
       "id": "otlp-metrics-rendering",
       "text": [
         "The sender renders drained buckets as one OTLP/JSON metrics request whose resource carries the service name and putnami.framework typescript, under the putnami scope.",
-        "A counter becomes a monotonic delta sum with an integer point, a gauge a double point, a histogram a point with its count, sum, min and max, and a metric seen in several buckets one point per bucket.",
+        "A counter becomes a monotonic delta sum with an integer point, a gauge a double point, a histogram a point with its count, sum, min, max, bounds and bucket counts, and a metric seen in several buckets one point per bucket.",
+        "A metric the collector describes carries its unit and description.",
         "No buckets render an empty request."
       ]
     },

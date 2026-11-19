@@ -136,7 +136,7 @@ server.Use(telemetry.HTTPMiddleware("my-service"))
 The middleware automatically:
 - Creates a span per request
 - Records `http.method`, `http.path`, `http.status_code` attributes
-- Emits `http.server.request_count` and `http.server.duration` metrics
+- Emits `http.server.request_count` and `http.server.duration` metrics, the same as the TypeScript runtime: [Add observability](/docs/how-to/add-observability#http-server-metrics) lists them
 - Propagates trace context to downstream services
 
 ## Error bridge

@@ -42,7 +42,13 @@ describe('drainMetrics', () => {
     const merged = drainMetrics(collector);
     expect(merged.counters['calls']).toBe(5);
     expect(merged.gauges['active']).toBe(0);
-    expect(merged.histograms['duration']).toEqual({ count: 3, sum: 15, min: 1, max: 10 });
+    expect(merged.histograms['duration']).toEqual({
+      count: 3,
+      sum: 15,
+      min: 1,
+      max: 10,
+      bucketCounts: [0, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    });
   });
 
   it('merges attributed series by name and attributes', () => {
@@ -56,7 +62,17 @@ describe('drainMetrics', () => {
     const merged = drainMetrics(collector);
     expect(merged.counterSeries).toEqual([{ name: 'calls', attributes, value: 3 }]);
     expect(merged.histogramSeries).toEqual([
-      { name: 'duration', attributes, aggregate: { count: 2, sum: 12, min: 5, max: 7 } },
+      {
+        name: 'duration',
+        attributes,
+        aggregate: {
+          count: 2,
+          sum: 12,
+          min: 5,
+          max: 7,
+          bucketCounts: [0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        },
+      },
     ]);
   });
 

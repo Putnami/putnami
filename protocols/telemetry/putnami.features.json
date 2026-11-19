@@ -124,6 +124,21 @@
           }
         },
         {
+          "id": "http-server-metrics-are-shared",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-conventions-match-their-fixture",
+              "the-go-middleware-records-the-conventions",
+              "the-typescript-middleware-records-the-conventions"
+            ]
+          }
+        },
+        {
           "id": "cli-usage-vocabulary-is-closed",
           "stage": "coded",
           "evidenceKinds": [

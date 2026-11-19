@@ -479,7 +479,7 @@ Supported time units: `H` (hours), `M` (minutes), `S` (seconds), `m` (millisecon
 gRPC routes are served on the same HTTP server, so all global middleware registered via `httpPlugin.use()` applies to gRPC requests:
 
 - **Logger** — gRPC requests are logged with method, route, status, and duration (route is the gRPC path, e.g. `/myapp.v1.UsersService/ListUsers`)
-- **Telemetry** — per-route counters and histograms are collected for gRPC endpoints (metric key: `http.POST./{package}.{Service}/{Method}.{status}`)
+- **Telemetry** — gRPC requests are counted in `http.server.request_count` and timed in `http.server.duration`, with `http.method` `POST`, `http.route` the gRPC path (`/{package}.{Service}/{Method}`) and `http.status_code`
 - **Trace** — `X-Cloud-Trace-Context` and `X-Correlation-ID` headers are extracted and propagated to the inner handler context via `ctx.traceId`
 
 The trace ID propagation is automatic. When a gRPC request carries a trace header, the middleware sets `ctx.traceId` on the outer context. The gRPC handler then copies `traceId`, `logContext`, and `user` to the inner API handler context. This means `useLogger()` calls inside route handlers will include the trace ID in log output.

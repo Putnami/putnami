@@ -1,8 +1,16 @@
 export {
+  ATTR_HTTP_METHOD,
+  ATTR_HTTP_ROUTE,
+  ATTR_HTTP_STATUS_CODE,
+  HTTP_SERVER_DURATION,
+  HTTP_SERVER_REQUEST_COUNT,
+} from './http-server-metrics';
+export {
   logsRequestFromEntries,
   marshalCanonical,
   metricsRequestFromBuckets,
   type RenderBucket,
+  type RenderHistogram,
   type TraceRenderRecord,
   tracesRequestFromSpans,
 } from './otlp';
@@ -10,7 +18,9 @@ export { OtlpLogSink, type OtlpLogSinkOptions } from './otlp-log.sink';
 export {
   type AttributedCounterAggregate,
   type AttributedHistogramAggregate,
+  HISTOGRAM_BOUNDS,
   type HistogramAggregate,
+  type MetricDescription,
   type MetricsBucket,
   type TelemetryAttributes,
   TelemetryCollector,

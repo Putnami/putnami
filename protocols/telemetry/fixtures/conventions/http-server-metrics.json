@@ -1,0 +1,18 @@
+{
+  "metrics": [
+    {
+      "name": "http.server.duration",
+      "kind": "histogram",
+      "unit": "ms",
+      "description": "HTTP request duration in milliseconds",
+      "attributes": ["http.method", "http.route", "http.status_code"],
+      "bounds": [0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10000]
+    },
+    {
+      "name": "http.server.request_count",
+      "kind": "counter",
+      "description": "Total HTTP requests",
+      "attributes": ["http.method", "http.route", "http.status_code"]
+    }
+  ]
+}

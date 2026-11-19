@@ -8,7 +8,7 @@ import {
 /**
  * Merge drained buckets into one view so an assertion does not depend on where
  * a Unix-second boundary falls. Counters sum, gauges keep the last value in
- * time order, histograms combine count, sum, min and max, and attributed series
+ * time order, histograms combine count, sum, min, max and bucket counts, and attributed series
  * merge by name and attributes, in the collector's order. `ts` is the earliest
  * bucket's second.
  */
@@ -34,7 +34,7 @@ function mergeMetricBuckets(buckets: readonly MetricsBucket[]): MetricsBucket {
       merged.histogramSeries ??= [];
       const current = merged.histogramSeries.find((e) => sameSeries(e, entry));
       if (current) current.aggregate = combine(current.aggregate, entry.aggregate);
-      else merged.histogramSeries.push({ ...entry, aggregate: { ...entry.aggregate } });
+      else merged.histogramSeries.push({ ...entry, aggregate: combine(undefined, entry.aggregate) });
     }
   }
   merged.counterSeries?.sort(compareSeries);
@@ -52,12 +52,13 @@ export function drainMetrics(collector: TelemetryCollector): MetricsBucket {
 }
 
 function combine(left: HistogramAggregate | undefined, right: HistogramAggregate): HistogramAggregate {
-  if (!left) return { ...right };
+  if (!left) return { ...right, bucketCounts: [...right.bucketCounts] };
   return {
     count: left.count + right.count,
     sum: left.sum + right.sum,
     min: Math.min(left.min, right.min),
     max: Math.max(left.max, right.max),
+    bucketCounts: left.bucketCounts.map((count, index) => count + (right.bucketCounts[index] ?? 0)),
   };
 }
 

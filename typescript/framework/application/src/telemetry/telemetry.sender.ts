@@ -15,7 +15,7 @@ import {
   PATH_TRACES,
   tracesRequestFromSpans,
 } from './otlp';
-import type { MetricsBucket, TelemetrySpanRecord } from './telemetry.collector';
+import type { MetricDescription, MetricsBucket, TelemetrySpanRecord } from './telemetry.collector';
 
 const SEND_TIMEOUT_MS = 5000;
 
@@ -37,6 +37,8 @@ export interface MetricsSendOptions {
   bearer?: string;
   /** Extra headers (e.g. tenant routing). */
   headers?: Record<string, string>;
+  /** Unit and description of each described metric, by name. */
+  descriptions?: Readonly<Record<string, MetricDescription>>;
 }
 
 type TracesSendOptions = MetricsSendOptions;
@@ -47,6 +49,7 @@ export function buildMetricsBody(buckets: MetricsBucket[], opts: MetricsSendOpti
     serviceName: opts.app,
     serviceVersion: opts.serviceVersion,
     resourceAttributes: opts.resourceAttributes,
+    descriptions: opts.descriptions,
   });
   return marshalCanonical(req);
 }

@@ -486,9 +486,12 @@ func (p *ServerPlugin) buildHandler() http.HandlerFunc {
 				allowed = p.routes.allowedMethods(r.URL.Path)
 			}
 			if match == nil && r.Method == "OPTIONS" && len(allowed) > 0 {
+				// The preflight carries the pattern of a route the path
+				// matches, never the path itself: telemetry and logging label
+				// the request with it, and a path is unbounded.
 				match = &routeMatch[Handler]{
 					Handlers: []Handler{p.preflightHandler(allowed)},
-					Pattern:  r.URL.Path,
+					Pattern:  p.routes.lookup(allowed[0], r.URL.Path).Pattern,
 				}
 			}
 			if match == nil {

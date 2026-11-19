@@ -2,7 +2,8 @@
  * Telemetry Collector — In-Memory Per-Second Aggregation
  *
  * Metrics are bucketed by Unix-second. Each bucket holds counters,
- * gauges, and histogram aggregates. Completed buckets (older than the
+ * gauges, and histogram aggregates, each histogram counting its observations
+ * in the buckets of HISTOGRAM_BOUNDS. Completed buckets (older than the
  * current second) are drained during flush.
  */
 
@@ -10,12 +11,33 @@
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * Explicit bucket bounds of every histogram, in the metric's unit. They are the
+ * bounds the telemetry protocol sets for http.server.duration, which the Go
+ * runtime records too, so a backend computes the same percentiles from both.
+ */
+export const HISTOGRAM_BOUNDS: readonly number[] = Object.freeze([
+  0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10_000,
+]);
+
 /** Aggregated histogram statistics for a single metric within a time bucket. */
 export interface HistogramAggregate {
   count: number;
   sum: number;
   min: number;
   max: number;
+  /**
+   * Observations per bucket of {@link HISTOGRAM_BOUNDS}: index i counts the
+   * values in (bounds[i-1], bounds[i]], and the last index the values above
+   * the highest bound.
+   */
+  bucketCounts: number[];
+}
+
+/** Unit and description a metric renders with, the same in every bucket. */
+export interface MetricDescription {
+  unit?: string;
+  description?: string;
 }
 
 /** Low-cardinality attributes attached to framework-generated client telemetry. */
@@ -69,11 +91,32 @@ export interface MetricsBucket {
 /** In-memory metrics collector that aggregates counters, gauges, and histograms into per-second buckets. */
 export class TelemetryCollector {
   private buckets = new Map<number, MetricsBucket>();
+  /** Attributed series of each bucket by series key, so a record finds its series in O(1). */
+  private seriesIndex = new Map<number, Map<string, AttributedCounterAggregate | AttributedHistogramAggregate>>();
   private spans: TelemetrySpanRecord[] = [];
+  private descriptions = new Map<string, MetricDescription>();
 
   /** Return the unix-second for a given timestamp (default: now). */
   private tick(now?: number): number {
     return Math.floor((now ?? Date.now()) / 1000);
+  }
+
+  /** The series index of a bucket's second. */
+  private indexOf(ts: number): Map<string, AttributedCounterAggregate | AttributedHistogramAggregate> {
+    let index = this.seriesIndex.get(ts);
+    if (!index) {
+      index = new Map();
+      this.seriesIndex.set(ts, index);
+    }
+    return index;
+  }
+
+  /** Close a drained bucket: drop its series index and order its series by name, then attributes. */
+  private close(bucket: MetricsBucket): MetricsBucket {
+    this.seriesIndex.delete(bucket.ts);
+    bucket.counterSeries?.sort(compareSeries);
+    bucket.histogramSeries?.sort(compareSeries);
+    return bucket;
   }
 
   /** Get or create the bucket for a given unix-second. */
@@ -100,12 +143,17 @@ export class TelemetryCollector {
   incCounterWithAttributes(name: string, value: number, attributes: TelemetryAttributes, now?: number): void {
     const bucket = this.bucket(this.tick(now));
     const normalized = normalizeAttributes(attributes);
-    bucket.counterSeries ??= [];
-    const key = seriesKey(name, normalized);
-    const current = bucket.counterSeries.find((entry) => seriesKey(entry.name, entry.attributes) === key);
-    if (current) current.value += value;
-    else bucket.counterSeries.push({ name, attributes: normalized, value });
-    bucket.counterSeries.sort(compareSeries);
+    const index = this.indexOf(bucket.ts);
+    const key = `c\0${seriesKey(name, normalized)}`;
+    const current = index.get(key) as AttributedCounterAggregate | undefined;
+    if (current) {
+      current.value += value;
+    } else {
+      const entry = { name, attributes: normalized, value };
+      index.set(key, entry);
+      bucket.counterSeries ??= [];
+      bucket.counterSeries.push(entry);
+    }
   }
 
   // -----------------------------------------------------------------------
@@ -119,44 +167,42 @@ export class TelemetryCollector {
   }
 
   // -----------------------------------------------------------------------
-  // Histogram — distribution tracking (count, sum, min, max)
+  // Histogram — distribution tracking (count, sum, min, max, bucket counts)
   // -----------------------------------------------------------------------
 
-  /** Record a histogram observation, updating count, sum, min, and max. */
+  /** Record a histogram observation, updating count, sum, min, max and its bucket count. */
   observeHistogram(name: string, value: number, now?: number): void {
     const b = this.bucket(this.tick(now));
     const h = b.histograms[name];
-    if (h) {
-      h.count += 1;
-      h.sum += value;
-      if (value < h.min) h.min = value;
-      if (value > h.max) h.max = value;
-    } else {
-      b.histograms[name] = { count: 1, sum: value, min: value, max: value };
-    }
+    if (h) observe(h, value);
+    else b.histograms[name] = firstObservation(value);
   }
 
   /** Record a histogram observation selected by deterministic attributes. */
   observeHistogramWithAttributes(name: string, value: number, attributes: TelemetryAttributes, now?: number): void {
     const bucket = this.bucket(this.tick(now));
     const normalized = normalizeAttributes(attributes);
-    bucket.histogramSeries ??= [];
-    const key = seriesKey(name, normalized);
-    const current = bucket.histogramSeries.find((entry) => seriesKey(entry.name, entry.attributes) === key);
+    const index = this.indexOf(bucket.ts);
+    const key = `h\0${seriesKey(name, normalized)}`;
+    const current = index.get(key) as AttributedHistogramAggregate | undefined;
     if (current) {
-      const aggregate = current.aggregate;
-      aggregate.count += 1;
-      aggregate.sum += value;
-      aggregate.min = Math.min(aggregate.min, value);
-      aggregate.max = Math.max(aggregate.max, value);
+      observe(current.aggregate, value);
     } else {
-      bucket.histogramSeries.push({
-        name,
-        attributes: normalized,
-        aggregate: { count: 1, sum: value, min: value, max: value },
-      });
+      const entry = { name, attributes: normalized, aggregate: firstObservation(value) };
+      index.set(key, entry);
+      bucket.histogramSeries ??= [];
+      bucket.histogramSeries.push(entry);
     }
-    bucket.histogramSeries.sort(compareSeries);
+  }
+
+  /** Give a metric the unit and description it renders with; the last call wins. */
+  describeMetric(name: string, description: MetricDescription): void {
+    this.descriptions.set(name, Object.freeze({ ...description }));
+  }
+
+  /** The unit and description of every described metric, by name. */
+  metricDescriptions(): Readonly<Record<string, MetricDescription>> {
+    return Object.fromEntries(this.descriptions);
   }
 
   /** Queue an immutable completed span for the next trace flush. */
@@ -185,7 +231,7 @@ export class TelemetryCollector {
 
     for (const [ts, bucket] of this.buckets) {
       if (ts < currentTick) {
-        flushed.push(bucket);
+        flushed.push(this.close(bucket));
         this.buckets.delete(ts);
       }
     }
@@ -197,8 +243,9 @@ export class TelemetryCollector {
    * Drain ALL buckets including the current one. Used during shutdown.
    */
   drainAll(): MetricsBucket[] {
-    const all = [...this.buckets.values()].sort((a, b) => a.ts - b.ts);
+    const all = [...this.buckets.values()].sort((a, b) => a.ts - b.ts).map((bucket) => this.close(bucket));
     this.buckets.clear();
+    this.seriesIndex.clear();
     return all;
   }
 
@@ -206,6 +253,26 @@ export class TelemetryCollector {
   isEmpty(): boolean {
     return this.buckets.size === 0 && this.spans.length === 0;
   }
+}
+
+/** The index of the {@link HISTOGRAM_BOUNDS} bucket that counts a value. */
+export function histogramBucketIndex(value: number): number {
+  const index = HISTOGRAM_BOUNDS.findIndex((bound) => value <= bound);
+  return index === -1 ? HISTOGRAM_BOUNDS.length : index;
+}
+
+function firstObservation(value: number): HistogramAggregate {
+  const bucketCounts = new Array<number>(HISTOGRAM_BOUNDS.length + 1).fill(0);
+  bucketCounts[histogramBucketIndex(value)] = 1;
+  return { count: 1, sum: value, min: value, max: value, bucketCounts };
+}
+
+function observe(aggregate: HistogramAggregate, value: number): void {
+  aggregate.count += 1;
+  aggregate.sum += value;
+  if (value < aggregate.min) aggregate.min = value;
+  if (value > aggregate.max) aggregate.max = value;
+  aggregate.bucketCounts[histogramBucketIndex(value)] += 1;
 }
 
 function normalizeAttributes(attributes: TelemetryAttributes): TelemetryAttributes {

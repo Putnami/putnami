@@ -4,6 +4,7 @@
   "executableRequirements": [
     "telemetry/otlp-push-contract#cli-usage-vocabulary-is-closed",
     "telemetry/otlp-push-contract#equivalent-input-serializes-to-the-same-bytes",
+    "telemetry/otlp-push-contract#http-server-metrics-are-shared",
     "telemetry/otlp-push-contract#released-command-names-stay",
     "telemetry/otlp-push-contract#the-cli-and-the-receiver-share-one-record-shape",
     "telemetry/otlp-push-contract#the-error-codes-are-a-closed-set",

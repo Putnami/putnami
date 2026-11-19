@@ -4,6 +4,7 @@
   "feature": "telemetry/otlp-push-contract",
   "outcomes": [
     "A workload that spans the Go and TypeScript runtimes points both at one OTLP/HTTP collector",
+    "A dashboard finds the HTTP server metrics of a Go and a TypeScript service under the same names, units, labels and buckets",
     "Telemetry never fails or stalls the workload that produces it",
     "The CLI and the usage receiver enforce one closed vocabulary, so a usage record carries no free text"
   ],
@@ -61,6 +62,15 @@
         "An unknown or uppercase level maps to 0, unspecified.",
         "BoolVal and DoubleVal set exactly one value kind.",
         "The Go runtime maps its metric temporality, span status and log levels to the OTLP numbers."
+      ]
+    },
+    {
+      "id": "http-server-metrics-are-shared",
+      "text": [
+        "Every runtime records each HTTP request it serves as http.server.request_count, a counter, and http.server.duration, a histogram in ms, both labeled http.method, http.route and http.status_code.",
+        "http.route is the route pattern, never the request path.",
+        "The histogram buckets are bounded by 0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500 and 10000 ms.",
+        "Both runtimes test against fixtures/conventions/http-server-metrics.json."
       ]
     },
     {

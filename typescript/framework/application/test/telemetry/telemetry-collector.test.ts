@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
-import { TelemetryCollector } from '../../src/telemetry/telemetry.collector';
+import { compareSeries, HISTOGRAM_BOUNDS, TelemetryCollector } from '../../src/telemetry/telemetry.collector';
 
 describe('TelemetryCollector', () => {
   describe('counter', () => {
@@ -135,6 +135,35 @@ describe('TelemetryCollector', () => {
         expect(h.max).toBe(42);
       },
     );
+
+    specTest(
+      'counts each observation in the bucket of the protocol bounds that holds it',
+      {
+        feature: 'typescript/service-telemetry',
+        requirement: 'per-second-aggregation',
+        check: 'a-histogram-counts-each-observation-in-its-bucket',
+      },
+      () => {
+        const collector = new TelemetryCollector();
+        const ts = 1_700_000_000_000;
+        // A bound belongs to the bucket it closes: (bounds[i-1], bounds[i]].
+        for (const value of [0, 0.4, 5, 5.01, 10_000, 10_000.5, 60_000]) {
+          collector.observeHistogram('latency', value, ts);
+          collector.observeHistogramWithAttributes('latency', value, { route: '/a' }, ts);
+        }
+
+        const bucket = collector.drainAll()[0];
+        const expected = new Array(HISTOGRAM_BOUNDS.length + 1).fill(0);
+        expected[0] = 1; // 0
+        expected[1] = 2; // 0.4 and 5
+        expected[2] = 1; // 5.01
+        expected[HISTOGRAM_BOUNDS.length - 1] = 1; // 10000
+        expected[HISTOGRAM_BOUNDS.length] = 2; // above the highest bound
+        expect(bucket.histograms['latency'].bucketCounts).toEqual(expected);
+        expect(bucket.histogramSeries?.[0].aggregate.bucketCounts).toEqual(expected);
+        expect(HISTOGRAM_BOUNDS).toEqual([0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500, 10_000]);
+      },
+    );
   });
 
   describe('drain', () => {
@@ -262,6 +291,33 @@ describe('TelemetryCollector', () => {
   });
 
   specTest(
+    'records into hundreds of live attributed series without scanning them on each record',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'per-second-aggregation',
+      check: 'attributed-series-aggregate-by-attribute-set',
+    },
+    () => {
+      const collector = new TelemetryCollector();
+      const now = 1_700_000_000_000;
+      const started = performance.now();
+      for (let i = 0; i < 50_000; i++) {
+        const attributes = { 'http.method': 'GET', 'http.route': `/r${i % 500}`, 'http.status_code': 200 };
+        collector.incCounterWithAttributes('http.server.request_count', 1, attributes, now);
+        collector.observeHistogramWithAttributes('http.server.duration', 1, attributes, now);
+      }
+      // A per-record scan and re-sort of 500 series takes tens of seconds here.
+      expect(performance.now() - started).toBeLessThan(5000);
+
+      const bucket = collector.drainAll()[0];
+      expect(bucket.counterSeries).toHaveLength(500);
+      expect(bucket.counterSeries?.every((series) => series.value === 100)).toBe(true);
+      const series = bucket.histogramSeries ?? [];
+      expect(series).toEqual([...series].sort(compareSeries));
+    },
+  );
+
+  specTest(
     'aggregates attributed client metrics by a deterministic bounded attribute set',
     {
       feature: 'typescript/service-telemetry',
@@ -288,7 +344,13 @@ describe('TelemetryCollector', () => {
         {
           name: 'rpc.client.duration',
           attributes,
-          aggregate: { count: 1, sum: 12.5, min: 12.5, max: 12.5 },
+          aggregate: {
+            count: 1,
+            sum: 12.5,
+            min: 12.5,
+            max: 12.5,
+            bucketCounts: [0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          },
         },
       ]);
     },

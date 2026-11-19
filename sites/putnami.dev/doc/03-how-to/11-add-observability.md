@@ -91,6 +91,24 @@ log := logger.New("checkout", logger.LevelInfo, logger.NewJSONSink(), sink)
 
 On the TypeScript runtime, `application()` attaches the equivalent sink, `OtlpLogSink` from `@putnami/application`, to the root logger by itself when `OTEL_EXPORTER_OTLP_ENDPOINT` is set, with the same resource and token source as metrics and traces. To push logs elsewhere, add your own `OtlpLogSink` to the root logger with `useLogger().addSink(sink)` before the application starts; `application()` then adds none.
 
+## HTTP server metrics
+
+Both runtimes record the HTTP requests a service answers under the same two metrics, with the same unit, labels and buckets:
+
+| Metric | Type | Unit | Labels |
+|---|---|---|---|
+| `http.server.request_count` | Counter | — | `http.method`, `http.route`, `http.status_code` |
+| `http.server.duration` | Histogram | `ms` | `http.method`, `http.route`, `http.status_code` |
+
+- `http.route` is the route pattern (`/users/[id]` in TypeScript, `/users/{id}` in Go), never the request path, so series stay bounded. A TypeScript request that matches no route is labeled `__unmatched__`, and a nonstandard method `_OTHER`; the Go runtime answers such a request before its middleware runs and does not record it.
+- `http.status_code` is the response status, an integer. Error rates filter on it: there is no separate error counter.
+- `http.server.duration` counts each request in the buckets bounded by 0, 5, 10, 25, 50, 75, 100, 250, 500, 750, 1000, 2500, 5000, 7500 and 10000 ms, so a backend computes percentiles from it.
+- The TypeScript runtime pushes per-second deltas, and the Go runtime cumulative totals. A backend that stores cumulative series, such as Prometheus, needs the collector's `deltatocumulative` processor in front of it for TypeScript services.
+
+With the default OTLP-to-Prometheus name translation, which adds the unit and the counter suffix, the request rate is `rate(http_server_request_count_total[5m])` and the p95 latency `histogram_quantile(0.95, sum by (le) (rate(http_server_duration_milliseconds_bucket[5m])))`. A collector configured without suffixes drops `_total` and `_milliseconds`.
+
+The [telemetry protocol](https://github.com/putnami/putnami/tree/main/protocols/telemetry) commits these names, labels and bounds, and both runtimes are tested against them.
+
 ## What you get
 
 - **Metrics** — framework metrics out of the box, plus your own counters, gauges, and histograms.
