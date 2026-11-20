@@ -3,7 +3,6 @@
 - **Status**: accepted
 - **Date**: 2026-11-20
 - **Scope**: `go.putnami.dev/protocol/telemetry` (`protocols/telemetry`)
-- **Issue**: Putnami/putnami#1307
 
 ## Context
 

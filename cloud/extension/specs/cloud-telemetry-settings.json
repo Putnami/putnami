@@ -6,9 +6,9 @@
     "putnami cloud telemetry shows, sets and resets the trace settings and log level Putnami Cloud returns to a workspace's services in their export directive, so a person tunes a running app's telemetry without a redeploy"
   ],
   "nonGoals": [
-    "A parent policy or an expiry on a setting: config-api stores neither yet, and the command gains --parent and --for once it does (Putnami/putnami-cloud#5283)",
-    "A row for an app whose canonical name holds a folder, such as surfaces/workloads/app: config-api refuses that service name until Putnami/putnami-cloud#5283, and the command reports its refusal",
-    "Sending the trace budget to running services: the workspace collector renders it once Putnami/putnami-cloud#5283 lands; until then --budget is stored only",
+    "A parent policy or an expiry on a setting: config-api stores neither yet, and the command gains --parent and --for once it does",
+    "A row for an app whose canonical name holds a folder, such as surfaces/workloads/app: config-api refuses that service name until it accepts a workload's canonical name, and the command reports its refusal",
+    "Sending the trace budget to running services: config-api stores it, and the workspace collector does not send it yet",
     "Applying a setting to a running service: the workspace collector returns it on the next export, by the telemetry/otlp-push-contract directive"
   ],
   "requirements": [
