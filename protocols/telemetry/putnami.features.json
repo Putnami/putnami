@@ -192,6 +192,7 @@
             "kind": "acceptance",
             "checks": [
               "the-outside-rule-matches-its-fixture",
+              "the-go-runtime-marks-the-fixture-outside-parents",
               "the-typescript-runtime-finds-the-fixture-outside-parents"
             ]
           }

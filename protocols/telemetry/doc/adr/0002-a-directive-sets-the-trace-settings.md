@@ -59,5 +59,8 @@ with its children, whatever `telemetry.traces` said.
   reaches it as no change, a lowering still applies.
 - A raise multiplies a service's trace volume for its ttl; Cloud bounds each
   field it stores, and the ttl is at most 3600 seconds.
-- Under `decide`, an outside caller can no longer force sampling, as it can
-  under `follow`.
+- Under `decide`, a caller that sends `traceparent` alone, such as a browser
+  or a load balancer's edge, can no longer force sampling, as it can under
+  `follow`. A caller that also sends a matching `x-putnami-traceparent` is
+  followed, as a Putnami client is: the header proves no identity, so the
+  parent policy bounds the edge's influence, not a deliberate caller's.
