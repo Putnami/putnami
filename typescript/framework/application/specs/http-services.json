@@ -47,7 +47,7 @@
       "id": "request-timeout-cancels-work",
       "text": [
         "At requestTimeoutMs the request context's signal aborts with a TimeoutError and its deadlineAt names that deadline, so the request's queries, client calls and server render stop instead of running on after the 408.",
-        "A request that ended, past its timeout or because its client left, answers 408 and its work's failure logs and records no error."
+        "A request that ended, past its timeout or because its client left, answers 408: the stop of its work logs and records no error, and any other failure of that work is still logged, recorded and passed to onError."
       ]
     },
     {

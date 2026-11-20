@@ -5,6 +5,7 @@ import { MemoryLogger } from '@putnami/runtime/testing';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
 import { HttpPlugin, http, resolveIdleTimeoutSeconds } from '../../src/http/http.plugin';
+import { logger } from '../../src/http/logger.plugin';
 import { HttpResponse } from '../../src/http/http-response';
 
 describe('HttpPlugin', () => {
@@ -345,11 +346,21 @@ describe('HttpPlugin', () => {
     let baseUrl: string;
     let stalled: { signal?: AbortSignal; deadlineAt?: number; context?: Record<string, unknown> } | undefined;
     let workAfterTimeout = false;
+    let reported: unknown[] = [];
 
     beforeEach(async () => {
       stalled = undefined;
       workAfterTimeout = false;
-      plugin = http({ port: 0, maxBodySizeBytes: 64, requestTimeoutMs: 200 });
+      reported = [];
+      plugin = http({
+        port: 0,
+        maxBodySizeBytes: 64,
+        requestTimeoutMs: 200,
+        onError: (error) => {
+          reported.push(error);
+          return undefined;
+        },
+      });
       plugin.post('/echo', async (ctx) => {
         const data = await ctx.body<Record<string, string>>();
         return HttpResponse.json({ received: data });
@@ -369,8 +380,14 @@ describe('HttpPlugin', () => {
         workAfterTimeout = true;
         return new HttpResponse('never');
       });
+      plugin.get('/broken-after-timeout', async (ctx) => {
+        stalled = { signal: ctx.signal, context: ctx as unknown as Record<string, unknown> };
+        // Ignores the signal, then fails for a reason of its own once the request ended.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        throw new TypeError('the handler broke');
+      });
 
-      app = application().use(plugin);
+      app = application().use(plugin).use(logger());
       await app.start();
       baseUrl = `http://localhost:${plugin.getServer()?.port}`;
     });
@@ -443,14 +460,42 @@ describe('HttpPlugin', () => {
         check: 'an-ended-request-logs-no-error',
       },
       async () => {
-        const logger = new MemoryLogger();
-        setRootLogger(logger);
+        const memory = new MemoryLogger();
+        setRootLogger(memory);
         try {
           const res = await fetch(`${baseUrl}/stalled`);
           expect(res.status).toBe(408);
           await new Promise((resolve) => setTimeout(resolve, 50));
-          expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+          expect(memory.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+          const access = memory.entries.find((entry) => entry.message.includes('[GET] /stalled'));
+          expect(access?.level).toBe('debug');
           expect(stalled?.context?.['__requestError']).toBeUndefined();
+          expect(reported).toEqual([]);
+        } finally {
+          resetDefaultLogger();
+        }
+      },
+    );
+
+    specTest(
+      'a handler that fails for its own reason after its request ended is still logged',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'a-failure-after-the-request-ended-is-still-logged',
+      },
+      async () => {
+        const memory = new MemoryLogger();
+        setRootLogger(memory);
+        try {
+          const res = await fetch(`${baseUrl}/broken-after-timeout`);
+          expect(res.status).toBe(408);
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          const errors = memory.entries.filter((entry) => entry.level === 'error');
+          expect(errors.some((entry) => JSON.stringify(entry).includes('the handler broke'))).toBe(true);
+          expect(reported).toHaveLength(1);
+          expect((reported[0] as Error).name).toBe('TypeError');
+          expect((stalled?.context?.['__requestError'] as Error | undefined)?.name).toBe('TypeError');
         } finally {
           resetDefaultLogger();
         }

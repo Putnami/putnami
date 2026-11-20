@@ -226,8 +226,11 @@ httpPlugin.get('/example', async (ctx: HttpRequestContext) => {
 408 and aborts `ctx.signal` with a `TimeoutError`, so the request's work stops:
 the queries of the database session store, the calls of a generated client
 built without a service binding, and the server render. Pass `ctx.signal` to
-your own long waits. A handler that fails because its request ended logs and
-records no error: the request answers 408.
+your own long waits. A handler that stops because its request ended logs and
+records no error: the request answers 408. A stop is the signal's own reason, an
+`AbortError`, a `TimeoutError`, a `QueryAbortError` or a `ClientCanceledError`,
+thrown directly or as a `cause`. Any other error is still logged, recorded and
+passed to `onError`, and the request still answers 408.
 
 ## Response Handling
 
@@ -461,7 +464,7 @@ The HTTP plugin also supports WebSocket connections. See [WebSockets](websockets
 
 ### Global Error Handler (`onError`)
 
-Register a global error handler via the `http()` options. The handler is called whenever a route handler throws. Return a value to use as the response body (it will be content-negotiated), or `undefined` to fall through to the default error handling.
+Register a global error handler via the `http()` options. The handler is called whenever a route handler throws, except when it throws the stop of a request that already ended (see [Request timeout](#request-timeout)). Return a value to use as the response body (it will be content-negotiated), or `undefined` to fall through to the default error handling.
 
 The handler may be synchronous or asynchronous — async handlers are properly awaited.
 

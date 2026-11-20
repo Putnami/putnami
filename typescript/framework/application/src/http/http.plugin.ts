@@ -17,7 +17,7 @@ import {
   DEFAULT_MAX_BODY_SIZE_BYTES,
 } from './http-context.builder';
 import type { HttpRequestContext, HttpRequestContextInternal, Server as HttpServer } from './http-context.type';
-import { HttpDispatcher } from './http-dispatcher';
+import { HttpDispatcher, isRequestStop } from './http-dispatcher';
 import type { HttpMethod } from './http-method.type';
 import { HttpMethodsMiddleware, resolveHttpMethodsOptions } from './http-methods.middleware';
 import type { HttpMiddleware } from './http-middleware.type';
@@ -414,8 +414,12 @@ export class HttpPlugin implements Plugin {
                 }
               } catch (e) {
                 // A request that ended (its timeout fired or its client left)
-                // unwinds quietly: its work stopped on purpose.
+                // answers 408. Its stopped work unwinds quietly; any other
+                // error is a failure of its own and is logged.
                 if (requestTimedOut || requestSignal.aborted) {
+                  if (!isRequestStop(e, requestSignal) && !context.__requestErrorLogged) {
+                    useLogger().error('Unhandled error', e);
+                  }
                   return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
                 }
                 if (e instanceof HttpResponse) {

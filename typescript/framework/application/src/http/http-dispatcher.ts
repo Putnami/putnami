@@ -104,10 +104,26 @@ export class HttpDispatcher {
     return flushContext(r);
   };
 
+  /** Calls the user's error handler for an error whose request already ended: the answer stays 408. */
+  private async notifyErrorHandler(e: unknown, context: HttpRequestContext): Promise<void> {
+    if (!this.errorHandler) return;
+    try {
+      await this.errorHandler(e, context);
+    } catch (handlerError) {
+      useLogger().error('Error handler threw:', handlerError);
+    }
+  }
+
   private async handleError(e: unknown, context: HttpRequestContext): Promise<HttpResponse> {
-    // The request ended (it passed its timeout or its client left), so its
-    // work stopped on purpose: the HTTP plugin answers 408, and nothing failed.
+    // The request ended (it passed its timeout or its client left): the HTTP
+    // plugin answers 408. Work that stopped with it did not fail; any other
+    // error is still the handler's own failure, so it is recorded and logged.
     if (context.signal?.aborted && !(e instanceof HttpResponse)) {
+      if (!isRequestStop(e, context.signal)) {
+        recordRequestError(context, e);
+        await this.notifyErrorHandler(e, context);
+        useLogger().error(e);
+      }
       return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
     }
     recordRequestError(context, e);
@@ -156,6 +172,27 @@ export class HttpDispatcher {
       : { error: 'Internal Server Error' };
     return HttpResponse.json(body, { status: 500 });
   }
+}
+
+const REQUEST_STOP_NAMES = new Set(['AbortError', 'TimeoutError', 'QueryAbortError', 'ClientCanceledError']);
+
+/**
+ * Tells whether `error` is the stop of a request that ended: the reason of its
+ * aborted `signal`, or an abort, timeout, query abort or canceled client call,
+ * directly or as the `cause` of the error thrown. Any other error is a failure
+ * of its own, even when the request ended before it was thrown.
+ */
+export function isRequestStop(error: unknown, signal: AbortSignal | undefined): boolean {
+  if (!signal?.aborted) return false;
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current; depth++) {
+    if (current === signal.reason) return true;
+    if (typeof current !== 'object') return false;
+    const name = (current as { name?: unknown }).name;
+    if (typeof name === 'string' && REQUEST_STOP_NAMES.has(name)) return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 /**

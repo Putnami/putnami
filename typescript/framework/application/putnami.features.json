@@ -1045,7 +1045,11 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["a-request-past-the-timeout-aborts-its-signal", "an-ended-request-logs-no-error"]
+            "checks": [
+              "a-request-past-the-timeout-aborts-its-signal",
+              "an-ended-request-logs-no-error",
+              "a-failure-after-the-request-ended-is-still-logged"
+            ]
           }
         },
         {
