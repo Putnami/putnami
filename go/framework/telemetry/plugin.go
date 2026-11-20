@@ -324,7 +324,7 @@ func (p *Plugin) configureLocked() error {
 
 	// Build TracerProvider
 	tpOpts := []sdktrace.TracerProviderOption{
-		sdktrace.WithSampler(sdktrace.ParentBased(p.sampler)),
+		sdktrace.WithSampler(newParentPolicy(p.sampler)),
 	}
 	if res != nil {
 		tpOpts = append(tpOpts, sdktrace.WithResource(res))

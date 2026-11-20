@@ -30,6 +30,7 @@ type proxySafeTraceparentFixture struct {
 		Traceparent        string            `json:"traceparent"`
 		PutnamiTraceparent string            `json:"putnamiTraceparent"`
 		Source             string            `json:"source"`
+		Outside            bool              `json:"outside"`
 		Parent             *otlp.Traceparent `json:"parent"`
 	} `json:"cases"`
 }
@@ -103,6 +104,46 @@ func TestProxySafeTraceContext_TheServerSpanResolvesTheFixtureCases(t *testing.T
 				t.Error("the server span left the caller's trace")
 			}
 		})
+	}
+}
+
+// TestProxySafeTraceContext_ExtractMarksTheFixtureOutsideParents checks that
+// Extract marks a remote parent as outside exactly in the fixture's outside
+// cases, the parents the sampler decides under ParentDecide.
+func TestProxySafeTraceContext_ExtractMarksTheFixtureOutsideParents(t *testing.T) {
+	fixture := readProxySafeTraceparentFixture(t)
+	for _, c := range fixture.Cases {
+		t.Run(c.Name, func(t *testing.T) {
+			carrier := propagation.MapCarrier{}
+			if c.Traceparent != "" {
+				carrier.Set(otlp.HeaderTraceparent, c.Traceparent)
+			}
+			if c.PutnamiTraceparent != "" {
+				carrier.Set(otlp.HeaderPutnamiTraceparent, c.PutnamiTraceparent)
+			}
+			ctx := ProxySafeTraceContext{}.Extract(context.Background(), carrier)
+			if got := outsideParent(ctx); got != c.Outside {
+				t.Fatalf("outside = %v, want %v", got, c.Outside)
+			}
+		})
+	}
+}
+
+func TestProxySafeTraceContext_AMarkAppliesToItsParentOnly(t *testing.T) {
+	carrier := propagation.MapCarrier{otlp.HeaderTraceparent: "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-00"}
+	ctx := ProxySafeTraceContext{}.Extract(context.Background(), carrier)
+	if !outsideParent(ctx) {
+		t.Fatal("a traceparent alone is an outside parent")
+	}
+	other := trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: trace.TraceID{1}, SpanID: trace.SpanID{2}, Remote: true,
+	})
+	if outsideParent(trace.ContextWithRemoteSpanContext(ctx, other)) {
+		t.Fatal("the mark of one parent applied to another remote parent")
+	}
+	local := trace.SpanContextFromContext(ctx).WithRemote(false)
+	if outsideParent(trace.ContextWithSpanContext(ctx, local)) {
+		t.Fatal("the mark applied to a local parent")
 	}
 }
 

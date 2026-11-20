@@ -88,10 +88,12 @@ built-in client.
 `TraceSampling` is a pointer so the plugin can distinguish an omitted value
 from an explicit zero: leave it nil for the default budget (100 roots, then
 1 %, with 1 root per minute), or pass `&telemetry.TraceSampling{}` to sample
-no root trace. A span with a parent follows its parent's sampled flag.
+no root trace. A span with a parent follows its parent's sampled flag, unless
+`Parent` is `telemetry.ParentDecide` and the parent came from outside, such as
+a load balancer's edge: that server span then takes a root decision.
 
 The plugin reloads the config sources every 30 seconds and applies a changed
-`telemetry.traces` key (`budget`, `ratio`, `floorPerMinute`) without a restart.
+`telemetry.traces` key (`budget`, `ratio`, `floorPerMinute`, `parent`) without a restart.
 A file under `conf/` that changes applies; `CONFIG_DATA` keeps its first load
 for the process, and so do the Putnami Cloud remote sources unless
 `CONFIG_SERVER_REFRESH` sets a refresh period. It

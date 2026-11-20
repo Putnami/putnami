@@ -23,6 +23,11 @@ import (
 // traceparent: that parse also accepts a later traceparent version, which
 // ResolveRemoteParent and the TypeScript runtime treat as no parent. Flags are
 // kept as OpenTelemetry keeps them, sampled and random.
+//
+// A remote parent with no valid x-putnami-traceparent on its trace came from
+// outside, by the otlp.RemoteParentOutside rule: no Putnami client sent it.
+// Extract marks such a parent in the context it returns, and the plugin's
+// sampler decides it as a root under the parent policy ParentDecide.
 type ProxySafeTraceContext struct {
 	traceContext propagation.TraceContext
 }
@@ -45,7 +50,10 @@ func (p ProxySafeTraceContext) Extract(ctx context.Context, carrier propagation.
 		return extracted
 	}
 	second, ok := otlp.ParseTraceparent(carrier.Get(otlp.HeaderPutnamiTraceparent))
-	if !ok || second.TraceID != remote.TraceID().String() || second.SpanID == remote.SpanID().String() {
+	if !ok || second.TraceID != remote.TraceID().String() {
+		return context.WithValue(extracted, outsideParentKey{}, remote)
+	}
+	if second.SpanID == remote.SpanID().String() {
 		return extracted
 	}
 	var spanID trace.SpanID
@@ -58,6 +66,23 @@ func (p ProxySafeTraceContext) Extract(ctx context.Context, carrier propagation.
 	}
 	parent := remote.WithSpanID(spanID).WithTraceFlags(trace.TraceFlags(flags[0]) & (trace.FlagsSampled | trace.FlagsRandom))
 	return trace.ContextWithRemoteSpanContext(extracted, parent)
+}
+
+// outsideParentKey marks, in a context, the remote parent that came from
+// outside.
+type outsideParentKey struct{}
+
+// outsideParent reports whether the parent span context of ctx is a remote
+// parent Extract marked as coming from outside. A mark applies to that parent
+// only, so a local child of the server span, or a parent read later from
+// another carrier, is never taken for it.
+func outsideParent(ctx context.Context) bool {
+	parent := trace.SpanContextFromContext(ctx)
+	if !parent.IsValid() || !parent.IsRemote() {
+		return false
+	}
+	marked, ok := ctx.Value(outsideParentKey{}).(trace.SpanContext)
+	return ok && marked.Equal(parent)
 }
 
 // Fields names the headers Inject sets.
