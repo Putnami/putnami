@@ -154,16 +154,15 @@ func buildCompileArgs(config, entrypoint, outputFile, target string, bytecode bo
 
 // reproducibleBytecodeBun is the earliest Bun release measured to write
 // --bytecode output that is byte-identical across compiles of the same inputs.
-// An image content-addresses its executable, so bytecode that differs between
-// compiles would change the digest of an unchanged service.
+// An image content-addresses its executable, so its digest stays the same for
+// an unchanged service only when the compile is byte-identical.
 var reproducibleBytecodeBun = [3]int{1, 4, 5}
 
 // bunCompilesReproducibleBytecode reports whether the bun at bunBin is
 // reproducibleBytecodeBun or later, from what it prints for --version. Only a
 // version it reads as earlier compiles without bytecode. A probe that fails,
-// or prints a version this does not read, fails the compile: compiling
-// without bytecode then would store a different executable under the same
-// cache key as a healthy run, and break the image digest it content-addresses.
+// or prints a version this does not read, fails the compile, so one cache key
+// always holds the executable of one Bun release.
 func bunCompilesReproducibleBytecode(bunBin, workDir string) (bool, error) {
 	result, err := execRunFunc(bunBin, []string{"--version"}, exec.Dir(workDir), exec.Timeout(30*time.Second))
 	if err != nil {
