@@ -136,6 +136,8 @@ export function resolveProviderWireHandlers(
       const streamContext = {
         ...context,
         signal: state.abort.signal,
+        // The stream outlives the request's deadline: it ends on its own budgets.
+        deadlineAt: undefined,
         messages: () => state.messages,
         send: (value: unknown) => send(ws, state, def, wire, budgets, value),
       };

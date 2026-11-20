@@ -1,9 +1,14 @@
 import { describe, expect, it } from 'bun:test';
 import { HttpException } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
-import { buildForwardHeaders, buildInternalUrl, readRequestEnvelope } from '../../src/grpc/grpc-request';
+import {
+  buildDispatchContext,
+  buildForwardHeaders,
+  buildInternalUrl,
+  readRequestEnvelope,
+} from '../../src/grpc/grpc-request';
 import type { DiscoveredRoute } from '../../src/api';
-import type { HttpRequestContext } from '../../src/http/http-context.type';
+import type { HttpRequestContext, HttpRequestContextInternal } from '../../src/http/http-context.type';
 
 describe('readRequestEnvelope', () => {
   specTest(
@@ -151,5 +156,39 @@ describe('buildForwardHeaders', () => {
     expect(headers['grpc-timeout']).toBeUndefined();
     expect(headers['grpc-accept-encoding']).toBeUndefined();
     expect(headers['grpc-encoding']).toBeUndefined();
+  });
+});
+
+describe('buildDispatchContext', () => {
+  const route = { path: '/items', method: 'GET' } as unknown as DiscoveredRoute;
+  const internalReq = new Request('http://internal/items');
+
+  it('stops the handler when its HTTP request ends, and carries the request deadline', () => {
+    const request = new AbortController();
+    const grpcDeadline = new AbortController();
+    const endRequest = () => {};
+    const ctx = { signal: request.signal, deadlineAt: 1234, __endRequest: endRequest } as unknown as HttpRequestContext;
+
+    const apiCtx = buildDispatchContext(ctx, internalReq, route, {}, {}, {}, grpcDeadline.signal);
+
+    expect(apiCtx.signal?.aborted).toBe(false);
+    expect(apiCtx.deadlineAt).toBe(1234);
+    expect((apiCtx as HttpRequestContextInternal).__endRequest).toBe(endRequest);
+    request.abort(new DOMException('Request Timeout', 'TimeoutError'));
+    expect(apiCtx.signal?.aborted).toBe(true);
+    expect(apiCtx.signal?.reason).toBeInstanceOf(DOMException);
+    expect((apiCtx.signal?.reason as DOMException | undefined)?.name).toBe('TimeoutError');
+  });
+
+  it('stops the handler at the gRPC deadline', () => {
+    const request = new AbortController();
+    const grpcDeadline = new AbortController();
+    const ctx = { signal: request.signal } as unknown as HttpRequestContext;
+
+    const apiCtx = buildDispatchContext(ctx, internalReq, route, {}, {}, {}, grpcDeadline.signal);
+
+    grpcDeadline.abort();
+    expect(apiCtx.signal?.aborted).toBe(true);
+    expect(request.signal.aborted).toBe(false);
   });
 });

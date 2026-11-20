@@ -227,7 +227,9 @@ httpPlugin.get('/example', async (ctx: HttpRequestContext) => {
 the queries of the database session store, the calls of a generated client
 built without a service binding, and the server render. Pass `ctx.signal` to
 your own long waits. The request ends at `deadlineAt`, even when a client call
-bound by that deadline stops a moment before the signal aborts.
+bound by that deadline stops a moment before the signal aborts. The deadline
+holds until the response is sent: a stream that runs on after it is no longer
+held to `deadlineAt`, and the timeout no longer aborts its signal.
 
 A handler that stops because its request ended logs and records no error: the
 request answers 408. A stop is the signal's own reason, an `AbortError`, a
