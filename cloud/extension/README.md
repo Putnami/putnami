@@ -1099,6 +1099,9 @@ putnami cloud logs [<app>] [--env <env>] [--since <t>] [--level <sev>] [--follow
 putnami cloud logs [<app>] --cursor <c> | --all     # cursor pagination / follow all pages
 putnami cloud traces [<app>] [--env <env>] [--slow <dur>] [--from <t>] [--to <t>] [--output=jsonl]
 putnami cloud metrics [<app>] [--env <env>] [--window <dur>] [--output=jsonl]
+putnami cloud telemetry show [--app <app>] [--output=json]  # the workspace row, each service row, and what each service ends with
+putnami cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--log-level <level>]
+putnami cloud telemetry reset [--app <app>]        # remove the row: back to the service's own settings
 putnami cloud registry-token --host <host>         # machine command: host-based compatibility alias
 ```
 
@@ -1121,6 +1124,22 @@ no `type` (a CLI older than the job context change), is refused with a message
 that says to upgrade the CLI; the command never reads a missing type as
 `application`. A workspace with no projects prints `No workloads found.`, as the
 core does.
+
+`putnami cloud telemetry` reads and writes the telemetry settings config-api
+keeps for the workspace (`GET|PUT /v1/workspaces/{workspace}/config/telemetry`):
+a workspace row, which every service without a row of its own takes, and one
+row per service, named by the app's canonical name (`--app` resolves it as every
+cloud command does). The workspace collector returns a service's settings on
+each export as its `Putnami-Export-Directive`, so a running service applies them
+within a few minutes, without a redeploy: each trace setting replaces the
+service's own, higher or lower, and the log level only tightens. An unset field
+keeps the service's own setting. `set` writes the flags it is given into the row
+and keeps the others; it checks each range before any call (budget and floor
+from 0 to 1000000, ratio from 0 to 1, log level `debug`, `info`, `warn` or
+`error`). `reset` removes the row. `show` needs `platform.workspace.read`; `set`
+and `reset` need `platform.workspace.manage`, as a person. The settings hold in
+every environment of the workspace. A parent policy and an expiry (`--parent`,
+`--for`) come once config-api stores them.
 
 `putnami cloud status` reads 12 entries at once and gives each a state: `ok`,
 `degraded`, `failing` or `unknown`. The entries are `whoami`, `token`,
