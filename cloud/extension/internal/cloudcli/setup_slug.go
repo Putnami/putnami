@@ -36,6 +36,7 @@ var workspaceSlugPattern = regexp.MustCompile(`^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$`)
 // them. The two modules share no package, so a name added there is added
 // here.
 var reservedWorkspaceSlugs = map[string]bool{
+	"agency":        true,
 	"business":      true,
 	"catalog":       true,
 	"cloud":         true,

@@ -34,6 +34,20 @@
       "archives": true,
       "binary-name": "putnami-cloud"
     },
+    "agent-artifact": {
+      "forbiddenContent": [
+        "password",
+        "access token",
+        "api key",
+        "https://user:",
+        "npm_",
+        "ghp_",
+        ".ai/domains.json"
+      ],
+      "requiredSkills": [
+        "audit"
+      ]
+    },
     "sdd": {
       "verification": {
         "specs": "enforce"
@@ -41,7 +55,8 @@
     },
     "test": {
       "filePatterns": [
-        "git:bin/**"
+        "git:bin/**",
+        "agent-src/**"
       ]
     }
   }

@@ -63,6 +63,11 @@ var machineCommands = []string{
 	"validate-site-content", "generate-site-content", "publish-site-content", "publish-deployment",
 }
 
+// groupCommands are the runtime commands of another command group of this
+// extension: `putnami agency` runs as `agency`. They never appear in the help
+// of `putnami cloud`.
+var groupCommands = []string{"agency"}
+
 // operatorCommands are platform maintenance commands that left the public CLI
 // for `putnami operator`. The public CLI answers them with a
 // usage error that names the new command.

@@ -2,6 +2,7 @@
   "$schema": "https://putnami.dev/schemas/putnami-scope.json",
   "includes": [
     "extension",
+    "clients/agency-api",
     "clients/auth-server",
     "clients/cache-server",
     "clients/config-api",

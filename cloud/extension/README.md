@@ -168,12 +168,34 @@ tool for the same data when one exists: `query_logs`, `query_metrics`,
 `list_releases`, `get_configuration` or `list_databases`. A `status` entry
 that needs such a route is `unknown` with that reason.
 
-### Intelligence
+### Agency
 
-The Intelligence commands ship with the
-`@putnami/intelligence` extension, not with this one: `putnami intelligence
-setup`, `status`, `review`, `audit-attest` and `provenance`. They use the
-workspace link and the session this extension writes.
+The `putnami agency` commands ship with this extension. They use the workspace
+link and the session it writes, and read every secret from standard input
+only:
+
+- `putnami agency trigger register --url <fire URL> --token-stdin`, `show` and
+  `remove` keep the API trigger of your own Putnami routine in the workspace,
+  or with `--skill rebase|build` of a routine for that skill alone. Config
+  stores the token and never reveals it.
+- `putnami agency build --issue <n> [--repository owner/name]` asks the agency
+  gateway (`/v1/workspaces/{workspace}/agency/builds`) to start your build
+  routine on one issue and prints its session link, or why nothing started.
+- `putnami agency model-key set --stdin`, `status` and `revoke` keep the
+  organization's Anthropic API key and its budget per run. Organization admins
+  only.
+- `putnami agency audit-attest get`, `set` and `prefetch` read and write the
+  workspace's shared audit attestations in Putnami Agency, which the `audit`
+  skill calls.
+
+`putnami cloud login` asks for the Putnami Agency scopes: `agency.read` for
+the hosted Agency reads and `agency.audit`, which the audit attestation routes
+require. The `audit` skill, with its `prune-triage` and `prune-apply` workers,
+is the agent content of this extension: a workspace receives it when it lists
+`extension:@putnami/cloud` in `agentArtifacts`, and configures it under
+`options["@putnami/cloud"].audit`. It replaces the `audit` skill of
+`@putnami/intelligence`: a workspace opts into one of the two, never both,
+since both write `skills/audit`.
 
 The setup command verifies the existing repository workspace link when one is
 present. Pass `--workspace <workspace-id>` to select or join a different
@@ -442,6 +464,36 @@ two routes are hand-written until the published Cloud schema declares them
   `proposals.find` or `tasks.get`. It never sends the write again.
 - **Redaction.** No answer carries the bearer the provider presented or the
   value of `PUTNAMI_CLOUD_TOKEN`.
+
+## Report agent sessions through Putnami Agency
+
+`@putnami/cloud` also provides the **memory** (version 1) and **missions**
+(version 2, which also offers version 1) collaboration contracts. Each
+operation is one call to agency-api, the Putnami Agency service, under your
+Putnami session, for the linked workspace:
+
+- `memory.context`, `memory.mission` and `memory.checkpoint` read and save
+  mission records. `memory.search` is not served.
+- `missions.sync`, `ask`, `reply` and `status` publish an agent session to
+  its mission, ask its owner a decision, answer the owner's messages and read
+  a mission's sessions.
+- `missions.start`, `report` and `runs` record the typed runs of a mission:
+  a build, a review, a rebase, an audit or a triage.
+
+Bind them in the workspace manifest:
+
+```json
+"options": {
+  "collaboration": {
+    "memory": { "provider": "@putnami/cloud", "version": 1 },
+    "missions": { "provider": "@putnami/cloud", "version": 2 }
+  }
+}
+```
+
+A write whose outcome is unknown answers `unresolved` and is not sent again:
+sync, ask, reply, start and report replay safely with the same document, and
+a checkpoint is settled with `memory.mission`.
 
 ## Upload a change evidence document
 
@@ -1232,8 +1284,7 @@ a workspace, subscribes or activates a product. A linked checkout needs no
 session and no network for this local preparation; hosted reads use the
 existing session when invoked. Existing `.putnami/cache.json` settings are
 preserved unless the install is forced. The Cloud installer never writes agent
-configuration wiring: the `@putnami/intelligence` extension's own installer does, when
-the repository enables Intelligence.
+configuration wiring.
 
 `putnami cloud token --json` prints a workspace-scoped bearer for
 scripts that need to call the control-plane or config APIs directly. The
@@ -1725,7 +1776,7 @@ Google Cloud IAM credentials, so it is an emergency operator path;
 
 ## Service clients
 
-The extension calls Putnami Cloud services through 14 generated Go clients.
+The extension calls Putnami Cloud services through 15 generated Go clients.
 Each one lives under `../clients/<service>/go` and is its own Putnami project,
 `go.putnami.dev/cloud/clients/<service>`. `./putnamiw client-generate`
 generates it from `../clients/<service>/schema/openapi.json`, and the
@@ -1733,7 +1784,7 @@ extension's build runs it first. The CLI's runtime preparation generates the
 same clients into an overlay of its own (see above). Git ignores
 `client.gen.go`: never edit or commit it.
 
-The services are auth-server, cache-server, config-api, control-api, data-api,
+The services are agency-api, auth-server, cache-server, config-api, control-api, data-api,
 db-gateway, delivery-api, distribution-api, identity-api, observability-api,
 oci-server, put-server, runtime-api and source-api.
 
@@ -1741,7 +1792,8 @@ The schemas come from the Put package `cloud/doc-contents-cloud-cli-schema`,
 channel `canary`, version `0.0.0-20261102145238-eda90513c` (archive digest
 `sha256:dab1f1b3075d46e412de527001649b4e46a7f8374e57764ae532bf5216df1204`). Its
 file layout is `docs/cloud-cli-schema/services/<service>/openapi.json`. Each
-file is copied byte for byte. `delivery-api` comes from a later source, which
+file is copied byte for byte. `delivery-api` comes from a later source, and
+`agency-api` and `config-api` from the putnami-cloud repository, which
 [`../clients/README.md`](../clients/README.md) names. To update the schemas:
 
 1. Fetch a newer version of `cloud/doc-contents-cloud-cli-schema`.

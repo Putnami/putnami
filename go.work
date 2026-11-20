@@ -2,6 +2,7 @@ go 1.26.9
 
 use (
 	./cloud/extension
+	./cloud/clients/agency-api
 	./cloud/clients/auth-server
 	./cloud/clients/cache-server
 	./cloud/clients/config-api

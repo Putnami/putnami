@@ -1,0 +1,63 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/agency-providers",
+  "outcomes": [
+    "A workspace that binds @putnami/cloud to the memory and missions contracts reports its agent sessions to their missions, asks and answers the owner's decisions, reads and checkpoints mission records, and records the typed runs of a mission in Putnami Agency, under the signed-in Putnami session"
+  ],
+  "nonGoals": [
+    "memory.search: agency-api serves no search, so the operation answers unsupported",
+    "Keeping any record on the machine: every operation is one call to agency-api, so every checkout of the workspace reads and writes the same records",
+    "Choosing the binding of a workspace: options.collaboration chooses the provider of each contract"
+  ],
+  "requirements": [
+    {
+      "id": "declares-memory-and-missions",
+      "text": [
+        "The @putnami/cloud manifest declares version 1 of the memory contract, with context, mission and checkpoint, and versions 1 and 2 of the missions contract, with sync, ask, reply and status, and in version 2 start, report and runs, each run by its own runtime with the provider argument.",
+        "checkpoint declares atomic preconditions; sync and status declare the missedSyncs member."
+      ]
+    },
+    {
+      "id": "memory-calls-agency-api",
+      "text": [
+        "memory.context, memory.mission and memory.checkpoint each send one request to the matching route under /v1/workspaces/{workspace}/agency/memory/ of agency-api, for the linked workspace, and answer the document agency-api answers.",
+        "An identity that names another workspace than the manifest's name is answered without a call: an empty context, a missing mission, a refused checkpoint.",
+        "A mission read or checkpoint whose identity names no repository takes the GitHub repository of the origin remote."
+      ]
+    },
+    {
+      "id": "missions-calls-agency-api",
+      "text": "missions.sync, ask, reply and status, in versions 1 and 2, each send one request to agency-api: the session sync route, the decisions route, the message reply route and the missions status route under /v1/workspaces/{workspace}/agency/, and answer the contract's result."
+    },
+    {
+      "id": "missions-runs-call-agency-api",
+      "text": "missions.start, report and runs, version 2, each send one request to agency-api's /v1/workspaces/{workspace}/agency/missions/start, report and runs routes with the contract's document, and answer the run or the page of runs agency-api answers."
+    },
+    {
+      "id": "refusals-keep-their-outcome",
+      "text": [
+        "agency-api's refusals keep their outcome: 401 is denied and names putnami cloud login, 403 denied, 404 not_found, 409 a conflict with the reason and current revision agency-api names, 429 a retryable unavailable, and any other 4xx invalid.",
+        "A binding whose settings carry any member is invalid, and a workspace with no Cloud link answers unavailable and names putnami cloud setup."
+      ]
+    },
+    {
+      "id": "never-repeats-an-uncertain-write",
+      "text": [
+        "A write is sent once. When its outcome is unknown, because no answer came back or agency-api answered a server error, the operation answers unresolved and names its reconcile: repeat the same document for sync, ask, reply, start and report, read memory.mission before a checkpoint.",
+        "A read that fails the same way answers unavailable and is retryable."
+      ]
+    },
+    {
+      "id": "signed-in-session-wins",
+      "text": [
+        "Every call presents the workspace-scoped bearer of the session putnami cloud login stored, refreshed when it expired; PUTNAMI_CLOUD_TOKEN is used only when no stored session can give one.",
+        "Without either, the operation sends nothing and answers denied, naming putnami cloud login."
+      ]
+    },
+    {
+      "id": "keeps-the-bearer-out-of-the-answer",
+      "text": "No answer the provider writes contains the bearer it presented or the value of PUTNAMI_CLOUD_TOKEN."
+    }
+  ]
+}

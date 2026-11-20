@@ -76,7 +76,10 @@
     },
     {
       "id": "repository-reads-are-declared-inputs",
-      "text": "Every repository file the Go extension's tests read outside the project (go.work, every go.work member's go.mod, every first-party extension manifest, the content policy and authored agent content of each manifest that ships content, and the npm packager's gate twin) is a declared test input, so editing one re-runs the suite instead of replaying an old verdict."
+      "text": [
+        "Every repository file the Go extension's tests read outside the project (go.work, every go.work member's go.mod, every first-party extension manifest, the putnami.json content policy and authored agent content of each manifest that ships content, and the npm packager's gate twin) is a declared test input, so editing one re-runs the suite instead of replaying an old verdict.",
+        "The manifest ratchet stages each manifest's content at the version the packager stamps, as packaging does."
+      ]
     },
     {
       "id": "testdata-is-a-test-input",
@@ -264,9 +267,9 @@
     {
       "id": "archive-agent-content",
       "text": [
-        "An extension that declares agent content ships, in every platform archive, the same tree built once from its authored source under its own name and version, bound by the digest the packaged manifest declares and stamped with the agent-content contract;",
-        "a manifest without agent content keeps the base contract.",
-        "Content the declared policy forbids, content under another name, and staged bytes that differ from the digest fail packaging."
+        "An extension with agent content ships, in every platform archive, one tree built from its authored source, bound by the packaged manifest's digest and stamped with the agent-content contract; a manifest without content keeps the base contract.",
+        "The content takes the name putnami.extension.json declares, under which the archive publishes, and the stamped package version; a package.json name must agree.",
+        "Forbidden content, a disagreeing package.json name and bytes that differ from the digest fail packaging."
       ]
     },
     {

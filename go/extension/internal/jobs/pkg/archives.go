@@ -98,7 +98,11 @@ func createExtensionArchives(ctx *pctx.Context, emit *jsonl.Emitter, packageName
 		// platform copies it: every platform archive carries the same content
 		// bytes, and the contract gate below verifies them against the digest
 		// the staged manifest now binds.
-		if _, err := agentartifact.StageExtensionContent(projectRoot, baseStageDir, packageName, version); err != nil {
+		// An extension archive publishes under its manifest's name
+		// (putnami.extension.json owns the registry identity); the project
+		// name only names the archive files. A package.json name is a
+		// published name too, so the content must agree with it.
+		if _, err := agentartifact.StageExtensionContent(projectRoot, baseStageDir, declaredPackageName(projectRoot), version); err != nil {
 			emit.Diagnostic("error", err.Error(), "", 0)
 			emit.PhaseEnd("package-archives", "failed")
 			return false

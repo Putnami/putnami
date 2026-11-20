@@ -7,6 +7,7 @@ require (
 	go.putnami.dev/api v0.0.0
 	go.putnami.dev/app v0.0.1
 	go.putnami.dev/client v0.0.0
+	go.putnami.dev/cloud/clients/agency-api v0.0.0
 	go.putnami.dev/cloud/clients/auth-server v0.0.0
 	go.putnami.dev/cloud/clients/cache-server v0.0.0
 	go.putnami.dev/cloud/clients/config-api v0.0.0
@@ -79,6 +80,8 @@ replace go.putnami.dev/api => ../../go/framework/api
 replace go.putnami.dev/app => ../../go/framework/app
 
 replace go.putnami.dev/client => ../../go/framework/client
+
+replace go.putnami.dev/cloud/clients/agency-api => ../clients/agency-api
 
 replace go.putnami.dev/cloud/clients/auth-server => ../clients/auth-server
 

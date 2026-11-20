@@ -129,7 +129,7 @@ func TestLoginPersistsStandardCredentialStore(t *testing.T) {
 	if req.Body["client_id"] != "putnami-cli" {
 		t.Fatalf("client_id = %v", req.Body["client_id"])
 	}
-	if req.Body["scope"] != "openid profile email apikeys:write intelligence.read intelligence.audit intelligence.review.read intelligence.review.manage" {
+	if req.Body["scope"] != "openid profile email apikeys:write agency.read agency.audit" {
 		t.Fatalf("scope = %v", req.Body["scope"])
 	}
 
@@ -2534,7 +2534,7 @@ func tokenResponse(extra map[string]any) map[string]any {
 		"email":    "dev@example.com",
 		"name":     "Dev User",
 		"provider": "github",
-		"scope":    "openid profile email apikeys:write intelligence.read intelligence.audit intelligence.review.read intelligence.review.manage",
+		"scope":    "openid profile email apikeys:write agency.read agency.audit",
 		"iat":      fixedNow().Unix(),
 		"exp":      fixedNow().Add(5 * time.Minute).Unix(),
 	}

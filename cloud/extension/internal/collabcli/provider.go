@@ -2,8 +2,10 @@
 // tasks and proposals contracts of go.putnami.dev/protocol/collaboration,
 // served by Putnami Source through the Putnami GitHub App of the repository
 // connected to the linked workspace. proposals.screenshots alone goes to
-// Putnami Delivery, which stores a change's screenshots. It needs no GitHub token on the machine:
-// every call presents the signed-in Putnami session.
+// Putnami Delivery, which stores a change's screenshots. The memory and
+// missions contracts are served by Putnami Agency (agency-api). It needs no
+// GitHub token on the machine: every call presents the signed-in Putnami
+// session.
 //
 // A write is sent once. When its outcome is unknown (the connection broke
 // after the request left, the deadline passed, or Source answered a server
@@ -16,6 +18,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"maps"
 	"net/http"
 	"os"
 	"strings"
@@ -53,6 +56,14 @@ type Provider struct {
 	IO clicore.IO
 	// Connect returns the Source surface of a resolved workspace.
 	Connect func(workspace *clicore.WorkspaceContext) (Source, error)
+	// ConnectAgency returns the agency-api client of a resolved workspace,
+	// which the memory and missions operations call. Nil binds the generated
+	// client to the workspace's control plane.
+	ConnectAgency func(workspace *clicore.WorkspaceContext) (Agency, error)
+	// OriginRemote returns the origin remote URL of the checkout at dir; nil
+	// asks git. A memory identity without a repository takes its GitHub
+	// repository.
+	OriginRemote func(dir string) (string, error)
 	// Budget bounds one operation, below the manifest's provider timeout so
 	// the provider answers before the orchestrator gives up. Default 100s.
 	Budget time.Duration
@@ -78,7 +89,7 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 		reviewRepeat   = "repeat proposals.review with the same idempotency key, or read the reviews with proposals.status"
 		taskRead       = "read the task with tasks.get"
 	)
-	return map[collab.OperationKey]collab.Handler{
+	handlers := map[collab.OperationKey]collab.Handler{
 		key(collab.ContractProposals, collab.OperationFind):        served(p, "", Source.FindProposals),
 		key(collab.ContractProposals, collab.OperationUpsert):      served(p, proposalRead, Source.UpsertProposal),
 		key(collab.ContractProposals, collab.OperationStatus):      served(p, "", Source.ProposalStatus),
@@ -95,6 +106,9 @@ func (p *Provider) Handlers() map[collab.OperationKey]collab.Handler {
 		key(collab.ContractTasks, collab.OperationUpdate):          notServed,
 		key(collab.ContractTasks, collab.OperationLink):            notServed,
 	}
+	maps.Copy(handlers, p.memoryHandlers())
+	maps.Copy(handlers, p.missionsHandlers())
+	return handlers
 }
 
 // notServed answers an operation Putnami Source does not serve. It sends
@@ -161,6 +175,26 @@ func (p *Provider) budget(ctx context.Context) (context.Context, context.CancelF
 // open resolves the linked workspace and its bearer, and connects Source.
 // Nothing is sent to Source before it returns.
 func (p *Provider) open(ctx context.Context, workspaceRoot string) (Source, *collab.Failure) {
+	workspace, failure := p.linked(ctx, workspaceRoot, "Putnami Source")
+	if failure != nil {
+		return nil, failure
+	}
+	connect := p.Connect
+	if connect == nil {
+		connect = connectSource
+	}
+	source, err := connect(workspace)
+	if err != nil {
+		return nil, collab.Fail(collab.OutcomeUnavailable, reasonTransport, "connect Putnami Source: %v", err)
+	}
+	return source, nil
+}
+
+// linked resolves the workspace linked at workspaceRoot and the bearer of
+// its session, and registers every bearer for redaction. service names what
+// the caller is about to call in a refusal. Nothing is sent before it
+// returns.
+func (p *Provider) linked(ctx context.Context, workspaceRoot, service string) (*clicore.WorkspaceContext, *collab.Failure) {
 	env := p.environment()
 	if token := strings.TrimSpace(env[cloudTokenVar]); token != "" {
 		p.remember(token)
@@ -176,20 +210,12 @@ func (p *Provider) open(ctx context.Context, workspaceRoot string) (Source, *col
 	workspace, err := p.workspace(ctx, link, env)
 	if err != nil {
 		if clicore.ExitCode(err) == clicore.ExitAuth {
-			return nil, collab.Fail(collab.OutcomeDenied, reasonSignIn, "no Putnami session can call Putnami Source: %v", err)
+			return nil, collab.Fail(collab.OutcomeDenied, reasonSignIn, "no Putnami session can call %s: %v", service, err)
 		}
 		return nil, collab.Fail(collab.OutcomeUnavailable, reasonTransport, "resolve the linked workspace: %v", err)
 	}
 	p.watchBearer(workspace)
-	connect := p.Connect
-	if connect == nil {
-		connect = connectSource
-	}
-	source, err := connect(workspace)
-	if err != nil {
-		return nil, collab.Fail(collab.OutcomeUnavailable, reasonTransport, "connect Putnami Source: %v", err)
-	}
-	return source, nil
+	return workspace, nil
 }
 
 // workspace resolves the linked workspace under the stored session first:

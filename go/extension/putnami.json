@@ -36,6 +36,8 @@
         "../../tooling/contributor/putnami.json",
         "../../tooling/contributor/src/**",
         "../../typescript/framework/web/putnami.json",
+        "../../cloud/extension/putnami.json",
+        "../../cloud/extension/agent-src/**",
         "../../typescript/framework/web/agent-src/**",
         "../../typescript/extension/internal/pkg/manifest_contract.go",
         "git:../../typescript/extension/bin/**",

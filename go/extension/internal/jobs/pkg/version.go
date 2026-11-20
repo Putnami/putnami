@@ -88,6 +88,22 @@ var (
 	startsAlphaNumRe = regexp.MustCompile(`^[A-Za-z0-9]`)
 )
 
+// declaredPackageName is the name the project's package.json publishes it
+// under, or "" when it has none.
+func declaredPackageName(projectRoot string) string {
+	data, err := os.ReadFile(filepath.Join(projectRoot, "package.json"))
+	if err != nil {
+		return ""
+	}
+	var pkg struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(data, &pkg) != nil {
+		return ""
+	}
+	return strings.TrimSpace(pkg.Name)
+}
+
 func toResolverArtifactName(value string) (string, error) {
 	noScope := strings.TrimPrefix(value, "@")
 	dashed := strings.NewReplacer("/", "-", "\\", "-").Replace(noScope)

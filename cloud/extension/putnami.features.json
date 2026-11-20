@@ -763,6 +763,260 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/agency-commands",
+      "type": "feature",
+      "name": "Agency commands of the Cloud CLI",
+      "outcome": "A person keeps their routine trigger, starts their build routine and reads and writes shared audit attestations, and an organization admin keeps the organization's model key, with putnami agency commands under their own putnami cloud login, and every secret is read from standard input only",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "trigger-token-is-read-from-stdin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-trigger-register"
+            ]
+          }
+        },
+        {
+          "id": "trigger-show-and-remove",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-trigger-show-remove"
+            ]
+          }
+        },
+        {
+          "id": "trigger-url-is-checked-before-sending",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-trigger-refuses-before-sending"
+            ]
+          }
+        },
+        {
+          "id": "model-key-is-read-from-stdin",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-model-key-set"
+            ]
+          }
+        },
+        {
+          "id": "model-key-status-and-revoke",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-model-key-status-revoke"
+            ]
+          }
+        },
+        {
+          "id": "model-key-budget-flags",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-model-key-budget-bounds"
+            ]
+          }
+        },
+        {
+          "id": "build-starts-the-routine",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-build-starts"
+            ]
+          }
+        },
+        {
+          "id": "build-says-why-nothing-started",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-build-refusals"
+            ]
+          }
+        },
+        {
+          "id": "audit-attest-reads-and-writes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-audit-attest"
+            ]
+          }
+        },
+        {
+          "id": "calls-go-through-generated-clients",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-commands-generated-clients"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "id": "cloud/agency-providers",
+      "type": "feature",
+      "name": "Memory and missions through Putnami Agency",
+      "outcome": "A workspace that binds @putnami/cloud to the memory and missions contracts reports its agent sessions to their missions, asks and answers the owner's decisions, reads and checkpoints mission records, and records the typed runs of a mission in Putnami Agency, under the signed-in Putnami session",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "declares-memory-and-missions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-provider-manifest-offer"
+            ]
+          }
+        },
+        {
+          "id": "memory-calls-agency-api",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-memory-routes"
+            ]
+          }
+        },
+        {
+          "id": "missions-calls-agency-api",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-missions-routes"
+            ]
+          }
+        },
+        {
+          "id": "missions-runs-call-agency-api",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-missions-run-routes"
+            ]
+          }
+        },
+        {
+          "id": "refusals-keep-their-outcome",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-provider-refusals"
+            ]
+          }
+        },
+        {
+          "id": "never-repeats-an-uncertain-write",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-provider-uncertain-writes"
+            ]
+          }
+        },
+        {
+          "id": "signed-in-session-wins",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-provider-credentials"
+            ]
+          }
+        },
+        {
+          "id": "keeps-the-bearer-out-of-the-answer",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agency-provider-redacts-the-bearer"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

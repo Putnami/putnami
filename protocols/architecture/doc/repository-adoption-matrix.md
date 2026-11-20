@@ -306,7 +306,7 @@ to the frontier.
 ### Cloud CLI extension
 
 **Why excluded:** `@putnami/cloud-extension` builds the `@putnami/cloud`
-extension binary, a client of the hosted platform. Its 14 generated clients
+extension binary, a client of the hosted platform. Its 15 generated clients
 come from the published Cloud CLI schema, and only the extension consumes
 them. No repository project links the extension from the workspace, and no
 existing domain owns the hosted platform's wire contracts.
@@ -318,6 +318,7 @@ to the frontier.
 | Project | Class | Owner |
 |---|---|---|
 | `/cloud/extension` | Hosted-platform CLI extension | `cloud` |
+| `/cloud/clients/agency-api` | Generated client | `cloud` |
 | `/cloud/clients/auth-server` | Generated client | `cloud` |
 | `/cloud/clients/cache-server` | Generated client | `cloud` |
 | `/cloud/clients/config-api` | Generated client | `cloud` |

@@ -1,0 +1,6 @@
+name: audit
+description: Scan Putnami projects for quality/correctness/security findings — create, update, and close GitHub issues; refresh scorecards. --prune removes dead weight per scope in one umbrella issue and one batch proposal
+model: claude-opus-5-5[1m]
+allowed-tools: Bash, Read, Grep, Glob, Task, TodoWrite
+argument-hint: [--all | --scope SCOPE | --project PROJECT | --group GROUP | --impacted] [--reconcile | --scorecard-only | --prune [--typology T] [--apply]] [--skip-scorecard] [--no-cache] [--dry-run]
+disable-model-invocation: true

@@ -288,9 +288,6 @@ func TestTheManifestOffersExactlyTheHandledOperations(t *testing.T) {
 			}
 		}
 	}
-	if len(offer.Versions(collab.ContractMemory)) != 0 || len(offer.Versions(collab.ContractMissions)) != 0 {
-		t.Fatal("the provider declares a contract it does not serve")
-	}
 	tasks, _ := offer.Operations(collab.ContractTasks, 1)
 	proposals, _ := offer.Operations(collab.ContractProposals, 1)
 	for name, op := range map[string]collab.ProvidedOperation{"tasks.transition": tasks["transition"], "tasks.assign": tasks["assign"], "proposals.upsert": proposals["upsert"]} {

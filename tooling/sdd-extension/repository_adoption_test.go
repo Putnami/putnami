@@ -74,6 +74,7 @@ var declaredDomains = []string{
 // its authority.
 var excludedProjects = map[string]string{
 	"/cloud/extension":                                     reasonCloudCLIExtension,
+	"/cloud/clients/agency-api":                            reasonCloudCLIClient,
 	"/cloud/clients/auth-server":                           reasonCloudCLIClient,
 	"/cloud/clients/cache-server":                          reasonCloudCLIClient,
 	"/cloud/clients/config-api":                            reasonCloudCLIClient,

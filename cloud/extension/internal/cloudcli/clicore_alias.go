@@ -117,6 +117,9 @@ func init() {
 		// env doctor: --strict fails on every row that is not ok. Declared
 		// here so `--strict staging` never takes the environment as its value.
 		"strict",
+		// agency trigger register: --token-stdin reads the routine's token
+		// from standard input.
+		"token-stdin", "tokenStdin",
 		// ci: --cancel-running cancels in-flight runs when pausing the pipeline.
 		"cancel-running", "cancelRunning",
 		// ci logs: --raw prints the runner's protocol records verbatim instead of the

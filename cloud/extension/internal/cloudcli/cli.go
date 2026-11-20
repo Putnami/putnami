@@ -16,6 +16,7 @@ import (
 	"time"
 
 	identityapi "go.putnami.dev/cloud/clients/identity-api/go"
+	agencycli "go.putnami.dev/cloud/extension/internal/agencycli"
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	configcli "go.putnami.dev/cloud/extension/internal/configcli"
 	deliverycli "go.putnami.dev/cloud/extension/internal/deliverycli"
@@ -349,6 +350,10 @@ func RunCommand(command string, ioctx IO, args []string) (err error) {
 		return observabilitycli.Traces(params, args, workspaceRoot, env, ioctx)
 	case "metrics":
 		return observabilitycli.Metrics(params, args, workspaceRoot, env, ioctx)
+
+	// Another command group of this runtime: `putnami agency`.
+	case "agency":
+		return agencycli.Agency(params, args, workspaceRoot, env, ioctx)
 
 	// Platform maintenance lives in the operator CLI.
 	case "sql-proxy", "publish-doc":
@@ -717,9 +722,9 @@ func setup(params map[string]any, workspaceRoot string, env map[string]string, i
 		"repository":        firstString(stringParam(params, "repository"), clicore.Deref(workspace.Repository)),
 		"linked_at":         ioctx.Now().UTC().Format(time.RFC3339Nano),
 	}
-	// Intelligence is the @putnami/intelligence extension's concern: its own
-	// `putnami intelligence setup` enables the agent wiring and reports hosted
-	// availability. Cloud setup links the workspace and nothing else of it.
+	// Cloud setup links the workspace and nothing else: the memory and
+	// missions providers and the agency commands need only the link and the
+	// session.
 	commitSetup, err := prepareSetupLink(workspaceRoot, linkData)
 	if err != nil {
 		return autoFail(auto, params, ioctx, err)

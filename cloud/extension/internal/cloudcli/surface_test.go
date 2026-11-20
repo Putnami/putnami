@@ -52,7 +52,7 @@ func TestHelpListsExactlyThePublicRoot(t *testing.T) {
 	if !slices.Equal(names, wantPublicRoot) {
 		t.Fatalf("help lists %v, want the 21 public entries %v", names, wantPublicRoot)
 	}
-	hidden := slices.Concat(machineCommands, slices.Collect(maps.Keys(operatorCommands)))
+	hidden := slices.Concat(machineCommands, groupCommands, slices.Collect(maps.Keys(operatorCommands)))
 	for _, name := range hidden {
 		if slices.Contains(names, name) {
 			t.Fatalf("help lists the hidden command %q", name)
@@ -74,6 +74,7 @@ func TestRootListsStayDisjoint(t *testing.T) {
 	}
 	add("public", wantPublicRoot...)
 	add("machine", machineCommands...)
+	add("group", groupCommands...)
 	add("operator", slices.Collect(maps.Keys(operatorCommands))...)
 }
 

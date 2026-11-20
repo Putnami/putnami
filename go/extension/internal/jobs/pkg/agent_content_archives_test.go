@@ -161,8 +161,21 @@ func TestCreateExtensionArchivesRefusesAgentContentThePolicyForbids(t *testing.T
 func TestCreateExtensionArchivesRefusesContentUnderAnotherName(t *testing.T) {
 	spectest.Proves(t, "go/go-project-toolchain", "archive-agent-content", "content-the-archive-cannot-bind-fails-packaging")
 	ctx, outputRoot := agentContentExtensionFixture(t, "Guide.\n")
+	mustWrite(t, filepath.Join(ctx.Project.FullPath, "package.json"), `{"name":"@putnami/renamed","version":"1.2.3"}`)
 	if ok := createExtensionArchives(ctx, jsonl.New(), "@putnami/renamed", "1.2.3", outputRoot, false); ok {
 		t.Fatal("content must be refused when the manifest's name is not the published one")
+	}
+}
+
+// TestCreateExtensionArchivesPublishesContentUnderTheManifestName packages
+// the content of a project whose workspace name differs from its manifest's:
+// the archive publishes under the manifest's name, as @putnami/cloud does.
+func TestCreateExtensionArchivesPublishesContentUnderTheManifestName(t *testing.T) {
+	spectest.Proves(t, "go/go-project-toolchain", "archive-agent-content", "every-platform-archive-carries-the-same-bound-content")
+	ctx, outputRoot := agentContentExtensionFixture(t, "Guide.\n")
+	ctx.Project.Name = "@putnami/testext-extension"
+	if ok := createExtensionArchives(ctx, jsonl.New(), "@putnami/testext-extension", "1.2.3", outputRoot, false); !ok {
+		t.Fatal("content under the manifest's name was refused")
 	}
 }
 

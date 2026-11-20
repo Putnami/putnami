@@ -1,6 +1,141 @@
 {
   "components": {
     "schemas": {
+      "AgentTrigger": {
+        "additionalProperties": false,
+        "properties": {
+          "generation": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "registeredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "routineId": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AgentTriggerRegisterRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "token": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AgentTriggerResolveRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "principalId": {
+            "type": "string"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AgentTriggerResolveResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "disabled": {
+            "type": "boolean"
+          },
+          "generation": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "registered": {
+            "type": "boolean"
+          },
+          "skill": {
+            "type": "string"
+          },
+          "token": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "AuditEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "actorId": {
+            "type": "string"
+          },
+          "appName": {
+            "type": "string"
+          },
+          "callerServiceAccount": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "grantId": {
+            "type": "string"
+          },
+          "occurredAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "sequence": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "version": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "ConfigApp": {
         "additionalProperties": false,
         "properties": {
@@ -24,6 +159,98 @@
               "$ref": "#/components/schemas/ConfigApp"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigDiff": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigDiffEntry"
+            },
+            "type": "array"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "fromVersion": {
+            "type": "string"
+          },
+          "toVersion": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigDiffEntry": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "nullable": true,
+            "type": "string"
+          },
+          "before": {
+            "nullable": true,
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "secret": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigKeyStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "field": {
+            "type": "string"
+          },
+          "key": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "required": {
+            "type": "boolean"
+          },
+          "secret": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigLayer": {
+        "additionalProperties": false,
+        "properties": {
+          "dimension": {
+            "type": "string"
+          },
+          "priority": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "secret": {
+            "type": "boolean"
           }
         },
         "type": "object"
@@ -70,6 +297,141 @@
         },
         "type": "object"
       },
+      "ConfigSnapshot": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "layers": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigLayer"
+            },
+            "type": "array"
+          },
+          "secretPaths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "secretsApplied": {
+            "type": "boolean"
+          },
+          "values": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "keys": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigKeyStatus"
+            },
+            "type": "array"
+          },
+          "schemaHash": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigVersion": {
+        "additionalProperties": false,
+        "properties": {
+          "current": {
+            "type": "boolean"
+          },
+          "id": {
+            "type": "string"
+          },
+          "pathCount": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigVersionList": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/ConfigVersion"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "DataBindingQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "environment": {
+            "type": "string"
+          },
+          "logicalName": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "targetBindingGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "targetBindingId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "DataBindingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "type": "string"
+          },
+          "query": {
+            "$ref": "#/components/schemas/DataBindingQuery"
+          }
+        },
+        "type": "object"
+      },
       "Entry": {
         "additionalProperties": false,
         "properties": {
@@ -91,6 +453,48 @@
             "type": "object"
           },
           "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "domain": {
+            "type": "string"
+          },
+          "finished_at": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/Item"
+            },
+            "type": "array"
+          },
+          "started_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "workspace_id": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "EvidenceResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "purges": {
+            "items": {
+              "$ref": "#/components/schemas/Evidence"
+            },
+            "type": "array"
+          },
+          "workspace_id": {
             "type": "string"
           }
         },
@@ -147,6 +551,69 @@
         },
         "type": "object"
       },
+      "Item": {
+        "additionalProperties": false,
+        "properties": {
+          "absent": {
+            "type": "boolean"
+          },
+          "deleted": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "handle": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "remaining": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "KeyAuthority": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "keyUri": {
+            "type": "string"
+          },
+          "revision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "revokedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "LayerInfo": {
         "additionalProperties": false,
         "properties": {
@@ -193,6 +660,186 @@
             },
             "nullable": true,
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "ModelCredentialRevokeRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "provider": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ModelCredentialSetRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/RunBudget",
+            "nullable": true
+          },
+          "expectedGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ModelCredentialStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/RunBudget"
+          },
+          "credentialRef": {
+            "type": "string"
+          },
+          "generation": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "updatedBy": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "OpaqueBootBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "digest": {
+            "type": "string"
+          },
+          "generation": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "reference": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PrepareRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "acceptInlineDocument": {
+            "type": "boolean"
+          },
+          "artifactDigest": {
+            "type": "string"
+          },
+          "coordinate": {
+            "type": "string"
+          },
+          "dataBindings": {
+            "items": {
+              "$ref": "#/components/schemas/DataBindingRequest"
+            },
+            "type": "array"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "releaseSetDigest": {
+            "type": "string"
+          },
+          "releaseSetId": {
+            "type": "string"
+          },
+          "resourceBindings": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceBindingQuery"
+            },
+            "type": "array"
+          },
+          "subjectBinding": {
+            "$ref": "#/components/schemas/SubjectBindingQuery"
+          },
+          "targetBinding": {
+            "$ref": "#/components/schemas/TargetBindingQuery"
+          },
+          "version": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "PreparedConfiguration": {
+        "additionalProperties": false,
+        "properties": {
+          "identity": {
+            "$ref": "#/components/schemas/PreparedConfigurationIdentity"
+          },
+          "inlineDocument": {
+            "type": "string"
+          },
+          "protectedBootBinding": {
+            "$ref": "#/components/schemas/OpaqueBootBinding"
+          }
+        },
+        "type": "object"
+      },
+      "PreparedConfigurationIdentity": {
+        "additionalProperties": false,
+        "properties": {
+          "authoredDigest": {
+            "type": "string"
+          },
+          "bindingSetDigest": {
+            "type": "string"
+          },
+          "bindingSetGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "memberDigest": {
+            "type": "string"
           }
         },
         "type": "object"
@@ -262,6 +909,39 @@
             "type": "string"
           },
           "status": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Request": {
+        "additionalProperties": false,
+        "properties": {
+          "reference": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Request2": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": "string"
+          },
+          "workspaceId": {
             "type": "string"
           }
         },
@@ -381,6 +1061,265 @@
         },
         "type": "object"
       },
+      "ResolveTransport": {
+        "additionalProperties": false,
+        "properties": {
+          "audience": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "ResourceBindingQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "resourceGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "resourceKey": {
+            "type": "string"
+          },
+          "targetBindingGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "targetBindingId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Response": {
+        "additionalProperties": false,
+        "properties": {
+          "config": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "Response2": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "grantId": {
+            "type": "string"
+          },
+          "grantRevision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "values": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object"
+          },
+          "version": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RunBudget": {
+        "additionalProperties": false,
+        "properties": {
+          "modelSeconds": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "tokens": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "RunLease": {
+        "additionalProperties": false,
+        "properties": {
+          "budget": {
+            "$ref": "#/components/schemas/RunBudget"
+          },
+          "closedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
+          "expiresAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "generation": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "issuedAt": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "leaseId": {
+            "type": "string"
+          },
+          "organizationId": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "runReference": {
+            "type": "string"
+          },
+          "stopReason": {
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/RunUsage",
+            "nullable": true
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RunLeaseCloseRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "stopReason": {
+            "type": "string"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/RunUsage"
+          }
+        },
+        "type": "object"
+      },
+      "RunLeaseOpenRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "provider": {
+            "type": "string"
+          },
+          "runReference": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "RunLeaseResolveResponse": {
+        "additionalProperties": false,
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "lease": {
+            "$ref": "#/components/schemas/RunLease"
+          }
+        },
+        "type": "object"
+      },
+      "RunUsage": {
+        "additionalProperties": false,
+        "properties": {
+          "modelMillis": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "tokens": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          }
+        },
+        "type": "object"
+      },
+      "SecretCheck": {
+        "additionalProperties": false,
+        "properties": {
+          "executionId": {
+            "type": "string"
+          },
+          "memberDigest": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "SecretCheckRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactDigest": {
+            "type": "string"
+          },
+          "coordinate": {
+            "type": "string"
+          },
+          "deadline": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "executionId": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "releaseSetDigest": {
+            "type": "string"
+          },
+          "releaseSetId": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "SecretKeyStatus": {
         "additionalProperties": false,
         "properties": {
@@ -440,6 +1379,260 @@
         },
         "type": "object"
       },
+      "StoreRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "artifactDigest": {
+            "type": "string"
+          },
+          "capabilityHash": {
+            "type": "string"
+          },
+          "coordinate": {
+            "type": "string"
+          },
+          "deadline": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "ecosystem": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "executionId": {
+            "type": "string"
+          },
+          "generation": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "inline": {
+            "type": "boolean"
+          },
+          "inputFingerprint": {
+            "type": "string"
+          },
+          "project": {
+            "type": "string"
+          },
+          "releaseSetDigest": {
+            "type": "string"
+          },
+          "releaseSetId": {
+            "type": "string"
+          },
+          "resolveTransport": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "StoredConfiguration": {
+        "additionalProperties": false,
+        "properties": {
+          "bootDocument": {
+            "type": "string"
+          },
+          "executionId": {
+            "type": "string"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "resolveTransport": {
+            "$ref": "#/components/schemas/ResolveTransport"
+          },
+          "stored": {
+            "type": "boolean"
+          }
+        },
+        "type": "object"
+      },
+      "SubjectBindingQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "audience": {
+            "type": "string"
+          },
+          "immutableSubjectId": {
+            "type": "string"
+          },
+          "issuer": {
+            "type": "string"
+          },
+          "resourceGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "resourceKey": {
+            "type": "string"
+          },
+          "targetBindingGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "targetBindingId": {
+            "type": "string"
+          },
+          "workloadKey": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TargetBindingQuery": {
+        "additionalProperties": false,
+        "properties": {
+          "bindingGeneration": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "bindingId": {
+            "type": "string"
+          },
+          "workspaceId": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TelemetryServiceSettings": {
+        "additionalProperties": false,
+        "properties": {
+          "effective": {
+            "$ref": "#/components/schemas/TelemetrySettingValues"
+          },
+          "override": {
+            "$ref": "#/components/schemas/TelemetrySettingValues"
+          },
+          "service": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TelemetrySettingValues": {
+        "additionalProperties": false,
+        "properties": {
+          "logLevel": {
+            "nullable": true,
+            "type": "string"
+          },
+          "traceBudget": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "traceFloorPerMinute": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "traceRatio": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "TelemetrySettingsView": {
+        "additionalProperties": false,
+        "properties": {
+          "services": {
+            "items": {
+              "$ref": "#/components/schemas/TelemetryServiceSettings"
+            },
+            "type": "array"
+          },
+          "workspace": {
+            "$ref": "#/components/schemas/TelemetrySettingValues"
+          },
+          "workspaceId": {
+            "type": "string"
+          },
+          "workspaceUpdatedAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "TelemetrySettingsWriteRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "logLevel": {
+            "nullable": true,
+            "type": "string"
+          },
+          "service": {
+            "type": "string"
+          },
+          "traceBudget": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "traceFloorPerMinute": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "nullable": true,
+            "type": "integer"
+          },
+          "traceRatio": {
+            "format": "double",
+            "nullable": true,
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "auditList": {
+        "additionalProperties": false,
+        "properties": {
+          "entries": {
+            "items": {
+              "$ref": "#/components/schemas/AuditEntry"
+            },
+            "type": "array"
+          }
+        },
+        "type": "object"
+      },
       "configError": {
         "additionalProperties": false,
         "properties": {
@@ -478,6 +1671,51 @@
               "$ref": "#/components/schemas/Grant"
             },
             "type": "array"
+          }
+        },
+        "type": "object"
+      },
+      "grantPutRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "appName": {
+            "type": "string"
+          },
+          "callerServiceAccount": {
+            "type": "string"
+          },
+          "capability": {
+            "type": "string"
+          },
+          "environment": {
+            "type": "string"
+          },
+          "expectedRevision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
+          },
+          "paths": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "revisionRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "expectedRevision": {
+            "format": "int64",
+            "maximum": 9223372036854775807,
+            "minimum": -9223372036854775808,
+            "type": "integer"
           }
         },
         "type": "object"
@@ -587,6 +1825,15 @@
           }
         },
         "type": "object"
+      },
+      "telemetryError": {
+        "additionalProperties": false,
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        },
+        "type": "object"
       }
     },
     "securitySchemes": {
@@ -598,13 +1845,167 @@
     }
   },
   "info": {
-    "description": "Config, schema, secret, durable caller-grant and KMS-authority APIs, plus encrypted credential custody. Owner mutations require a live Identity projection. Consumers call it through the generated clients in clients/go and clients/ts.",
+    "description": "Config, schema, secret, durable caller-grant and KMS-authority APIs, plus the organization model credential. Owner mutations require a live Identity projection. Consumers call it through the generated clients in clients/go and clients/ts.",
     "title": "Putnami Config API",
     "version": "1.0.0"
   },
   "openapi": "3.0.3",
   "paths": {
     "/api/configs": {
+      "delete": {
+        "description": "Delete plaintext configuration values for a specific dimension.\n\nRequired scopes: config.value.write.",
+        "operationId": "deleteApi_Configs",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/statusResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.value.write"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/configs",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
       "put": {
         "description": "Write plaintext configuration values for a specific dimension. The write rolls no revision: a workload reads the new value on its next deploy. The `roll` and `rollShared` query parameters and the `roll` response member are ignored and never set.\n\nRequired scopes: config.value.write.",
         "operationId": "putApi_Configs",
@@ -759,6 +2160,241 @@
       }
     },
     "/api/configs/resolve": {
+      "get": {
+        "description": "Resolve and merge configuration values for an application environment from query parameters. Use secretsMode=reveal for plaintext secrets (requires config.secret.read or an exact runtime service-account config claim).\n\nRequired scopes: config.value.read.",
+        "operationId": "getApi_Configs_Resolve",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "includeSecrets",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pinned",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "schemaHash",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "secretsMode",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResolveConfigsResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.unprocessable_entity",
+              "status": 422
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "attemptTimeoutMs": 5000,
+            "retry": {
+              "maxAttempts": 8,
+              "statuses": [
+                408,
+                425,
+                429,
+                500,
+                502,
+                503,
+                504
+              ]
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.value.read"
+                    ]
+                  }
+                ]
+              },
+              {
+                "allOf": [
+                  {
+                    "profile": "service",
+                    "scopes": [
+                      "config.value.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/configs/resolve",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
       "post": {
         "description": "Resolve and merge configuration values for an application environment. Pass secretsMode=redacted to merge secret shape without plaintext, or includeSecrets=true / secretsMode=reveal for plaintext (requires config.secret.read or an exact runtime service-account config claim).\n\nRequired scopes: config.value.read.",
         "operationId": "postApi_Configs_Resolve",
@@ -1220,6 +2856,136 @@
       }
     },
     "/api/schemas/{app}": {
+      "delete": {
+        "description": "Delete a registered schema for an application.\n\nRequired scopes: config.schema.write.",
+        "operationId": "deleteApi_Schemas_App",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/statusResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.schema.write"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/schemas/{app}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
       "get": {
         "description": "Return the latest registered schema for an application.\n\nRequired scopes: config.schema.read.",
         "operationId": "getApi_Schemas_App",
@@ -1345,6 +3111,141 @@
             {
               "encoding": "json",
               "path": "/api/schemas/{app}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/api/schemas/{app}/history": {
+      "get": {
+        "description": "Return schema registration history for an application.\n\nRequired scopes: config.schema.read.",
+        "operationId": "getApi_Schemas_App_History",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "app",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/schemaManifestDoc"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Invalid request body or validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Authentication is required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The caller is not allowed to access the requested scope"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "The requested config resource was not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/errorResponse"
+                }
+              }
+            },
+            "description": "Internal config server error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.schema.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/api/schemas/{app}/history",
               "protocol": "rest-json"
             }
           ]
@@ -2101,6 +4002,1585 @@
         }
       }
     },
+    "/internal/agent-triggers/resolve": {
+      "post": {
+        "description": "Resolve one person's routine trigger for a skill in a workspace, to start that person's routine: the trigger of that skill, else the person's Putnami routine (skill putnami). Answered with Cache-Control: no-store. When agent triggers are off it answers registered false with disabled true. Service-to-service only: exact-audience Google ID token from an allowlisted dispatcher.",
+        "operationId": "postInternal_Agent-triggers_Resolve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentTriggerResolveRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTriggerResolveResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed resolve request"
+          },
+          "403": {
+            "description": "The caller is not an allowlisted dispatcher"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "The caller could not be verified"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/agent-triggers/resolve",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/config/prepared-configuration/accepted": {
+      "post": {
+        "description": "Prepare an exact accepted Config member after owner verification. Service-to-service only; callers provide no artifact bytes or acceptance receipt.",
+        "operationId": "postInternal_Config_Prepared-configuration_Accepted",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PrepareRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreparedConfiguration"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed exact selector"
+          },
+          "403": {
+            "description": "Control service identity denied"
+          },
+          "409": {
+            "description": "Accepted member is not verified ready"
+          },
+          "412": {
+            "description": "A secret the member references is not set"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "precondition_failed",
+              "status": 412
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/config/prepared-configuration/accepted",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/config/prepared-configuration/boot": {
+      "post": {
+        "description": "Resolve one opaque prepared configuration reference for the exact currently authorized workload issuer, immutable subject and audience.",
+        "operationId": "postInternal_Config_Prepared-configuration_Boot",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Request"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Response"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed prepared configuration boot request"
+          },
+          "403": {
+            "description": "Workload identity or opaque reference is not authorized"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Prepared configuration boot failed closed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "resilience": {
+            "attemptTimeoutMs": 5000,
+            "retry": {
+              "maxAttempts": 8,
+              "statuses": [
+                408,
+                425,
+                429,
+                500,
+                502,
+                503,
+                504
+              ]
+            },
+            "timeoutMs": 30000
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/config/prepared-configuration/boot",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/config/prepared-configuration/check-secrets": {
+      "post": {
+        "description": "Check that every secret an exact accepted Config member references is set for its workload. The deploy calls it before it changes anything. Service-to-service only.",
+        "operationId": "postInternal_Config_Prepared-configuration_Check-secrets",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SecretCheckRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SecretCheck"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed request"
+          },
+          "403": {
+            "description": "Caller identity denied"
+          },
+          "409": {
+            "description": "Deadline passed, or the member conflicts with owner evidence"
+          },
+          "412": {
+            "description": "A secret the member references is not set"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "precondition_failed",
+              "status": 412
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/config/prepared-configuration/check-secrets",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/config/prepared-configuration/store": {
+      "post": {
+        "description": "Store an exact accepted Config member as its workload's stored configuration, and answer the workload's boot document and resolve transport. Service-to-service only.",
+        "operationId": "postInternal_Config_Prepared-configuration_Store",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StoreRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StoredConfiguration"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed request, or a member Config refuses to store"
+          },
+          "403": {
+            "description": "Caller identity denied"
+          },
+          "409": {
+            "description": "Deadline passed, a newer generation is recorded for the workload, or the member conflicts with the stored schema"
+          },
+          "412": {
+            "description": "The member is not prepared, or the boot document is refused"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "precondition_failed",
+              "status": 412
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/config/prepared-configuration/store",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/config/secrets/resolve": {
+      "post": {
+        "description": "Resolve an explicitly granted set of plaintext secret string paths for one exact workspace/application/environment/version tuple. Service-to-service only: exact-audience Google ID token plus an allowlisted caller service account.",
+        "operationId": "postInternal_Config_Secrets_Resolve",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Request2"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Response2"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed or out-of-bounds secret projection request"
+          },
+          "403": {
+            "description": "Service caller or requested secret tuple is not authorized"
+          },
+          "500": {
+            "description": "Secret projection failed closed"
+          },
+          "503": {
+            "description": "Service caller could not be verified because Google signing keys are unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/config/secrets/resolve",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/config/workspaces/{workspace}/purge": {
+      "get": {
+        "description": "Read what this workload's purge of one workspace deleted: per domain, when the purge started and finished, each table with the rows it deleted and the rows left, and each provider resource with its handle and whether it was re-observed absent. finished_at stays empty until every table has 0 rows left and every resource is absent. Service-to-service only.\n\nRequired scopes: workspace.lifecycle.evidence.",
+        "operationId": "getInternal_Config_Workspaces_Workspace_Purge",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EvidenceResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Invalid workspace id"
+          },
+          "401": {
+            "description": "Caller is not authenticated"
+          },
+          "403": {
+            "description": "Service caller is not authorized"
+          },
+          "500": {
+            "description": "Purge evidence read failed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "internal",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service",
+                    "scopes": [
+                      "workspace.lifecycle.evidence"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/config/workspaces/{workspace}/purge",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/model-credentials/leases": {
+      "post": {
+        "description": "Open the lease of one run on the Anthropic API key of the workspace's organization, with the per-run budget stored now. Opening the same run again answers the same lease. Service-to-service only: exact-audience Google ID token from an allowlisted model relay.",
+        "operationId": "postInternal_Model-credentials_Leases",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunLeaseOpenRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunLease"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed lease request"
+          },
+          "403": {
+            "description": "The caller is not an allowlisted model relay"
+          },
+          "404": {
+            "description": "No credential or lease for this caller"
+          },
+          "409": {
+            "description": "The key is revoked, the run is leased to another caller, or the lease is closed, expired or superseded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Organization model credentials are not enabled, or the caller could not be verified"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/model-credentials/leases",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/model-credentials/leases/{lease}/close": {
+      "post": {
+        "description": "Close a lease with the run's usage and stop reason. A closed lease never resolves again; closing it again answers the recorded close.",
+        "operationId": "postInternal_Model-credentials_Leases_Lease_Close",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lease",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RunLeaseCloseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunLease"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed lease request"
+          },
+          "403": {
+            "description": "The caller is not an allowlisted model relay"
+          },
+          "404": {
+            "description": "No credential or lease for this caller"
+          },
+          "409": {
+            "description": "The key is revoked, the run is leased to another caller, or the lease is closed, expired or superseded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Organization model credentials are not enabled, or the caller could not be verified"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/model-credentials/leases/{lease}/close",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/model-credentials/leases/{lease}/resolve": {
+      "post": {
+        "description": "Resolve the key under an open lease, only for the relay that opened it, before its deadline and at its generation. Answered with Cache-Control: no-store.",
+        "operationId": "postInternal_Model-credentials_Leases_Lease_Resolve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lease",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunLeaseResolveResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed lease request"
+          },
+          "403": {
+            "description": "The caller is not an allowlisted model relay"
+          },
+          "404": {
+            "description": "No credential or lease for this caller"
+          },
+          "409": {
+            "description": "The key is revoked, the run is leased to another caller, or the lease is closed, expired or superseded"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Organization model credentials are not enabled, or the caller could not be verified"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/model-credentials/leases/{lease}/resolve",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/agent-triggers/{skill}": {
+      "delete": {
+        "description": "Remove the caller's own routine trigger for a skill in the workspace. Removing none succeeds.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "deleteV1_Workspaces_Workspace_Config_Agent-triggers_Skill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful response"
+          },
+          "204": {
+            "description": "Trigger removed"
+          },
+          "400": {
+            "description": "The URL is not a routine fire endpoint of api.anthropic.com, or the token is malformed"
+          },
+          "403": {
+            "description": "The caller is not a person with platform.workspace.read at the workspace"
+          },
+          "404": {
+            "description": "Unknown skill, or the caller has no trigger for it"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Agent triggers are not enabled, or Identity is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/agent-triggers/{skill}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "get": {
+        "description": "Read the caller's own routine trigger for a skill in the workspace: the routine id, the generation, and when it was registered and last changed. Never the token.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Agent-triggers_Skill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTrigger"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "The URL is not a routine fire endpoint of api.anthropic.com, or the token is malformed"
+          },
+          "403": {
+            "description": "The caller is not a person with platform.workspace.read at the workspace"
+          },
+          "404": {
+            "description": "Unknown skill, or the caller has no trigger for it"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Agent triggers are not enabled, or Identity is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/agent-triggers/{skill}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Store or replace the caller's own routine trigger for a skill in the workspace: a fire URL of api.anthropic.com and the routine's token, sealed under the workspace data key. The token is write-only.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "putV1_Workspaces_Workspace_Config_Agent-triggers_Skill",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "skill",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AgentTriggerRegisterRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentTrigger"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "The URL is not a routine fire endpoint of api.anthropic.com, or the token is malformed"
+          },
+          "403": {
+            "description": "The caller is not a person with platform.workspace.read at the workspace"
+          },
+          "404": {
+            "description": "Unknown skill, or the caller has no trigger for it"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Agent triggers are not enabled, or Identity is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/agent-triggers/{skill}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
     "/v1/workspaces/{workspace}/config/apps": {
       "get": {
         "description": "List concrete config apps and environments in a workspace. Requires platform.workspace.read resolved at the target workspace; returns metadata only.\n\nRequired scopes: platform.workspace.read.",
@@ -2264,6 +5744,1192 @@
         }
       }
     },
+    "/v1/workspaces/{workspace}/config/diff": {
+      "get": {
+        "description": "Compute a deterministic server-side diff between two current or frozen config snapshots. Secret leaves remain fixed redaction markers on both sides. Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Diff",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fromVersion",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "toVersion",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigDiff"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Invalid config read selection"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config version not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config read service unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/diff",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/key-authority": {
+      "get": {
+        "description": "Read Config's current persistent workspace KMS authority.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Key-authority",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyAuthority"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/key-authority",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Ensure and activate the server-derived workspace-named KMS key using expectedRevision CAS. Callers cannot select a project, location, key ring, or key URI.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "putV1_Workspaces_Workspace_Config_Key-authority",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/revisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyAuthority"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/key-authority",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/key-authority/revoke": {
+      "post": {
+        "description": "Revoke Config's workspace KMS authority using expectedRevision CAS. A tombstone never falls back to Runtime placement.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Config_Key-authority_Revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/revisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/KeyAuthority"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/key-authority/revoke",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/organization-model-credential": {
+      "get": {
+        "description": "Read the redacted status of the Anthropic API key of the workspace's organization: state, generation, per-run budget, and who changed it and when. Never the key. Requires platform.organization.manage resolved at that organization.\n\nRequired scopes: platform.organization.manage.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Organization-model-credential",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCredentialStatus"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed key, budget or generation"
+          },
+          "403": {
+            "description": "The caller does not hold platform.organization.manage at the workspace's organization"
+          },
+          "404": {
+            "description": "The organization has no model credential"
+          },
+          "409": {
+            "description": "The generation moved, or the key is already revoked"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Organization model credentials are not enabled, or Identity is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.organization.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/organization-model-credential",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Store or replace the Anthropic API key of the workspace's organization, sealed under that organization's KMS key, with its per-run budget (default 2,000,000 tokens and 900 seconds of model time). The key is write-only. Requires platform.organization.manage resolved at that organization.\n\nRequired scopes: platform.organization.manage.",
+        "operationId": "putV1_Workspaces_Workspace_Config_Organization-model-credential",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCredentialSetRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCredentialStatus"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed key, budget or generation"
+          },
+          "403": {
+            "description": "The caller does not hold platform.organization.manage at the workspace's organization"
+          },
+          "404": {
+            "description": "The organization has no model credential"
+          },
+          "409": {
+            "description": "The generation moved, or the key is already revoked"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Organization model credentials are not enabled, or Identity is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.organization.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/organization-model-credential",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/organization-model-credential/revoke": {
+      "post": {
+        "description": "Revoke the organization's key at the generation the caller read. Every open lease stops resolving. Requires platform.organization.manage resolved at that organization.\n\nRequired scopes: platform.organization.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Config_Organization-model-credential_Revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModelCredentialRevokeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ModelCredentialStatus"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "description": "Malformed key, budget or generation"
+          },
+          "403": {
+            "description": "The caller does not hold platform.organization.manage at the workspace's organization"
+          },
+          "404": {
+            "description": "The organization has no model credential"
+          },
+          "409": {
+            "description": "The generation moved, or the key is already revoked"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "description": "Organization model credentials are not enabled, or Identity is unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "conflict",
+              "status": 409
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.organization.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/organization-model-credential/revoke",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/resolve": {
+      "get": {
+        "description": "Resolve a current or frozen config snapshot with every secret leaf replaced by a fixed redaction marker. There is no reveal mode. Requires platform.workspace.read resolved at the target workspace.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Resolve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "version",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigSnapshot"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Invalid config read selection"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config version not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config read service unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/resolve",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
     "/v1/workspaces/{workspace}/config/secret-grants": {
       "get": {
         "description": "List Config-owned caller grants for one exact workspace.\n\nRequired scopes: platform.workspace.manage.",
@@ -2382,6 +7048,1162 @@
             {
               "encoding": "json",
               "path": "/v1/workspaces/{workspace}/config/secret-grants",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/secret-grants/audit": {
+      "get": {
+        "description": "Read the durable grant and key-authority mutation audit for one workspace.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Secret-grants_Audit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/auditList"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/secret-grants/audit",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/secret-grants/{grant}": {
+      "get": {
+        "description": "Read one Config-owned caller grant and its CAS revision.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Secret-grants_Grant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Grant"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/secret-grants/{grant}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Create or replace one exact caller capability using expectedRevision CAS. Secret-read grants require an exact app/environment/version/path set; config-read grants carry no secret coordinates.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "putV1_Workspaces_Workspace_Config_Secret-grants_Grant",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/grantPutRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Grant"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/secret-grants/{grant}",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/secret-grants/{grant}/revoke": {
+      "post": {
+        "description": "Immediately revoke one exact caller grant using expectedRevision CAS.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "postV1_Workspaces_Workspace_Config_Secret-grants_Grant_Revoke",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/revisionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Grant"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "non-idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/secret-grants/{grant}/revoke",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/status": {
+      "get": {
+        "description": "List every configuration key and secret name the app's registered schema declares in one environment, whether each is a secret and required, and whether the live view holds a value for it (set or missing). Requires config.secret.read resolved at the target workspace; returns no value, default or hash of a value.\n\nRequired scopes: config.secret.read.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Status",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigStatus"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Invalid config read selection"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config version not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config read service unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "config.secret.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/status",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/telemetry": {
+      "get": {
+        "description": "Read the workspace's telemetry settings: the workspace row, each service override in service order, and the settings each overridden service ends with, field by field. An unset field takes the framework default. Requires platform.workspace.read at the workspace.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Telemetry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetrySettingsView"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "Malformed workspace, service or field value"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "Insufficient workspace permissions, or a machine token"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "The settings store failed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "internal",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/telemetry",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      },
+      "put": {
+        "description": "Replace the workspace's telemetry settings row, or one service's override when service is set: trace budget and per-minute trace floor from 0 to 1000000, trace ratio from 0 to 1, log level debug, info, warn or error. A request with every field unset removes the row. Answers the same view as the read. Requires platform.workspace.manage in this request's live Identity projection of the workspace: a token-carried scope alone is refused, and so is a machine token.\n\nRequired scopes: platform.workspace.manage.",
+        "operationId": "putV1_Workspaces_Workspace_Config_Telemetry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TelemetrySettingsWriteRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetrySettingsView"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "Malformed workspace, service or field value"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "Insufficient workspace permissions, or a machine token"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "The settings store failed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "invalid_argument",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "internal",
+              "status": 500
+            }
+          ],
+          "idempotency": {
+            "kind": "idempotent"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.manage"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/telemetry",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/v1/workspaces/{workspace}/config/versions": {
+      "get": {
+        "description": "List current plus persisted resolved-value snapshots for one config app and environment. Requires platform.workspace.read resolved at the target workspace; returns no values.\n\nRequired scopes: platform.workspace.read.",
+        "operationId": "getV1_Workspaces_Workspace_Config_Versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "workspace",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "appName",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "environment",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigVersionList"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Invalid config read selection"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Authentication required"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Insufficient workspace permissions"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config version not found"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/configError"
+                }
+              }
+            },
+            "description": "Config read service unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "unauthorized",
+              "status": 401
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "not_found",
+              "status": 404
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "user",
+                    "scopes": [
+                      "platform.workspace.read"
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/v1/workspaces/{workspace}/config/versions",
               "protocol": "rest-json"
             }
           ]

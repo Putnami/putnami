@@ -261,6 +261,10 @@ func TestFirstPartyManifestsSurviveTheGateAndLoad(t *testing.T) {
 				t.Fatalf("read %s: %v", rel, err)
 			}
 			stage := stageManifest(t, string(source))
+			// The packager stamps the package version into the manifest
+			// before it stages the agent content (archives.go), so a manifest
+			// that names a source version packages under the stamped one.
+			stampManifestVersion(stage, "0.0.0-gate")
 			// A manifest with agent content ships the tree built from its
 			// authored source; every packager stages it before the gate.
 			if _, err := agentartifact.StageExtensionContent(filepath.Join(repoRoot, filepath.Dir(rel)), stage, "", "0.0.0-gate"); err != nil {

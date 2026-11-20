@@ -14,7 +14,7 @@ ignores `client.gen.go`: never edit or commit it.
 `clientgen.json` declares a client that lives inside its provider's own Go
 module. Its `go.output` names the package directory, here `go`.
 
-The services are auth-server, cache-server, config-api, control-api, data-api,
+The services are agency-api, auth-server, cache-server, config-api, control-api, data-api,
 db-gateway, delivery-api, distribution-api, identity-api, observability-api,
 oci-server, put-server, runtime-api and source-api.
 
@@ -43,6 +43,18 @@ digest
 adds the collaboration routes under `source/proposals`, `source/tasks` and
 `source/collaboration/capabilities`, which `@putnami/cloud` calls to serve the
 tasks and proposals contracts.
+
+Two schemas come from the putnami-cloud repository instead of the package.
+`agency-api/schema/openapi.json` is a byte-for-byte copy of
+`agency/workloads/agency-api/schema/openapi.json` at commit
+`5efd5633f16582a222f63a7e47280c08fe975abe` (branch `epic-5143/gateway-routine`),
+which serves the memory, missions (v1 and v2 runs), build start and audit
+attestation routes `@putnami/cloud` calls. `config-api/schema/openapi.json` is a
+byte-for-byte copy of `config/workloads/config-api/schema/openapi.json` at
+commit `34663727215f4ec61080067bec3b16f2f9a10aa2` of `main`, which adds the
+agent trigger and organization model credential routes of
+`putnami agency trigger` and `putnami agency model-key`. Refresh either one
+the same way, from the service's committed `schema/openapi.json`.
 
 ## Update the schemas
 

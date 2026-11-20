@@ -231,6 +231,28 @@ Stable URL prefixes per section, **Copy as Markdown** on every page, and
 [`/llms.txt`](/llms.txt) as a machine-readable index of the whole tree. The
 structure an agent reads is the structure you read.
 
+## A session reports to its mission
+
+An agent session can report to a **mission**: the work an owner follows, with
+its plan, its open decisions and the owner's messages. The `memory` and
+`missions` collaboration contracts carry it, and a workspace binds each one to
+a provider. Bound to `@putnami/cloud`, every operation is one call to Putnami
+Agency under your `putnami cloud login`, so each checkout and each session of
+the workspace reads the same missions:
+
+```json
+"options": {
+  "collaboration": {
+    "memory": { "provider": "@putnami/cloud", "version": 1 },
+    "missions": { "provider": "@putnami/cloud", "version": 2 }
+  }
+}
+```
+
+The same extension serves `putnami agency`: your routine's trigger, a build
+started on an issue, the organization's model key and the shared audit
+attestations.
+
 ---
 
 ## What this deliberately does not do

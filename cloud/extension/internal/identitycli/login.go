@@ -34,14 +34,11 @@ func Login(params map[string]any, env map[string]string, ioctx clicore.IO) (Logi
 	if scope == "" {
 		// apikeys:write is required so the resulting JWT can mint the per-
 		// registry pkt_* personal access keys that the login flow records for
-		// registry-token resolution. intelligence.read enables the hosted
-		// Intelligence reads; intelligence.audit is the narrower shared
-		// attestation permission and never grants graph writes.
-		// intelligence.review.read / intelligence.review.manage let the
-		// workspace session drive `putnami intelligence review`; the
-		// API still enforces the workspace role behind them. Bundling them
-		// into the default keeps `putnami cloud login` a single-prompt flow.
-		scope = "openid profile email apikeys:write intelligence.read intelligence.audit intelligence.review.read intelligence.review.manage"
+		// registry-token resolution. agency.read enables the hosted Agency
+		// reads; agency.audit is the narrower permission the shared audit
+		// attestation routes require. Bundling them into the default keeps
+		// `putnami cloud login` a single-prompt flow.
+		scope = "openid profile email apikeys:write agency.read agency.audit"
 	}
 	body := map[string]any{"client_id": clientID, "scope": scope}
 	if workspaceID := clicore.ScalarStringParam(params, "workspace", "workspaceId"); workspaceID != "" {

@@ -197,7 +197,7 @@ func TestSetupRefusesASlugFlagWithoutAValue(t *testing.T) {
 // the runtime provisioner: a name added there must be added here too.
 func TestSetupRefusesAReservedSlug(t *testing.T) {
 	want := []string{
-		"business", "catalog", "cloud", "config", "control", "data", "delivery",
+		"agency", "business", "catalog", "cloud", "config", "control", "data", "delivery",
 		"distribution", "events", "identity", "infra", "intelligence",
 		"observability", "platform", "putnami", "qa", "runtime", "source",
 		"surfaces", "tooling",

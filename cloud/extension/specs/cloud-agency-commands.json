@@ -1,0 +1,78 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/agency-commands",
+  "outcomes": [
+    "A person keeps their Putnami routine's API trigger, starts their build routine on an issue, and reads and writes the shared audit attestations of the linked workspace with putnami agency commands, under their own putnami cloud login",
+    "An organization admin stores, reads and revokes the organization's Anthropic API key and its per-run budget with putnami agency model-key",
+    "A secret the person hands to a command is read from standard input only, sent once, and never printed or written"
+  ],
+  "nonGoals": [
+    "putnami intelligence setup and review-change: @putnami/cloud carries neither, and the intelligence command group has no alias",
+    "Revealing a stored routine token or model key",
+    "Registering a trigger or a key for another person",
+    "Running the build on this machine: the routine runs it"
+  ],
+  "requirements": [
+    {
+      "id": "trigger-token-is-read-from-stdin",
+      "text": [
+        "putnami agency trigger register --url <fire URL> --token-stdin registers the person's Putnami routine through config-api, and --skill rebase|build a routine for that skill alone.",
+        "It reads the token from standard input only, sends it once, even when Config answers a status the client would retry, and prints the redacted trigger: skill, routine id and generation.",
+        "It never prints or writes the token, and refuses a --token, --value, --key or --from-file flag."
+      ]
+    },
+    {
+      "id": "trigger-show-and-remove",
+      "text": [
+        "putnami agency trigger show prints the person's redacted trigger or says none is registered and how to register one; putnami agency trigger remove removes it.",
+        "With --skill rebase or --skill build, both act on that skill's trigger. A refusal from Config is printed and fails the command: exit 3 for a refused credential or permission, 4 for any other refusal."
+      ]
+    },
+    {
+      "id": "trigger-url-is-checked-before-sending",
+      "text": "register refuses a URL that is not a routine fire endpoint of api.anthropic.com, an unknown --skill, and a token that is not one line of 16 to 1024 printable characters, before it sends anything."
+    },
+    {
+      "id": "model-key-is-read-from-stdin",
+      "text": "putnami agency model-key set --stdin reads the organization's Anthropic API key from standard input only, sends it to Config once through config-api's model credential route, even when Config answers a status the client would retry, and prints the redacted status. It never prints or writes the key."
+    },
+    {
+      "id": "model-key-status-and-revoke",
+      "text": [
+        "putnami agency model-key status prints the provider, state, generation and per-run budget of the key of the linked workspace's organization; putnami agency model-key revoke revokes it at the generation the status read.",
+        "A caller without platform.organization.manage at the organization gets Config's refusal and exits 3."
+      ]
+    },
+    {
+      "id": "model-key-budget-flags",
+      "text": "model-key set takes --max-tokens and --max-model-minutes for the per-run budget and refuses values outside Config's bounds before it sends anything."
+    },
+    {
+      "id": "build-starts-the-routine",
+      "text": [
+        "putnami agency build --issue <n> [--repository owner/name] asks the agency gateway, POST /v1/workspaces/{workspace}/agency/builds of agency-api, to start the caller's build routine in the linked workspace, for that issue of that repository; without --repository it takes the GitHub repository of the origin remote.",
+        "It prints the session link when the gateway returns one, and exits 0."
+      ]
+    },
+    {
+      "id": "build-says-why-nothing-started",
+      "text": [
+        "When the gateway starts nothing, the command prints the reason and its fix and exits 1: for no_trigger, how to register the person's Putnami routine with putnami agency trigger register and no --skill.",
+        "A refusal from the gateway exits 1; an issue that is not a positive integer and a repository that is not owner/name exit 1 before anything is sent."
+      ]
+    },
+    {
+      "id": "audit-attest-reads-and-writes",
+      "text": [
+        "putnami agency audit-attest get and set read and record one shared audit attestation, keyed by repository, project, group, input hash and rubric hash, through agency-api's /api/agency/audit/attestations routes.",
+        "prefetch resolves the JSONL lookups of standard input or --file in one request and prints one JSON line per lookup.",
+        "A missing key member or set argument, and a line that is not a lookup, exit 2 before anything is sent; a refusal exits 3 for a refused credential, 4 otherwise."
+      ]
+    },
+    {
+      "id": "calls-go-through-generated-clients",
+      "text": "trigger and model-key call config-api, and build and audit-attest agency-api, through the service's generated client, under the workspace-scoped bearer of the stored putnami cloud login, re-minted once on a 401."
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+name: prune-apply
+description: Edit worker for /audit --prune — applies one typology of prescribed removals on the batch branch, runs the --projects gate, reports what it deleted. Use only when the audit skill delegates a batch; not for general delegation.
+tools: Bash, Read, Grep, Glob, Edit, Write, TodoWrite
+model: sonnet
+effort: medium

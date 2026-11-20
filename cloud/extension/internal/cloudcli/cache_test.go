@@ -413,7 +413,7 @@ func TestCloudTokenForCacheEmitsBareBearer(t *testing.T) {
 				AccessToken: ordinaryWorkspaceToken,
 				TokenType:   "Bearer",
 				ExpiresAt:   fixedNow().Add(time.Hour).Format(time.RFC3339Nano),
-				Scope:       "openid profile email apikeys:write intelligence.read intelligence.audit intelligence.review.read intelligence.review.manage",
+				Scope:       "openid profile email apikeys:write agency.read agency.audit",
 			},
 		}
 		if err := writeAuth(stored, env); err != nil {
