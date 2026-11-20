@@ -64,7 +64,12 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["a-query-after-abort-raises-query-abort-error", "a-query-in-flight-unwinds-at-the-abort"]
+            "checks": [
+              "a-query-after-abort-raises-query-abort-error",
+              "a-query-after-abort-is-never-sent",
+              "a-query-in-flight-unwinds-at-the-abort",
+              "the-session-store-stops-with-the-request"
+            ]
           }
         },
         {

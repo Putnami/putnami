@@ -748,6 +748,11 @@ export abstract class BaseClient {
           code: 'client.remote',
         });
       }
+      // The request this call took its signal from ended: the client's own
+      // timeout did not fire. A signal the caller passed keeps its own error.
+      if (!options?.signal && request.signal?.aborted) {
+        throw new ClientCanceledError(this.serviceName, `${method} ${path}`);
+      }
       // AbortSignal.timeout() surfaces as a DOMException named 'TimeoutError'.
       // Wrap it in the documented typed error carrying the configured timeout.
       if (error instanceof Error && error.name === 'TimeoutError') {

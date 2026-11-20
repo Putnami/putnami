@@ -140,7 +140,7 @@ react({
 **Type:** `number`
 **Default:** `3000`
 
-Timeout in milliseconds for SSR rendering. If rendering takes longer, the request is aborted.
+Timeout in milliseconds for SSR rendering. If rendering takes longer, the request is aborted. The render also stops when its request ends: the client left or the request passed the HTTP plugin's `requestTimeoutMs`.
 
 ```typescript
 react({

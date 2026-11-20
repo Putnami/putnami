@@ -276,6 +276,24 @@ describe('BaseClient request cancellation', () => {
       };
       await client.call();
       expect(outside?.aborted ?? false).toBe(false);
+
+      // A client without contracts reports the same cancel, not its own timeout.
+      const plain = new RequestTestClient({
+        baseUrl: 'http://example.com',
+        transport: 'http',
+        retry: { maxRetries: 0 },
+      });
+      const plainRequest = new AbortController();
+      (plain as unknown as { transport: StubTransport }).transport = {
+        execute: async (call): Promise<ClientResponse> => {
+          plainRequest.abort(new DOMException('Request Timeout', 'TimeoutError'));
+          throw call.signal?.reason;
+        },
+      };
+      const plainError = await runInContext({ signal: plainRequest.signal }, () =>
+        plain.callGet('/items').catch((caught: unknown) => caught),
+      );
+      expect(plainError).toBeInstanceOf(ClientCanceledError);
     },
   );
 

@@ -413,7 +413,9 @@ export class HttpPlugin implements Plugin {
                   await commitRequestSession();
                 }
               } catch (e) {
-                if (requestTimedOut) {
+                // A request that ended (its timeout fired or its client left)
+                // unwinds quietly: its work stopped on purpose.
+                if (requestTimedOut || requestSignal.aborted) {
                   return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
                 }
                 if (e instanceof HttpResponse) {

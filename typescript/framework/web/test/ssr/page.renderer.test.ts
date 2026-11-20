@@ -309,6 +309,49 @@ describe('page.renderer', () => {
       },
     );
 
+    specTest(
+      'stops the render quietly when the request ends',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'ssr-response',
+        check: 'a-render-stops-with-its-request',
+      },
+      async () => {
+        const logger = new MemoryLogger();
+        const request = new AbortController();
+        const req = new Request('http://localhost/slow');
+        const ctx = Object.assign(buildHttpContext<HttpRequestContext>({ req, signal: request.signal }), {
+          params: {},
+          statusCode: 0,
+          logger,
+        }) as never as HttpRequestContext;
+        const never = new Promise<string>(() => {});
+        function Hanging(): React.ReactElement {
+          return React.createElement('div', null, React.use(never));
+        }
+        const handler = pageRenderer(
+          () => [{ path: '/slow', element: React.createElement(Hanging) } as never],
+          () => RootHtml,
+          () => 'hydrate.js',
+          10_000,
+        );
+
+        const outcome = Promise.resolve(runInContext(ctx, () => respond(handler, ctx))).catch(
+          (error: unknown) => error,
+        );
+        setTimeout(() => request.abort(new DOMException('Request Timeout', 'TimeoutError')), 20);
+        const started = Date.now();
+        const settled = await outcome;
+
+        // It stops at the abort, not at the 10 s render budget, and leaves the
+        // answer to the HTTP plugin: no error log, no request error, no 500 page.
+        expect(Date.now() - started).toBeLessThan(5000);
+        expect(settled).toBeInstanceOf(Error);
+        expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+        expect((ctx as unknown as { __requestError?: unknown }).__requestError).toBeUndefined();
+      },
+    );
+
     it('records an HttpException a loader throws as the request error without logging it', async () => {
       const exception = new HttpException('Post not found', 404);
       const logger = new MemoryLogger();

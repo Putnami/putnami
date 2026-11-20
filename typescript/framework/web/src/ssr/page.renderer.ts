@@ -165,7 +165,8 @@ export const pageRenderer =
         signal: requestSignal ? AbortSignal.any([controller.signal, requestSignal]) : controller.signal,
         nonce,
         onError: (error) => {
-          logger.error('SSR streaming error:', error);
+          // A request that ended stops its render on purpose: nothing failed.
+          if (!requestSignal?.aborted) logger.error('SSR streaming error:', error);
         },
       });
 
@@ -219,6 +220,9 @@ export const pageRenderer =
       // whole try would clear it too early — the timer must outlive this return
       // to cover async streaming.)
       if (timeoutId !== undefined) clearTimeout(timeoutId);
+      // The request ended (its client left or it passed its timeout): the
+      // HTTP plugin answers it, quietly, so this is not a render failure.
+      if (reqContext.signal?.aborted) throw error;
       recordRequestError(reqContext, error);
       logger.error(error);
       return handleRenderError(error);
