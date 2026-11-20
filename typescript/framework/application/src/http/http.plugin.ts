@@ -17,7 +17,7 @@ import {
   DEFAULT_MAX_BODY_SIZE_BYTES,
 } from './http-context.builder';
 import type { HttpRequestContext, HttpRequestContextInternal, Server as HttpServer } from './http-context.type';
-import { HttpDispatcher } from './http-dispatcher';
+import { HttpDispatcher, isRequestStop, requestEnded } from './http-dispatcher';
 import type { HttpMethod } from './http-method.type';
 import { HttpMethodsMiddleware, resolveHttpMethodsOptions } from './http-methods.middleware';
 import type { HttpMiddleware } from './http-middleware.type';
@@ -94,6 +94,30 @@ const METHODLESS_NATIVE_HTTP_METHODS = ['DELETE', 'GET', 'HEAD', 'OPTIONS', 'PAT
 const DEFAULT_WS_MAX_PAYLOAD_BYTES = 1_048_576;
 /** Default max buffered outbound WebSocket bytes (16 MiB) before the connection is closed. */
 const DEFAULT_WS_BACKPRESSURE_BYTES = 16_777_216;
+
+/** Loads an asynchronous store's session before the inner middlewares and writes it back after them. */
+const requestSessionMiddleware: HttpMiddleware = async (context, next) => {
+  await loadRequestSession();
+  let response: HttpResponse | undefined;
+  try {
+    response = await next();
+  } catch (chainError) {
+    // A response the chain throws (a redirect) is an answer, not a failure:
+    // like a returned one, it needs its session written.
+    if (chainError instanceof HttpResponse && !requestEnded(context)) {
+      await commitRequestSession();
+      throw chainError;
+    }
+    // The commit still runs, but the chain's own error is the one this
+    // request reports.
+    await commitRequestSession().catch((commitError: unknown) => {
+      if (!isRequestStop(commitError, context)) useLogger().error('Session commit failed', commitError);
+    });
+    throw chainError;
+  }
+  await commitRequestSession();
+  return response;
+};
 
 /**
  * Resolves an explicit socket idle timeout (seconds) for `serve()`, derived
@@ -365,12 +389,12 @@ export class HttpPlugin implements Plugin {
       idleTimeout: resolveIdleTimeoutSeconds(requestTimeoutMs),
       fetch: async (req, server) => {
         let requestTimedOut = false;
-        // The request signal is Bun's native req.signal, which aborts on client
-        // disconnect. We deliberately do NOT wire an extra AbortController for the
-        // hard request timeout: on timeout we return 408 and let the in-flight
-        // handler unwind on its own (client-disconnect cancellation still applies).
-        // This avoids a per-request AbortController + abort listener on the hot path.
-        const requestSignal = req.signal;
+        // The request's signal aborts when the client disconnects (Bun's
+        // req.signal) and when the request outlives requestTimeoutMs: its
+        // queries, client calls and render stop instead of running on after
+        // the 408. Both sources live for this request only.
+        const timeout = requestTimeoutMs > 0 ? new AbortController() : undefined;
+        const requestSignal = timeout ? AbortSignal.any([req.signal, timeout.signal]) : req.signal;
 
         const context = buildHttpContext<HttpRequestContextInternal>({
           req,
@@ -381,6 +405,14 @@ export class HttpPlugin implements Plugin {
           maxBodySizeBytes,
         });
         context.__drain = drain;
+        if (timeout) {
+          context.deadlineAt = Date.now() + requestTimeoutMs;
+          // A request that reached its deadline before the timer fired ends
+          // now: its signal aborts, as it would at the timeout.
+          context.__endRequest = () => {
+            if (!timeout.signal.aborted) timeout.abort(new DOMException('Request Timeout', 'TimeoutError'));
+          };
+        }
 
         const executeRequest = async (): Promise<Response> => {
           let scopeTransferred = false;
@@ -402,17 +434,16 @@ export class HttpPlugin implements Plugin {
             // always has access to traceId / logContext.
             const res = await runInContext(context, async () => {
               try {
-                // An asynchronous session store (database) is read before the
-                // middlewares and written after the response is built: the
-                // session API that handlers and middlewares call is synchronous.
-                await loadRequestSession();
-                try {
-                  return await middlewareChain(context, dispatch);
-                } finally {
-                  await commitRequestSession();
-                }
+                return await middlewareChain(context, dispatch);
               } catch (e) {
-                if (requestTimedOut) {
+                // A request that ended (its timeout fired or its client left)
+                // answers 408. Its stopped work unwinds quietly; any other
+                // error is logged as it would be during the request.
+                if (requestTimedOut || requestEnded(context)) {
+                  const loggedLive = e instanceof HttpResponse || e instanceof HttpException;
+                  if (!loggedLive && !isRequestStop(e, context) && !context.__requestErrorLogged) {
+                    useLogger().error('Unhandled error', e);
+                  }
                   return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
                 }
                 if (e instanceof HttpResponse) {
@@ -467,6 +498,7 @@ export class HttpPlugin implements Plugin {
         const timeoutPromise = new Promise<typeof TIMEOUT_SENTINEL>((resolve) => {
           timeoutHandle = setTimeout(() => {
             requestTimedOut = true;
+            timeout?.abort(new DOMException('Request Timeout', 'TimeoutError'));
             resolve(TIMEOUT_SENTINEL);
           }, requestTimeoutMs);
         });
@@ -475,6 +507,9 @@ export class HttpPlugin implements Plugin {
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
         }
+        // The deadline bounded the request until its response. A stream or a
+        // background task that runs on after it is no longer held to it.
+        if (result !== TIMEOUT_SENTINEL && !requestSignal.aborted) context.deadlineAt = undefined;
         if (result === TIMEOUT_SENTINEL) {
           return createJsonErrorResponse(408, 'Request Timeout');
         }
@@ -584,6 +619,12 @@ export class HttpPlugin implements Plugin {
       middlewares.unshift(CompressionMiddleware(compressionOpts));
     }
 
+    // An asynchronous session store (database) is read before every other
+    // middleware and written after the response is built: the session API
+    // that handlers and middlewares call is synchronous. It sits inside the
+    // outermost slot, so the request's span covers the read and the write.
+    middlewares.unshift(requestSessionMiddleware);
+
     // Outermost slot (telemetry): in front of compression, so a request any
     // other middleware refuses is still observed.
     middlewares.unshift(...this.outermostMiddlewares);
@@ -609,13 +650,6 @@ export class HttpPlugin implements Plugin {
       ctx: HttpRequestContext,
       dispatch: () => Promise<HttpResponse | undefined>,
     ) => Promise<HttpResponse | undefined>;
-
-    // Empty-chain bypass: with no middleware the chain is just the dispatch call,
-    // so skip the wrapper layer entirely (relevant when the security defaults are
-    // turned off, e.g. an unsecured fast lane).
-    if (middlewares.length === 0) {
-      return (_ctx: HttpRequestContext, dispatch: () => Promise<HttpResponse | undefined>) => dispatch();
-    }
 
     // Compose from the inside out. The innermost middleware receives `dispatch`
     // itself as `next`, so we avoid allocating a redundant terminal `() =>

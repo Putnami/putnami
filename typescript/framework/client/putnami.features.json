@@ -74,7 +74,8 @@
               "an-aborted-attempt-is-not-retried",
               "an-already-aborted-signal-rejects-before-a-retry-delay",
               "no-per-attempt-signal-is-injected-without-a-timeout",
-              "the-caller-signal-is-combined-with-the-per-attempt-timeout"
+              "the-caller-signal-is-combined-with-the-per-attempt-timeout",
+              "an-unbound-client-call-stops-with-its-request"
             ]
           }
         },
@@ -209,7 +210,8 @@
               "no-retry-counter-is-emitted-when-the-first-attempt-succeeds",
               "one-attempt-counter-per-retried-attempt",
               "retry-exhaustion-is-counted",
-              "retry-metrics-fall-back-to-an-unnamed-prefix"
+              "retry-metrics-fall-back-to-an-unnamed-prefix",
+              "an-unbound-generated-client-records-call-and-attempt-spans"
             ]
           }
         },
@@ -423,7 +425,8 @@
               "entries-never-cross-a-forwarded-identity-or-outlive-the-registry",
               "the-cache-key-matches-the-shared-vectors",
               "the-runtime-implements-exactly-the-published-capabilities",
-              "the-emitted-ts-client-pins-the-response-cache-capability"
+              "the-emitted-ts-client-pins-the-response-cache-capability",
+              "the-emitted-ts-client-pins-the-response-cache-capability-and-its-manifest-declares-the-policy"
             ]
           }
         },

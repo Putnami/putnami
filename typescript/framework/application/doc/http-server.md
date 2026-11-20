@@ -217,6 +217,26 @@ httpPlugin.get('/example', async (ctx: HttpRequestContext) => {
 | `path()` | `string` | URL path |
 | `host()` | `string` | Request host |
 | `secured()` | `boolean` | Is HTTPS? |
+| `signal` | `AbortSignal` | Aborts when the request ends: its client left or it passed `requestTimeoutMs` |
+| `deadlineAt` | `number \| undefined` | Epoch milliseconds at which the request times out |
+
+### Request timeout
+
+`http({ requestTimeoutMs })` bounds each request. Past it, the server answers
+408 and aborts `ctx.signal` with a `TimeoutError`, so the request's work stops:
+the queries of the database session store, the calls of a generated client
+built without a service binding, and the server render. Pass `ctx.signal` to
+your own long waits. The request ends at `deadlineAt`, even when a client call
+bound by that deadline stops a moment before the signal aborts. The deadline
+holds until the response is sent: a stream that runs on after it is no longer
+held to `deadlineAt`, and the timeout no longer aborts its signal.
+
+A handler that stops because its request ended logs and records no error: the
+request answers 408. A stop is the signal's own reason, an `AbortError`, a
+`TimeoutError`, a `QueryAbortError` or a `ClientCanceledError`, thrown directly
+or as a `cause`, and a `ClientDeadlineError` when the request reached its
+deadline. Any other error is logged, recorded and passed to `onError` as it
+would be during the request, and the request still answers 408.
 
 ## Response Handling
 
@@ -450,7 +470,7 @@ The HTTP plugin also supports WebSocket connections. See [WebSockets](websockets
 
 ### Global Error Handler (`onError`)
 
-Register a global error handler via the `http()` options. The handler is called whenever a route handler throws. Return a value to use as the response body (it will be content-negotiated), or `undefined` to fall through to the default error handling.
+Register a global error handler via the `http()` options. The handler is called whenever a route handler throws, except when it throws the stop of a request that already ended (see [Request timeout](#request-timeout)). Return a value to use as the response body (it will be content-negotiated), or `undefined` to fall through to the default error handling.
 
 The handler may be synchronous or asynchronous — async handlers are properly awaited.
 

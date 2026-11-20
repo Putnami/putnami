@@ -839,7 +839,10 @@ type Context = Record<string, unknown> & {
   logger?: Logger;
   traceId?: string;
   logContext?: Record<string, unknown>;
+  /** Aborts when the request ends: its client left or it passed its timeout. */
   signal?: AbortSignal;
+  /** Epoch milliseconds at which the request times out, when it has a timeout. */
+  deadlineAt?: number;
 };
 ```
 

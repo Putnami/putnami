@@ -104,7 +104,33 @@ export class HttpDispatcher {
     return flushContext(r);
   };
 
+  /**
+   * Calls the user's error handler for an error whose request already ended:
+   * the answer stays 408. Returns whether the handler answered the error.
+   */
+  private async notifyErrorHandler(e: unknown, context: HttpRequestContext): Promise<boolean> {
+    if (!this.errorHandler) return false;
+    try {
+      return (await this.errorHandler(e, context)) !== undefined;
+    } catch (handlerError) {
+      useLogger().error('Error handler threw:', handlerError);
+      return false;
+    }
+  }
+
   private async handleError(e: unknown, context: HttpRequestContext): Promise<HttpResponse> {
+    // The request ended (it passed its timeout or its client left): the HTTP
+    // plugin answers 408. Work that stopped with it did not fail; any other
+    // error is still the handler's own failure: it is recorded, passed to the
+    // error handler and logged as it would be during the request.
+    if (requestEnded(context) && !(e instanceof HttpResponse)) {
+      if (!isRequestStop(e, context)) {
+        recordRequestError(context, e);
+        const answered = await this.notifyErrorHandler(e, context);
+        if (!answered && !(e instanceof HttpException)) useLogger().error(e);
+      }
+      return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
+    }
     recordRequestError(context, e);
 
     // Give the user's error handler first chance
@@ -151,6 +177,52 @@ export class HttpDispatcher {
       : { error: 'Internal Server Error' };
     return HttpResponse.json(body, { status: 500 });
   }
+}
+
+const REQUEST_STOP_NAMES = new Set(['AbortError', 'TimeoutError', 'QueryAbortError', 'ClientCanceledError']);
+
+/** The parts of a request context that tell whether the request ended. */
+export interface RequestEnd {
+  readonly signal?: AbortSignal;
+  readonly deadlineAt?: number;
+}
+
+/**
+ * Tells whether the request ended: its signal aborted (its client left or it
+ * passed its timeout), or its deadline passed. A client call bound by the
+ * deadline can stop a moment before the timeout fires: the request then ends
+ * here, and its signal aborts at once, so the rest of its work stops too.
+ */
+export function requestEnded(request: RequestEnd | undefined): boolean {
+  if (request?.signal?.aborted) return true;
+  if (request?.deadlineAt === undefined || Date.now() < request.deadlineAt) return false;
+  (request as { __endRequest?: () => void }).__endRequest?.();
+  return true;
+}
+
+/**
+ * Tells whether `error` is the stop of a request that ended: the reason of its
+ * aborted signal, or an abort, timeout, query abort or canceled client call,
+ * directly or as the `cause` of the error thrown. A client call that met its
+ * deadline counts too when the request ended at its own deadline. Any other
+ * error is a failure of its own, even when the request ended before it was thrown.
+ */
+export function isRequestStop(error: unknown, request: RequestEnd | undefined): boolean {
+  if (!requestEnded(request)) return false;
+  const reason: unknown = request?.signal?.aborted ? request.signal.reason : undefined;
+  const timedOut =
+    (request?.deadlineAt !== undefined && Date.now() >= request.deadlineAt) ||
+    (reason as { name?: unknown } | undefined)?.name === 'TimeoutError';
+  let current: unknown = error;
+  for (let depth = 0; depth < 8 && current; depth++) {
+    if (reason !== undefined && current === reason) return true;
+    if (typeof current !== 'object') return false;
+    const name = (current as { name?: unknown }).name;
+    if (typeof name === 'string' && REQUEST_STOP_NAMES.has(name)) return true;
+    if (timedOut && name === 'ClientDeadlineError') return true;
+    current = (current as { cause?: unknown }).cause;
+  }
+  return false;
 }
 
 /**

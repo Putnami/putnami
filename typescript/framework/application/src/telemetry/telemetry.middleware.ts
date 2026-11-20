@@ -10,6 +10,7 @@
  */
 
 import { HttpException } from '@putnami/runtime';
+import { requestEnded } from '../http/http-dispatcher';
 import type { HttpMiddleware } from '../http/http-middleware.type';
 import { attachTelemetryContext, startTelemetrySpan } from './client-telemetry';
 import {
@@ -51,7 +52,12 @@ export const TelemetryMiddleware = (collector: TelemetryCollector): HttpMiddlewa
       status = res ? res.status || 200 : 404;
       return res;
     } catch (error) {
-      if (error instanceof HttpException) {
+      if (requestEnded(ctx)) {
+        // The request ended (it reached its deadline or its client left): the
+        // HTTP plugin answers 408 whatever the error, so the request counts as 408.
+        // A step that failed for its own reason keeps `error` on its span.
+        status = 408;
+      } else if (error instanceof HttpException) {
         status = error.getStatus();
       } else {
         status = 500;

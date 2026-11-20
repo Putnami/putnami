@@ -46,6 +46,7 @@ class HttpContext {
   __authorizationHeader?: string;
   __requestError?: unknown;
   __requestErrorLogged?: boolean;
+  __endRequest?: () => void;
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
   __matchedHandlers?: HandlerResult<RouteHandler<HttpRequestContext>>[];
 

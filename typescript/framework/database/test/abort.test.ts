@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'bun:test';
 import { runInContext } from '@putnami/runtime';
+import postgres from 'postgres';
 import { specTest } from '@putnami/spectest';
-import { QueryAbortError, throwIfAborted, useAbortSignal } from '../src/abort';
+import { abortableQuery, QueryAbortError, throwIfAborted, useAbortSignal } from '../src/abort';
+import type { SqlQuery } from '../src/sql-client';
 
 describe('QueryAbortError', () => {
   it('should have the expected name and code', () => {
@@ -79,4 +81,80 @@ describe('throwIfAborted', () => {
       });
     },
   );
+});
+
+/** A query whose connection never answers: it settles only if cancel() settles it. */
+function hungQuery(settleOnCancel: boolean): { query: SqlQuery<never[]>; cancels: () => number } {
+  let cancels = 0;
+  let reject: (error: Error) => void = () => {};
+  const pending = new Promise<never[]>((_, rejectQuery) => {
+    reject = rejectQuery;
+  });
+  const query = Object.assign(pending, {
+    cancel: () => {
+      cancels += 1;
+      if (settleOnCancel) reject(new Error('canceling statement due to user request'));
+    },
+  }) as unknown as SqlQuery<never[]>;
+  return { query, cancels: () => cancels };
+}
+
+describe('abortableQuery', () => {
+  specTest(
+    'unwinds at the abort even when the connection never answers',
+    {
+      feature: 'typescript/relational-persistence',
+      requirement: 'cancellation',
+      check: 'a-query-in-flight-unwinds-at-the-abort',
+    },
+    async () => {
+      for (const settleOnCancel of [false, true]) {
+        const controller = new AbortController();
+        const hung = hungQuery(settleOnCancel);
+        const outcome = Promise.resolve(runInContext({ signal: controller.signal }, () => abortableQuery(hung.query)));
+        controller.abort(new DOMException('Request Timeout', 'TimeoutError'));
+        expect(await outcome.catch((error: unknown) => error)).toBeInstanceOf(QueryAbortError);
+        expect(hung.cancels()).toBe(1);
+      }
+    },
+  );
+
+  specTest(
+    'never starts a query once the request is aborted',
+    {
+      feature: 'typescript/relational-persistence',
+      requirement: 'cancellation',
+      check: 'a-query-after-abort-is-never-sent',
+    },
+    async () => {
+      // A real driver on a port nothing listens on: starting the query would
+      // fail with a connection error, and a cancel would reject it unread.
+      const sql = postgres({ host: '127.0.0.1', port: 1, max: 1, connect_timeout: 1 });
+      const unhandled: unknown[] = [];
+      const onUnhandled = (reason: unknown) => unhandled.push(reason);
+      process.on('unhandledRejection', onUnhandled);
+      try {
+        const controller = new AbortController();
+        controller.abort(new DOMException('Request Timeout', 'TimeoutError'));
+        const outcome = await Promise.resolve(
+          runInContext({ signal: controller.signal }, () => abortableQuery(sql`select 1`)),
+        ).catch((error: unknown) => error);
+        expect(outcome).toBeInstanceOf(QueryAbortError);
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        expect(unhandled).toEqual([]);
+      } finally {
+        process.off('unhandledRejection', onUnhandled);
+        await sql.end({ timeout: 0 });
+      }
+    },
+  );
+
+  it('returns the rows of a query that answers before any abort', async () => {
+    const controller = new AbortController();
+    const rows = [{ id: 1 }];
+    const query = Object.assign(Promise.resolve(rows), { cancel: () => {} }) as unknown as SqlQuery<never[]>;
+    const result = await runInContext({ signal: controller.signal }, () => abortableQuery(query));
+    expect(result as unknown).toEqual(rows);
+    controller.abort();
+  });
 });

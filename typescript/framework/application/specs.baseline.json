@@ -70,6 +70,7 @@
     "typescript/http-services#request-bounds",
     "typescript/http-services#request-log-and-trace",
     "typescript/http-services#request-rewrite",
+    "typescript/http-services#request-timeout-cancels-work",
     "typescript/http-services#response-encoding",
     "typescript/http-services#route-fragments",
     "typescript/http-services#routing",
@@ -93,6 +94,7 @@
     "typescript/service-telemetry#per-second-aggregation",
     "typescript/service-telemetry#process-instance-identity",
     "typescript/service-telemetry#push-transport",
+    "typescript/service-telemetry#request-step-spans",
     "typescript/service-telemetry#service-identity-from-environment",
     "typescript/service-telemetry#trace-budget",
     "typescript/service-telemetry#trace-propagation"

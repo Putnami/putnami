@@ -42,7 +42,7 @@
     },
     {
       "id": "cancellation",
-      "text": "A query started after the request signal aborted raises `QueryAbortError`, and a query already in flight is cancelled at the PostgreSQL protocol level rather than left running."
+      "text": "A query started after the request signal aborted raises `QueryAbortError`, and a query already in flight is cancelled at the PostgreSQL protocol level rather than left running. The caller unwinds at the abort even when the connection never answers, and the database session store's reads and writes cancel the same way."
     },
     {
       "id": "secret-free-telemetry",

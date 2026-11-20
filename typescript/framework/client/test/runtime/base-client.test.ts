@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { runInContext } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { BaseClient } from '../../src/runtime/base-client';
 import { circuitBreakerInterceptor } from '../../src/runtime/circuit-breaker';
@@ -240,6 +241,62 @@ class FirstPartyRequestTestClient extends BaseClient {
 }
 
 describe('BaseClient request cancellation', () => {
+  specTest(
+    'a call made inside a request takes its signal and stops with it',
+    {
+      feature: 'typescript/service-clients',
+      requirement: 'cancellation',
+      check: 'an-unbound-client-call-stops-with-its-request',
+    },
+    async () => {
+      const client = new FirstPartyRequestTestClient();
+      const request = new AbortController();
+      let seen: AbortSignal | undefined;
+      (client as unknown as { transport: StubTransport }).transport = {
+        execute: async (call): Promise<ClientResponse> => {
+          seen = call.signal;
+          request.abort(new DOMException('Request Timeout', 'TimeoutError'));
+          throw call.signal?.reason;
+        },
+      };
+
+      const error = await runInContext({ signal: request.signal }, () =>
+        client.call().catch((caught: unknown) => caught),
+      );
+      expect(error).toBeInstanceOf(ClientCanceledError);
+      expect(seen?.aborted).toBe(true);
+
+      // Outside the request, the same client calls on with no aborted signal.
+      let outside: AbortSignal | undefined;
+      (client as unknown as { transport: StubTransport }).transport = {
+        execute: async (call): Promise<ClientResponse> => {
+          outside = call.signal;
+          return { data: {}, status: 200, headers: new Headers() };
+        },
+      };
+      await client.call();
+      expect(outside?.aborted ?? false).toBe(false);
+
+      // A client without contracts reports the same cancel, not its own timeout.
+      const plain = new RequestTestClient({
+        baseUrl: 'http://example.com',
+        transport: 'http',
+        retry: { maxRetries: 0 },
+      });
+      const plainRequest = new AbortController();
+      (plain as unknown as { transport: StubTransport }).transport = {
+        execute: async (call): Promise<ClientResponse> => {
+          plainRequest.abort(new DOMException('Request Timeout', 'TimeoutError'));
+          throw call.signal?.reason;
+        },
+      };
+      const plainError = await runInContext({ signal: plainRequest.signal }, () =>
+        plain.callGet('/items').catch((caught: unknown) => caught),
+      );
+      expect(plainError).toBeInstanceOf(ClientCanceledError);
+    },
+  );
+
   test('forwards the caller signal to the transport', async () => {
     const client = new RequestTestClient({
       baseUrl: 'http://example.com',

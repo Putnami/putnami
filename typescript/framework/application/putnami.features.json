@@ -1040,6 +1040,21 @@
           }
         },
         {
+          "id": "request-timeout-cancels-work",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-request-past-the-timeout-aborts-its-signal",
+              "an-ended-request-logs-no-error",
+              "a-failure-after-the-request-ended-is-still-logged",
+              "a-client-call-at-the-deadline-answers-408",
+              "a-stream-outlives-the-request-deadline"
+            ]
+          }
+        },
+        {
           "id": "error-answers",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -1272,6 +1287,21 @@
               "every-composed-server-is-instrumented",
               "a-server-another-plugin-creates-is-instrumented",
               "telemetry-starts-no-server"
+            ]
+          }
+        },
+        {
+          "id": "request-step-spans",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-session-step-ends-error-or-canceled",
+              "a-session-step-stopped-by-the-timeout-counts-as-408",
+              "a-step-stopped-at-the-deadline-counts-as-408",
+              "a-step-span-keeps-the-writes-of-its-step",
+              "session-load-and-commit-are-child-spans"
             ]
           }
         },

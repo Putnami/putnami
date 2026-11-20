@@ -12,6 +12,12 @@ export class AsyncMemorySessionStore implements AsyncSessionStore {
   loads = 0;
   saves = 0;
   removes = 0;
+  /** The error the next load fails with, once. */
+  failNextLoad: Error | undefined;
+  /** Awaited by every load, to stand for a query that waits on the database. */
+  loadGate: (() => Promise<void>) | undefined;
+  /** The error the next save fails with, once. */
+  failNextSave: Error | undefined;
 
   get<T>(sessionId: string, key: string): T | undefined {
     return this.getAll<Record<string, unknown>>(sessionId)[key] as T | undefined;
@@ -46,12 +52,19 @@ export class AsyncMemorySessionStore implements AsyncSessionStore {
   async loadAsync(sessionId: string): Promise<Record<string, unknown>> {
     this.loads++;
     await Promise.resolve();
+    await this.loadGate?.();
+    const error = this.failNextLoad;
+    this.failNextLoad = undefined;
+    if (error) throw error;
     return structuredClone(this.rows.get(sessionId) ?? {});
   }
 
   async saveAsync(sessionId: string, data: Record<string, unknown>): Promise<void> {
     this.saves++;
     await Promise.resolve();
+    const error = this.failNextSave;
+    this.failNextSave = undefined;
+    if (error) throw error;
     this.rows.set(sessionId, structuredClone(data));
   }
 

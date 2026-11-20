@@ -62,6 +62,13 @@
       ]
     },
     {
+      "id": "request-step-spans",
+      "text": [
+        "An asynchronous session store is read and written inside the request's span, each step under its own internal child span, `session load` and `session commit`. A step runs on the request's own context, so what it writes there stays, and its span ends `canceled` when the request stopped it and `error` when it failed.",
+        "A request whose work fails or stops after it ended, at its deadline or because its client left, counts as 408 on its span, as its answer does."
+      ]
+    },
+    {
       "id": "per-push-credential",
       "text": [
         "Each push of metrics, spans or log records asks the token source registered for the collector endpoint for its bearer, and a static bearer wins over the source.",

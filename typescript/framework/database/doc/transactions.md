@@ -141,7 +141,7 @@ When the timeout fires:
 
 When the HTTP request carries an `AbortSignal` (e.g. client disconnect or server timeout), the SQL layer reacts automatically:
 
-- **In-flight queries are cancelled.** The framework sends a PostgreSQL protocol-level cancel request so the server stops executing the query.
+- **In-flight queries are cancelled.** The framework sends a PostgreSQL protocol-level cancel request so the server stops executing the query, and the caller gets `QueryAbortError` at once, even when the connection never answers.
 - **New queries are rejected.** Any call to `useTxConnection()` or repository methods after abort throws `QueryAbortError`.
 - **Open transactions are rolled back.** The `TransactionMiddleware` triggers `cleanupTransaction()` on abort, releasing reserved connections back to the pool.
 

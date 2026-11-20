@@ -1,7 +1,7 @@
 import { HttpException } from '@putnami/runtime';
 import type { DiscoveredRoute } from '../api';
 import { buildHttpContext } from '../http/http-context.builder';
-import type { HttpRequestContext } from '../http/http-context.type';
+import type { HttpRequestContext, HttpRequestContextInternal } from '../http/http-context.type';
 import type { ProtoFieldMeta } from '../proto';
 import { decodeProto } from './proto-decode';
 import { type ProtoEnumRegistry, readEnvelope } from './proto-codec';
@@ -234,9 +234,18 @@ export function buildDispatchContext(
   apiCtx.queryParams = () => query as Record<string, string>;
   // Pass parsed body directly — avoids JSON.stringify → JSON.parse round-trip
   apiCtx.body = <T>() => Promise.resolve(body as T | undefined);
-  // Propagate deadline signal to context for downstream consumers (SQL, etc.)
-  if (signal) {
-    apiCtx.signal = signal;
+  // The handler stops with the gRPC deadline and with the HTTP request it
+  // runs in: its client leaving or the request timeout aborts it too.
+  const signals = [ctx.signal, signal].filter((s): s is AbortSignal => s !== undefined);
+  if (signals.length > 0) {
+    apiCtx.signal = signals.length > 1 ? AbortSignal.any(signals) : signals[0];
+  }
+  if (ctx.deadlineAt !== undefined) {
+    apiCtx.deadlineAt = ctx.deadlineAt;
+  }
+  const endRequest = (ctx as HttpRequestContextInternal).__endRequest;
+  if (endRequest) {
+    (apiCtx as HttpRequestContextInternal).__endRequest = endRequest;
   }
   // Propagate observability context from the outer (gRPC) request context
   // so that logs emitted inside handlers include the trace/correlation ID.

@@ -1,3 +1,4 @@
+import { tryContext } from '@putnami/runtime';
 import { StreamRelay } from './connect-stream';
 import type {
   ClientContractOperation,
@@ -11,7 +12,11 @@ import { CircuitBreaker } from './circuit-breaker';
 import { CredentialRegistryClosedError, rejectRequestCredentials } from './credential';
 import { ServiceWebSocketTransport } from './service-ws-transport';
 import { type ByteStream, type FrameStream, ProviderWebSocketTransport } from './provider-ws-transport';
-import { startServiceStreamCall } from './service-telemetry';
+import {
+  serviceAttemptTelemetryInterceptor,
+  serviceCallTelemetryInterceptor,
+  startServiceStreamCall,
+} from './service-telemetry';
 import { StreamSession, type StreamBudgets } from './stream-session';
 import { assertSuccessBodyDeliverable, type SuccessBody } from './success-body';
 import { type ConnectEncoding, ConnectTransport, type ProtoMeta, protoMetaFromDescriptor } from './connect-transport';
@@ -263,9 +268,17 @@ export abstract class BaseClient {
     // the per-attempt timeout and uses it as the overall retry deadline so the
     // whole sequence stays within a single timeoutMs.
     const userInterceptors = config.interceptors ?? [];
-    const attemptTerminal = this.buildChain(config.attemptInterceptors ?? []);
+    // A generated client built without a service binding records the same
+    // call and attempt spans as a bound one, which installs its own; the
+    // attempt carries the trace context to the callee.
+    const unboundServiceId =
+      !config.endpointBinding && config.operationContracts ? (config.serviceId ?? config.packageName) : undefined;
+    const callTelemetry = unboundServiceId ? [serviceCallTelemetryInterceptor(unboundServiceId)] : [];
+    const attemptTelemetry = unboundServiceId ? [serviceAttemptTelemetryInterceptor(unboundServiceId)] : [];
+    const attemptTerminal = this.buildChain([...attemptTelemetry, ...(config.attemptInterceptors ?? [])]);
     this.chain = this.buildChain(
       [
+        ...callTelemetry,
         ...userInterceptors,
         retryInterceptor(config.retry, { timeoutMs: this.timeoutMs, getServiceName: () => this.serviceName }),
       ],
@@ -282,6 +295,17 @@ export abstract class BaseClient {
     // interceptors against a synthetic terminal to populate auth/context
     // headers without making a network call or running retry/backoff.
     this.headerChain = this.buildChain(config.streamInterceptors ?? userInterceptors, captureHeaders);
+  }
+
+  /**
+   * The signal of the request this call runs in, for a client built without a
+   * service binding: the call stops when that request ends, as a bound
+   * client's deadline interceptor already makes it. Undefined for a bound
+   * client and outside a request.
+   */
+  private ambientSignal(): AbortSignal | undefined {
+    if (this.endpointBinding) return undefined;
+    return tryContext<{ signal?: AbortSignal }>()?.signal;
   }
 
   /**
@@ -684,7 +708,7 @@ export abstract class BaseClient {
       query: options?.query,
       body: options?.body,
       headers,
-      signal: options?.signal,
+      signal: options?.signal ?? this.ambientSignal(),
       ...(options?.withoutResponseCache ? { withoutResponseCache: true } : {}),
       featureTrace: resolveClientFeatureTrace(this.design, options?.operationId),
       ...(options?.operationId ? { operationId: options.operationId } : {}),
@@ -716,7 +740,7 @@ export abstract class BaseClient {
       return (await this.chain(request)) as ClientResponse<T>;
     } catch (error) {
       if (request.clientOperation) {
-        if (options?.signal?.aborted) throw new ClientCanceledError(this.serviceName, `${method} ${path}`);
+        if (request.signal?.aborted) throw new ClientCanceledError(this.serviceName, `${method} ${path}`);
         if (error instanceof ClientRetryExhaustedError) {
           throw new ClientFrameworkError({
             service: this.serviceName,
@@ -735,6 +759,11 @@ export abstract class BaseClient {
           status: 0,
           code: 'client.remote',
         });
+      }
+      // The request this call took its signal from ended: the client's own
+      // timeout did not fire. A signal the caller passed keeps its own error.
+      if (!options?.signal && request.signal?.aborted) {
+        throw new ClientCanceledError(this.serviceName, `${method} ${path}`);
       }
       // AbortSignal.timeout() surfaces as a DOMException named 'TimeoutError'.
       // Wrap it in the documented typed error carrying the configured timeout.

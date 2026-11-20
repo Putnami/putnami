@@ -429,7 +429,7 @@ async function heavyReport(filters: ReportFilters) {
 }
 ```
 
-If the client disconnects while this query runs, `abortableQuery` sends a PostgreSQL cancel request and throws `QueryAbortError`. Without it, the query runs to completion on the server even though nobody is waiting for the result.
+If the client disconnects or the request passes its timeout while this query runs, `abortableQuery` sends a PostgreSQL cancel request and throws `QueryAbortError` at once, even when the connection never answers. Without it, the query runs to completion on the server even though nobody is waiting for the result.
 
 Repository methods already use `abortableQuery` internally — you only need it for raw queries.
 

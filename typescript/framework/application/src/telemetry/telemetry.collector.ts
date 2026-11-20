@@ -61,7 +61,7 @@ export interface TelemetrySpanRecord {
   spanId: string;
   parentSpanId?: string;
   name: string;
-  /** OTLP span kind: server=2, client=3. */
+  /** OTLP span kind: internal=1, server=2, client=3, consumer=5. */
   kind: number;
   startTimeUnixNano: string;
   endTimeUnixNano: string;

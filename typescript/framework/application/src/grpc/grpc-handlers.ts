@@ -2,6 +2,7 @@ import { HttpException, runInContext, useLogger } from '@putnami/runtime';
 import type { DiscoveredRoute } from '../api';
 import type { StreamEndpointDefinition } from '../api/route/stream-endpoint';
 import type { HttpRequestContext } from '../http/http-context.type';
+import { isRequestStop } from '../http/http-dispatcher';
 import { HttpResponse } from '../http/http-response';
 import type { RouteHandler } from '../http/route.type';
 import type { ProtoFieldMeta } from '../proto';
@@ -172,6 +173,9 @@ export function buildUnaryRpcHandler(
         }
         return connectErrorResponse({ code: 'deadline_exceeded', message: 'Request deadline exceeded' });
       }
+      // The HTTP request ended, at its timeout or because its client left: the
+      // request answers 408 and the stop of its work logs no error.
+      if (isRequestStop(err, ctx)) throw err;
       return handleGrpcError(logger, err, isGrpcWeb, useBinaryResponse, route.responses);
     } finally {
       if (deadlineTimer) clearTimeout(deadlineTimer);

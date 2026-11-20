@@ -1,8 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { NotFoundException, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
+import { MemoryLogger } from '@putnami/runtime/testing';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
 import { HttpPlugin, http, resolveIdleTimeoutSeconds } from '../../src/http/http.plugin';
+import { logger } from '../../src/http/logger.plugin';
 import { HttpResponse } from '../../src/http/http-response';
 
 describe('HttpPlugin', () => {
@@ -341,9 +344,27 @@ describe('HttpPlugin', () => {
     let app: Application;
     let plugin: HttpPlugin;
     let baseUrl: string;
+    let stalled: { signal?: AbortSignal; deadlineAt?: number; context?: Record<string, unknown> } | undefined;
+    let workAfterTimeout = false;
+    let reported: unknown[] = [];
+    let deadlineSignals: AbortSignal[] = [];
+    let streamed: { deadlineAt?: number; aborted?: boolean } | undefined;
 
     beforeEach(async () => {
-      plugin = http({ port: 0, maxBodySizeBytes: 64, requestTimeoutMs: 200 });
+      stalled = undefined;
+      workAfterTimeout = false;
+      reported = [];
+      deadlineSignals = [];
+      streamed = undefined;
+      plugin = http({
+        port: 0,
+        maxBodySizeBytes: 64,
+        requestTimeoutMs: 200,
+        onError: (error) => {
+          reported.push(error);
+          return undefined;
+        },
+      });
       plugin.post('/echo', async (ctx) => {
         const data = await ctx.body<Record<string, string>>();
         return HttpResponse.json({ received: data });
@@ -352,8 +373,55 @@ describe('HttpPlugin', () => {
         await new Promise((resolve) => setTimeout(resolve, 500));
         return new HttpResponse('slow-ok');
       });
+      plugin.get('/stalled', async (ctx) => {
+        stalled = {
+          signal: ctx.signal,
+          deadlineAt: ctx.deadlineAt as number | undefined,
+          context: ctx as unknown as Record<string, unknown>,
+        };
+        // Waits on a dependency that never answers; only the signal ends the wait.
+        await new Promise((_, reject) => ctx.signal?.addEventListener('abort', () => reject(ctx.signal?.reason)));
+        workAfterTimeout = true;
+        return new HttpResponse('never');
+      });
+      plugin.get('/broken-after-timeout', async (ctx) => {
+        stalled = { signal: ctx.signal, context: ctx as unknown as Record<string, unknown> };
+        // Ignores the signal, then fails for a reason of its own once the request ended.
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        throw new TypeError('the handler broke');
+      });
 
-      app = application().use(plugin);
+      plugin.get('/client-deadline', (ctx) => {
+        // A client call bound by the request deadline stops at that deadline,
+        // a moment before the timeout aborts the request's signal.
+        deadlineSignals.push(ctx.signal as AbortSignal);
+        const remaining = (ctx.deadlineAt ?? Date.now()) - Date.now();
+        return new Promise((_, reject) =>
+          setTimeout(
+            () => reject(Object.assign(new Error('deadline'), { name: 'ClientDeadlineError' })),
+            Math.max(0, remaining),
+          ),
+        );
+      });
+      plugin.get('/stream', (ctx) => {
+        // A stream that runs on after its response, past the request timeout.
+        const body = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            controller.enqueue(new TextEncoder().encode('first\n'));
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            streamed = { deadlineAt: ctx.deadlineAt as number | undefined, aborted: ctx.signal?.aborted };
+            controller.enqueue(new TextEncoder().encode('last\n'));
+            controller.close();
+          },
+        });
+        return new HttpResponse(body, { headers: { 'content-type': 'text/plain' } });
+      });
+      plugin.get('/missing-after-timeout', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        throw new NotFoundException('gone');
+      });
+
+      app = application().use(plugin).use(logger());
       await app.start();
       baseUrl = `http://localhost:${plugin.getServer()?.port}`;
     });
@@ -396,6 +464,133 @@ describe('HttpPlugin', () => {
         expect(body.statusCode).toBe(408);
       },
     );
+
+    specTest(
+      'aborts the signal of a request past its timeout',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'a-request-past-the-timeout-aborts-its-signal',
+      },
+      async () => {
+        const sent = Date.now();
+        const res = await fetch(`${baseUrl}/stalled`);
+        expect(res.status).toBe(408);
+        expect(stalled?.signal?.aborted).toBe(true);
+        const reason = stalled?.signal?.reason as Error | undefined;
+        expect(reason?.name).toBe('TimeoutError');
+        expect(stalled?.deadlineAt).toBeGreaterThanOrEqual(sent + 200);
+        expect(stalled?.deadlineAt).toBeLessThan(sent + 1000);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(workAfterTimeout).toBe(false);
+      },
+    );
+
+    specTest(
+      'a handler that stops on its ended request logs and records no error',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'an-ended-request-logs-no-error',
+      },
+      async () => {
+        const memory = new MemoryLogger();
+        setRootLogger(memory);
+        try {
+          const res = await fetch(`${baseUrl}/stalled`);
+          expect(res.status).toBe(408);
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          expect(memory.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+          const access = memory.entries.find((entry) => entry.message.includes('[GET] /stalled'));
+          expect(access?.level).toBe('debug');
+          expect(stalled?.context?.['__requestError']).toBeUndefined();
+          expect(reported).toEqual([]);
+        } finally {
+          resetDefaultLogger();
+        }
+      },
+    );
+
+    specTest(
+      'a handler that fails for its own reason after its request ended is still logged',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'a-failure-after-the-request-ended-is-still-logged',
+      },
+      async () => {
+        const memory = new MemoryLogger();
+        setRootLogger(memory);
+        try {
+          const res = await fetch(`${baseUrl}/broken-after-timeout`);
+          expect(res.status).toBe(408);
+          await new Promise((resolve) => setTimeout(resolve, 200));
+          const errors = memory.entries.filter((entry) => entry.level === 'error');
+          expect(errors.some((entry) => JSON.stringify(entry).includes('the handler broke'))).toBe(true);
+          expect(reported).toHaveLength(1);
+          expect((reported[0] as Error).name).toBe('TypeError');
+          expect((stalled?.context?.['__requestError'] as Error | undefined)?.name).toBe('TypeError');
+        } finally {
+          resetDefaultLogger();
+        }
+      },
+    );
+
+    specTest(
+      'a client call stopped at the request deadline answers 408 and logs nothing',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'a-client-call-at-the-deadline-answers-408',
+      },
+      async () => {
+        const memory = new MemoryLogger();
+        setRootLogger(memory);
+        try {
+          // The client's timer and the request's timer race: every run must answer 408.
+          const statuses = await Promise.all(
+            Array.from({ length: 10 }, async () => (await fetch(`${baseUrl}/client-deadline`)).status),
+          );
+          expect(statuses).toEqual(Array.from({ length: 10 }, () => 408));
+          // Each request ended at its deadline, so its signal stopped the rest of its work.
+          expect(deadlineSignals.map((signal) => signal.aborted)).toEqual(Array.from({ length: 10 }, () => true));
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          expect(memory.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+          expect(reported).toEqual([]);
+        } finally {
+          resetDefaultLogger();
+        }
+      },
+    );
+
+    specTest(
+      'a stream that runs on after its response is no longer held to the request deadline',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'a-stream-outlives-the-request-deadline',
+      },
+      async () => {
+        const res = await fetch(`${baseUrl}/stream`);
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe('first\nlast\n');
+        expect(streamed).toEqual({ deadlineAt: undefined, aborted: false });
+      },
+    );
+
+    it('logs after the request ended only what it logs during the request', async () => {
+      const memory = new MemoryLogger();
+      setRootLogger(memory);
+      try {
+        const res = await fetch(`${baseUrl}/missing-after-timeout`);
+        expect(res.status).toBe(408);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(memory.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+        expect(reported).toHaveLength(1);
+      } finally {
+        resetDefaultLogger();
+      }
+    });
   });
 
   describe('Application Integration', () => {

@@ -8,6 +8,7 @@ import {
   writeRequestSession,
 } from '@putnami/application';
 import { useConfig } from '@putnami/runtime';
+import { abortableQuery } from '../abort';
 import { database } from '../factory';
 import { type Datasource, type SQLDefinition, type SQLSource, sqlSourceInline } from '../migrations/sql-source';
 
@@ -177,13 +178,13 @@ export class DatabaseSessionStore implements AsyncSessionStore {
     // back as text: the client turns the keys of a JSON column into
     // camelCase, and the session must return the keys it was given
     // (`oauth_pending` stays `oauth_pending`).
-    const result = await sql<{ data: string }[]>`
+    const result = await abortableQuery(sql<{ data: string }[]>`
       UPDATE sessions
       SET expires_at = ${expiresAt}, updated_at = NOW()
       WHERE session_id = ${sessionId}
         AND expires_at > NOW()
       RETURNING data::text AS data
-    `;
+    `);
 
     if (result.length === 0) {
       return {} as S;
@@ -201,30 +202,30 @@ export class DatabaseSessionStore implements AsyncSessionStore {
     // Cast session to unknown then to JSONValue-compatible type for sql.json()
     const sessionData = session as unknown as Parameters<typeof sql.json>[0];
 
-    await sql`
+    await abortableQuery(sql`
       INSERT INTO sessions (session_id, data, expires_at)
       VALUES (${sessionId}, ${sql.json(sessionData)}, ${expiresAt})
       ON CONFLICT (session_id) DO UPDATE
       SET data = ${sql.json(sessionData)},
           expires_at = ${expiresAt},
           updated_at = NOW()
-    `;
+    `);
   }
 
   async deleteAllAsync(sessionId: string): Promise<void> {
     await this.ensureTable();
     const sql = await database(this.dbName);
-    await sql`DELETE FROM sessions WHERE session_id = ${sessionId}`;
+    await abortableQuery(sql`DELETE FROM sessions WHERE session_id = ${sessionId}`);
   }
 
   async existsAsync(sessionId: string): Promise<boolean> {
     await this.ensureTable();
     const sql = await database(this.dbName);
-    const result = await sql`
+    const result = await abortableQuery(sql`
       SELECT 1 FROM sessions
       WHERE session_id = ${sessionId}
         AND expires_at > NOW()
-    `;
+    `);
     return result.length > 0;
   }
 

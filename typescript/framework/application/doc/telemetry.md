@@ -146,6 +146,23 @@ runs each handler in a consumer span, `process <topic>`, that continues that
 trace, or starts a new root for an event without one. A TypeScript publisher
 and a Go consumer share the trace.
 
+Inside a request's span, each step that waits has its own child span, so a
+slow request names where its time went:
+
+| Span | Kind | Covers |
+| --- | --- | --- |
+| `session load`, `session commit` | internal | The read and the write of an asynchronous session store, such as `store: database` |
+| `<operationId>`, `<operationId> attempt` | client | A generated client's call and each attempt, bound or built directly |
+| `ssr loaders`, `ssr render` | internal | The route loaders (or a form post's action), then the React render of the page shell |
+
+A step that fails ends with status `error`. A step its request stopped, because
+the client left or the request passed its timeout, ends with `canceled`.
+
+A framework step uses `span.within(step)`: the step runs on the request's own
+context, with the span as its parent, and what it writes there stays. The
+context holds one parent at a time, so a step awaits its work; work it starts
+without awaiting gets its own span through `span.run()`.
+
 `TelemetryPlugin.sampler` (or `getTraceSampler()`) returns the installed
 `TraceSampler`. Its `settings` are its own, without an export directive's
 limits, which `inForce()` adds. Its `update()` tightens the settings at

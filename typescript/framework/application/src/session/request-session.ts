@@ -1,4 +1,6 @@
 import { tryContext, useConfig } from '@putnami/runtime';
+import { isRequestStop, type RequestEnd } from '../http/http-dispatcher';
+import { startTelemetrySpan } from '../telemetry/client-telemetry';
 import { cookies } from './cookies';
 import { SessionConfig } from './session.config';
 import { getRegisteredStore, type SessionStore } from './session.store';
@@ -57,7 +59,7 @@ export async function loadRequestSession(): Promise<void> {
   if (!isAsyncSessionStore(store)) return;
 
   const sessionId = cookies().get(sessionIdCookieName());
-  const data = sessionId ? await store.loadAsync(sessionId) : {};
+  const data = sessionId ? await inSpan('session load', () => store.loadAsync(sessionId)) : {};
   context.__requestSession = { store, sessionId, data, dirty: false, removed: false };
 }
 
@@ -66,10 +68,22 @@ export async function commitRequestSession(): Promise<void> {
   const state = tryContext<RequestSessionContext>()?.__requestSession;
   if (!state?.dirty || !state.sessionId) return;
   state.dirty = false;
-  if (state.removed) {
-    await state.store.removeAsync(state.sessionId);
-  } else {
-    await state.store.saveAsync(state.sessionId, state.data);
+  const sessionId = state.sessionId;
+  await inSpan('session commit', () =>
+    state.removed ? state.store.removeAsync(sessionId) : state.store.saveAsync(sessionId, state.data),
+  );
+}
+
+/** Runs one step of the request under its own span, which records the step's failure. */
+async function inSpan<T>(name: string, step: () => Promise<T>): Promise<T> {
+  const span = startTelemetrySpan({ name, kind: 'internal' });
+  try {
+    const result = await span.within(step);
+    span.finish();
+    return result;
+  } catch (error) {
+    span.finish({ code: isRequestStop(error, tryContext<RequestEnd>()) ? 'canceled' : 'error' });
+    throw error;
   }
 }
 

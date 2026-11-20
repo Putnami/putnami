@@ -99,6 +99,15 @@ app.post('/internal/sync', requireClient(['orders-service', 'billing-service']),
 
 ---
 
+### Trace spans of a generated client
+
+A generated client built directly, without a service binding, records a client
+span per call and one per attempt, and each attempt writes the W3C trace
+headers: `traceparent`, `x-putnami-traceparent`, and `tracestate` and
+`baggage` from the active trace. When the active trace carries no `tracestate`
+or `baggage`, the attempt removes those headers, so a value an interceptor set
+does not reach the server. A bound client gets the same spans from its binding.
+
 ### `contextInterceptor(): Interceptor`
 
 Propagates routing context headers from the current async context to outgoing requests. Enables distributed tracing, geo-routing, and A/B experiment propagation across service boundaries.

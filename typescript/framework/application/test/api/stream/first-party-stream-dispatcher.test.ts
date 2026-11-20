@@ -138,9 +138,9 @@ afterEach(async () => {
 /** Start a real first-party provider on a real port. */
 async function startProvider(
   register: (plugin: ApiPlugin) => void,
-  options: { secured?: boolean; held?: Promise<void> } = {},
+  options: { secured?: boolean; held?: Promise<void>; requestTimeoutMs?: number } = {},
 ): Promise<Provider> {
-  const providerHttp: HttpPlugin = http({ port: 0 });
+  const providerHttp: HttpPlugin = http({ port: 0, requestTimeoutMs: options.requestTimeoutMs });
   if (options.secured !== false) {
     // The held promise makes credential resolution genuinely asynchronous, which
     // is the state the admission machine has to re-read before it answers ready.
@@ -911,6 +911,38 @@ describe('first-party websocket provider', () => {
       release?.();
     },
   );
+});
+
+describe('a stream and its request deadline', () => {
+  test('a stream runs past the request timeout without its deadline', async () => {
+    let seen: { deadlineAt?: unknown; aborted?: boolean } | undefined;
+    const provider = await startProvider(
+      (plugin) =>
+        plugin.register(
+          '/widgets/slow',
+          endpoint()
+            .returns(Stream({ id: String }))
+            .client({ security: { alternatives: [{ allOf: [] }] }, idempotency: { kind: 'safe' } })
+            .handle(async (context) => {
+              // Outlives the upgrade request's timeout before it sends.
+              await new Promise((resolve) => setTimeout(resolve, 120));
+              seen = {
+                deadlineAt: (context as unknown as { deadlineAt?: unknown }).deadlineAt,
+                aborted: context.signal?.aborted,
+              };
+              context.send({ id: 'late' });
+            }),
+          'GET',
+        ),
+      { secured: false, requestTimeoutMs: 50 },
+    );
+    const conversation = await Conversation.open(provider.url('/widgets/slow'));
+    conversation.init({ operationId: 'getWidgetsSlow', credentials: [] });
+    expect(await conversation.next()).toMatchObject({ type: 'ready' });
+    expect(await conversation.next()).toMatchObject({ type: 'message', payload: { value: { id: 'late' } } });
+    expect(await conversation.next()).toEqual({ v: 1, type: 'result' });
+    expect(seen).toEqual({ deadlineAt: undefined, aborted: false });
+  });
 });
 
 describe('following the serving drain', () => {
