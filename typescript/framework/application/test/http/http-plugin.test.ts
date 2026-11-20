@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { resetDefaultLogger, setRootLogger } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
+import { MemoryLogger } from '@putnami/runtime/testing';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
 import { HttpPlugin, http, resolveIdleTimeoutSeconds } from '../../src/http/http.plugin';
@@ -341,7 +343,7 @@ describe('HttpPlugin', () => {
     let app: Application;
     let plugin: HttpPlugin;
     let baseUrl: string;
-    let stalled: { signal?: AbortSignal; deadlineAt?: number } | undefined;
+    let stalled: { signal?: AbortSignal; deadlineAt?: number; context?: Record<string, unknown> } | undefined;
     let workAfterTimeout = false;
 
     beforeEach(async () => {
@@ -357,7 +359,11 @@ describe('HttpPlugin', () => {
         return new HttpResponse('slow-ok');
       });
       plugin.get('/stalled', async (ctx) => {
-        stalled = { signal: ctx.signal, deadlineAt: ctx.deadlineAt as number | undefined };
+        stalled = {
+          signal: ctx.signal,
+          deadlineAt: ctx.deadlineAt as number | undefined,
+          context: ctx as unknown as Record<string, unknown>,
+        };
         // Waits on a dependency that never answers; only the signal ends the wait.
         await new Promise((_, reject) => ctx.signal?.addEventListener('abort', () => reject(ctx.signal?.reason)));
         workAfterTimeout = true;
@@ -426,6 +432,28 @@ describe('HttpPlugin', () => {
         expect(stalled?.deadlineAt).toBeLessThan(sent + 1000);
         await new Promise((resolve) => setTimeout(resolve, 20));
         expect(workAfterTimeout).toBe(false);
+      },
+    );
+
+    specTest(
+      'a handler that stops on its ended request logs and records no error',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'an-ended-request-logs-no-error',
+      },
+      async () => {
+        const logger = new MemoryLogger();
+        setRootLogger(logger);
+        try {
+          const res = await fetch(`${baseUrl}/stalled`);
+          expect(res.status).toBe(408);
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+          expect(stalled?.context?.['__requestError']).toBeUndefined();
+        } finally {
+          resetDefaultLogger();
+        }
       },
     );
   });

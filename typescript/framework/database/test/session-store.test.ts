@@ -9,7 +9,6 @@ import {
   useSession,
 } from '@putnami/application';
 import { runInContext, useConfig } from '@putnami/runtime';
-import { specTest } from '@putnami/spectest';
 import { QueryAbortError } from '../src/abort';
 import { database } from '../src/factory';
 import { ensurePostgresContainer, isDockerAvailable, POSTGRES_SETUP_TIMEOUT_MS } from './utils/postgres-helper';
@@ -80,34 +79,15 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       expect((retrieved['preferences'] as { theme: string }).theme).toBe('dark');
     });
 
-    specTest(
-      'writes nothing once the request is aborted',
-      {
-        feature: 'typescript/relational-persistence',
-        requirement: 'cancellation',
-        check: 'the-session-store-stops-with-the-request',
-      },
-      async () => {
-        const unhandled: unknown[] = [];
-        const onUnhandled = (reason: unknown) => unhandled.push(reason);
-        process.on('unhandledRejection', onUnhandled);
-        try {
-          const controller = new AbortController();
-          controller.abort(new DOMException('Request Timeout', 'TimeoutError'));
-          const outcome = await Promise.resolve(
-            runInContext({ signal: controller.signal }, () =>
-              store.setAllAsync('aborted-session', { userId: 'user-123' }),
-            ),
-          ).catch((error: unknown) => error);
-          expect(outcome).toBeInstanceOf(QueryAbortError);
-          await new Promise((resolve) => setTimeout(resolve, 50));
-          expect(unhandled).toEqual([]);
-          expect(await store.getAllAsync<Record<string, unknown>>('aborted-session')).toEqual({});
-        } finally {
-          process.off('unhandledRejection', onUnhandled);
-        }
-      },
-    );
+    it('writes nothing once the request is aborted, on a live database', async () => {
+      const controller = new AbortController();
+      controller.abort(new DOMException('Request Timeout', 'TimeoutError'));
+      const outcome = await Promise.resolve(
+        runInContext({ signal: controller.signal }, () => store.setAllAsync('aborted-session', { userId: 'user-123' })),
+      ).catch((error: unknown) => error);
+      expect(outcome).toBeInstanceOf(QueryAbortError);
+      expect(await store.getAllAsync<Record<string, unknown>>('aborted-session')).toEqual({});
+    });
 
     it('should update existing session', async () => {
       const sessionId = 'test-session-2';

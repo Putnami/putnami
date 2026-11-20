@@ -105,6 +105,11 @@ export class HttpDispatcher {
   };
 
   private async handleError(e: unknown, context: HttpRequestContext): Promise<HttpResponse> {
+    // The request ended (it passed its timeout or its client left), so its
+    // work stopped on purpose: the HTTP plugin answers 408, and nothing failed.
+    if (context.signal?.aborted && !(e instanceof HttpResponse)) {
+      return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });
+    }
     recordRequestError(context, e);
 
     // Give the user's error handler first chance

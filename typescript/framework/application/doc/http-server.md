@@ -217,6 +217,17 @@ httpPlugin.get('/example', async (ctx: HttpRequestContext) => {
 | `path()` | `string` | URL path |
 | `host()` | `string` | Request host |
 | `secured()` | `boolean` | Is HTTPS? |
+| `signal` | `AbortSignal` | Aborts when the request ends: its client left or it passed `requestTimeoutMs` |
+| `deadlineAt` | `number \| undefined` | Epoch milliseconds at which the request times out |
+
+### Request timeout
+
+`http({ requestTimeoutMs })` bounds each request. Past it, the server answers
+408 and aborts `ctx.signal` with a `TimeoutError`, so the request's work stops:
+the queries of the database session store, the calls of a generated client
+built without a service binding, and the server render. Pass `ctx.signal` to
+your own long waits. A handler that fails because its request ended logs and
+records no error: the request answers 408.
 
 ## Response Handling
 
