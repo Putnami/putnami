@@ -29,7 +29,7 @@ that commit contains. See
 `go.dev` when your system Go is older than the workspace pin. You do need a Go
 *build* — `--download` is refused here, because a downloaded binary is not built
 from your tree and the CLI would reject it. You do not need [Bun](https://bun.sh) either: TypeScript packages run with the
-exact version declared in `package.json` (`packageManager: "bun@1.4.0"`) and
+exact version declared in `package.json` (`packageManager: "bun@1.4.5"`) and
 recorded with vendor archive digests in `putnami.lock.json`. `./putnamiw install`
 uses a Bun of your machine when it reports that version, and installs that
 version under `~/.putnami/toolchains/bun` otherwise.

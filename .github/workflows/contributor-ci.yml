@@ -161,7 +161,7 @@ jobs:
       # the release the lock records, so the runner's Bun is that release.
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.0
+          bun-version: 1.4.5
       - uses: astral-sh/setup-uv@v6
 
       # ~/.putnami/tools/go is the machine tool home, which holds

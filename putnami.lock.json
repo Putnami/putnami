@@ -5,46 +5,46 @@
   },
   "toolchains": {
     "bun": {
-      "version": "1.4.0",
+      "version": "1.4.5",
       "archives": {
         "darwin/amd64": {
-          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-darwin-x64.zip",
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.5/bun-darwin-x64.zip",
           "format": "zip",
           "executable": "bun-darwin-x64/bun"
         },
         "darwin/arm64": {
-          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-darwin-aarch64.zip",
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.5/bun-darwin-aarch64.zip",
           "format": "zip",
           "executable": "bun-darwin-aarch64/bun"
         },
         "linux/amd64": {
-          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-x64.zip",
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.5/bun-linux-x64.zip",
           "format": "zip",
           "executable": "bun-linux-x64/bun"
         },
         "linux/arm64": {
-          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-linux-aarch64.zip",
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.5/bun-linux-aarch64.zip",
           "format": "zip",
           "executable": "bun-linux-aarch64/bun"
         },
         "windows/amd64": {
-          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-windows-x64.zip",
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.5/bun-windows-x64.zip",
           "format": "zip",
           "executable": "bun-windows-x64/bun.exe"
         },
         "windows/arm64": {
-          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.0/bun-windows-aarch64.zip",
+          "url": "https://github.com/oven-sh/bun/releases/download/bun-v1.4.5/bun-windows-aarch64.zip",
           "format": "zip",
           "executable": "bun-windows-aarch64/bun.exe"
         }
       },
       "integrities": {
-        "darwin/amd64": "1d0211b8f1dc991182344687ad15e72ee86f154845a5f7fa477994cd341dd9b0",
-        "darwin/arm64": "c669e97f6164e1c96e0701748db98dfa77492908cbd8394c7557134a735de381",
-        "linux/amd64": "2d03fb5fb83ac8b567aca0a281b2ce1a1a19d488f56c2968d88c3f25e92fe452",
-        "linux/arm64": "4b1a332ee861983eb93bcfe6f770fff94e3e31b2c388bdaea3c8ed35e58eed0e",
-        "windows/amd64": "e6f093d39da486b20262ca8cdd5ed6a9e8bc9c2f275b78e6d3a0c5b28cc95901",
-        "windows/arm64": "f473bfe2df73ee770548c93dd5d380aea7120c218ec2aa1afdd0bbba7bf18c47"
+        "darwin/amd64": "a4972e778cce4b6a194d7d289f326aa61576d71d80b7a53e9da2f3739566e5fd",
+        "darwin/arm64": "b5d6bc2e13caf14e57c89661e89efd073ff16165b41bfe43882616410609cd10",
+        "linux/amd64": "94559b3b528995a49452f9f2404cec74f2efd7d06e0a000a8cd214b02c3666eb",
+        "linux/arm64": "18656a3bf0ea5641f5796ae4213b75255579a70a0fded2f337933785568cdf84",
+        "windows/amd64": "815ab45ec7f549abf87e6869584b506eab088e24225683957b7e150b47d6de30",
+        "windows/arm64": "41f57d49c3c6811888d9633c569e40b4eb1f7e92b5e5336e3abd3af03187d77a"
       }
     },
     "go": {
