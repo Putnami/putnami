@@ -3,7 +3,7 @@
   "protocolVersion": 1,
   "feature": "cloud/evidence-upload",
   "outcomes": [
-    "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, or a person uploads it after signing in, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported, at the report URL the upload answers"
+    "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, or a GitHub Actions job with its own ID token and no secret, or a person uploads it after signing in, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported, at the report URL the upload answers"
   ],
   "nonGoals": [
     "Creating the observed workspace or its token: the runbook does it by hand for this slice",
@@ -56,7 +56,7 @@
     {
       "id": "refuses-what-it-cannot-upload",
       "text": [
-        "Without PUTNAMI_CLOUD_TOKEN, with a document that does not parse or validate, or with a document whose subject names no numeric project id, it sends nothing and exits non-zero with a message that names the cause.",
+        "Without a credential, with a document that does not parse or validate, or with a document whose subject names no numeric project id, it sends nothing and exits non-zero with a message that names the cause.",
         "A refused run or batch exits non-zero with the route and the server's reason, and never prints the token;",
         "a run opened again without its operational counts as refused only when that call is refused too.",
         "Under --output=json a refused batch prints one failure result naming the run and what it stored."
@@ -65,9 +65,24 @@
     {
       "id": "signs-a-person-in",
       "text": [
-        "With --sign-in and no PUTNAMI_CLOUD_TOKEN, the command uses the session putnami cloud login stored, refreshed when it expired, and runs the same device sign-in when none exists, then uploads as that person: the run names the repository and no workspace, and Putnami Cloud opens the observed workspace in the person's organization.",
+        "With --sign-in, no token and no GitHub Actions exchange, the command uses the session putnami cloud login stored, refreshed when expired, and runs the same device sign-in when none exists, then uploads as that person: the run names the repository and no workspace, and Putnami Cloud opens the observed workspace in the person's organization.",
         "With a token in PUTNAMI_CLOUD_TOKEN, the upload names the repository too: an organization's ingest token needs it.",
-        "Without --sign-in and without a token, it refuses as before."
+        "Without --sign-in, a token or the exchange, it refuses."
+      ]
+    },
+    {
+      "id": "exchanges-a-github-actions-id-token",
+      "text": [
+        "In a GitHub Actions job (GITHUB_ACTIONS true) with PUTNAMI_ORGANIZATION and no PUTNAMI_CLOUD_TOKEN, it requests the job's ID token for the auth-server's base URL, exchanges it at the auth-server for client delivery-ingest and that organization_id, and uploads with the answered token, naming the repository, even with --sign-in.",
+        "An explicit PUTNAMI_CLOUD_TOKEN wins: no ID token is requested."
+      ]
+    },
+    {
+      "id": "explains-a-refused-exchange",
+      "text": [
+        "PUTNAMI_ORGANIZATION in a GitHub Actions job (GITHUB_ACTIONS true) without ACTIONS_ID_TOKEN_REQUEST_URL or ACTIONS_ID_TOKEN_REQUEST_TOKEN sends nothing and names permissions id-token: write.",
+        "The auth-server's refusal for a repository the organization does not trust is named with the observation trust to add.",
+        "Any other failed request names the request and its reason. Each exits non-zero and prints no token."
       ]
     },
     {

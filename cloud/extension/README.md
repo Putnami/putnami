@@ -521,6 +521,19 @@ putnami extensions install --user @putnami/cloud
 PUTNAMI_CLOUD_TOKEN=pkt_... putnami observe --upload
 ```
 
+A GitHub Actions job needs no secret. With `permissions: id-token: write` and
+`PUTNAMI_ORGANIZATION` set to the id of the Putnami organization it uploads
+for, and no `PUTNAMI_CLOUD_TOKEN`, the command asks GitHub for the job's ID
+token, whose audience is the auth-server's base URL, and exchanges it at the
+auth-server's token endpoint (RFC 8693 token exchange, client
+`delivery-ingest`, `organization_id`) for a five-minute token of scope
+`delivery.ingest`. The auth-server mints it only when that organization
+trusts the job's repository, or its owner, for observation, on the
+organization's observe page in putnami.app. The upload then names the
+repository. Without `id-token: write`, the command says so; a refused
+exchange names the auth-server's reason, and the untrusted-repository refusal
+names the trust to add. `PUTNAMI_CLOUD_TOKEN`, when set, wins.
+
 On a laptop, `putnami observe --open` adds `--sign-in`. Without
 `PUTNAMI_CLOUD_TOKEN`, the command then uploads as the person signed in with
 `putnami cloud login`, refreshing the session when it expired, and runs the
@@ -576,7 +589,7 @@ The command reads a `protocol/evidence` v1 document and makes three calls:
    member is not sent.
 
 A batch with nothing to carry is not sent. The summary lists apart the kinds
-Delivery already held for that submission. Without the token or `--sign-in`, with a document
+Delivery already held for that submission. Without a credential (the token, the GitHub Actions exchange or `--sign-in`), with a document
 that does not validate, or with a document whose subject names no numeric
 project id, it sends nothing. Any refusal
 exits non-zero with the route and the server's reason; `putnami observe`

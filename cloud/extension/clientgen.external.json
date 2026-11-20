@@ -60,6 +60,23 @@
       "reason": "Mints an audience-bound ID token for the runner's attached service account from the fixed metadata endpoint."
     },
     {
+      "authority": "GitHub Actions OpenID Connect ID token request (docs.github.com/actions/security-for-github-actions/security-hardening-your-deployments/about-security-hardening-with-openid-connect)",
+      "adapter": "cloud/extension/internal/deliverycli/evidence_actions.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/deliverycli/evidence_actions.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "a76c8b65654116e1965e43edda68cae7fa8cfe7eccdbfed4c33fb6587f5e4d03"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/deliverycli/evidence_actions_test.go"
+      ],
+      "reason": "evidence-report asks the job's ACTIONS_ID_TOKEN_REQUEST_URL for an ID token whose audience is the auth-server, with the job's ACTIONS_ID_TOKEN_REQUEST_TOKEN as bearer, then exchanges it at the token endpoint for an ingest token. The request and its {value} answer are GitHub's, not a first-party provider contract."
+    },
+    {
       "authority": "Go toolchain download index at go.dev/dl (the ?mode=json machine-readable index)",
       "adapter": "cloud/extension/internal/deliverycli/godevindex.go",
       "callsites": [

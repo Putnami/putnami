@@ -10,7 +10,10 @@
 // refuses a body over 1 MiB whole; refused for its size while its dependency
 // changes carry before and after states, it goes again without them. The bearer is the workspace token in
 // PUTNAMI_CLOUD_TOKEN; the workspace comes out of it, never out of the body.
-// With --sign-in and no token, the bearer is the person's session from
+// In a GitHub Actions job with PUTNAMI_ORGANIZATION and no token, the bearer
+// is the ingest token the job's own ID token exchanges for
+// (evidence_actions.go). With --sign-in and no token, the bearer is the
+// person's session from
 // `putnami cloud login`, signed in first when none is stored; the run and its
 // batches then name the repository, and Putnami Cloud opens the observed
 // workspace in the person's organization. The result carries the report URL
@@ -170,20 +173,26 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 		return err
 	}
 	token := clicore.EnvGet(env, evidenceTokenEnv)
-	person := false
+	namesRepository := false
 	if token == "" {
-		if !clicore.BoolParam(params, false, "sign-in", "signIn") {
-			return clicore.NewError("cloud evidence-report needs "+evidenceTokenEnv+": a workspace token of scope delivery.ingest, or --sign-in to upload as the signed-in person", clicore.ExitAuth)
+		switch organization := actionsOrganization(env); {
+		case organization != "":
+			if token, err = actionsIngestToken(params, env, ioctx, organization); err != nil {
+				return err
+			}
+		case clicore.BoolParam(params, false, "sign-in", "signIn"):
+			if token, err = personToken(params, env, ioctx, signIn); err != nil {
+				return err
+			}
+		default:
+			return clicore.NewError("cloud evidence-report needs a credential: "+evidenceTokenEnv+" set to a workspace token of scope delivery.ingest, "+evidenceOrganizationEnv+" in a GitHub Actions job with permissions id-token: write, or --sign-in to upload as the signed-in person", clicore.ExitAuth)
 		}
-		if token, err = personToken(params, env, ioctx, signIn); err != nil {
-			return err
-		}
-		person = true
+		namesRepository = true
 	}
 	// Every upload names its repository. A person's upload and an
 	// organization's ingest token need it to find the observed workspace; a
 	// workspace token keeps its workspace, and Delivery ignores it there.
-	if person || (strings.TrimSpace(doc.Subject.Host) != "" && strings.TrimSpace(doc.Subject.Repository) != "") {
+	if namesRepository || (strings.TrimSpace(doc.Subject.Host) != "" && strings.TrimSpace(doc.Subject.Repository) != "") {
 		run.Repository = &evidenceRepository{Host: doc.Subject.Host, Path: doc.Subject.Repository}
 	}
 	if fields := strings.Fields(token); len(fields) != 1 || fields[0] != token {

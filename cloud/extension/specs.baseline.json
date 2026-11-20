@@ -51,6 +51,8 @@
     "cloud/env-definition-drift#enable-fails-on-a-definition-that-stays-degraded",
     "cloud/env-definition-drift#status-names-enable-for-an-omitted-workload",
     "cloud/evidence-upload#answers-the-report-url",
+    "cloud/evidence-upload#exchanges-a-github-actions-id-token",
+    "cloud/evidence-upload#explains-a-refused-exchange",
     "cloud/evidence-upload#opens-the-external-run",
     "cloud/evidence-upload#posts-the-reports-in-two-batches",
     "cloud/evidence-upload#refuses-what-it-cannot-upload",

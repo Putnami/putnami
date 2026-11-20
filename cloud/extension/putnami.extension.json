@@ -613,7 +613,7 @@
           ]
         },
         "evidence-report": {
-          "description": "Machine command: upload a change evidence document to Putnami Cloud, as the evidence reporter putnami observe --upload runs.",
+          "description": "Machine command: upload a change evidence document to Putnami Cloud, as the evidence reporter putnami observe --upload runs, with PUTNAMI_CLOUD_TOKEN, the GitHub Actions ID token exchange or --sign-in.",
           "command": "cloud-evidence-report",
           "interactive": true,
           "workspace": "optional",

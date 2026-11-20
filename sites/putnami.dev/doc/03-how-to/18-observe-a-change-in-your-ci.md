@@ -55,7 +55,7 @@ The install needs the network: when the installer or the registry cannot be reac
 
 `putnami observe` reads the checkout and the reports on the machine that runs it. Without `--upload` or `--open`, nothing about the change leaves that machine: it prints the summary and writes the evidence document where `--evidence` names it, and your CI keeps that file as an artifact. Its only other network use is Git, which fetches from your `origin` remote the history the base of the change needs, deepening a shallow clone.
 
-`--open` uploads too. With either flag, `putnami observe` first asks the GitHub or GitLab API for the repository's numeric id when it runs outside a CI, with `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set; GitHub Actions and GitLab CI state that id themselves. It then hands the evidence document to the `@putnami/cloud` extension, which sends Putnami Cloud these fields, with `PUTNAMI_CLOUD_TOKEN` or your signed-in session as the credential:
+`--open` uploads too. With either flag, `putnami observe` first asks the GitHub or GitLab API for the repository's numeric id when it runs outside a CI, with `GITHUB_TOKEN` or `PUTNAMI_GITLAB_TOKEN` when one is set; GitHub Actions and GitLab CI state that id themselves. It then hands the evidence document to the `@putnami/cloud` extension, which sends Putnami Cloud these fields, with `PUTNAMI_CLOUD_TOKEN`, the short-lived token a GitHub Actions job gets for its own ID token, or your signed-in session as the credential. That GitHub Actions job first sends its ID token, signed by GitHub and naming the repository, its owner, the workflow, the ref and the actor that started the run, with your organization's id to `auth.putnami.cloud`. The evidence then carries:
 
 | Part | Fields |
 |---|---|
@@ -373,6 +373,42 @@ Without `--upload`, after a failed upload, without the code host token, or on a 
 To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the Putnami Cloud workspace that receives the uploads. `putnami cloud token create --name ci --scopes delivery.ingest` creates it and prints it once; it runs, signed in, in a Putnami workspace that `putnami cloud setup --workspace <id>` linked to that Cloud workspace, which does not have to be the repository you observe.
 
 On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`, as step 2 shows. With a token, the action uploads the evidence and publishes unless you set `publish` to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload --publish` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
+
+#### On GitHub, without a secret
+
+A GitHub Actions job can upload with no secret at all: it exchanges the job's own ID token for a five-minute upload token. Your Putnami organization must first trust the repository, or the GitHub organization that owns it, on its observe page in putnami.app. Then commit this file as `.github/workflows/putnami.yml`, with your organization's id in place of `<organization-id>` and your default branch in place of `main`:
+
+```yaml
+name: Putnami
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  id-token: write
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    env:
+      PUTNAMI_ORGANIZATION: <organization-id>
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Putnami
+        run: |
+          curl -fsSL https://putnami.dev/install.sh | bash
+          echo "$HOME/.putnami/bin" >> "$GITHUB_PATH"
+      - name: Install the observe and cloud extensions
+        run: |
+          putnami extensions install --user @putnami/observe
+          putnami extensions install --user @putnami/cloud
+      - name: Observe the change
+        run: putnami observe --upload
+```
+
+The workflow runs on each pull request and on each push to the default branch, where `putnami observe` measures the push against the commit before it. It needs no test report: add the reports of [step 1](#1-write-the-reports-your-stack-needs) to the same job, before the last step, when you want tests and coverage in the report. `PUTNAMI_ORGANIZATION` is an id, not a secret, so it sits in the file.
+
+`id-token: write` lets the job ask GitHub for an ID token that names its repository. With `PUTNAMI_ORGANIZATION` set and no `PUTNAMI_CLOUD_TOKEN`, `@putnami/cloud` asks for that token and exchanges it at `auth.putnami.cloud`, which answers an upload token only when the organization trusts the repository, or its owner, for observation. When it does not, the summary names that refusal and the trust to add; without `id-token: write`, it names the missing permission. GitHub withholds the ID token from a pull request from a fork in most repositories, so such a run uploads nothing. As always, an upload that fails is a warning, and the job still passes. A `PUTNAMI_CLOUD_TOKEN` set in the job wins over the exchange.
 
 ### 7) Add licences and known vulnerabilities from an SBOM
 

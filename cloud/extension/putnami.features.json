@@ -395,7 +395,7 @@
       "id": "cloud/evidence-upload",
       "type": "feature",
       "name": "Upload a change evidence document to Putnami Cloud",
-      "outcome": "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, or a person uploads it after signing in, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported, at the report URL the upload answers",
+      "outcome": "A CI job that is not Putnami's uploads its change evidence document to Putnami Cloud with a workspace token, or a GitHub Actions job with its own ID token and no secret, or a person uploads it after signing in, and the run shows its tests, coverage, components, changed-line coverage and dependency changes, marked as self-reported, at the report URL the upload answers",
       "owner": "cloud",
       "target": "coded",
       "requirements": [
@@ -513,6 +513,35 @@
               "sign-in-runs-the-device-sign-in-without-a-session",
               "a-person-upload-names-the-repository-and-no-workspace",
               "a-token-upload-names-the-repository"
+            ]
+          }
+        },
+        {
+          "id": "exchanges-a-github-actions-id-token",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-actions-job-exchanges-its-id-token-and-uploads",
+              "an-explicit-token-skips-the-exchange"
+            ]
+          }
+        },
+        {
+          "id": "explains-a-refused-exchange",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-job-without-id-token-permission-is-told-so",
+              "an-untrusted-repository-is-refused-by-name",
+              "a-failed-exchange-names-its-cause"
             ]
           }
         },
