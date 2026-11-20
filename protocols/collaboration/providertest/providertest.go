@@ -13,8 +13,9 @@
 // item asked for, that an idempotent repeat returns the first result instead
 // of a second item, that a stale revision is a conflict, that pages cover a
 // result set exactly once, that a reference another source issued is not
-// found, and that tasks.get returns each context member the target declares
-// in TaskMembers and no other. The memory scenarios check that a checkpoint lands only against the
+// found, that tasks.get returns each context member the target declares
+// in TaskMembers and no other, and that a proposal carries a pageUrl exactly
+// when the target declares it in ProposalMembers. The memory scenarios check that a checkpoint lands only against the
 // revision it names, that of concurrent writers at one revision exactly one
 // lands, that a repeated idempotency key replays the write that landed, that
 // another provider instance resumes from the store alone, that a record
@@ -73,6 +74,12 @@ type Target struct {
 	// when it is declared, as the CLI does, and checks that status answers
 	// the one the provider kept, and none when it is not declared.
 	MissionMembers []string
+	// ProposalMembers are the members the provider's manifest declares under
+	// the members of every proposals operation that answers a proposal
+	// (collab.ProposalMembers lists them). RunProposals checks that each
+	// proposal answered carries a pageUrl when it is declared, and none when
+	// it is not.
+	ProposalMembers []string
 	// Settle is how long a read may take to observe a write the provider
 	// acknowledged, for a backend whose search index is eventually consistent.
 	// Zero means every read observes every acknowledged write at once.

@@ -58,6 +58,14 @@
       ]
     },
     {
+      "id": "change-page-link",
+      "text": [
+        "When the proposals provider answers the proposal's pageUrl, change finalize prints CHANGE_URL=<pageUrl> right after PROPOSAL_URL, for a draft and for a ready publication, and its result carries it as changeUrl.",
+        "Build's end report leads with that change page and what waits there for the owner, then the proposal link.",
+        "Without a pageUrl, the command prints no CHANGE_URL and the end report is unchanged."
+      ]
+    },
+    {
       "id": "authorized-auto-merge",
       "text": [
         "publication.autoMerge is \"squash\" or false, false by default; any other value stops the run before any write.",

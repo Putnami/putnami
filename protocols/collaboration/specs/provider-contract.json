@@ -226,6 +226,15 @@
       ]
     },
     {
+      "id": "declared-page-url",
+      "text": [
+        "A proposal may carry pageUrl, a declared result member of version 1: a display link to its change in the provider's console, never an identity.",
+        "The catalog lists it for proposals.find, upsert, status, merge and automerge; a provider without a console declares nothing and leaves it absent.",
+        "A pageUrl that is not an absolute http or https link is refused.",
+        "providertest checks that a declaring provider answers it on every proposal and that any other answers none."
+      ]
+    },
+    {
       "id": "scenarios-normalize-requests",
       "text": "The scenarios normalize each request before it reaches Serve: a list request without a page gets page.size 20 and an explicit size is kept, a memory request without a workspace gets the served one and one naming its own keeps it, and a request the contract refuses is sent unchanged."
     },
@@ -340,6 +349,7 @@
     "protocols/collaboration/doc/adr/0007-a-declared-result-member-may-join-version-1.md",
     "protocols/collaboration/doc/adr/0008-a-session-leaves-no-empty-mission-behind.md",
     "protocols/collaboration/doc/adr/0009-a-declared-request-member-may-join-version-1.md",
-    "protocols/collaboration/doc/adr/0010-missions-version-2-adds-typed-runs.md"
+    "protocols/collaboration/doc/adr/0010-missions-version-2-adds-typed-runs.md",
+    "protocols/collaboration/doc/adr/0011-a-proposal-carries-its-change-page-as-a-declared-member.md"
   ]
 }

@@ -193,7 +193,7 @@ func hostedWorkflowStatus(request HostedWorkflowRequest, status *collab.Proposal
 func (r *verifyRun) hostedWorkflowReadyReceipt(unit, output *jsObject, expectedBaseSHA string) bool {
 	finalizer := workflowObject(output, "workflow hosted finalizer result",
 		[]string{"proposalRef", "headSHA", "state", "gate", "workflowSHA256", "readyUnits", "hostedWorkflowReceipt", "labelsVerified", "assigneesVerified"},
-		[]string{"proposalRef", "proposalUrl", "headSHA", "state", "gate", "workflowSHA256", "readyUnits", "hostedWorkflowReceipt", "labelsVerified", "assigneesVerified"})
+		[]string{"proposalRef", "proposalUrl", "changeUrl", "headSHA", "state", "gate", "workflowSHA256", "readyUnits", "hostedWorkflowReceipt", "labelsVerified", "assigneesVerified"})
 	hosted := workflowObject(finalizer.get("hostedWorkflowReceipt"), "workflow hosted ready receipt",
 		[]string{"workflow", "baseSHA", "headSHA", "fingerprint", "proposalRef", "requiredChecks", "status"},
 		[]string{"workflow", "baseSHA", "headSHA", "fingerprint", "proposalRef", "requiredChecks", "status"})

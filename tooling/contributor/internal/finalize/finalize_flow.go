@@ -420,7 +420,7 @@ func (f Finalizer) seedAndFind(ctx context.Context, c *publicationCandidate) (*R
 func settledOutcome(c *publicationCandidate, settled []collab.Proposal) (*Result, error) {
 	for _, proposal := range settled {
 		if proposal.State == collab.ProposalStateMerged && proposal.Change.HeadCommit == c.head {
-			return &Result{ProposalRef: proposal.Ref, ProposalURL: proposal.URL, HeadSHA: c.head, State: proposal.State}, nil
+			return &Result{ProposalRef: proposal.Ref, ProposalURL: proposal.URL, ChangeURL: proposal.PageURL, HeadSHA: c.head, State: proposal.State}, nil
 		}
 	}
 	names := make([]string, 0, len(settled))
@@ -653,7 +653,8 @@ func (f Finalizer) upsertAndReadback(ctx context.Context, c *publicationCandidat
 	if err := compareMembers(upsert.Proposal, status.Proposal); err != nil {
 		return Result{}, err
 	}
-	return Result{ProposalRef: status.Proposal.Ref, ProposalURL: status.Proposal.URL, HeadSHA: c.head, State: status.Proposal.State,
+	return Result{ProposalRef: status.Proposal.Ref, ProposalURL: status.Proposal.URL, ChangeURL: status.Proposal.PageURL,
+		HeadSHA: c.head, State: status.Proposal.State,
 		LabelsVerified:    upsert.Proposal.Labels != nil && status.Proposal.Labels != nil,
 		AssigneesVerified: upsert.Proposal.Assignees != nil && status.Proposal.Assignees != nil}, nil
 }

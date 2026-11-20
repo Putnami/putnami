@@ -28,6 +28,10 @@
         "ref": { "$ref": "collaboration.json#/$defs/ref" },
         "revision": { "$ref": "collaboration.json#/$defs/token" },
         "url": { "$ref": "collaboration.json#/$defs/url" },
+        "pageUrl": {
+          "$ref": "collaboration.json#/$defs/url",
+          "description": "A display link to the proposal's change in the provider's own console, never an identity. Only a provider whose operation declares pageUrl reports it; one with no console leaves it absent."
+        },
         "change": { "$ref": "#/$defs/change" },
         "title": { "type": "string", "minLength": 1, "maxLength": 256 },
         "body": { "type": "string" },

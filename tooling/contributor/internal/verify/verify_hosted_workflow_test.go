@@ -289,6 +289,7 @@ func TestHostedWorkflowReadyReceiptReplaysOriginalEvidence(t *testing.T) {
 	}
 	output := fxObj{
 		"proposalRef": request.ProposalRef, "headSHA": request.HeadSHA, "state": "open",
+		"proposalUrl": "https://github.com/acme/app/pull/7", "changeUrl": "https://console.example.com/changes/7",
 		"gate": "hosted checks passed on " + request.HeadSHA, "workflowSHA256": request.SHA256,
 		"readyUnits": fxArr{"first"}, "labelsVerified": true, "assigneesVerified": true,
 		"hostedWorkflowReceipt": fxObj{

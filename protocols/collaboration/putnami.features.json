@@ -408,6 +408,22 @@
           }
         },
         {
+          "id": "declared-page-url",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "only-the-operations-that-answer-a-proposal-declare-page-url",
+              "a-proposal-keeps-its-page-url-through-a-re-encoding",
+              "an-invalid-page-url-is-refused",
+              "the-proposal-scenarios-check-the-declared-page-url"
+            ]
+          }
+        },
+        {
           "id": "scenarios-normalize-requests",
           "stage": "coded",
           "evidenceKinds": [

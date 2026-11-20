@@ -997,6 +997,7 @@ func (c *checker) proposal(field string, proposal Proposal) {
 	c.ref(field+".ref", proposal.Ref)
 	c.token(field+".revision", proposal.Revision)
 	c.url(field+".url", proposal.URL)
+	c.url(field+".pageUrl", proposal.PageURL)
 	c.change(field+".change", proposal.Change, true)
 	c.title(field+".title", proposal.Title)
 	c.bytesLimit(field+".body", proposal.Body, MaxBodyBytes)

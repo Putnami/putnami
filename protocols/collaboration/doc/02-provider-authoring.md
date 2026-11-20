@@ -61,7 +61,9 @@ when it resolves a binding:
   `parentProgress`, `blockedBy`, `blocking` and `comments`
   ([task context](01-operations.md#task-context)); on `missions.sync`, the
   request member `missedSyncs`, and on `missions.status`, the same result
-  member. Return a listed result member only when you declare it, and always
+  member; on `proposals.find`, `upsert`, `status`, `merge` and `automerge`,
+  the result member `pageUrl`, the link to the proposal's change in your own
+  console. Return a listed result member only when you declare it, and always
   when you do, `[]` or a count of 0 when there is none. You receive a request
   member only when you declare it: Putnami removes it from a request to a
   provider that does not. `<contract> capabilities` reports them. Declaring
@@ -214,6 +216,10 @@ write.
   declares on both `missions.sync` and `missions.status`: the scenarios send
   `missedSyncs` only when it is declared, and check that `status` answers the
   report of the last sync that carried one, and none when it is not declared.
+- A proposals target names in `ProposalMembers` the members your manifest
+  declares on every proposals operation that answers a proposal: the
+  scenarios check that each proposal they read carries a `pageUrl` when it is
+  declared, and none when it is not.
 - A memory target also names `Workspace`, the name the orchestrator fills
   into an identity, and `Reopen`, which returns a second provider instance on
   the same store. `RunMemory` checks creation with `mustNotExist`, the replay

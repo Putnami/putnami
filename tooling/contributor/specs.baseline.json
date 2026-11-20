@@ -32,6 +32,7 @@
     "tooling/contributor-executable#authorized-auto-merge",
     "tooling/contributor-executable#change-finalize-parity",
     "tooling/contributor-executable#change-language-parity",
+    "tooling/contributor-executable#change-page-link",
     "tooling/contributor-executable#change-verify-parity",
     "tooling/contributor-executable#local-evidence-verification",
     "tooling/contributor-executable#merge-queue-gate",

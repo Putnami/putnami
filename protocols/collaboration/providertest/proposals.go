@@ -1,6 +1,7 @@
 package providertest
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -9,7 +10,9 @@ import (
 
 // RunProposals runs the proposals v1 scenarios, each against a fresh target.
 // Each scenario may open proposals on the target's two heads, so a target
-// against a real backend supplies fresh heads for every scenario. The comment
+// against a real backend supplies fresh heads for every scenario. Every
+// proposal a scenario reads carries a pageUrl exactly when the target
+// declares it in ProposalMembers. The comment
 // scenario runs only against a provider that offers proposals.comments, and
 // is skipped for any other.
 func RunProposals(t *testing.T, newTarget func(t *testing.T) Target) {
@@ -48,14 +51,39 @@ func (s *Session) upsert(head int, title, extra string) collab.ProposalUpsertRes
 }
 
 // sameChange fails unless a proposal is about the exact base and head the
-// scenario named, in a repository the provider named.
+// scenario named, in a repository the provider named, and carries a pageUrl
+// exactly when the target declares it.
 func (s *Session) sameChange(proposal collab.Proposal, head int) {
 	s.t.Helper()
+	s.declaredPage(proposal)
 	change := proposal.Change
 	if change.Base != s.target.Base || change.Head != s.target.Heads[head] || change.Repository == "" {
 		s.t.Fatalf("proposal %s/%s is about %s %s...%s, requested %s...%s", proposal.Ref.Source, proposal.Ref.ID,
 			change.Repository, change.Base, change.Head, s.target.Base, s.target.Heads[head])
 	}
+}
+
+// declaredPage fails unless a proposal carries a pageUrl exactly when the
+// target declares it.
+func (s *Session) declaredPage(proposal collab.Proposal) {
+	s.t.Helper()
+	if problem := PageURLProblem(proposal, s.target.ProposalMembers); problem != "" {
+		s.t.Fatalf("proposal %s/%s: %s", proposal.Ref.Source, proposal.Ref.ID, problem)
+	}
+}
+
+// PageURLProblem says how a proposal's pageUrl differs from the members
+// declared, empty when it matches: a declared pageUrl is present, and an
+// undeclared one is absent.
+func PageURLProblem(proposal collab.Proposal, declared []string) string {
+	want := slices.Contains(declared, collab.ProposalMemberPageURL)
+	switch {
+	case proposal.PageURL != "" && !want:
+		return fmt.Sprintf("pageUrl %q is present, and it is not declared", proposal.PageURL)
+	case proposal.PageURL == "" && want:
+		return "pageUrl is declared and absent; a provider that declares it answers it on every proposal"
+	}
+	return ""
 }
 
 // sameMembers fails unless two answers about one proposal report its labels

@@ -260,11 +260,13 @@ from a local session.
 ## Output and exit codes
 
 The command prints `PROPOSAL_REF=<json>`, then `PROPOSAL_URL=<url>` when the
-proposal has a URL. When the policy sets `publication.autoMerge` and the run
+proposal has a URL, then `CHANGE_URL=<url>` when the proposals provider
+answers the proposal's `pageUrl`, its change page in the provider's own
+console, for a draft and a ready publication alike. When the policy sets `publication.autoMerge` and the run
 sent the request, it adds `AUTO_MERGE=squash` when auto-merge is on, or
 `AUTO_MERGE=off` with the reason on stderr. With `--output=json`, `jsonl` or `cloud-logging`, it
 prints the result document on one line instead: the proposal reference and
-URL, the head commit, the proposal state, the gate, whether the labels and
+URL, the change page (`changeUrl`) when the provider answers one, the head commit, the proposal state, the gate, whether the labels and
 assignees read back, `screenshots` for a ready publication, `screenshotsUpload` when it accepted a manifest, for a hosted workflow, its digest, ready units and
 receipt, `autoMerge` (`method`, `enabled` and the `refusal`) when the run
 sent the request, and `stripped` (`field`, `line`, `kind` and `text` of each

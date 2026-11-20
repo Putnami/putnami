@@ -103,9 +103,15 @@ detect such a change.
 | `automerge` | mutating | no | yes | — | `ref`, `expectedHeadCommit`, `method` | `proposal` (state `open` or `merged`) |
 | `screenshots` | mutating | no | yes | — | `ref`, `commit`, `manifest` | `ref`, `commit`, `project`, `captures`, `uploaded` |
 
-A proposal is `ref`, `revision`, `url`, `change` (`repository`, `base`,
-`head`, `headCommit`), `title`, `body`, `state` (`draft`, `open`, `merged`,
-`closed`), `providerState`, `labels`, `assignees`, `updatedAt`. A request may
+A proposal is `ref`, `revision`, `url`, `pageUrl`, `change` (`repository`,
+`base`, `head`, `headCommit`), `title`, `body`, `state` (`draft`, `open`,
+`merged`, `closed`), `providerState`, `labels`, `assignees`, `updatedAt`.
+`url` links the proposal on its code host; `pageUrl` links its change in the
+provider's own console. Both are display links, never an identity. `pageUrl`
+is a declared member of `find`, `upsert`, `status`, `merge` and `automerge`
+(ADR 0007): only a provider whose manifest names it under the operation's
+`members` answers it, `capabilities` reports it, and a provider with no
+console declares nothing and leaves it absent. A request may
 omit `repository`; the provider applies its configured one, and every
 proposal it returns names it. `labels` and `assignees` include those the
 provider applies from its own settings; a provider reports them on every

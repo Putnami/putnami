@@ -116,8 +116,11 @@ type Finalizer struct {
 const queueGatePrefix = "merge queue of "
 
 type Result struct {
-	ProposalRef           collab.Ref             `json:"proposalRef"`
-	ProposalURL           string                 `json:"proposalUrl,omitempty"`
+	ProposalRef collab.Ref `json:"proposalRef"`
+	ProposalURL string     `json:"proposalUrl,omitempty"`
+	// ChangeURL is the proposal's pageUrl: its change page in the proposals
+	// provider's own console, empty when the provider answers none.
+	ChangeURL             string                 `json:"changeUrl,omitempty"`
 	HeadSHA               string                 `json:"headSHA"`
 	State                 collab.ProposalState   `json:"state"`
 	Gate                  string                 `json:"gate,omitempty"`

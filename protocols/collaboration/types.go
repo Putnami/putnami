@@ -340,6 +340,12 @@ type Proposal struct {
 	Revision string `json:"revision"`
 	// URL is a display link. It is never an identity.
 	URL string `json:"url,omitempty"`
+	// PageURL is a display link to the proposal's change in the provider's
+	// own console, beside the code host's URL. It is never an identity. It is
+	// a declared member (ProposalMemberPageURL): a provider answers it only
+	// when its manifest declares it, and a provider with no console leaves
+	// it absent.
+	PageURL string `json:"pageUrl,omitempty"`
 	// Change is the repository/base/head identity the proposal is associated
 	// with.
 	Change Change `json:"change"`
@@ -1049,6 +1055,15 @@ type MissionsSyncInput struct {
 	// one: absent keeps it.
 	MissedSyncs *MissedSyncs `json:"missedSyncs,omitempty"`
 }
+
+// ProposalMemberPageURL is the declared member of the proposals operations
+// that answer a proposal: find, upsert, status, merge and automerge. It names
+// Proposal.PageURL (ADR 0007).
+const ProposalMemberPageURL = "pageUrl"
+
+// ProposalMembers is the closed vocabulary of the declared members of the
+// proposals operations that answer a proposal, in canonical order.
+var ProposalMembers = []string{ProposalMemberPageURL}
 
 // MissionMemberMissedSyncs is the declared member of missions.sync and
 // missions.status that reports a session's failed syncs (ADR 0009).

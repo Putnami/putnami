@@ -87,6 +87,20 @@
           }
         },
         {
+          "id": "change-page-link",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "change-finalize-prints-the-change-page",
+              "the-end-report-leads-with-the-change-page"
+            ]
+          }
+        },
+        {
           "id": "authorized-auto-merge",
           "stage": "coded",
           "evidenceKinds": [
