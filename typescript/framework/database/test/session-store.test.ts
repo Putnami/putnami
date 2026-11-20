@@ -325,6 +325,16 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
       return (res.headers.get('set-cookie') ?? '').split(';')[0];
     }
 
+    /** The response, once it answered 200: a failure shows its status and the start of its body. */
+    async function answered(res: Promise<Response>): Promise<Response> {
+      const response = await res;
+      if (response.status !== 200) {
+        const body = (await response.text()).slice(0, 400);
+        expect({ status: response.status, body }).toEqual({ status: 200, body: '' });
+      }
+      return response;
+    }
+
     async function withServer(run: (base: string) => Promise<void>): Promise<void> {
       const hp = http({ port: 0 });
       hp.route('GET', '/read', () => ({ cart: useSession<string[]>('cart') ?? null }));
@@ -353,7 +363,7 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
     it('keeps what one request wrote for the next request, in PostgreSQL', async () => {
       await sql`DELETE FROM sessions`;
       await withServer(async (base) => {
-        const cookie = cookieOf(await fetch(`${base}/write`));
+        const cookie = cookieOf(await answered(fetch(`${base}/write`)));
         expect(cookie.startsWith('session_id=')).toBe(true);
         const rows = await sql<{ data: { cart: string[] } }[]>`SELECT data FROM sessions`;
         expect(rows.map((row) => row.data)).toEqual([{ cart: ['item-1'] }]);
@@ -366,7 +376,7 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
     it('reads back a snake_case key the previous request wrote, as an OAuth callback does', async () => {
       await sql`DELETE FROM sessions`;
       await withServer(async (base) => {
-        const cookie = cookieOf(await fetch(`${base}/login`));
+        const cookie = cookieOf(await answered(fetch(`${base}/login`)));
         const callback = await fetch(`${base}/callback`, { headers: { Cookie: cookie } });
         expect(await callback.json()).toEqual({ pending: { state: 's-1', code_verifier: 'v-1' } });
       });
@@ -375,7 +385,7 @@ describe.skipIf(!dockerAvailable)('DatabaseSessionStore', () => {
     it('stores no row for a visitor whose request only reads the session', async () => {
       await sql`DELETE FROM sessions`;
       await withServer(async (base) => {
-        const read = await fetch(`${base}/read`);
+        const read = await answered(fetch(`${base}/read`));
         expect(await read.json()).toEqual({ cart: null });
         const [{ count }] = await sql<{ count: number }[]>`SELECT count(*)::int AS count FROM sessions`;
         expect(count).toBe(0);
