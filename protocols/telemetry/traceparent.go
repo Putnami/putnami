@@ -81,6 +81,22 @@ func ResolveRemoteParent(traceparent, putnamiTraceparent string) (Traceparent, s
 	return primary, RemoteParentTraceparent
 }
 
+// RemoteParentOutside reports whether the remote parent of a request came
+// from outside: traceparent is valid and putnamiTraceparent is not a valid
+// value on the same trace. Every Putnami client sends both headers, so a
+// parent it sent is never outside; a load balancer's edge or a browser sends
+// traceparent only. A request with no valid traceparent has no remote parent
+// and reports false. Under ParentDecide, a server span whose parent is outside
+// takes a root decision.
+func RemoteParentOutside(traceparent, putnamiTraceparent string) bool {
+	primary, ok := ParseTraceparent(traceparent)
+	if !ok {
+		return false
+	}
+	second, ok := ParseTraceparent(putnamiTraceparent)
+	return !ok || second.TraceID != primary.TraceID
+}
+
 func lowerHex(value string) bool {
 	for i := 0; i < len(value); i++ {
 		c := value[i]

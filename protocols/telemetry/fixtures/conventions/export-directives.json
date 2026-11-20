@@ -1,6 +1,6 @@
 {
   "header": "Putnami-Export-Directive",
-  "keys": {"traceRatio": "trace-ratio", "traceFloor": "trace-floor", "logLevel": "log-level", "ttl": "ttl"},
+  "keys": {"traceBudget": "trace-budget", "traceRatio": "trace-ratio", "traceFloor": "trace-floor", "traceParent": "trace-parent", "logLevel": "log-level", "ttl": "ttl"},
   "maxTtlSeconds": 3600,
   "parseCases": [
     {"value": "trace-ratio=0.1, trace-floor=1, log-level=warn, ttl=300", "directive": {"traceRatio": 0.1, "traceFloor": 1, "logLevel": "warn", "ttlSeconds": 300}},
@@ -11,6 +11,8 @@
     {"value": "ttl=7200", "directive": {"ttlSeconds": 3600}},
     {"value": "ttl=99999999999999999999", "directive": {"ttlSeconds": 3600}},
     {"value": "budget=5, ttl=60", "directive": {"ttlSeconds": 60}},
+    {"value": "trace-budget=500, trace-parent=decide, ttl=60", "directive": {"traceBudget": 500, "traceParent": "decide", "ttlSeconds": 60}},
+    {"value": "Trace-Parent=FOLLOW, trace-budget=0, ttl=60", "directive": {"traceBudget": 0, "traceParent": "follow", "ttlSeconds": 60}},
     {"value": "", "directive": null},
     {"value": "trace-ratio=0.5", "directive": null},
     {"value": "ttl=0", "directive": null},
@@ -24,23 +26,40 @@
     {"value": "trace-floor=-1, ttl=60", "directive": null},
     {"value": "trace-floor=2.0, ttl=60", "directive": null},
     {"value": "log-level=fatal, ttl=60", "directive": null},
-    {"value": "log-level=warning, ttl=60", "directive": null}
+    {"value": "log-level=warning, ttl=60", "directive": null},
+    {"value": "trace-budget=-1, ttl=60", "directive": null},
+    {"value": "trace-budget=1.5, ttl=60", "directive": null},
+    {"value": "trace-budget=, ttl=60", "directive": null},
+    {"value": "trace-parent=always, ttl=60", "directive": null},
+    {"value": "trace-parent=, ttl=60", "directive": null}
   ],
-  "limitCases": [
+  "applyCases": [
     {
-      "name": "a looser directive changes nothing",
+      "name": "a directive raises the ratio and the floor, and a lower level leaves the service's",
       "own": {"traces": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1}, "logLevel": "info"},
       "directive": "trace-ratio=0.5, trace-floor=5, log-level=debug, ttl=60",
-      "effective": {"traces": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1}, "logLevel": "info"}
+      "effective": {"traces": {"budget": 100, "ratio": 0.5, "floorPerMinute": 5}, "logLevel": "info"}
     },
     {
-      "name": "a stricter directive lowers the ratio and the floor and raises the level, and keeps the budget",
+      "name": "a directive lowers the ratio and the floor and raises the level, and keeps the budget it leaves out",
       "own": {"traces": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1}, "logLevel": "info"},
       "directive": "trace-ratio=0, trace-floor=0, log-level=warn, ttl=60",
       "effective": {"traces": {"budget": 100, "ratio": 0, "floorPerMinute": 0}, "logLevel": "warn"}
     },
     {
-      "name": "a directive without a limit keeps the settings",
+      "name": "a directive sets the budget and the parent policy",
+      "own": {"traces": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1, "parent": "follow"}, "logLevel": "info"},
+      "directive": "trace-budget=1000, trace-parent=decide, ttl=60",
+      "effective": {"traces": {"budget": 1000, "ratio": 0.01, "floorPerMinute": 1, "parent": "decide"}, "logLevel": "info"}
+    },
+    {
+      "name": "a directive lowers the budget and sets the parent policy back to follow",
+      "own": {"traces": {"budget": 100, "ratio": 1, "floorPerMinute": 0, "parent": "decide"}, "logLevel": "warn"},
+      "directive": "trace-budget=0, trace-parent=follow, ttl=60",
+      "effective": {"traces": {"budget": 0, "ratio": 1, "floorPerMinute": 0, "parent": "follow"}, "logLevel": "warn"}
+    },
+    {
+      "name": "a directive without a trace setting keeps the settings",
       "own": {"traces": {"budget": 2, "ratio": 0.5, "floorPerMinute": 3}, "logLevel": "debug"},
       "directive": "ttl=60",
       "effective": {"traces": {"budget": 2, "ratio": 0.5, "floorPerMinute": 3}, "logLevel": "debug"}
@@ -77,13 +96,36 @@
       ]
     },
     {
-      "name": "the service keeps its own budget under a directive",
+      "name": "the service keeps its own budget under a directive that leaves it out",
       "settings": {"budget": 2, "ratio": 0, "floorPerMinute": 0},
       "events": [
         {"atSecond": 0, "directive": "trace-ratio=0, trace-floor=0, ttl=60"},
         {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
         {"atSecond": 2, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
         {"atSecond": 3, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
+      ]
+    },
+    {
+      "name": "a directive raises the ratio until its ttl ends",
+      "settings": {"budget": 0, "ratio": 0, "floorPerMinute": 0},
+      "events": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 1, "directive": "trace-ratio=1, ttl=60"},
+        {"atSecond": 2, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 60, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 61, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
+      ]
+    },
+    {
+      "name": "a directive raises the budget, and the roots already kept count against it",
+      "settings": {"budget": 1, "ratio": 0, "floorPerMinute": 0},
+      "events": [
+        {"atSecond": 0, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 1, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false},
+        {"atSecond": 2, "directive": "trace-budget=3, ttl=60"},
+        {"atSecond": 3, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 4, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": true},
+        {"atSecond": 5, "traceId": "4bf92f3577b34da6ffffffffffffffff", "kept": false}
       ]
     }
   ],

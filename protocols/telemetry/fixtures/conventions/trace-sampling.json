@@ -1,7 +1,8 @@
 {
   "configPath": "telemetry.traces",
-  "keys": {"budget": "budget", "ratio": "ratio", "floorPerMinute": "floorPerMinute"},
-  "defaults": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1},
+  "keys": {"budget": "budget", "ratio": "ratio", "floorPerMinute": "floorPerMinute", "parent": "parent"},
+  "defaults": {"budget": 100, "ratio": 0.01, "floorPerMinute": 1, "parent": "follow"},
+  "parentPolicies": {"follow": "follow", "decide": "decide"},
   "counter": {"name": "trace.decisions", "attribute": "outcome", "kept": "kept", "dropped": "dropped"},
   "ratioCases": [
     {"traceId": "4bf92f3577b34da60000000000000000", "ratio": 0, "picked": false},
@@ -28,6 +29,59 @@
     {"traceId": "4bf92f3577b34da6028f5c28f5c28f60", "ratio": 0.01, "picked": false},
     {"traceId": "4bf92f3577b34da6028f5c28f5c28f60", "ratio": 0.5, "picked": true},
     {"traceId": "4bf92f3577b34da6028f5c28f5c28f60", "ratio": 1, "picked": true}
+  ],
+  "parentCases": [
+    {
+      "name": "follow keeps the unsampled flag of an outside parent",
+      "settings": {"budget": 0, "ratio": 1, "floorPerMinute": 0, "parent": "follow"},
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-00",
+      "sampled": false, "decided": false, "parentSpanId": "a1a1a1a1a1a1a1a1"
+    },
+    {
+      "name": "follow keeps the sampled flag of an outside parent",
+      "settings": {"budget": 0, "ratio": 0, "floorPerMinute": 0, "parent": "follow"},
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
+      "sampled": true, "decided": false, "parentSpanId": "a1a1a1a1a1a1a1a1"
+    },
+    {
+      "name": "an unset parent policy follows",
+      "settings": {"budget": 0, "ratio": 1, "floorPerMinute": 0},
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-00",
+      "sampled": false, "decided": false, "parentSpanId": "a1a1a1a1a1a1a1a1"
+    },
+    {
+      "name": "decide keeps an outside parent's span that the rule keeps, on the parent's trace",
+      "settings": {"budget": 0, "ratio": 1, "floorPerMinute": 0, "parent": "decide"},
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-00",
+      "sampled": true, "decided": true, "parentSpanId": "a1a1a1a1a1a1a1a1"
+    },
+    {
+      "name": "decide drops an outside parent's span that the rule drops, whatever its flag",
+      "settings": {"budget": 0, "ratio": 0, "floorPerMinute": 0, "parent": "decide"},
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
+      "sampled": false, "decided": true, "parentSpanId": "a1a1a1a1a1a1a1a1"
+    },
+    {
+      "name": "decide follows a parent a Putnami client sent",
+      "settings": {"budget": 0, "ratio": 1, "floorPerMinute": 0, "parent": "decide"},
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00",
+      "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00",
+      "sampled": false, "decided": false, "parentSpanId": "00f067aa0ba902b7"
+    },
+    {
+      "name": "decide follows a Putnami client behind a proxy that rewrote traceparent",
+      "settings": {"budget": 0, "ratio": 0, "floorPerMinute": 0, "parent": "decide"},
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-00",
+      "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "sampled": true, "decided": false, "parentSpanId": "00f067aa0ba902b7"
+    },
+    {
+      "name": "decide decides when the second header is on another trace",
+      "settings": {"budget": 0, "ratio": 1, "floorPerMinute": 0, "parent": "decide"},
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-00",
+      "putnamiTraceparent": "00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01",
+      "sampled": true, "decided": true, "parentSpanId": "a1a1a1a1a1a1a1a1"
+    }
   ],
   "scenarios": [
     {
