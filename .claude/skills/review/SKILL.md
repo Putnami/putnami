@@ -1,7 +1,7 @@
 ---
 name: review
 description: Independently challenge a material artifact or frozen candidate
-model: claude-fable-5-1
+model: claude-opus-5-5
 allowed-tools: Bash, Read, Grep, Glob, Task, TodoWrite, Write, ToolSearch
 argument-hint: <artifact-ref|candidate-ref>
 ---
