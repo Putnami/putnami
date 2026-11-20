@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -396,9 +397,12 @@ func TestRunBuildCompileBatch_CompilesResolvableEntrypoint(t *testing.T) {
 	}
 	ctx.Params = pctx.Params{"compile-target": []byte(`"bun-linux-x64"`)}
 
+	// Each project's compile first probes bun --version; only the compiles count.
 	var calls int
-	mockAllExec(t, func(_ string, _ []string, _ ...exec.Option) (*exec.Result, error) {
-		calls++
+	mockAllExec(t, func(_ string, args []string, _ ...exec.Option) (*exec.Result, error) {
+		if slices.Contains(args, "--compile") {
+			calls++
+		}
 		return &exec.Result{Success: true, ExitCode: 0}, nil
 	})
 

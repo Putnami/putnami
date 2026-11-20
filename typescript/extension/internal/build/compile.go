@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -131,18 +133,67 @@ func resolveCompileOutputFile(outputPath, entrypoint, target string) string {
 
 // buildCompileArgs builds the bun build --compile args. A non-empty config
 // names the bunfig.toml that bun reads instead of the one in its working
-// directory.
-func buildCompileArgs(config, entrypoint, outputFile, target string) []string {
+// directory. With bytecode, the executable carries the bundle's precompiled
+// bytecode, so it starts without parsing the bundle. --format=esm keeps the
+// module format a plain compile uses: with --bytecode, bun defaults to cjs.
+func buildCompileArgs(config, entrypoint, outputFile, target string, bytecode bool) []string {
 	args := []string{"build"}
 	if config != "" {
 		args = append(args, "--config="+config)
 	}
+	args = append(args, "--compile")
+	if bytecode {
+		args = append(args, "--bytecode", "--format=esm")
+	}
 	return append(args,
-		"--compile",
 		entrypoint,
 		"--outfile", outputFile,
 		"--target", target,
 	)
+}
+
+// reproducibleBytecodeBun is the first Bun release whose --bytecode output is
+// byte-identical across compiles of the same inputs. Bun 1.4.0 writes a few
+// kilobytes that differ on every compile, which would change the digest of an
+// image that content-addresses an unchanged service.
+var reproducibleBytecodeBun = [3]int{1, 4, 5}
+
+// bunCompilesReproducibleBytecode reports whether the bun at bunBin is
+// reproducibleBytecodeBun or later, from what it prints for --version. A bun
+// that fails the probe, or prints a version this does not read, compiles
+// without bytecode: the executable stays reproducible and only starts slower.
+func bunCompilesReproducibleBytecode(bunBin, workDir string) bool {
+	result, err := execRunFunc(bunBin, []string{"--version"}, exec.Dir(workDir), exec.Timeout(30*time.Second))
+	if err != nil || result == nil || !result.Success {
+		return false
+	}
+	version, ok := parseBunVersion(result.Stdout)
+	if !ok {
+		return false
+	}
+	return slices.Compare(version[:], reproducibleBytecodeBun[:]) >= 0
+}
+
+// parseBunVersion reads the major, minor and patch numbers of what bun prints
+// for --version, such as "1.4.5". A pre-release or build suffix after the
+// patch number is ignored.
+func parseBunVersion(output string) ([3]int, bool) {
+	var version [3]int
+	parts := strings.SplitN(strings.TrimSpace(output), ".", 3)
+	if len(parts) != 3 {
+		return version, false
+	}
+	if end := strings.IndexFunc(parts[2], func(r rune) bool { return r < '0' || r > '9' }); end >= 0 {
+		parts[2] = parts[2][:end]
+	}
+	for i, part := range parts {
+		n, err := strconv.Atoi(part)
+		if err != nil || n < 0 {
+			return version, false
+		}
+		version[i] = n
+	}
+	return version, true
 }
 
 // RunCompile invokes bun build --compile once per resolved target.
@@ -188,11 +239,12 @@ func RunCompile(bunBin, projectPath, outputPath string, entrypoint string, targe
 
 	var files []string
 	var errors []string
+	bytecode := bunCompilesReproducibleBytecode(bunBin, workDir)
 
 	for _, target := range targets {
 		outputFile := resolveCompileOutputFile(outputPath, entrypoint, target)
 
-		args := buildCompileArgs(config, entry, outputFile, target)
+		args := buildCompileArgs(config, entry, outputFile, target, bytecode)
 
 		result, err := execRunFunc(bunBin, args, exec.Dir(workDir), exec.Timeout(5*time.Minute))
 		if err != nil {
