@@ -108,19 +108,20 @@ func TestPrepareAuthoredConfigRefusesAMapEntryWithoutARequiredValue(t *testing.T
 }
 
 func TestPrepareAuthoredConfigRefusesANonCanonicalMapEntry(t *testing.T) {
-	for name, entries := range map[string]string{
-		"key":    "    \"git lab\":\n      issuer: https://gitlab.com\n",
-		"object": "    gitlab: https://gitlab.com\n",
+	for entries, want := range map[string]string{
+		"    \"git.lab\":\n      issuer: https://gitlab.com\n": "not one canonical path segment",
+		"    gitlab: https://gitlab.com\n":                     "rejected by schema validation",
 	} {
 		_, err := prepareSignInProviders(t, signInProvidersWorkspace(t, false, entries))
-		if err == nil {
-			t.Fatalf("%s: a non-canonical map entry was accepted", name)
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("non-canonical entry %q error = %v, want %q", entries, err, want)
 		}
 	}
 }
 
 // A map whose values declare no sensitive field stays one opaque value, so a
 // project keeps declaring its entries in schema/config-authored-fields.json.
+// A secret reached only through a nested map does not expand the outer one.
 func TestPrepareAuthoredConfigKeepsAMapWithoutSensitiveValuesOpaque(t *testing.T) {
 	root := authoredConfigWorkspace(t)
 	writeJSONFile(t, filepath.Join(root, "schema", "config.json"), map[string]any{
@@ -128,6 +129,10 @@ func TestPrepareAuthoredConfigKeepsAMapWithoutSensitiveValuesOpaque(t *testing.T
 		"configs": []any{map[string]any{"path": "clients", "fields": []any{
 			map[string]any{"name": "services", "type": "map", "keys": "string", "values": map[string]any{"name": "", "type": "object", "fields": []any{
 				map[string]any{"name": "url", "type": "string"},
+				map[string]any{"name": "credentials", "type": "map", "keys": "string", "values": map[string]any{"name": "", "type": "object", "fields": []any{
+					map[string]any{"name": "audience", "type": "string"},
+					map[string]any{"name": "clientSecret", "type": "string", "sensitive": true},
+				}}},
 			}}},
 		}}},
 	})
@@ -182,4 +187,49 @@ func secretReferenceOf(t *testing.T, member authoredmember.AuthoredMember, path 
 	}
 	t.Fatalf("member references no secret at %s", path)
 	return authoredmember.SecretReference{}
+}
+
+// A project that declared the entries of a now expanded map in
+// schema/config-authored-fields.json keeps building: the declarations the
+// expansion already holds change nothing.
+func TestPrepareAuthoredConfigAcceptsRedundantEntryDeclarations(t *testing.T) {
+	root := signInProvidersWorkspace(t, false, gitlabEntryWithoutSecret)
+	writeJSONFile(t, filepath.Join(root, "schema", "config-authored-fields.json"), map[string]any{"fields": []any{
+		map[string]any{"path": "signInProviders.oidc.gitlab", "type": "object"},
+		map[string]any{"path": "signInProviders.oidc.gitlab.issuer", "type": "string"},
+		map[string]any{"path": "signInProviders.oidc.gitlab.label", "type": "string"},
+	}})
+	if _, err := prepareSignInProviders(t, root); err != nil {
+		t.Fatalf("redundant entry declarations: %v", err)
+	}
+	writeJSONFile(t, filepath.Join(root, "schema", "config-authored-fields.json"), map[string]any{"fields": []any{
+		map[string]any{"path": "signInProviders.oidc.gitlab.clientSecret", "type": "string"},
+	}})
+	if _, err := prepareSignInProviders(t, root); err == nil {
+		t.Fatal("a non-sensitive declaration at a sensitive entry path was accepted")
+	}
+}
+
+// An expanded entry keeps the array rule of a fixed object: an array whose
+// items declare a secret cannot be published, even when the entry omits it.
+func TestPrepareAuthoredConfigRefusesAnExpandedEntryWithASensitiveArray(t *testing.T) {
+	root := signInProvidersWorkspace(t, false, gitlabEntryWithoutSecret)
+	writeJSONFile(t, filepath.Join(root, "schema", "config.json"), map[string]any{
+		"appName": "my-app",
+		"configs": []any{map[string]any{"path": "signInProviders", "fields": []any{
+			map[string]any{"name": "oidc", "type": "map", "keys": "string", "values": map[string]any{"name": "", "type": "object", "fields": []any{
+				map[string]any{"name": "issuer", "type": "string"},
+				map[string]any{"name": "clientSecret", "type": "string", "sensitive": true},
+				map[string]any{"name": "extra", "type": "array", "items": map[string]any{"fields": []any{
+					map[string]any{"name": "token", "type": "string", "sensitive": true, "required": true},
+				}}},
+			}}},
+		}}},
+	})
+	if err := os.WriteFile(filepath.Join(root, "conf", "env.prod.yaml"), []byte("signInProviders:\n  oidc:\n    gitlab:\n      issuer: https://gitlab.com\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := prepareSignInProviders(t, root); err == nil || !strings.Contains(err.Error(), "sensitive descendants") {
+		t.Fatalf("sensitive array in an entry error = %v", err)
+	}
 }

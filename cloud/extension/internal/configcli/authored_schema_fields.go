@@ -40,8 +40,10 @@ func extendAuthoredSchema(projectDir string, schema authoredmember.NormalizedSch
 	}
 	opaque := map[string]bool{}
 	known := map[string]bool{}
+	generated := make(map[string]authoredmember.SchemaField, len(schema.Fields))
 	for _, field := range schema.Fields {
 		known[field.Path] = true
+		generated[field.Path] = field
 		if field.Type == "object" && !field.Sensitive {
 			opaque[field.Path] = true
 		}
@@ -53,7 +55,11 @@ func extendAuthoredSchema(projectDir string, schema authoredmember.NormalizedSch
 			}
 		}
 	}
+	declared := make([]authoredmember.SchemaField, 0, len(additional.Fields))
 	for _, field := range additional.Fields {
+		if redundantAuthoredField(field, generated) {
+			continue
+		}
 		allowed := false
 		for parent := range opaque {
 			allowed = allowed || strings.HasPrefix(field.Path, parent+".")
@@ -62,7 +68,33 @@ func extendAuthoredSchema(projectDir string, schema authoredmember.NormalizedSch
 			return schema, fmt.Errorf("authored Config field must uniquely extend an opaque generated object: %s", field.Path)
 		}
 		known[field.Path] = true
+		declared = append(declared, field)
 	}
-	schema.Fields = append(append([]authoredmember.SchemaField{}, schema.Fields...), additional.Fields...)
+	schema.Fields = append(append([]authoredmember.SchemaField{}, schema.Fields...), declared...)
 	return schema, nil
+}
+
+// redundantAuthoredField reports a declaration the generated schema already
+// holds, as it does for the committed entries of a map the member expands
+// with its value schema: the same non-sensitive path and type, or an object
+// whose descendants the schema declares. Such a declaration changes nothing,
+// so a project that declared those entries before the map expanded keeps
+// building. A declaration that differs, such as a non-sensitive type at a
+// sensitive path, is not redundant and stays refused.
+func redundantAuthoredField(field authoredmember.SchemaField, generated map[string]authoredmember.SchemaField) bool {
+	if field.Sensitive || field.Required {
+		return false
+	}
+	if existing, ok := generated[field.Path]; ok {
+		return !existing.Sensitive && existing.Type == field.Type
+	}
+	if field.Type != "object" {
+		return false
+	}
+	for path := range generated {
+		if strings.HasPrefix(path, field.Path+".") {
+			return true
+		}
+	}
+	return false
 }

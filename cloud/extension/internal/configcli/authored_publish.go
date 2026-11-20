@@ -365,6 +365,9 @@ func appendAuthoredSchemaField(path string, field schemaField, value any, fields
 	}
 	if !inArray && expandsMapEntries(field, value) {
 		return eachMapEntry(path, value, func(entryPath string, entry map[string]any) error {
+			if err := validateArraySafeFields(entryPath, field.MapValues); err != nil {
+				return err
+			}
 			for _, child := range field.MapValues {
 				if err := appendAuthoredSchemaField(entryPath+"."+child.Name, child, entry[child.Name], fields, references, false, optionalBlock); err != nil {
 					return err
@@ -479,21 +482,24 @@ func authoredValues(blocks []schemaBlock, writes []blockWrite) (map[string]any, 
 }
 
 func validateAuthoredArraySafety(blocks []schemaBlock) error {
-	var validateFields func(string, []schemaField) error
-	validateFields = func(prefix string, fields []schemaField) error {
-		for _, field := range fields {
-			path := prefix + "." + field.Name
-			if len(field.Items) != 0 && hasSensitiveSchemaField(field.Items) {
-				return fmt.Errorf("Config field %s mixes array values with sensitive descendants and cannot be published safely", path)
-			}
-			if err := validateFields(path, field.Fields); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
 	for _, block := range blocks {
-		if err := validateFields(block.Path, block.Fields); err != nil {
+		if err := validateArraySafeFields(block.Path, block.Fields); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateArraySafeFields refuses an array among fields, or the fields of
+// their nested objects, whose items declare a sensitive descendant: an array
+// is one authored value, so it cannot hold a secret reference.
+func validateArraySafeFields(prefix string, fields []schemaField) error {
+	for _, field := range fields {
+		path := prefix + "." + field.Name
+		if len(field.Items) != 0 && hasSensitiveSchemaField(field.Items) {
+			return fmt.Errorf("Config field %s mixes array values with sensitive descendants and cannot be published safely", path)
+		}
+		if err := validateArraySafeFields(path, field.Fields); err != nil {
 			return err
 		}
 	}
