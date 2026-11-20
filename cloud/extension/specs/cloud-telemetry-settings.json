@@ -13,7 +13,7 @@
     {
       "id": "show-prints-the-rows",
       "text": [
-        "putnami cloud telemetry show reads the workspace's telemetry settings through config-api's generated client and prints the workspace row, each service override and the settings each service ends with, field by field; a field no row sets prints as the framework default.",
+        "putnami cloud telemetry show reads the workspace's telemetry settings through config-api's generated client and prints the workspace row, each service row and the settings each service ends with, field by field; a field no row sets is left out, and the service keeps its own setting.",
         "With --app, it prints the workspace row and that service's row only; --output=json prints the view config-api answers."
       ]
     },
