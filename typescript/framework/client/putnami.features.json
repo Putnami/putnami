@@ -74,7 +74,8 @@
               "an-aborted-attempt-is-not-retried",
               "an-already-aborted-signal-rejects-before-a-retry-delay",
               "no-per-attempt-signal-is-injected-without-a-timeout",
-              "the-caller-signal-is-combined-with-the-per-attempt-timeout"
+              "the-caller-signal-is-combined-with-the-per-attempt-timeout",
+              "an-unbound-client-call-stops-with-its-request"
             ]
           }
         },

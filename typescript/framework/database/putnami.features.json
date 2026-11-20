@@ -64,7 +64,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": ["a-query-after-abort-raises-query-abort-error"]
+            "checks": ["a-query-after-abort-raises-query-abort-error", "a-query-in-flight-unwinds-at-the-abort"]
           }
         },
         {

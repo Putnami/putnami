@@ -158,8 +158,11 @@ export const pageRenderer =
         controller.abort();
       }, ssrTimeout);
 
+      // The render also stops when the request ends: its client left or it
+      // outlived the HTTP plugin's request timeout.
+      const requestSignal = reqContext.signal;
       const reactStream = await createReactStream(staticRouter, {
-        signal: controller.signal,
+        signal: requestSignal ? AbortSignal.any([controller.signal, requestSignal]) : controller.signal,
         nonce,
         onError: (error) => {
           logger.error('SSR streaming error:', error);

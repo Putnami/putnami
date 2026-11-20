@@ -365,12 +365,12 @@ export class HttpPlugin implements Plugin {
       idleTimeout: resolveIdleTimeoutSeconds(requestTimeoutMs),
       fetch: async (req, server) => {
         let requestTimedOut = false;
-        // The request signal is Bun's native req.signal, which aborts on client
-        // disconnect. We deliberately do NOT wire an extra AbortController for the
-        // hard request timeout: on timeout we return 408 and let the in-flight
-        // handler unwind on its own (client-disconnect cancellation still applies).
-        // This avoids a per-request AbortController + abort listener on the hot path.
-        const requestSignal = req.signal;
+        // The request's signal aborts when the client disconnects (Bun's
+        // req.signal) and when the request outlives requestTimeoutMs: its
+        // queries, client calls and render stop instead of running on after
+        // the 408. Both sources live for this request only.
+        const timeout = requestTimeoutMs > 0 ? new AbortController() : undefined;
+        const requestSignal = timeout ? AbortSignal.any([req.signal, timeout.signal]) : req.signal;
 
         const context = buildHttpContext<HttpRequestContextInternal>({
           req,
@@ -381,6 +381,7 @@ export class HttpPlugin implements Plugin {
           maxBodySizeBytes,
         });
         context.__drain = drain;
+        if (timeout) context.deadlineAt = Date.now() + requestTimeoutMs;
 
         const executeRequest = async (): Promise<Response> => {
           let scopeTransferred = false;
@@ -467,6 +468,7 @@ export class HttpPlugin implements Plugin {
         const timeoutPromise = new Promise<typeof TIMEOUT_SENTINEL>((resolve) => {
           timeoutHandle = setTimeout(() => {
             requestTimedOut = true;
+            timeout?.abort(new DOMException('Request Timeout', 'TimeoutError'));
             resolve(TIMEOUT_SENTINEL);
           }, requestTimeoutMs);
         });

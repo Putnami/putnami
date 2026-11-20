@@ -39,7 +39,7 @@
     },
     {
       "id": "cancellation",
-      "text": "A caller-supplied abort signal reaches the transport combined with the per-attempt timeout, aborts any pending backoff sleep, and ends the sequence: the aborted attempt is not retried."
+      "text": "A caller-supplied abort signal reaches the transport combined with the per-attempt timeout, aborts any pending backoff sleep, and ends the sequence: the aborted attempt is not retried. A unary call of a client built without a service binding, made with no signal of its own inside a request, takes that request's signal and stops when it aborts."
     },
     {
       "id": "circuit-isolation",

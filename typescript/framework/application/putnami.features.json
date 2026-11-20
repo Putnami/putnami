@@ -1040,6 +1040,15 @@
           }
         },
         {
+          "id": "request-timeout-cancels-work",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-request-past-the-timeout-aborts-its-signal"]
+          }
+        },
+        {
           "id": "error-answers",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

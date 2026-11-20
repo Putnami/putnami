@@ -341,8 +341,12 @@ describe('HttpPlugin', () => {
     let app: Application;
     let plugin: HttpPlugin;
     let baseUrl: string;
+    let stalled: { signal?: AbortSignal; deadlineAt?: number } | undefined;
+    let workAfterTimeout = false;
 
     beforeEach(async () => {
+      stalled = undefined;
+      workAfterTimeout = false;
       plugin = http({ port: 0, maxBodySizeBytes: 64, requestTimeoutMs: 200 });
       plugin.post('/echo', async (ctx) => {
         const data = await ctx.body<Record<string, string>>();
@@ -351,6 +355,13 @@ describe('HttpPlugin', () => {
       plugin.get('/slow', async () => {
         await new Promise((resolve) => setTimeout(resolve, 500));
         return new HttpResponse('slow-ok');
+      });
+      plugin.get('/stalled', async (ctx) => {
+        stalled = { signal: ctx.signal, deadlineAt: ctx.deadlineAt as number | undefined };
+        // Waits on a dependency that never answers; only the signal ends the wait.
+        await new Promise((_, reject) => ctx.signal?.addEventListener('abort', () => reject(ctx.signal?.reason)));
+        workAfterTimeout = true;
+        return new HttpResponse('never');
       });
 
       app = application().use(plugin);
@@ -394,6 +405,27 @@ describe('HttpPlugin', () => {
         const body = await res.json();
         expect(body.error).toBe('Request Timeout');
         expect(body.statusCode).toBe(408);
+      },
+    );
+
+    specTest(
+      'aborts the signal of a request past its timeout',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'a-request-past-the-timeout-aborts-its-signal',
+      },
+      async () => {
+        const sent = Date.now();
+        const res = await fetch(`${baseUrl}/stalled`);
+        expect(res.status).toBe(408);
+        expect(stalled?.signal?.aborted).toBe(true);
+        const reason = stalled?.signal?.reason as Error | undefined;
+        expect(reason?.name).toBe('TimeoutError');
+        expect(stalled?.deadlineAt).toBeGreaterThanOrEqual(sent + 200);
+        expect(stalled?.deadlineAt).toBeLessThan(sent + 1000);
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        expect(workAfterTimeout).toBe(false);
       },
     );
   });

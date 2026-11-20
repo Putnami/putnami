@@ -1,3 +1,4 @@
+import { tryContext } from '@putnami/runtime';
 import { StreamRelay } from './connect-stream';
 import type {
   ClientContractOperation,
@@ -282,6 +283,17 @@ export abstract class BaseClient {
     // interceptors against a synthetic terminal to populate auth/context
     // headers without making a network call or running retry/backoff.
     this.headerChain = this.buildChain(config.streamInterceptors ?? userInterceptors, captureHeaders);
+  }
+
+  /**
+   * The signal of the request this call runs in, for a client built without a
+   * service binding: the call stops when that request ends, as a bound
+   * client's deadline interceptor already makes it. Undefined for a bound
+   * client and outside a request.
+   */
+  private ambientSignal(): AbortSignal | undefined {
+    if (this.endpointBinding) return undefined;
+    return tryContext<{ signal?: AbortSignal }>()?.signal;
   }
 
   /**
@@ -684,7 +696,7 @@ export abstract class BaseClient {
       query: options?.query,
       body: options?.body,
       headers,
-      signal: options?.signal,
+      signal: options?.signal ?? this.ambientSignal(),
       ...(options?.withoutResponseCache ? { withoutResponseCache: true } : {}),
       featureTrace: resolveClientFeatureTrace(this.design, options?.operationId),
       ...(options?.operationId ? { operationId: options.operationId } : {}),
@@ -716,7 +728,7 @@ export abstract class BaseClient {
       return (await this.chain(request)) as ClientResponse<T>;
     } catch (error) {
       if (request.clientOperation) {
-        if (options?.signal?.aborted) throw new ClientCanceledError(this.serviceName, `${method} ${path}`);
+        if (request.signal?.aborted) throw new ClientCanceledError(this.serviceName, `${method} ${path}`);
         if (error instanceof ClientRetryExhaustedError) {
           throw new ClientFrameworkError({
             service: this.serviceName,
