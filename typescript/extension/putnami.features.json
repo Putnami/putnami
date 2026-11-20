@@ -981,6 +981,20 @@
           }
         },
         {
+          "id": "bun-compile-bytecode",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-compile-on-bun-1-4-5-or-later-carries-bytecode-and-an-earlier-bun-compiles-without",
+              "a-bun-whose-version-cannot-be-read-fails-the-compile"
+            ]
+          }
+        },
+        {
           "id": "node-serve",
           "stage": "coded",
           "evidenceKinds": [

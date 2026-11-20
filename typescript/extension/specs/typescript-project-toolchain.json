@@ -266,6 +266,10 @@
       "text": "On node, the compile step writes a Node bundle in place of a Bun executable: the compile entrypoint as an ES module with the project's own modules and its workspace dependencies bundled, its installed packages left as imports, and a linked source map."
     },
     {
+      "id": "bun-compile-bytecode",
+      "text": "On bun, the compile step reads the version of the Bun that runs it. Bun 1.4.5 or later writes an executable that carries its bundle's bytecode, as an ES module; an earlier Bun writes it without bytecode, so an executable stays byte-identical across compiles of the same inputs. A Bun whose version cannot be read fails the compile."
+    },
+    {
       "id": "node-serve",
       "text": "On node, serve bundles the serve entrypoint, the ./serve export else the run entrypoint, as compile does, and starts node --enable-source-maps on it with the environment, port and log forwarding of a Bun serve. The bundle resolves packages from the project's node_modules. With watch on, it rebuilds when a file the bundle was built from changes and restarts node; a rebuild that fails reports its errors and keeps the running process and its bundle."
     },
