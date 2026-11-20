@@ -27,7 +27,9 @@ import (
 //
 // Without --app a command reads or writes the workspace row, which every
 // service without a row of its own takes; with --app it reads or writes that
-// service's row, named by the app's canonical name.
+// service's row, named by the app's canonical name. config-api refuses a name
+// that holds a folder until Putnami/putnami-cloud#5283, and the collector
+// sends the trace budget from then on too.
 
 // telemetryMaxTraces bounds the trace budget and floor, as config-api does.
 const telemetryMaxTraces = 1_000_000
@@ -87,6 +89,8 @@ func Telemetry(params map[string]any, args []string, workspaceRoot string, env m
 	}
 	var update TelemetrySettings
 	if verb == "set" {
+		// The flags are read before anything else, so a value out of range
+		// costs no call.
 		var err error
 		if update, err = telemetryFlags(params); err != nil {
 			return err
@@ -136,7 +140,7 @@ func Telemetry(params map[string]any, args []string, workspaceRoot string, env m
 func telemetryHelp(params map[string]any, ioctx clicore.IO) error {
 	commands := []map[string]string{
 		{"command": "cloud telemetry show [--app <app>]", "description": "the workspace row, each service row and the settings each service ends with"},
-		{"command": "cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--log-level <level>]", "description": "write the given fields into the row and keep the others; the services apply them within a few minutes"},
+		{"command": "cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--log-level <level>]", "description": "write the given fields into the row and keep the others; the services apply the ratio, the floor and the log level within a few minutes"},
 		{"command": "cloud telemetry reset [--app <app>]", "description": "remove the row: its services return to their own settings, or to the workspace row"},
 	}
 	if clicore.StructuredOutput(params) {
@@ -249,7 +253,7 @@ func mergeTelemetry(row, update TelemetrySettings) TelemetrySettings {
 }
 
 func readTelemetry(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb string) (*TelemetryView, error) {
-	return telemetryCall(reqCtx, ctx, verb, func(callCtx context.Context, api *configapiclient.ConfigClient) (*configapiclient.TelemetrySettingsView, error) {
+	return telemetryCall(reqCtx, ctx, verb, "", func(callCtx context.Context, api *configapiclient.ConfigClient) (*configapiclient.TelemetrySettingsView, error) {
 		return api.GetV1WorkspacesConfigTelemetry(callCtx, configapiclient.GetV1WorkspacesConfigTelemetryInput{
 			Path: configapiclient.GetV1WorkspacesConfigTelemetryPath{Workspace: ctx.WorkspaceID},
 		})
@@ -268,7 +272,7 @@ func writeTelemetry(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb,
 	if service != "" {
 		body.Service = &service
 	}
-	return telemetryCall(reqCtx, ctx, verb, func(callCtx context.Context, api *configapiclient.ConfigClient) (*configapiclient.TelemetrySettingsView, error) {
+	return telemetryCall(reqCtx, ctx, verb, service, func(callCtx context.Context, api *configapiclient.ConfigClient) (*configapiclient.TelemetrySettingsView, error) {
 		return api.UpdateV1WorkspacesConfigTelemetry(callCtx, configapiclient.UpdateV1WorkspacesConfigTelemetryInput{
 			Path: configapiclient.UpdateV1WorkspacesConfigTelemetryPath{Workspace: ctx.WorkspaceID},
 			Body: body,
@@ -277,11 +281,15 @@ func writeTelemetry(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb,
 }
 
 // telemetryCall sends one generated config-api call and maps a refusal onto
-// a message that names the verb and config-api's reason.
-func telemetryCall(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb string,
+// a message that names the verb and config-api's reason. config-api answers a
+// refusal of this route as {"error": …}, so the call goes through the same
+// legacy-error transport as the config and secrets commands, which carries
+// that reason to the message.
+func telemetryCall(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb, service string,
 	call func(context.Context, *configapiclient.ConfigClient) (*configapiclient.TelemetrySettingsView, error),
 ) (*TelemetryView, error) {
-	api, err := clicore.NewServiceClient[configapiclient.ConfigClient](configapiclient.RegisterConfigClient, ctx.ServiceBinding())
+	binding := clicore.ServiceBindingFor(ctx.ControlPlane, withLegacyConfigErrors(ctx.IO.Client))
+	api, err := clicore.NewServiceClient[configapiclient.ConfigClient](configapiclient.RegisterConfigClient, binding)
 	if err != nil {
 		return nil, err
 	}
@@ -289,12 +297,12 @@ func telemetryCall(reqCtx context.Context, ctx *clicore.WorkspaceContext, verb s
 		return call(callCtx, api)
 	})
 	if err != nil {
-		return nil, telemetryRefusal(verb, ctx, err)
+		return nil, telemetryRefusal(verb, service, ctx, err)
 	}
 	return telemetryViewOf(answer), nil
 }
 
-func telemetryRefusal(verb string, ctx *clicore.WorkspaceContext, err error) error {
+func telemetryRefusal(verb, service string, ctx *clicore.WorkspaceContext, err error) error {
 	status := clicore.ServiceStatus(err)
 	if status == 0 {
 		return clicore.NewError(fmt.Sprintf("cloud telemetry %s: request failed for %s: %v", verb, ctx.WorkspaceURL("/config/telemetry"), err), clicore.ExitAPI)
@@ -305,6 +313,12 @@ func telemetryRefusal(verb string, ctx *clicore.WorkspaceContext, err error) err
 	}
 	prefix := "cloud telemetry " + verb + ": " + message
 	switch status {
+	case 400:
+		if strings.Contains(service, "/") {
+			prefix += " (config-api does not accept a service name with a folder, such as " + service +
+				", until Putnami/putnami-cloud#5283)"
+		}
+		return clicore.NewError(prefix, clicore.ExitUsage)
 	case 401:
 		return clicore.NewError(prefix+": run `putnami cloud login`", clicore.ExitAuth)
 	case 403:

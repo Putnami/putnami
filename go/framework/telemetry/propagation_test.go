@@ -111,6 +111,7 @@ func TestProxySafeTraceContext_TheServerSpanResolvesTheFixtureCases(t *testing.T
 // Extract marks a remote parent as outside exactly in the fixture's outside
 // cases, the parents the sampler decides under ParentDecide.
 func TestProxySafeTraceContext_ExtractMarksTheFixtureOutsideParents(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "an-outside-parent", "the-go-runtime-marks-the-fixture-outside-parents")
 	fixture := readProxySafeTraceparentFixture(t)
 	for _, c := range fixture.Cases {
 		t.Run(c.Name, func(t *testing.T) {

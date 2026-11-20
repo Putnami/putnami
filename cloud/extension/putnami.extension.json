@@ -590,25 +590,25 @@
             }
           ]
         },
-          "telemetry": {
-            "description": "Show, set or reset the trace sampling and log level Putnami Cloud returns to a workspace's services, without a redeploy (supports --output=json).",
-            "command": "cloud-telemetry",
-            "interactive": true,
-            "examples": [
-              {
-                "command": "putnami cloud telemetry show",
-                "description": "The workspace row, each service row and the settings each service ends with"
-              },
-              {
-                "command": "putnami cloud telemetry set --app my-app --ratio 1",
-                "description": "Keep every trace of one app until reset"
-              },
-              {
-                "command": "putnami cloud telemetry reset --app my-app",
-                "description": "Return the app to its own settings"
-              }
-            ]
-          },
+        "telemetry": {
+          "description": "Show, set or reset the trace sampling and log level Putnami Cloud returns to a workspace's services, without a redeploy (supports --output=json).",
+          "command": "cloud-telemetry",
+          "interactive": true,
+          "examples": [
+            {
+              "command": "putnami cloud telemetry show",
+              "description": "The workspace row, each service row and the settings each service ends with"
+            },
+            {
+              "command": "putnami cloud telemetry set --app my-app --ratio 1",
+              "description": "Keep every trace of one app until reset"
+            },
+            {
+              "command": "putnami cloud telemetry reset --app my-app",
+              "description": "Return the app to its own settings"
+            }
+          ]
+        },
         "release-set": {
           "description": "Machine command: the distribution/release-set/v2 provider the engine calls.",
           "command": "cloud-release-set",
@@ -2177,57 +2177,57 @@
         }
       ]
     },
-      "cloud-telemetry": {
-        "activationFiles": [
-          "putnami.extension.json"
-        ],
-        "description": "Show, set or reset a workspace's telemetry settings: the trace budget, ratio, floor and log level the workspace collector returns to each service as its export directive (supports --output=json).",
-        "flags": {
-          "app": {
-            "type": "string",
-            "description": "The app whose row to read or write; without it, the workspace row, which every service without a row of its own takes."
-          },
-          "budget": {
-            "type": "string",
-            "description": "set: the root traces an instance keeps first, a whole number from 0 to 1000000."
-          },
-          "ratio": {
-            "type": "string",
-            "description": "set: the share of root traces kept once the budget is spent, from 0 to 1."
-          },
-          "floor": {
-            "type": "string",
-            "description": "set: the root traces kept each minute whatever the ratio picks, a whole number from 0 to 1000000."
-          },
-          "log-level": {
-            "type": "string",
-            "description": "set: the minimum log level, debug, info, warn or error; a level below the service's own changes nothing."
-          },
-          "workspace": {
-            "type": "string",
-            "description": "Workspace id (override the linked workspace)."
-          },
-          "control-plane-url": {
-            "type": "string",
-            "description": "Putnami control-plane API base URL (override the linked URL)."
-          },
-          "auth-url": {
-            "type": "string",
-            "description": "Putnami auth base URL."
-          },
-          "client-id": {
-            "type": "string",
-            "default": "putnami-cli",
-            "description": "OAuth client ID."
-          }
+    "cloud-telemetry": {
+      "activationFiles": [
+        "putnami.extension.json"
+      ],
+      "description": "Show, set or reset a workspace's telemetry settings: the trace budget, ratio, floor and log level the workspace collector returns to each service as its export directive (supports --output=json).",
+      "flags": {
+        "app": {
+          "type": "string",
+          "description": "The app whose row to read or write; without it, the workspace row, which every service without a row of its own takes."
         },
-        "run": [
-          {
-            "id": "telemetry",
-            "task": "cloud-telemetry"
-          }
-        ]
+        "budget": {
+          "type": "string",
+          "description": "set: the root traces an instance keeps first, a whole number from 0 to 1000000."
+        },
+        "ratio": {
+          "type": "string",
+          "description": "set: the share of root traces kept once the budget is spent, from 0 to 1."
+        },
+        "floor": {
+          "type": "string",
+          "description": "set: the root traces kept each minute whatever the ratio picks, a whole number from 0 to 1000000."
+        },
+        "log-level": {
+          "type": "string",
+          "description": "set: the minimum log level, debug, info, warn or error; a level below the service's own changes nothing."
+        },
+        "workspace": {
+          "type": "string",
+          "description": "Workspace id (override the linked workspace)."
+        },
+        "control-plane-url": {
+          "type": "string",
+          "description": "Putnami control-plane API base URL (override the linked URL)."
+        },
+        "auth-url": {
+          "type": "string",
+          "description": "Putnami auth base URL."
+        },
+        "client-id": {
+          "type": "string",
+          "default": "putnami-cli",
+          "description": "OAuth client ID."
+        }
       },
+      "run": [
+        {
+          "id": "telemetry",
+          "task": "cloud-telemetry"
+        }
+      ]
+    },
     "cloud-secrets": {
       "activationFiles": [
         "putnami.extension.json"
@@ -3300,17 +3300,17 @@
       "description": "Query a workspace app's metric series.",
       "timeoutMs": 120000
     },
-      "cloud-telemetry": {
-        "kind": "command",
-        "command": "{extensionRuntime}",
-        "args": [
-          "telemetry"
-        ],
-        "cwd": "{workspaceRoot}",
-        "cache": false,
-        "description": "Show, set or reset a workspace's telemetry settings.",
-        "timeoutMs": 120000
-      },
+    "cloud-telemetry": {
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "telemetry"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "description": "Show, set or reset a workspace's telemetry settings.",
+      "timeoutMs": 120000
+    },
     "agency-trigger": {
       "kind": "command",
       "command": "{extensionRuntime}",

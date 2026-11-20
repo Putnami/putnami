@@ -1133,13 +1133,18 @@ cloud command does). The workspace collector returns a service's settings on
 each export as its `Putnami-Export-Directive`, so a running service applies them
 within a few minutes, without a redeploy: each trace setting replaces the
 service's own, higher or lower, and the log level only tightens. An unset field
-keeps the service's own setting. `set` writes the flags it is given into the row
-and keeps the others; it checks each range before any call (budget and floor
-from 0 to 1000000, ratio from 0 to 1, log level `debug`, `info`, `warn` or
-`error`). `reset` removes the row. `show` needs `platform.workspace.read`; `set`
+keeps the service's own setting. `set` reads the row, writes the flags it is
+given into it and keeps the others; two writes at once keep the last one. It
+checks each range before any call (budget and floor from 0 to 1000000, ratio
+from 0 to 1, log level `debug`, `info`, `warn` or `error`), and a refusal names
+config-api's reason. `reset` removes the row. `show` needs `platform.workspace.read`; `set`
 and `reset` need `platform.workspace.manage`, as a person. The settings hold in
-every environment of the workspace. A parent policy and an expiry (`--parent`,
-`--for`) come once config-api stores them.
+every environment of the workspace. Until
+[Putnami/putnami-cloud#5283](https://github.com/Putnami/putnami-cloud/issues/5283)
+lands, config-api refuses a row for an app whose canonical name holds a folder,
+such as `surfaces/workloads/app`, the collector stores `--budget` without
+sending it, and a parent policy and an expiry (`--parent`, `--for`) are not
+offered.
 
 `putnami cloud status` reads 12 entries at once and gives each a state: `ok`,
 `degraded`, `failing` or `unknown`. The entries are `whoami`, `token`,

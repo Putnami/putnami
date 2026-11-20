@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -13,8 +14,15 @@ import (
 
 const telemetryPath = "/v1/workspaces/ws-acme/config/telemetry"
 
+// telemetryService is the service name config-api accepts today, and
+// telemetryRefusal the reason it gives for any value it refuses.
+var telemetryServicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
+
+const telemetryInvalid = "trace budget and floor are 0 to 1000000, trace ratio 0 to 1, log level debug, info, warn or error, and a service a lowercase name"
+
 // telemetryFake serves config-api's telemetry settings route over the rows it
-// keeps, so a write shows in the next read, as config-api resolves them.
+// keeps, so a write shows in the next read, as config-api resolves them. It
+// refuses what config-api refuses, with config-api's legacy error body.
 type telemetryFake struct {
 	t       *testing.T
 	rows    map[string]map[string]any // service ("" for the workspace) → fields
@@ -58,6 +66,9 @@ func (f *telemetryFake) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 		f.writes = append(f.writes, write)
 		service := clicore.StringValue(write["service"])
+		if service != "" && !telemetryServicePattern.MatchString(service) {
+			return jsonResponse(http.StatusBadRequest, map[string]any{"error": telemetryInvalid}), nil
+		}
 		fields := map[string]any{}
 		for _, key := range []string{"traceBudget", "traceRatio", "traceFloorPerMinute", "logLevel"} {
 			if value, ok := write[key]; ok && value != nil {
@@ -142,6 +153,7 @@ func TestTelemetryShow_AppPrintsOneService(t *testing.T) {
 	spectest.Proves(t, "cloud/telemetry-settings", "show-prints-the-rows", "telemetry-show-app-prints-one-service")
 	fake := newTelemetryFake(t)
 	fake.rows["my-app"] = map[string]any{"traceRatio": 1}
+	// A row config-api will hold for a workload once it accepts its name.
 	fake.rows["surfaces/workloads/app"] = map[string]any{"traceRatio": 0.2}
 	ioctx, stdout := telemetryIO(t, fake)
 
@@ -275,12 +287,17 @@ func TestTelemetryApp_NamesTheServiceRow(t *testing.T) {
 	workspaceRoot := ioctx.Env["PUTNAMI_WORKSPACE_ROOT"]
 	writeProjectFile(t, workspaceRoot, "surfaces/workloads/app")
 
-	// The tail of a local project resolves to its canonical name.
-	if err := runTelemetry(ioctx, "set", "--app", "app", "--ratio", "1"); err != nil {
-		t.Fatalf("set: %v", err)
-	}
+	// The tail of a local project resolves to its canonical name. config-api
+	// refuses a name with a folder until Putnami/putnami-cloud#5283, and the
+	// person reads its reason and the issue.
+	err := runTelemetry(ioctx, "set", "--app", "app", "--ratio", "1")
 	if service := fake.writes[0]["service"]; service != "surfaces/workloads/app" {
 		t.Fatalf("service = %v, want the app's canonical name", service)
+	}
+	if err == nil || clicore.ExitCode(err) != clicore.ExitUsage ||
+		!strings.Contains(err.Error(), "cloud telemetry set: "+telemetryInvalid) ||
+		!strings.Contains(err.Error(), "Putnami/putnami-cloud#5283") {
+		t.Fatalf("set = %v, want config-api's reason and the issue that lifts it", err)
 	}
 	// Without --app, the command never takes the cwd project.
 	if err := runTelemetry(ioctx, "set", "--ratio", "1"); err != nil {
@@ -288,6 +305,13 @@ func TestTelemetryApp_NamesTheServiceRow(t *testing.T) {
 	}
 	if service, ok := fake.writes[1]["service"]; ok {
 		t.Fatalf("service = %v, want the workspace row", service)
+	}
+	// A refusal of a plain name carries config-api's reason without the hint.
+	fake.refuse, fake.message = 0, ""
+	err = runTelemetry(ioctx, "reset", "--app", "Billing")
+	if err == nil || !strings.Contains(err.Error(), "cloud telemetry reset: "+telemetryInvalid) ||
+		strings.Contains(err.Error(), "#5283") {
+		t.Fatalf("reset = %v, want config-api's reason alone", err)
 	}
 }
 
