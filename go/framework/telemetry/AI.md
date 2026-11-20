@@ -31,7 +31,7 @@ plugin := telemetry.NewPlugin(telemetry.Config{
 	ServiceVersion: "1.0.0",
 	TraceExporter:  traceExporter, // sdktrace.SpanExporter; nil disables tracing
 	MetricReader:   metricReader,  // sdkmetric.Reader; nil disables metrics
-	TraceSampling:  &telemetry.TraceSampling{Budget: 100, Ratio: 0.5, FloorPerMinute: 1}, // optional; nil takes DefaultTraceSampling()
+	TraceSampling:  &telemetry.TraceSampling{Budget: 100, Ratio: 0.5, FloorPerMinute: 1, Parent: telemetry.ParentDecide}, // optional; nil takes DefaultTraceSampling(); ParentDecide samples behind a load balancer's edge
 })
 
 a := app.New("my-service")
