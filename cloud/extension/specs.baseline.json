@@ -69,6 +69,10 @@
     "cloud/publication-uploader#cloud-uploads-renew-the-plan-bearer",
     "cloud/publish-channels#publish-tasks-declare-their-channels",
     "cloud/secret-config-key#declared-key-stored",
-    "cloud/secret-config-key#undeclared-key-stored-with-warning"
+    "cloud/secret-config-key#undeclared-key-stored-with-warning",
+    "cloud/telemetry-settings#app-names-the-service",
+    "cloud/telemetry-settings#reset-removes-the-row",
+    "cloud/telemetry-settings#set-merges-into-the-row",
+    "cloud/telemetry-settings#show-prints-the-rows"
   ]
 }

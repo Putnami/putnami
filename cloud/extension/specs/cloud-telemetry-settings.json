@@ -1,0 +1,36 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/telemetry-settings",
+  "outcomes": [
+    "putnami cloud telemetry shows, sets and resets the trace settings and log level Putnami Cloud returns to a workspace's services in their export directive, so a person tunes a running app's telemetry without a redeploy"
+  ],
+  "nonGoals": [
+    "A parent policy or an expiry on a setting: config-api stores neither yet, and the command gains --parent and --for once it does",
+    "Applying a setting to a running service: the workspace collector returns it on the next export, by the telemetry/otlp-push-contract directive"
+  ],
+  "requirements": [
+    {
+      "id": "show-prints-the-rows",
+      "text": [
+        "putnami cloud telemetry show reads the workspace's telemetry settings through config-api's generated client and prints the workspace row, each service override and the settings each service ends with, field by field; a field no row sets prints as the framework default.",
+        "With --app, it prints the workspace row and that service's row only; --output=json prints the view config-api answers."
+      ]
+    },
+    {
+      "id": "set-merges-into-the-row",
+      "text": [
+        "putnami cloud telemetry set writes each flag it is given, --budget, --ratio, --floor and --log-level, into the workspace row, or the row of the --app service, and keeps every field of that row it is not given.",
+        "It refuses, before any call, a set with no flag and a value out of range: a budget or a floor that is not a whole number from 0 to 1000000, a ratio outside 0 to 1, a log level other than debug, info, warn or error."
+      ]
+    },
+    {
+      "id": "reset-removes-the-row",
+      "text": "putnami cloud telemetry reset removes the workspace row, or the row of the --app service, so its services return to their own settings or to the workspace row."
+    },
+    {
+      "id": "app-names-the-service",
+      "text": "--app resolves an app the way every cloud command does and names the row by the app's canonical name, the service its telemetry carries; without --app the command reads or writes the workspace row."
+    }
+  ]
+}

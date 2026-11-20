@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "telemetry/otlp-push-contract#a-client-sends-both-headers",
+    "telemetry/otlp-push-contract#an-outside-parent",
     "telemetry/otlp-push-contract#cli-usage-vocabulary-is-closed",
     "telemetry/otlp-push-contract#equivalent-input-serializes-to-the-same-bytes",
     "telemetry/otlp-push-contract#event-trace-context-is-shared",
@@ -20,6 +21,7 @@
     "telemetry/otlp-push-contract#the-version-is-pinned",
     "telemetry/otlp-push-contract#three-signals-on-fixed-paths",
     "telemetry/otlp-push-contract#too-many-requests-delays-a-signal",
+    "telemetry/otlp-push-contract#trace-parent-policy",
     "telemetry/otlp-push-contract#trace-sampling-defaults",
     "telemetry/otlp-push-contract#trace-sampling-is-shared",
     "telemetry/otlp-push-contract#values-map-to-otlp-numbers"

@@ -58,9 +58,17 @@
       "id": "trace-budget",
       "text": [
         "The tracer provider samples by the telemetry/otlp-push-contract rule, from the plugin's TraceSampling or the protocol defaults, and each telemetry.traces config key overrides its field.",
-        "A span with a parent follows the parent's sampled flag whatever the budget.",
+        "A span with a parent follows the parent's sampled flag unless the parent policy decides for it.",
         "Each root decision counts in trace.decisions on the plugin's meter provider.",
         "A TraceSampling of zero budget, zero ratio and zero floor samples no root, so \"not configured\" and \"deliberately disabled\" stay distinguishable."
+      ]
+    },
+    {
+      "id": "parent-policy",
+      "text": [
+        "The parent policy is TraceSampling.Parent, overridden by the telemetry.traces.parent config key, then by an export directive while it holds; follow is the default.",
+        "Under decide, the server span of a request whose traceparent comes from outside, by the telemetry/otlp-push-contract rule, takes a root decision counted in trace.decisions and keeps the parent's trace and parent span IDs.",
+        "A parent a Putnami client sent is followed under either policy."
       ]
     },
     {
@@ -102,7 +110,7 @@
     {
       "id": "export-directives",
       "text": [
-        "Every OTLP exporter, the log sink included, reads the Putnami-Export-Directive header of each collector response and applies it by the telemetry/otlp-push-contract rule: to the sampler of each running plugin and to the level of every logger, until its ttl ends.",
+        "Every OTLP exporter, the log sink included, reads the Putnami-Export-Directive header of each collector response and applies it by the telemetry/otlp-push-contract rule until its ttl ends: its trace settings replace those of the sampler of each running plugin, higher or lower, and its log level tightens the level of every logger.",
         "trace.decisions and log.records keep counting the roots and records a directive drops.",
         "A 429 response with a Retry-After delays the next export of its own signal only."
       ]

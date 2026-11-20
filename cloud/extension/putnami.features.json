@@ -153,6 +153,72 @@
       ]
     },
     {
+      "id": "cloud/telemetry-settings",
+      "type": "feature",
+      "name": "Telemetry settings of a workspace from the CLI",
+      "outcome": "putnami cloud telemetry shows, sets and resets the trace settings and log level Putnami Cloud returns to a workspace's services in their export directive, so a person tunes a running app's telemetry without a redeploy",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "show-prints-the-rows",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "telemetry-show-prints-workspace-and-services",
+              "telemetry-show-app-prints-one-service",
+              "telemetry-show-json-prints-the-view"
+            ]
+          }
+        },
+        {
+          "id": "set-merges-into-the-row",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "telemetry-set-merges-flags-into-the-row",
+              "telemetry-set-refuses-values-out-of-range",
+              "telemetry-set-needs-a-flag"
+            ]
+          }
+        },
+        {
+          "id": "reset-removes-the-row",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "telemetry-reset-removes-the-row"
+            ]
+          }
+        },
+        {
+          "id": "app-names-the-service",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "telemetry-app-names-the-service-row"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "cloud/secret-config-key",
       "type": "feature",
       "name": "Secrets stored under the config key the application reads",

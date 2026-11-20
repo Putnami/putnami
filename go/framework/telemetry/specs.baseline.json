@@ -12,6 +12,7 @@
     "go/service-telemetry#lifecycle-purity",
     "go/service-telemetry#live-sampling-settings",
     "go/service-telemetry#never-fails-the-workload",
+    "go/service-telemetry#parent-policy",
     "go/service-telemetry#process-instance-identity",
     "go/service-telemetry#push-transport",
     "go/service-telemetry#service-identity",

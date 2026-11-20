@@ -168,6 +168,35 @@
           }
         },
         {
+          "id": "trace-parent-policy",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-parent-policy-convention-matches-its-fixture",
+              "the-go-runtime-decides-the-fixture-parents",
+              "the-typescript-runtime-decides-the-fixture-parents"
+            ]
+          }
+        },
+        {
+          "id": "an-outside-parent",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-outside-rule-matches-its-fixture",
+              "the-typescript-runtime-finds-the-fixture-outside-parents"
+            ]
+          }
+        },
+        {
           "id": "the-client-span-survives-a-proxy",
           "stage": "coded",
           "evidenceKinds": [
