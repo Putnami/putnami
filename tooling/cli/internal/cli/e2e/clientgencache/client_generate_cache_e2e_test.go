@@ -49,7 +49,7 @@ var files = map[string]string{
 	// The emitter formats the client it writes with the workspace's Biome
 	// configuration.
 	"biome.json":             `{"root": true, "formatter": {"indentStyle": "space", "indentWidth": 2, "lineWidth": 120}}` + "\n",
-	"package.json":           `{"name": "ws", "private": true, "packageManager": "bun@1.4.0", "workspaces": ["clients/ts"]}` + "\n",
+	"package.json":           `{"name": "ws", "private": true, "packageManager": "bun@1.4.5", "workspaces": ["clients/ts"]}` + "\n",
 	"putnami.workspace.json": `{"name": "ws", "extensions": ["/.ext/typescript", "/.ext/dev", "/.ext/clientgen"], "includes": ["provider", "clients/ts"]}` + "\n",
 	"provider/putnami.json":  `{"name": "provider", "extensions": ["@putnami/typescript", "@putnami/clientgen"]}` + "\n",
 	"provider/package.json":  `{"name": "provider", "private": true}` + "\n",

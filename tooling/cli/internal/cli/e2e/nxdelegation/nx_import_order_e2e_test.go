@@ -90,7 +90,7 @@ func TestAnImportedNxTestWaitsForTheNxBuildAndFoldsItsKey(t *testing.T) {
 	if err != nil || json.Unmarshal(data, &pkg) != nil {
 		t.Fatalf("read the root package.json: %v", err)
 	}
-	pkg["packageManager"] = json.RawMessage(`"bun@1.4.0"`)
+	pkg["packageManager"] = json.RawMessage(`"bun@1.4.5"`)
 	data, _ = json.MarshalIndent(pkg, "", "  ")
 	clitest.WriteFile(t, filepath.Join(root, "package.json"), string(data)+"\n")
 	if code, out := clitest.RunGateArgs(t, root, "projects", "sync"); code != 0 {

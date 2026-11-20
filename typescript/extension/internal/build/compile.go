@@ -152,26 +152,35 @@ func buildCompileArgs(config, entrypoint, outputFile, target string, bytecode bo
 	)
 }
 
-// reproducibleBytecodeBun is the first Bun release whose --bytecode output is
-// byte-identical across compiles of the same inputs. Bun 1.4.0 writes a few
-// kilobytes that differ on every compile, which would change the digest of an
-// image that content-addresses an unchanged service.
+// reproducibleBytecodeBun is the earliest Bun release measured to write
+// --bytecode output that is byte-identical across compiles of the same inputs.
+// An image content-addresses its executable, so bytecode that differs between
+// compiles would change the digest of an unchanged service.
 var reproducibleBytecodeBun = [3]int{1, 4, 5}
 
 // bunCompilesReproducibleBytecode reports whether the bun at bunBin is
-// reproducibleBytecodeBun or later, from what it prints for --version. A bun
-// that fails the probe, or prints a version this does not read, compiles
-// without bytecode: the executable stays reproducible and only starts slower.
-func bunCompilesReproducibleBytecode(bunBin, workDir string) bool {
+// reproducibleBytecodeBun or later, from what it prints for --version. Only a
+// version it reads as earlier compiles without bytecode. A probe that fails,
+// or prints a version this does not read, fails the compile: compiling
+// without bytecode then would store a different executable under the same
+// cache key as a healthy run, and break the image digest it content-addresses.
+func bunCompilesReproducibleBytecode(bunBin, workDir string) (bool, error) {
 	result, err := execRunFunc(bunBin, []string{"--version"}, exec.Dir(workDir), exec.Timeout(30*time.Second))
-	if err != nil || result == nil || !result.Success {
-		return false
+	if err != nil {
+		return false, fmt.Errorf("read the version of %s: %w", bunBin, err)
+	}
+	if result == nil || !result.Success {
+		detail := ""
+		if result != nil {
+			detail = strings.TrimSpace(result.Stderr)
+		}
+		return false, fmt.Errorf("read the version of %s: bun --version failed%s", bunBin, cond(detail != "", ": "+detail, ""))
 	}
 	version, ok := parseBunVersion(result.Stdout)
 	if !ok {
-		return false
+		return false, fmt.Errorf("read the version of %s: bun --version printed %q", bunBin, strings.TrimSpace(result.Stdout))
 	}
-	return slices.Compare(version[:], reproducibleBytecodeBun[:]) >= 0
+	return slices.Compare(version[:], reproducibleBytecodeBun[:]) >= 0, nil
 }
 
 // parseBunVersion reads the major, minor and patch numbers of what bun prints
@@ -239,7 +248,10 @@ func RunCompile(bunBin, projectPath, outputPath string, entrypoint string, targe
 
 	var files []string
 	var errors []string
-	bytecode := bunCompilesReproducibleBytecode(bunBin, workDir)
+	bytecode, err := bunCompilesReproducibleBytecode(bunBin, workDir)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	for _, target := range targets {
 		outputFile := resolveCompileOutputFile(outputPath, entrypoint, target)

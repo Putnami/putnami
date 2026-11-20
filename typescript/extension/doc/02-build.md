@@ -551,10 +551,11 @@ Invokes `bun build --compile` to produce standalone executables.
 executable carries the bundle's precompiled bytecode (`--bytecode
 --format=esm`), so it starts without parsing its bundle: on a 6.5 MB server
 bundle, the time to the listening port drops from 143 ms to 58 ms, and the
-executable grows by about 12 MB. Bun 1.4.5 is the first release whose bytecode
-is byte-identical across compiles of the same inputs; an earlier Bun compiles
-without bytecode, so an image that content-addresses its executable keeps its
-digest. The phase reads the version from `bun --version` before it compiles.
+executable grows by about 12 MB. Bun 1.4.5 writes bytecode that is
+byte-identical across compiles of the same inputs, where Bun 1.4.0 does not; an
+earlier Bun compiles without bytecode, so an image that content-addresses its
+executable keeps its digest. The phase reads the version from `bun --version`
+before it compiles, and fails when it cannot read it.
 
 **Entrypoint resolution** (in order):
 

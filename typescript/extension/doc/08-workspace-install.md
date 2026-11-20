@@ -78,7 +78,7 @@ A job that starts with no bun on `PATH`, in `$BUN_INSTALL` or in `~/.bun` runs
 the release from `toolchains/bun/bun-<version>` under the Putnami home, at
 `bun-<target>/bun` or at `bin/bun`. The release is the one `putnami.lock.json`
 pins under `toolchains.bun`, else the one the root `package.json` declares in
-`packageManager`, else the extension's default release, Bun 1.4.0. When that
+`packageManager`, else the extension's default release, Bun 1.4.5. When that
 folder holds no Bun, the job fails with a message that names the release and
 `putnami install`. It downloads nothing, on a hosted run or not.
 `workspace-fetch` never runs a bun inside the workspace.

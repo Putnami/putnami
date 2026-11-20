@@ -8,6 +8,7 @@
     "typescript/typescript-project-toolchain#batch-failure-isolation",
     "typescript/typescript-project-toolchain#bounded-test-output",
     "typescript/typescript-project-toolchain#bun-answers-its-toolchain-pin",
+    "typescript/typescript-project-toolchain#bun-compile-bytecode",
     "typescript/typescript-project-toolchain#bun-under-the-putnami-home",
     "typescript/typescript-project-toolchain#catalog-seeding",
     "typescript/typescript-project-toolchain#committed-openapi-drift",
