@@ -135,6 +135,9 @@ type schemaField struct {
 	Default   any
 	Fields    []schemaField
 	Items     []schemaField
+	// MapValues holds the fields of a map's value schema when its values are
+	// objects. Only the native Config member reads it.
+	MapValues []schemaField
 }
 
 // PublishConfig backs `putnami cloud config publish`. It fills the three
@@ -480,6 +483,9 @@ func parseSchemaFields(raw any) []schemaField {
 		}
 		if items, ok := fieldMap["items"].(map[string]any); ok {
 			field.Items = parseSchemaFields(items["fields"])
+		}
+		if values, ok := fieldMap["values"].(map[string]any); ok && field.Type == "map" {
+			field.MapValues = parseSchemaFields(values["fields"])
 		}
 		out = append(out, field)
 	}

@@ -248,6 +248,31 @@ func TestValidateConfigRejectsUndeclaredOpaqueDescendants(t *testing.T) {
 	}
 }
 
+func TestValidateConfigAcceptsAMapEntryWithoutItsSensitiveField(t *testing.T) {
+	root := configValidationFixture(t)
+	writeJSONFile(t, filepath.Join(root, "schema", "config.json"), map[string]any{
+		"appName": "my-app",
+		"configs": []any{map[string]any{"path": "signInProviders", "fields": []any{
+			map[string]any{"name": "oidc", "type": "map", "keys": "string", "values": map[string]any{"name": "", "type": "object", "fields": []any{
+				map[string]any{"name": "issuer", "type": "string"},
+				map[string]any{"name": "clientId", "type": "string"},
+				map[string]any{"name": "clientSecret", "type": "string", "sensitive": true},
+			}}},
+		}}},
+	})
+	if err := os.WriteFile(filepath.Join(root, "conf", "env.prod.yaml"), []byte("signInProviders:\n  oidc:\n    gitlab:\n      issuer: https://gitlab.com\n      clientId: gitlab-client\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout []string
+	err := validateConfig(map[string]any{}, []string{"my-app"}, root, IO{Stdout: func(line string) { stdout = append(stdout, line) }})
+	if err != nil {
+		t.Fatalf("map entry without its secret: %v", err)
+	}
+	if got := strings.Join(stdout, "\n"); !strings.Contains(got, "Validated authored Config") {
+		t.Fatalf("stdout = %q", got)
+	}
+}
+
 func TestValidateConfigFailsClosedForMissingSchemaAndNamespace(t *testing.T) {
 	t.Run("schema", func(t *testing.T) {
 		root := configValidationFixture(t)

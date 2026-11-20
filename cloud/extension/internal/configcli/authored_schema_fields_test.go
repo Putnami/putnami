@@ -15,7 +15,7 @@ func TestAuthoredArraySchemaRetainsNestedObjectNodes(t *testing.T) {
 	blocks := []schemaBlock{{Path: "server", Fields: []schemaField{{Name: "callers", Type: "array", Items: []schemaField{
 		{Name: "scope", Type: "object", Required: true, Fields: []schemaField{{Name: "workspaceId", Type: "string", Required: true}}},
 	}}}}}
-	schema, refs, err := normalizeAuthoredSchema(blocks)
+	schema, refs, err := normalizeAuthoredSchema(blocks, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -112,7 +112,7 @@ func TestAuthoredSchemaReferencesEverySecretAndRequiresOnlyTheOnesTheBootNeeds(t
 			{Name: "provider", Type: "object", Fields: []schemaField{{Name: "key", Type: "string", Required: true, Sensitive: true}}},
 		}},
 	}
-	schema, refs, err := normalizeAuthoredSchema(blocks)
+	schema, refs, err := normalizeAuthoredSchema(blocks, nil)
 	if err != nil {
 		t.Fatal(err)
 	}

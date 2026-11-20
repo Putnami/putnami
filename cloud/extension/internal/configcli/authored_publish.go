@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -212,7 +213,7 @@ func PrepareAuthoredConfig(params map[string]any, args []string, workspaceRoot s
 		return nil, clicore.NewError("native Config member is missing committed production values: "+strings.Join(problems, ", "), clicore.ExitUsage)
 	}
 
-	schema, references, err := normalizeAuthoredSchema(blocks)
+	schema, references, err := normalizeAuthoredSchema(blocks, writes)
 	if err != nil {
 		return nil, clicore.NewError(err.Error(), clicore.ExitUsage)
 	}
@@ -307,12 +308,13 @@ func AuthoredConfigMemberPath(workspaceRoot, project string) string {
 	return filepath.Join(workspaceRoot, ".putnami", "out", filepath.FromSlash(strings.TrimPrefix(project, "/")), configMemberDirectory, configMemberFilename)
 }
 
-func normalizeAuthoredSchema(blocks []schemaBlock) (authoredmember.NormalizedSchema, []authoredmember.SecretReference, error) {
+func normalizeAuthoredSchema(blocks []schemaBlock, writes []blockWrite) (authoredmember.NormalizedSchema, []authoredmember.SecretReference, error) {
+	byBlock := blockWriteValues(writes)
 	fields := make([]authoredmember.SchemaField, 0)
 	references := make([]authoredmember.SecretReference, 0)
 	for _, block := range blocks {
 		for _, field := range block.Fields {
-			if err := appendAuthoredSchemaField(block.Path+"."+field.Name, field, &fields, &references, false, block.Optional); err != nil {
+			if err := appendAuthoredSchemaField(block.Path+"."+field.Name, field, byBlock[block.Path][field.Name], &fields, &references, false, block.Optional); err != nil {
 				return authoredmember.NormalizedSchema{}, nil, err
 			}
 		}
@@ -320,9 +322,19 @@ func normalizeAuthoredSchema(blocks []schemaBlock) (authoredmember.NormalizedSch
 	return authoredmember.NormalizedSchema{Fields: fields}, references, nil
 }
 
-// appendAuthoredSchemaField normalizes one schema field. optionalBlock reports
-// that the schema marks the field's block optional.
-func appendAuthoredSchemaField(path string, field schemaField, fields *[]authoredmember.SchemaField, references *[]authoredmember.SecretReference, inArray, optionalBlock bool) error {
+func blockWriteValues(writes []blockWrite) map[string]map[string]any {
+	byBlock := make(map[string]map[string]any, len(writes))
+	for _, write := range writes {
+		byBlock[write.Path] = write.Values
+	}
+	return byBlock
+}
+
+// appendAuthoredSchemaField normalizes one schema field. value is the
+// committed value at path, which names the entries of a map that
+// expandsMapEntries normalizes. optionalBlock reports that the schema marks
+// the field's block optional.
+func appendAuthoredSchemaField(path string, field schemaField, value any, fields *[]authoredmember.SchemaField, references *[]authoredmember.SecretReference, inArray, optionalBlock bool) error {
 	kind, err := authoredFieldType(field.Type)
 	if err != nil {
 		return fmt.Errorf("Config field %s: %w", path, err)
@@ -343,22 +355,98 @@ func appendAuthoredSchemaField(path string, field schemaField, fields *[]authore
 		if inArray {
 			*fields = append(*fields, authoredmember.SchemaField{Path: path, Type: kind, Required: field.Required})
 		}
+		nested, _ := value.(map[string]any)
 		for _, child := range field.Fields {
-			if err := appendAuthoredSchemaField(path+"."+child.Name, child, fields, references, inArray, optionalBlock); err != nil {
+			if err := appendAuthoredSchemaField(path+"."+child.Name, child, nested[child.Name], fields, references, inArray, optionalBlock); err != nil {
 				return err
 			}
 		}
 		return nil
 	}
+	if !inArray && expandsMapEntries(field, value) {
+		return eachMapEntry(path, value, func(entryPath string, entry map[string]any) error {
+			if err := validateArraySafeFields(entryPath, field.MapValues); err != nil {
+				return err
+			}
+			for _, child := range field.MapValues {
+				if err := appendAuthoredSchemaField(entryPath+"."+child.Name, child, entry[child.Name], fields, references, false, optionalBlock); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
+	}
 	*fields = append(*fields, authoredmember.SchemaField{Path: path, Type: kind, Required: field.Required})
 	if len(field.Items) != 0 {
 		for _, child := range field.Items {
-			if err := appendAuthoredSchemaField(path+"."+child.Name, child, fields, references, true, optionalBlock); err != nil {
+			if err := appendAuthoredSchemaField(path+"."+child.Name, child, nil, fields, references, true, optionalBlock); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+// expandsMapEntries reports whether the member normalizes a map entry by
+// entry: its values are objects that declare a sensitive field, and the
+// committed file holds at least one entry. Each entry then normalizes like a
+// nested object at <map>.<key>, so its non-sensitive fields are authored
+// values and each sensitive field is a secret reference at the entry's path,
+// exactly as a sensitive field of a fixed object. A map whose values declare
+// no sensitive field stays one opaque value, whose entries the project
+// declares in schema/config-authored-fields.json.
+func expandsMapEntries(field schemaField, value any) bool {
+	entries, ok := value.(map[string]any)
+	return field.Type == "map" && ok && len(entries) != 0 && declaresSensitiveObjectField(field.MapValues)
+}
+
+// declaresSensitiveObjectField reports a sensitive field among fields or the
+// fields of their nested objects. A nested map does not count: it stays one
+// opaque value unless it expands itself.
+func declaresSensitiveObjectField(fields []schemaField) bool {
+	for _, field := range fields {
+		if field.Sensitive || declaresSensitiveObjectField(field.Fields) {
+			return true
+		}
+	}
+	return false
+}
+
+// eachMapEntry calls visit for each committed entry of a map, in key order.
+// An entry key is one canonical path segment, and an entry is an object or
+// empty.
+func eachMapEntry(path string, value any, visit func(string, map[string]any) error) error {
+	entries, _ := value.(map[string]any)
+	keys := make([]string, 0, len(entries))
+	for key := range entries {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		if !canonicalMapEntryKey(key) {
+			return fmt.Errorf("Config map %s has entry key %q, which is not one canonical path segment", path, key)
+		}
+		entry, ok := entries[key].(map[string]any)
+		if !ok && entries[key] != nil {
+			return fmt.Errorf("Config map entry %s.%s is not a canonical object", path, key)
+		}
+		if err := visit(path+"."+key, entry); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func canonicalMapEntryKey(key string) bool {
+	if key == "" || len(key) > 256 {
+		return false
+	}
+	for _, r := range key {
+		if !(r == '-' || r == '_' || r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9') {
+			return false
+		}
+	}
+	return true
 }
 
 func authoredFieldType(kind string) (string, error) {
@@ -381,10 +469,7 @@ func authoredFieldType(kind string) (string, error) {
 }
 
 func authoredValues(blocks []schemaBlock, writes []blockWrite) (map[string]any, error) {
-	byBlock := make(map[string]map[string]any, len(writes))
-	for _, write := range writes {
-		byBlock[write.Path] = write.Values
-	}
+	byBlock := blockWriteValues(writes)
 	values := map[string]any{}
 	for _, block := range blocks {
 		for _, field := range block.Fields {
@@ -397,21 +482,24 @@ func authoredValues(blocks []schemaBlock, writes []blockWrite) (map[string]any, 
 }
 
 func validateAuthoredArraySafety(blocks []schemaBlock) error {
-	var validateFields func(string, []schemaField) error
-	validateFields = func(prefix string, fields []schemaField) error {
-		for _, field := range fields {
-			path := prefix + "." + field.Name
-			if len(field.Items) != 0 && hasSensitiveSchemaField(field.Items) {
-				return fmt.Errorf("Config field %s mixes array values with sensitive descendants and cannot be published safely", path)
-			}
-			if err := validateFields(path, field.Fields); err != nil {
-				return err
-			}
-		}
-		return nil
-	}
 	for _, block := range blocks {
-		if err := validateFields(block.Path, block.Fields); err != nil {
+		if err := validateArraySafeFields(block.Path, block.Fields); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// validateArraySafeFields refuses an array among fields, or the fields of
+// their nested objects, whose items declare a sensitive descendant: an array
+// is one authored value, so it cannot hold a secret reference.
+func validateArraySafeFields(prefix string, fields []schemaField) error {
+	for _, field := range fields {
+		path := prefix + "." + field.Name
+		if len(field.Items) != 0 && hasSensitiveSchemaField(field.Items) {
+			return fmt.Errorf("Config field %s mixes array values with sensitive descendants and cannot be published safely", path)
+		}
+		if err := validateArraySafeFields(path, field.Fields); err != nil {
 			return err
 		}
 	}
@@ -433,6 +521,16 @@ func appendAuthoredValue(path string, field schemaField, value any, values map[s
 			}
 		}
 		return nil
+	}
+	if expandsMapEntries(field, value) {
+		return eachMapEntry(path, value, func(entryPath string, entry map[string]any) error {
+			for _, child := range field.MapValues {
+				if err := appendAuthoredValue(entryPath+"."+child.Name, child, entry[child.Name], values); err != nil {
+					return err
+				}
+			}
+			return nil
+		})
 	}
 	if len(field.Items) != 0 && hasSensitiveSchemaField(field.Items) {
 		return fmt.Errorf("Config field %s mixes array values with sensitive descendants and cannot be published safely", path)

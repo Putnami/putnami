@@ -931,6 +931,21 @@ they cannot replace generated fields or open a closed object. Packaging never
 infers field permissions from values, and undeclared descendants still fail.
 Keep this file alongside the owning workload schema when production keys change.
 
+A map whose values are objects that declare a sensitive field, directly or in
+a nested object, such as `signInProviders.oidc` of `map[string]Provider` with
+a sensitive `clientSecret`, needs no such declaration: packaging reads each
+committed entry with the map's value schema, as it reads a nested object.
+Commit the entry's non-sensitive fields and leave the sensitive one out; the
+member references it at the entry's path, and
+`putnami cloud config secrets set signInProviders.oidc.gitlab.clientSecret`
+stores it. A committed sensitive value, an entry key that is not one path
+segment of letters, digits, `-` or `_`, a missing required field and an array
+whose items declare a secret still fail. An existing declaration of such an
+entry that matches its value schema is ignored; one that differs fails. A map
+whose values declare no sensitive field, or reach one only through a nested
+map (such as `clients.services`), stays one opaque value whose entries the
+project declares as above.
+
 For extension archive publishes, `putnami.extension.json` owns the registry
 package identity, so this project publishes as `@putnami/cloud` even though the
 workspace project is named `@putnami/cloud-extension`.
