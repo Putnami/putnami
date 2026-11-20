@@ -14,8 +14,8 @@ import (
 
 const telemetryPath = "/v1/workspaces/ws-acme/config/telemetry"
 
-// telemetryService is the service name config-api accepts today, and
-// telemetryRefusal the reason it gives for any value it refuses.
+// telemetryServicePattern is the service name config-api accepts today, and
+// telemetryInvalid the reason it gives for any value it refuses.
 var telemetryServicePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9._-]{0,62}$`)
 
 const telemetryInvalid = "trace budget and floor are 0 to 1000000, trace ratio 0 to 1, log level debug, info, warn or error, and a service a lowercase name"
@@ -307,7 +307,6 @@ func TestTelemetryApp_NamesTheServiceRow(t *testing.T) {
 		t.Fatalf("service = %v, want the workspace row", service)
 	}
 	// A refusal of a plain name carries config-api's reason without the hint.
-	fake.refuse, fake.message = 0, ""
 	err = runTelemetry(ioctx, "reset", "--app", "Billing")
 	if err == nil || !strings.Contains(err.Error(), "cloud telemetry reset: "+telemetryInvalid) ||
 		strings.Contains(err.Error(), "#5283") {

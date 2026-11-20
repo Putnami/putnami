@@ -1142,8 +1142,8 @@ and `reset` need `platform.workspace.manage`, as a person. The settings hold in
 every environment of the workspace. Until
 [Putnami/putnami-cloud#5283](https://github.com/Putnami/putnami-cloud/issues/5283)
 lands, config-api refuses a row for an app whose canonical name holds a folder,
-such as `surfaces/workloads/app`, the collector stores `--budget` without
-sending it, and a parent policy and an expiry (`--parent`, `--for`) are not
+such as `surfaces/workloads/app`, config-api stores `--budget` but the
+collector does not send it, and a parent policy and an expiry (`--parent`, `--for`) are not
 offered.
 
 `putnami cloud status` reads 12 entries at once and gives each a state: `ok`,

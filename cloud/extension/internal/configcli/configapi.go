@@ -445,8 +445,11 @@ func (api configAPI) listSecretGrants(workspaceID string) (*configapiclient.Gran
 // legacyConfigErrors rewrites such a body into the first-party envelope before
 // the client reads it: the prose becomes `message`, and the two refusals the
 // commands explain get the code the current config-api declares for them.
-// Remove withLegacyConfigErrors and everything below it once every control
-// plane serves a config-api whose refusals carry `code`.
+// The telemetry settings route still answers every refusal this way, so
+// `putnami cloud telemetry` reads its reason through it too. Remove
+// withLegacyConfigErrors and everything below it once every control plane
+// serves a config-api whose refusals carry `code`, the telemetry route's
+// included.
 const (
 	legacySchemaNotRegistered = "config.schema_not_registered"
 	legacySchemaInvalid       = "config.schema_invalid"
