@@ -79,7 +79,8 @@ func Telemetry(params map[string]any, args []string, workspaceRoot string, env m
 	}
 	switch verb {
 	case "", "help":
-		return telemetryHelp(params, ioctx)
+		telemetryHelp(params, ioctx)
+		return nil
 	case "show", "set", "reset":
 	default:
 		return clicore.NewError("unknown cloud telemetry verb: "+verb+"; expected show, set or reset", clicore.ExitUsage)
@@ -117,7 +118,8 @@ func Telemetry(params map[string]any, args []string, workspaceRoot string, env m
 		if err != nil {
 			return err
 		}
-		return printTelemetry(params, ioctx, view, service)
+		printTelemetry(params, ioctx, view, service)
+		return nil
 	case "set":
 		view, err := readTelemetry(reqCtx, ctx, verb)
 		if err != nil {
@@ -127,17 +129,19 @@ func Telemetry(params map[string]any, args []string, workspaceRoot string, env m
 		if view, err = writeTelemetry(reqCtx, ctx, verb, service, row); err != nil {
 			return err
 		}
-		return printTelemetry(params, ioctx, view, service)
+		printTelemetry(params, ioctx, view, service)
+		return nil
 	default:
 		view, err := writeTelemetry(reqCtx, ctx, verb, service, TelemetrySettings{})
 		if err != nil {
 			return err
 		}
-		return printTelemetry(params, ioctx, view, service)
+		printTelemetry(params, ioctx, view, service)
+		return nil
 	}
 }
 
-func telemetryHelp(params map[string]any, ioctx clicore.IO) error {
+func telemetryHelp(params map[string]any, ioctx clicore.IO) {
 	commands := []map[string]string{
 		{"command": "cloud telemetry show [--app <app>]", "description": "the workspace row, each service row and the settings each service ends with"},
 		{"command": "cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--log-level <level>]", "description": "write the given fields into the row and keep the others; the services apply the ratio, the floor and the log level within a few minutes"},
@@ -145,14 +149,13 @@ func telemetryHelp(params map[string]any, ioctx clicore.IO) error {
 	}
 	if clicore.StructuredOutput(params) {
 		clicore.WriteResult(map[string]any{"commands": commands}, params, ioctx, "")
-		return nil
+		return
 	}
 	ioctx.Stdout("@putnami/cloud telemetry commands:")
 	for _, c := range commands {
 		ioctx.Stdout("  putnami " + c["command"])
 		ioctx.Stdout("      " + c["description"])
 	}
-	return nil
 }
 
 // telemetryService resolves --app to the service whose row a command reads or
@@ -385,7 +388,7 @@ func optional[T any](value *T) client.Optional[T] {
 
 // printTelemetry prints the view, or with service only the workspace row and
 // that service's row.
-func printTelemetry(params map[string]any, ioctx clicore.IO, view *TelemetryView, service string) error {
+func printTelemetry(params map[string]any, ioctx clicore.IO, view *TelemetryView, service string) {
 	if service != "" {
 		rows := []TelemetryService{}
 		for _, row := range view.Services {
@@ -397,7 +400,7 @@ func printTelemetry(params map[string]any, ioctx clicore.IO, view *TelemetryView
 	}
 	if clicore.StructuredOutput(params) {
 		clicore.WriteResult(view, params, ioctx, "")
-		return nil
+		return
 	}
 	ioctx.Stdout("Telemetry settings of workspace " + view.WorkspaceID + ". An unset field keeps the service's own setting.")
 	ioctx.Stdout("workspace: " + describeTelemetry(view.Workspace) + updatedSuffix(view.WorkspaceUpdatedAt))
@@ -408,7 +411,6 @@ func printTelemetry(params map[string]any, ioctx clicore.IO, view *TelemetryView
 	if service != "" && len(view.Services) == 0 {
 		ioctx.Stdout(service + ": no row; it takes the workspace row")
 	}
-	return nil
 }
 
 // describeTelemetry renders the fields a row sets, in the order of the flags.
