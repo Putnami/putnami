@@ -75,19 +75,23 @@ export interface ActiveTelemetrySpan {
  *
  * A span with a parent, remote or ambient, takes the parent's sampled flag. A
  * root span asks the trace sampler the telemetry plugin installs; without one
- * it is sampled. The span records only when sampled, and injects its flag
- * either way, so the services it calls follow its decision.
+ * it is sampled. Under the sampler's parent policy `decide`, a span whose
+ * `remoteHeaders` parent came from outside also asks the sampler, and keeps
+ * the parent's trace ID. The span records only when sampled, and injects its
+ * flag either way, so the services it calls follow its decision.
  */
 export function startTelemetrySpan(options: TelemetrySpanOptions): ActiveTelemetrySpan {
   const ambient = tryContext<AmbientTelemetryContext>();
-  const remote =
-    options.remoteContext ?? (options.remoteHeaders ? readRemoteContext(options.remoteHeaders) : undefined);
+  const fromHeaders =
+    options.remoteContext === undefined && options.remoteHeaders ? readRemoteParent(options.remoteHeaders) : undefined;
+  const remote = options.remoteContext ?? fromHeaders?.context;
   const parent = remote ?? (options.newRoot ? undefined : ambient?.__putnamiTrace);
   const traceId = parent?.traceId ?? randomHex(16);
+  const decides = !parent || (fromHeaders?.outside === true && getTraceSampler()?.decidesOutsideParents() === true);
   const context: TelemetryTraceContext = {
     traceId,
     spanId: randomHex(8),
-    traceFlags: parent?.traceFlags ?? rootTraceFlags(traceId),
+    traceFlags: parent && !decides ? parent.traceFlags : rootTraceFlags(traceId),
     ...(parent?.tracestate ? { tracestate: parent.tracestate } : {}),
     ...(parent?.baggage ? { baggage: parent.baggage } : {}),
   };
@@ -163,26 +167,49 @@ function isSampled(traceFlags: string): boolean {
   return (Number.parseInt(traceFlags, 16) & 1) === 1;
 }
 
+/** The remote parent of a server span, and whether it came from outside. */
+interface RemoteParent {
+  context: TelemetryTraceContext;
+  /** No Putnami client sent it: no valid x-putnami-traceparent on its trace. */
+  outside: boolean;
+}
+
 /**
  * Read the remote parent of a server span from W3C headers.
  *
  * Without a valid traceparent there is no parent. When x-putnami-traceparent
  * carries the same trace ID and another parent ID, a proxy rewrote
  * traceparent, and the parent is the one in x-putnami-traceparent; otherwise
- * it is traceparent's.
+ * it is traceparent's. Without a valid x-putnami-traceparent on the same
+ * trace, the parent came from outside: every Putnami client sends both
+ * headers.
  */
-function readRemoteContext(headers: Headers): TelemetryTraceContext | undefined {
+function readRemoteParent(headers: Headers): RemoteParent | undefined {
   const primary = parseTraceparent(headers.get('traceparent')?.toLowerCase());
   if (!primary) return undefined;
   const second = parseTraceparent(headers.get(PUTNAMI_TRACEPARENT_HEADER) ?? undefined);
-  const parent = second && second.traceId === primary.traceId && second.spanId !== primary.spanId ? second : primary;
+  const onTrace = second !== undefined && second.traceId === primary.traceId;
+  const parent = onTrace && second.spanId !== primary.spanId ? second : primary;
   const tracestate = boundedHeader(headers.get('tracestate'), MAX_TRACESTATE_LENGTH);
   const baggage = boundedHeader(headers.get('baggage'), MAX_BAGGAGE_LENGTH);
   return {
-    ...parent,
-    ...(tracestate ? { tracestate } : {}),
-    ...(baggage ? { baggage } : {}),
+    context: {
+      ...parent,
+      ...(tracestate ? { tracestate } : {}),
+      ...(baggage ? { baggage } : {}),
+    },
+    outside: !onTrace,
   };
+}
+
+/**
+ * Whether the remote parent the headers carry came from outside: a valid
+ * traceparent with no valid x-putnami-traceparent on the same trace. A
+ * request with no valid traceparent has no remote parent and gives `false`.
+ * The rule is the telemetry/otlp-push-contract one, shared with the Go runtime.
+ */
+export function remoteParentOutside(headers: Headers): boolean {
+  return readRemoteParent(headers)?.outside === true;
 }
 
 function parseTraceparent(

@@ -52,6 +52,7 @@ import {
   TraceSampler,
   type TraceSampling,
   TraceSamplingConfig,
+  type TraceSamplingSection,
   traceSamplingError,
   traceSamplingOver,
 } from './trace-sampling';
@@ -233,7 +234,7 @@ export class TelemetryPlugin implements Plugin {
   refreshSampling(): void {
     const sampler = this.traceSampler;
     if (!sampler) return;
-    let section: Partial<TraceSampling>;
+    let section: TraceSamplingSection;
     try {
       section = readConfig(TraceSamplingConfig);
     } catch (error) {
@@ -248,7 +249,12 @@ export class TelemetryPlugin implements Plugin {
       return;
     }
     this.samplingLoadError = undefined;
-    const key = JSON.stringify([section.budget ?? null, section.ratio ?? null, section.floorPerMinute ?? null]);
+    const key = JSON.stringify([
+      section.budget ?? null,
+      section.ratio ?? null,
+      section.floorPerMinute ?? null,
+      section.parent ?? null,
+    ]);
     if (key === this.samplingSection) return;
     this.samplingSection = key;
     try {

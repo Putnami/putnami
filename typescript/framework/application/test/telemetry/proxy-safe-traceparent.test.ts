@@ -5,7 +5,11 @@ import { specTest } from '@putnami/runtime/spectest';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
 import { http } from '../../src/http/http.plugin';
-import { PUTNAMI_TRACEPARENT_HEADER, startTelemetrySpan } from '../../src/telemetry/client-telemetry';
+import {
+  PUTNAMI_TRACEPARENT_HEADER,
+  remoteParentOutside,
+  startTelemetrySpan,
+} from '../../src/telemetry/client-telemetry';
 import { TelemetryCollector } from '../../src/telemetry/telemetry.collector';
 import { TelemetryMiddleware } from '../../src/telemetry/telemetry.middleware';
 import { clearCollector, setCollector } from '../../src/telemetry/telemetry.utils';
@@ -25,6 +29,7 @@ interface ProxySafeTraceparentFixture {
     traceparent?: string;
     putnamiTraceparent?: string;
     source: 'none' | 'traceparent' | 'x-putnami-traceparent';
+    outside: boolean;
     parent?: Traceparent;
   }>;
 }
@@ -119,6 +124,25 @@ describe('proxy-safe trace context', () => {
       const spans = collector?.drainSpans() ?? [];
       const server = spans.find((span) => span.kind === 2);
       expect(server).toMatchObject({ traceId: client.context.traceId, parentSpanId: client.context.spanId });
+    },
+  );
+
+  specTest(
+    'a parent no Putnami client sent comes from outside',
+    {
+      feature: FEATURE,
+      requirement: 'an-outside-parent',
+      check: 'the-typescript-runtime-finds-the-fixture-outside-parents',
+    },
+    () => {
+      const outside = fixture.cases.map((testCase) => {
+        const headers = new Headers();
+        if (testCase.traceparent) headers.set('traceparent', testCase.traceparent);
+        if (testCase.putnamiTraceparent) headers.set(fixture.header, testCase.putnamiTraceparent);
+        return { name: testCase.name, outside: remoteParentOutside(headers) };
+      });
+      expect(outside).toEqual(fixture.cases.map(({ name, outside }) => ({ name, outside })));
+      expect(new Set(outside.map((c) => c.outside))).toEqual(new Set([true, false]));
     },
   );
 });

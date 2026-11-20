@@ -101,11 +101,20 @@ minute, so a rarely called service still exports traces. A span with a parent,
 remote or ambient, takes its parent's sampled flag: a service follows its
 caller's decision. The Go runtime applies the same rule to the same keys.
 
+Behind a load balancer such as Cloud Run's, the edge sends a `traceparent`
+whose sampled flag is usually off, so following it drops almost every server
+span. With `parent: decide`, a server span whose parent came from outside, a
+`traceparent` without an `x-putnami-traceparent` on the same trace, takes a
+root decision by the budget instead, and keeps the parent's trace ID. A call
+from another Putnami service sends both headers, so its decision still holds,
+and so does an event's or an ambient parent.
+
 | Key in `telemetry.traces` | Default | Meaning |
 |---|---|---|
 | `budget` | `100` | Root traces the instance keeps first |
 | `ratio` | `0.01` | Share of root traces kept once the budget is spent, from 0 to 1 |
 | `floorPerMinute` | `1` | Root traces kept each minute whatever the ratio picks |
+| `parent` | `follow` | `follow` an outside parent's sampled flag, or `decide` as a root |
 
 ```yaml
 # conf/.env.yaml, or CONFIG_DATA
@@ -114,9 +123,10 @@ telemetry:
     budget: 100
     ratio: 0.01
     floorPerMinute: 1
+    parent: decide
 ```
 
-The `traces` option of `telemetry()` sets the same three values in code; each
+The `traces` option of `telemetry()` sets the same values in code; each
 key of the config section overrides its field. While it runs, the plugin
 reloads the config sources every 30 seconds with `readConfig()` and applies a
 changed value to the next root decision, without a restart. A change to a file
@@ -164,18 +174,20 @@ context holds one parent at a time, so a step awaits its work; work it starts
 without awaiting gets its own span through `span.run()`.
 
 `TelemetryPlugin.sampler` (or `getTraceSampler()`) returns the installed
-`TraceSampler`. Its `settings` are its own, without an export directive's
-limits, which `inForce()` adds. Its `update()` tightens the settings at
-runtime, and they hold until the `telemetry.traces` section changes.
+`TraceSampler`. Its `settings` are its own, without an export directive's,
+which `inForce()` applies. Its `update()` changes the settings at runtime, and
+they hold until the `telemetry.traces` section changes.
 
 ### Export directives
 
-A push response may carry `Putnami-Export-Directive: trace-ratio=0.001,
-trace-floor=1, log-level=warn, ttl=300`. For `ttl` seconds, at most an hour,
-the service applies the lower ratio and floor and the higher log level of the
-directive and its own settings, keeps its own budget, and still emits every
-`error` record. `sampler.settings` keeps its own values; `sampler.inForce()`
-returns the limited ones. A `429` with a `Retry-After` delays the next push of
+A push response may carry `Putnami-Export-Directive: trace-ratio=1,
+trace-parent=decide, log-level=warn, ttl=300`. For `ttl` seconds, at most an
+hour, each trace setting the directive carries (`trace-budget`,
+`trace-ratio`, `trace-floor`, `trace-parent`) replaces the service's own,
+higher or lower; the service applies the higher log level of the directive
+and its own, and still emits every `error` record. Putnami Cloud sends the
+settings a person set with `putnami cloud telemetry set`. `sampler.settings`
+keeps its own values; `sampler.inForce()` returns the ones in force. A `429` with a `Retry-After` delays the next push of
 that signal only; log records wait in the sink's queue.
 
 ## Auto-Collected HTTP Metrics

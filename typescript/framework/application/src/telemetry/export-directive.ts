@@ -1,14 +1,16 @@
 /**
- * Export directives — the limits an OTLP endpoint returns in export responses.
+ * Export directives — the settings an OTLP endpoint returns in export responses.
  *
- * An export response may carry a `Putnami-Export-Directive` header that
- * tightens the trace and log limits of the service that sent it, for a
- * bounded time, and a 429 with a `Retry-After` slows one signal down. Every
- * push, the log sink included, hands its response to the process receiver:
- * a valid directive replaces the one in force, and until its ttl ends the
- * installed trace sampler takes the stricter of the directive and its own
- * settings, and every logger that checks the level the stricter of the
- * directive's level and its own. A void header changes nothing.
+ * An export response may carry a `Putnami-Export-Directive` header that sets
+ * the trace settings and tightens the log level of the service that sent it,
+ * for a bounded time, and a 429 with a `Retry-After` slows one signal down.
+ * Putnami Cloud renders the settings a person stored, so a directive's trace
+ * settings win over the service's own, higher or lower. Every push, the log
+ * sink included, hands its response to the process receiver: a valid
+ * directive replaces the one in force, and until its ttl ends each trace
+ * setting it carries replaces that of the installed trace sampler, and every
+ * logger that checks the level takes the stricter of the directive's level
+ * and its own. A void header changes nothing.
  *
  * The header, the rule and the Retry-After delay are the
  * telemetry/otlp-push-contract convention, shared with the Go runtime and
@@ -16,14 +18,18 @@
  */
 
 import { LEVEL_PRIORITY, type LogLevel, setLogLevelLimit } from '@putnami/runtime';
-import type { TraceSampling } from './trace-sampling';
+import type { TraceParentPolicy, TraceSampling } from './trace-sampling';
 
 /** The response header that carries a directive. */
 export const EXPORT_DIRECTIVE_HEADER = 'Putnami-Export-Directive';
-/** Caps the trace ratio: a number in [0, 1]. */
+/** Sets the trace budget: a whole number of 0 or more. */
+export const DIRECTIVE_TRACE_BUDGET = 'trace-budget';
+/** Sets the trace ratio: a number in [0, 1]. */
 export const DIRECTIVE_TRACE_RATIO = 'trace-ratio';
-/** Caps the trace floor: a whole number of 0 or more. */
+/** Sets the trace floor: a whole number of 0 or more. */
 export const DIRECTIVE_TRACE_FLOOR = 'trace-floor';
+/** Sets the parent policy: follow or decide. */
+export const DIRECTIVE_TRACE_PARENT = 'trace-parent';
 /** Raises the minimum log level: debug, info, warn or error. */
 export const DIRECTIVE_LOG_LEVEL = 'log-level';
 /** How many seconds the directive holds: a whole number of 1 or more; required. */
@@ -33,12 +39,16 @@ export const MAX_DIRECTIVE_TTL_SECONDS = 3600;
 /** The longest delay a 429 Retry-After imposes on a signal, in seconds. */
 export const MAX_RETRY_AFTER_SECONDS = 3600;
 
-/** One parsed directive. An absent limit leaves the service's own setting. */
+/** One parsed directive. An absent setting leaves the service's own. */
 export interface ExportDirective {
-  /** Caps the trace ratio. */
+  /** Sets the trace budget. */
+  traceBudget?: number;
+  /** Sets the trace ratio. */
   traceRatio?: number;
-  /** Caps the trace floor per minute. */
+  /** Sets the trace floor per minute. */
   traceFloor?: number;
+  /** Sets the parent policy. */
+  traceParent?: TraceParentPolicy;
   /** Raises the minimum log level. */
   logLevel?: LogLevel;
   /** How long the directive holds from its arrival, in seconds. */
@@ -75,6 +85,18 @@ export function parseExportDirective(value: string): ExportDirective | undefined
     if (seen.has(key)) return undefined;
     seen.add(key);
     switch (key) {
+      case DIRECTIVE_TRACE_BUDGET: {
+        const budget = wholeNumber(raw);
+        if (budget === undefined) return undefined;
+        directive.traceBudget = budget;
+        break;
+      }
+      case DIRECTIVE_TRACE_PARENT: {
+        const parent = raw.toLowerCase();
+        if (parent !== 'follow' && parent !== 'decide') return undefined;
+        directive.traceParent = parent;
+        break;
+      }
       case DIRECTIVE_TRACE_RATIO: {
         if (!DECIMAL.test(raw) || raw === '' || raw === '.') return undefined;
         const ratio = Number(raw);
@@ -105,15 +127,18 @@ export function parseExportDirective(value: string): ExportDirective | undefined
   return directive.ttlSeconds === undefined ? undefined : (directive as ExportDirective);
 }
 
-/** The stricter of `own` and the directive: the lower ratio, the lower floor and `own` budget. */
-export function limitTraceSampling(directive: ExportDirective, own: Readonly<TraceSampling>): TraceSampling {
+/**
+ * `own` with each trace setting the directive carries in its place, higher or
+ * lower: the budget, the ratio, the floor and the parent policy. A setting the
+ * directive leaves out keeps `own`'s.
+ */
+export function applyTraceSampling(directive: ExportDirective, own: Readonly<TraceSampling>): TraceSampling {
+  const parent = directive.traceParent ?? own.parent;
   return {
-    budget: own.budget,
-    ratio: directive.traceRatio !== undefined && directive.traceRatio < own.ratio ? directive.traceRatio : own.ratio,
-    floorPerMinute:
-      directive.traceFloor !== undefined && directive.traceFloor < own.floorPerMinute
-        ? directive.traceFloor
-        : own.floorPerMinute,
+    budget: directive.traceBudget ?? own.budget,
+    ratio: directive.traceRatio ?? own.ratio,
+    floorPerMinute: directive.traceFloor ?? own.floorPerMinute,
+    ...(parent === undefined ? {} : { parent }),
   };
 }
 
@@ -145,7 +170,7 @@ export function retryAfterDelayMs(status: number, value: string | null | undefin
 
 /** What a sampler needs to follow the directives. */
 export interface DirectiveFollower {
-  restrict(directive: ExportDirective, nowMs: number): void;
+  direct(directive: ExportDirective, nowMs: number): void;
 }
 
 /**
@@ -174,7 +199,7 @@ export class DirectiveReceiver {
     this.directive = directive;
     this.arrivedMs = now;
     this.endsMs = now + directive.ttlSeconds * 1000;
-    this.follower?.restrict(directive, now);
+    this.follower?.direct(directive, now);
     if (directive.logLevel) {
       // Loggers consult the limit on every record only once a directive has
       // set a level. Each such directive installs it again, so a caller that
@@ -190,7 +215,7 @@ export class DirectiveReceiver {
   /** Makes `follower` follow the directives, starting with the one in force, if any. */
   follow(follower: DirectiveFollower | undefined): void {
     this.follower = follower;
-    if (follower && this.directive && this.now() < this.endsMs) follower.restrict(this.directive, this.arrivedMs);
+    if (follower && this.directive && this.now() < this.endsMs) follower.direct(this.directive, this.arrivedMs);
   }
 }
 
