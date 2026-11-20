@@ -381,7 +381,14 @@ export class HttpPlugin implements Plugin {
           maxBodySizeBytes,
         });
         context.__drain = drain;
-        if (timeout) context.deadlineAt = Date.now() + requestTimeoutMs;
+        if (timeout) {
+          context.deadlineAt = Date.now() + requestTimeoutMs;
+          // A request that reached its deadline before the timer fired ends
+          // now: its signal aborts, as it would at the timeout.
+          context.__endRequest = () => {
+            if (!timeout.signal.aborted) timeout.abort(new DOMException('Request Timeout', 'TimeoutError'));
+          };
+        }
 
         const executeRequest = async (): Promise<Response> => {
           let scopeTransferred = false;
@@ -411,6 +418,12 @@ export class HttpPlugin implements Plugin {
                 try {
                   response = await middlewareChain(context, dispatch);
                 } catch (chainError) {
+                  // A response the chain throws (a redirect) is an answer, not
+                  // a failure: like a returned one, it needs its session written.
+                  if (chainError instanceof HttpResponse && !requestEnded(context)) {
+                    await commitRequestSession();
+                    throw chainError;
+                  }
                   // The commit still runs, but the chain's own error is the
                   // one this request reports.
                   await commitRequestSession().catch((commitError: unknown) => {
@@ -492,6 +505,9 @@ export class HttpPlugin implements Plugin {
         if (timeoutHandle) {
           clearTimeout(timeoutHandle);
         }
+        // The deadline bounded the request until its response. A stream or a
+        // background task that runs on after it is no longer held to it.
+        if (result !== TIMEOUT_SENTINEL && !requestSignal.aborted) context.deadlineAt = undefined;
         if (result === TIMEOUT_SENTINEL) {
           return createJsonErrorResponse(408, 'Request Timeout');
         }

@@ -85,6 +85,9 @@ export type HttpRequestContextInternal = HttpRequestContext & {
   /** Whether the request completion middleware already emitted the terminal error. */
   __requestErrorLogged?: boolean;
 
+  /** Ends the request now: aborts its signal with a `TimeoutError`, once its deadline passed. */
+  __endRequest?: () => void;
+
   /** Response transform callbacks (e.g. Set-Cookie) applied before the response is sent. */
   __callbacks?: ((r: HttpResponse) => HttpResponse)[];
 

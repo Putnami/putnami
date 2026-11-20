@@ -347,11 +347,15 @@ describe('HttpPlugin', () => {
     let stalled: { signal?: AbortSignal; deadlineAt?: number; context?: Record<string, unknown> } | undefined;
     let workAfterTimeout = false;
     let reported: unknown[] = [];
+    let deadlineSignals: AbortSignal[] = [];
+    let streamed: { deadlineAt?: number; aborted?: boolean } | undefined;
 
     beforeEach(async () => {
       stalled = undefined;
       workAfterTimeout = false;
       reported = [];
+      deadlineSignals = [];
+      streamed = undefined;
       plugin = http({
         port: 0,
         maxBodySizeBytes: 64,
@@ -390,6 +394,7 @@ describe('HttpPlugin', () => {
       plugin.get('/client-deadline', (ctx) => {
         // A client call bound by the request deadline stops at that deadline,
         // a moment before the timeout aborts the request's signal.
+        deadlineSignals.push(ctx.signal as AbortSignal);
         const remaining = (ctx.deadlineAt ?? Date.now()) - Date.now();
         return new Promise((_, reject) =>
           setTimeout(
@@ -397,6 +402,19 @@ describe('HttpPlugin', () => {
             Math.max(0, remaining),
           ),
         );
+      });
+      plugin.get('/stream', (ctx) => {
+        // A stream that runs on after its response, past the request timeout.
+        const body = new ReadableStream<Uint8Array>({
+          async start(controller) {
+            controller.enqueue(new TextEncoder().encode('first\n'));
+            await new Promise((resolve) => setTimeout(resolve, 300));
+            streamed = { deadlineAt: ctx.deadlineAt as number | undefined, aborted: ctx.signal?.aborted };
+            controller.enqueue(new TextEncoder().encode('last\n'));
+            controller.close();
+          },
+        });
+        return new HttpResponse(body, { headers: { 'content-type': 'text/plain' } });
       });
       plugin.get('/missing-after-timeout', async () => {
         await new Promise((resolve) => setTimeout(resolve, 300));
@@ -534,12 +552,29 @@ describe('HttpPlugin', () => {
             Array.from({ length: 10 }, async () => (await fetch(`${baseUrl}/client-deadline`)).status),
           );
           expect(statuses).toEqual(Array.from({ length: 10 }, () => 408));
+          // Each request ended at its deadline, so its signal stopped the rest of its work.
+          expect(deadlineSignals.map((signal) => signal.aborted)).toEqual(Array.from({ length: 10 }, () => true));
           await new Promise((resolve) => setTimeout(resolve, 50));
           expect(memory.entries.filter((entry) => entry.level === 'error')).toEqual([]);
           expect(reported).toEqual([]);
         } finally {
           resetDefaultLogger();
         }
+      },
+    );
+
+    specTest(
+      'a stream that runs on after its response is no longer held to the request deadline',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'a-stream-outlives-the-request-deadline',
+      },
+      async () => {
+        const res = await fetch(`${baseUrl}/stream`);
+        expect(res.status).toBe(200);
+        expect(await res.text()).toBe('first\nlast\n');
+        expect(streamed).toEqual({ deadlineAt: undefined, aborted: false });
       },
     );
 

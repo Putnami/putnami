@@ -1049,7 +1049,8 @@
               "a-request-past-the-timeout-aborts-its-signal",
               "an-ended-request-logs-no-error",
               "a-failure-after-the-request-ended-is-still-logged",
-              "a-client-call-at-the-deadline-answers-408"
+              "a-client-call-at-the-deadline-answers-408",
+              "a-stream-outlives-the-request-deadline"
             ]
           }
         },

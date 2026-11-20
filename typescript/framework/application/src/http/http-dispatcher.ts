@@ -190,11 +190,14 @@ export interface RequestEnd {
 /**
  * Tells whether the request ended: its signal aborted (its client left or it
  * passed its timeout), or its deadline passed. A client call bound by the
- * deadline can stop a moment before the timeout aborts the signal.
+ * deadline can stop a moment before the timeout fires: the request then ends
+ * here, and its signal aborts at once, so the rest of its work stops too.
  */
 export function requestEnded(request: RequestEnd | undefined): boolean {
   if (request?.signal?.aborted) return true;
-  return request?.deadlineAt !== undefined && Date.now() >= request.deadlineAt;
+  if (request?.deadlineAt === undefined || Date.now() < request.deadlineAt) return false;
+  (request as { __endRequest?: () => void }).__endRequest?.();
+  return true;
 }
 
 /**
