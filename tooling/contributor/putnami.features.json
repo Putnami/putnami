@@ -425,6 +425,32 @@
           }
         },
         {
+          "id": "identity-refresh",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-session-that-checks-out-a-branch-reports-to-its-declared-mission"
+            ]
+          }
+        },
+        {
+          "id": "no-mission-reason",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-session-without-a-mission-says-why-once"
+            ]
+          }
+        },
+        {
           "id": "host-channel",
           "stage": "coded",
           "evidenceKinds": [

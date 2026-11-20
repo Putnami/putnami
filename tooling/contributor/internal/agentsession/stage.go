@@ -57,13 +57,17 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 		_, _ = fmt.Fprintf(stderr, "agent stage: no agent session found for this checkout: %s\n", e.noSessionCause())
 		return 1
 	}
+	identity := e.stageIdentity(ctx, files)
 	now := e.Now()
-	mission, publishable := "", false
+	mission, publishable, reason := "", false, ""
 	var usage *collab.SessionUsage
 	dir := e.sessionsDir()
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		if cache == nil {
 			return nil, nil
+		}
+		if identity != nil && identity.root == cache.Root {
+			applyIdentity(cache, *identity, dir)
 		}
 		cache.Stage = stage
 		if inSession {
@@ -75,6 +79,9 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 		}
 		refreshMissionKey(cache, dir)
 		mission, publishable = cache.Mission.Key, sessionPublishable(cache)
+		if !publishable {
+			reason = noMissionReason(cache)
+		}
 		refreshUsage(cache)
 		if cache.Usage != nil {
 			totals := cache.Usage.Totals
@@ -86,7 +93,7 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 		return 1
 	}
 	if !publishable {
-		_, _ = fmt.Fprintf(stdout, "The session is at stage %s. It reports to no mission yet; its first sync carries the stage.\n", stage)
+		_, _ = fmt.Fprintf(stdout, "The session is at stage %s. It reports to no mission yet (%s); its first sync carries the stage.\n", stage, reason)
 		printSpentTokens(stdout, usage)
 		return 0
 	}
@@ -99,6 +106,24 @@ func Stage(ctx context.Context, e *Env, args []string, stdout, stderr io.Writer)
 	_, _ = fmt.Fprintf(stdout, "The session is at stage %s, and its mission %s knows it.\n", stage, mission)
 	printSpentTokens(stdout, usage)
 	return 0
+}
+
+// stageIdentity reads again the branch and origin of the checkout the
+// session holds, so a session that checked out a branch since its last hook
+// reports to that branch's mission. It answers nil when the session holds no
+// checkout or git fails, which it logs: the session keeps the identity it
+// read last.
+func (e *Env) stageIdentity(ctx context.Context, files sessionFiles) *sessionIdentity {
+	peek, err := files.read()
+	if err != nil || peek == nil || peek.Root == "" {
+		return nil
+	}
+	identity, err := e.checkoutIdentity(ctx, peek.Root)
+	if err != nil {
+		e.log(peek.Engine, sessionEventStage, err)
+		return nil
+	}
+	return &identity
 }
 
 // printSpentTokens prints the tokens the session spent so far: input, cache

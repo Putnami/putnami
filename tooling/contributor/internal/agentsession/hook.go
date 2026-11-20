@@ -352,38 +352,79 @@ func (e *Env) handleHookEvent(ctx context.Context, engine string, input hookInpu
 
 // sessionIdentity is what a session reads from its checkout: the workspace
 // root, the lowercase owner/name of origin and the branch. Reading it runs
-// git, so only SessionStart, Stop and StopFailure read it, never a tool call.
+// git, so SessionStart reads it and Stop reads it again (stopIdentity), never
+// a tool call. StopFailure and SessionEnd keep the identity read last.
 type sessionIdentity struct {
 	root, repository, branch string
 }
 
-func (e *Env) readSessionIdentity(ctx context.Context, engine string, input hookInput) sessionIdentity {
+// readSessionIdentity reads the identity of the checkout the payload names.
+// It answers nil when git fails, so the session keeps the identity it read
+// last; a session that has none yet reads it again at its next event.
+func (e *Env) readSessionIdentity(ctx context.Context, engine string, input hookInput) *sessionIdentity {
 	root := canonicalRoot(sessionWorkspaceRoot(input.Cwd, e.Root))
 	if root == "" {
-		return sessionIdentity{}
+		return &sessionIdentity{}
 	}
-	branch, err := e.checkoutBranch(ctx, root)
-	var repository string
-	if err == nil {
-		repository, err = e.originRepository(ctx, root)
-	}
+	identity, err := e.checkoutIdentity(ctx, root)
 	if err != nil {
-		// A git that failed leaves the identity unknown: the next event reads
-		// it again.
 		e.log(engine, input.Event, err)
-		return sessionIdentity{}
+		return nil
 	}
-	return sessionIdentity{root: root, repository: repository, branch: branch}
+	return &identity
 }
 
-// peekIdentity reads the identity only when the cache has none yet: Stop and
-// StopFailure keep the one SessionStart read.
+// checkoutIdentity reads the branch and the origin repository of the
+// checkout at root. A git that fails is an error, never a detached HEAD.
+func (e *Env) checkoutIdentity(ctx context.Context, root string) (sessionIdentity, error) {
+	branch, err := e.checkoutBranch(ctx, root)
+	if err != nil {
+		return sessionIdentity{}, err
+	}
+	repository, err := e.originRepository(ctx, root)
+	if err != nil {
+		return sessionIdentity{}, err
+	}
+	return sessionIdentity{root: root, repository: repository, branch: branch}, nil
+}
+
+// stopIdentity reads the identity at Stop: the branch and origin of the root
+// the session already holds, so a session that checked out a branch since its
+// start reports to that branch's mission, while a directory the agent moved
+// to never moves it to another workspace. A session without a root reads it
+// from the payload, as SessionStart does.
+func (e *Env) stopIdentity(ctx context.Context, engine string, files sessionFiles, input hookInput) *sessionIdentity {
+	peek, _ := files.read()
+	if peek == nil || peek.Root == "" || peek.Engine != engine || peek.Session != input.SessionID {
+		return e.readSessionIdentity(ctx, engine, input)
+	}
+	identity, err := e.checkoutIdentity(ctx, peek.Root)
+	if err != nil {
+		e.log(engine, input.Event, err)
+		return nil
+	}
+	return &identity
+}
+
+// peekIdentity reads the identity only when the cache has none yet:
+// StopFailure and SessionEnd keep the one the session read last.
 func (e *Env) peekIdentity(ctx context.Context, engine string, files sessionFiles, input hookInput) *sessionIdentity {
 	if peek, _ := files.read(); peek != nil && peek.Root != "" {
 		return nil
 	}
-	identity := e.readSessionIdentity(ctx, engine, input)
-	return &identity
+	return e.readSessionIdentity(ctx, engine, input)
+}
+
+// applyIdentity sets the identity read from the checkout. A detached HEAD
+// read after a branch of the same checkout, such as during a rebase or a
+// bisect, keeps that branch, unless an issue is declared for the detached
+// HEAD: the session stays on its mission until it checks out another branch.
+func applyIdentity(cache *sessionCache, identity sessionIdentity, dir string) {
+	branch := identity.branch
+	if branch == "" && cache.Branch != "" && cache.Root == identity.root && declaredIssue(dir, identity.root, "") == 0 {
+		branch = cache.Branch
+	}
+	cache.Root, cache.Repository, cache.Branch = identity.root, identity.repository, branch
 }
 
 // openSession returns the cache of the session the payload names, with the
@@ -402,7 +443,7 @@ func (e *Env) openSession(cache *sessionCache, engine string, input hookInput, i
 		cache.Model = model
 	}
 	if identity != nil && len(identity.root) <= sessionPathMax && len(identity.repository) <= sessionPathMax && len(identity.branch) <= sessionPathMax {
-		cache.Root, cache.Repository, cache.Branch = identity.root, identity.repository, identity.branch
+		applyIdentity(cache, *identity, e.sessionsDir())
 	}
 	refreshMissionKey(cache, e.sessionsDir())
 	return cache
@@ -447,7 +488,7 @@ func (e *Env) hookSessionStart(ctx context.Context, engine string, input hookInp
 	identity := e.readSessionIdentity(ctx, engine, input)
 	now := e.Now()
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
-		cache = e.openSession(cache, engine, input, &identity)
+		cache = e.openSession(cache, engine, input, identity)
 		setSessionState(cache, collab.SessionStateWorking, sessionEventStart)
 		cache.ActiveAt = now
 		return cache, nil
@@ -640,7 +681,7 @@ func toolSyncDue(cache *sessionCache, now time.Time) bool {
 // the next sync reports them.
 func (e *Env) hookStop(ctx context.Context, engine string, input hookInput) (*hookOutput, pendingDelivery, error) {
 	files := e.files(engine, input.SessionID)
-	identity := e.peekIdentity(ctx, engine, files, input)
+	identity := e.stopIdentity(ctx, engine, files, input)
 	now := e.Now()
 	dir := e.sessionsDir()
 	var reason string

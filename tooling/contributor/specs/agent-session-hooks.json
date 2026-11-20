@@ -102,6 +102,18 @@
       ]
     },
     {
+      "id": "identity-refresh",
+      "text": [
+        "Stop and agent stage reread the branch and origin of the checkout the session started in, so a session that started on a detached HEAD and then checked out a branch reports to the mission declared for that branch at its next sync.",
+        "A detached HEAD read after a branch, such as during a rebase, keeps that branch unless an issue is declared for the detached HEAD.",
+        "A git failure keeps the identity read last."
+      ]
+    },
+    {
+      "id": "no-mission-reason",
+      "text": "A hook whose session reports to no mission, such as one on a detached HEAD without a declared issue or one whose origin names no repository, leaves one hook.log line that says why, once until the reason changes; agent stage prints the same reason."
+    },
+    {
       "id": "host-channel",
       "text": "The executable behind putnami agent hook reaches the missions and memory providers only through the host RPC channel putnami opens for the interactive launch."
     },

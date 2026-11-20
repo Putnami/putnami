@@ -166,7 +166,16 @@ nothing ([ADR 0016](doc/adr/0016-an-event-two-hook-sources-send-is-handled-once.
   session's own thread.
 
 A session reports to `branch:<branch>` until `putnami agent attach --issue <n>`
-makes `issue-<n>` the mission of the checkout's branch.
+makes `issue-<n>` the mission of the checkout's branch. Each Stop and each
+`agent stage` reads the checkout's branch again, so a session that started on
+a detached HEAD and then checked out a branch reports to that branch's mission
+from its next sync; a detached HEAD read after a branch, such as during a
+rebase, keeps that branch unless an issue is declared for the detached HEAD.
+A session that reports to no mission, such as one on a
+detached HEAD without a declared issue or one whose origin names no
+repository, says why in `hook.log` once, until the reason changes, so
+`putnami doctor` shows it as the last hook line, and `agent stage` prints the
+same reason.
 `putnami agent stage <talk|declare|show|code|check|prove|validate|merge>`
 records the loop stage of the current session and syncs it when the session
 reports to a mission; every later sync carries it. Once it read the

@@ -43,6 +43,30 @@ func sessionPublishable(cache *sessionCache) bool {
 	return cache.Repository != "" && cache.Mission.Key != ""
 }
 
+// noMissionReason says why a session that is not publishable names no
+// mission. It holds no path: the hook.log line already names the root.
+func noMissionReason(cache *sessionCache) string {
+	switch {
+	case cache.Root == "":
+		return "the session has not read its checkout yet"
+	case cache.Repository == "":
+		return "the origin remote of the checkout names no owner/name repository"
+	case cache.Mission.Key != "":
+		return ""
+	case cache.Branch == "":
+		return "the checkout is on a detached HEAD and putnami agent attach --issue <n> declared no issue for it"
+	}
+	return "the branch name is not a mission key: run putnami agent attach --issue <n>"
+}
+
+// noMissionError reports, once until the reason changes, that a sync was not
+// sent because the session names no mission.
+type noMissionError struct{ reason string }
+
+func (e *noMissionError) Error() string {
+	return "the session reports to no mission: " + e.reason
+}
+
 // syncSnapshot is what one sync request sent, so the answer clears exactly
 // that and keeps what hooks added during the call.
 type syncSnapshot struct {
@@ -345,7 +369,9 @@ func without(values, drop []string) []string {
 
 // syncSession publishes the session through missions.sync and merges the
 // answer. The session lock is held to read and to merge, never across the
-// call. A session that names no mission publishes nothing and answers nil.
+// call. A session that names no mission publishes nothing: it answers a
+// noMissionError when its reason appears or changes, so the hook logs it
+// once, and nil otherwise.
 // Each sync first reads the usage the session's transcripts added, and
 // carries the session's stage and usage.
 //
@@ -363,15 +389,28 @@ func without(values, drop []string) []string {
 func (e *Env) syncSession(ctx context.Context, files sessionFiles) error {
 	var request collab.MissionsSyncInput
 	var snapshot syncSnapshot
-	publishable := false
+	publishable, reason := false, ""
 	if err := lockedUpdate(files, func(cache *sessionCache) (*sessionCache, error) {
 		if cache == nil {
 			return nil, nil
 		}
 		request, snapshot, publishable = e.prepareSync(cache)
+		current := ""
+		if !publishable {
+			current = noMissionReason(cache)
+		}
+		if current != cache.NoMission {
+			cache.NoMission, reason = current, current
+		}
 		return cache, nil
-	}); err != nil || !publishable {
+	}); err != nil {
 		return err
+	}
+	if !publishable {
+		if reason != "" {
+			return &noMissionError{reason: reason}
+		}
+		return nil
 	}
 	return e.sendSync(ctx, files, request, snapshot)
 }

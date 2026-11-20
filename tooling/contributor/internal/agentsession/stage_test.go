@@ -79,7 +79,7 @@ func TestAgentStageRecordsTheStageOfASessionWithoutMission(t *testing.T) {
 	syncs := len(h.provider.recordedSyncs())
 	h.environ["CLAUDE_CODE_SESSION_ID"] = claudeSession
 	code, stdout, stderr := h.stage("show")
-	if code != 0 || stderr != "" || stdout != "The session is at stage show. It reports to no mission yet; its first sync carries the stage.\n" {
+	if code != 0 || stderr != "" || stdout != "The session is at stage show. It reports to no mission yet (the origin remote of the checkout names no owner/name repository); its first sync carries the stage.\n" {
 		t.Fatalf("exit %d, stdout %q, stderr %q", code, stdout, stderr)
 	}
 	if got := len(h.provider.recordedSyncs()); got != syncs {

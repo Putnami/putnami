@@ -111,6 +111,10 @@ type sessionCache struct {
 	StopContinued bool      `json:"stop_continued,omitempty"`
 	StopKey       string    `json:"stop_key,omitempty"`
 
+	// NoMission is why the last sync was not sent, when the session names no
+	// mission: a hook logs a reason once, until it changes.
+	NoMission string `json:"no_mission,omitempty"`
+
 	LastSyncAt time.Time `json:"last_sync_at"`
 	// ToolSyncAt is when a tool call last claimed a sync: until
 	// toolSyncInterval after it, no other tool call syncs.

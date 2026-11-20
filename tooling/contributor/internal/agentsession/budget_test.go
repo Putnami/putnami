@@ -79,8 +79,8 @@ func TestTheBudgetsFitTheDeclaredTimeouts(t *testing.T) {
 	}{
 		// the branch, the origin, sync and memory.mission.
 		{"session start", eventBudget(claude, hookEventSessionStart, false), 2 * callTimeout},
-		// the identity of a session no start opened, sync and the
-		// republish after a message the sync answered.
+		// the identity, read again at every Stop, sync and the republish
+		// after a message the sync answered.
 		{"stop", eventBudget(claude, hookEventStop, false), 2 * callTimeout},
 		{"stop failure", eventBudget(claude, hookEventStopFailure, false), callTimeout},
 		// the sync of a plan change and its retry without the plan.
