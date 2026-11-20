@@ -17,7 +17,7 @@ import {
   DEFAULT_MAX_BODY_SIZE_BYTES,
 } from './http-context.builder';
 import type { HttpRequestContext, HttpRequestContextInternal, Server as HttpServer } from './http-context.type';
-import { HttpDispatcher, isRequestStop } from './http-dispatcher';
+import { HttpDispatcher, isRequestStop, requestEnded } from './http-dispatcher';
 import type { HttpMethod } from './http-method.type';
 import { HttpMethodsMiddleware, resolveHttpMethodsOptions } from './http-methods.middleware';
 import type { HttpMiddleware } from './http-middleware.type';
@@ -407,17 +407,26 @@ export class HttpPlugin implements Plugin {
                 // middlewares and written after the response is built: the
                 // session API that handlers and middlewares call is synchronous.
                 await loadRequestSession();
+                let response: HttpResponse | undefined;
                 try {
-                  return await middlewareChain(context, dispatch);
-                } finally {
-                  await commitRequestSession();
+                  response = await middlewareChain(context, dispatch);
+                } catch (chainError) {
+                  // The commit still runs, but the chain's own error is the
+                  // one this request reports.
+                  await commitRequestSession().catch((commitError: unknown) => {
+                    if (!isRequestStop(commitError, context)) useLogger().error('Session commit failed', commitError);
+                  });
+                  throw chainError;
                 }
+                await commitRequestSession();
+                return response;
               } catch (e) {
                 // A request that ended (its timeout fired or its client left)
                 // answers 408. Its stopped work unwinds quietly; any other
-                // error is a failure of its own and is logged.
-                if (requestTimedOut || requestSignal.aborted) {
-                  if (!isRequestStop(e, requestSignal) && !context.__requestErrorLogged) {
+                // error is logged as it would be during the request.
+                if (requestTimedOut || requestEnded(context)) {
+                  const loggedLive = e instanceof HttpResponse || e instanceof HttpException;
+                  if (!loggedLive && !isRequestStop(e, context) && !context.__requestErrorLogged) {
                     useLogger().error('Unhandled error', e);
                   }
                   return HttpResponse.json({ error: 'Request Timeout', statusCode: 408 }, { status: 408 });

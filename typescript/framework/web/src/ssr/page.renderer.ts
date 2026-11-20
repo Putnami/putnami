@@ -4,6 +4,7 @@ import {
   HttpResponse,
   isRequestStop,
   recordRequestError,
+  requestEnded,
   resolveRoles,
   resolveScopes,
   CSP_NONCE_CONTEXT_KEY,
@@ -90,6 +91,10 @@ export const pageRenderer =
     const reactStaticHandler = createStaticHandler(tree, staticOpts);
     const reactStaticContext = await reactStaticHandler.query(req);
     reportLoaderErrors(reactStaticContext, reqContext, logger);
+    // The request ended while its loaders ran: the HTTP plugin answers it, so
+    // nothing is rendered.
+    if (requestEnded(reqContext))
+      throw reqContext.signal?.reason ?? new DOMException('Request Timeout', 'TimeoutError');
 
     const validationResult = handleStaticContext(reactStaticContext);
     if (validationResult) {
@@ -168,7 +173,7 @@ export const pageRenderer =
         onError: (error) => {
           // A request that ended stops its render on purpose: that stop is not
           // a failure. Any other error still is.
-          if (!isRequestStop(error, requestSignal)) logger.error('SSR streaming error:', error);
+          if (!isRequestStop(error, reqContext)) logger.error('SSR streaming error:', error);
         },
       });
 
@@ -224,7 +229,7 @@ export const pageRenderer =
       if (timeoutId !== undefined) clearTimeout(timeoutId);
       // The request ended (its client left or it passed its timeout): the
       // HTTP plugin answers it, quietly, so its stop is not a render failure.
-      if (isRequestStop(error, reqContext.signal)) throw error;
+      if (isRequestStop(error, reqContext)) throw error;
       recordRequestError(reqContext, error);
       logger.error(error);
       return handleRenderError(error);
@@ -422,6 +427,8 @@ function reportLoaderErrors(
   let recorded = false;
   for (const error of Object.values(context.errors)) {
     if (isRouteErrorResponse(error) || error instanceof Response || error instanceof HttpResponse) continue;
+    // A loader that stopped with its ended request did not fail.
+    if (isRequestStop(error, reqContext)) continue;
     if (!recorded) {
       recordRequestError(reqContext, error);
       recorded = true;

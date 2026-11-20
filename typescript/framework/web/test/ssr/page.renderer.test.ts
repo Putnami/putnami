@@ -14,7 +14,7 @@ import { MemoryLogger } from '@putnami/runtime/testing';
 import { restoreEnv } from '@putnami/utils';
 import { buildHttpContext } from '../../../application/src/http/http-context.builder';
 import type { StaticHandlerContext } from 'react-router';
-import { runInContext } from '../../../runtime/src/context/context.utils';
+import { runInContext, useContext } from '../../../runtime/src/context/context.utils';
 import RootHtml from '../../src/ssr/default.html';
 import {
   handleRenderError,
@@ -346,6 +346,54 @@ describe('page.renderer', () => {
         // It stops at the abort, not at the 10 s render budget, and leaves the
         // answer to the HTTP plugin: no error log, no request error, no 500 page.
         expect(Date.now() - started).toBeLessThan(5000);
+        expect(settled).toBeInstanceOf(Error);
+        expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+        expect((ctx as unknown as { __requestError?: unknown }).__requestError).toBeUndefined();
+      },
+    );
+
+    specTest(
+      'a loader whose query stops with the request logs and records nothing',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'ssr-response',
+        check: 'a-loader-stopped-with-its-request-logs-nothing',
+      },
+      async () => {
+        const logger = new MemoryLogger();
+        const request = new AbortController();
+        const ctx = Object.assign(
+          buildHttpContext<HttpRequestContext>({ req: new Request('http://localhost/orders'), signal: request.signal }),
+          { params: {}, statusCode: 0, logger },
+        ) as never as HttpRequestContext;
+        const handler = pageRenderer(
+          () => [
+            {
+              path: '/orders',
+              // A database query stops with its request's signal.
+              loader: () => {
+                const signal = useContext<HttpRequestContext>().signal as AbortSignal;
+                return new Promise((_, reject) =>
+                  signal.addEventListener('abort', () =>
+                    reject(Object.assign(new Error('Query aborted'), { name: 'QueryAbortError' })),
+                  ),
+                );
+              },
+              element: React.createElement('div', null, 'Orders'),
+            } as never,
+          ],
+          () => RootHtml,
+          () => 'hydrate.js',
+          10_000,
+        );
+
+        const outcome = Promise.resolve(runInContext(ctx, () => respond(handler, ctx))).catch(
+          (error: unknown) => error,
+        );
+        setTimeout(() => request.abort(new DOMException('Request Timeout', 'TimeoutError')), 20);
+        const settled = await outcome;
+
+        // The HTTP plugin answers the ended request: nothing is rendered, logged or recorded.
         expect(settled).toBeInstanceOf(Error);
         expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
         expect((ctx as unknown as { __requestError?: unknown }).__requestError).toBeUndefined();

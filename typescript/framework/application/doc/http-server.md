@@ -226,11 +226,15 @@ httpPlugin.get('/example', async (ctx: HttpRequestContext) => {
 408 and aborts `ctx.signal` with a `TimeoutError`, so the request's work stops:
 the queries of the database session store, the calls of a generated client
 built without a service binding, and the server render. Pass `ctx.signal` to
-your own long waits. A handler that stops because its request ended logs and
-records no error: the request answers 408. A stop is the signal's own reason, an
-`AbortError`, a `TimeoutError`, a `QueryAbortError` or a `ClientCanceledError`,
-thrown directly or as a `cause`. Any other error is still logged, recorded and
-passed to `onError`, and the request still answers 408.
+your own long waits. The request ends at `deadlineAt`, even when a client call
+bound by that deadline stops a moment before the signal aborts.
+
+A handler that stops because its request ended logs and records no error: the
+request answers 408. A stop is the signal's own reason, an `AbortError`, a
+`TimeoutError`, a `QueryAbortError` or a `ClientCanceledError`, thrown directly
+or as a `cause`, and a `ClientDeadlineError` when the request reached its
+deadline. Any other error is logged, recorded and passed to `onError` as it
+would be during the request, and the request still answers 408.
 
 ## Response Handling
 

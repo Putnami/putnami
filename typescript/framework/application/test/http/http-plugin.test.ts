@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import { resetDefaultLogger, setRootLogger } from '@putnami/runtime';
+import { NotFoundException, resetDefaultLogger, setRootLogger } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
 import { MemoryLogger } from '@putnami/runtime/testing';
 import type { Application } from '../../src/application';
@@ -387,6 +387,22 @@ describe('HttpPlugin', () => {
         throw new TypeError('the handler broke');
       });
 
+      plugin.get('/client-deadline', (ctx) => {
+        // A client call bound by the request deadline stops at that deadline,
+        // a moment before the timeout aborts the request's signal.
+        const remaining = (ctx.deadlineAt ?? Date.now()) - Date.now();
+        return new Promise((_, reject) =>
+          setTimeout(
+            () => reject(Object.assign(new Error('deadline'), { name: 'ClientDeadlineError' })),
+            Math.max(0, remaining),
+          ),
+        );
+      });
+      plugin.get('/missing-after-timeout', async () => {
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        throw new NotFoundException('gone');
+      });
+
       app = application().use(plugin).use(logger());
       await app.start();
       baseUrl = `http://localhost:${plugin.getServer()?.port}`;
@@ -501,6 +517,45 @@ describe('HttpPlugin', () => {
         }
       },
     );
+
+    specTest(
+      'a client call stopped at the request deadline answers 408 and logs nothing',
+      {
+        feature: 'typescript/http-services',
+        requirement: 'request-timeout-cancels-work',
+        check: 'a-client-call-at-the-deadline-answers-408',
+      },
+      async () => {
+        const memory = new MemoryLogger();
+        setRootLogger(memory);
+        try {
+          // The client's timer and the request's timer race: every run must answer 408.
+          const statuses = await Promise.all(
+            Array.from({ length: 10 }, async () => (await fetch(`${baseUrl}/client-deadline`)).status),
+          );
+          expect(statuses).toEqual(Array.from({ length: 10 }, () => 408));
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          expect(memory.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+          expect(reported).toEqual([]);
+        } finally {
+          resetDefaultLogger();
+        }
+      },
+    );
+
+    it('logs after the request ended only what it logs during the request', async () => {
+      const memory = new MemoryLogger();
+      setRootLogger(memory);
+      try {
+        const res = await fetch(`${baseUrl}/missing-after-timeout`);
+        expect(res.status).toBe(408);
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        expect(memory.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+        expect(reported).toHaveLength(1);
+      } finally {
+        resetDefaultLogger();
+      }
+    });
   });
 
   describe('Application Integration', () => {
