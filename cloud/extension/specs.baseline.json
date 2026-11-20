@@ -20,6 +20,8 @@
     "cloud/agency-providers#never-repeats-an-uncertain-write",
     "cloud/agency-providers#refusals-keep-their-outcome",
     "cloud/agency-providers#signed-in-session-wins",
+    "cloud/agent-content#names-only-agency-commands",
+    "cloud/agent-content#ships-the-agency-skills-and-workers",
     "cloud/agent-session#a-delegated-session-reads-the-cache-with-its-own-token",
     "cloud/agent-session#a-delegated-session-says-what-it-reaches",
     "cloud/agent-session#a-read-only-cache-credential-is-declared",

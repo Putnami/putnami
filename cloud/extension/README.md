@@ -190,12 +190,20 @@ only:
 
 `putnami cloud login` asks for the Putnami Agency scopes: `agency.read` for
 the hosted Agency reads and `agency.audit`, which the audit attestation routes
-require. The `audit` skill, with its `prune-triage` and `prune-apply` workers,
-is the agent content of this extension: a workspace receives it when it lists
-`extension:@putnami/cloud` in `agentArtifacts`, and configures it under
-`options["@putnami/cloud"].audit`. It replaces the `audit` skill of
-`@putnami/intelligence`: a workspace opts into one of the two, never both,
-since both write `skills/audit`.
+require.
+
+The agent content of this extension reaches a workspace that lists
+`extension:@putnami/cloud` in `agentArtifacts`, through `putnami install`:
+
+- the `audit` skill, with its `prune-triage` and `prune-apply` workers,
+  configured under `options["@putnami/cloud"].audit`;
+- the `putnami-routine` skill, which creates the person's Putnami routine,
+  and the `rebase` and `routine-build` skills that routine runs. Their
+  commands are `putnami agency build` and `putnami agency trigger`.
+
+It replaces the agent content of `@putnami/intelligence`, under the same skill
+names and paths: a workspace opts into one of the two, never both, since both
+write the same skills.
 
 The setup command verifies the existing repository workspace link when one is
 present. Pass `--workspace <workspace-id>` to select or join a different

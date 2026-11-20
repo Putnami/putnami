@@ -1,0 +1,30 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/agent-content",
+  "outcomes": [
+    "A workspace that lists extension:@putnami/cloud in agentArtifacts receives from putnami install the agency agent content @putnami/intelligence used to ship, so that extension can go without a workspace losing a skill",
+    "The Putnami routine a person already created keeps working: the skills keep their names and their paths under .agents/skills/, and every command they name is a putnami agency command @putnami/cloud runs"
+  ],
+  "nonGoals": [
+    "Changing what the audit, putnami-routine, rebase or routine-build skills do, beyond the commands and the settings block they name",
+    "Removing @putnami/intelligence or its agent content, which happens apart once @putnami/cloud ships this content",
+    "Changing this repository's own agentArtifacts or extension pins"
+  ],
+  "requirements": [
+    {
+      "id": "ships-the-agency-skills-and-workers",
+      "text": [
+        "@putnami/cloud declares agentContent, built from agent-src, and its content holds the skills audit, putnami-routine, rebase and routine-build, and the workers prune-apply and prune-triage.",
+        "putnami-routine keeps references/dispatch.md, references/saved-prompt.md, references/environment-setup.sh and scripts/dispatch.sh at those paths, and its dispatch allowlist stays rebase and build, build running routine-build."
+      ]
+    },
+    {
+      "id": "names-only-agency-commands",
+      "text": [
+        "No file of the content names putnami intelligence or extension:@putnami/intelligence: a command it names is putnami agency trigger, putnami agency build or putnami agency audit-attest, and a workspace that lacks a skill is told to list extension:@putnami/cloud in agentArtifacts.",
+        "The audit skill reads its settings from options[\"@putnami/cloud\"].audit."
+      ]
+    }
+  ]
+}

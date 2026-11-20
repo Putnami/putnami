@@ -1017,6 +1017,42 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/agent-content",
+      "type": "feature",
+      "name": "Agency agent content of the Cloud extension",
+      "outcome": "A workspace that lists extension:@putnami/cloud in agentArtifacts receives the audit, putnami-routine, rebase and routine-build skills and the prune workers, and every command they name is a putnami agency command",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "ships-the-agency-skills-and-workers",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agent-content-ships-agency-skills"
+            ]
+          }
+        },
+        {
+          "id": "names-only-agency-commands",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agent-content-names-agency-commands"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
