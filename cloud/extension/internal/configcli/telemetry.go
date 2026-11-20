@@ -28,8 +28,8 @@ import (
 // Without --app a command reads or writes the workspace row, which every
 // service without a row of its own takes; with --app it reads or writes that
 // service's row, named by the app's canonical name. config-api refuses a name
-// that holds a folder until Putnami/putnami-cloud#5283, and the collector
-// sends the trace budget from then on too.
+// that holds a folder until it accepts a workload's canonical name, and the
+// collector does not send the trace budget yet.
 
 // telemetryMaxTraces bounds the trace budget and floor, as config-api does.
 const telemetryMaxTraces = 1_000_000
@@ -315,8 +315,7 @@ func telemetryRefusal(verb, service string, ctx *clicore.WorkspaceContext, err e
 	switch status {
 	case 400:
 		if strings.Contains(service, "/") {
-			prefix += " (config-api does not accept a service name with a folder, such as " + service +
-				", until Putnami/putnami-cloud#5283)"
+			prefix += " (config-api does not accept a service name with a folder, such as " + service + ", yet)"
 		}
 		return clicore.NewError(prefix, clicore.ExitUsage)
 	case 401:

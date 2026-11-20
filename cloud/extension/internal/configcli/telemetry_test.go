@@ -288,16 +288,16 @@ func TestTelemetryApp_NamesTheServiceRow(t *testing.T) {
 	writeProjectFile(t, workspaceRoot, "surfaces/workloads/app")
 
 	// The tail of a local project resolves to its canonical name. config-api
-	// refuses a name with a folder until Putnami/putnami-cloud#5283, and the
-	// person reads its reason and the issue.
+	// refuses a name with a folder for now, and the person reads its reason
+	// and why.
 	err := runTelemetry(ioctx, "set", "--app", "app", "--ratio", "1")
 	if service := fake.writes[0]["service"]; service != "surfaces/workloads/app" {
 		t.Fatalf("service = %v, want the app's canonical name", service)
 	}
 	if err == nil || clicore.ExitCode(err) != clicore.ExitUsage ||
 		!strings.Contains(err.Error(), "cloud telemetry set: "+telemetryInvalid) ||
-		!strings.Contains(err.Error(), "Putnami/putnami-cloud#5283") {
-		t.Fatalf("set = %v, want config-api's reason and the issue that lifts it", err)
+		!strings.Contains(err.Error(), "does not accept a service name with a folder, such as surfaces/workloads/app") {
+		t.Fatalf("set = %v, want config-api's reason and the folder-name gap", err)
 	}
 	// Without --app, the command never takes the cwd project.
 	if err := runTelemetry(ioctx, "set", "--ratio", "1"); err != nil {
@@ -309,7 +309,7 @@ func TestTelemetryApp_NamesTheServiceRow(t *testing.T) {
 	// A refusal of a plain name carries config-api's reason without the hint.
 	err = runTelemetry(ioctx, "reset", "--app", "Billing")
 	if err == nil || !strings.Contains(err.Error(), "cloud telemetry reset: "+telemetryInvalid) ||
-		strings.Contains(err.Error(), "#5283") {
+		strings.Contains(err.Error(), "with a folder") {
 		t.Fatalf("reset = %v, want config-api's reason alone", err)
 	}
 }

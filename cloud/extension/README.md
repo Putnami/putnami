@@ -1139,9 +1139,8 @@ checks each range before any call (budget and floor from 0 to 1000000, ratio
 from 0 to 1, log level `debug`, `info`, `warn` or `error`), and a refusal names
 config-api's reason. `reset` removes the row. `show` needs `platform.workspace.read`; `set`
 and `reset` need `platform.workspace.manage`, as a person. The settings hold in
-every environment of the workspace. Until
-[Putnami/putnami-cloud#5283](https://github.com/Putnami/putnami-cloud/issues/5283)
-lands, config-api refuses a row for an app whose canonical name holds a folder,
+every environment of the workspace. For now, config-api refuses a row for an
+app whose canonical name holds a folder,
 such as `surfaces/workloads/app`, config-api stores `--budget` but the
 collector does not send it, and a parent policy and an expiry (`--parent`, `--for`) are not
 offered.
