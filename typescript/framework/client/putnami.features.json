@@ -424,7 +424,8 @@
               "entries-never-cross-a-forwarded-identity-or-outlive-the-registry",
               "the-cache-key-matches-the-shared-vectors",
               "the-runtime-implements-exactly-the-published-capabilities",
-              "the-emitted-ts-client-pins-the-response-cache-capability"
+              "the-emitted-ts-client-pins-the-response-cache-capability",
+              "the-emitted-ts-client-pins-the-response-cache-capability-and-its-manifest-declares-the-policy"
             ]
           }
         },
