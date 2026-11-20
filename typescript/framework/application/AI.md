@@ -639,6 +639,11 @@ of that context or a new root. `startTelemetrySpan()` takes `kind: 'consumer'`,
 a `remoteContext` parent and `newRoot`; `attachTelemetryContext(target, span,
 { correlate: false })` attaches a span and keeps the target's `traceId`. These
 run without the telemetry plugin too: the spans are then recorded nowhere.
+`kind: 'internal'` marks a step inside the service. A span's `within(step)`
+runs an awaited step on the current context with the span as parent and
+restores the previous parent; `run(action)` runs in a child context, for work
+alongside siblings such as a client attempt. The HTTP plugin's session
+middleware and the SSR renderer record their steps with `within()`.
 
 ## Testing
 

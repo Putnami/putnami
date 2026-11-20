@@ -98,4 +98,36 @@ describe('framework telemetry spans', () => {
       expect(collector.drainSpans()[0]).toMatchObject({ kind: 2, statusCode: 2, statusMessage: 'client.remote' });
     },
   );
+  specTest(
+    'a sequential step writes to the request it runs in and restores its parent',
+    {
+      feature: 'typescript/service-telemetry',
+      requirement: 'request-step-spans',
+      check: 'a-step-span-keeps-the-writes-of-its-step',
+    },
+    async () => {
+      collector = new TelemetryCollector();
+      setCollector(collector);
+      const request: Record<string, unknown> = {};
+      const parent = startTelemetrySpan({ name: 'GET /orders', kind: 'server' });
+      await runInContext(request, () =>
+        parent.within(async () => {
+          const step = startTelemetrySpan({ name: 'session load', kind: 'internal' });
+          await step.within(async () => {
+            const current = tryContext<Record<string, unknown>>() ?? {};
+            current['written'] = 'kept';
+            const active = current['__putnamiTrace'] as TelemetryTraceContext;
+            expect(active.spanId).toBe(step.context.spanId);
+          });
+          step.finish();
+          expect((request['__putnamiTrace'] as TelemetryTraceContext).spanId).toBe(parent.context.spanId);
+        }),
+      );
+      parent.finish();
+      expect(request['written']).toBe('kept');
+      expect(request['__putnamiTrace']).toBeUndefined();
+      const step = collector.drainSpans().find((span) => span.name === 'session load');
+      expect(step?.parentSpanId).toBe(parent.context.spanId);
+    },
+  );
 });

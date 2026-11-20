@@ -7,6 +7,9 @@ import {
   type HttpRequestContext,
   type HttpResponse,
   type RouteHandler,
+  setCollector,
+  startTelemetrySpan,
+  TelemetryCollector,
 } from '@putnami/application';
 import { HttpException } from '@putnami/runtime';
 import { specTest } from '@putnami/runtime/spectest';
@@ -349,6 +352,141 @@ describe('page.renderer', () => {
         expect(settled).toBeInstanceOf(Error);
         expect(logger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
         expect((ctx as unknown as { __requestError?: unknown }).__requestError).toBeUndefined();
+      },
+    );
+
+    specTest(
+      'runs the loaders and the render under their own spans',
+      {
+        feature: 'typescript/web-application-delivery',
+        requirement: 'ssr-response',
+        check: 'ssr-loaders-and-render-have-their-own-spans',
+      },
+      async () => {
+        const collector = new TelemetryCollector();
+        setCollector(collector);
+        try {
+          const ctx = createMockContext({ req: new Request('http://localhost/orders') });
+          const handler = pageRenderer(
+            () => [
+              {
+                path: '/orders',
+                loader: () => {
+                  // A loader writes to its request, as a session or a DI scope does.
+                  useContext<Record<string, unknown>>()['loaderMark'] = 'kept';
+                  return { orders: 1 };
+                },
+                element: React.createElement('div', null, 'Orders'),
+              } as never,
+            ],
+            () => RootHtml,
+            () => 'hydrate.js',
+            SSR_TIMEOUT_MS,
+          );
+          const request = startTelemetrySpan({ name: 'GET /orders', kind: 'server' });
+          const response = await runInContext(ctx, () => request.within(() => respond(handler, ctx)));
+          await response?.get().text();
+          request.finish();
+
+          const spans = collector.drainSpans();
+          for (const name of ['ssr loaders', 'ssr render']) {
+            const step = spans.find((span) => span.name === name);
+            expect(step?.kind).toBe(1);
+            expect(step?.traceId).toBe(request.context.traceId);
+            expect(step?.parentSpanId).toBe(request.context.spanId);
+            expect(step?.statusCode).toBe(1);
+          }
+          // The write stays on the request, and the request's own parent is back.
+          const written = ctx as Record<string, unknown>;
+          expect(written['loaderMark']).toBe('kept');
+          expect(written['__putnamiTrace']).toBeUndefined();
+
+          // A loader that fails marks its span as failed.
+          const failing = pageRenderer(
+            () => [
+              {
+                path: '/orders',
+                loader: () => {
+                  throw new Error('upstream answered 500');
+                },
+                element: React.createElement('div', null, 'Orders'),
+              } as never,
+            ],
+            () => RootHtml,
+            () => 'hydrate.js',
+            SSR_TIMEOUT_MS,
+          );
+          const failedCtx = createMockContext({
+            req: new Request('http://localhost/orders'),
+            logger: new MemoryLogger(),
+          });
+          const failed = await runInContext(failedCtx, () => respond(failing, failedCtx));
+          await failed?.get().text();
+          const failedLoaders = collector.drainSpans().find((span) => span.name === 'ssr loaders');
+          expect(failedLoaders?.statusCode).toBe(2);
+          expect(failedLoaders?.statusMessage).toBe('error');
+
+          // A render its request stopped is canceled, not failed.
+          const ended = new AbortController();
+          const endedCtx = Object.assign(
+            buildHttpContext<HttpRequestContext>({ req: new Request('http://localhost/slow'), signal: ended.signal }),
+            { params: {}, statusCode: 0, logger: new MemoryLogger() },
+          ) as never as HttpRequestContext;
+          const never = new Promise<string>(() => {});
+          function Hanging(): React.ReactElement {
+            return React.createElement('div', null, React.use(never));
+          }
+          const hanging = pageRenderer(
+            () => [{ path: '/slow', element: React.createElement(Hanging) } as never],
+            () => RootHtml,
+            () => 'hydrate.js',
+            10_000,
+          );
+          const stopped = Promise.resolve(runInContext(endedCtx, () => respond(hanging, endedCtx))).catch(
+            (error: unknown) => error,
+          );
+          setTimeout(() => ended.abort(new DOMException('Request Timeout', 'TimeoutError')), 20);
+          await stopped;
+          const canceled = collector.drainSpans().find((span) => span.name === 'ssr render');
+          expect(canceled?.statusMessage).toBe('canceled');
+
+          // A loader its request stopped is canceled too, and logs and records nothing.
+          const loaderEnded = new AbortController();
+          const loaderLogger = new MemoryLogger();
+          const loaderCtx = Object.assign(
+            buildHttpContext<HttpRequestContext>({
+              req: new Request('http://localhost/orders'),
+              signal: loaderEnded.signal,
+            }),
+            { params: {}, statusCode: 0, logger: loaderLogger },
+          ) as never as HttpRequestContext;
+          const waiting = pageRenderer(
+            () => [
+              {
+                path: '/orders',
+                loader: () => {
+                  const signal = useContext<HttpRequestContext>().signal as AbortSignal;
+                  return new Promise((_, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
+                },
+                element: React.createElement('div', null, 'Orders'),
+              } as never,
+            ],
+            () => RootHtml,
+            () => 'hydrate.js',
+            10_000,
+          );
+          const loaderStopped = Promise.resolve(runInContext(loaderCtx, () => respond(waiting, loaderCtx))).catch(
+            (error: unknown) => error,
+          );
+          setTimeout(() => loaderEnded.abort(new DOMException('Request Timeout', 'TimeoutError')), 20);
+          await loaderStopped;
+          const stoppedLoaders = collector.drainSpans().find((span) => span.name === 'ssr loaders');
+          expect(stoppedLoaders?.statusMessage).toBe('canceled');
+          expect(loaderLogger.entries.filter((entry) => entry.level === 'error')).toEqual([]);
+          expect((loaderCtx as never as Record<string, unknown>)['__requestError']).toBeUndefined();
+        } finally {
+          setCollector(undefined);
+        }
       },
     );
 

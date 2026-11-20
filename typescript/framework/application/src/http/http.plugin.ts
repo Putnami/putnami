@@ -95,6 +95,30 @@ const DEFAULT_WS_MAX_PAYLOAD_BYTES = 1_048_576;
 /** Default max buffered outbound WebSocket bytes (16 MiB) before the connection is closed. */
 const DEFAULT_WS_BACKPRESSURE_BYTES = 16_777_216;
 
+/** Loads an asynchronous store's session before the inner middlewares and writes it back after them. */
+const requestSessionMiddleware: HttpMiddleware = async (context, next) => {
+  await loadRequestSession();
+  let response: HttpResponse | undefined;
+  try {
+    response = await next();
+  } catch (chainError) {
+    // A response the chain throws (a redirect) is an answer, not a failure:
+    // like a returned one, it needs its session written.
+    if (chainError instanceof HttpResponse && !requestEnded(context)) {
+      await commitRequestSession();
+      throw chainError;
+    }
+    // The commit still runs, but the chain's own error is the one this
+    // request reports.
+    await commitRequestSession().catch((commitError: unknown) => {
+      if (!isRequestStop(commitError, context)) useLogger().error('Session commit failed', commitError);
+    });
+    throw chainError;
+  }
+  await commitRequestSession();
+  return response;
+};
+
 /**
  * Resolves an explicit socket idle timeout (seconds) for `serve()`, derived
  * from the request timeout with a small buffer so the application-level 408
@@ -410,29 +434,7 @@ export class HttpPlugin implements Plugin {
             // always has access to traceId / logContext.
             const res = await runInContext(context, async () => {
               try {
-                // An asynchronous session store (database) is read before the
-                // middlewares and written after the response is built: the
-                // session API that handlers and middlewares call is synchronous.
-                await loadRequestSession();
-                let response: HttpResponse | undefined;
-                try {
-                  response = await middlewareChain(context, dispatch);
-                } catch (chainError) {
-                  // A response the chain throws (a redirect) is an answer, not
-                  // a failure: like a returned one, it needs its session written.
-                  if (chainError instanceof HttpResponse && !requestEnded(context)) {
-                    await commitRequestSession();
-                    throw chainError;
-                  }
-                  // The commit still runs, but the chain's own error is the
-                  // one this request reports.
-                  await commitRequestSession().catch((commitError: unknown) => {
-                    if (!isRequestStop(commitError, context)) useLogger().error('Session commit failed', commitError);
-                  });
-                  throw chainError;
-                }
-                await commitRequestSession();
-                return response;
+                return await middlewareChain(context, dispatch);
               } catch (e) {
                 // A request that ended (its timeout fired or its client left)
                 // answers 408. Its stopped work unwinds quietly; any other
@@ -617,6 +619,12 @@ export class HttpPlugin implements Plugin {
       middlewares.unshift(CompressionMiddleware(compressionOpts));
     }
 
+    // An asynchronous session store (database) is read before every other
+    // middleware and written after the response is built: the session API
+    // that handlers and middlewares call is synchronous. It sits inside the
+    // outermost slot, so the request's span covers the read and the write.
+    middlewares.unshift(requestSessionMiddleware);
+
     // Outermost slot (telemetry): in front of compression, so a request any
     // other middleware refuses is still observed.
     middlewares.unshift(...this.outermostMiddlewares);
@@ -642,13 +650,6 @@ export class HttpPlugin implements Plugin {
       ctx: HttpRequestContext,
       dispatch: () => Promise<HttpResponse | undefined>,
     ) => Promise<HttpResponse | undefined>;
-
-    // Empty-chain bypass: with no middleware the chain is just the dispatch call,
-    // so skip the wrapper layer entirely (relevant when the security defaults are
-    // turned off, e.g. an unsecured fast lane).
-    if (middlewares.length === 0) {
-      return (_ctx: HttpRequestContext, dispatch: () => Promise<HttpResponse | undefined>) => dispatch();
-    }
 
     // Compose from the inside out. The innermost middleware receives `dispatch`
     // itself as `next`, so we avoid allocating a redundant terminal `() =>

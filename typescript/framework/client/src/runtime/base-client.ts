@@ -12,7 +12,11 @@ import { CircuitBreaker } from './circuit-breaker';
 import { CredentialRegistryClosedError, rejectRequestCredentials } from './credential';
 import { ServiceWebSocketTransport } from './service-ws-transport';
 import { type ByteStream, type FrameStream, ProviderWebSocketTransport } from './provider-ws-transport';
-import { startServiceStreamCall } from './service-telemetry';
+import {
+  serviceAttemptTelemetryInterceptor,
+  serviceCallTelemetryInterceptor,
+  startServiceStreamCall,
+} from './service-telemetry';
 import { StreamSession, type StreamBudgets } from './stream-session';
 import { assertSuccessBodyDeliverable, type SuccessBody } from './success-body';
 import { type ConnectEncoding, ConnectTransport, type ProtoMeta, protoMetaFromDescriptor } from './connect-transport';
@@ -264,9 +268,17 @@ export abstract class BaseClient {
     // the per-attempt timeout and uses it as the overall retry deadline so the
     // whole sequence stays within a single timeoutMs.
     const userInterceptors = config.interceptors ?? [];
-    const attemptTerminal = this.buildChain(config.attemptInterceptors ?? []);
+    // A generated client built without a service binding records the same
+    // call and attempt spans as a bound one, which installs its own; the
+    // attempt carries the trace context to the callee.
+    const unboundServiceId =
+      !config.endpointBinding && config.operationContracts ? (config.serviceId ?? config.packageName) : undefined;
+    const callTelemetry = unboundServiceId ? [serviceCallTelemetryInterceptor(unboundServiceId)] : [];
+    const attemptTelemetry = unboundServiceId ? [serviceAttemptTelemetryInterceptor(unboundServiceId)] : [];
+    const attemptTerminal = this.buildChain([...attemptTelemetry, ...(config.attemptInterceptors ?? [])]);
     this.chain = this.buildChain(
       [
+        ...callTelemetry,
         ...userInterceptors,
         retryInterceptor(config.retry, { timeoutMs: this.timeoutMs, getServiceName: () => this.serviceName }),
       ],

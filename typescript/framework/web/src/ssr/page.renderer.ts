@@ -5,11 +5,13 @@ import {
   isRequestStop,
   recordRequestError,
   requestEnded,
+  type RequestEnd,
   resolveRoles,
   resolveScopes,
   CSP_NONCE_CONTEXT_KEY,
   CSRF_TOKEN_CONTEXT_KEY,
   type RouteHandler,
+  startTelemetrySpan,
 } from '@putnami/application';
 import { HttpException, type Logger, shouldExposeErrorStack, useConfig, useContext, useLogger } from '@putnami/runtime';
 import type { ClientSecurityContext } from '../shared/security.types';
@@ -89,8 +91,17 @@ export const pageRenderer =
     const staticOpts = resolvedBasename ? { basename: resolvedBasename } : undefined;
     const tree = i18nState ? localeRoutes(routes(), i18nState.settings, i18nState.locale) : routes();
     const reactStaticHandler = createStaticHandler(tree, staticOpts);
-    const reactStaticContext = await reactStaticHandler.query(req);
-    reportLoaderErrors(reactStaticContext, reqContext, logger);
+    // The loaders, or the action of a form post, run under their own span.
+    const loaders = startTelemetrySpan({ name: 'ssr loaders', kind: 'internal' });
+    let reactStaticContext: Awaited<ReturnType<typeof reactStaticHandler.query>>;
+    try {
+      reactStaticContext = await loaders.within(() => reactStaticHandler.query(req));
+    } catch (error) {
+      loaders.finish({ code: failedStepCode(error, reqContext) });
+      throw error;
+    }
+    const loaderCode = reportLoaderErrors(reactStaticContext, reqContext, logger);
+    loaders.finish(loaderCode ? { code: loaderCode } : undefined);
     // The request ended while its loaders ran: the HTTP plugin answers it, so
     // nothing is rendered.
     if (requestEnded(reqContext))
@@ -167,15 +178,26 @@ export const pageRenderer =
       // The render also stops when the request ends: its client left or it
       // outlived the HTTP plugin's request timeout.
       const requestSignal = reqContext.signal;
-      const reactStream = await createReactStream(staticRouter, {
-        signal: requestSignal ? AbortSignal.any([controller.signal, requestSignal]) : controller.signal,
-        nonce,
-        onError: (error) => {
-          // A request that ended stops its render on purpose: that stop is not
-          // a failure. Any other error still is.
-          if (!isRequestStop(error, reqContext)) logger.error('SSR streaming error:', error);
-        },
-      });
+      // The span ends once React has rendered the shell the stream starts with.
+      const render = startTelemetrySpan({ name: 'ssr render', kind: 'internal' });
+      let reactStream: ReactDOMServerReadableStream;
+      try {
+        reactStream = await render.within(() =>
+          createReactStream(staticRouter, {
+            signal: requestSignal ? AbortSignal.any([controller.signal, requestSignal]) : controller.signal,
+            nonce,
+            onError: (error) => {
+              // A request that ended stops its render on purpose: that stop is
+              // not a failure. Any other error still is.
+              if (!isRequestStop(error, reqContext)) logger.error('SSR streaming error:', error);
+            },
+          }),
+        );
+        render.finish();
+      } catch (error) {
+        render.finish({ code: failedStepCode(error, reqContext) });
+        throw error;
+      }
 
       // Build client-side security context from the authenticated user (if any).
       // Only roles and scopes — never tokens or PII.
@@ -411,30 +433,41 @@ export function handleRenderError(error: unknown) {
   });
 }
 
+/** The status code of a step that failed: canceled when it is the stop of its ended request. */
+function failedStepCode(error: unknown, request: RequestEnd): 'canceled' | 'error' {
+  return isRequestStop(error, request) ? 'canceled' : 'error';
+}
+
 /**
  * Handles the errors React Router kept from loaders and actions, one per error
  * boundary, the way the dispatcher handles a route handler's error: records the
  * first one as the request error, and logs each one at ERROR with its stack
  * unless it is an `HttpException`. A thrown `Response` or `HttpResponse` is a
- * redirect or a status the loader chose, not an error.
+ * redirect or a status the loader chose, not an error, and a loader that stopped
+ * with its ended request did not fail. Returns the loaders span's status code:
+ * `error` when it recorded an error, `canceled` when a loader only stopped.
  */
 function reportLoaderErrors(
   context: StaticHandlerContext | Response,
   reqContext: HttpRequestContext,
   logger: Logger,
-): void {
-  if (!('errors' in context) || !context.errors) return;
+): 'canceled' | 'error' | undefined {
+  if (!('errors' in context) || !context.errors) return undefined;
   let recorded = false;
+  let stopped = false;
   for (const error of Object.values(context.errors)) {
     if (isRouteErrorResponse(error) || error instanceof Response || error instanceof HttpResponse) continue;
-    // A loader that stopped with its ended request did not fail.
-    if (isRequestStop(error, reqContext)) continue;
+    if (isRequestStop(error, reqContext)) {
+      stopped = true;
+      continue;
+    }
     if (!recorded) {
       recordRequestError(reqContext, error);
       recorded = true;
     }
     if (!(error instanceof HttpException)) logger.error(error);
   }
+  return recorded ? 'error' : stopped ? 'canceled' : undefined;
 }
 
 function handleStaticContext(reactStaticContext: StaticHandlerContext | Response): HttpResponse | undefined {

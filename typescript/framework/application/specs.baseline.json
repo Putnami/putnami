@@ -94,6 +94,7 @@
     "typescript/service-telemetry#per-second-aggregation",
     "typescript/service-telemetry#process-instance-identity",
     "typescript/service-telemetry#push-transport",
+    "typescript/service-telemetry#request-step-spans",
     "typescript/service-telemetry#service-identity-from-environment",
     "typescript/service-telemetry#trace-budget",
     "typescript/service-telemetry#trace-propagation"

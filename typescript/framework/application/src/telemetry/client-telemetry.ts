@@ -16,7 +16,7 @@ const ZERO_SPAN_ID = '0000000000000000';
 const MAX_TRACESTATE_LENGTH = 512;
 const MAX_BAGGAGE_LENGTH = 8192;
 /** OTLP span kinds. */
-const SPAN_KINDS = { server: 2, client: 3, consumer: 5 } as const;
+const SPAN_KINDS = { internal: 1, server: 2, client: 3, consumer: 5 } as const;
 
 export interface TelemetryTraceContext {
   traceId: string;
@@ -32,7 +32,8 @@ interface AmbientTelemetryContext extends Record<string, unknown> {
 
 export interface TelemetrySpanOptions {
   name: string;
-  kind: 'server' | 'client' | 'consumer';
+  /** `internal` is a step inside the current service, such as reading the session. */
+  kind: 'internal' | 'server' | 'client' | 'consumer';
   attributes?: TelemetryAttributes;
   /** Standard W3C headers on an inbound request. */
   remoteHeaders?: Headers;
@@ -50,7 +51,21 @@ export interface TelemetrySpanResult {
 
 export interface ActiveTelemetrySpan {
   readonly context: TelemetryTraceContext;
+  /**
+   * Runs the action in a child of the current context, with this span as its
+   * parent. Writes to the context stay in that child: use it for work that
+   * runs alongside siblings, such as a client attempt.
+   */
   run<T>(action: () => T | Promise<T>): T | Promise<T>;
+  /**
+   * Runs a sequential step of the current context with this span as its
+   * parent, then restores the previous parent. The step reads and writes the
+   * context itself, so what it sets there, such as a cookie or a DI scope,
+   * stays for the rest of the request. The context holds one parent at a
+   * time: await the step, and give work the step does not await its own
+   * span through run().
+   */
+  within<T>(action: () => Promise<T>): Promise<T>;
   inject(headers: Headers): void;
   finish(result?: TelemetrySpanResult): void;
 }
@@ -88,6 +103,17 @@ export function startTelemetrySpan(options: TelemetrySpanOptions): ActiveTelemet
         traceId: context.traceId,
       });
       return runInContext(derived, action);
+    },
+    within: async <T>(action: () => Promise<T>): Promise<T> => {
+      const target = tryContext<AmbientTelemetryContext>();
+      if (!target) return action();
+      const previous = target.__putnamiTrace;
+      target.__putnamiTrace = context;
+      try {
+        return await action();
+      } finally {
+        target.__putnamiTrace = previous;
+      }
     },
     inject: (headers) => injectContext(headers, context),
     finish: (result = {}) => {

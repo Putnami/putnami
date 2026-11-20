@@ -1291,6 +1291,21 @@
           }
         },
         {
+          "id": "request-step-spans",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-failed-session-step-ends-error-or-canceled",
+              "a-session-step-stopped-by-the-timeout-counts-as-408",
+              "a-step-stopped-at-the-deadline-counts-as-408",
+              "a-step-span-keeps-the-writes-of-its-step",
+              "session-load-and-commit-are-child-spans"
+            ]
+          }
+        },
+        {
           "id": "per-push-credential",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

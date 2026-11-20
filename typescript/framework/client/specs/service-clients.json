@@ -75,7 +75,7 @@
     },
     {
       "id": "resilience-telemetry",
-      "text": "Retry attempts, retry exhaustion, retry recovery, and every circuit transition emit counters and a state gauge under a per-service metric prefix, and fall back to an unnamed prefix rather than being dropped when no service name is configured."
+      "text": "Retry attempts, retry exhaustion, retry recovery, and every circuit transition emit counters and a state gauge under a per-service metric prefix, and fall back to an unnamed prefix rather than being dropped when no service name is configured. A generated client built without a service binding records the same call and attempt spans as a bound client, and its attempt carries the trace context to the callee."
     },
     {
       "id": "stream-session-lifecycle",

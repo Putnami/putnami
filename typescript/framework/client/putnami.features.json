@@ -210,7 +210,8 @@
               "no-retry-counter-is-emitted-when-the-first-attempt-succeeds",
               "one-attempt-counter-per-retried-attempt",
               "retry-exhaustion-is-counted",
-              "retry-metrics-fall-back-to-an-unnamed-prefix"
+              "retry-metrics-fall-back-to-an-unnamed-prefix",
+              "an-unbound-generated-client-records-call-and-attempt-spans"
             ]
           }
         },
