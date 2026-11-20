@@ -23,6 +23,7 @@ type proxySafeTraceparentCase struct {
 	Traceparent        string       `json:"traceparent,omitempty"`
 	PutnamiTraceparent string       `json:"putnamiTraceparent,omitempty"`
 	Source             string       `json:"source"`
+	Outside            bool         `json:"outside"`
 	Parent             *Traceparent `json:"parent,omitempty"`
 }
 
@@ -75,6 +76,22 @@ func TestTraceparent_TheRuleMatchesItsFixture(t *testing.T) {
 		if !sources[source] {
 			t.Errorf("no fixture case resolves to %q", source)
 		}
+	}
+}
+
+// TestTraceparent_TheOutsideRuleMatchesItsFixture keeps RemoteParentOutside
+// equal to the outside flag of each case the TypeScript runtime reads.
+func TestTraceparent_TheOutsideRuleMatchesItsFixture(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "an-outside-parent", "the-outside-rule-matches-its-fixture")
+	seen := map[bool]bool{}
+	for _, c := range readProxySafeTraceparentFixture(t).Cases {
+		seen[c.Outside] = true
+		if got := RemoteParentOutside(c.Traceparent, c.PutnamiTraceparent); got != c.Outside {
+			t.Errorf("%s: outside = %v, want %v", c.Name, got, c.Outside)
+		}
+	}
+	if !seen[true] || !seen[false] {
+		t.Error("the fixture needs an outside and an inside case")
 	}
 }
 

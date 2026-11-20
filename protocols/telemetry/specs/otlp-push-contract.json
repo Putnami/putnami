@@ -8,7 +8,8 @@
     "Telemetry never fails or stalls the workload that produces it",
     "The CLI and the usage receiver enforce one closed vocabulary, so a usage record carries no free text",
     "A server span parents to the client span that called it, even when a proxy between them rewrites the parent ID of traceparent",
-    "An OTLP endpoint tightens the trace and log limits of every service it receives from, and slows an overloaded signal down, through its export responses"
+    "An OTLP endpoint sets the trace settings and tightens the log level of every service it receives from, and slows an overloaded signal down, through its export responses",
+    "A service behind a load balancer samples its own spans by its trace settings instead of the edge's sampled flag, when its parent policy is decide"
   ],
   "nonGoals": [
     "A /metrics scrape endpoint, gRPC OTLP, statsd or a Prometheus push gateway: OTLP/JSON over HTTP is the one transport, as ADR 0001 records",
@@ -87,9 +88,24 @@
     {
       "id": "trace-sampling-defaults",
       "text": [
-        "The defaults are a budget of 100 roots, a ratio of 0.01 and a floor of 1 root per minute; a budget and a floor are whole numbers of 0 or more, and a ratio lies between 0 and 1.",
-        "A span with a parent, remote or local, follows the parent's sampled flag and makes no decision.",
+        "The defaults are a budget of 100 roots, a ratio of 0.01, a floor of 1 root per minute and the parent policy follow; a budget and a floor are whole numbers of 0 or more, a ratio lies between 0 and 1, telemetry.traces.parent is follow or decide.",
+        "A span with a parent follows the parent's sampled flag and makes no decision, unless the parent policy decides for it.",
         "Each root decision counts once in the counter trace.decisions, labeled outcome kept or dropped."
+      ]
+    },
+    {
+      "id": "trace-parent-policy",
+      "text": [
+        "Under the parent policy decide, a server span whose remote parent comes from outside takes a root decision by the sampling rule, counted in trace.decisions, and keeps the parent's trace ID, parent span ID and tracestate.",
+        "Under follow, and for a parent a Putnami client sent, a local parent or an event's parent, the span follows the parent's sampled flag.",
+        "Both runtimes test against fixtures/conventions/trace-sampling.json."
+      ]
+    },
+    {
+      "id": "an-outside-parent",
+      "text": [
+        "A remote parent comes from outside when the request carries a valid traceparent and no valid x-putnami-traceparent with the same trace ID: a Putnami client sends both headers, a load balancer's edge or a browser traceparent only.",
+        "Both runtimes test against the outside flag of fixtures/conventions/proxy-safe-traceparent.json."
       ]
     },
     {
@@ -144,7 +160,7 @@
     {
       "id": "the-export-directive-header",
       "text": [
-        "An export response may carry the Putnami-Export-Directive header: comma-separated key=value members trace-ratio, between 0 and 1, trace-floor, a whole number of 0 or more, log-level, debug, info, warn or error, and ttl.",
+        "An export response may carry the Putnami-Export-Directive header: comma-separated key=value members trace-budget, a whole number of 0 or more, trace-ratio, between 0 and 1, trace-floor, a whole number of 0 or more, trace-parent, follow or decide, log-level, debug, info, warn or error, and ttl.",
         "ttl is required, in whole seconds of 1 or more, capped at 3600.",
         "An unknown key is ignored; a member without =, a malformed known value, a repeated key or a missing ttl voids the whole header."
       ]
@@ -152,8 +168,9 @@
     {
       "id": "export-directives-are-shared",
       "text": [
-        "A valid directive replaces the one in force and holds for ttl seconds from its arrival; then the service returns to its own settings.",
-        "While it holds, the service applies the lower trace ratio, the lower trace floor and the higher log level of the directive and its own settings, keeps its own trace budget, and emits a record at error whatever the directive.",
+        "A valid directive replaces the one in force and holds for ttl seconds from its arrival, then the service returns to its own settings.",
+        "While it holds, each trace setting it carries, budget, ratio, floor and parent policy, replaces the service's own, higher or lower; one it leaves out keeps the service's own.",
+        "The log level only tightens: the higher of the two applies, and a record at error passes.",
         "Both runtimes test against fixtures/conventions/export-directives.json."
       ]
     },
@@ -168,6 +185,7 @@
     }
   ],
   "decisions": [
-    "protocols/telemetry/doc/adr/0001-otlp-json-is-the-only-transport.md"
+    "protocols/telemetry/doc/adr/0001-otlp-json-is-the-only-transport.md",
+    "protocols/telemetry/doc/adr/0002-a-directive-sets-the-trace-settings.md"
   ]
 }

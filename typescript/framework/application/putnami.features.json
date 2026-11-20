@@ -1452,6 +1452,20 @@
           }
         },
         {
+          "id": "parent-policy",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-outside-parent-takes-a-root-decision-under-decide",
+              "a-putnami-parent-is-followed-under-decide",
+              "the-config-section-sets-the-parent-policy",
+              "a-directive-sets-the-parent-policy"
+            ]
+          }
+        },
+        {
           "id": "live-sampling-settings",
           "stage": "coded",
           "evidenceKinds": ["attestation"],
@@ -1472,7 +1486,7 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "a-directive-tightens-the-sampler-until-its-ttl",
+              "a-directive-sets-the-sampler-until-its-ttl",
               "a-directive-raises-the-log-level-until-its-ttl",
               "a-directive-drop-is-counted",
               "a-retry-after-delays-only-its-signal"

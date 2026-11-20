@@ -137,6 +137,7 @@ var Commands = []string{
 	"cloud-setup",
 	"cloud-source",
 	"cloud-status",
+	"cloud-telemetry",
 	"cloud-token",
 	"cloud-traces",
 	"cloud-whoami",

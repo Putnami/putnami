@@ -350,6 +350,8 @@ func RunCommand(command string, ioctx IO, args []string) (err error) {
 		return observabilitycli.Traces(params, args, workspaceRoot, env, ioctx)
 	case "metrics":
 		return observabilitycli.Metrics(params, args, workspaceRoot, env, ioctx)
+	case "telemetry":
+		return configcli.Telemetry(params, args, workspaceRoot, env, ioctx)
 
 	// Another command group of this runtime: `putnami agency`.
 	case "agency":

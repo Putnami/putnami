@@ -19,8 +19,8 @@ import {
   DirectiveReceiver,
   EXPORT_DIRECTIVE_HEADER,
   type ExportDirective,
+  applyTraceSampling,
   limitLogLevel,
-  limitTraceSampling,
   MAX_DIRECTIVE_TTL_SECONDS,
   MAX_RETRY_AFTER_SECONDS,
   parseExportDirective,
@@ -29,6 +29,7 @@ import {
   setDirectiveReceiver,
   setSignalDelays,
 } from '../../src/telemetry/export-directive';
+import { startTelemetrySpan } from '../../src/telemetry/client-telemetry';
 import { PATH_LOGS, PATH_METRICS, PATH_TRACES } from '../../src/telemetry/otlp';
 import { OtlpLogSink } from '../../src/telemetry/otlp-log.sink';
 import { TelemetryCollector } from '../../src/telemetry/telemetry.collector';
@@ -44,8 +45,10 @@ import {
 } from '../../src/telemetry/trace-sampling';
 
 interface FixtureDirective {
+  traceBudget?: number;
   traceRatio?: number;
   traceFloor?: number;
+  traceParent?: 'follow' | 'decide';
   logLevel?: LogLevel;
   ttlSeconds: number;
 }
@@ -66,10 +69,17 @@ interface DirectiveEvent {
 
 interface DirectivesFixture {
   header: string;
-  keys: { traceRatio: string; traceFloor: string; logLevel: string; ttl: string };
+  keys: {
+    traceBudget: string;
+    traceRatio: string;
+    traceFloor: string;
+    traceParent: string;
+    logLevel: string;
+    ttl: string;
+  };
   maxTtlSeconds: number;
   parseCases: Array<{ value: string; directive: FixtureDirective | null }>;
-  limitCases: Array<{ name: string; own: FixtureLimits; directive: string; effective: FixtureLimits }>;
+  applyCases: Array<{ name: string; own: FixtureLimits; directive: string; effective: FixtureLimits }>;
   traceScenarios: Array<{ name: string; settings: TraceSampling; events: DirectiveEvent[] }>;
   logScenarios: Array<{ name: string; level: LogLevel; events: DirectiveEvent[] }>;
   retryAfter: {
@@ -153,8 +163,10 @@ describe('export directives', () => {
       () => {
         expect(fixture.header).toBe(EXPORT_DIRECTIVE_HEADER);
         expect(fixture.keys).toEqual({
+          traceBudget: 'trace-budget',
           traceRatio: 'trace-ratio',
           traceFloor: 'trace-floor',
+          traceParent: 'trace-parent',
           logLevel: 'log-level',
           ttl: 'ttl',
         });
@@ -162,11 +174,12 @@ describe('export directives', () => {
         for (const c of fixture.parseCases) {
           expect({ value: c.value, directive: parseExportDirective(c.value) ?? null }).toEqual(c);
         }
-        for (const c of fixture.limitCases) {
+        expect(fixture.applyCases.length).toBeGreaterThan(0);
+        for (const c of fixture.applyCases) {
           const directive = mustParse(c.directive);
           expect({
             name: c.name,
-            traces: limitTraceSampling(directive, c.own.traces),
+            traces: applyTraceSampling(directive, c.own.traces),
             logLevel: limitLogLevel(directive, c.own.logLevel),
           }).toEqual({ name: c.name, traces: c.effective.traces, logLevel: c.effective.logLevel });
         }
@@ -238,21 +251,25 @@ describe('export directives', () => {
   });
 
   specTest(
-    'a directive tightens the sampler until its ttl ends',
-    { feature, requirement, check: 'a-directive-tightens-the-sampler-until-its-ttl' },
+    'a directive sets the sampler until its ttl ends',
+    { feature, requirement, check: 'a-directive-sets-the-sampler-until-its-ttl' },
     async () => {
       const own: TraceSampling = { budget: 0, ratio: 0.5, floorPerMinute: 3 };
       sampler = new TraceSampler(own);
       setTraceSampler(sampler);
       collectorStub((path) =>
         path === PATH_METRICS
-          ? { status: 200, headers: { [EXPORT_DIRECTIVE_HEADER]: 'trace-ratio=0.1, trace-floor=1, ttl=60' } }
+          ? {
+              status: 200,
+              headers: { [EXPORT_DIRECTIVE_HEADER]: 'trace-budget=7, trace-ratio=0.9, trace-floor=1, ttl=60' },
+            }
           : { status: 200 },
       );
 
-      // A metrics answer carries the directive; it applies to the traces.
+      // A metrics answer carries the directive; it applies to the traces,
+      // higher or lower.
       await postOtlp(ENDPOINT, PATH_METRICS, '{}');
-      expect(sampler.inForce(clock.ms)).toEqual({ budget: 0, ratio: 0.1, floorPerMinute: 1 });
+      expect(sampler.inForce(clock.ms)).toEqual({ budget: 7, ratio: 0.9, floorPerMinute: 1 });
       expect(sampler.settings).toEqual(own);
       expect(sampler.inForce(clock.ms + 60_000)).toEqual(own);
 
@@ -260,7 +277,28 @@ describe('export directives', () => {
       const late = new TraceSampler(own);
       setTraceSampler(late);
       sampler = late;
-      expect(late.inForce(clock.ms).ratio).toBe(0.1);
+      expect(late.inForce(clock.ms).ratio).toBe(0.9);
+    },
+  );
+
+  specTest(
+    'a directive sets the parent policy until its ttl ends',
+    { feature, requirement: 'parent-policy', check: 'a-directive-sets-the-parent-policy' },
+    () => {
+      collector = new TelemetryCollector();
+      setCollector(collector);
+      sampler = new TraceSampler({ budget: 0, ratio: 1, floorPerMinute: 0 });
+      setTraceSampler(sampler);
+      const outside = new Headers({ traceparent: `00-${'1'.repeat(32)}-${'2'.repeat(16)}-00` });
+      const flags = () => startTelemetrySpan({ name: 'in', kind: 'server', remoteHeaders: outside }).context.traceFlags;
+
+      // A span starts on the wall clock, so the directive arrives on it too.
+      clock.ms = Date.now();
+      expect(flags()).toBe('00');
+      receiver.receive('trace-parent=decide, ttl=60');
+      expect(sampler.inForce(clock.ms).parent).toBe('decide');
+      expect(flags()).toBe('01');
+      expect(sampler.decidesOutsideParents(clock.ms + 60_000)).toBe(false);
     },
   );
 

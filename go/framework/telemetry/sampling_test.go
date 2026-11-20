@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"net/http/httptest"
+
 	"go.opentelemetry.io/otel"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
@@ -16,6 +18,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"go.putnami.dev/config"
+	putnami_http "go.putnami.dev/http"
 	"go.putnami.dev/protocol/features/spectest"
 	otlp "go.putnami.dev/protocol/telemetry"
 )
@@ -95,6 +98,57 @@ func (p *samplingProbe) decisions(t *testing.T) map[string]int64 {
 		}
 	}
 	return counts
+}
+
+// parentCase is a case of the fixture's parentCases: a request's two trace
+// headers under fixed settings, and the server span it gives.
+type parentCase struct {
+	Name               string        `json:"name"`
+	Settings           TraceSampling `json:"settings"`
+	Traceparent        string        `json:"traceparent"`
+	PutnamiTraceparent string        `json:"putnamiTraceparent"`
+	Sampled            bool          `json:"sampled"`
+	Decided            bool          `json:"decided"`
+	ParentSpanID       string        `json:"parentSpanId"`
+}
+
+func readParentCases(t *testing.T) []parentCase {
+	t.Helper()
+	data, err := os.ReadFile(samplingFixturePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		ParentCases []parentCase `json:"parentCases"`
+	}
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if len(fixture.ParentCases) == 0 {
+		t.Fatal("the fixture holds no parent case")
+	}
+	return fixture.ParentCases
+}
+
+// serveRequest sends one request with the two trace headers through the HTTP
+// middleware and returns the span context of its server span.
+func serveRequest(t *testing.T, traceparent, putnamiTraceparent string) trace.SpanContext {
+	t.Helper()
+	request := httptest.NewRequest("GET", "/", nil)
+	if traceparent != "" {
+		request.Header.Set(otlp.HeaderTraceparent, traceparent)
+	}
+	if putnamiTraceparent != "" {
+		request.Header.Set(otlp.HeaderPutnamiTraceparent, putnamiTraceparent)
+	}
+	ctx := putnami_http.NewContext(httptest.NewRecorder(), request)
+	ctx.Route = "/"
+	var span trace.SpanContext
+	HTTPMiddleware("test-svc")(ctx, func() *putnami_http.Response {
+		span = trace.SpanContextFromContext(ctx.Request.Context())
+		return nil
+	})
+	return span
 }
 
 func TestSampling_UnsetSamplingUsesTheProtocolDefaults(t *testing.T) {
@@ -238,6 +292,61 @@ func TestSampling_TheGoSamplerDecidesTheFixtureScenarios(t *testing.T) {
 	}
 }
 
+// --- Parent policy ---
+
+func TestSampling_TheGoRuntimeDecidesTheFixtureParents(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "trace-parent-policy", "the-go-runtime-decides-the-fixture-parents")
+	spectest.Proves(t, "go/service-telemetry", "parent-policy", "an-outside-parent-takes-a-root-decision-under-decide")
+	spectest.Proves(t, "go/service-telemetry", "parent-policy", "a-putnami-parent-is-followed-under-decide")
+	for _, c := range readParentCases(t) {
+		t.Run(c.Name, func(t *testing.T) {
+			settings := c.Settings
+			probe := newSamplingProbe(t, Config{ServiceName: "test", TraceSampling: &settings})
+			span := serveRequest(t, c.Traceparent, c.PutnamiTraceparent)
+			if span.IsSampled() != c.Sampled {
+				t.Errorf("sampled = %v, want %v", span.IsSampled(), c.Sampled)
+			}
+			parent, ok := otlp.ParseTraceparent(c.Traceparent)
+			if !ok || span.TraceID().String() != parent.TraceID {
+				t.Errorf("the server span is on trace %s, want the parent's", span.TraceID())
+			}
+			decisions := probe.decisions(t)
+			if decided := decisions[otlp.TraceDecisionKept]+decisions[otlp.TraceDecisionDropped] == 1; decided != c.Decided {
+				t.Errorf("trace.decisions = %v, want decided %v", decisions, c.Decided)
+			}
+			exported := probe.exported(t)
+			if c.Sampled != (len(exported) == 1) {
+				t.Fatalf("exported %d spans, want sampled %v", len(exported), c.Sampled)
+			}
+			if c.Sampled && exported[0].Parent.SpanID().String() != c.ParentSpanID {
+				t.Errorf("parent span = %s, want %s", exported[0].Parent.SpanID(), c.ParentSpanID)
+			}
+		})
+	}
+}
+
+func TestSampling_TheConfigSectionSetsTheParentPolicy(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "parent-policy", "the-config-section-sets-the-parent-policy")
+	t.Setenv("CONFIG_DATA", "telemetry:\n  traces:\n    parent: decide\n")
+	probe := newSamplingProbe(t, Config{ServiceName: "test", TraceSampling: &TraceSampling{Ratio: 1}})
+	if got := probe.plugin.Sampler().Settings(); got != (TraceSampling{Ratio: 1, Parent: ParentDecide}) {
+		t.Fatalf("Settings() = %+v, want the parent policy from config", got)
+	}
+	if span := serveRequest(t, "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-00", ""); !span.IsSampled() {
+		t.Fatal("under decide an outside parent's unsampled flag still decided the span")
+	}
+}
+
+func TestSampling_AnInvalidParentPolicyFailsConfigure(t *testing.T) {
+	saveOTelGlobals(t)
+	t.Setenv("CONFIG_DATA", "")
+	plugin := NewPlugin(Config{ServiceName: "test", TraceSampling: &TraceSampling{Parent: "always"}})
+	if err := plugin.Configure(context.Background(), nil); err == nil {
+		_ = plugin.Stop(context.Background(), nil)
+		t.Fatal("Configure accepted the parent policy always")
+	}
+}
+
 // --- Live settings ---
 
 func TestSampling_AChangedKeyAppliesWithoutARestart(t *testing.T) {
@@ -249,7 +358,8 @@ func TestSampling_AChangedKeyAppliesWithoutARestart(t *testing.T) {
 	}
 
 	t.Setenv("CONFIG_DATA", "telemetry:\n  traces:\n    budget: 4\n    ratio: 0\n    floorPerMinute: 0\n")
-	waitForSettings(t, probe.plugin.Sampler(), TraceSampling{Budget: 4})
+	// The plugin's other settings are the protocol defaults, parent policy included.
+	waitForSettings(t, probe.plugin.Sampler(), TraceSampling{Budget: 4, Parent: ParentFollow})
 	// One root is already kept, so a budget of 4 keeps 3 more.
 	if got := probe.roots(t, 5); got != 3 {
 		t.Fatalf("after the change 5 roots exported %d spans, want 3", got)

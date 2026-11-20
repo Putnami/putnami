@@ -9,10 +9,13 @@ import (
 )
 
 // Export directive conventions. An OTLP endpoint may answer an export with a
-// directive header that tightens the trace and log limits of the service that
-// sent it, for a bounded time, and may slow a signal down with a 429 and a
-// Retry-After. Every runtime parses the header and applies the directive by
-// the same rule, so an operator tunes Go and TypeScript services alike.
+// directive header that sets the trace settings of the service that sent it
+// and tightens its log level, for a bounded time, and may slow a signal down
+// with a 429 and a Retry-After. Putnami Cloud renders the settings a person
+// stored, so a directive's trace settings win over the service's own, higher
+// or lower (ADR 0002). Every runtime parses the header and applies the
+// directive by the same rule, so a person tunes Go and TypeScript services
+// alike.
 //
 // fixtures/conventions/export-directives.json holds the same values and cases;
 // directive_test.go keeps them equal.
@@ -20,11 +23,17 @@ const (
 	// HeaderExportDirective is the response header that carries a directive.
 	HeaderExportDirective = "Putnami-Export-Directive"
 
-	// DirectiveTraceRatio caps telemetry.traces.ratio: a number in [0, 1].
+	// DirectiveTraceBudget sets telemetry.traces.budget: a whole number of 0
+	// or more.
+	DirectiveTraceBudget = "trace-budget"
+	// DirectiveTraceRatio sets telemetry.traces.ratio: a number in [0, 1].
 	DirectiveTraceRatio = "trace-ratio"
-	// DirectiveTraceFloor caps telemetry.traces.floorPerMinute: a whole
+	// DirectiveTraceFloor sets telemetry.traces.floorPerMinute: a whole
 	// number of 0 or more.
 	DirectiveTraceFloor = "trace-floor"
+	// DirectiveTraceParent sets telemetry.traces.parent: ParentFollow or
+	// ParentDecide.
+	DirectiveTraceParent = "trace-parent"
 	// DirectiveLogLevel raises the minimum log level: debug, info, warn or
 	// error.
 	DirectiveLogLevel = "log-level"
@@ -40,13 +49,17 @@ const (
 	MaxRetryAfterSeconds = 3600
 )
 
-// ExportDirective is one parsed directive. A nil limit leaves the service's
-// own setting; LogLevel is empty when the directive sets no level.
+// ExportDirective is one parsed directive. A nil or empty setting leaves the
+// service's own; LogLevel is empty when the directive sets no level.
 type ExportDirective struct {
-	// TraceRatio caps the trace ratio.
+	// TraceBudget sets the trace budget.
+	TraceBudget *int64
+	// TraceRatio sets the trace ratio.
 	TraceRatio *float64
-	// TraceFloorPerMinute caps the trace floor.
+	// TraceFloorPerMinute sets the trace floor.
 	TraceFloorPerMinute *int64
+	// TraceParent sets the parent policy: ParentFollow or ParentDecide.
+	TraceParent string
 	// LogLevel raises the minimum log level: debug, info, warn or error.
 	LogLevel string
 	// TTL is how long the directive holds from its arrival.
@@ -76,6 +89,18 @@ func ParseExportDirective(value string) (ExportDirective, bool) {
 		}
 		seen[key] = true
 		switch key {
+		case DirectiveTraceBudget:
+			budget, ok := wholeNumber(raw)
+			if !ok {
+				return ExportDirective{}, false
+			}
+			directive.TraceBudget = &budget
+		case DirectiveTraceParent:
+			parent := strings.ToLower(raw)
+			if parent != ParentFollow && parent != ParentDecide {
+				return ExportDirective{}, false
+			}
+			directive.TraceParent = parent
 		case DirectiveTraceRatio:
 			ratio, err := strconv.ParseFloat(raw, 64)
 			if err != nil || !decimal(raw) || math.IsNaN(ratio) || ratio < 0 || ratio > 1 {
@@ -108,14 +133,21 @@ func ParseExportDirective(value string) (ExportDirective, bool) {
 	return directive, true
 }
 
-// LimitTraceSampling returns the stricter of own and the directive: the lower
-// ratio, the lower floor and own budget.
-func (d ExportDirective) LimitTraceSampling(own TraceSampling) TraceSampling {
-	if d.TraceRatio != nil && *d.TraceRatio < own.Ratio {
+// ApplyTraceSampling returns own with each trace setting the directive
+// carries in its place, higher or lower: the budget, the ratio, the floor and
+// the parent policy. A setting the directive leaves out keeps own's.
+func (d ExportDirective) ApplyTraceSampling(own TraceSampling) TraceSampling {
+	if d.TraceBudget != nil {
+		own.Budget = *d.TraceBudget
+	}
+	if d.TraceRatio != nil {
 		own.Ratio = *d.TraceRatio
 	}
-	if d.TraceFloorPerMinute != nil && *d.TraceFloorPerMinute < own.FloorPerMinute {
+	if d.TraceFloorPerMinute != nil {
 		own.FloorPerMinute = *d.TraceFloorPerMinute
+	}
+	if d.TraceParent != "" {
+		own.Parent = d.TraceParent
 	}
 	return own
 }

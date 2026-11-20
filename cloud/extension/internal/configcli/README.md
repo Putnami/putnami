@@ -2,13 +2,21 @@
 
 The Config domain's commands for the `@putnami/cloud` CLI extension, in
 package `configcli` (`go.putnami.dev/cloud/extension/internal/configcli`). It
-implements `putnami cloud config` and `putnami cloud secrets`. It also supplies
+implements `putnami cloud config`, `putnami cloud secrets` and
+`putnami cloud telemetry`. It also supplies
 the Config logic behind `config publish`, `config validate` and
 `package-config-member`. It builds on the shared toolkit in
 [`internal/clicore`](../clicore) and on the authored-member format in
 [`go.putnami.dev/protocol/config/authoredmember`](../../../../protocols/config/authoredmember).
 
 ## Commands
+
+- `putnami cloud telemetry show|set|reset [--app <app>]`: reads and writes the
+  workspace's telemetry settings, the workspace row and one row per service,
+  through config-api's `GET|PUT /v1/workspaces/{ws}/config/telemetry`. `set`
+  merges its flags into the stored row; `reset` writes an empty row, which
+  removes it. The workspace collector returns a service's settings as its
+  export directive.
 
 - `putnami cloud config status [<project>]` and
   `putnami cloud secrets status [<project>]`: compare what each project's
@@ -64,6 +72,7 @@ The package has no sub-packages:
 
 - `config.go`, `config_inspect.go`: the `config` family and the inspect view.
 - `secrets.go`: the `secrets` family.
+- `telemetry.go`: the `telemetry` family.
 - `status.go`: `config status` and `secrets status`, and the nodes
   `putnami cloud status` reads.
 - `publish.go`: `config publish` and the sync publish path.

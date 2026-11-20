@@ -5,7 +5,11 @@ import { ConfigService, type ConfigSource, runInContext, useConfig } from '@putn
 import { specTest } from '@putnami/runtime/spectest';
 import type { Application } from '../../src/application';
 import { application } from '../../src/application';
-import { startTelemetrySpan, type TelemetryTraceContext } from '../../src/telemetry/client-telemetry';
+import {
+  PUTNAMI_TRACEPARENT_HEADER,
+  startTelemetrySpan,
+  type TelemetryTraceContext,
+} from '../../src/telemetry/client-telemetry';
 import { type MetricsBucket, TelemetryCollector } from '../../src/telemetry/telemetry.collector';
 import { TelemetryConfig } from '../../src/telemetry/telemetry.config';
 import { TelemetryPlugin, telemetry } from '../../src/telemetry/telemetry.plugin';
@@ -17,17 +21,31 @@ import {
   getTraceSampler,
   setTraceSampler,
   TRACE_DECISIONS,
+  TRACE_PARENT_POLICIES,
   TRACE_SAMPLING_CONFIG_PATH,
+  type TraceParentPolicy,
   TraceSampler,
   type TraceSampling,
   traceRatioPicks,
   traceSamplingError,
 } from '../../src/telemetry/trace-sampling';
 
+interface ParentCase {
+  name: string;
+  settings: TraceSampling;
+  traceparent: string;
+  putnamiTraceparent?: string;
+  sampled: boolean;
+  decided: boolean;
+  parentSpanId: string;
+}
+
 interface SamplingFixture {
   configPath: string;
-  keys: { budget: string; ratio: string; floorPerMinute: string };
+  keys: { budget: string; ratio: string; floorPerMinute: string; parent: string };
   defaults: TraceSampling;
+  parentPolicies: { follow: string; decide: string };
+  parentCases: ParentCase[];
   counter: { name: string; attribute: string; kept: string; dropped: string };
   ratioCases: Array<{ traceId: string; ratio: number; picked: boolean }>;
   scenarios: Array<{
@@ -118,7 +136,13 @@ describe('trace sampling', () => {
       },
       () => {
         expect(fixture.configPath).toBe(TRACE_SAMPLING_CONFIG_PATH);
-        expect(fixture.keys).toEqual({ budget: 'budget', ratio: 'ratio', floorPerMinute: 'floorPerMinute' });
+        expect(fixture.keys).toEqual({
+          budget: 'budget',
+          ratio: 'ratio',
+          floorPerMinute: 'floorPerMinute',
+          parent: 'parent',
+        });
+        expect(Object.values(fixture.parentPolicies)).toEqual([...TRACE_PARENT_POLICIES]);
         expect(fixture.defaults).toEqual({ ...DEFAULT_TRACE_SAMPLING });
         expect(fixture.counter).toEqual({
           name: TRACE_DECISIONS,
@@ -150,6 +174,7 @@ describe('trace sampling', () => {
         { ...DEFAULT_TRACE_SAMPLING, ratio: -0.1 },
         { ...DEFAULT_TRACE_SAMPLING, ratio: 1.5 },
         { ...DEFAULT_TRACE_SAMPLING, ratio: Number.NaN },
+        { ...DEFAULT_TRACE_SAMPLING, parent: 'always' as TraceParentPolicy },
       ]) {
         expect(traceSamplingError(settings)).toBeDefined();
         expect(() => new TraceSampler(settings)).toThrow(TRACE_SAMPLING_CONFIG_PATH);
@@ -174,6 +199,115 @@ describe('trace sampling', () => {
         floor.decide(NONE_PICKED, -1000),
         floor.decide(NONE_PICKED, 0),
       ]).toEqual([true, false, true]);
+    });
+  });
+
+  describe('parent-policy', () => {
+    /** Start the server span of a fixture parent case and report what it did. */
+    function serveParentCase(c: ParentCase) {
+      install(c.settings);
+      const headers = new Headers({ traceparent: c.traceparent });
+      if (c.putnamiTraceparent) headers.set(PUTNAMI_TRACEPARENT_HEADER, c.putnamiTraceparent);
+      const span = startTelemetrySpan({ name: 'in', kind: 'server', remoteHeaders: headers });
+      span.finish();
+      const recorded = collector?.drainSpans() ?? [];
+      const counted = decisions(collector?.drainAll() ?? []);
+      const sampled = span.context.traceFlags === '01';
+      return {
+        name: c.name,
+        sampled,
+        decided: (counted['kept'] ?? 0) + (counted['dropped'] ?? 0) === 1,
+        onParentTrace: span.context.traceId === c.traceparent.slice(3, 35),
+        parentSpanId: sampled ? recorded[0]?.parentSpanId : c.parentSpanId,
+      };
+    }
+
+    function expectFixtureParents(): void {
+      expect(fixture.parentCases.length).toBeGreaterThan(0);
+      for (const c of fixture.parentCases) {
+        expect(serveParentCase(c)).toEqual({
+          name: c.name,
+          sampled: c.sampled,
+          decided: c.decided,
+          onParentTrace: true,
+          parentSpanId: c.parentSpanId,
+        });
+        if (collector) clearCollector(collector);
+        if (sampler) clearTraceSampler(sampler);
+      }
+    }
+
+    specTest(
+      'decides every fixture parent case',
+      {
+        feature: 'telemetry/otlp-push-contract',
+        requirement: 'trace-parent-policy',
+        check: 'the-typescript-runtime-decides-the-fixture-parents',
+      },
+      expectFixtureParents,
+    );
+
+    specTest(
+      'an outside parent takes a root decision under decide',
+      {
+        feature: 'typescript/service-telemetry',
+        requirement: 'parent-policy',
+        check: 'an-outside-parent-takes-a-root-decision-under-decide',
+      },
+      () => {
+        const outside = fixture.parentCases.filter((c) => c.settings.parent === 'decide' && c.decided);
+        expect(outside.length).toBeGreaterThan(0);
+        for (const c of outside) {
+          expect(serveParentCase(c)).toMatchObject({ sampled: c.sampled, decided: true, onParentTrace: true });
+        }
+      },
+    );
+
+    specTest(
+      'a parent a Putnami client sent is followed under decide',
+      {
+        feature: 'typescript/service-telemetry',
+        requirement: 'parent-policy',
+        check: 'a-putnami-parent-is-followed-under-decide',
+      },
+      () => {
+        const inside = fixture.parentCases.filter((c) => c.settings.parent === 'decide' && !c.decided);
+        expect(inside.length).toBeGreaterThan(0);
+        for (const c of inside) {
+          expect(serveParentCase(c)).toMatchObject({ sampled: c.sampled, decided: false });
+        }
+        // An event's parent and an ambient parent are followed too.
+        install({ budget: 0, ratio: 1, floorPerMinute: 0, parent: 'decide' });
+        const event = startTelemetrySpan({
+          name: 'process',
+          kind: 'consumer',
+          remoteContext: { traceId: '5'.repeat(32), spanId: '6'.repeat(16), traceFlags: '00' },
+        });
+        expect(event.context.traceFlags).toBe('00');
+        expect(decisions(collector?.drainAll() ?? [])).toEqual({});
+      },
+    );
+
+    specTest(
+      'the config section sets the parent policy',
+      {
+        feature: 'typescript/service-telemetry',
+        requirement: 'parent-policy',
+        check: 'the-config-section-sets-the-parent-policy',
+      },
+      async () => {
+        setTraces({ parent: 'decide' });
+        const current = await startPlugin(telemetry({ enabled: true, endpoint: ENDPOINT, traces: { ratio: 1 } }));
+        expect(current.settings.parent).toBe('decide');
+        const span = startTelemetrySpan({ name: 'in', kind: 'server', remoteHeaders: remoteHeaders('00') });
+        expect(span.context.traceFlags).toBe('01');
+      },
+    );
+
+    it('keeps the settings in force when the section names an unknown parent policy', async () => {
+      setTraces({ parent: 'always' });
+      const current = await startPlugin(telemetry({ enabled: true, endpoint: ENDPOINT }));
+      expect(current.settings.parent).toBe('follow');
     });
   });
 
@@ -209,7 +343,7 @@ describe('trace sampling', () => {
         const current = await startPlugin(
           telemetry({ enabled: true, endpoint: ENDPOINT, traces: { budget: 10, ratio: 0 } }),
         );
-        expect(current.settings).toEqual({ budget: 3, ratio: 0, floorPerMinute: 1 });
+        expect(current.settings).toEqual({ budget: 3, ratio: 0, floorPerMinute: 1, parent: 'follow' });
         // The telemetry section still reads with its traces key present.
         expect(useConfig(TelemetryConfig).enabled).toBe(false);
       },
@@ -318,7 +452,7 @@ describe('trace sampling', () => {
         while (current.settings.budget !== 7 && Date.now() < deadline) {
           await Bun.sleep(10);
         }
-        expect(current.settings).toEqual({ budget: 7, ratio: 0.5, floorPerMinute: 1 });
+        expect(current.settings).toEqual({ budget: 7, ratio: 0.5, floorPerMinute: 1, parent: 'follow' });
       },
     );
 

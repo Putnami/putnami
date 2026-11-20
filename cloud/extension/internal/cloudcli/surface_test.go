@@ -17,6 +17,7 @@ import (
 var wantPublicRoot = []string{
 	"login", "logout", "whoami", "setup", "status", "token", "registries", "packages", "channels",
 	"ci", "cache", "source", "config", "secrets", "db", "env", "infra", "deploy", "logs", "traces", "metrics",
+	"telemetry",
 }
 
 func runSurface(t *testing.T, command string, args ...string) ([]string, error) {
@@ -50,7 +51,7 @@ func TestHelpListsExactlyThePublicRoot(t *testing.T) {
 		}
 	}
 	if !slices.Equal(names, wantPublicRoot) {
-		t.Fatalf("help lists %v, want the 21 public entries %v", names, wantPublicRoot)
+		t.Fatalf("help lists %v, want the 22 public entries %v", names, wantPublicRoot)
 	}
 	hidden := slices.Concat(machineCommands, groupCommands, slices.Collect(maps.Keys(operatorCommands)))
 	for _, name := range hidden {

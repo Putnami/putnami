@@ -41,11 +41,19 @@ minute, so a rarely called service still exports traces. A span with a parent,
 remote or local, follows its parent's sampled flag: a service follows its
 caller's decision.
 
+Behind a load balancer such as Cloud Run's, the edge sends a `traceparent`
+whose sampled flag is usually off, so following it drops almost every server
+span. With `parent: decide`, a server span whose parent came from outside, a
+`traceparent` without an `x-putnami-traceparent` on the same trace, takes a
+root decision by the budget instead, and keeps the parent's trace ID. A call
+from another Putnami service sends both headers, so its decision still holds.
+
 | Key in `telemetry.traces` | Default | Meaning |
 |---|---|---|
 | `budget` | `100` | Root traces the instance keeps first |
 | `ratio` | `0.01` | Share of root traces kept once the budget is spent, from 0 to 1 |
 | `floorPerMinute` | `1` | Root traces kept each minute whatever the ratio picks |
+| `parent` | `follow` | `follow` an outside parent's sampled flag, or `decide` as a root |
 
 ```yaml
 # conf/.env.yaml, or CONFIG_DATA
@@ -54,9 +62,11 @@ telemetry:
     budget: 100
     ratio: 0.01
     floorPerMinute: 1
+    parent: decide
 ```
 
-`Config.TraceSampling` sets the same three values in code; each key of the
+`Config.TraceSampling` sets the same values in code (`Parent` takes
+`telemetry.ParentFollow` or `telemetry.ParentDecide`); each key of the
 config section overrides its field. While it runs, the plugin reloads the
 config sources every 30 seconds and applies a changed value without a restart.
 A change to a file under `conf/` applies within 30 seconds. `CONFIG_DATA` keeps
@@ -68,35 +78,41 @@ A value out of range keeps the settings in force and logs a warning.
 
 The counter `trace.decisions`, labeled `outcome` `kept` or `dropped`, counts
 each root decision. `Plugin.Sampler()` returns the sampler: `Settings()` reads
-its own settings, without an export directive's limits, and `Update(settings)` replaces them at runtime until
+its own settings, without an export directive's, and `Update(settings)` replaces them at runtime until
 the config section changes. The TypeScript runtime applies the same keys, rule
 and counter, which `go.putnami.dev/protocol/telemetry` defines.
 
 ## Export directives
 
-The OTLP endpoint can tighten the limits of every service that pushes to it,
-without a redeploy. Any export response, from the metrics, traces or logs path
-and whatever its status, may carry a `Putnami-Export-Directive` header:
+The OTLP endpoint can set the trace settings and tighten the log level of
+every service that pushes to it, without a redeploy. Putnami Cloud's collector
+sends the settings a person set with `putnami cloud telemetry set`. Any export
+response, from the metrics, traces or logs path and whatever its status, may
+carry a `Putnami-Export-Directive` header:
 
 ```
-Putnami-Export-Directive: trace-ratio=0.001, trace-floor=1, log-level=warn, ttl=300
+Putnami-Export-Directive: trace-ratio=1, trace-parent=decide, log-level=warn, ttl=300
 ```
 
 | Key | Value | Effect while the directive holds |
 |---|---|---|
-| `trace-ratio` | a number from 0 to 1 | the lower of it and `telemetry.traces.ratio` |
-| `trace-floor` | a whole number of 0 or more | the lower of it and `telemetry.traces.floorPerMinute` |
+| `trace-budget` | a whole number of 0 or more | replaces `telemetry.traces.budget` |
+| `trace-ratio` | a number from 0 to 1 | replaces `telemetry.traces.ratio` |
+| `trace-floor` | a whole number of 0 or more | replaces `telemetry.traces.floorPerMinute` |
+| `trace-parent` | `follow` or `decide` | replaces `telemetry.traces.parent` |
 | `log-level` | `debug`, `info`, `warn` or `error` | the higher of it and the logger's own level |
 | `ttl` | whole seconds, required, capped at 3600 | how long the directive holds |
 
-A directive only tightens: the service keeps its own `budget`, a looser value
+A trace setting the directive carries wins, higher or lower, and one it leaves
+out keeps the service's own. The log level only tightens: a lower level
 changes nothing, and a record at error is always emitted. A valid directive
 replaces the one in force; when its `ttl` ends, the service returns to its own
 settings. A member without `=`, a malformed known value, a repeated key or a
-missing `ttl` voids the header, and an unknown key is ignored. The directive limits the sampler of
+missing `ttl` voids the header, and an unknown key is ignored. The directive applies to the sampler of
 each running plugin, whose `Settings()` keep the plugin's own values, and every
 logger through `logger.SetLevelLimit`, without changing the live level. The
-roots and records it drops still count in `trace.decisions` and `log.records`.
+roots and records it keeps or drops still count in `trace.decisions` and
+`log.records`.
 
 A `429 Too Many Requests` with a `Retry-After`, in seconds or as an HTTP date,
 delays the next export of that signal to that collector, from every exporter

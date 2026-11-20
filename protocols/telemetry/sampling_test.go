@@ -21,9 +21,15 @@ type samplingFixture struct {
 		Budget         string `json:"budget"`
 		Ratio          string `json:"ratio"`
 		FloorPerMinute string `json:"floorPerMinute"`
+		Parent         string `json:"parent"`
 	} `json:"keys"`
-	Defaults TraceSampling `json:"defaults"`
-	Counter  struct {
+	Defaults       TraceSampling `json:"defaults"`
+	ParentPolicies struct {
+		Follow string `json:"follow"`
+		Decide string `json:"decide"`
+	} `json:"parentPolicies"`
+	ParentCases []ParentCase `json:"parentCases"`
+	Counter     struct {
 		Name      string `json:"name"`
 		Attribute string `json:"attribute"`
 		Kept      string `json:"kept"`
@@ -35,6 +41,19 @@ type samplingFixture struct {
 		Picked  bool    `json:"picked"`
 	} `json:"ratioCases"`
 	Scenarios []SamplingScenario `json:"scenarios"`
+}
+
+// ParentCase is one server span started from a request's two trace headers
+// under fixed settings: whether it is sampled, whether it took a root
+// decision, and the parent span it keeps.
+type ParentCase struct {
+	Name               string        `json:"name"`
+	Settings           TraceSampling `json:"settings"`
+	Traceparent        string        `json:"traceparent"`
+	PutnamiTraceparent string        `json:"putnamiTraceparent,omitempty"`
+	Sampled            bool          `json:"sampled"`
+	Decided            bool          `json:"decided"`
+	ParentSpanID       string        `json:"parentSpanId"`
 }
 
 // SamplingScenario is one sequence of root decisions under fixed settings.
@@ -83,7 +102,8 @@ func TestSampling_TheConventionMatchesItsFixture(t *testing.T) {
 	if fixture.ConfigPath != ConfigTraceSamplingPath {
 		t.Errorf("configPath = %q, want %q", fixture.ConfigPath, ConfigTraceSamplingPath)
 	}
-	if fixture.Keys.Budget != KeyTraceBudget || fixture.Keys.Ratio != KeyTraceRatio || fixture.Keys.FloorPerMinute != KeyTraceFloorPerMinute {
+	if fixture.Keys.Budget != KeyTraceBudget || fixture.Keys.Ratio != KeyTraceRatio ||
+		fixture.Keys.FloorPerMinute != KeyTraceFloorPerMinute || fixture.Keys.Parent != KeyTraceParent {
 		t.Errorf("keys = %+v", fixture.Keys)
 	}
 	if len(fixture.RatioCases) == 0 || len(fixture.Scenarios) == 0 {
@@ -130,6 +150,47 @@ func TestSampling_TheBudgetDecidesTheFixtureScenarios(t *testing.T) {
 	}
 }
 
+// TestSampling_TheParentPolicyConventionMatchesItsFixture applies the parent
+// rule to each parent case: a span whose parent is outside under
+// ParentDecide takes a root decision, every other span follows its resolved
+// parent's sampled flag.
+func TestSampling_TheParentPolicyConventionMatchesItsFixture(t *testing.T) {
+	spectest.Proves(t, "telemetry/otlp-push-contract", "trace-parent-policy", "the-parent-policy-convention-matches-its-fixture")
+	fixture := readSamplingFixture(t)
+	if fixture.ParentPolicies.Follow != ParentFollow || fixture.ParentPolicies.Decide != ParentDecide {
+		t.Errorf("parentPolicies = %+v", fixture.ParentPolicies)
+	}
+	if DefaultTraceParent != ParentFollow {
+		t.Errorf("DefaultTraceParent = %q, want %q", DefaultTraceParent, ParentFollow)
+	}
+	if len(fixture.ParentCases) == 0 {
+		t.Fatal("the fixture holds no parent case")
+	}
+	for _, c := range fixture.ParentCases {
+		t.Run(c.Name, func(t *testing.T) {
+			budget, err := NewTraceBudget(c.Settings)
+			if err != nil {
+				t.Fatal(err)
+			}
+			parent, source := ResolveRemoteParent(c.Traceparent, c.PutnamiTraceparent)
+			if source == RemoteParentNone {
+				t.Fatal("a parent case names no remote parent")
+			}
+			if parent.SpanID != c.ParentSpanID {
+				t.Errorf("parent span = %s, want %s", parent.SpanID, c.ParentSpanID)
+			}
+			decided := c.Settings.DecidesOutsideParents() && RemoteParentOutside(c.Traceparent, c.PutnamiTraceparent)
+			sampled := hexValue(parent.TraceFlags[1])&1 == 1
+			if decided {
+				sampled = budget.Decide(traceIDOf(t, parent.TraceID), time.Unix(0, 0))
+			}
+			if decided != c.Decided || sampled != c.Sampled {
+				t.Errorf("decided %v sampled %v, want decided %v sampled %v", decided, sampled, c.Decided, c.Sampled)
+			}
+		})
+	}
+}
+
 func TestSampling_ValidateRefusesSettingsOutOfRange(t *testing.T) {
 	for _, settings := range []TraceSampling{
 		{Budget: -1},
@@ -137,6 +198,8 @@ func TestSampling_ValidateRefusesSettingsOutOfRange(t *testing.T) {
 		{Ratio: -0.1},
 		{Ratio: 1.5},
 		{Ratio: math.NaN()},
+		{Parent: "always"},
+		{Parent: "Decide"},
 	} {
 		if settings.Validate() == nil {
 			t.Errorf("Validate(%+v) = nil, want an error", settings)
@@ -147,6 +210,11 @@ func TestSampling_ValidateRefusesSettingsOutOfRange(t *testing.T) {
 	}
 	if err := (TraceSampling{}).Validate(); err != nil {
 		t.Errorf("zero settings are valid: %v", err)
+	}
+	for _, parent := range []string{ParentFollow, ParentDecide} {
+		if err := (TraceSampling{Parent: parent}).Validate(); err != nil {
+			t.Errorf("parent %q is valid: %v", parent, err)
+		}
 	}
 }
 

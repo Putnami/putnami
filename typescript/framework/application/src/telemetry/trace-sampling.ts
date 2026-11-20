@@ -4,7 +4,9 @@
  * A root span is kept while the instance has kept fewer than `budget` roots,
  * or while the current UTC minute holds fewer than `floorPerMinute` kept
  * roots, or when `ratio` picks its trace ID. Otherwise it is dropped. A span
- * with a parent follows the parent's sampled flag and makes no decision.
+ * with a parent follows the parent's sampled flag and makes no decision,
+ * except under the parent policy `decide` a server span whose remote parent
+ * came from outside, which takes a root decision on the parent's trace.
  *
  * The rule, the keys, the defaults and the counter are the
  * telemetry/otlp-push-contract convention, committed in
@@ -12,7 +14,7 @@
  */
 
 import { Config, Int, Optional } from '@putnami/runtime';
-import { type ExportDirective, getDirectiveReceiver, limitTraceSampling } from './export-directive';
+import { applyTraceSampling, type ExportDirective, getDirectiveReceiver } from './export-directive';
 import { incCounterWithAttributes } from './telemetry.utils';
 
 /** The config section that holds the three keys. */
@@ -22,7 +24,19 @@ export const TRACE_DECISIONS = 'trace.decisions';
 /** The attribute that labels a decision kept or dropped. */
 export const ATTR_TRACE_DECISION_OUTCOME = 'outcome';
 
-/** The three settings of the trace budget. */
+/**
+ * The parent policy. `follow` makes a span with a parent follow the parent's
+ * sampled flag. `decide` makes a server span whose remote parent came from
+ * outside — a `traceparent` with no `x-putnami-traceparent` on the same trace,
+ * as a load balancer's edge or a browser sends — take a root decision, keeping
+ * the parent's trace ID. A parent a Putnami client sent is still followed.
+ */
+export type TraceParentPolicy = 'follow' | 'decide';
+
+/** The parent policies, in the order the protocol lists them. */
+export const TRACE_PARENT_POLICIES: readonly TraceParentPolicy[] = Object.freeze(['follow', 'decide']);
+
+/** The settings of the trace budget. */
 export interface TraceSampling {
   /** The number of root traces the instance keeps first; a whole number of 0 or more. */
   budget: number;
@@ -30,6 +44,8 @@ export interface TraceSampling {
   ratio: number;
   /** The number of root traces kept each UTC minute whatever the ratio picks; a whole number of 0 or more. */
   floorPerMinute: number;
+  /** The parent policy; absent reads as `follow`. */
+  parent?: TraceParentPolicy;
 }
 
 /** The settings that apply when nothing sets them. */
@@ -37,6 +53,7 @@ export const DEFAULT_TRACE_SAMPLING: Readonly<TraceSampling> = Object.freeze({
   budget: 100,
   ratio: 0.01,
   floorPerMinute: 1,
+  parent: 'follow',
 });
 
 /**
@@ -48,17 +65,20 @@ export const TraceSamplingConfig = Config(TRACE_SAMPLING_CONFIG_PATH, {
   budget: Optional(Int),
   ratio: Optional(Number),
   floorPerMinute: Optional(Int),
+  parent: Optional(String),
 });
 
-/** A `telemetry.traces` section as read: each key may be unset. */
-export type TraceSamplingSection = Partial<TraceSampling>;
+/** A `telemetry.traces` section as read: each key may be unset, and `parent` is checked later. */
+export type TraceSamplingSection = Partial<Omit<TraceSampling, 'parent'>> & { parent?: string };
 
 /** Returns base with each key the section sets. */
 export function traceSamplingOver(section: TraceSamplingSection, base: Readonly<TraceSampling>): TraceSampling {
+  const parent = section.parent ?? base.parent;
   return {
     budget: section.budget ?? base.budget,
     ratio: section.ratio ?? base.ratio,
     floorPerMinute: section.floorPerMinute ?? base.floorPerMinute,
+    ...(parent === undefined ? {} : { parent: parent as TraceParentPolicy }),
   };
 }
 
@@ -72,6 +92,9 @@ export function traceSamplingError(settings: Readonly<TraceSampling>): string | 
   }
   if (!Number.isInteger(settings.floorPerMinute) || settings.floorPerMinute < 0) {
     return `${TRACE_SAMPLING_CONFIG_PATH}.floorPerMinute must be a whole number of 0 or more, got ${settings.floorPerMinute}`;
+  }
+  if (settings.parent !== undefined && !TRACE_PARENT_POLICIES.includes(settings.parent)) {
+    return `${TRACE_SAMPLING_CONFIG_PATH}.parent must be follow or decide, got ${String(settings.parent)}`;
   }
   return undefined;
 }
@@ -119,25 +142,31 @@ export class TraceSampler {
     this.current = Object.freeze({ ...settings });
   }
 
-  /** The settings `update()` or the constructor set, without a directive's limits. */
+  /** The settings `update()` or the constructor set, without a directive's. */
   get settings(): Readonly<TraceSampling> {
     return this.current;
   }
 
   /**
    * Applies `directive`, which arrived at `nowMs`, to the decisions until its
-   * ttl ends: each one takes the stricter of the directive and the settings.
-   * It replaces a directive in force; the settings themselves stay.
+   * ttl ends: each trace setting it carries replaces the matching setting,
+   * higher or lower. It replaces a directive in force; the settings
+   * themselves stay.
    */
-  restrict(directive: ExportDirective, nowMs: number = Date.now()): void {
+  direct(directive: ExportDirective, nowMs: number = Date.now()): void {
     this.directive = directive;
     this.directiveEndsMs = nowMs + directive.ttlSeconds * 1000;
   }
 
-  /** The settings a decision at `nowMs` applies: the settings, limited by a directive that still holds. */
+  /** The settings a decision at `nowMs` applies: the settings, with those of a directive that still holds in their place. */
   inForce(nowMs: number = Date.now()): Readonly<TraceSampling> {
-    if (this.directive && nowMs < this.directiveEndsMs) return limitTraceSampling(this.directive, this.current);
+    if (this.directive && nowMs < this.directiveEndsMs) return applyTraceSampling(this.directive, this.current);
     return this.current;
+  }
+
+  /** Whether the parent policy in force at `nowMs` is `decide`. */
+  decidesOutsideParents(nowMs: number = Date.now()): boolean {
+    return this.inForce(nowMs).parent === 'decide';
   }
 
   /**

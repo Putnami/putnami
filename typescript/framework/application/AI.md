@@ -639,6 +639,10 @@ of that context or a new root. `startTelemetrySpan()` takes `kind: 'consumer'`,
 a `remoteContext` parent and `newRoot`; `attachTelemetryContext(target, span,
 { correlate: false })` attaches a span and keeps the target's `traceId`. These
 run without the telemetry plugin too: the spans are then recorded nowhere.
+With `remoteHeaders`, a span whose parent came from outside
+(`remoteParentOutside(headers)`: a `traceparent` with no `x-putnami-traceparent`
+on its trace) takes a root decision when the sampler's parent policy is
+`decide` (`telemetry.traces.parent`, or `trace-parent` in an export directive).
 `kind: 'internal'` marks a step inside the service. A span's `within(step)`
 runs an awaited step on the current context with the span as parent and
 restores the previous parent; `run(action)` runs in a child context, for work

@@ -15,22 +15,24 @@ import (
 type DirectiveFixture struct {
 	Header string `json:"header"`
 	Keys   struct {
-		TraceRatio string `json:"traceRatio"`
-		TraceFloor string `json:"traceFloor"`
-		LogLevel   string `json:"logLevel"`
-		TTL        string `json:"ttl"`
+		TraceBudget string `json:"traceBudget"`
+		TraceRatio  string `json:"traceRatio"`
+		TraceFloor  string `json:"traceFloor"`
+		TraceParent string `json:"traceParent"`
+		LogLevel    string `json:"logLevel"`
+		TTL         string `json:"ttl"`
 	} `json:"keys"`
 	MaxTTLSeconds int64 `json:"maxTtlSeconds"`
 	ParseCases    []struct {
 		Value     string            `json:"value"`
 		Directive *FixtureDirective `json:"directive"`
 	} `json:"parseCases"`
-	LimitCases []struct {
+	ApplyCases []struct {
 		Name      string        `json:"name"`
 		Own       FixtureLimits `json:"own"`
 		Directive string        `json:"directive"`
 		Effective FixtureLimits `json:"effective"`
-	} `json:"limitCases"`
+	} `json:"applyCases"`
 	TraceScenarios []struct {
 		Name     string           `json:"name"`
 		Settings TraceSampling    `json:"settings"`
@@ -55,10 +57,12 @@ type DirectiveFixture struct {
 
 // FixtureDirective is a parsed directive as the fixture writes it.
 type FixtureDirective struct {
-	TraceRatio *float64 `json:"traceRatio"`
-	TraceFloor *int64   `json:"traceFloor"`
-	LogLevel   string   `json:"logLevel"`
-	TTLSeconds int64    `json:"ttlSeconds"`
+	TraceBudget *int64   `json:"traceBudget"`
+	TraceRatio  *float64 `json:"traceRatio"`
+	TraceFloor  *int64   `json:"traceFloor"`
+	TraceParent string   `json:"traceParent"`
+	LogLevel    string   `json:"logLevel"`
+	TTLSeconds  int64    `json:"ttlSeconds"`
 }
 
 // FixtureLimits are the trace settings and the log level of a service.
@@ -108,15 +112,16 @@ func TestDirective_TheHeaderConventionMatchesItsFixture(t *testing.T) {
 	if fixture.Header != HeaderExportDirective {
 		t.Errorf("header = %q, want %q", fixture.Header, HeaderExportDirective)
 	}
-	if fixture.Keys.TraceRatio != DirectiveTraceRatio || fixture.Keys.TraceFloor != DirectiveTraceFloor ||
+	if fixture.Keys.TraceBudget != DirectiveTraceBudget || fixture.Keys.TraceRatio != DirectiveTraceRatio ||
+		fixture.Keys.TraceFloor != DirectiveTraceFloor || fixture.Keys.TraceParent != DirectiveTraceParent ||
 		fixture.Keys.LogLevel != DirectiveLogLevel || fixture.Keys.TTL != DirectiveTTL {
 		t.Errorf("keys = %+v", fixture.Keys)
 	}
 	if fixture.MaxTTLSeconds != MaxDirectiveTTLSeconds {
 		t.Errorf("maxTtlSeconds = %d, want %d", fixture.MaxTTLSeconds, MaxDirectiveTTLSeconds)
 	}
-	if len(fixture.ParseCases) == 0 || len(fixture.LimitCases) == 0 {
-		t.Fatal("the fixture holds no parse case or no limit case")
+	if len(fixture.ParseCases) == 0 || len(fixture.ApplyCases) == 0 {
+		t.Fatal("the fixture holds no parse case or no apply case")
 	}
 	for _, c := range fixture.ParseCases {
 		got, ok := ParseExportDirective(c.Value)
@@ -131,14 +136,15 @@ func TestDirective_TheHeaderConventionMatchesItsFixture(t *testing.T) {
 			continue
 		}
 		want := *c.Directive
-		if !equalFloat(got.TraceRatio, want.TraceRatio) || !equalInt(got.TraceFloorPerMinute, want.TraceFloor) ||
+		if !equalInt(got.TraceBudget, want.TraceBudget) || !equalFloat(got.TraceRatio, want.TraceRatio) ||
+			!equalInt(got.TraceFloorPerMinute, want.TraceFloor) || got.TraceParent != want.TraceParent ||
 			got.LogLevel != want.LogLevel || got.TTL != time.Duration(want.TTLSeconds)*time.Second {
 			t.Errorf("ParseExportDirective(%q) = %+v, want %+v", c.Value, got, want)
 		}
 	}
-	for _, c := range fixture.LimitCases {
+	for _, c := range fixture.ApplyCases {
 		directive := mustParseDirective(t, c.Directive)
-		if got := directive.LimitTraceSampling(c.Own.Traces); got != c.Effective.Traces {
+		if got := directive.ApplyTraceSampling(c.Own.Traces); got != c.Effective.Traces {
 			t.Errorf("%s: traces = %+v, want %+v", c.Name, got, c.Effective.Traces)
 		}
 		if got := directive.LimitLogLevel(c.Own.LogLevel); got != c.Effective.LogLevel {
@@ -165,7 +171,7 @@ func TestDirective_TheRetryAfterConventionMatchesItsFixture(t *testing.T) {
 }
 
 // TestDirective_TheBudgetAppliesTheTraceScenarios runs each trace scenario
-// through TraceBudget.Restrict, the rule the Go sampler applies.
+// through TraceBudget.Direct, the rule the Go sampler applies.
 func TestDirective_TheBudgetAppliesTheTraceScenarios(t *testing.T) {
 	for _, scenario := range readDirectiveFixture(t).TraceScenarios {
 		t.Run(scenario.Name, func(t *testing.T) {
@@ -177,7 +183,7 @@ func TestDirective_TheBudgetAppliesTheTraceScenarios(t *testing.T) {
 				at := time.Unix(event.AtSecond, 0)
 				if event.Directive != "" {
 					if directive, ok := ParseExportDirective(event.Directive); ok {
-						budget.Restrict(directive, at)
+						budget.Direct(directive, at)
 					}
 					continue
 				}
@@ -197,8 +203,8 @@ func TestDirective_InForceReturnsToTheSettingsAtTheTTL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	budget.Restrict(mustParseDirective(t, "trace-ratio=0.1, trace-floor=1, ttl=10"), time.Unix(100, 0))
-	if got := budget.InForce(time.Unix(109, 0)); got != (TraceSampling{Budget: 1, Ratio: 0.1, FloorPerMinute: 1}) {
+	budget.Direct(mustParseDirective(t, "trace-budget=5, trace-ratio=0.9, trace-floor=1, trace-parent=decide, ttl=10"), time.Unix(100, 0))
+	if got := budget.InForce(time.Unix(109, 0)); got != (TraceSampling{Budget: 5, Ratio: 0.9, FloorPerMinute: 1, Parent: ParentDecide}) {
 		t.Errorf("in force at 109 = %+v", got)
 	}
 	if got := budget.InForce(time.Unix(110, 0)); got != budget.Settings() {

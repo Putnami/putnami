@@ -18,17 +18,30 @@ import (
 	otlp "go.putnami.dev/protocol/telemetry"
 )
 
-// TraceSampling holds the three settings of the trace budget: the first
-// Budget root traces are kept, then a root is kept when Ratio picks its trace
-// ID, and at least FloorPerMinute roots are kept each minute. The protocol
-// package go.putnami.dev/protocol/telemetry defines the rule, which the
-// TypeScript runtime shares.
+// TraceSampling holds the settings of the trace budget: the first Budget root
+// traces are kept, then a root is kept when Ratio picks its trace ID, and at
+// least FloorPerMinute roots are kept each minute. Parent is the parent
+// policy: ParentFollow, the default, or ParentDecide, under which a server
+// span whose remote parent came from outside takes a root decision. The
+// protocol package go.putnami.dev/protocol/telemetry defines the rule, which
+// the TypeScript runtime shares.
 type TraceSampling = otlp.TraceSampling
 
 // DefaultTraceSampling returns the settings that apply when neither the plugin
-// nor the config sets them: a budget of 100 roots, a ratio of 0.01 and a floor
-// of 1 root per minute.
+// nor the config sets them: a budget of 100 roots, a ratio of 0.01, a floor
+// of 1 root per minute and the parent policy ParentFollow.
 func DefaultTraceSampling() TraceSampling { return otlp.DefaultTraceSampling() }
+
+// The parent policies of TraceSampling.Parent.
+const (
+	// ParentFollow makes a span with a parent follow the parent's sampled
+	// flag.
+	ParentFollow = otlp.ParentFollow
+	// ParentDecide makes a server span whose remote parent came from outside,
+	// such as a load balancer's edge, take a root decision on the parent's
+	// trace. A parent a Putnami client sent is still followed.
+	ParentDecide = otlp.ParentDecide
+)
 
 // DefaultSamplingRefresh is how often the plugin reloads the config sources
 // and re-reads the telemetry.traces section while it runs. A source that keeps
@@ -47,6 +60,7 @@ type traceSamplingSection struct {
 	Budget         *int64   `json:"budget"`
 	Ratio          *float64 `json:"ratio"`
 	FloorPerMinute *int64   `json:"floorPerMinute"`
+	Parent         *string  `json:"parent"`
 }
 
 var traceSamplingConfig = config.Config[traceSamplingSection](otlp.ConfigTraceSamplingPath)
@@ -62,16 +76,19 @@ func (s traceSamplingSection) over(base TraceSampling) TraceSampling {
 	if s.FloorPerMinute != nil {
 		base.FloorPerMinute = *s.FloorPerMinute
 	}
+	if s.Parent != nil {
+		base.Parent = *s.Parent
+	}
 	return base
 }
 
 // key identifies the values of the section, so a re-read that finds the same
 // values changes nothing.
 func (s traceSamplingSection) key() string {
-	return optionalKey(s.Budget) + "|" + optionalKey(s.Ratio) + "|" + optionalKey(s.FloorPerMinute)
+	return optionalKey(s.Budget) + "|" + optionalKey(s.Ratio) + "|" + optionalKey(s.FloorPerMinute) + "|" + optionalKey(s.Parent)
 }
 
-func optionalKey[T int64 | float64](value *T) string {
+func optionalKey[T int64 | float64 | string](value *T) string {
 	if value == nil {
 		return "unset"
 	}
@@ -81,7 +98,9 @@ func optionalKey[T int64 | float64](value *T) string {
 // Sampler decides the root spans of the tracer provider the plugin builds by
 // the trace budget, and counts each decision in trace.decisions. The provider
 // wraps it in a parent-based sampler, so a span with a parent, remote or
-// local, follows its parent's sampled flag and never reaches it.
+// local, follows its parent's sampled flag and never reaches it, except under
+// ParentDecide a span whose remote parent came from outside, which the
+// sampler decides as a root.
 //
 // Settings returns the settings in force, and Update replaces them for the
 // next root decision. The plugin calls Update when the telemetry.traces config
@@ -133,6 +152,32 @@ func (s *Sampler) ShouldSample(p sdktrace.SamplingParameters) sdktrace.SamplingR
 
 // Description implements sdktrace.Sampler.
 func (s *Sampler) Description() string { return "PutnamiTraceBudget" }
+
+// parentPolicy is the sampler of the tracer provider the plugin builds: a
+// parent-based sampler over root, except that a span whose remote parent came
+// from outside, as ProxySafeTraceContext marks it, takes a root decision when
+// the parent policy in force is ParentDecide.
+type parentPolicy struct {
+	root        *Sampler
+	parentBased sdktrace.Sampler
+}
+
+func newParentPolicy(root *Sampler) parentPolicy {
+	return parentPolicy{root: root, parentBased: sdktrace.ParentBased(root)}
+}
+
+// ShouldSample implements sdktrace.Sampler.
+func (p parentPolicy) ShouldSample(params sdktrace.SamplingParameters) sdktrace.SamplingResult {
+	if outsideParent(params.ParentContext) && p.root.budget.InForce(p.root.now()).DecidesOutsideParents() {
+		return p.root.ShouldSample(params)
+	}
+	return p.parentBased.ShouldSample(params)
+}
+
+// Description implements sdktrace.Sampler.
+func (p parentPolicy) Description() string {
+	return "PutnamiParentPolicy{" + p.parentBased.Description() + "}"
+}
 
 // Settings returns the settings in force.
 func (s *Sampler) Settings() TraceSampling { return s.budget.Settings() }

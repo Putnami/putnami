@@ -43,16 +43,22 @@ supply a default when the variable is unset.
 
 Traces follow a budget: each instance keeps its first 100 root traces, then
 1 % of them, with at least 1 root each minute. Set `telemetry.traces.budget`,
-`ratio` and `floorPerMinute` to change it, in Go and in TypeScript. A change
+`ratio` and `floorPerMinute` to change it, in Go and in TypeScript. Behind a
+load balancer, set `telemetry.traces.parent: decide`: a server span then
+samples by that budget instead of following the edge's `traceparent`, whose
+sampled flag is usually off, and stays on the edge's trace. A change
 to a file under `conf/` applies within 30 seconds, without a restart; a change
 in `CONFIG_DATA` applies at the next start, and so does a change in Putnami
 Cloud config, unless the workload sets `CONFIG_SERVER_REFRESH` (for example
 `1m`): the change then applies within that period plus a minute.
 
-The collector can tighten every service from its export responses, without a
-redeploy: a `Putnami-Export-Directive: trace-ratio=0.001, log-level=warn,
-ttl=300` header caps the trace ratio and floor and raises the log level for
-`ttl` seconds, at most an hour, and errors are always emitted. A `429` with a
+The collector can tune every service from its export responses, without a
+redeploy: a `Putnami-Export-Directive: trace-ratio=1, trace-parent=decide,
+log-level=warn, ttl=300` header replaces the trace budget, ratio, floor and
+parent policy it carries, higher or lower, and raises the log level, for `ttl`
+seconds, at most an hour; errors are always emitted. On Putnami Cloud,
+`putnami cloud telemetry set --app <app> --ratio 1` sets what the collector
+sends. A `429` with a
 `Retry-After` delays the next export of that signal.
 
 Telemetry is opt-in and has **no default endpoint**: if it is enabled but no endpoint is set, the plugin logs a warning and stays off, so data is never shipped to a hardcoded collector.

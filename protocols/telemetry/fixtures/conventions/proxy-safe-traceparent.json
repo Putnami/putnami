@@ -6,6 +6,7 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
       "source": "x-putnami-traceparent",
+      "outside": false,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "traceFlags": "01"}
     },
     {
@@ -13,6 +14,7 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00",
       "source": "x-putnami-traceparent",
+      "outside": false,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "traceFlags": "00"}
     },
     {
@@ -20,6 +22,7 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-03",
       "source": "x-putnami-traceparent",
+      "outside": false,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "traceFlags": "03"}
     },
     {
@@ -27,12 +30,14 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
       "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
       "source": "traceparent",
+      "outside": false,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "00f067aa0ba902b7", "traceFlags": "01"}
     },
     {
       "name": "the second header is absent: traceparent",
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "source": "traceparent",
+      "outside": true,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "a1a1a1a1a1a1a1a1", "traceFlags": "01"}
     },
     {
@@ -40,6 +45,7 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "00-0af7651916cd43dd8448eb211c80319c-00f067aa0ba902b7-01",
       "source": "traceparent",
+      "outside": true,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "a1a1a1a1a1a1a1a1", "traceFlags": "01"}
     },
     {
@@ -47,6 +53,7 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7",
       "source": "traceparent",
+      "outside": true,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "a1a1a1a1a1a1a1a1", "traceFlags": "01"}
     },
     {
@@ -54,6 +61,7 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "00-4BF92F3577B34DA6A3CE929D0E0E4736-00F067AA0BA902B7-01",
       "source": "traceparent",
+      "outside": true,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "a1a1a1a1a1a1a1a1", "traceFlags": "01"}
     },
     {
@@ -61,6 +69,7 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "01-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
       "source": "traceparent",
+      "outside": true,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "a1a1a1a1a1a1a1a1", "traceFlags": "01"}
     },
     {
@@ -68,22 +77,26 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-0000000000000000-01",
       "source": "traceparent",
+      "outside": true,
       "parent": {"traceId": "4bf92f3577b34da6a3ce929d0e0e4736", "spanId": "a1a1a1a1a1a1a1a1", "traceFlags": "01"}
     },
     {
       "name": "the second header alone is no parent",
       "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
-      "source": "none"
+      "source": "none",
+      "outside": false
     },
     {
       "name": "an invalid traceparent is no parent, whatever the second header says",
       "traceparent": "00-00000000000000000000000000000000-a1a1a1a1a1a1a1a1-01",
       "putnamiTraceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
-      "source": "none"
+      "source": "none",
+      "outside": false
     },
     {
       "name": "no header is no parent",
-      "source": "none"
+      "source": "none",
+      "outside": false
     }
   ]
 }

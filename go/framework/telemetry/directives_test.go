@@ -173,15 +173,15 @@ func TestDirectives_TheGoRuntimeAppliesTheFixtureDirectives(t *testing.T) {
 	}
 }
 
-func TestDirectives_ADirectiveTightensTheSamplerUntilItsTTL(t *testing.T) {
-	spectest.Proves(t, "go/service-telemetry", "export-directives", "a-directive-tightens-the-sampler-until-its-ttl")
+func TestDirectives_ADirectiveSetsTheSamplerUntilItsTTL(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "export-directives", "a-directive-sets-the-sampler-until-its-ttl")
 	clock := &testClock{now: time.Unix(1000, 0)}
 	useDirectiveReceiver(t, clock)
 	own := TraceSampling{Budget: 0, Ratio: 0.5, FloorPerMinute: 3}
 	probe := newSamplingProbe(t, Config{ServiceName: "test", TraceSampling: &own})
 	collector := newCollectorStub(t, func(path string, header http.Header) int {
 		if path == otlp.PathMetrics {
-			header.Set(otlp.HeaderExportDirective, "trace-ratio=0.1, trace-floor=1, ttl=60")
+			header.Set(otlp.HeaderExportDirective, "trace-budget=7, trace-ratio=0.9, trace-floor=1, ttl=60")
 		}
 		return http.StatusOK
 	})
@@ -191,8 +191,8 @@ func TestDirectives_ADirectiveTightensTheSamplerUntilItsTTL(t *testing.T) {
 		t.Fatal(err)
 	}
 	budget := probe.plugin.Sampler().budget
-	if got := budget.InForce(clock.Now()); got != (TraceSampling{Budget: 0, Ratio: 0.1, FloorPerMinute: 1}) {
-		t.Fatalf("settings in force = %+v, want the directive's ratio and floor", got)
+	if got := budget.InForce(clock.Now()); got != (TraceSampling{Budget: 7, Ratio: 0.9, FloorPerMinute: 1}) {
+		t.Fatalf("settings in force = %+v, want the directive's budget, higher ratio and lower floor", got)
 	}
 	if probe.plugin.Sampler().Settings() != own {
 		t.Fatalf("the directive changed the sampler's own settings to %+v", probe.plugin.Sampler().Settings())
@@ -208,8 +208,28 @@ func TestDirectives_ADirectiveTightensTheSamplerUntilItsTTL(t *testing.T) {
 		t.Fatal(err)
 	}
 	late := newSamplingProbe(t, Config{ServiceName: "late", TraceSampling: &own})
-	if got := late.plugin.Sampler().budget.InForce(clock.Now()); got.Ratio != 0.1 {
-		t.Fatalf("a plugin configured during a directive samples at %v, want 0.1", got.Ratio)
+	if got := late.plugin.Sampler().budget.InForce(clock.Now()); got.Ratio != 0.9 {
+		t.Fatalf("a plugin configured during a directive samples at %v, want 0.9", got.Ratio)
+	}
+}
+
+func TestDirectives_ADirectiveSetsTheParentPolicy(t *testing.T) {
+	spectest.Proves(t, "go/service-telemetry", "parent-policy", "a-directive-sets-the-parent-policy")
+	clock := &testClock{now: time.Unix(1000, 0)}
+	receiver := useDirectiveReceiver(t, clock)
+	probe := newSamplingProbe(t, Config{ServiceName: "test", TraceSampling: &TraceSampling{Ratio: 1}})
+	probe.plugin.Sampler().now = clock.Now
+	outside := "00-4bf92f3577b34da6a3ce929d0e0e4736-a1a1a1a1a1a1a1a1-00"
+	if serveRequest(t, outside, "").IsSampled() {
+		t.Fatal("under follow an outside parent's unsampled flag did not decide the span")
+	}
+	receiver.receive("trace-parent=decide, ttl=60")
+	if !serveRequest(t, outside, "").IsSampled() {
+		t.Fatal("under a decide directive the span followed its outside parent")
+	}
+	clock.Set(time.Unix(1060, 0))
+	if serveRequest(t, outside, "").IsSampled() {
+		t.Fatal("once the ttl ended the span did not follow its outside parent again")
 	}
 }
 

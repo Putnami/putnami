@@ -51,6 +51,7 @@ var publicEntries = []publicEntry{
 	{"logs", "logs", "query a project's logs"},
 	{"traces", "traces", "query a project's traces"},
 	{"metrics", "metrics", "query a project's metrics"},
+	{"telemetry", "telemetry show | set | reset", "trace sampling and log level settings the services apply without a redeploy"},
 }
 
 // machineCommands are called by the engine, a provider seam, or another
@@ -79,7 +80,7 @@ var operatorCommands = map[string]string{
 // selfHelpEntries answer `help` with their own verbs.
 var selfHelpEntries = map[string]bool{
 	"status": true, "token": true, "packages": true, "channels": true, "ci": true, "cache": true,
-	"source": true, "config": true, "secrets": true, "db": true, "env": true,
+	"source": true, "config": true, "secrets": true, "db": true, "env": true, "telemetry": true,
 }
 
 // rootHelpArgs answers `putnami cloud <name> help` before any handler runs, so

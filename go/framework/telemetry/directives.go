@@ -16,9 +16,9 @@ import (
 // Export directives. Every OTLP exporter of the process, the log sink
 // included, hands each collector response to processDirectives. A response
 // that carries a valid Putnami-Export-Directive header replaces the directive
-// in force: until its ttl ends, the sampler of each running plugin takes the
-// stricter of the directive and its own settings, and every logger the
-// stricter of the directive's level and its own. A void header changes
+// in force: until its ttl ends, each trace setting it carries replaces that of
+// the sampler of each running plugin, higher or lower, and every logger takes
+// the stricter of the directive's level and its own. A void header changes
 // nothing. The rule is the telemetry/otlp-push-contract one, shared with the
 // TypeScript runtime.
 
@@ -75,7 +75,7 @@ func (r *directiveReceiver) receive(value string) {
 	defer r.mu.Unlock()
 	r.directive, r.arrived, r.ends = directive, now, now.Add(directive.TTL)
 	for sampler := range r.samplers {
-		sampler.budget.Restrict(directive, now)
+		sampler.budget.Direct(directive, now)
 	}
 	limit := &levelLimit{level: lowestLevel, ends: r.ends}
 	if directive.LogLevel != "" {
@@ -105,7 +105,7 @@ func (r *directiveReceiver) register(sampler *Sampler) {
 	defer r.mu.Unlock()
 	r.samplers[sampler] = struct{}{}
 	if r.now().Before(r.ends) {
-		sampler.budget.Restrict(r.directive, r.arrived)
+		sampler.budget.Direct(r.directive, r.arrived)
 	}
 }
 
