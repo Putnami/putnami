@@ -35,7 +35,7 @@ var repoRoot string
 // through its package, references it and builds with tsc -b too.
 var files = map[string]string{
 	".gitignore":             "node_modules\ndist\n*.tsbuildinfo\n.putnami\n.gen\n",
-	"package.json":           `{"name": "ws", "private": true, "packageManager": "bun@1.4.0", "workspaces": ["libs/lib", "apps/app"]}` + "\n",
+	"package.json":           `{"name": "ws", "private": true, "packageManager": "bun@1.4.5", "workspaces": ["libs/lib", "apps/app"]}` + "\n",
 	"putnami.workspace.json": `{"name": "ws", "extensions": ["/.ext/typescript", "/.ext/dev"], "includes": ["libs/lib", "apps/app"]}` + "\n",
 	"libs/lib/putnami.json":  `{"name": "lib", "extensions": ["@putnami/typescript"]}` + "\n",
 	"libs/lib/package.json": `{"name": "lib", "type": "module", "main": "dist/index.js", "types": "dist/index.d.ts",` +

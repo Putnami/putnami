@@ -106,7 +106,7 @@ func importWorkspace(t *testing.T, runtime string) string {
 	// whose digests the extension ships, so the install reads no release
 	// metadata from GitHub, and an empty workspaces list, which the install
 	// fills in: an adopted repository that keeps no list gains none.
-	clitest.WriteFile(t, filepath.Join(root, "package.json"), `{"name": "shop", "private": true, "packageManager": "bun@1.4.0", "workspaces": []}`+"\n")
+	clitest.WriteFile(t, filepath.Join(root, "package.json"), `{"name": "shop", "private": true, "packageManager": "bun@1.4.5", "workspaces": []}`+"\n")
 	clitest.WriteFile(t, filepath.Join(root, "putnami.workspace.json"), `{"name": "shop", "extensions": ["/.ext/rush", "/.ext/typescript", "/.ext/dev"], "includes": [], "options": {"@putnami/rush": {"mode": "import"}}}`)
 
 	for name, rel := range map[string]string{"typescript": "typescript/extension", "dev": "tooling/dev"} {

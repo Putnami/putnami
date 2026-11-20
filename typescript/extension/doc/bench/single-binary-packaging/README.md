@@ -139,6 +139,13 @@ landed at 3 138 and 854 for the same kind of nondeterminism, and repeat runs of
 `bench.sh determinism` move both numbers — which is the clearest statement of
 the problem.)
 
+> **Update, Bun 1.4.5.** Bun 1.4.5 compiles bytecode reproducibly: three
+> `--compile --bytecode --format=esm` compiles of a 6.5 MB server bundle for
+> `bun-linux-x64` are byte-identical, where Bun 1.4.0 differs by 129,728 bytes.
+> The compile phase now passes `--bytecode` when the Bun that runs it is 1.4.5
+> or later (see [Build](../../02-build.md#phase-4-compile)). The finding below
+> holds for earlier releases.
+
 This is the finding that constrains the verdict. `putnami package --docker`
 content-addresses images (`oci.ContentHash`) so "identical inputs produce a
 byte-identical image and the digest can travel across commits"

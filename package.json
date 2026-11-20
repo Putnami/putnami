@@ -27,7 +27,7 @@
     "@putnami/spectest": "workspace:*",
     "@putnami/utils": "workspace:*"
   },
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.5",
   "private": true,
   "repository": {
     "type": "git",

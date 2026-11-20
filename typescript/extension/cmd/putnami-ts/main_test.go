@@ -52,9 +52,16 @@ func mockBiomeResolution(t *testing.T) {
 }
 
 // mockAllExec mocks exec in all internal packages with a success result.
+// The compile's bun --version probe answers Bun 1.4.0, a release that compiles
+// without bytecode, so fn sees only the commands a test asserts on.
 func mockAllExec(t *testing.T, fn func(string, []string, ...exec.Option) (*exec.Result, error)) {
 	t.Helper()
-	t.Cleanup(build.SetExecRunForTesting(fn))
+	t.Cleanup(build.SetExecRunForTesting(func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(args, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.4.0\n"}, nil
+		}
+		return fn(name, args, opts...)
+	}))
 	t.Cleanup(testjob.SetExecRunForTesting(fn))
 	t.Cleanup(hooks.SetExecRunForTesting(fn))
 	t.Cleanup(lint.SetExecRunForTesting(fn))
@@ -914,7 +921,7 @@ func TestWorkspaceBiomeDefault_FreshWorkspacePutnamiLifecycle(t *testing.T) {
 		t.Fatal(err)
 	}
 	writeFreshWorkspaceFile(t, workspaceRoot, "putnami.workspace.json", append(workspaceManifest, '\n'))
-	writeFreshWorkspaceFile(t, workspaceRoot, "package.json", []byte("{\"name\":\"fresh-biome-default\",\"private\":true,\"workspaces\":[\"app\"],\"packageManager\":\"bun@1.4.0\"}\n"))
+	writeFreshWorkspaceFile(t, workspaceRoot, "package.json", []byte("{\"name\":\"fresh-biome-default\",\"private\":true,\"workspaces\":[\"app\"],\"packageManager\":\"bun@1.4.5\"}\n"))
 	writeFreshWorkspaceFile(t, workspaceRoot, ".gitignore", []byte("app/ignored.ts\n"))
 	if err := os.Mkdir(filepath.Join(workspaceRoot, ".git"), 0755); err != nil {
 		t.Fatal(err)

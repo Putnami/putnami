@@ -3,6 +3,7 @@ package build
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -1206,7 +1207,7 @@ func TestResolveCompileOutputFile_NestedEntrypoint(t *testing.T) {
 // ---- buildCompileArgs ----
 
 func TestBuildCompileArgs(t *testing.T) {
-	args := buildCompileArgs("", "serve.ts", "/out/serve-linux-x64", "bun-linux-x64")
+	args := buildCompileArgs("", "serve.ts", "/out/serve-linux-x64", "bun-linux-x64", false)
 	if len(args) != 7 {
 		t.Fatalf("expected 7 args, got %d: %v", len(args), args)
 	}
@@ -1222,11 +1223,138 @@ func TestBuildCompileArgs(t *testing.T) {
 }
 
 func TestBuildCompileArgs_Config(t *testing.T) {
-	args := buildCompileArgs("/p/bunfig.toml", "/p/serve.ts", "/out/serve-linux-x64", "bun-linux-x64")
+	args := buildCompileArgs("/p/bunfig.toml", "/p/serve.ts", "/out/serve-linux-x64", "bun-linux-x64", false)
 	want := []string{"build", "--config=/p/bunfig.toml", "--compile", "/p/serve.ts",
 		"--outfile", "/out/serve-linux-x64", "--target", "bun-linux-x64"}
 	if !slices.Equal(args, want) {
 		t.Errorf("buildCompileArgs() = %v, want %v", args, want)
+	}
+}
+
+func TestBuildCompileArgs_Bytecode(t *testing.T) {
+	args := buildCompileArgs("/p/bunfig.toml", "/p/serve.ts", "/out/serve-linux-x64", "bun-linux-x64", true)
+	want := []string{"build", "--config=/p/bunfig.toml", "--compile", "--bytecode", "--format=esm", "/p/serve.ts",
+		"--outfile", "/out/serve-linux-x64", "--target", "bun-linux-x64"}
+	if !slices.Equal(args, want) {
+		t.Errorf("buildCompileArgs() = %v, want %v", args, want)
+	}
+}
+
+// ---- bunCompilesReproducibleBytecode ----
+
+func TestParseBunVersion(t *testing.T) {
+	for _, tc := range []struct {
+		output string
+		want   [3]int
+		ok     bool
+	}{
+		{"1.4.5\n", [3]int{1, 4, 5}, true},
+		{"1.4.12", [3]int{1, 4, 12}, true},
+		{"1.5.0-canary.3+abc", [3]int{1, 5, 0}, true},
+		{"1.4", [3]int{}, false},
+		{"bun 1.4.5", [3]int{}, false},
+		{"", [3]int{}, false},
+	} {
+		got, ok := parseBunVersion(tc.output)
+		if ok != tc.ok || (ok && got != tc.want) {
+			t.Errorf("parseBunVersion(%q) = %v, %v; want %v, %v", tc.output, got, ok, tc.want, tc.ok)
+		}
+	}
+}
+
+func TestBunCompilesReproducibleBytecode(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		result  *exec.Result
+		err     error
+		want    bool
+		wantErr bool
+	}{
+		{"first reproducible release", &exec.Result{Success: true, Stdout: "1.4.5\n"}, nil, true, false},
+		{"later patch", &exec.Result{Success: true, Stdout: "1.4.6"}, nil, true, false},
+		{"later minor", &exec.Result{Success: true, Stdout: "1.5.0"}, nil, true, false},
+		{"later major", &exec.Result{Success: true, Stdout: "2.0.0"}, nil, true, false},
+		{"earlier patch", &exec.Result{Success: true, Stdout: "1.4.0"}, nil, false, false},
+		{"earlier minor", &exec.Result{Success: true, Stdout: "1.3.14"}, nil, false, false},
+		{"unreadable version", &exec.Result{Success: true, Stdout: "canary"}, nil, false, true},
+		{"failed probe", &exec.Result{Success: false, Stderr: "boom"}, nil, false, true},
+		{"no result", nil, nil, false, true},
+		{"probe error", nil, errors.New("no bun"), false, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+				if !slices.Equal(args, []string{"--version"}) {
+					t.Errorf("probe args = %v, want [--version]", args)
+				}
+				return tc.result, tc.err
+			})
+			got, err := bunCompilesReproducibleBytecode("bun", t.TempDir())
+			if (err != nil) != tc.wantErr || got != tc.want {
+				t.Errorf("bunCompilesReproducibleBytecode() = %v, %v; want %v, error %v", got, err, tc.want, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestRunCompile_BytecodeFollowsTheBunVersion(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-compile-bytecode",
+		"a-compile-on-bun-1-4-5-or-later-carries-bytecode-and-an-earlier-bun-compiles-without")
+	for _, tc := range []struct {
+		version string
+		want    bool
+	}{
+		{"1.4.5", true},
+		{"1.4.0", false},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			dir := t.TempDir()
+			var compiles [][]string
+			withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+				if slices.Equal(args, []string{"--version"}) {
+					return &exec.Result{Success: true, Stdout: tc.version + "\n"}, nil
+				}
+				compiles = append(compiles, args)
+				for i, a := range args {
+					if a == "--outfile" && i+1 < len(args) {
+						os.MkdirAll(filepath.Dir(args[i+1]), 0o755)
+						os.WriteFile(args[i+1], []byte("binary"), 0o755)
+					}
+				}
+				return &exec.Result{Success: true}, nil
+			})
+			if _, errs, err := RunCompile("bun", dir, filepath.Join(dir, "compile"), "serve.ts", []string{"bun-linux-x64", "bun-linux-arm64"}); err != nil || len(errs) > 0 {
+				t.Fatalf("RunCompile: err=%v errors=%v", err, errs)
+			}
+			if len(compiles) != 2 {
+				t.Fatalf("compiles = %d, want 2", len(compiles))
+			}
+			for _, args := range compiles {
+				if got := slices.Contains(args, "--bytecode") && slices.Contains(args, "--format=esm"); got != tc.want {
+					t.Errorf("bun %s: compile args %v carry bytecode = %v, want %v", tc.version, args, got, tc.want)
+				}
+			}
+		})
+	}
+}
+
+func TestRunCompile_FailsWhenTheBunVersionCannotBeRead(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "bun-compile-bytecode",
+		"a-bun-whose-version-cannot-be-read-fails-the-compile")
+	dir := t.TempDir()
+	var compiles int
+	withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(args, []string{"--version"}) {
+			return &exec.Result{Success: false, Stderr: "bun: killed"}, nil
+		}
+		compiles++
+		return &exec.Result{Success: true}, nil
+	})
+	files, errs, err := RunCompile("bun", dir, filepath.Join(dir, "compile"), "serve.ts", []string{"bun-linux-x64"})
+	if err == nil || !strings.Contains(err.Error(), "bun: killed") {
+		t.Fatalf("RunCompile error = %v, want the probe's stderr", err)
+	}
+	if compiles != 0 || len(files) != 0 || len(errs) != 0 {
+		t.Errorf("compiles=%d files=%v errors=%v, want no compile", compiles, files, errs)
 	}
 }
 
@@ -1260,6 +1388,9 @@ func TestRunCompile_Success(t *testing.T) {
 	outDir := filepath.Join(dir, "compile")
 
 	withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(args, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.4.0\n"}, nil
+		}
 		// Create the output file to simulate a real compile
 		for i, a := range args {
 			if a == "--outfile" && i+1 < len(args) {
@@ -1291,6 +1422,9 @@ func TestRunCompile_AllDefaultTargets(t *testing.T) {
 
 	var calledTargets []string
 	withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(args, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.4.0\n"}, nil
+		}
 		for i, a := range args {
 			if a == "--target" && i+1 < len(args) {
 				calledTargets = append(calledTargets, args[i+1])
@@ -1323,6 +1457,9 @@ func TestRunCompile_Failure(t *testing.T) {
 	outDir := filepath.Join(dir, "compile")
 
 	withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(args, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.4.0\n"}, nil
+		}
 		return &exec.Result{Success: false, ExitCode: 1, Stderr: "compile error"}, nil
 	})
 
@@ -1346,6 +1483,9 @@ func TestRunCompile_ExecError(t *testing.T) {
 	outDir := filepath.Join(dir, "compile")
 
 	withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+		if slices.Equal(args, []string{"--version"}) {
+			return &exec.Result{Success: true, Stdout: "1.4.0\n"}, nil
+		}
 		return nil, os.ErrNotExist
 	})
 

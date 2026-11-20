@@ -76,7 +76,7 @@ func TestADelegatedTurborepoImportsPricingAndPassesLintTestBuild(t *testing.T) {
 	}
 	// Bun installs, and an empty workspaces list, which the install fills in:
 	// an adopted repository that keeps no list gains none.
-	pkg["packageManager"] = json.RawMessage(`"bun@1.4.0"`)
+	pkg["packageManager"] = json.RawMessage(`"bun@1.4.5"`)
 	pkg["workspaces"] = json.RawMessage(`[]`)
 	data, _ = json.MarshalIndent(pkg, "", "  ")
 	clitest.WriteFile(t, filepath.Join(root, "package.json"), string(data)+"\n")

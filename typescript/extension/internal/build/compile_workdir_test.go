@@ -16,6 +16,7 @@ import (
 // --outfile. While the temporary file exists, it records what git lists as
 // untracked in the project: what a source binding computed at that moment sees.
 const fakeCompileBun = `#!/bin/sh
+if [ "$1" = "--version" ]; then echo 1.4.5; exit 0; fi
 out=""
 while [ $# -gt 0 ]; do
   if [ "$1" = "--outfile" ]; then out="$2"; fi
