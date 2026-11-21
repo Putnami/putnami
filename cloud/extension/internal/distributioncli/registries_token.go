@@ -231,7 +231,7 @@ func delegatedRegistryMintError(env map[string]string) error {
 		return nil
 	}
 	return clicore.NewError(
-		fmt.Sprintf("no registry token: this session is delegated through an MCP connection (%s) for workspace %s, and its token cannot create the API key a registry token needs",
+		fmt.Sprintf("this session is delegated through an MCP connection (%s) for workspace %s, and its token cannot create the API key a registry token needs",
 			delegation.Actor, delegation.WorkspaceID),
 		clicore.ExitAuth,
 	)
