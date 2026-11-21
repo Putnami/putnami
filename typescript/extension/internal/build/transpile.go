@@ -152,11 +152,9 @@ func RunTranspile(bunBin, projectPath, outputPath string, params TranspileParams
 }
 
 // localChunkRequire matches an import.meta.require call whose argument is a
-// relative path. Since Bun 1.4.5, `bun build --splitting` writes a lazy
-// require('./x') of a source module as its own chunk and loads it with
-// import.meta.require("./x-<hash>.js"). `bun build --compile` never embeds an
-// import.meta.require target, so an executable compiled against such a
-// library fails at startup with "Cannot find module".
+// relative path: the load of a chunk of the library's own output. Library
+// output holds no such call, since `bun build --compile` does not embed its
+// target.
 var localChunkRequire = regexp.MustCompile(`import\.meta\.require\(\s*["'](\.{1,2}/[^"']+)["']\s*\)`)
 
 // chunkHashSuffix is the content hash Bun appends to a chunk file name.

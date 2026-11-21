@@ -18,9 +18,9 @@ export interface DescriptionAndOptions {
  *
  * Pairs an HTTP status code with a response payload. Subclasses for the
  * common status codes (e.g. `BadRequestException`, `NotFoundException`) are
- * derived from this class in `exceptions.ts`. When the error reaches the
- * HTTP layer it is serialized via {@link HttpException.toJSON} into the JSON
- * response body.
+ * derived from this class with {@link createExceptionClass} and exported from
+ * `exceptions.ts`. When the error reaches the HTTP layer it is serialized via
+ * {@link HttpException.toJSON} into the JSON response body.
  */
 export class HttpException extends Error {
   public static from(error: unknown): HttpException {
@@ -167,10 +167,7 @@ export function createExceptionClass(
   return classes[name] as HttpExceptionConstructor;
 }
 
-// Defined here, not in exceptions.ts, so that HttpException.from reaches it
-// through a static binding: exceptions.ts imports error.utils.ts, which imports
-// this module, and a lazy require() back into exceptions.ts becomes a chunk that
-// a compiled executable cannot load. exceptions.ts re-exports it.
+// exceptions.ts re-exports this class with the other HTTP exceptions.
 export const InternalServerErrorException = createExceptionClass(
   'InternalServerErrorException',
   HttpStatus.INTERNAL_SERVER_ERROR,

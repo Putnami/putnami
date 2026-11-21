@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/exec"
 )
 
@@ -886,6 +887,7 @@ func writeSingleEntryProject(t *testing.T) string {
 }
 
 func TestRunTranspile_FailsOnImportMetaRequireOfALocalChunk(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "library-output-has-no-lazy-chunk-loads", "a-lazy-chunk-load-fails-the-transpile-and-names-its-source")
 	dir := writeSingleEntryProject(t)
 	outDir := filepath.Join(dir, "lib")
 	mockTranspileOutput(t, map[string]string{
@@ -919,6 +921,7 @@ func TestRunTranspile_FailsOnImportMetaRequireOfALocalChunk(t *testing.T) {
 }
 
 func TestRunTranspile_AcceptsOutputWithoutLocalChunkRequire(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "library-output-has-no-lazy-chunk-loads", "output-without-a-lazy-chunk-load-passes")
 	dir := writeSingleEntryProject(t)
 	outDir := filepath.Join(dir, "lib")
 	mockTranspileOutput(t, map[string]string{

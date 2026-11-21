@@ -428,9 +428,6 @@ let _defaultLogger: Logger | undefined;
 const getDefaultLogger = (): Logger => {
   if (!_defaultLogger) {
     const config = getLoggerConfig();
-    // Static imports: the sinks import only types from logger.type.ts, so they
-    // form no cycle with this module. A lazy require() here would be emitted as
-    // a separate chunk that a `bun build --compile` executable cannot load.
     const outputSink: LogSink = config.json ? new JsonSink() : new ConsoleSink();
 
     let sinks: LogSink[];
