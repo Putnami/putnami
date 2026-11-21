@@ -157,7 +157,9 @@ func TestTelemetryShow_PrintsWorkspaceAndServices(t *testing.T) {
 	assertContains(t, text, "Telemetry settings of workspace ws-acme. An unset field keeps the service's own setting.")
 	assertContains(t, text, "workspace: ratio 0.5 (updated 2026-05-19T09:00:00Z)")
 	assertContains(t, text, "my-app: budget 1000, parent decide, log level warn until 2026-05-19T10:00:00Z (updated 2026-05-19T09:00:00Z)")
-	assertContains(t, text, "  in force: budget 1000, ratio 0.5, parent decide, log level warn until 2026-05-19T10:00:00Z")
+	if last := (*stdout)[len(*stdout)-1]; last != "  in force: budget 1000, ratio 0.5, parent decide, log level warn" {
+		t.Fatalf("in force = %q, want the settings without an expiry", last)
+	}
 	if len(fake.writes) != 0 {
 		t.Fatalf("show wrote %v", fake.writes)
 	}
@@ -333,7 +335,7 @@ func TestTelemetryApp_NamesTheServiceRow(t *testing.T) {
 
 func TestTelemetryFor_SetsTheExpiry(t *testing.T) {
 	spectest.Proves(t, "cloud/telemetry-settings", "for-ends-the-row", "telemetry-for-sets-the-expiry")
-	telemetryClock(t, time.Date(2026, 11, 21, 18, 30, 15, 500, time.FixedZone("CET", 3600)))
+	telemetryClock(t, time.Date(2026, 11, 21, 18, 30, 15, 0, time.FixedZone("CET", 3600)))
 	fake := newTelemetryFake(t)
 	ioctx, stdout := telemetryIO(t, fake)
 
@@ -345,20 +347,42 @@ func TestTelemetryFor_SetsTheExpiry(t *testing.T) {
 		t.Fatalf("write = %v, want the settings and an expiry an hour after the command, in UTC", write)
 	}
 	assertContains(t, strings.Join(*stdout, "\n"), "my-app: ratio 1, parent decide until 2026-11-21T18:30:15Z")
+
+	// A duration shorter than what is left of the second still ends after
+	// the write: the expiry rounds up.
+	telemetryClock(t, time.Date(2026, 11, 21, 18, 0, 0, 0, time.UTC))
+	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--for", "999ms"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if write := fake.writes[1]; write["expiresAt"] != "2026-11-21T18:00:01Z" {
+		t.Fatalf("expiresAt = %v, want it rounded up to the next second", write["expiresAt"])
+	}
 }
 
-func TestTelemetrySet_KeepsTheExpiry(t *testing.T) {
-	spectest.Proves(t, "cloud/telemetry-settings", "for-ends-the-row", "telemetry-set-keeps-the-expiry")
+func TestTelemetrySet_WithoutForHoldsUntilReset(t *testing.T) {
+	spectest.Proves(t, "cloud/telemetry-settings", "for-ends-the-row", "telemetry-set-without-for-holds-until-reset")
 	fake := newTelemetryFake(t)
 	fake.rows["my-app"] = map[string]any{"traceRatio": 1, "expiresAt": "2026-11-21T19:00:00Z"}
 	ioctx, _ := telemetryIO(t, fake)
+	var warnings []string
+	ioctx.Stderr = func(line string) { warnings = append(warnings, line) }
 
-	// A change to a temporary row never makes it permanent.
 	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--log-level", "warn"); err != nil {
 		t.Fatalf("set: %v", err)
 	}
-	if write := fake.writes[0]; write["traceRatio"] != 1.0 || write["logLevel"] != "warn" || write["expiresAt"] != "2026-11-21T19:00:00Z" {
-		t.Fatalf("write = %v, want the row's expiry kept", write)
+	if write := fake.writes[0]; write["traceRatio"] != 1.0 || write["logLevel"] != "warn" || write["expiresAt"] != nil {
+		t.Fatalf("write = %v, want the row with no expiry", write)
+	}
+	assertContains(t, strings.Join(warnings, "\n"),
+		"cloud telemetry set: the row of my-app ended at 2026-11-21T19:00:00Z and now holds until reset; give --for to end it")
+
+	// A row with no expiry draws no notice.
+	warnings = nil
+	if err := runTelemetry(ioctx, "set", "--app", "my-app", "--ratio", "0.5"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if len(warnings) != 0 {
+		t.Fatalf("warnings = %v, want none", warnings)
 	}
 }
 

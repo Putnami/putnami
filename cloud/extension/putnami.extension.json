@@ -2213,7 +2213,7 @@
         },
         "for": {
           "type": "string",
-          "description": "set: end the row after this duration, such as 30m or 1h; without it the row keeps its expiry, or holds until reset."
+          "description": "set: end the row after this duration, such as 30m or 1h; without it the row holds until reset."
         },
         "workspace": {
           "type": "string",
