@@ -1115,7 +1115,7 @@ putnami cloud logs [<app>] --cursor <c> | --all     # cursor pagination / follow
 putnami cloud traces [<app>] [--env <env>] [--slow <dur>] [--from <t>] [--to <t>] [--output=jsonl]
 putnami cloud metrics [<app>] [--env <env>] [--window <dur>] [--output=jsonl]
 putnami cloud telemetry show [--app <app>] [--output=json]  # the workspace row, each service row, and what each service ends with
-putnami cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--log-level <level>]
+putnami cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--parent follow|decide] [--log-level <level>] [--for <duration>]
 putnami cloud telemetry reset [--app <app>]        # remove the row: back to the service's own settings
 putnami cloud registry-token --host <host>         # machine command: host-based compatibility alias
 ```
@@ -1156,10 +1156,12 @@ from 0 to 1, parent policy `follow` or `decide`, log level `debug`, `info`,
 makes a service behind a load balancer sample its own server spans instead of
 following the edge's flag. `--for <duration>`, such as `1h`, gives the row an
 expiry: config-api reads the row as absent past it, so its services return to
-the workspace row or to their own settings by themselves. Without `--for`,
-`set` keeps the row's expiry, so a change to a temporary row never makes it
-permanent; `--for` alone moves the expiry of a row that sets something. `show`
-prints each row's expiry after `until`. `reset` removes the row. `show` needs
+the workspace row or to their own settings by themselves, within the ttl of
+the last directive they received. Without `--for`, `set` writes the row with no
+expiry, so it holds until reset, and says so when the row had one; `--for`
+alone moves the expiry of a row that sets something. `show` prints each row's
+expiry after `until`; the settings in force name none, since they may come
+from both rows. `reset` removes the row. `show` needs
 `platform.workspace.read`; `set` and `reset` need `platform.workspace.manage`,
 as a person. The settings hold in every environment of the workspace.
 

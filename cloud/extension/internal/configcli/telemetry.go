@@ -142,12 +142,14 @@ func Telemetry(params map[string]any, args []string, workspaceRoot string, env m
 		if row.empty() {
 			return clicore.NewError("cloud telemetry set --for: "+rowName(service)+" sets nothing to end; give a setting with --for", clicore.ExitUsage)
 		}
-		if lasting > 0 {
-			expires := telemetryNow().Add(lasting).UTC().Truncate(time.Second)
-			row.ExpiresAt = &expires
-		}
+		ended := row.ExpiresAt
+		row.ExpiresAt = expiryAfter(lasting)
 		if view, err = writeTelemetry(reqCtx, ctx, verb, service, row); err != nil {
 			return err
+		}
+		if ended != nil && row.ExpiresAt == nil && ioctx.Stderr != nil {
+			ioctx.Stderr("cloud telemetry set: " + rowName(service) + " ended at " + ended.UTC().Format(time.RFC3339) +
+				" and now holds until reset; give --for to end it")
 		}
 		printTelemetry(params, ioctx, view, service)
 		return nil
@@ -164,7 +166,7 @@ func Telemetry(params map[string]any, args []string, workspaceRoot string, env m
 func telemetryHelp(params map[string]any, ioctx clicore.IO) {
 	commands := []map[string]string{
 		{"command": "cloud telemetry show [--app <app>]", "description": "the workspace row, each service row and the settings each service ends with"},
-		{"command": "cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--parent follow|decide] [--log-level <level>] [--for <duration>]", "description": "write the given fields into the row and keep the others; the services apply them within a few minutes; --for ends the row after the duration, such as 1h, and without it the row keeps its expiry, if any"},
+		{"command": "cloud telemetry set [--app <app>] [--budget <n>] [--ratio <0..1>] [--floor <n>] [--parent follow|decide] [--log-level <level>] [--for <duration>]", "description": "write the given fields into the row and keep the others; the services apply them within a few minutes; --for ends the row after the duration, such as 1h, and without it the row holds until reset"},
 		{"command": "cloud telemetry reset [--app <app>]", "description": "remove the row: its services return to their own settings, or to the workspace row"},
 	}
 	if clicore.StructuredOutput(params) {
@@ -238,6 +240,20 @@ func telemetryChoice(params map[string]any, name string, choices []string, refus
 	return &value, nil
 }
 
+// expiryAfter returns the expiry `set --for lasting` writes, rounded up to
+// the second so a short duration still ends after the write, or nil without
+// --for: the row holds until reset.
+func expiryAfter(lasting time.Duration) *time.Time {
+	if lasting <= 0 {
+		return nil
+	}
+	expires := telemetryNow().Add(lasting).UTC()
+	if whole := expires.Truncate(time.Second); !whole.Equal(expires) {
+		expires = whole.Add(time.Second)
+	}
+	return &expires
+}
+
 // rowName names the row of service, or the workspace row for "".
 func rowName(service string) string {
 	if service == "" {
@@ -285,8 +301,7 @@ func rowOf(view *TelemetryView, service string) TelemetrySettings {
 	return TelemetrySettings{}
 }
 
-// mergeTelemetry returns row with each field update sets in its place. The
-// row keeps its expiry.
+// mergeTelemetry returns row with each field update sets in its place.
 func mergeTelemetry(row, update TelemetrySettings) TelemetrySettings {
 	if update.TraceBudget != nil {
 		row.TraceBudget = update.TraceBudget
@@ -455,9 +470,11 @@ func printTelemetry(params map[string]any, ioctx clicore.IO, view *TelemetryView
 		return
 	}
 	ioctx.Stdout("Telemetry settings of workspace " + view.WorkspaceID + ". An unset field keeps the service's own setting.")
-	ioctx.Stdout("workspace: " + describeTelemetry(view.Workspace) + updatedSuffix(view.WorkspaceUpdatedAt))
+	ioctx.Stdout("workspace: " + describeTelemetry(view.Workspace) + untilSuffix(view.Workspace.ExpiresAt) + updatedSuffix(view.WorkspaceUpdatedAt))
 	for _, row := range view.Services {
-		ioctx.Stdout(row.Service + ": " + describeTelemetry(row.Override) + updatedSuffix(row.UpdatedAt))
+		ioctx.Stdout(row.Service + ": " + describeTelemetry(row.Override) + untilSuffix(row.Override.ExpiresAt) + updatedSuffix(row.UpdatedAt))
+		// The settings in force may come from both rows, each ending at its
+		// own expiry, so the line names none.
 		ioctx.Stdout("  in force: " + describeTelemetry(row.Effective))
 	}
 	if service != "" && len(view.Services) == 0 {
@@ -465,8 +482,7 @@ func printTelemetry(params map[string]any, ioctx clicore.IO, view *TelemetryView
 	}
 }
 
-// describeTelemetry renders the fields a row sets, in the order of the flags,
-// then its expiry.
+// describeTelemetry renders the fields a row sets, in the order of the flags.
 func describeTelemetry(s TelemetrySettings) string {
 	var fields []string
 	if s.TraceBudget != nil {
@@ -487,11 +503,16 @@ func describeTelemetry(s TelemetrySettings) string {
 	if len(fields) == 0 {
 		return "nothing set"
 	}
-	text := strings.Join(fields, ", ")
-	if s.ExpiresAt != nil {
-		text += " until " + s.ExpiresAt.UTC().Format(time.RFC3339)
+	return strings.Join(fields, ", ")
+}
+
+// untilSuffix names when a row stops holding, or nothing for a row that holds
+// until reset.
+func untilSuffix(at *time.Time) string {
+	if at == nil {
+		return ""
 	}
-	return text
+	return " until " + at.UTC().Format(time.RFC3339)
 }
 
 func updatedSuffix(at *time.Time) string {
