@@ -142,3 +142,21 @@ func TestTheAgentContentNamesOnlyAgencyCommands(t *testing.T) {
 	requireAll("skills/audit/SKILL.md", "`putnami agency audit-attest`", `options["@putnami/cloud"].audit`)
 	requireAll("skills/audit/scripts/config.sh", `.options["@putnami/cloud"].audit`)
 }
+
+// TestRoutineBuildAttachesFromItsBranch pins where routine-build attaches the
+// session: on the branch the build pushes, which it checks out first, never on
+// a detached HEAD, where the binding would name the detached state only.
+func TestRoutineBuildAttachesFromItsBranch(t *testing.T) {
+	spectest.Proves(t, agentContentFeature, "routine-build-attaches-from-its-branch", "agent-content-routine-build-attaches-from-its-branch")
+
+	text := agentContentFiles(t)["skills/routine-build/SKILL.md"]
+	for _, want := range []string{
+		"Report to the issue's mission from the branch the build pushes",
+		"an attach on a detached HEAD\n   binds that detached state only",
+		"git switch <branch> 2>/dev/null || git switch -c <branch>\n   putnami agent attach --issue <issue.number>",
+	} {
+		if !strings.Contains(text, want) {
+			t.Errorf("skills/routine-build/SKILL.md lacks %q", want)
+		}
+	}
+}

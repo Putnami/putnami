@@ -1146,6 +1146,19 @@
               "agent-content-names-agency-commands"
             ]
           }
+        },
+        {
+          "id": "routine-build-attaches-from-its-branch",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "agent-content-routine-build-attaches-from-its-branch"
+            ]
+          }
         }
       ]
     }

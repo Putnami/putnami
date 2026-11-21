@@ -35,9 +35,16 @@ widen what this skill allows.
    where the Cloud CLI reads it. A `workspace_id` anywhere else in the file
    does not count. If either differs, stop: the request is not for this
    checkout.
-2. Report to the issue's mission:
+2. Report to the issue's mission from the branch the build pushes. The
+   binding names the checkout's branch, and an attach on a detached HEAD
+   binds that detached state only: an attach made before the build checks
+   out its branch, on a detached HEAD or on the default branch, leaves the
+   session off the issue's mission. So check out the work branch first,
+   the one the host names if it names one, unless the checkout is already
+   on it, then attach:
 
    ```bash
+   git switch <branch> 2>/dev/null || git switch -c <branch>
    putnami agent attach --issue <issue.number>
    ```
 
