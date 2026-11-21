@@ -202,7 +202,7 @@ staticFiles({
 **Type:** `number`
 **Default:** `1024`
 
-Minimum file size in bytes to compress. Files larger than this are gzipped.
+Minimum file size in bytes to compress. Files larger than this are gzipped. Set to `0` to disable compression.
 
 ```typescript
 staticFiles({
