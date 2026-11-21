@@ -200,7 +200,7 @@
             "kind": "acceptance",
             "checks": [
               "telemetry-for-sets-the-expiry",
-              "telemetry-set-keeps-the-expiry",
+              "telemetry-set-without-for-holds-until-reset",
               "telemetry-for-alone-moves-the-expiry"
             ]
           }

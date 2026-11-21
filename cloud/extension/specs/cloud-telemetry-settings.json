@@ -13,7 +13,7 @@
     {
       "id": "show-prints-the-rows",
       "text": [
-        "putnami cloud telemetry show reads the workspace's telemetry settings through config-api's generated client and prints the workspace row, each service row and the settings each service ends with, field by field, the parent policy and the expiry included; a field no row sets is left out, and the service keeps its own setting.",
+        "putnami cloud telemetry show reads the workspace's telemetry settings through config-api's generated client and prints the workspace row and each service row, with its parent policy and its expiry, and the settings each service ends with, field by field; a field no row sets is left out, and the service keeps its own setting.",
         "With --app, it prints the workspace row and that service's row only; --output=json prints the view config-api answers."
       ]
     },
@@ -28,8 +28,8 @@
     {
       "id": "for-ends-the-row",
       "text": [
-        "set --for <duration> writes the row with an expiry, now plus a positive duration such as 30m or 1h; config-api reads the row as absent past it, so its services return to the workspace row or their own settings by themselves.",
-        "Without --for, set keeps the row's expiry, if any. --for alone moves the expiry of a row that sets something, and is refused on a row that sets nothing, as is a duration that is not positive, before any write."
+        "set --for <duration> writes the row with an expiry, now plus a positive duration such as 30m or 1h, rounded up to the second; config-api reads the row as absent past it, so its services return to the workspace row or their own settings by themselves.",
+        "Without --for, set writes the row with no expiry: it holds until reset, and set says so when the row had one. --for alone moves the expiry of a row that sets something, and is refused on a row that sets nothing, as is a duration that is not positive."
       ]
     },
     {
