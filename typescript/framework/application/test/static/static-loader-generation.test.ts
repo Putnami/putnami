@@ -99,7 +99,8 @@ function gzipLiterals(source: string): string[] {
  * The loader is served from memory; only its own diagnostics are returned.
  */
 function typeCheckLoader(source: string): string[] {
-  const loaderPath = join(tmpdir(), 'putnami-static-loader-typecheck', '.static.gen.ts');
+  // TypeScript hands the host forward-slash paths on every platform: compare normalized forms.
+  const loaderPath = join(tmpdir(), 'putnami-static-loader-typecheck', '.static.gen.ts').replaceAll('\\', '/');
   const options: ts.CompilerOptions = {
     noEmit: true,
     strict: true,
@@ -114,10 +115,10 @@ function typeCheckLoader(source: string): string[] {
   const readFile = host.getSourceFile.bind(host);
   const fileExists = host.fileExists.bind(host);
   host.getSourceFile = (fileName, languageVersion, ...rest) =>
-    fileName === loaderPath
+    fileName.replaceAll('\\', '/') === loaderPath
       ? ts.createSourceFile(fileName, source, languageVersion)
       : readFile(fileName, languageVersion, ...rest);
-  host.fileExists = (fileName) => fileName === loaderPath || fileExists(fileName);
+  host.fileExists = (fileName) => fileName.replaceAll('\\', '/') === loaderPath || fileExists(fileName);
 
   const program = ts.createProgram([loaderPath], options, host);
   const loader = program.getSourceFile(loaderPath);
