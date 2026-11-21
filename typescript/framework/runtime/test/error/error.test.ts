@@ -6,8 +6,10 @@ import {
   getHttpStatusCode,
   getHttpStatusText,
   HttpException,
+  InternalServerErrorException,
   isHttpException,
 } from '../../src/index';
+import { InternalServerErrorException as InternalServerErrorFromExceptions } from '../../src/error/exceptions';
 import {
   createBody,
   extractDescriptionAndOptionsFrom,
@@ -164,6 +166,15 @@ describe('Error Module', () => {
       const result = HttpException.from('unknown string');
       expect(result.getStatus()).toBe(500);
       expect(result.message).toBe('Unknown Error');
+    });
+
+    it('should build the InternalServerErrorException that exceptions.ts exports', () => {
+      const result = HttpException.from(new Error('boom'));
+
+      expect(InternalServerErrorFromExceptions).toBe(InternalServerErrorException);
+      expect(result).toBeInstanceOf(InternalServerErrorException);
+      expect(result.name).toBe('InternalServerErrorException');
+      expect(result.code).toBe('InternalServerErrorException');
     });
   });
 

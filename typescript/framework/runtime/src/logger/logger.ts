@@ -1,6 +1,7 @@
 import { type Context, tryContext } from '../context';
-import type { ConsoleSink } from './console.sink';
-import type { JsonSink } from './json.sink';
+import { BufferSink } from './buffer.sink';
+import { ConsoleSink } from './console.sink';
+import { JsonSink } from './json.sink';
 import { countLogRecord } from './log-records';
 import { getLoggerConfig, shouldLog } from './logger.config';
 import type { LogEntry, LogLevel, LogSink, SerializedError, WithOptions } from './logger.type';
@@ -427,16 +428,10 @@ let _defaultLogger: Logger | undefined;
 const getDefaultLogger = (): Logger => {
   if (!_defaultLogger) {
     const config = getLoggerConfig();
-    // Dynamic requires to avoid circular imports at module load time.
-    // These modules only depend on logger.type.ts, not this file.
-    const { ConsoleSink: CSink } = require('./console.sink') as { ConsoleSink: typeof ConsoleSink };
-    const { JsonSink: JSink } = require('./json.sink') as { JsonSink: typeof JsonSink };
-
-    const outputSink: LogSink = config.json ? new JSink() : new CSink();
+    const outputSink: LogSink = config.json ? new JsonSink() : new ConsoleSink();
 
     let sinks: LogSink[];
     if (config.buffer) {
-      const { BufferSink } = require('./buffer.sink');
       sinks = [
         new BufferSink({ sink: outputSink, maxSize: config.bufferMaxSize, flushInterval: config.bufferFlushInterval }),
       ];

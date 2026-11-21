@@ -183,6 +183,20 @@
           }
         },
         {
+          "id": "library-output-has-no-lazy-chunk-loads",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-lazy-chunk-load-fails-the-transpile-and-names-its-source",
+              "output-without-a-lazy-chunk-load-passes"
+            ]
+          }
+        },
+        {
           "id": "npm-agent-content",
           "stage": "coded",
           "evidenceKinds": [

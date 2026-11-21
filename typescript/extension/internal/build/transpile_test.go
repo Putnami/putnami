@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/exec"
 )
 
@@ -852,5 +853,114 @@ func TestRunTranspile_CleansStaleOutputBeforeBuilding(t *testing.T) {
 	}
 	if _, err := os.Stat(stale); !os.IsNotExist(err) {
 		t.Fatalf("stale chunk %s survived the rebuild; npm staging would pack it", stale)
+	}
+}
+
+// ---- local chunk require guard ----
+
+// mockTranspileOutput makes every bun build invocation write files into its
+// --outdir, as a real transpile would.
+func mockTranspileOutput(t *testing.T, files map[string]string) {
+	t.Helper()
+	withMockExec(t, func(name string, args []string, opts ...exec.Option) (*exec.Result, error) {
+		outDir := args[indexOfArg(args, "--outdir")+1]
+		for rel, content := range files {
+			path := filepath.Join(outDir, rel)
+			if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return &exec.Result{Success: true}, nil
+	})
+}
+
+func writeSingleEntryProject(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	os.MkdirAll(filepath.Join(dir, "src"), 0o755)
+	os.WriteFile(filepath.Join(dir, "src", "index.ts"), []byte("export {}"), 0o644)
+	os.WriteFile(filepath.Join(dir, "package.json"), []byte(`{"name":"test","exports":{".":{"default":"./src/index.ts"}}}`), 0o644)
+	return dir
+}
+
+func TestRunTranspile_FailsOnImportMetaRequireOfALocalChunk(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "library-output-has-no-lazy-chunk-loads", "a-lazy-chunk-load-fails-the-transpile-and-names-its-source")
+	dir := writeSingleEntryProject(t)
+	outDir := filepath.Join(dir, "lib")
+	mockTranspileOutput(t, map[string]string{
+		"src/index.js":             `export * from "../tsconfig-js9j0sc9.js";`,
+		"tsconfig-js9j0sc9.js":     `var a=()=>{const{ConsoleSink:x}=import.meta.require("./console.sink-fknm05eg.js");const{JsonSink:y}=import.meta.require('./json.sink-reqpfvhc.js');return import.meta.require("./console.sink-fknm05eg.js")};`,
+		"console.sink-fknm05eg.js": `export class ConsoleSink{}`,
+		"json.sink-reqpfvhc.js":    `export class JsonSink{}`,
+	})
+
+	files, errors, err := RunTranspile("bun", dir, outDir, TranspileParams{Target: "bun", Splitting: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if files != nil {
+		t.Errorf("a failed check must return no files, got %v", files)
+	}
+	if len(errors) != 2 {
+		t.Fatalf("expected one error per distinct chunk, got %d: %v", len(errors), errors)
+	}
+	for i, want := range []struct{ chunk, module string }{
+		{"./console.sink-fknm05eg.js", `"console.sink"`},
+		{"./json.sink-reqpfvhc.js", `"json.sink"`},
+	} {
+		msg := errors[i]
+		for _, part := range []string{"tsconfig-js9j0sc9.js", want.chunk, want.module, "static import"} {
+			if !strings.Contains(msg, part) {
+				t.Errorf("error %d does not name %q: %s", i, part, msg)
+			}
+		}
+	}
+}
+
+func TestRunTranspile_AcceptsOutputWithoutLocalChunkRequire(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "library-output-has-no-lazy-chunk-loads", "output-without-a-lazy-chunk-load-passes")
+	dir := writeSingleEntryProject(t)
+	outDir := filepath.Join(dir, "lib")
+	mockTranspileOutput(t, map[string]string{
+		"src/index.js":         `import {a} from "../tsconfig-js9j0sc9.js"; export {a};`,
+		"tsconfig-js9j0sc9.js": `export const a=()=>[import.meta.require("node:fs"),import.meta.require("react"),import.meta.require(name)];`,
+		// A source map quotes the original source; it is never loaded.
+		"tsconfig-js9j0sc9.js.map": `{"sourcesContent":["import.meta.require(\"./x-abc.js\")"]}`,
+	})
+
+	files, errors, err := RunTranspile("bun", dir, outDir, TranspileParams{Target: "bun", Splitting: true, Sourcemap: "external"})
+	if err != nil || len(errors) != 0 {
+		t.Fatalf("unexpected failure: err=%v errors=%v", err, errors)
+	}
+	if len(files) != 3 {
+		t.Errorf("expected the 3 output files, got %v", files)
+	}
+}
+
+func TestFindLocalChunkRequires_NamesTheModuleOfAParentDirectoryChunk(t *testing.T) {
+	outDir := t.TempDir()
+	path := filepath.Join(outDir, "src", "error", "http.exception.js")
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	os.WriteFile(path, []byte(`import.meta.require( "../../exceptions-1a2b3c4d.mjs" )`), 0o644)
+
+	errors := findLocalChunkRequires(outDir, []string{path})
+	if len(errors) != 1 {
+		t.Fatalf("expected 1 error, got %v", errors)
+	}
+	for _, part := range []string{"src/error/http.exception.js", "../../exceptions-1a2b3c4d.mjs", `"exceptions"`} {
+		if !strings.Contains(errors[0], part) {
+			t.Errorf("error does not name %q: %s", part, errors[0])
+		}
+	}
+}
+
+func TestFindLocalChunkRequires_ReportsAnUnreadableFile(t *testing.T) {
+	outDir := t.TempDir()
+	errors := findLocalChunkRequires(outDir, []string{filepath.Join(outDir, "missing.js")})
+	if len(errors) != 1 || !strings.Contains(errors[0], "missing.js") {
+		t.Fatalf("expected one error naming the unreadable file, got %v", errors)
 	}
 }

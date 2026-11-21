@@ -6,7 +6,9 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
+	"strings"
 	"time"
 
 	"go.putnami.dev/sdk/extension/exec"
@@ -142,7 +144,59 @@ func RunTranspile(bunBin, projectPath, outputPath string, params TranspileParams
 		return nil
 	})
 
+	if errors := findLocalChunkRequires(outputPath, files); len(errors) > 0 {
+		return nil, errors, nil
+	}
+
 	return files, nil, nil
+}
+
+// localChunkRequire matches an import.meta.require call whose argument is a
+// relative path: the load of a chunk of the library's own output. Library
+// output holds no such call, since `bun build --compile` does not embed its
+// target.
+var localChunkRequire = regexp.MustCompile(`import\.meta\.require\(\s*["'](\.{1,2}/[^"']+)["']\s*\)`)
+
+// chunkHashSuffix is the content hash Bun appends to a chunk file name.
+var chunkHashSuffix = regexp.MustCompile(`-[0-9a-z]+\.m?js$`)
+
+// findLocalChunkRequires returns one error per import.meta.require of a local
+// chunk in the transpiled output. Each names the output file, the chunk it
+// loads, and the source module whose require() produced that chunk.
+func findLocalChunkRequires(outputPath string, files []string) []string {
+	var errors []string
+	for _, path := range files {
+		if ext := filepath.Ext(path); ext != ".js" && ext != ".mjs" {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			errors = append(errors, fmt.Sprintf("Transpile output check: reading %s: %v", path, err))
+			continue
+		}
+		rel, relErr := filepath.Rel(outputPath, path)
+		if relErr != nil {
+			rel = path
+		}
+		seen := map[string]bool{}
+		for _, match := range localChunkRequire.FindAllStringSubmatch(string(data), -1) {
+			target := match[1]
+			if seen[target] {
+				continue
+			}
+			seen[target] = true
+			module := strings.TrimSuffix(filepath.Base(target), filepath.Ext(target))
+			if loc := chunkHashSuffix.FindStringIndex(filepath.Base(target)); loc != nil {
+				module = filepath.Base(target)[:loc[0]]
+			}
+			errors = append(errors, fmt.Sprintf(
+				"Transpile emitted a lazy chunk load: %s calls import.meta.require(%q), the chunk of a require() of %q in the source. "+
+					"bun build --compile never embeds an import.meta.require target, so an executable built with this library fails at startup. "+
+					"Replace that require() with a static import, and break any import cycle it avoided.",
+				filepath.ToSlash(rel), target, module))
+		}
+	}
+	return errors
 }
 
 // TranspileParams holds transpile-specific options.

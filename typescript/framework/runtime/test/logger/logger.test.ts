@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import { runInContext } from '../../src/context';
 import { getLoggerConfig, normalizeLogLevel, resetLoggerConfig } from '../../src/logger/logger.config';
+import { ConsoleSink } from '../../src/logger/console.sink';
+import { JsonSink } from '../../src/logger/json.sink';
 import { Logger, useLogger, resetDefaultLogger, MAX_APPENDED_FIELD_VALUES } from '../../src/logger/logger';
 import { MemoryLogger, MemorySink } from '../../src/logger/memory.logger';
 
@@ -506,6 +508,12 @@ describe('useLogger', () => {
   it('should return a Logger instance', () => {
     const logger = useLogger();
     expect(logger).toBeInstanceOf(Logger);
+  });
+
+  it('should write through the output sink the logger config selects', () => {
+    const [sink] = useLogger().sinks;
+    const expected = getLoggerConfig().json ? JsonSink : ConsoleSink;
+    expect(sink).toBeInstanceOf(expected);
   });
 
   it('should return a named logger', () => {

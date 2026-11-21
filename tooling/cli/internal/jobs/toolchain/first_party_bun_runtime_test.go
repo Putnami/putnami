@@ -92,6 +92,46 @@ func TestFirstPartyBunRuntimesResolveTheInstallUnderThePutnamiHome(t *testing.T)
 	}
 }
 
+// TestTheClientgenEmitterResolvesAnInstallThatHoldsBinBun resolves the
+// clientgen emitter on a host that unpacked the pinned Bun release itself, at
+// toolchains/bun/bun-<version>/bin/bun, as a CI runner image does when its
+// baked bun is another release. The bun on PATH is never substituted, and
+// BUN_INSTALL names the install directory.
+func TestTheClientgenEmitterResolvesAnInstallThatHoldsBinBun(t *testing.T) {
+	spectest.Proves(t, "cli/runtime-toolchain-pinning", "exact-lock-resolution",
+		"a-first-party-bun-runtime-resolves-the-install-under-the-putnami-home")
+	const pinned, ambient = "1.9.9", "1.4.0"
+	if runtime.GOOS == "windows" {
+		t.Skip("the bin/bun candidate names no .exe; a Windows host resolves the archive's bun-<target> layout")
+	}
+	const program = "bin/bun"
+	repoRoot := findJobsRepoRoot(t)
+	root := t.TempDir()
+	writeArchivedToolchainLock(t, root, "bun", pinned, program)
+	onPath := t.TempDir()
+	writeRuntimeTool(t, filepath.Join(onPath, "bun"), ambient)
+	home := t.TempDir()
+	putnamiHome := filepath.Join(home, ".putnami")
+	installDir := filepath.Join(putnamiHome, "toolchains", "bun", "bun-"+pinned)
+	base := []string{"PATH=" + onPath, "HOME=" + home, "USERPROFILE=" + home, "PUTNAMI_HOME=" + putnamiHome}
+	installed := writeRuntimeTool(t, filepath.Join(installDir, filepath.FromSlash(program)), pinned)
+
+	ext := extension.LoadExtensionFromDir(filepath.Join(repoRoot, "tooling", "clientgen-extension"), "@putnami/clientgen")
+	if ext == nil || ext.Runtime == nil {
+		t.Fatal("tooling/clientgen-extension declares no runtime")
+	}
+	if err := resolveRuntimeToolchainRefs(context.Background(), root, ext, []string{"typescriptEmitter"}, base, ResolveStrict); err != nil {
+		t.Fatalf("resolution with bun %s at bin/bun under the Putnami home: %v", pinned, err)
+	}
+	resolution := ext.RuntimeToolchains["typescriptEmitter"]
+	if !resolution.Available || !sameResolvedPath(t, resolution.Executable, installed) {
+		t.Fatalf("resolution = %+v, want the install %s", resolution, installed)
+	}
+	if got := resolution.Environment["BUN_INSTALL"]; !sameResolvedPath(t, got, installDir) {
+		t.Fatalf("BUN_INSTALL = %q, want the install directory %s", got, installDir)
+	}
+}
+
 // sameResolvedPath reports whether a and b name the same file once symbolic
 // links are resolved, which a temporary directory holds on macOS.
 func sameResolvedPath(t *testing.T, a, b string) bool {
