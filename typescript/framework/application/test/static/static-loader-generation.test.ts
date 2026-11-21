@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import ts from 'typescript';
 import { StaticPlugin } from '../../src/static/static.plugin';
 
 /**
@@ -17,7 +18,7 @@ import { StaticPlugin } from '../../src/static/static.plugin';
  *   run and makes the emitted bytes unreviewable.
  */
 describe('static loader generation', () => {
-  async function generateLoader(files: string[]): Promise<string> {
+  async function generateLoader(files: string[], compress = 1_000_000): Promise<string> {
     const originalProjectRoot = process.env['PUTNAMI_PROJECT_ROOT'];
     const projectRoot = mkdtempSync(join(tmpdir(), 'putnami-static-loader-'));
     try {
@@ -28,7 +29,7 @@ describe('static loader generation', () => {
         mkdirSync(join(target, '..'), { recursive: true });
         writeFileSync(target, relative);
       }
-      await new StaticPlugin({ scanPath: sourcePath, compress: 1_000_000 }).generate();
+      await new StaticPlugin({ scanPath: sourcePath, compress }).generate();
       return readFileSync(join(projectRoot, '.gen', 'src', 'static', '.static.gen.ts'), 'utf8');
     } finally {
       if (originalProjectRoot === undefined) {
@@ -71,4 +72,58 @@ describe('static loader generation', () => {
 
     expect(second).toBe(first);
   });
+
+  it('emits a boolean gzip flag that type-checks when compression is off', async () => {
+    const source = await generateLoader(['fonts/inter.woff2', 'index.html'], 0);
+
+    expect(gzipLiterals(source)).toEqual(['false', 'false', 'false', 'false']);
+    expect(typeCheckLoader(source)).toEqual([]);
+  }, 30_000);
+
+  it('emits a boolean gzip flag that type-checks when files are compressed', async () => {
+    const source = await generateLoader(['fonts/inter.woff2', 'index.html'], 1);
+
+    expect(gzipLiterals(source)).toEqual(['true', 'true', 'true', 'true']);
+    expect(typeCheckLoader(source)).toEqual([]);
+  }, 30_000);
 });
+
+/** The value each generated `routeStatic` call passes as `gzip`, as written. */
+function gzipLiterals(source: string): string[] {
+  return [...source.matchAll(/\{ gzip: ([^,]*), mime:/g)].map((match) => match[1] as string);
+}
+
+/**
+ * Type-check a generated loader the way a workload's `build~types` does: against
+ * the real `StaticPlugin` declaration, which `@putnami/application` resolves to.
+ * The loader is served from memory; only its own diagnostics are returned.
+ */
+function typeCheckLoader(source: string): string[] {
+  // TypeScript hands the host forward-slash paths on every platform: compare normalized forms.
+  const loaderPath = join(tmpdir(), 'putnami-static-loader-typecheck', '.static.gen.ts').replaceAll('\\', '/');
+  const options: ts.CompilerOptions = {
+    noEmit: true,
+    strict: true,
+    skipLibCheck: true,
+    types: [],
+    target: ts.ScriptTarget.ES2022,
+    module: ts.ModuleKind.ESNext,
+    moduleResolution: ts.ModuleResolutionKind.Bundler,
+    paths: { '@putnami/application': [join(import.meta.dir, '..', '..', 'src', 'static', 'static.plugin.ts')] },
+  };
+  const host = ts.createCompilerHost(options);
+  const readFile = host.getSourceFile.bind(host);
+  const fileExists = host.fileExists.bind(host);
+  host.getSourceFile = (fileName, languageVersion, ...rest) =>
+    fileName.replaceAll('\\', '/') === loaderPath
+      ? ts.createSourceFile(fileName, source, languageVersion)
+      : readFile(fileName, languageVersion, ...rest);
+  host.fileExists = (fileName) => fileName.replaceAll('\\', '/') === loaderPath || fileExists(fileName);
+
+  const program = ts.createProgram([loaderPath], options, host);
+  const loader = program.getSourceFile(loaderPath);
+  if (!loader) throw new Error('generated loader was not loaded');
+  return [...program.getSyntacticDiagnostics(loader), ...program.getSemanticDiagnostics(loader)].map((diagnostic) =>
+    ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'),
+  );
+}
