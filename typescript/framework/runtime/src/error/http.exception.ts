@@ -1,5 +1,7 @@
 import { isObject, isString } from '@putnami/utils';
+import { createBody, extractDescriptionAndOptionsFrom } from './exception-body';
 import { shouldExposeErrorStack } from './expose-stack';
+import { HttpStatus } from './http-status.enum';
 
 export interface HttpExceptionOptions {
   cause?: Error;
@@ -27,14 +29,12 @@ export class HttpException extends Error {
     }
 
     if (error instanceof Error) {
-      const { InternalServerErrorException } = require('./exceptions');
       // Expose only a generic public message; keep the original error (which may
       // carry DB driver text, file paths, or stack-bearing messages) on `cause`
       // for logs rather than leaking it into the client-facing response body.
       return new InternalServerErrorException('Internal Server Error', { cause: error });
     }
 
-    const { InternalServerErrorException } = require('./exceptions');
     return new InternalServerErrorException('Unknown Error', { cause: error as Error });
   }
 
@@ -137,3 +137,42 @@ export class HttpException extends Error {
 export function isHttpException(value: unknown): value is HttpException {
   return value instanceof HttpException;
 }
+
+export type HttpExceptionConstructor = new (
+  objectOrError?: string | object,
+  descriptionOrOptions?: string | HttpExceptionOptions,
+) => HttpException;
+
+/**
+ * Creates a named HttpException subclass for a given HTTP status code.
+ * The generated class preserves `constructor.name` and supports `instanceof`.
+ */
+export function createExceptionClass(
+  name: string,
+  status: number,
+  defaultDescription: string,
+): HttpExceptionConstructor {
+  // Use computed property name to set the class name dynamically
+  const classes = {
+    [name]: class extends HttpException {
+      constructor(
+        objectOrError?: string | object,
+        descriptionOrOptions: string | HttpExceptionOptions = defaultDescription,
+      ) {
+        const { description, httpExceptionOptions } = extractDescriptionAndOptionsFrom(descriptionOrOptions);
+        super(createBody(objectOrError, description, status), status, httpExceptionOptions);
+      }
+    },
+  };
+  return classes[name] as HttpExceptionConstructor;
+}
+
+// Defined here, not in exceptions.ts, so that HttpException.from reaches it
+// through a static binding: exceptions.ts imports error.utils.ts, which imports
+// this module, and a lazy require() back into exceptions.ts becomes a chunk that
+// a compiled executable cannot load. exceptions.ts re-exports it.
+export const InternalServerErrorException = createExceptionClass(
+  'InternalServerErrorException',
+  HttpStatus.INTERNAL_SERVER_ERROR,
+  'Internal Server Error',
+);

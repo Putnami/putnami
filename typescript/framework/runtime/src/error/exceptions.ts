@@ -82,11 +82,7 @@ export const TooManyRequestsException = createExceptionClass(
 );
 
 // 5xx Server Errors
-export const InternalServerErrorException = createExceptionClass(
-  'InternalServerErrorException',
-  HttpStatus.INTERNAL_SERVER_ERROR,
-  'Internal Server Error',
-);
+export { InternalServerErrorException } from './http.exception';
 export const NotImplementedException = createExceptionClass(
   'NotImplementedException',
   HttpStatus.NOT_IMPLEMENTED,
