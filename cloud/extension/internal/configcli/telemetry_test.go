@@ -374,7 +374,7 @@ func TestTelemetrySet_WithoutForHoldsUntilReset(t *testing.T) {
 		t.Fatalf("write = %v, want the row with no expiry", write)
 	}
 	assertContains(t, strings.Join(warnings, "\n"),
-		"cloud telemetry set: the row of my-app ended at 2026-11-21T19:00:00Z and now holds until reset; give --for to end it")
+		"cloud telemetry set: the row of my-app was to end at 2026-11-21T19:00:00Z and now holds until reset; give --for to end it")
 
 	// A row with no expiry draws no notice.
 	warnings = nil

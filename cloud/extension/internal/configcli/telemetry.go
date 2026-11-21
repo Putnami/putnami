@@ -148,7 +148,7 @@ func Telemetry(params map[string]any, args []string, workspaceRoot string, env m
 			return err
 		}
 		if ended != nil && row.ExpiresAt == nil && ioctx.Stderr != nil {
-			ioctx.Stderr("cloud telemetry set: " + rowName(service) + " ended at " + ended.UTC().Format(time.RFC3339) +
+			ioctx.Stderr("cloud telemetry set: " + rowName(service) + " was to end at " + ended.UTC().Format(time.RFC3339) +
 				" and now holds until reset; give --for to end it")
 		}
 		printTelemetry(params, ioctx, view, service)
