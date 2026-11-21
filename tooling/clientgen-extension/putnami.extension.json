@@ -36,7 +36,8 @@
           { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-linux-aarch64/bun" },
           { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-linux-x64/bun" },
           { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-windows-aarch64/bun.exe" },
-          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-windows-x64/bun.exe" }
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bun-windows-x64/bun.exe" },
+          { "from": "putnami-home", "path": "toolchains/bun/bun-{version}/bin/bun" }
         ],
         "probe": { "args": ["--version"], "expect": "{version}" },
         "environment": {

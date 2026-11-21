@@ -232,8 +232,11 @@ func TestTaskEffectTable(t *testing.T) {
 // the archive @putnami/typescript pins under the Putnami home: the archive
 // holds bun in a bun-<target> directory, one per Bun target. The emitter
 // toolchain lists the program of each target after the host's own locations,
-// so the emitter runs on a host where nobody installed Bun. It lists no
-// provisioned candidate, since @putnami/clientgen answers for no bun pin.
+// so the emitter runs on a host where nobody installed Bun. Last comes
+// bin/bun, the layout a host that unpacks the release itself writes, as a CI
+// runner image does; @putnami/typescript resolves the same two layouts. It
+// lists no provisioned candidate, since @putnami/clientgen answers for no bun
+// pin.
 func TestTypeScriptEmitterResolvesTheBunUnderThePutnamiHome(t *testing.T) {
 	spectest.Proves(t, clientgenFeature, "portable-emitter-resolution",
 		"the-typescript-emitter-resolves-the-bun-under-the-putnami-home")
@@ -252,6 +255,7 @@ func TestTypeScriptEmitterResolvesTheBunUnderThePutnamiHome(t *testing.T) {
 		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-linux-x64/bun"},
 		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-windows-aarch64/bun.exe"},
 		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bun-windows-x64/bun.exe"},
+		{From: proto.RuntimeToolchainCandidatePutnamiHome, Path: "toolchains/bun/bun-{version}/bin/bun"},
 	}
 	if !reflect.DeepEqual(emitter.Candidates, want) {
 		t.Fatalf("typescriptEmitter candidates = %+v, want %+v", emitter.Candidates, want)
