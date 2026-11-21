@@ -1540,6 +1540,11 @@
       "TelemetrySettingValues": {
         "additionalProperties": false,
         "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
           "logLevel": {
             "nullable": true,
             "type": "string"
@@ -1557,6 +1562,10 @@
             "minimum": -9223372036854775808,
             "nullable": true,
             "type": "integer"
+          },
+          "traceParent": {
+            "nullable": true,
+            "type": "string"
           },
           "traceRatio": {
             "format": "double",
@@ -1592,6 +1601,11 @@
       "TelemetrySettingsWriteRequest": {
         "additionalProperties": false,
         "properties": {
+          "expiresAt": {
+            "format": "date-time",
+            "nullable": true,
+            "type": "string"
+          },
           "logLevel": {
             "nullable": true,
             "type": "string"
@@ -1612,6 +1626,10 @@
             "minimum": -9223372036854775808,
             "nullable": true,
             "type": "integer"
+          },
+          "traceParent": {
+            "nullable": true,
+            "type": "string"
           },
           "traceRatio": {
             "format": "double",
@@ -4679,6 +4697,132 @@
             {
               "encoding": "json",
               "path": "/internal/config/secrets/resolve",
+              "protocol": "rest-json"
+            }
+          ]
+        }
+      }
+    },
+    "/internal/config/telemetry-settings": {
+      "get": {
+        "description": "Read the telemetry settings of the workspace the calling workload runs in, the same view as the workspace read. Service-to-service only: a Google ID token for Config's boot audience whose service account Runtime places in a workspace, as a workload's runtime account or as the workspace collector's write account. The workspace collector reads it to return each service its export directive.",
+        "operationId": "getInternal_Config_Telemetry-settings",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TelemetrySettingsView"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "code": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "error",
+                    "message"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "The caller is not a service account Runtime places in a workspace"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "The settings store failed"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/telemetryError"
+                }
+              }
+            },
+            "description": "The caller could not be verified now"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "x-putnami-client": {
+          "errors": [
+            {
+              "code": "http.bad_request",
+              "status": 400
+            },
+            {
+              "code": "forbidden",
+              "status": 403
+            },
+            {
+              "code": "http.internal_server",
+              "status": 500
+            },
+            {
+              "code": "internal",
+              "status": 500
+            },
+            {
+              "code": "http.service_unavailable",
+              "status": 503
+            }
+          ],
+          "idempotency": {
+            "kind": "safe"
+          },
+          "security": {
+            "alternatives": [
+              {
+                "allOf": [
+                  {
+                    "profile": "service"
+                  }
+                ]
+              }
+            ]
+          },
+          "stream": "unary",
+          "transports": [
+            {
+              "encoding": "json",
+              "path": "/internal/config/telemetry-settings",
               "protocol": "rest-json"
             }
           ]
@@ -7773,7 +7917,7 @@
     },
     "/v1/workspaces/{workspace}/config/telemetry": {
       "get": {
-        "description": "Read the workspace's telemetry settings: the workspace row, each service override in service order, and the settings each overridden service ends with, field by field. An unset field takes the framework default. Requires platform.workspace.read at the workspace.\n\nRequired scopes: platform.workspace.read.",
+        "description": "Read the workspace's telemetry settings: the workspace row, each service override in service order, and the settings each overridden service ends with, field by field, the expiry included. A row past its expiry reads as absent. An unset field takes the framework default. Requires platform.workspace.read at the workspace.\n\nRequired scopes: platform.workspace.read.",
         "operationId": "getV1_Workspaces_Workspace_Config_Telemetry",
         "parameters": [
           {
@@ -7897,7 +8041,7 @@
         }
       },
       "put": {
-        "description": "Replace the workspace's telemetry settings row, or one service's override when service is set: trace budget and per-minute trace floor from 0 to 1000000, trace ratio from 0 to 1, log level debug, info, warn or error. A request with every field unset removes the row. Answers the same view as the read. Requires platform.workspace.manage in this request's live Identity projection of the workspace: a token-carried scope alone is refused, and so is a machine token.\n\nRequired scopes: platform.workspace.manage.",
+        "description": "Replace the workspace's telemetry settings row, or one service's override when service names a workload, such as surfaces/workloads/app: trace budget and per-minute trace floor from 0 to 1000000, trace ratio from 0 to 1, trace parent follow or decide, log level debug, info, warn or error, and an optional expiresAt, an RFC 3339 time after the write, past which the row reads as absent. A request that sets no setting removes the row. Answers the same view as the read. Requires platform.workspace.manage in this request's live Identity projection of the workspace: a token-carried scope alone is refused, and so is a machine token.\n\nRequired scopes: platform.workspace.manage.",
         "operationId": "putV1_Workspaces_Workspace_Config_Telemetry",
         "parameters": [
           {

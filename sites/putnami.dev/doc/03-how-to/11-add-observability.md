@@ -57,8 +57,11 @@ redeploy: a `Putnami-Export-Directive: trace-ratio=1, trace-parent=decide,
 log-level=warn, ttl=300` header replaces the trace budget, ratio, floor and
 parent policy it carries, higher or lower, and raises the log level, for `ttl`
 seconds, at most an hour; errors are always emitted. On Putnami Cloud,
-`putnami cloud telemetry set --app <app> --ratio 1` sets what the collector
-sends. A `429` with a
+`putnami cloud telemetry set --app <app> --ratio 1 --parent decide --for 1h`
+sets what the collector sends: every trace of the app for an hour, its server
+spans sampled by the app even behind a load balancer; once the last directive's
+`ttl` runs out after that hour, the workspace's settings or the app's own apply
+again. A `429` with a
 `Retry-After` delays the next export of that signal.
 
 Telemetry is opt-in and has **no default endpoint**: if it is enabled but no endpoint is set, the plugin logs a warning and stays off, so data is never shipped to a hardcoded collector.

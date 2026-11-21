@@ -51,9 +51,10 @@ Two schemas come from the putnami-cloud repository instead of the package.
 which serves the memory, missions (v1 and v2 runs), build start and audit
 attestation routes `@putnami/cloud` calls. `config-api/schema/openapi.json` is a
 byte-for-byte copy of `config/workloads/config-api/schema/openapi.json` at
-commit `34663727215f4ec61080067bec3b16f2f9a10aa2` of `main`, which adds the
+commit `bdecdb94ef12611b2440bc9513a0562543b479e6` of `main`, which carries the
 agent trigger and organization model credential routes of
-`putnami agency trigger` and `putnami agency model-key`. Refresh either one
+`putnami agency trigger` and `putnami agency model-key`, and the parent policy
+and expiry of the telemetry settings `putnami cloud telemetry` writes. Refresh either one
 the same way, from the service's committed `schema/openapi.json`.
 
 ## Update the schemas
