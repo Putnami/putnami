@@ -442,9 +442,12 @@ answer carries `pageUrl`, its change page on putnami.app
 (`https://putnami.app/w/<workspace>/pr-<number>`), so `putnami change
 finalize` prints `CHANGE_URL`. The manifest declares the `pageUrl` member on
 those four operations. Source builds the link from its operator template,
-which has a default. A CLI that predates the member refuses the declaration
-and withdraws this provider's proposals contract: move a workspace's CLI pin
-with, or before, the pin of a `@putnami/cloud` that declares it.
+which has a default. The template must stay set: with an empty one, Source
+answers no `pageUrl`, `putnami proposals capabilities` still lists it, and
+`change finalize` prints no `CHANGE_URL`. A CLI built before the member
+(no 0.4.x release knows it) refuses the declaration and withdraws this
+provider's whole proposals contract: move a workspace's CLI pin with, or
+before, the pin of a `@putnami/cloud` that declares it.
 
 `proposals screenshots` is the one operation that goes to Putnami Delivery,
 which stores the screenshots of a change and shows them on the change page.
