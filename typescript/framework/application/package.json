@@ -40,5 +40,8 @@
     "@putnami/runtime": "workspace:*",
     "@putnami/utils": "workspace:*"
   },
+  "devDependencies": {
+    "typescript": "^6.0.2"
+  },
   "private": false
 }

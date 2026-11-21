@@ -353,7 +353,10 @@ export class StaticPlugin implements Plugin {
       }
       const fileAbsolutePath = joinPath(generatedPublicPath, fileRelativePath);
       const f = file(fileAbsolutePath);
-      const compressed = this.config.compress && f.size > this.config.compress;
+      // A boolean, never the threshold itself: the loader writes it verbatim into
+      // `routeStatic(..., { gzip })`, which takes a boolean, so `compress: 0` must
+      // emit `gzip: false`, not `gzip: 0`, or the loader does not type-check.
+      const compressed: boolean = Boolean(this.config.compress) && f.size > this.config.compress;
 
       const targetFile = compressed ? `${fileRelativePath}.gz` : fileRelativePath;
       // Copy to .gen/public/ (will be copied to dist by Phase 3)

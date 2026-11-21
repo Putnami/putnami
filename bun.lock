@@ -90,6 +90,9 @@
         "@putnami/runtime": "workspace:*",
         "@putnami/utils": "workspace:*",
       },
+      "devDependencies": {
+        "typescript": "^6.0.2",
+      },
     },
     "typescript/framework/cli-protocol": {
       "name": "@putnami/cli-protocol",
