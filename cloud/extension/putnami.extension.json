@@ -604,6 +604,10 @@
               "description": "Keep every trace of one app until reset"
             },
             {
+              "command": "putnami cloud telemetry set --app my-app --ratio 1 --parent decide --for 1h",
+              "description": "Keep every trace of one app behind a load balancer for an hour"
+            },
+            {
               "command": "putnami cloud telemetry reset --app my-app",
               "description": "Return the app to its own settings"
             }
@@ -2181,7 +2185,7 @@
       "activationFiles": [
         "putnami.extension.json"
       ],
-      "description": "Show, set or reset a workspace's telemetry settings: the trace budget, ratio, floor and log level the workspace collector returns to each service as its export directive (supports --output=json).",
+      "description": "Show, set or reset a workspace's telemetry settings: the trace budget, ratio, floor, parent policy and log level the workspace collector returns to each service as its export directive, until reset or for a set time (supports --output=json).",
       "flags": {
         "app": {
           "type": "string",
@@ -2199,9 +2203,17 @@
           "type": "string",
           "description": "set: the root traces kept each minute whatever the ratio picks, a whole number from 0 to 1000000."
         },
+        "parent": {
+          "type": "string",
+          "description": "set: follow keeps the sampled flag of a parent from outside the workspace; decide samples a server span behind a load balancer as a root, on the parent's trace."
+        },
         "log-level": {
           "type": "string",
           "description": "set: the minimum log level, debug, info, warn or error; a level below the service's own changes nothing."
+        },
+        "for": {
+          "type": "string",
+          "description": "set: end the row after this duration, such as 30m or 1h; without it the row keeps its expiry, or holds until reset."
         },
         "workspace": {
           "type": "string",

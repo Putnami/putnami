@@ -1163,14 +1163,21 @@ service's own, higher or lower, and the log level only tightens. An unset field
 keeps the service's own setting. `set` reads the row, writes the flags it is
 given into it and keeps the others; two writes at once keep the last one. It
 checks each range before any call (budget and floor from 0 to 1000000, ratio
-from 0 to 1, log level `debug`, `info`, `warn` or `error`), and a refusal names
-config-api's reason. `reset` removes the row. `show` needs `platform.workspace.read`; `set`
-and `reset` need `platform.workspace.manage`, as a person. The settings hold in
-every environment of the workspace. For now, config-api refuses a row for an
-app whose canonical name holds a folder,
-such as `surfaces/workloads/app`, config-api stores `--budget` but the
-collector does not send it, and a parent policy and an expiry (`--parent`, `--for`) are not
-offered.
+from 0 to 1, parent policy `follow` or `decide`, log level `debug`, `info`,
+`warn` or `error`), and a refusal names config-api's reason. `--parent decide`
+makes a service behind a load balancer sample its own server spans instead of
+following the edge's flag. `--for <duration>`, such as `1h`, gives the row an
+expiry: config-api reads the row as absent past it, so its services return to
+the workspace row or to their own settings by themselves. Without `--for`,
+`set` keeps the row's expiry, so a change to a temporary row never makes it
+permanent; `--for` alone moves the expiry of a row that sets something. `show`
+prints each row's expiry after `until`. `reset` removes the row. `show` needs
+`platform.workspace.read`; `set` and `reset` need `platform.workspace.manage`,
+as a person. The settings hold in every environment of the workspace.
+
+```bash
+putnami cloud telemetry set --app surfaces/workloads/app --ratio 1 --parent decide --for 1h
+```
 
 `putnami cloud status` reads 12 entries at once and gives each a state: `ok`,
 `degraded`, `failing` or `unknown`. The entries are `whoami`, `token`,
