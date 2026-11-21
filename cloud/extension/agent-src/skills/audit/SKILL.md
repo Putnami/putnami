@@ -436,7 +436,7 @@ Module granularity and god files are reported as observations in the umbrella is
 
 ### Workers
 
-Judgment and edits run on different tiers. This extension ships both workers with the skill: `prune-triage` (read-only, strongest tier, high effort) and `prune-apply` (edits, light tier, medium effort), under `.claude/agents/` and `.codex/agents/`. On Codex, the repository registers them in `.codex/config.toml`.
+Judgment and edits run on different tiers. This extension ships both workers with the skill: `prune-triage` (read-only, middle tier, high effort) and `prune-apply` (edits, light tier, medium effort), under `.claude/agents/` and `.codex/agents/`. On Codex, the repository registers them in `.codex/config.toml`.
 
 | Step | Who | Why |
 | --- | --- | --- |

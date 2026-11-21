@@ -25,6 +25,10 @@
         "No file of the content names putnami intelligence or extension:@putnami/intelligence: a command it names is putnami agency trigger, putnami agency build or putnami agency audit-attest, and a workspace that lacks a skill is told to list extension:@putnami/cloud in agentArtifacts.",
         "The audit skill reads its settings from options[\"@putnami/cloud\"].audit."
       ]
+    },
+    {
+      "id": "routine-build-attaches-from-its-branch",
+      "text": "routine-build checks out the work branch before putnami agent attach --issue <issue.number>, so the session reports to mission issue-<number> from the branch the build pushes, never from a detached HEAD or the default branch, as the last routine-build @putnami/intelligence shipped did."
     }
   ]
 }
