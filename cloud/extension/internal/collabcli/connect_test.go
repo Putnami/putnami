@@ -7,12 +7,14 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
 
 	clicore "go.putnami.dev/cloud/extension/internal/clicore"
 	collab "go.putnami.dev/protocol/collaboration"
+	"go.putnami.dev/protocol/collaboration/providertest"
 	"go.putnami.dev/protocol/features/spectest"
 )
 
@@ -59,17 +61,17 @@ func (s *sourceStandIn) serve(w http.ResponseWriter, r *http.Request) {
 	route := strings.TrimPrefix(r.URL.Path, prefix)
 	switch {
 	case r.Method == http.MethodGet && route == "proposals":
-		answer = collab.ProposalListResult{Items: []collab.Proposal{proposal("main", "topic")}}
+		answer = collab.ProposalListResult{Items: []collab.Proposal{sourceProposal()}}
 	case r.Method == http.MethodPost && route == "proposals":
-		answer = collab.ProposalUpsertResult{Proposal: proposal("main", "topic"), Created: true}
+		answer = collab.ProposalUpsertResult{Proposal: sourceProposal(), Created: true}
 	case r.Method == http.MethodGet && route == "proposals/7":
-		answer = collab.ProposalStatusResult{Proposal: proposal("main", "topic"), Checks: collab.Checks{State: collab.ChecksStatePassing, Commit: "55e2a8e42"}}
+		answer = collab.ProposalStatusResult{Proposal: sourceProposal(), Checks: collab.Checks{State: collab.ChecksStatePassing, Commit: "55e2a8e42"}}
 	case r.Method == http.MethodGet && route == "proposals/7/comments":
 		answer = collab.ProposalCommentListResult{Items: []collab.ProposalComment{}}
 	case r.Method == http.MethodPost && route == "proposals/7/reviews":
 		answer = collab.ProposalReviewResult{Review: collab.Review{Ref: collab.Ref{Source: "github:acme/app", ID: "r-1"}, Verdict: collab.ReviewVerdictComment}, Created: true}
 	case r.Method == http.MethodPost && route == "proposals/7/automerge":
-		answer = collab.ProposalResult{Proposal: proposal("main", "topic")}
+		answer = collab.ProposalResult{Proposal: sourceProposal()}
 	case r.Method == http.MethodGet && route == "tasks/42":
 		answer = collab.TaskResult{Task: task(collab.TaskStateOpen, []string{})}
 	case r.Method == http.MethodPost && route == "tasks/42/transition":
@@ -82,6 +84,17 @@ func (s *sourceStandIn) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(answer)
+}
+
+// changePage is the change page the Source stand-in answers on a proposal.
+const changePage = "https://putnami.app/w/" + workspaceID + "/pr-7"
+
+// sourceProposal is the proposal the Source stand-in answers: Source fills
+// pageUrl with the proposal's change page on putnami.app.
+func sourceProposal() collab.Proposal {
+	p := proposal("main", "topic")
+	p.PageURL = changePage
+	return p
 }
 
 func (s *sourceStandIn) received() []sourceRequest {
@@ -168,6 +181,52 @@ func TestTheSourceConnectionCallsEachRoute(t *testing.T) {
 	if response.Outcome != collab.OutcomeOK || len(response.Result) == 0 || len(requests) != 1 ||
 		requests[0].query != "base=main&head=topic&repository=acme%2Fapp&size=10&state=draft%2Copen" {
 		t.Fatalf("find sent %+v and answered %s %+v", requests, response.Outcome, response.Error)
+	}
+}
+
+// TestTheSourceConnectionAnswersTheChangePage carries the pageUrl Source
+// answers on a proposal through the generated client into the result of
+// proposals.find, upsert, status and automerge, the four operations whose
+// declaration lists the pageUrl member.
+func TestTheSourceConnectionAnswersTheChangePage(t *testing.T) {
+	spectest.Proves(t, feature, "answers-the-change-page", "collab-provider-change-page")
+	operations, _ := readOffer(t).Operations(collab.ContractProposals, 1)
+	pageOperations := []string{collab.OperationFind, collab.OperationUpsert, collab.OperationStatus, collab.OperationAutoMerge}
+	for name, op := range operations {
+		want := slices.Contains(pageOperations, name)
+		if got := slices.Contains(op.Members(), collab.ProposalMemberPageURL); got != want {
+			t.Errorf("proposals.%s declares pageUrl = %v, want %v", name, got, want)
+		}
+	}
+	for _, op := range servedOperations {
+		if op.contract != collab.ContractProposals || !slices.Contains(pageOperations, op.operation) {
+			continue
+		}
+		t.Run(op.operation, func(t *testing.T) {
+			standIn := newSourceStandIn(t)
+			h, _ := sourceHarness(t, standIn)
+			_, response := h.call(t, op.contract, op.operation, op.arguments, "")
+			if response.Outcome != collab.OutcomeOK {
+				t.Fatalf("outcome = %s: %+v", response.Outcome, response.Error)
+			}
+			var result struct {
+				Items    []collab.Proposal `json:"items"`
+				Proposal *collab.Proposal  `json:"proposal"`
+			}
+			if err := json.Unmarshal(response.Result, &result); err != nil {
+				t.Fatal(err)
+			}
+			proposal := result.Proposal
+			if op.operation == collab.OperationFind && len(result.Items) == 1 {
+				proposal = &result.Items[0]
+			}
+			if proposal == nil {
+				t.Fatalf("no proposal in %s", response.Result)
+			}
+			if problem := providertest.PageURLProblem(*proposal, operations[op.operation].Members()); problem != "" || proposal.PageURL != changePage {
+				t.Fatalf("pageUrl = %q (%s), want %q", proposal.PageURL, problem, changePage)
+			}
+		})
 	}
 }
 

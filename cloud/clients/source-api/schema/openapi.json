@@ -223,6 +223,9 @@
             },
             "type": "array"
           },
+          "pageUrl": {
+            "type": "string"
+          },
           "providerState": {
             "type": "string"
           },

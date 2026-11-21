@@ -36,6 +36,7 @@
     "cloud/cache-provider-configuration#the-run-log-names-the-session-mode",
     "cloud/cli-archive-publication#member-only-after-accepted-put-response",
     "cloud/cli-infra-plan#plan-lists-workloads-from-job-context",
+    "cloud/collaboration-provider#answers-the-change-page",
     "cloud/collaboration-provider#answers-unsupported-without-a-call",
     "cloud/collaboration-provider#calls-source-for-each-served-operation",
     "cloud/collaboration-provider#declares-the-source-operations",
