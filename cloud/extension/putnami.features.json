@@ -156,7 +156,7 @@
       "id": "cloud/telemetry-settings",
       "type": "feature",
       "name": "Telemetry settings of a workspace from the CLI",
-      "outcome": "putnami cloud telemetry shows, sets and resets the trace settings and log level Putnami Cloud returns to a workspace's services in their export directive, so a person tunes a running app's telemetry without a redeploy",
+      "outcome": "putnami cloud telemetry shows, sets and resets the trace settings and log level Putnami Cloud returns to a workspace's services in their export directive, for a set time or until reset, so a person tunes a running app's telemetry without a redeploy",
       "owner": "cloud",
       "target": "coded",
       "requirements": [
@@ -187,6 +187,21 @@
               "telemetry-set-merges-flags-into-the-row",
               "telemetry-set-refuses-values-out-of-range",
               "telemetry-set-needs-a-flag"
+            ]
+          }
+        },
+        {
+          "id": "for-ends-the-row",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "telemetry-for-sets-the-expiry",
+              "telemetry-set-keeps-the-expiry",
+              "telemetry-for-alone-moves-the-expiry"
             ]
           }
         },
