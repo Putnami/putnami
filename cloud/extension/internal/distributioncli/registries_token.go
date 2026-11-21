@@ -153,6 +153,10 @@ func resolveRegistryTokenEndpoint(params map[string]any, env map[string]string) 
 // endpoint's registry kind, reusing the per-host cache until shortly before
 // expiry so a publish that resolves the recipe for every package does not mint
 // once per package.
+//
+// A sign-in delegated through a person's MCP connection mints nothing: its
+// token cannot create the backing API key, so the mint fails before any
+// request (delegatedRegistryMintError).
 func mintUserRegistryToken(
 	params map[string]any,
 	workspaceRoot string,
@@ -160,6 +164,9 @@ func mintUserRegistryToken(
 	ioctx clicore.IO,
 	endpoint RegistryEndpoint,
 ) (string, error) {
+	if err := delegatedRegistryMintError(env); err != nil {
+		return "", err
+	}
 	clientID := registryTokenClientID(params, env)
 	requestedScope := RegistryMarkerScope(endpoint.Registry)
 	if requestedScope == "" {
@@ -205,6 +212,29 @@ func mintUserRegistryToken(
 		return "", err
 	}
 	return auth.AccessToken, nil
+}
+
+// delegatedRegistryMintError is the refusal of a registry mint for a stored
+// sign-in delegated through a person's MCP connection, nil for any other
+// session. Such a token is bound to the MCP resource and its delegated scopes,
+// and auth-server refuses it at POST /apikeys, so the mint stops here instead
+// of sending a request bound to fail. It exits with the auth code and does not
+// mention signing in: the registry credential seam then reads it as absence
+// and keeps the machine's existing credential.
+func delegatedRegistryMintError(env map[string]string) error {
+	auth, err := clicore.ReadAuth(env, false)
+	if err != nil {
+		return nil
+	}
+	delegation, ok := clicore.DelegationOf(auth)
+	if !ok {
+		return nil
+	}
+	return clicore.NewError(
+		fmt.Sprintf("no registry token: this session is delegated through an MCP connection (%s) for workspace %s, and its token cannot create the API key a registry token needs",
+			delegation.Actor, delegation.WorkspaceID),
+		clicore.ExitAuth,
+	)
 }
 
 func registryTokenClientID(params map[string]any, env map[string]string) string {

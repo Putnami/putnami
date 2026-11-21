@@ -26,8 +26,10 @@ const providerReadAccessPrefix = "@credential-provider read "
 // the user's workspace membership what the bearer may read.
 //
 // It answers nil and no error (absence, so the engine keeps its native
-// credentials) when the user is not signed in, the checkout is not linked, or
-// no registry endpoint resolves. The bearer is cached in registries.json until
+// credentials) when the user is not signed in, the sign-in is delegated
+// through a person's MCP connection (its token cannot create the backing API
+// key, so no POST /apikeys is sent), the checkout is not linked, or no
+// registry endpoint resolves. The bearer is cached in registries.json until
 // shortly before it expires, like the per-host registry tokens, and logout
 // removes it with that file. ioctx must not write to stdout: the credential
 // provider's protocol owns it.
@@ -47,6 +49,9 @@ func ProviderReadCredential(ctx context.Context, params map[string]any, workspac
 		return nil, err
 	}
 	if auth == nil || (auth.AccessToken == "" && auth.RefreshToken == "") {
+		return nil, nil
+	}
+	if _, delegated := clicore.DelegationOf(auth); delegated {
 		return nil, nil
 	}
 	link, err := clicore.ReadCloudLink(workspaceRoot)
