@@ -14,9 +14,10 @@ the Config logic behind `config publish`, `config validate` and
 - `putnami cloud telemetry show|set|reset [--app <app>]`: reads and writes the
   workspace's telemetry settings, the workspace row and one row per service,
   through config-api's `GET|PUT /v1/workspaces/{ws}/config/telemetry`. `set`
-  merges its flags into the stored row; `reset` writes an empty row, which
-  removes it. The workspace collector returns a service's settings as its
-  export directive.
+  merges its flags into the stored row and keeps its expiry, unless `--for`
+  writes a new one; `reset` writes an empty row, which removes it. The
+  workspace collector returns a service's settings as its export directive
+  until the row's expiry.
 
 - `putnami cloud config status [<project>]` and
   `putnami cloud secrets status [<project>]`: compare what each project's
