@@ -346,6 +346,23 @@ output does not depend on the machine that built it:
 
 **External resolution**: dependencies and peerDependencies are marked as external unless `--bundle bundled` is set. Both graphs use the same external set, so consumers still resolve dependency conditions themselves.
 
+**No lazy chunk loads**: since Bun 1.4.5, `--splitting` writes a lazy
+`require('./x')` of a source module as its own chunk, loaded with
+`import.meta.require("./x-<hash>.js")`. `bun build --compile` never embeds an
+`import.meta.require` target, so an executable compiled against that library
+fails at startup with `Cannot find module`. The transpile phase fails when
+its output holds an `import.meta.require` of a relative path, with one
+diagnostic per chunk that names the output file, the chunk and the source
+module whose `require()` produced it:
+
+```text
+Transpile emitted a lazy chunk load: tsconfig-js9j0sc9.js calls import.meta.require("./console.sink-fknm05eg.js"), the chunk of a require() of "console.sink" in the source. ...
+```
+
+Replace that `require()` with a static import. When the `require()` avoided
+an import cycle, break the cycle instead. Requires of a package or a `node:`
+builtin are not affected.
+
 #### Node.js target
 
 Bun runs the code it builds for itself, so a build for Node.js is only correct
