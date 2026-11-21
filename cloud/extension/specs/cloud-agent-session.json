@@ -59,6 +59,14 @@
       ]
     },
     {
+      "id": "a-delegated-session-mints-no-registry-token",
+      "text": [
+        "A session delegated through a person's MCP connection sends no POST /apikeys for a registry bearer: the credential provider answers absence, and the engine keeps its native credentials.",
+        "cloud registry-token and cloud token --for npm|go|oci|put exit with an auth error naming the delegated session, which the registry seam reads as absence.",
+        "An own session still mints through one API key."
+      ]
+    },
+    {
       "id": "a-read-only-cache-credential-is-declared",
       "text": [
         "When core lists read-only at initialize, the cache provider echoes it for a session that cannot write: a workspace machine token, or the signed-in user's putnami cloud token --for cache recipe off a hosted run.",
