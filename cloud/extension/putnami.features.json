@@ -674,6 +674,19 @@
           }
         },
         {
+          "id": "answers-the-change-page",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "collab-provider-change-page"
+            ]
+          }
+        },
+        {
           "id": "uploads-screenshots-to-delivery",
           "stage": "coded",
           "evidenceKinds": [

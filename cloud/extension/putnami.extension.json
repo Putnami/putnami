@@ -3433,17 +3433,26 @@
       "timeoutMs": 120000,
       "operations": {
         "find": {
-          "description": "Find the pull requests of an exact base and head in the repository connected to the linked Putnami workspace, through Putnami Source and the Putnami GitHub App.",
-          "openWorld": true
+          "description": "Find the pull requests of an exact base and head in the repository connected to the linked Putnami workspace, through Putnami Source and the Putnami GitHub App. Each pull request carries pageUrl, its change page on putnami.app.",
+          "openWorld": true,
+          "members": [
+            "pageUrl"
+          ]
         },
         "upsert": {
-          "description": "Update the open pull request of an exact base and head, or open it, through Putnami Source and the Putnami GitHub App: draft or ready, at a requested headCommit. Source compares expectedRevision with the pull request it read just before the write. A write whose outcome is unknown is never sent again: it answers unresolved.",
+          "description": "Update the open pull request of an exact base and head, or open it, through Putnami Source and the Putnami GitHub App: draft or ready, at a requested headCommit. Source compares expectedRevision with the pull request it read just before the write. A write whose outcome is unknown is never sent again: it answers unresolved. The pull request carries pageUrl, its change page on putnami.app.",
           "openWorld": true,
-          "preconditions": "checked"
+          "preconditions": "checked",
+          "members": [
+            "pageUrl"
+          ]
         },
         "status": {
-          "description": "Read a pull request, the checks of its head commit and its submitted reviews through Putnami Source.",
-          "openWorld": true
+          "description": "Read a pull request, the checks of its head commit and its submitted reviews through Putnami Source. The pull request carries pageUrl, its change page on putnami.app.",
+          "openWorld": true,
+          "members": [
+            "pageUrl"
+          ]
         },
         "review": {
           "description": "Submit a comment-only review of a pull request through Putnami Source; the idempotency key makes a repeated review return the one it published. A review whose outcome is unknown answers unresolved and is never sent again.",
@@ -3458,8 +3467,11 @@
           "openWorld": true
         },
         "automerge": {
-          "description": "Turn squash auto-merge on for an open, ready pull request whose head is still the expected commit, through Putnami Source and the Putnami GitHub App. Source refuses a draft, a closed pull request and a moved head. Binding this provider authorizes nobody to turn it on.",
-          "openWorld": true
+          "description": "Turn squash auto-merge on for an open, ready pull request whose head is still the expected commit, through Putnami Source and the Putnami GitHub App. Source refuses a draft, a closed pull request and a moved head. Binding this provider authorizes nobody to turn it on. The pull request carries pageUrl, its change page on putnami.app.",
+          "openWorld": true,
+          "members": [
+            "pageUrl"
+          ]
         },
         "screenshots": {
           "description": "Store the screenshots of a pull request in Putnami Delivery, under the signed-in person's session: the manifest file as written, then each capture file Delivery does not hold yet. A process that holds only PUTNAMI_CLOUD_TOKEN, and a Delivery that does not serve the route, answer unsupported. A repeat sends only what is still missing.",
