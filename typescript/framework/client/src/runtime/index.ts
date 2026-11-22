@@ -16,6 +16,7 @@ export {
   writeEnvelope,
 } from './connect-stream';
 export {
+  type ConnectDuplexOptions,
   type ConnectEncoding,
   type ConnectStreamOptions,
   ConnectTransport,
