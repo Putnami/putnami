@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
@@ -33,7 +34,7 @@ func TestRunTypeCheck_SkipsAProjectWithNothingToCheck(t *testing.T) {
 		return &exec.Result{Success: true}, nil
 	})
 
-	result, err := RunTypeCheck("bun", dir, "", false)
+	result, err := RunTypeCheck("bun", dir, "", false, TypeCheckerTsc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +62,7 @@ func TestRunTypeCheck_ChecksEveryProjectFileWithoutEmitting(t *testing.T) {
 		return &exec.Result{Success: false, Stdout: "test/index.test.ts(1,1): error TS2578: Unused '@ts-expect-error' directive.\n"}, nil
 	})
 
-	result, err := RunTypeCheck("bun", dir, scratch, false)
+	result, err := RunTypeCheck("bun", dir, scratch, false, TypeCheckerTsc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -118,7 +119,7 @@ func TestRunTypeCheck_WithoutATsconfigExtendsNothing(t *testing.T) {
 		return &exec.Result{Success: true}, nil
 	})
 
-	result, err := RunTypeCheck("bun", dir, "", false)
+	result, err := RunTypeCheck("bun", dir, "", false, TypeCheckerTsc)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func TestRunTypeCheck_IncludesTheFilesUnderADotDirectory(t *testing.T) {
 		return &exec.Result{Success: true}, nil
 	})
 
-	if _, err := RunTypeCheck("bun", dir, "", false); err != nil {
+	if _, err := RunTypeCheck("bun", dir, "", false, TypeCheckerTsc); err != nil {
 		t.Fatal(err)
 	}
 	anchored := func(pattern string) any { return filepath.ToSlash(filepath.Join(dir, pattern)) }
@@ -199,7 +200,7 @@ func TestRunTypeCheck_ProjectTypesKeepTheProjectsCompilerOptions(t *testing.T) {
 		return &exec.Result{Success: true}, nil
 	})
 	for _, projectTypes := range []bool{false, true} {
-		if _, err := RunTypeCheck("bun", dir, "", projectTypes); err != nil {
+		if _, err := RunTypeCheck("bun", dir, "", projectTypes, TypeCheckerTsc); err != nil {
 			t.Fatal(err)
 		}
 		for _, flag := range []string{"--types", "--strict", "--module", "--moduleResolution", "--lib"} {
@@ -211,6 +212,64 @@ func TestRunTypeCheck_ProjectTypesKeepTheProjectsCompilerOptions(t *testing.T) {
 			if !slices.Contains(args, flag) {
 				t.Errorf("projectTypes %v: args %v lack %s", projectTypes, args, flag)
 			}
+		}
+	}
+}
+
+func TestResolveTypeChecker(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "the-type-checker-is-tsc-unless-the-project-chooses-bun")
+	for param, want := range map[string]string{"": TypeCheckerTsc, "tsc": TypeCheckerTsc, "bun": TypeCheckerBun} {
+		got, err := ResolveTypeChecker(param)
+		if err != nil || got != want {
+			t.Errorf("ResolveTypeChecker(%q) = %q, %v, want %q", param, got, err, want)
+		}
+	}
+}
+
+func TestResolveTypeChecker_RefusesAnUnknownValue(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "test-type-checker-choice", "an-unknown-type-checker-fails-the-task-naming-the-choices")
+	_, err := ResolveTypeChecker("tsgo")
+	if err == nil {
+		t.Fatal("an unknown type-checker resolved")
+	}
+	for _, want := range []string{`"tsgo"`, "tsc", "bun"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("error %q does not name %s", err, want)
+		}
+	}
+}
+
+func TestRunTypeCheck_BunRunsBunCheckOnTheScratchTsconfig(t *testing.T) {
+	dir := t.TempDir()
+	writeProjectFiles(t, dir, "tsconfig.json", "src/index.ts", "test/index.test.ts")
+	scratch := t.TempDir()
+	var args []string
+	withMockExec(t, func(_ string, a []string, _ ...exec.Option) (*exec.Result, error) {
+		args = a
+		if _, err := os.Stat(a[len(a)-1]); err != nil {
+			t.Errorf("the scratch tsconfig is missing during the check: %v", err)
+		}
+		return &exec.Result{Success: false, Stdout: "test/index.test.ts(1,1): error TS2578: Unused '@ts-expect-error' directive.\nFound 1 error in 1 file, checked 2 files [10ms]\n"}, nil
+	})
+
+	result, err := RunTypeCheck("bun", dir, scratch, false, TypeCheckerBun)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Success || len(result.Diagnostics) != 1 || result.Diagnostics[0].Code != "TS2578" {
+		t.Errorf("result %+v, want the failure and its one diagnostic", result)
+	}
+	if args[0] != "check" || args[len(args)-2] != "-p" || filepath.Dir(args[len(args)-1]) != scratch {
+		t.Errorf("args %v, want bun check -p on the scratch tsconfig", args)
+	}
+	for _, want := range []string{"--no-pretty", "--all", "--no-script", "--strict", "--rootDir"} {
+		if !slices.Contains(args, want) {
+			t.Errorf("bun check args %v lack %s", args, want)
+		}
+	}
+	for _, unwanted := range []string{"x", "tsc", "--noEmit", "--pretty", "--incremental", "--tsBuildInfoFile"} {
+		if slices.Contains(args, unwanted) {
+			t.Errorf("bun check args %v hold %s", args, unwanted)
 		}
 	}
 }
