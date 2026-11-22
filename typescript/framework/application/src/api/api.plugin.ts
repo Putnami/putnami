@@ -362,7 +362,9 @@ export class ApiPlugin implements Plugin {
 
       registerWsHandlers(this.httpPlugin, route, wsHandlers);
     } else {
-      // Bidirectional / client-stream: WebSocket only
+      // Bidirectional / client-stream: WebSocket only on the route's own path.
+      // The gRPC plugin serves the same stream as a Connect RPC over HTTP/2;
+      // HTTP/1.1 has no request-streaming shape for it here.
       this.httpPlugin.route('GET', route, (context: HttpRequestContext) => {
         if (context.req.headers.has('upgrade')) return upgrade(context);
         throw new BadRequestException('websocket, expected header "upgrade"');

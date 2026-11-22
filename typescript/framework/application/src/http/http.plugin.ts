@@ -387,6 +387,12 @@ export class HttpPlugin implements Plugin {
       // Explicit idle timeout bounds stalled/slow-loris sockets (Bun's default
       // is implicit). Derived from requestTimeoutMs so the 408 path fires first.
       idleTimeout: resolveIdleTimeoutSeconds(requestTimeoutMs),
+      // HTTP/2 in cleartext for a client that opens with the HTTP/2 preface
+      // (prior knowledge), beside HTTP/1.1 and WebSocket upgrades on the same
+      // port. Its request body is read as it arrives, which is what carries a
+      // Connect client or bidirectional stream. The option is newer than the
+      // pinned Bun types, hence the spread.
+      ...({ http2: true } as object),
       fetch: async (req, server) => {
         let requestTimedOut = false;
         // The request's signal aborts when the client disconnects (Bun's

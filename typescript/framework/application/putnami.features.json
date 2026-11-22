@@ -1220,9 +1220,7 @@
           "evidenceKinds": ["attestation"],
           "verification": {
             "kind": "acceptance",
-            "checks": [
-              "a-prior-knowledge-http2-request-is-served-beside-http1-and-websocket-on-one-port"
-            ]
+            "checks": ["a-prior-knowledge-http2-request-is-served-beside-http1-and-websocket-on-one-port"]
           }
         }
       ]
