@@ -6,7 +6,7 @@ branding:
   color: purple
 inputs:
   token:
-    description: Putnami Cloud workspace token with the delivery.ingest scope. When set, the step uploads the evidence and, by default, publishes on the pull request.
+    description: Putnami Cloud token with the delivery.ingest scope, such as the organization ingest token from putnami cloud token create --organization. When set, the step uploads the evidence and, by default, publishes on the pull request.
     required: false
     default: ''
   publish:

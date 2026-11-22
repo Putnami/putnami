@@ -177,7 +177,9 @@ and the `--publish` diagnostics. Its last line names the next command:
 |---|---|
 | An upload answered a report URL | `Full report: <url>` |
 | Outside a CI | `putnami observe --open` |
-| A CI job whose reporter is `@putnami/cloud`, without `PUTNAMI_CLOUD_TOKEN` | The `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --name ci --scopes delivery.ingest`, which creates it |
+| A run of `Putnami/observe-action` without its `token` input | The `token` input and `putnami cloud token create --organization <id> --name ci`, which creates it |
+| Another GitHub Actions job whose reporter is `@putnami/cloud`, without `PUTNAMI_CLOUD_TOKEN` or `PUTNAMI_ORGANIZATION` | The ID token exchange (`PUTNAMI_ORGANIZATION` and `permissions: id-token: write`), or the `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --organization <id> --name ci`, which creates it |
+| Another CI job whose reporter is `@putnami/cloud`, without `PUTNAMI_CLOUD_TOKEN` | The `PUTNAMI_CLOUD_TOKEN` setting and `putnami cloud token create --organization <id> --name ci`, which creates it |
 | Any other CI job | `--upload` |
 
 `--details` prints the detailed summary instead: the changed files (the first
@@ -268,8 +270,11 @@ document that was not written each give `observe.upload_failed`, and observe
 still exits 0. When the reporter exits non-zero with a failure result, the
 diagnostic ends with the result's error message.
 
-For `@putnami/cloud`, the job sets `PUTNAMI_CLOUD_TOKEN` to a workspace token
-of scope `delivery.ingest`. See
+For `@putnami/cloud`, the job sets `PUTNAMI_CLOUD_TOKEN` to its organization's
+ingest token, which `putnami cloud token create --organization <id> --name ci`
+creates and prints once, signed in, with no Putnami workspace. A GitHub
+Actions job can instead set `PUTNAMI_ORGANIZATION` and exchange its ID token.
+See
 [the Cloud extension](https://github.com/putnami/putnami/blob/main/cloud/extension/README.md#upload-a-change-evidence-document).
 
 ## Opening the report

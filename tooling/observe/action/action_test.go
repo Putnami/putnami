@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/observe/internal/upload"
 	"go.putnami.dev/tooling/observe/internal/yaml"
 )
 
@@ -388,5 +389,29 @@ func TestTheActionChecksOutNothing(t *testing.T) {
 	}
 	if got := yaml.String(doc, "outputs", "evidence", "value"); got != "${{ steps.observe.outputs.evidence }}" {
 		t.Fatalf("outputs.evidence.value = %q", got)
+	}
+}
+
+// TestTheActionMarksItsRunForTheNextLine proves putnami observe runs with the
+// variable the summary's Next line reads to name the action's token input.
+func TestTheActionMarksItsRunForTheNextLine(t *testing.T) {
+	installer := filepath.Join(t.TempDir(), "install.sh")
+	write(t, installer, `mkdir -p "$HOME/.putnami/bin"
+cat >"$HOME/.putnami/bin/putnami" <<'PUTNAMI'
+#!/bin/sh
+printf 'putnami %s | action=%s\n' "$*" "${`+upload.ActionEnv+`-unset}" >>"$LOG"
+PUTNAMI
+chmod +x "$HOME/.putnami/bin/putnami"
+`, 0o644)
+	// The last FAKE_INSTALLER of the environment wins over runAction's own.
+	r := runAction(t, map[string]string{"FAKE_INSTALLER": installer})
+	call := observeCall(t, r)
+	if !strings.HasSuffix(call, "| action=true") {
+		t.Fatalf("putnami observe ran without %s=true: %q", upload.ActionEnv, call)
+	}
+	for _, line := range r.log {
+		if strings.HasPrefix(line, "putnami extensions ") && !strings.HasSuffix(line, "| action=unset") {
+			t.Fatalf("an install saw %s: %q", upload.ActionEnv, line)
+		}
 	}
 }

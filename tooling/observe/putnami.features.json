@@ -141,6 +141,8 @@
             "checks": [
               "a-laptop-run-names-open",
               "a-ci-job-without-a-token-names-the-token-setting",
+              "a-github-actions-job-names-the-id-token-exchange",
+              "the-action-names-its-token-input",
               "a-ci-job-with-a-token-names-upload",
               "an-upload-names-the-report-url"
             ]

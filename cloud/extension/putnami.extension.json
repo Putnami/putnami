@@ -119,6 +119,7 @@
           "description": "Sign in to Putnami Cloud with OAuth device authorization.",
           "command": "cloud-login",
           "interactive": true,
+          "workspace": "optional",
           "workspaceState": "none",
           "examples": [
             {
@@ -131,6 +132,7 @@
           "description": "Clear stored Putnami Cloud credentials.",
           "command": "cloud-logout",
           "interactive": true,
+          "workspace": "optional",
           "workspaceState": "none",
           "examples": [
             {
@@ -195,9 +197,10 @@
           ]
         },
         "token": {
-          "description": "Check machine tokens (status), mint a bearer for a script (cache, npm, go, oci, put), or manage workspace machine tokens (create, list, revoke).",
+          "description": "Check machine tokens (status), mint a bearer for a script (cache, npm, go, oci, put), or manage workspace machine tokens and, with --organization, organization ingest tokens (create, list, revoke).",
           "command": "cloud-token",
           "interactive": true,
+          "workspace": "optional",
           "examples": [
             {
               "command": "putnami cloud token cache",
@@ -214,6 +217,10 @@
             {
               "command": "putnami cloud token create --name ci-cache --scopes cache.read",
               "description": "Create a workspace machine token (the raw pkt_* is shown once)"
+            },
+            {
+              "command": "putnami cloud token create --organization <organization-id> --name ci",
+              "description": "Create the organization's ingest token a CI uploads its evidence with; needs no workspace (the raw pkt_* is shown once)"
             },
             {
               "command": "putnami cloud token list --output=jsonl",
@@ -961,6 +968,10 @@
         "expires": {
           "type": "string",
           "description": "For `token create`: optional lifetime (e.g. 30d, 12h) or an explicit RFC3339 expiry."
+        },
+        "organization": {
+          "type": "string",
+          "description": "For `token create|list|revoke`: manage this organization's ingest tokens (scope delivery.ingest, no workspace) instead of the linked workspace's machine tokens. Needs platform.organization.manage on it."
         }
       },
       "run": [

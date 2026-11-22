@@ -4,6 +4,30 @@
     {
       "runtime": "@putnami/cloud-extension",
       "status": "pending-provider-contract",
+      "adapter": "cloud/extension/internal/cloudcli/orgtokens.go",
+      "callsites": [
+        {
+          "path": "cloud/extension/internal/cloudcli/orgtokens.go",
+          "transport": "http",
+          "symbol": "http.NewRequest",
+          "fingerprint": "d3971d61043d4688f4c4a2907215379d67f41b7f700dcc9dd4d8f51f0b41e5ba"
+        }
+      ],
+      "owner": "@putnami/cloud-extension",
+      "tests": [
+        "cloud/extension/internal/cloudcli/orgtokens_test.go"
+      ],
+      "reason": "The organization ingest token routes of identity-api, which putnami cloud token create, list and revoke --organization call. identity-api declares the three operations in its OpenAPI document, but the published Cloud CLI schema package this repository generates the identity-api client from does not carry them yet.",
+      "operations": [
+        "deleteV1_Organizations_Organization_Tokens_Id",
+        "getV1_Organizations_Organization_Tokens",
+        "postV1_Organizations_Organization_Tokens"
+      ],
+      "pendingWork": "Copy the identity-api schema that declares the organization token routes into cloud/clients/identity-api, then call the generated client"
+    },
+    {
+      "runtime": "@putnami/cloud-extension",
+      "status": "pending-provider-contract",
       "adapter": "cloud/extension/internal/collabcli/screenshots.go",
       "callsites": [
         {

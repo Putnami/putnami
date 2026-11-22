@@ -72,6 +72,9 @@ if [[ "$publish" == true ]]; then
 fi
 
 (
+  # The summary's last line names this action's token input, not a setting
+  # the action does not read.
+  export PUTNAMI_OBSERVE_ACTION=true
   if [[ -n "$token" ]]; then
     export PUTNAMI_CLOUD_TOKEN="$token"
   fi

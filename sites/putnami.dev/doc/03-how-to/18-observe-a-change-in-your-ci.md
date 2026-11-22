@@ -357,10 +357,10 @@ putnami observe: GitHub Actions, github.com/Putnami/demo-observe-go (project 144
     dependent api [go, go.mod], depends on pricing
   changed lines  8 of 10 lines (80.0%) covered
   dependencies  1 change; without an SBOM, their licenses and vulnerabilities are unknown
-Next: set PUTNAMI_CLOUD_TOKEN in this CI to a token from `putnami cloud token create --name ci --scopes delivery.ingest`, then add --upload to keep the full report
+Next: pass a token from `putnami cloud token create --organization <id> --name ci` as this action's token input to keep the full report
 ```
 
-A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The last line names what keeps the full report: the token to set, `--upload` once the job holds one, or the report URL once an upload answered it. `--details` prints the changed files, the reports, each component's tests and coverage, and each dependency change instead. The evidence document is the `observe-evidence` artifact of the job.
+A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The last line names what keeps the full report: the action's `token` input; in another GitHub Actions job, the organization to name for the ID token exchange or the token to set; in another CI, the token to set; `--upload` once the job holds one, or the report URL once an upload answered it. `--details` prints the changed files, the reports, each component's tests and coverage, and each dependency change instead. The evidence document is the `observe-evidence` artifact of the job.
 
 ### 5) Read the pull or merge request
 
@@ -370,7 +370,7 @@ Without `--upload`, after a failed upload, without the code host token, or on a 
 
 ### 6) Upload the evidence to Putnami Cloud
 
-To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the Putnami Cloud workspace that receives the uploads. `putnami cloud token create --name ci --scopes delivery.ingest` creates it and prints it once; it runs, signed in, in a Putnami workspace that `putnami cloud setup --workspace <id>` linked to that Cloud workspace, which does not have to be the repository you observe.
+To send the evidence to Putnami Cloud, store your organization's ingest token as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. Signed in with `putnami observe --open`, run `putnami cloud token create --organization <organization-id> --name ci` anywhere: it needs no Putnami workspace, creates a token with the `delivery.ingest` scope only, and prints it once. It needs the right to manage the organization. The upload names the repository, and its first upload opens the repository's observed workspace in the organization. `putnami cloud token list --organization <organization-id>` lists the tokens without their secrets, and `putnami cloud token revoke <name> --organization <organization-id>` revokes one. On GitHub Actions, the job can skip the secret and exchange its ID token instead, as [below](#on-github-without-a-secret) shows.
 
 On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`, as step 2 shows. With a token, the action uploads the evidence and publishes unless you set `publish` to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload --publish` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
 

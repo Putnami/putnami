@@ -118,9 +118,18 @@ func movedToOperator(command, operator string) error {
 }
 
 // routeToken serves `cloud token`: `token [<target>]` mints a bearer and
-// `token create|list|revoke` manages workspace machine tokens.
+// `token create|list|revoke` manages workspace machine tokens, or with
+// --organization an organization's ingest tokens.
 func routeToken(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx IO) error {
-	switch sub := clicore.FirstPositional(args); sub {
+	sub := clicore.FirstPositional(args)
+	if organizationParam(params) != "" {
+		switch sub {
+		case "create", "list", "revoke", "help":
+		default:
+			return newError("cloud token takes --organization with create, list or revoke only", ExitUsage)
+		}
+	}
+	switch sub {
 	case "status", "create", "list", "revoke":
 		return machineTokens(params, args, workspaceRoot, env, ioctx)
 	case "help":
@@ -131,6 +140,9 @@ func routeToken(params map[string]any, args []string, workspaceRoot string, env 
 			{"command": "cloud token create --name <name> --scopes <s,...>", "description": "create a workspace machine token (pkt_*); the raw token is shown once"},
 			{"command": "cloud token list", "description": "list the workspace machine tokens (never the secret)"},
 			{"command": "cloud token revoke <id|name>", "description": "revoke a workspace machine token"},
+			{"command": "cloud token create --organization <id> --name <name>", "description": "create an organization's ingest token (delivery.ingest, no workspace); the raw token is shown once"},
+			{"command": "cloud token list --organization <id>", "description": "list an organization's ingest tokens (never the secret)"},
+			{"command": "cloud token revoke <id|name> --organization <id>", "description": "revoke an organization's ingest token"},
 		})
 	case "":
 		return workspaceToken(params, workspaceRoot, env, ioctx)

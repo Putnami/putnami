@@ -1,0 +1,53 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-spec.json",
+  "protocolVersion": 1,
+  "feature": "cloud/ingest-token",
+  "outcomes": [
+    "A team with no Putnami workspace creates its organization's ingest token from the CLI, signed in, and stores it as the CI upload token: putnami cloud token create --organization prints it once, and list and revoke manage it without ever printing it again"
+  ],
+  "nonGoals": [
+    "Creating an organization, or finding its id: the person reads it in Putnami Cloud",
+    "Tokens with another scope than delivery.ingest: identity-api gives an organization token that scope only",
+    "Workspace machine tokens: putnami cloud token create without --organization keeps creating them in the linked workspace"
+  ],
+  "requirements": [
+    {
+      "id": "create-calls-the-organization-route",
+      "text": [
+        "putnami cloud token create --organization <id> --name <n> [--expires <dur>] calls identity-api's POST /v1/organizations/{organization}/tokens on the control plane, under the signed-in session, with a body that holds the name and, with --expires, expires_at only.",
+        "It needs no linked workspace and runs outside any workspace; inside one, it reads only the control-plane URL of the link, when there is one."
+      ]
+    },
+    {
+      "id": "signs-in-outside-a-workspace",
+      "text": "putnami cloud login and logout run outside any Putnami workspace too, as putnami cloud token does, so a person with no workspace signs in before creating the organization token."
+    },
+    {
+      "id": "create-shows-the-token-once",
+      "text": [
+        "The text output prints the raw token once, the organization id, the warning that it is shown only once, and the paste-ready CI settings of PUTNAMI_CLOUD_TOKEN.",
+        "--output=json prints the answer with raw_token.",
+        "No other output, warning or error of the command prints the token."
+      ]
+    },
+    {
+      "id": "create-refuses-another-scope",
+      "text": "With --organization, --scopes other than delivery.ingest, --allowed-clients or --allowed-client-ids is refused before any call, with a message that says an organization token carries delivery.ingest only."
+    },
+    {
+      "id": "list-never-shows-the-secret",
+      "text": [
+        "putnami cloud token list --organization <id> calls GET /v1/organizations/{organization}/tokens and prints the organization's live tokens: name, scopes, creation, expiry, last use and id, never a secret.",
+        "--output=json prints the same rows."
+      ]
+    },
+    {
+      "id": "revoke-resolves-the-token",
+      "text": "putnami cloud token revoke <id|name> --organization <id> resolves the name among the organization's live tokens, refuses an ambiguous or unknown one, and calls DELETE /v1/organizations/{organization}/tokens/{id}; a token already revoked converges."
+    },
+    {
+      "id": "refusal-names-the-route",
+      "text": "A refused call exits non-zero with the route and the server's reason; a 403 also says that the command needs platform.organization.manage on that organization."
+    }
+  ]
+}

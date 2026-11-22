@@ -15,7 +15,7 @@ Add the step to the job that runs your tests, after the step that writes the rep
 
 `if: ${{ !cancelled() }}` runs the step when a test fails too: a failed test is part of the evidence. Keep your `actions/checkout` step as it is: the action deepens a shallow clone itself to find the base of the change, so `fetch-depth: 1` works.
 
-With a Putnami Cloud workspace token, stored as the secret `PUTNAMI_CLOUD_TOKEN`, the step also uploads the evidence and posts on the pull request:
+With your Putnami organization's ingest token, stored as the secret `PUTNAMI_CLOUD_TOKEN`, the step also uploads the evidence and posts on the pull request:
 
 ```yaml
     permissions:
@@ -38,7 +38,7 @@ The action hands the run's `GITHUB_TOKEN` to `putnami observe` only when `token`
 
 | Input | Default | Meaning |
 |---|---|---|
-| `token` | empty | Putnami Cloud workspace token with the `delivery.ingest` scope. When set, the step installs `@putnami/cloud` and uploads the evidence. |
+| `token` | empty | Putnami Cloud token with the `delivery.ingest` scope: the organization's ingest token that `putnami cloud token create --organization <id> --name ci` creates, with no Putnami workspace. When set, the step installs `@putnami/cloud` and uploads the evidence. |
 | `publish` | `true` with a token, `false` without | `true` posts the commit status and the summary note on the pull request, which link to the report the upload stored, so it needs `token`; `false` does not post. |
 | `junit` | discovery | Comma-separated JUnit XML or TRX paths or glob patterns. Empty finds the reports by their content. |
 | `coverage` | discovery | Comma-separated LCOV, Cobertura, Clover, JaCoCo or Go cover paths or glob patterns. |
