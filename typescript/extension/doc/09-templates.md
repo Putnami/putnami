@@ -69,8 +69,7 @@ my-api/
 ```
 
 **package.json:** Exports `./serve` pointing to `src/serve.ts`. Depends on `@putnami/application`.
-`putnami serve` runs `src/serve.ts`; the compiled binary imports `app` from
-`src/main.ts` instead, so keep startup code in `app`.
+`putnami serve`, the compiled binary and the image all run `src/serve.ts`.
 
 `putnami init --project <name>` creates a `typescript-web` project. To start a
 workspace with an API, run `putnami init`, then `putnami projects create my-api --template typescript-server`.

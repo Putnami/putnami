@@ -1,0 +1,9 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-decision.json",
+  "protocolVersion": 1,
+  "id": "compiled-entry-runs-the-serve-entry",
+  "statement": "the compiled entry runs the project's serve entry (./serve export, else src/serve.ts), so the executable, its image and putnami serve share one entry and one resolved config, base and env files, port included",
+  "settled": "2026-11-22",
+  "settledBy": "fdumay",
+  "reviewOnly": true
+}

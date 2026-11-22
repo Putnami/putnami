@@ -29,6 +29,7 @@ import {
 } from '@putnami/runtime/jobs';
 import { getProjectRoot } from '@putnami/utils';
 import { markStartupFailureLogged } from './app-bootstrap';
+import { runBundledStartGuard } from '../bundled/start-guard';
 import { emitDesignGraph } from '../features/design-graph';
 import { createCapabilitiesProducer, invalidateCapabilityManifest } from '../capabilities/capabilities.producer';
 import { propagateBuildOptions, runGenerate, runPostGenerate } from './app-build';
@@ -450,6 +451,7 @@ export class Application extends Module {
     let startedPlugins: Array<{ plugin: Plugin; owner: Module }> = [];
 
     try {
+      await runBundledStartGuard(this);
       await this.prepare();
       contextStarted = true;
 

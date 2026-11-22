@@ -157,7 +157,7 @@ const (
 const BundledServeHookPackage = bundledServeApplication
 
 // BundledServeImports returns the packages the bundled serve entry
-// (.gen/src/serve.bundled.ts) imports, in the order it imports them. A project
+// (.gen/src/serve.bundled.ts) and the modules it writes beside it import. A project
 // that depends on BundledServeHookPackage reads each of them from generated
 // source, even when its own sources import none of them.
 func BundledServeImports() []string {
@@ -168,6 +168,13 @@ func BundledServeImports() []string {
 // metadata in capabilities.json. The generate export map is deliberately not
 // consulted: the shipped, validated manifest is the single source of truth for
 // which generated modules a packaged workload activates.
+//
+// The entry runs the project's own serve entry (see ProjectServeEntry), the
+// one `putnami serve` runs, and embeds the project's conf/.env.yaml and
+// conf/.env.<env>.yaml files (see EmbeddedConfigFiles), so the executable and
+// its image resolve the same config, port included, wherever they run. It
+// writes two modules beside the entry: serve.bundled.config.ts and
+// serve.bundled.loaders.ts.
 func GenerateBundledServe(projectPath, manifestPath string, log func(string)) (string, error) {
 	pkg := project.ReadPackageJSONSafe(filepath.Join(projectPath, "package.json"))
 	appEntry := "src/main.ts"
@@ -251,38 +258,97 @@ func GenerateBundledServe(projectPath, manifestPath string, log func(string)) (s
 		return "", fmt.Errorf("encoding capability config paths: %w", err)
 	}
 
+	configModule, err := embeddedConfigModule(projectPath)
+	if err != nil {
+		return "", err
+	}
+	configPath := filepath.Join(targetDir, bundledServeConfigFile)
+	if err := os.WriteFile(configPath, []byte(configModule), 0644); err != nil {
+		return "", fmt.Errorf("writing bundled serve config: %w", err)
+	}
+
+	// The loader module registers the generated server modules and the start
+	// guard. It is a module of its own because a module's statements run only
+	// after every module it imports has evaluated: the entry below imports it
+	// after the app entrypoint and before the project's serve entry, so the
+	// loaders are registered before that serve entry starts the application.
+	var loaderLines []string
+	loaderLines = append(loaderLines, "import { registerBundledStartGuard, registerModuleLoader } from '"+bundledServeApplication+"';")
+	loaderLines = append(loaderLines, "import { assertRegisteredConfigDefinitions } from '"+bundledServeRuntime+"';")
+	for i, loader := range loaders {
+		loaderLines = append(loaderLines, fmt.Sprintf("import * as loaderModule%d from %s;", i, strconv.Quote(loader.importPath)))
+	}
+	loaderLines = append(loaderLines, "")
+	loaderLines = append(loaderLines, "// Activate the generated server modules declared by capabilities.json.")
+	for i, loader := range loaders {
+		loaderLines = append(loaderLines, fmt.Sprintf("registerModuleLoader(%s, () => Promise.resolve(loaderModule%d));", strconv.Quote(loader.key), i))
+	}
+	loaderLines = append(loaderLines, "")
+	// The application that starts first, whoever builds it, registers its
+	// contributed configs and proves the manifest's config definitions active.
+	loaderLines = append(loaderLines, "registerBundledStartGuard((workload) => {")
+	loaderLines = append(loaderLines, "  workload.registerContributedConfigs();")
+	loaderLines = append(loaderLines, fmt.Sprintf("  assertRegisteredConfigDefinitions(%s);", configPathsJSON))
+	loaderLines = append(loaderLines, "});")
+	loaderLines = append(loaderLines, "")
+	loadersPath := filepath.Join(targetDir, bundledServeLoadersFile)
+	if err := os.WriteFile(loadersPath, []byte(strings.Join(loaderLines, "\n")), 0644); err != nil {
+		return "", fmt.Errorf("writing bundled serve loaders: %w", err)
+	}
+
+	serveEntry := ProjectServeEntry(projectPath)
+
+	// Every module the entry imports is a namespace the entry exports: in a
+	// package marked "sideEffects": false, Bun drops a module imported only
+	// for its effects, and the executable would exit without serving.
 	var lines []string
-	lines = append(lines, "import { bootstrapServe, registerModuleLoader } from '"+bundledServeApplication+"';")
-	lines = append(lines, "import { assertRegisteredConfigDefinitions } from '"+bundledServeRuntime+"';")
-	// The app entrypoint is imported BEFORE the generated loader modules. ES
-	// modules evaluate imports in source order, and a generated loader module
-	// can read config while it evaluates (`export default new ReactApplication()`
-	// calls `useConfig` in its constructor). The workload's static activation
-	// — the `import './activate'` at the top of `src/main.ts` that registers the
-	// remote config source from an extension package — must run first, or the
-	// config loader discovers no remote source and a deployed binary exits at
-	// boot with CONFIG_SERVER_URL set.
+	modules := []string{"embeddedConfig"}
+	// The embedded conf/ files are registered before any other module
+	// evaluates, so a module that reads config while it evaluates resolves
+	// the project's base and environment files wherever the executable runs.
+	lines = append(lines, "import * as embeddedConfig from "+strconv.Quote(importSpecifier(bundledServeConfigFile))+";")
+	if serveEntry != "" {
+		lines = append(lines, "import { reportPendingBundledStartGuard } from '"+bundledServeApplication+"';")
+	} else {
+		lines = append(lines, "import { bootstrapServe, reportPendingBundledStartGuard } from '"+bundledServeApplication+"';")
+	}
 	lines = append(lines, "// The app entrypoint evaluates first so its static activation (src/activate.ts)")
 	lines = append(lines, "// registers config sources before any generated module reads config.")
-	lines = append(lines, fmt.Sprintf("import { app } from %s;", strconv.Quote(appImportPath)))
-	for i, loader := range loaders {
-		lines = append(lines, fmt.Sprintf("import * as loaderModule%d from %s;", i, strconv.Quote(loader.importPath)))
+	// A generated loader module can read config while it evaluates (`export
+	// default new ReactApplication()` calls `useConfig` in its constructor).
+	// The workload's static activation — the `import './activate'` at the top
+	// of `src/main.ts` that registers the remote config source from an
+	// extension package — must run first, or the config loader discovers no
+	// remote source and a deployed binary exits at boot with CONFIG_SERVER_URL
+	// set.
+	if serveEntry != "" {
+		lines = append(lines, fmt.Sprintf("import * as appEntry from %s;", strconv.Quote(appImportPath)))
+		modules = append(modules, "appEntry")
+	} else {
+		lines = append(lines, fmt.Sprintf("import { app } from %s;", strconv.Quote(appImportPath)))
+	}
+	lines = append(lines, "import * as loaders from "+strconv.Quote(importSpecifier(bundledServeLoadersFile))+";")
+	modules = append(modules, "loaders")
+	if serveEntry != "" {
+		// The project's own serve entry starts the application, as it does
+		// under `putnami serve`, so both run one entry.
+		serveImportPath := normalizeImportPath(project.RelativePath(targetDir, filepath.Join(projectPath, serveEntry)))
+		lines = append(lines, "// The project's serve entry starts the application, as under `putnami serve`.")
+		lines = append(lines, fmt.Sprintf("import * as serveEntry from %s;", strconv.Quote(serveImportPath)))
+		modules = append(modules, "serveEntry")
 	}
 	lines = append(lines, "")
-	lines = append(lines, "// Activate the generated server modules declared by capabilities.json.")
-	for i, loader := range loaders {
-		lines = append(lines, fmt.Sprintf("registerModuleLoader(%s, () => Promise.resolve(loaderModule%d));", strconv.Quote(loader.key), i))
+	lines = append(lines, "// Using each module keeps it in a package marked \"sideEffects\": false.")
+	lines = append(lines, "export const bundledModules = ["+strings.Join(modules, ", ")+"];")
+	if serveEntry == "" {
+		// Route through bootstrapServe so a fatal startup failure (config
+		// load, DI, plugin start) is logged as a single structured JSON line
+		// and exits non-zero, instead of escaping to Bun's default multi-line
+		// stack printer.
+		lines = append(lines, "await bootstrapServe(app);")
 	}
-	lines = append(lines, "")
-	// Route through bootstrapServe so a fatal startup failure (config load, DI,
-	// plugin start) is logged as a single structured JSON line and exits
-	// non-zero, instead of escaping to Bun's default multi-line stack printer.
-	lines = append(lines, "await bootstrapServe(async () => {")
-	lines = append(lines, "  const workload = await app();")
-	lines = append(lines, "  workload.registerContributedConfigs();")
-	lines = append(lines, fmt.Sprintf("  assertRegisteredConfigDefinitions(%s);", configPathsJSON))
-	lines = append(lines, "  return workload;")
-	lines = append(lines, "});")
+	// A serve entry that started no Application left the start guard unrun.
+	lines = append(lines, "reportPendingBundledStartGuard();")
 	lines = append(lines, "")
 
 	if err := os.WriteFile(targetPath, []byte(strings.Join(lines, "\n")), 0644); err != nil {

@@ -665,6 +665,33 @@ func TestGenerateKeysPublicAcrossTheDependencyClosure(t *testing.T) {
 	}
 }
 
+// TestGenerateKeysTheConfFiles pins that the generate key reads the conf
+// files the bundled serve entry embeds, conf/.env.yaml and every
+// conf/.env.<env>.yaml of the project, so an edit to one moves the generate
+// key and the compile key that folds it.
+func TestGenerateKeysTheConfFiles(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-generate-key-reads-the-conf-files")
+	m := loadExtensionManifest(t)
+	generate, ok := m.Tasks["build-generate"]
+	if !ok {
+		t.Fatal("manifest task \"build-generate\" is missing")
+	}
+	key := proto.DeriveTaskCacheKey(generate.Inputs)
+	for _, file := range []string{"conf/.env.yaml", "conf/.env.*.yaml"} {
+		if !slices.Contains(key.Files, file) {
+			t.Errorf("generate key files = %v, want %q", key.Files, file)
+		}
+	}
+	for _, file := range []string{"!conf/.env.local.yaml", "!conf/.env.prod.yaml"} {
+		if !slices.Contains(key.Files, file) {
+			t.Errorf("generate key files = %v, want %q: a machine-local override is never embedded", key.Files, file)
+		}
+	}
+	if slices.ContainsFunc(key.Files, func(file string) bool { return strings.Contains(file, ".secrets") }) {
+		t.Errorf("generate key files = %v read a secrets file the entry never embeds", key.Files)
+	}
+}
+
 // configSchemaFallbackCompanionPath is the JSON Schema the TypeScript extractor
 // writes next to the fallback manifest.
 const configSchemaFallbackCompanionPath = ".gen/config-schema.jsonschema.json"

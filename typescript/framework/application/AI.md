@@ -386,10 +386,13 @@ database:
     database: mydb
 ```
 
-A compiled binary and its image ship no `conf/`: there, configure with
-environment variables (`Env(...)` fields, `CONFIG_DATA`, `DATABASE_BINDINGS`).
-The binary runs a generated entry that imports `app` from `main`, never
-`src/serve.ts`.
+A compiled binary and its image embed `conf/.env.yaml` and every
+`conf/.env.<env>.yaml`, never a secrets file nor the gitignored
+`conf/.env.local.yaml` and `conf/.env.prod.yaml`, and run `src/serve.ts` (the
+`./serve` export) as `putnami serve` does: same config, `putnami.port`
+included, though a `PORT` variable, which an image sets, outranks it. Pass
+secrets and per-deployment values with environment variables (`Env(...)`
+fields, `CONFIG_DATA`, `DATABASE_BINDINGS`).
 
 Define typed config schemas:
 

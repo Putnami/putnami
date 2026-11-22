@@ -10,8 +10,8 @@ export {
 export type { ConfigDefinition, ConfigParams, InferConfig } from './config';
 export { ConfigService } from './config-service';
 export type { ConfigDescription, FieldOrigin } from './config-service';
-export { registerSourceDiscoverer } from './config-source';
-export type { ConfigSource, SourceDiscoverer } from './config-source';
+export { registerEmbeddedConfig, registerSourceDiscoverer } from './config-source';
+export type { ConfigSource, EmbeddedConfigFiles, SourceDiscoverer } from './config-source';
 export { registerConfigLoaderResetHook } from './loader-hooks';
 export {
   assertRegisteredConfigDefinitions,

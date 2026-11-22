@@ -69,9 +69,18 @@ Configuration is loaded from multiple sources in priority order (highest wins):
 4. **`conf/.secrets.{env}.yaml`** — Local secrets file, gitignored by template default (priority 35)
 5. **`.gen/conf/.env.{env}.yaml`** — Generated config files (priority 30)
 6. **`conf/.env.{env}.yaml`** — Source config files in your project (priority 20)
-7. **`conf/.env.yaml`** — Env-agnostic base config shared across all environments (priority 10)
-8. **`confInit` values** — Programmatic defaults passed via `useConfig()`
-9. **`Default()` values** in the schema (lowest priority)
+7. **Embedded `conf/.env.{env}.yaml`** — The copy a compiled binary carries (priority 19)
+8. **`conf/.env.yaml`** — Env-agnostic base config shared across all environments (priority 10)
+9. **Embedded `conf/.env.yaml`** — The copy a compiled binary carries (priority 9)
+10. **`confInit` values** — Programmatic defaults passed via `useConfig()`
+11. **`Default()` values** in the schema (lowest priority)
+
+A compiled binary (`putnami build --compile`, and the image `putnami package
+--docker` builds) embeds the project's `conf/.env.yaml` and every
+`conf/.env.{env}.yaml`, never a secrets file nor the machine-local
+`conf/.env.local.yaml` and `conf/.env.prod.yaml`, and reads `NODE_ENV` and
+`APP_ENV` when it runs. Each embedded file ranks just below its on-disk copy,
+so the binary resolves the config `putnami serve` resolves from any directory.
 
 ### Remote sources
 

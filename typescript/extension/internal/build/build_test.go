@@ -1,7 +1,6 @@
 package build
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -582,17 +581,13 @@ func TestGenerateBundledServe_WithMainFile(t *testing.T) {
 		t.Fatal("expected non-empty result")
 	}
 
-	data, err := os.ReadFile(result)
-	if err != nil {
-		t.Fatalf("failed to read generated file: %v", err)
-	}
-	content := string(data)
+	content := readBundledServe(t, result)
 
-	if !contains(content, "import { bootstrapServe, registerModuleLoader }") {
-		t.Error("expected bootstrapServe + registerModuleLoader import")
+	if !contains(content, "import { registerBundledStartGuard, registerModuleLoader }") {
+		t.Error("expected registerBundledStartGuard + registerModuleLoader import")
 	}
-	if !contains(content, "await bootstrapServe(async () =>") {
-		t.Error("expected guarded bootstrap wrapper")
+	if !contains(content, "await bootstrapServe(app);") {
+		t.Error("expected guarded bootstrap of the app entrypoint")
 	}
 	if !contains(content, "workload.registerContributedConfigs()") {
 		t.Error("expected dependency-contributed configs to be registered")
@@ -621,28 +616,30 @@ func TestBundledServeImportsNameEveryPackageTheEntryImports(t *testing.T) {
 	if err != nil || result == "" {
 		t.Fatalf("GenerateBundledServe = %q, %v; want an entry", result, err)
 	}
-	data, err := os.ReadFile(result)
-	if err != nil {
-		t.Fatal(err)
-	}
+	data := readBundledServe(t, result)
 	var packages []string
-	for _, match := range regexp.MustCompile(`(?m)^import\b.*\bfrom\s+['"]([^'"]+)['"];$`).FindAllStringSubmatch(string(data), -1) {
-		if !strings.HasPrefix(match[1], ".") {
+	for _, match := range regexp.MustCompile(`(?m)^import\b.*\bfrom\s+['"]([^'"]+)['"];$`).FindAllStringSubmatch(data, -1) {
+		if !strings.HasPrefix(match[1], ".") && !slices.Contains(packages, match[1]) {
 			packages = append(packages, match[1])
 		}
 	}
-	if want := BundledServeImports(); !slices.Equal(packages, want) {
-		t.Fatalf("the entry imports %q, want BundledServeImports() = %q", packages, want)
+	slices.Sort(packages)
+	want := slices.Clone(BundledServeImports())
+	slices.Sort(want)
+	if !slices.Equal(packages, want) {
+		t.Fatalf("the entry and its modules import %q, want BundledServeImports() = %q", packages, want)
 	}
 	if !slices.Contains(packages, BundledServeHookPackage) {
 		t.Fatalf("the entry does not import BundledServeHookPackage %q", BundledServeHookPackage)
 	}
 	for _, line := range []string{
-		"import { bootstrapServe, registerModuleLoader } from '@putnami/application';",
+		"import { bootstrapServe, reportPendingBundledStartGuard } from '@putnami/application';",
+		"import { registerBundledStartGuard, registerModuleLoader } from '@putnami/application';",
 		"import { assertRegisteredConfigDefinitions } from '@putnami/runtime';",
+		"import { registerEmbeddedConfig } from '@putnami/runtime';",
 	} {
-		if !strings.Contains(string(data), line+"\n") {
-			t.Errorf("the entry lacks the line %s", line)
+		if !strings.Contains(data, line+"\n") {
+			t.Errorf("the entry and its modules lack the line %s", line)
 		}
 	}
 }
@@ -690,8 +687,7 @@ func TestGenerateBundledServe_WithLoaderExports(t *testing.T) {
 		t.Fatal("expected non-empty result")
 	}
 
-	data, _ := os.ReadFile(result)
-	content := string(data)
+	content := readBundledServe(t, result)
 
 	// Should include server-side loader (ends with -loader, no -client)
 	if !contains(content, "my-loader") {
@@ -724,11 +720,17 @@ func TestGenerateBundledServe_WithLoaderExports(t *testing.T) {
 	// module. A loader module reads config while it evaluates, and the
 	// workload's static activation (first import of src/main.ts) is what
 	// registers the remote config source in a compiled binary.
-	appImport := strings.Index(content, `import { app } from "../../src/main";`)
-	firstLoaderImport := strings.Index(content, "import * as loaderModule0")
-	if appImport < 0 || firstLoaderImport < 0 || appImport > firstLoaderImport {
-		t.Errorf("expected the app entrypoint import before the generated loader imports:\n%s", content)
+	entry, err := os.ReadFile(result)
+	if err != nil {
+		t.Fatal(err)
 	}
+	assertImportOrder(t, string(entry),
+		`import * as embeddedConfig from "./serve.bundled.config";`,
+		`import { app } from "../../src/main";`,
+		`import * as loaders from "./serve.bundled.loaders";`,
+		"export const bundledModules = [embeddedConfig, loaders];",
+		"await bootstrapServe(app);",
+		"reportPendingBundledStartGuard();")
 }
 
 func TestGenerateBundledServe_V2FeatureEvidenceIsRuntimeInert(t *testing.T) {
@@ -769,10 +771,7 @@ func TestGenerateBundledServe_V2FeatureEvidenceIsRuntimeInert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate v2 bundled serve: %v", err)
 	}
-	before, err := os.ReadFile(result)
-	if err != nil {
-		t.Fatal(err)
-	}
+	before := readBundledServe(t, result)
 	evidenceDir := filepath.Join(dir, ".gen", "schema", "feature-evidence")
 	if err := os.MkdirAll(evidenceDir, 0755); err != nil {
 		t.Fatal(err)
@@ -793,23 +792,184 @@ func TestGenerateBundledServe_V2FeatureEvidenceIsRuntimeInert(t *testing.T) {
 	if err != nil {
 		t.Fatalf("generate v2 bundled serve with feature evidence: %v", err)
 	}
-	after, err := os.ReadFile(result)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Equal(before, after) {
+	after := readBundledServe(t, result)
+	if before != after {
 		t.Fatalf("feature evidence changed bundled loader/config/startup activation\nbefore:\n%s\nafter:\n%s", before, after)
 	}
-	content := string(after)
+	content := after
 	for _, want := range []string{
 		`registerModuleLoader("api-loader", () => Promise.resolve(loaderModule0))`,
 		`registerModuleLoader("sql-loader", () => Promise.resolve(loaderModule1))`,
 		`assertRegisteredConfigDefinitions(["database.primary"])`,
-		"return workload;",
+		"registerBundledStartGuard((workload) => {",
 	} {
 		if !strings.Contains(content, want) {
 			t.Errorf("v2 bundled serve missing stable activation %q", want)
 		}
+	}
+}
+
+// readBundledServe answers the bundled serve entry at entry followed by the
+// two modules it imports from its directory, the loaders and the embedded
+// config.
+func readBundledServe(t *testing.T, entry string) string {
+	t.Helper()
+	var out strings.Builder
+	for _, path := range []string{entry, filepath.Join(filepath.Dir(entry), bundledServeLoadersFile), filepath.Join(filepath.Dir(entry), bundledServeConfigFile)} {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		out.Write(data)
+		out.WriteString("\n")
+	}
+	return out.String()
+}
+
+// assertImportOrder fails unless content holds every line of want, in order.
+func assertImportOrder(t *testing.T, content string, want ...string) {
+	t.Helper()
+	last := -1
+	for _, line := range want {
+		at := strings.Index(content, line+"\n")
+		if at < 0 || at < last {
+			t.Fatalf("expected %q after the lines before it:\n%s", line, content)
+		}
+		last = at
+	}
+}
+
+func writeServeProject(t *testing.T, packageJSON string, files map[string]string) string {
+	t.Helper()
+	dir := t.TempDir()
+	files["package.json"] = packageJSON
+	files["src/main.ts"] = "export const app = () => {};"
+	for rel, body := range files {
+		path := filepath.Join(dir, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return dir
+}
+
+// A project with its own serve entry runs it in the executable, the entry
+// `putnami serve` runs, after the embedded config, the app entrypoint's
+// activation and the loaders.
+func TestGenerateBundledServe_RunsTheProjectServeEntry(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-compiled-entry-runs-the-project-serve-entry")
+	dir := writeServeProject(t, `{"name":"test","main":"src/main.ts"}`, map[string]string{
+		"src/serve.ts": "await bootstrapServe(app);",
+	})
+	manifestPath := writeCapabilityActivationManifest(t, dir, `{"protocolVersion":1,"project":"test"}`)
+
+	result, err := GenerateBundledServe(dir, manifestPath, nil)
+	if err != nil || result == "" {
+		t.Fatalf("GenerateBundledServe = %q, %v; want an entry", result, err)
+	}
+	entry, err := os.ReadFile(result)
+	if err != nil {
+		t.Fatal(err)
+	}
+	assertImportOrder(t, string(entry),
+		`import * as embeddedConfig from "./serve.bundled.config";`,
+		`import * as appEntry from "../../src/main";`,
+		`import * as loaders from "./serve.bundled.loaders";`,
+		`import * as serveEntry from "../../src/serve";`,
+		"export const bundledModules = [embeddedConfig, appEntry, loaders, serveEntry];",
+		"reportPendingBundledStartGuard();")
+	if strings.Contains(string(entry), "bootstrapServe(") {
+		t.Errorf("the entry starts the app itself beside the project's serve entry:\n%s", entry)
+	}
+}
+
+func TestProjectServeEntry(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-compiled-entry-runs-the-project-serve-entry")
+	cases := []struct {
+		name        string
+		packageJSON string
+		files       map[string]string
+		want        string
+	}{
+		{"the ./serve export", `{"name":"t","exports":{"./serve":{"default":"src/boot.ts"}}}`, map[string]string{"src/boot.ts": "", "src/serve.ts": ""}, "src/boot.ts"},
+		{"src/serve.ts without an export", `{"name":"t"}`, map[string]string{"src/serve.ts": ""}, "src/serve.ts"},
+		{"an export outside src/ falls back to src/serve.ts", `{"name":"t","exports":{"./serve":"server/serve.ts"}}`, map[string]string{"server/serve.ts": "", "src/serve.ts": ""}, "src/serve.ts"},
+		{"an export into .gen falls back to src/serve.ts", `{"name":"t","exports":{"./serve":".gen/src/serve.ts"}}`, map[string]string{".gen/src/serve.ts": "", "src/serve.ts": ""}, "src/serve.ts"},
+		{"an export into .gen alone", `{"name":"t","exports":{"./serve":".gen/src/serve.ts"}}`, map[string]string{".gen/src/serve.ts": ""}, ""},
+		{"an export that escapes the project", `{"name":"t","exports":{"./serve":"../other/serve.ts"}}`, map[string]string{}, ""},
+		{"a missing export file", `{"name":"t","exports":{"./serve":"src/gone.ts"}}`, map[string]string{}, ""},
+		{"no serve entry", `{"name":"t"}`, map[string]string{}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := writeServeProject(t, tc.packageJSON, tc.files)
+			if got := ProjectServeEntry(dir); got != tc.want {
+				t.Errorf("ProjectServeEntry() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// The executable carries conf/.env.yaml and every conf/.env.<env>.yaml as
+// written, in a fixed order, and never a secrets file nor a machine-local
+// override (conf/.env.local.yaml, conf/.env.prod.yaml).
+func TestGenerateBundledServe_EmbedsTheProjectConfig(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-compiled-entry-embeds-the-project-conf-files")
+	dir := writeServeProject(t, `{"name":"test","main":"src/main.ts"}`, map[string]string{
+		"conf/.env.yaml":                "putnami:\n  port: 8080\n",
+		"conf/.env.production.yaml":     "putnami:\n  port: \"9090\" # quoted\n",
+		"conf/.env.local.yaml":          "password: local\n",
+		"conf/.env.prod.yaml":           "password: prod\n",
+		"conf/.env.staging.yaml":        "a: b\n",
+		"conf/.secrets.production.yaml": "token: secret\n",
+		"conf/notes.yaml":               "ignored: true\n",
+	})
+	manifestPath := writeCapabilityActivationManifest(t, dir, `{"protocolVersion":1,"project":"test"}`)
+
+	result, err := GenerateBundledServe(dir, manifestPath, nil)
+	if err != nil || result == "" {
+		t.Fatalf("GenerateBundledServe = %q, %v; want an entry", result, err)
+	}
+	config, err := os.ReadFile(filepath.Join(filepath.Dir(result), bundledServeConfigFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `import { registerEmbeddedConfig } from '@putnami/runtime';
+
+// The project's conf/ files, embedded so the executable resolves its base and
+// environment config wherever it runs.
+registerEmbeddedConfig({
+  base: "putnami:\n  port: 8080\n",
+  envs: {
+    "production": "putnami:\n  port: \"9090\" # quoted\n",
+    "staging": "a: b\n",
+  },
+});
+`
+	if string(config) != want {
+		t.Fatalf("embedded config module =\n%s\nwant\n%s", config, want)
+	}
+}
+
+// A project without conf/ embeds no file.
+func TestGenerateBundledServe_EmbedsNoConfigWithoutConf(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-compiled-entry-embeds-the-project-conf-files")
+	dir := writeServeProject(t, `{"name":"test","main":"src/main.ts"}`, map[string]string{})
+	manifestPath := writeCapabilityActivationManifest(t, dir, `{"protocolVersion":1,"project":"test"}`)
+
+	result, err := GenerateBundledServe(dir, manifestPath, nil)
+	if err != nil || result == "" {
+		t.Fatalf("GenerateBundledServe = %q, %v; want an entry", result, err)
+	}
+	config, err := os.ReadFile(filepath.Join(filepath.Dir(result), bundledServeConfigFile))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(config), "registerEmbeddedConfig({\n});\n") {
+		t.Fatalf("embedded config module =\n%s\nwant no file", config)
 	}
 }
 
@@ -1207,24 +1367,19 @@ func TestResolveCompileOutputFile_NestedEntrypoint(t *testing.T) {
 // ---- buildCompileArgs ----
 
 func TestBuildCompileArgs(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-compile-reads-node-env-at-run-time")
 	args := buildCompileArgs("", "serve.ts", "/out/serve-linux-x64", "bun-linux-x64", false)
-	if len(args) != 7 {
-		t.Fatalf("expected 7 args, got %d: %v", len(args), args)
-	}
-	if args[0] != "build" || args[1] != "--compile" || args[2] != "serve.ts" {
-		t.Errorf("unexpected first args: %v", args[:3])
-	}
-	if args[3] != "--outfile" || args[4] != "/out/serve-linux-x64" {
-		t.Errorf("unexpected outfile args: %v", args[3:5])
-	}
-	if args[5] != "--target" || args[6] != "bun-linux-x64" {
-		t.Errorf("unexpected target args: %v", args[5:7])
+	want := []string{"build", "--compile", "--env=disable", "serve.ts",
+		"--outfile", "/out/serve-linux-x64", "--target", "bun-linux-x64"}
+	if !slices.Equal(args, want) {
+		t.Errorf("buildCompileArgs() = %v, want %v", args, want)
 	}
 }
 
 func TestBuildCompileArgs_Config(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-compile-reads-node-env-at-run-time")
 	args := buildCompileArgs("/p/bunfig.toml", "/p/serve.ts", "/out/serve-linux-x64", "bun-linux-x64", false)
-	want := []string{"build", "--config=/p/bunfig.toml", "--compile", "/p/serve.ts",
+	want := []string{"build", "--config=/p/bunfig.toml", "--compile", "--env=disable", "/p/serve.ts",
 		"--outfile", "/out/serve-linux-x64", "--target", "bun-linux-x64"}
 	if !slices.Equal(args, want) {
 		t.Errorf("buildCompileArgs() = %v, want %v", args, want)
@@ -1232,8 +1387,9 @@ func TestBuildCompileArgs_Config(t *testing.T) {
 }
 
 func TestBuildCompileArgs_Bytecode(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-compile-reads-node-env-at-run-time")
 	args := buildCompileArgs("/p/bunfig.toml", "/p/serve.ts", "/out/serve-linux-x64", "bun-linux-x64", true)
-	want := []string{"build", "--config=/p/bunfig.toml", "--compile", "--bytecode", "--format=esm", "/p/serve.ts",
+	want := []string{"build", "--config=/p/bunfig.toml", "--compile", "--env=disable", "--bytecode", "--format=esm", "/p/serve.ts",
 		"--outfile", "/out/serve-linux-x64", "--target", "bun-linux-x64"}
 	if !slices.Equal(args, want) {
 		t.Errorf("buildCompileArgs() = %v, want %v", args, want)

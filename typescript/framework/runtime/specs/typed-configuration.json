@@ -16,7 +16,7 @@
   "requirements": [
     {
       "id": "source-precedence",
-      "text": "Configuration sources merge from lowest to highest as base file, environment file, build-merged file, local secrets file, registered extension sources, then CONFIG_DATA."
+      "text": "Configuration sources merge from lowest to highest as base file, environment file, build-merged file, local secrets file, registered extension sources, then CONFIG_DATA. The conf files a compiled entrypoint embeds rank each just below its on-disk copy: the embedded base below the base file, the embedded environment file above both base files and below the environment file."
     },
     {
       "id": "config-environment",

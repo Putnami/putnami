@@ -12,8 +12,15 @@ Configuration is loaded from multiple sources in order of precedence (highest wi
 2. `CONFIG_DATA` environment variable (inline YAML string)
 3. `.gen/conf/.env.{env}.yaml` - Generated config files (created by build tools)
 4. `conf/.env.{env}.yaml` - Source config files in your project
-5. `confInit` values - Programmatic defaults from plugin constructors
-6. `Default()` values in the schema (lowest precedence)
+5. `conf/.env.yaml` - Base config shared by every environment
+6. `confInit` values - Programmatic defaults from plugin constructors
+7. `Default()` values in the schema (lowest precedence)
+
+A compiled binary and its image embed `conf/.env.yaml` and every
+`conf/.env.{env}.yaml`, never `conf/.secrets.*` nor the gitignored
+`conf/.env.local.yaml` and `conf/.env.prod.yaml`, so they read the same base
+and environment files as `putnami serve`, `putnami.port` included, wherever
+they run. A `PORT` variable, which an image sets, still outranks `putnami.port`.
 
 ### Basic structure
 

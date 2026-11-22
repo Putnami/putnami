@@ -70,8 +70,10 @@ Every other datasource, such as `database('auth')`, reads the same list
 without `DATABASE_URL`: one URL names one database. Give it
 `database.auth.url`.
 
-A compiled binary or container image ships no `conf/` directory. There, set
-`DATABASE_URL`; see
+A compiled binary or container image embeds `conf/.env.yaml` and
+`conf/.env.<env>.yaml`, so a `${DATABASE_URL}` reference there resolves from
+the container's environment; it embeds no `conf/.secrets.*` file and not the
+gitignored `conf/.env.local.yaml`. There, set `DATABASE_URL`; see
 [Publish & Docker](/docs/frameworks/typescript/extension/publish-and-docker).
 
 ### Configuration options

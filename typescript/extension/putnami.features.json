@@ -942,6 +942,23 @@
           }
         },
         {
+          "id": "compiled-service-config",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-compiled-entry-runs-the-project-serve-entry",
+              "the-compiled-entry-embeds-the-project-conf-files",
+              "the-compile-reads-node-env-at-run-time",
+              "the-generate-key-reads-the-conf-files",
+              "the-compiled-executable-listens-on-the-configured-port"
+            ]
+          }
+        },
+        {
           "id": "source-bound-generate",
           "stage": "coded",
           "evidenceKinds": [

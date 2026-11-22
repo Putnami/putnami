@@ -16,10 +16,9 @@ putnami serve . --port 4000
 putnami serve . --entrypoint src/server.ts
 ```
 
-`putnami serve` runs `src/serve.ts`, but the compiled binary and the container
-image do not: they run a generated entry that imports `app` from `main`. Keep
-`src/serve.ts` to `await bootstrapServe(app)` and put startup code in the `app`
-builder. See
+`putnami serve`, the compiled binary and the container image all run
+`src/serve.ts` (the `./serve` export) and resolve the same `conf/` config,
+`putnami.port` included. A `PORT` variable, which an image sets, still outranks `putnami.port`. See
 [What the compiled binary runs](/docs/frameworks/typescript/extension/publish-and-docker#what-the-compiled-binary-runs).
 
 ## Options

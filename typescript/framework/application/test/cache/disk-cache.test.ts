@@ -1,8 +1,12 @@
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
+import { resetDefaultLogger, setRootLogger } from '@putnami/runtime';
+import { MemoryLogger } from '@putnami/runtime/testing';
 import { joinPath } from '@putnami/utils';
 import { DiskCacheStorage, evictOldVersionsInDir } from '../../src/cache/disk-cache.storage';
+import { InMemoryCacheStorage } from '../../src/cache/in-memory-cache.storage';
+import { LayeredCacheStorage } from '../../src/cache/layered-cache.storage';
 
 const TEST_CACHE_DIR = '/tmp/putnami-test-disk-cache';
 
@@ -222,4 +226,50 @@ describe('evictOldVersionsInDir', () => {
       expect(remaining.length).toBe(5);
     },
   );
+});
+
+describe('DiskCacheStorage in a directory it cannot write', () => {
+  const blocker = '/tmp/putnami-test-disk-cache-blocker';
+
+  beforeEach(() => {
+    rmSync(blocker, { recursive: true, force: true });
+    // A file where the cache directory's parent should be: mkdir fails as it
+    // does in a read-only working directory.
+    writeFileSync(blocker, 'not a directory');
+  });
+
+  afterEach(() => {
+    rmSync(blocker, { recursive: true, force: true });
+  });
+
+  test('a write that fails keeps the value in the memory layer', async () => {
+    const disk = new DiskCacheStorage('app', undefined, joinPath(blocker, 'cache'));
+    const layered = new LayeredCacheStorage([new InMemoryCacheStorage(), disk]);
+
+    await layered.set('key', 'value');
+    await disk.set('other', 'value');
+
+    expect((await layered.get<string>('key'))?.value).toBe('value');
+    expect(await disk.get('key')).toBeUndefined();
+  });
+
+  test('logs the cause once and never answers an entry older than a failed write', async () => {
+    const memory = new MemoryLogger();
+    setRootLogger(memory);
+    const dir = joinPath(blocker, 'cache');
+    const disk = new DiskCacheStorage('app', undefined, dir);
+    try {
+      await disk.set('k', 'v1');
+      await disk.set('k', 'v2');
+      await disk.clear();
+      await disk.set('k', 'v3');
+    } finally {
+      resetDefaultLogger();
+    }
+
+    const warnings = memory.entries.filter((entry) => entry.message.startsWith('disk cache disabled'));
+    expect(warnings).toHaveLength(1);
+    expect(String(warnings[0]?.context?.['cause'] ?? JSON.stringify(warnings[0]))).toContain('ENOTDIR');
+    expect(await disk.get('k')).toBeUndefined();
+  });
 });

@@ -1334,6 +1334,15 @@
             "package.json"
           ]
         },
+        "configFiles": {
+          "from": "project",
+          "files": [
+            "conf/.env.yaml",
+            "conf/.env.*.yaml",
+            "!conf/.env.local.yaml",
+            "!conf/.env.prod.yaml"
+          ]
+        },
         "clear": {
           "from": "params"
         },

@@ -302,12 +302,9 @@ func TestReconcileCapabilityManifestV2_SlottedLoadersAreSourceDiscoverersAndActi
 	if err != nil {
 		t.Fatalf("generate bundled serve: %v", err)
 	}
-	body, err := os.ReadFile(entry)
-	if err != nil {
-		t.Fatal(err)
-	}
+	body := readBundledServe(t, entry)
 	for key := range exports {
-		if count := strings.Count(string(body), "registerModuleLoader(\""+key+"\","); count != 1 {
+		if count := strings.Count(body, "registerModuleLoader(\""+key+"\","); count != 1 {
 			t.Fatalf("bundled serve registers %q %d times, want once:\n%s", key, count, body)
 		}
 	}
