@@ -135,6 +135,38 @@ describe('Router static fast path', () => {
     },
   );
 
+  specTest(
+    'matches a route that declares */* whatever the request accepts',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'wildcard-accept',
+      check: 'a-wildcard-route-matches-any-accept-behind-a-named-type',
+    },
+    () => {
+      const router = new Router<string>();
+      router.add('/page', 'page', { accept: ['text/html', '*/*'] });
+      router.add('/page', 'markdown', { accept: ['text/markdown'] });
+
+      // A type the page does not name still reaches it through its */*.
+      expect(router.find('/page', ['image/png']).map((m) => m.handler)).toEqual(['page']);
+      // A route that names the requested type runs first.
+      expect(router.find('/page', ['text/markdown']).map((m) => m.handler)).toEqual(['markdown', 'page']);
+
+      // The trie path (a parameter route) scores the same way.
+      const dynamic = new Router<string>();
+      dynamic.add('/docs/[slug]', 'page', { accept: ['text/html', '*/*'] });
+      expect(dynamic.find('/docs/intro', ['text/markdown']).map((m) => m.handler)).toEqual(['page']);
+
+      // A less specific route that names the type still runs before a static
+      // route that matches only through its */*.
+      const mixed = new Router<string>();
+      mixed.add('/feed', 'api', { accept: ['application/json', '*/*'] });
+      mixed.add('/[name]', 'rss', { accept: ['application/rss+xml'] });
+      expect(mixed.find('/feed', ['application/rss+xml']).map((m) => m.handler)).toEqual(['rss', 'api']);
+      expect(mixed.find('/feed', ['application/json'])[0].handler).toBe('api');
+    },
+  );
+
   it('treats a route without an accept option as unconstrained', () => {
     const router = new Router<string>();
     router.add('/page', 'page');

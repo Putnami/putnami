@@ -375,17 +375,24 @@ function countSlashes(route: string): number {
 }
 
 /**
- * Content-negotiation score for a static handler, mirroring the trie's
- * `addMatch` logic: 1 on an exact Accept match, 0.5 when the handler is
- * unconstrained or the request accepts anything (`*​/*` or no Accept), 0
- * (filtered out) otherwise.
+ * Accept score of a handler that matches only through its own `*​/*`: low
+ * enough that the match ranks after every other match of the request, of any
+ * specificity (the lowest other score is 1 slash x 0.1 x 0.5), yet above zero.
+ */
+const DECLARED_WILDCARD_SCORE = 1e-6;
+
+/**
+ * Content-negotiation score for a handler, shared by the trie's `pushMatch`
+ * and the static fast path: 1 on an exact Accept match, 0.5 when the handler
+ * is unconstrained or the request accepts anything (`*​/*` or no Accept),
+ * {@link DECLARED_WILDCARD_SCORE} when only the handler's declared `*​/*`
+ * matches, 0 (filtered out) otherwise. A handler that declares `*​/*` thus
+ * answers any Accept, and only when no other route matches the request first.
  */
 function scoreAccept<T>(handler: Handler<T>, requestAccept: string[]): number {
-  let acceptScore = requestAccept.some((item) => handler.accept.has(item)) ? 1 : 0;
-  if (acceptScore === 0 && (handler.accept.size === 0 || requestAccept.length === 0 || requestAccept.includes('*/*'))) {
-    acceptScore = 0.5;
-  }
-  return acceptScore;
+  if (requestAccept.some((item) => handler.accept.has(item))) return 1;
+  if (handler.accept.size === 0 || requestAccept.length === 0 || requestAccept.includes('*/*')) return 0.5;
+  return handler.accept.has('*/*') ? DECLARED_WILDCARD_SCORE : 0;
 }
 
 /**

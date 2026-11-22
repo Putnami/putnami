@@ -525,6 +525,15 @@
               "the-provider-answers-the-declared-details-in-the-first-party-envelope"
             ]
           }
+        },
+        {
+          "id": "empty-result",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["an-empty-result-answers-204"]
+          }
         }
       ]
     },
@@ -1073,6 +1082,24 @@
               "a-client-call-at-the-deadline-answers-408",
               "a-stream-outlives-the-request-deadline"
             ]
+          }
+        },
+        {
+          "id": "wildcard-accept",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-wildcard-route-matches-any-accept-behind-a-named-type"]
+          }
+        },
+        {
+          "id": "malformed-json-body",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-malformed-json-body-answers-400"]
           }
         },
         {

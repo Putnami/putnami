@@ -22,9 +22,7 @@ export function buildDefinition(
   dependencies?: readonly string[],
   provenance?: EndpointDefinition['provenance'],
 ): EndpointDefinition {
-  const hasInputSchemas = schemas?.params || schemas?.query || schemas?.body || schemas?.bodyBinary || schemas?.headers;
-  const hasResponseSchema = schemas?.returns || schemas?.returnsBinary?.streamed;
-  const needsWrapping = hasInputSchemas || hasResponseSchema;
+  const needsWrapping = needsValidation(schemas);
   const hasMiddleware = middleware && middleware.length > 0;
 
   let finalHandler = needsWrapping ? wrapWithValidation(handler, schemas) : handler;
@@ -52,6 +50,71 @@ export function buildDefinition(
 }
 
 /**
+ * Build the handler an endpoint serves on its HTTP route: its validation, then
+ * an empty answer for an empty result, then its middleware. An endpoint whose
+ * handler returns `undefined` answers 204 No Content, or the status the handler set
+ * on the context when it is not 200: a raw HTTP route that returns nothing
+ * falls through to the next match, but an endpoint is the operation its path
+ * names, so nothing is the answer, not a miss. The empty answer sits inside the
+ * middleware chain, so a middleware such as CORS decorates it. The Connect and
+ * gRPC bridge, which serves this same handler, reads it back as no result
+ * through {@link isEmptyEndpointAnswer}.
+ *
+ * With `aot`, the compiled validators replace the generic ones, for an endpoint
+ * with no route-level middleware, as {@link buildAotValidatedHandler} does.
+ */
+export function buildHttpEndpointHandler(def: EndpointDefinition, aot?: AotValidators): RouteHandler {
+  // A definition built without its raw handler already composes validation
+  // and middleware: only the empty answer can be added, around it.
+  if (!def.__rawHandler) return answeringNoContent(def.handler);
+  const raw = def.__rawHandler;
+  const middleware = def.middleware ?? [];
+  let validated: RouteHandler = raw;
+  if (aot && middleware.length === 0) {
+    validated = buildAotValidatedHandler(def, aot);
+  } else if (needsValidation(def.schemas)) {
+    validated = wrapWithValidation(raw, def.schemas);
+  }
+  const answered = answeringNoContent(validated);
+  return middleware.length > 0 ? wrapWithMiddleware(answered, middleware) : answered;
+}
+
+/** The empty answers {@link answeringNoContent} built, so a bridge can read them back as no result. */
+const emptyAnswers = new WeakSet<HttpResponse>();
+
+/**
+ * Whether a response is the empty answer an endpoint gave for a handler that
+ * returned `undefined`. The Connect and gRPC unary bridge serves the same
+ * handler and reads such an answer as no result: an empty message, not 204.
+ */
+export function isEmptyEndpointAnswer(result: unknown): boolean {
+  return result instanceof HttpResponse && emptyAnswers.has(result);
+}
+
+function answeringNoContent(handler: RouteHandler): RouteHandler {
+  return async (ctx: HttpRequestContext) => {
+    const result = await handler(ctx);
+    if (result !== undefined) return result;
+    const status = ctx.statusCode && ctx.statusCode !== 200 ? ctx.statusCode : 204;
+    const answer = new HttpResponse(undefined, { status });
+    emptyAnswers.add(answer);
+    return answer;
+  };
+}
+
+function needsValidation(schemas: EndpointDefinition['schemas']): boolean {
+  return Boolean(
+    schemas?.params ||
+      schemas?.query ||
+      schemas?.body ||
+      schemas?.bodyBinary ||
+      schemas?.headers ||
+      schemas?.returns ||
+      schemas?.returnsBinary?.streamed,
+  );
+}
+
+/**
  * Rebuild an endpoint's validation around compiled (AOT) validators, reusing its
  * pre-validation handler. Used by the build-time codegen for endpoints with no
  * route-level middleware. Each compiled validator falls back to the generic
@@ -61,7 +124,7 @@ export function buildAotValidatedHandler(def: EndpointDefinition, aot: AotValida
   return wrapWithValidation(def.__rawHandler ?? def.handler, def.schemas, aot);
 }
 
-function wrapWithMiddleware(handler: RouteHandler, middleware: HttpMiddleware[]): RouteHandler {
+function wrapWithMiddleware(handler: RouteHandler, middleware: readonly HttpMiddleware[]): RouteHandler {
   // Pre-compose middleware chain once at definition time (not per request).
   type ChainFn = (
     ctx: HttpRequestContext,

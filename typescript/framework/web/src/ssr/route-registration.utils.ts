@@ -1,4 +1,10 @@
-import type { HttpMiddleware, HttpPlugin, RouteHandler, RouteOptions } from '@putnami/application';
+import {
+  type HttpMiddleware,
+  type HttpPlugin,
+  HttpResponse,
+  type RouteHandler,
+  type RouteOptions,
+} from '@putnami/application';
 import type { ReactNode } from 'react';
 import type { LoaderFunction, RouteObject } from 'react-router';
 import { ACTION_REQUEST_HEADER } from '../shared/client-redirect';
@@ -271,7 +277,7 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
       const actionModule = await cache.loadModule(`action:${route}`, lazyAction);
       const actionDef = inModuleOrDefault<ActionDefinition, ActionModule>(actionModule, 'action');
       if (actionDef) {
-        return runAndEvict(() => actionDef.handler(ctx), actionDef.evict);
+        return runAndEvict(async () => noContentIfEmpty(await actionDef.handler(ctx)), actionDef.evict);
       }
       return undefined;
     };
@@ -286,7 +292,8 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
 
   const actionDef = inModuleOrDefault<ActionDefinition, ActionModule>(action as ActionModule, 'action');
   if (actionDef) {
-    const actionFn: RouteHandler = (ctx) => runAndEvict(() => actionDef.handler(ctx), actionDef.evict);
+    const actionFn: RouteHandler = (ctx) =>
+      runAndEvict(async () => noContentIfEmpty(await actionDef.handler(ctx)), actionDef.evict);
     node.action = actionHandler(actionFn);
     httpPlugin.post(
       httpRoute,
@@ -294,6 +301,15 @@ export function registerRouteAction(reg: RouteActionRegistration): void {
       postOptions,
     );
   }
+}
+
+/**
+ * An action that returns nothing answers 204 No Content, on its HTTP route as
+ * in the router. Left as `undefined`, the HTTP dispatcher would fall through
+ * to the next match and answer 404 for an action that succeeded.
+ */
+function noContentIfEmpty(result: unknown): unknown {
+  return result === undefined || result === null ? new HttpResponse(undefined, { status: 204 }) : result;
 }
 
 /**

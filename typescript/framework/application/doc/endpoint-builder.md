@@ -413,6 +413,30 @@ Provide the handler function. This finalises the endpoint definition and must be
 
 When `.body()` or `.returns()` use `Stream()`, `.handle()` produces a `StreamEndpointDefinition` (WebSocket/SSE). Otherwise it produces a standard `EndpointDefinition` (HTTP).
 
+What the handler returns decides the answer:
+
+| Return value | Answer |
+|--------------|--------|
+| Object or array | 200, serialized for the `Accept` header (see [Content Negotiation](#content-negotiation)) |
+| String | 200 `text/plain` |
+| `HttpResponse` | Sent as is |
+| `undefined` | 204 No Content with no body, or the status set on `ctx.statusCode` when it is not 200; over Connect or gRPC, the empty message |
+
+```typescript
+import { endpoint, Uuid } from '@putnami/application';
+
+const items = new Map<string, { name: string }>();
+
+// DELETE /items/:id → 204 No Content
+export const DELETE = endpoint()
+  .params({ id: Uuid })
+  .handle((ctx) => {
+    items.delete(ctx.params.id);
+  });
+```
+
+The empty answer passes through the endpoint's middleware, so `.cors()` or `.cache()` still apply to it.
+
 ### Streaming with `Stream()`
 
 Wrap a schema in `Stream()` to mark it as a stream of messages. The streaming mode is derived from which slots are streams:
@@ -569,6 +593,18 @@ export const POST = endpoint()
 ```
 
 ## Error Handling
+
+A request whose JSON body does not parse answers `400 Bad Request`, never 500, as soon as the handler or the `.body()` validation reads the body:
+
+```
+POST /users
+Content-Type: application/json
+{"name": 
+
+→ 400 { "statusCode": 400, "message": "Malformed JSON body", "error": "Bad Request" }
+```
+
+Under a first-party client contract, the same error leaves as the `{ code, error, message }` envelope. An empty body is no body: `ctx.body()` returns `undefined`, and a declared `.body()` schema reports its required fields.
 
 Validation errors return a `400 Bad Request` with a descriptive message and a structured list of issues:
 

@@ -3,6 +3,7 @@ import type { DiscoveredRoute } from '../api';
 import type { StreamEndpointDefinition } from '../api/route/stream-endpoint';
 import type { HttpRequestContext } from '../http/http-context.type';
 import { isRequestStop } from '../http/http-dispatcher';
+import { isEmptyEndpointAnswer } from '../api/route/endpoint-helpers';
 import { HttpResponse } from '../http/http-response';
 import type { RouteHandler } from '../http/route.type';
 import type { ProtoFieldMeta } from '../proto';
@@ -150,7 +151,10 @@ export function buildUnaryRpcHandler(
       // Build context and dispatch directly to the handler
       const apiCtx = buildDispatchContext(ctx, internalReq, route, params, query, body, signal);
 
-      const result = await runInContext(apiCtx, () => apiHandler(apiCtx));
+      const answered = await runInContext(apiCtx, () => apiHandler(apiCtx));
+      // An endpoint that returned nothing answers 204 on HTTP; on this wire it
+      // is the empty message it always was.
+      const result = isEmptyEndpointAnswer(answered) ? undefined : answered;
 
       // A refusal the chain produced as a response rather than by throwing —
       // the security guard's 401 and 403 are the ones that matter — is an error

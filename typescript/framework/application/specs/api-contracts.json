@@ -150,6 +150,12 @@
         "It overrides a .throws() schema for its status.",
         "The provider answers the exception's response object as details, unary and stream."
       ]
+    },
+    {
+      "id": "empty-result",
+      "text": [
+        "An HTTP endpoint whose handler returns undefined answers 204 No Content with no body, or the status the handler set on the context when it is not 200, and the endpoint's middleware receives that answer to decorate; its Connect and gRPC call still answers the empty message."
+      ]
     }
   ],
   "decisions": [
