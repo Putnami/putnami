@@ -1042,6 +1042,22 @@
               "suites-skipped-without-a-test-database-are-summarized"
             ]
           }
+        },
+        {
+          "id": "worktree-vcs-stamp",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-worktree-builds-below-a-git-directory-that-is-no-repository",
+              "a-worktree-turns-the-vcs-stamp-off",
+              "an-explicit-buildvcs-wins",
+              "a-clone-keeps-go-default-stamping",
+              "a-worktree-keeps-the-go-env-file-flags",
+              "test-processes-keep-their-vcs-stamp"
+            ]
+          }
         }
       ]
     },

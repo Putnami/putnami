@@ -1022,7 +1022,7 @@ putnami-go gocacheprog: object cache served 182 objects, offered 3
 | `--race` | `false` | Enable race detector |
 | `--trimpath` | `false` | Remove local file system paths from binary |
 | `--cgo` | auto | Enable CGO (disabled automatically when cross-compiling) |
-| `--buildvcs` | auto | Stamp version control information (revision, commit time, modified state) into the binary. Absent keeps Go's default, which stamps it inside a repository. `false` builds the same bytes at every commit whose compiled sources are unchanged; together with no `version-var`, the binary does not change between builds that differ only in their version |
+| `--buildvcs` | auto | Stamp version control information (revision, commit time, modified state) into the binary. Absent keeps Go's default, which stamps it inside a repository; in a checkout whose `.git` is a file (a git worktree or a submodule), Go does not find that checkout's repository and stamps nothing, another repository, or an error, so absent means `false` there. `false` builds the same bytes at every commit whose compiled sources are unchanged; together with no `version-var`, the binary does not change between builds that differ only in their version |
 | `--buildmode` | `default` | Build mode: `default`, `archive`, `c-archive`, `c-shared`, `shared`, `exe`, `pie` |
 | `--installsuffix` | — | Install suffix for build cache isolation |
 | `--p <n>` | GOMAXPROCS | Number of parallel compilations |

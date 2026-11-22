@@ -68,7 +68,7 @@
         "installsuffix": { "type": "string", "description": "Install suffix for build cache isolation" },
         "p": { "type": "number", "short": "-p", "description": "Parallel builds (default: GOMAXPROCS)" },
         "cgo": { "type": "boolean", "description": "Build with CGO enabled" },
-        "buildvcs": { "type": "boolean", "description": "Stamp version control information (revision, commit time, modified state) into the binary. Absent keeps Go's default, which stamps it inside a repository; false builds the same bytes at every commit whose compiled sources are unchanged" },
+        "buildvcs": { "type": "boolean", "description": "Stamp version control information (revision, commit time, modified state) into the binary. Absent keeps Go's default, which stamps it inside a repository, and means false in a checkout whose .git is a file (a git worktree or a submodule); false builds the same bytes at every commit whose compiled sources are unchanged" },
         "buildmode": {
           "type": "string",
           "description": "Build mode (default, archive, c-archive, c-shared, shared, exe, pie)"

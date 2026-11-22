@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -459,8 +460,30 @@ func FindGoWork(dir string) string {
 // real working directory, while resolving projectDir below gives GOWORK the
 // same physical identity.
 //
+// When the checkout holding projectDir has a `.git` file, GOFLAGS gains
+// -buildvcs=false; see checkoutGitIsFile.
+//
 // env is typically os.Environ(). A fresh slice is returned; env is not mutated.
 func WorkspaceBuildEnv(env []string, projectDir, goBinary string) []string {
+	out, projectDir := workspaceGoEnv(env, projectDir, goBinary)
+	if checkoutGitIsFile(projectDir) {
+		out = withoutVCSStamp(out, goBinary)
+	}
+	return out
+}
+
+// WorkspaceTestEnv is WorkspaceBuildEnv for `go test`, without the
+// -buildvcs=false a checkout with a `.git` file adds: go test stamps no test
+// binary, and the test processes inherit this environment, so the flag would
+// change what a test's own go commands build.
+func WorkspaceTestEnv(env []string, projectDir, goBinary string) []string {
+	out, _ := workspaceGoEnv(env, projectDir, goBinary)
+	return out
+}
+
+// workspaceGoEnv applies the GOWORK and PWD rules of WorkspaceBuildEnv and
+// returns the environment with projectDir resolved through symbolic links.
+func workspaceGoEnv(env []string, projectDir, goBinary string) ([]string, string) {
 	out := removeEnv(GoCommandEnv(env, goBinary), goWorkEnvVar)
 	out = removeEnv(out, "PWD")
 	if resolved, err := filepath.EvalSymlinks(projectDir); err == nil {
@@ -469,8 +492,91 @@ func WorkspaceBuildEnv(env []string, projectDir, goBinary string) []string {
 	if gowork := FindGoWork(projectDir); gowork != "" {
 		out = setEnvValue(out, goWorkEnvVar, gowork)
 	}
-	return out
+	return out, projectDir
 }
+
+// checkoutGitIsFile reports whether the nearest `.git` entry at or above dir
+// is a file, as in a git worktree or a submodule.
+//
+// cmd/go takes only a `.git` DIRECTORY as a repository root. It walks past a
+// `.git` file to the first `.git` directory above it, so its VCS stamp is
+// absent, names another repository, or fails: a `.git` directory that is no
+// repository (a tool's leftover above a worktree) makes `git status` exit 128,
+// and every go command that stamps (build, and the `go list -export` that
+// staticcheck runs) fails with "error obtaining VCS status".
+func checkoutGitIsFile(dir string) bool {
+	if abs, err := filepath.Abs(dir); err == nil {
+		dir = abs
+	}
+	for {
+		if info, err := os.Stat(filepath.Join(dir, ".git")); err == nil {
+			return !info.IsDir()
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return false
+		}
+		dir = parent
+	}
+}
+
+// withoutVCSStamp adds -buildvcs=false to GOFLAGS, unless GOFLAGS already
+// sets -buildvcs. A -buildvcs flag on the go command line still wins over
+// GOFLAGS, so an explicit `buildvcs` parameter keeps its effect.
+//
+// A GOFLAGS variable replaces the GOFLAGS of Go's environment file whole, so
+// when env has none, the flags start from `go env GOFLAGS`: a machine with
+// `go env -w GOFLAGS=-tags=...` keeps its flags in a worktree. An empty
+// GOFLAGS counts as none, as Go reads it.
+func withoutVCSStamp(env []string, goBinary string) []string {
+	// Go reads its environment file when GOFLAGS is empty, not only unset.
+	goflags := envValue(env, "GOFLAGS")
+	set := goflags != ""
+	if !set {
+		goflags = goEnvFileFlags(env, goBinary)
+	}
+	for _, field := range goFlagFields(goflags) {
+		if goFlagName(field) == "buildvcs" {
+			if set {
+				return env
+			}
+			return setEnvValue(env, "GOFLAGS", goflags)
+		}
+	}
+	if trimmed := strings.TrimSpace(goflags); trimmed != "" {
+		return setEnvValue(env, "GOFLAGS", trimmed+" -buildvcs=false")
+	}
+	return setEnvValue(env, "GOFLAGS", "-buildvcs=false")
+}
+
+// goEnvFileFlags returns the GOFLAGS that `go env` resolves for env, which
+// carries no GOFLAGS variable: the value of Go's environment file, or "" when
+// the go command cannot answer. The answer is kept per go command and
+// environment file for the life of the process.
+func goEnvFileFlags(env []string, goBinary string) string {
+	if strings.TrimSpace(goBinary) == "" {
+		goBinary = "go"
+	}
+	key := goBinary + "\x00" + envValue(env, "GOENV") + "\x00" + envValue(env, "HOME") + "\x00" + envValue(env, "XDG_CONFIG_HOME") + "\x00" + envValue(env, "AppData")
+	goEnvFlagsMu.Lock()
+	defer goEnvFlagsMu.Unlock()
+	if cached, ok := goEnvFlagsCache[key]; ok {
+		return cached
+	}
+	cmd := exec.Command(goBinary, "env", "GOFLAGS")
+	cmd.Env = env
+	var flags string
+	if out, err := cmd.Output(); err == nil {
+		flags = strings.TrimSpace(string(out))
+	}
+	goEnvFlagsCache[key] = flags
+	return flags
+}
+
+var (
+	goEnvFlagsMu    sync.Mutex
+	goEnvFlagsCache = map[string]string{}
+)
 
 func managedGoRoot(goBinary string, env []string) string {
 	return managedGoRootOn(runtime.GOOS, goBinary, env)

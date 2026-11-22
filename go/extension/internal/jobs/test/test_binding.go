@@ -39,17 +39,17 @@ import (
 //	   the require mode, so a suite that asks for a test database fails
 //	   instead of skipping.
 func buildTestEnv(ctx *pctx.Context, projectPath string, race bool, goBinary string) ([]string, error) {
-	// Base the test env on WorkspaceBuildEnv, not a raw os.Environ(): an
+	// Base the test env on WorkspaceTestEnv, not a raw os.Environ(): an
 	// inherited GOWORK=off is stripped and GOWORK points at the governing go.work.
 	//
 	// Then drop the HOST's platform identity block. The scrub applies to the
 	// INHERITED environment only: every setEnv below runs after it and still wins.
 	//
 	// Then drop the variables that describe this job to the extension on a
-	// hosted run (hostenv.JobVars). WorkspaceBuildEnv already read the offline
+	// hosted run (hostenv.JobVars). WorkspaceTestEnv already read the offline
 	// signal and turned module downloads off, and those go settings stay: the
 	// repository's tests run offline, but they are not jobs of the run.
-	env := hostenv.ScrubJobVars(hostenv.ScrubPlatformIdentity(toolchain.WorkspaceBuildEnv(os.Environ(), projectPath, goBinary)))
+	env := hostenv.ScrubJobVars(hostenv.ScrubPlatformIdentity(toolchain.WorkspaceTestEnv(os.Environ(), projectPath, goBinary)))
 	envName := testEnvironment()
 	env = setEnv(env, envAppEnv, envName)
 	env = setEnv(env, "FORCE_COLOR", "1")

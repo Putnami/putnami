@@ -37,8 +37,10 @@ that are already ready; it never waits for a batch to fill. Package events are
 attributed back to the owning module, so every project still gets its own
 status, diagnostics, metrics, cache entry, and terminal row.
 
-The extension derives the subprocess environment through `WorkspaceBuildEnv`.
-That shared policy maps the CLI's managed Go cache, pins
+The extension derives the subprocess environment through `WorkspaceTestEnv`,
+the build environment without the `-buildvcs=false` a worktree adds: `go test`
+stamps no test binary, and the test processes inherit this environment. That
+shared policy maps the CLI's managed Go cache, pins
 `GOTOOLCHAIN=local`, applies the Putnami proxy/checksum defaults, and removes an
 inherited `GOWORK=off` before invoking packages governed by a `go.work` file.
 Coverage writes a temporary profile, then a module-filtered `coverage.out` (and

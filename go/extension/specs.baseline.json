@@ -72,6 +72,7 @@
     "go/go-project-toolchain#the-packager-stamps-a-dependent",
     "go/go-project-toolchain#tidy-drift-visibility",
     "go/go-project-toolchain#vocabulary-default-traits",
+    "go/go-project-toolchain#worktree-vcs-stamp",
     "go/project-setup#create-fails-when-go-mod-tidy-fails",
     "go/project-setup#create-holds-a-missing-credential-warning",
     "go/project-setup#create-resolves-the-go-framework-version",

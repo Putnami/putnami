@@ -84,16 +84,22 @@ func goFlagFields(goflags string) []string {
 // isModFlag reports whether one GOFLAGS field sets -mod: "-mod=..." or
 // "--mod=...", as the flag package reads a flag.
 func isModFlag(field string) bool {
+	return goFlagName(field) == "mod"
+}
+
+// goFlagName returns the flag name one GOFLAGS field sets, as the flag package
+// reads "-name", "--name" and "-name=value", or "" when the field is no flag.
+func goFlagName(field string) string {
 	name, ok := strings.CutPrefix(field, "-")
 	if !ok {
-		return false
+		return ""
 	}
 	name = strings.TrimPrefix(name, "-")
 	if strings.HasPrefix(name, "-") {
-		return false
+		return ""
 	}
 	name, _, _ = strings.Cut(name, "=")
-	return name == "mod"
+	return name
 }
 
 // withOfflineDependencies applies OfflineGoOverrides to env when env carries

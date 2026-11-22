@@ -228,7 +228,7 @@ func TestBuildTestEnv_ScrubIsNoopWithoutPlatformIdentity(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildTestEnv: %v", err)
 	}
-	base := toolchain.WorkspaceBuildEnv(os.Environ(), proj, "")
+	base := toolchain.WorkspaceTestEnv(os.Environ(), proj, "")
 	baseNames := envNames(base)
 	for _, name := range baseNames {
 		if !slices.Contains(envNames(env), name) {
