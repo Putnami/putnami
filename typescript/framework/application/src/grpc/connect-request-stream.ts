@@ -14,12 +14,15 @@ import { MAX_GRPC_MESSAGE_BYTES, decompressGzip } from './grpc-protocol';
  * Each call to {@link next} pulls just enough of the body to return one
  * message, so a handler that is slow to read slows the caller down through
  * the transport's own flow control instead of buffering the stream in memory.
- * A message whose length prefix is past the bound is refused from the prefix
- * alone, before any of it is buffered.
+ * At most one message is held at a time. A message whose length prefix is
+ * past the bound is refused from the prefix alone, before any of it is
+ * buffered, and a message is assembled into one buffer of its declared length,
+ * so reading it costs time linear in its size however small the chunks are.
  */
 export class ConnectRequestStream {
   private readonly reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
-  private buffer = new Uint8Array(0);
+  /** The unread rest of the last chunk the body delivered. */
+  private chunk = new Uint8Array(0);
   private ended = false;
 
   constructor(
@@ -33,34 +36,18 @@ export class ConnectRequestStream {
 
   /** The payload of the next message, decompressed, or `undefined` once the caller ended its side. */
   async next(): Promise<Uint8Array | undefined> {
-    for (;;) {
-      if (this.buffer.length >= ENVELOPE_HEADER_BYTES) {
-        const flags = this.buffer[0] ?? 0;
-        const length = new DataView(this.buffer.buffer, this.buffer.byteOffset + 1, 4).getUint32(0, false);
-        if (length > this.maxMessageBytes) {
-          throw new HttpException(`Payload Too Large: gRPC message exceeds ${this.maxMessageBytes} bytes`, 413);
-        }
-        const size = ENVELOPE_HEADER_BYTES + length;
-        if (this.buffer.length >= size) {
-          const payload = this.buffer.slice(ENVELOPE_HEADER_BYTES, size);
-          this.buffer = this.buffer.subarray(size);
-          return this.decode(flags, payload);
-        }
-      }
-      if (this.ended) {
-        if (this.buffer.length > 0) {
-          throw new HttpException('Bad Request: truncated Connect stream request envelope', 400);
-        }
-        return undefined;
-      }
-      // biome-ignore lint/performance/noAwaitInLoops: one message is read at a time, in order
-      const chunk = await this.reader?.read();
-      if (!chunk || chunk.done) {
-        this.ended = true;
-        continue;
-      }
-      this.append(chunk.value);
+    const header = new Uint8Array(ENVELOPE_HEADER_BYTES);
+    const headerRead = await this.fill(header);
+    if (headerRead === 0) return undefined;
+    if (headerRead < ENVELOPE_HEADER_BYTES) throw truncated();
+    const flags = header[0] ?? 0;
+    const length = new DataView(header.buffer).getUint32(1, false);
+    if (length > this.maxMessageBytes) {
+      throw new HttpException(`Payload Too Large: gRPC message exceeds ${this.maxMessageBytes} bytes`, 413);
     }
+    const payload = new Uint8Array(length);
+    if ((await this.fill(payload)) < length) throw truncated();
+    return this.decode(flags, payload);
   }
 
   /** Stop reading: the response ended before the caller ended its side. */
@@ -70,14 +57,32 @@ export class ConnectRequestStream {
     this.reader?.cancel().catch(() => {});
   }
 
-  private append(chunk: Uint8Array): void {
-    if (chunk.length === 0) return;
-    // The runtime may reuse a chunk's memory once the next read starts, so a
-    // pending partial message is always kept in a copy of its own.
-    const merged = new Uint8Array(this.buffer.length + chunk.length);
-    merged.set(this.buffer, 0);
-    merged.set(chunk, this.buffer.length);
-    this.buffer = merged;
+  /**
+   * Copy body bytes into `target` until it is full or the body ended, and
+   * return how many were copied. Each body byte is copied once.
+   */
+  private async fill(target: Uint8Array): Promise<number> {
+    let filled = 0;
+    while (filled < target.length) {
+      if (this.chunk.length === 0) {
+        if (this.ended) return filled;
+        // biome-ignore lint/performance/noAwaitInLoops: the body is read in order, one chunk at a time
+        const read = await this.reader?.read();
+        if (!read || read.done) {
+          this.ended = true;
+          return filled;
+        }
+        // The runtime may reuse a chunk's memory once the next read starts, so
+        // the unread rest is kept in a copy of its own.
+        this.chunk = new Uint8Array(read.value);
+        continue;
+      }
+      const take = Math.min(this.chunk.length, target.length - filled);
+      target.set(this.chunk.subarray(0, take), filled);
+      this.chunk = this.chunk.subarray(take);
+      filled += take;
+    }
+    return filled;
   }
 
   private decode(flags: number, payload: Uint8Array): Uint8Array {
@@ -96,4 +101,8 @@ export class ConnectRequestStream {
     }
     return decompressGzip(payload, this.maxMessageBytes);
   }
+}
+
+function truncated(): HttpException {
+  return new HttpException('Bad Request: truncated Connect stream request envelope', 400);
 }

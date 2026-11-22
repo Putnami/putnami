@@ -106,8 +106,16 @@ describe('cleartext HTTP/2', () => {
       check: 'a-prior-knowledge-http2-request-is-served-beside-http1-and-websocket-on-one-port',
     },
     () => {
-      const request = (headers: Record<string, string>) => new Request('http://localhost/', { headers });
+      const request = (headers: Record<string, string>) =>
+        new Request('http://localhost/', {
+          method: 'POST',
+          headers,
+          body: new ReadableStream(),
+          duplex: 'half',
+        } as RequestInit);
       expect(arrivedOverHttp2(request({ host: 'localhost', 'content-type': 'application/connect+json' }))).toBe(true);
+      // A request with no body at all is never read as HTTP/2.
+      expect(arrivedOverHttp2(new Request('http://localhost/', { method: 'POST' }))).toBe(false);
       for (const name of ['connection', 'keep-alive', 'transfer-encoding', 'upgrade', 'content-length']) {
         expect(arrivedOverHttp2(request({ [name]: name === 'content-length' ? '3' : 'x' }))).toBe(false);
       }

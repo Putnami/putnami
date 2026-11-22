@@ -898,6 +898,15 @@
           }
         },
         {
+          "id": "duplex-stream-budgets",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-connect-duplex-stream-runs-under-its-declared-budgets"]
+          }
+        },
+        {
           "id": "endpoint-pipeline",
           "stage": "coded",
           "evidenceKinds": ["attestation"],

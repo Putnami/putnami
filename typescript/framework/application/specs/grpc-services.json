@@ -46,6 +46,13 @@
       ]
     },
     {
+      "id": "duplex-stream-budgets",
+      "text": [
+        "A Connect client or bidirectional stream runs under the budgets its endpoint declares for WebSocket: a request message past maxFrameBytes ends it resource_exhausted, and no message in either direction for idleTimeoutMs ends it deadline_exceeded.",
+        "Request messages are read one at a time as the handler pulls them, in time linear in their size, and a caller that leaves 16 MiB of answers unread ends the stream resource_exhausted."
+      ]
+    },
+    {
       "id": "endpoint-pipeline",
       "text": [
         "A gRPC or Connect call runs through the global HTTP middleware and the endpoint's own security chain.",

@@ -26,11 +26,13 @@ const HTTP1_FRAMING_HEADERS = [
  * the only one a client or bidirectional stream can come from — sends none of
  * them. An HTTP/2 caller that states a `Content-Length` is read as HTTP/1.1,
  * and its client or bidirectional stream is refused UNIMPLEMENTED. An HTTP/1.1
- * request with no body and no connection header sends none of them either and
- * is read as HTTP/2; it carries no message, so the stream it opens ends at once
- * and nothing waits on it.
+ * request with no body sends none of them either, so a request whose body is
+ * absent is not one: an HTTP/2 request that opens a body has one, even empty.
  */
 export function arrivedOverHttp2(req: Request): boolean {
+  // An HTTP/2 request that opens a body has one, even an empty one; an
+  // HTTP/1.1 request that frames none has none.
+  if (req.body === null) return false;
   for (const name of HTTP1_FRAMING_HEADERS) {
     if (req.headers.has(name)) return false;
   }

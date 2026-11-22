@@ -7,6 +7,12 @@ import { type Application, application } from '../../src/application';
 import { grpc } from '../../src/grpc/grpc.plugin';
 import { http, type HttpPlugin } from '../../src/http/http.plugin';
 import { proto } from '../../src/proto';
+import type { DiscoveredRoute } from '../../src/api';
+import type { StreamEndpointDefinition } from '../../src/api/route/stream-endpoint';
+import { ConnectRequestStream } from '../../src/grpc/connect-request-stream';
+import { buildDuplexRpcHandler } from '../../src/grpc/grpc-handlers';
+import { buildHttpContext } from '../../src/http/http-context.builder';
+import { arrivedOverHttp2 } from '../../src/http/http-version';
 
 // Client and bidirectional streams ride Connect over HTTP/2 (prior knowledge,
 // cleartext), on the same port that keeps serving HTTP/1.1 and WebSocket.
@@ -186,6 +192,34 @@ describe('Connect client and bidirectional streams', () => {
       },
       'GET',
     );
+    apiPlugin.register(
+      '/budgets/[id]/small',
+      {
+        GET: endpoint()
+          .params({ id: String })
+          .body(Stream({ text: String }))
+          .returns({ count: Number })
+          .client({ resilience: { stream: { maxFrameBytes: 64, idleTimeoutMs: 150 } } })
+          .handle(async (ctx) => {
+            let count = 0;
+            for await (const _ of ctx.messages()) count++;
+            return { count };
+          }),
+      },
+      'GET',
+    );
+    apiPlugin.register(
+      '/vault/[id]/deposit',
+      {
+        GET: endpoint()
+          .params({ id: String })
+          .body(Stream({ delta: Number }))
+          .returns({ total: Number })
+          .secure()
+          .handle(async () => ({ total: 0 })),
+      },
+      'GET',
+    );
     app = application()
       .use(httpPlugin)
       .use(apiPlugin)
@@ -336,6 +370,66 @@ describe('Connect client and bidirectional streams', () => {
   );
 
   specTest(
+    'refuses a message larger than the declared maxFrameBytes',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-stream-budgets',
+      check: 'a-connect-duplex-stream-runs-under-its-declared-budgets',
+    },
+    async () => {
+      const port = await start();
+      session = http2.connect(`http://localhost:${port}`);
+      const call = openH2Stream(session, '/test.v1.BudgetsService/ListBudgetsByIdSmall');
+      call.write({ params: { id: 'a' }, body: { text: 'x'.repeat(200) } });
+      call.end();
+      await call.done;
+      expect(call.frames).toHaveLength(1);
+      expect(call.frames[0]?.flags).toBe(2);
+      expect(call.frames[0]?.value).toMatchObject({ error: { code: 'resource_exhausted' } });
+    },
+  );
+
+  specTest(
+    'ends a stream idle past the declared idleTimeoutMs with deadline_exceeded',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-stream-budgets',
+      check: 'a-connect-duplex-stream-runs-under-its-declared-budgets',
+    },
+    async () => {
+      const port = await start();
+      session = http2.connect(`http://localhost:${port}`);
+      const call = openH2Stream(session, '/test.v1.BudgetsService/ListBudgetsByIdSmall');
+      call.write({ params: { id: 'a' } });
+      // The caller never ends its side: the idle budget ends the stream.
+      const terminal = await call.next();
+      expect(terminal.flags).toBe(2);
+      expect(terminal.value).toMatchObject({ error: { code: 'deadline_exceeded' } });
+    },
+  );
+
+  specTest(
+    'refuses a secured duplex stream before any message with the error terminal',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'endpoint-pipeline',
+      check: 'a-refused-server-stream-yields-only-the-error-terminal',
+    },
+    async () => {
+      const port = await start();
+      session = http2.connect(`http://localhost:${port}`);
+      const call = openH2Stream(session, '/test.v1.VaultService/ListVaultByIdDeposit');
+      call.write({ params: { id: 'a' }, body: { delta: 1 } });
+      call.end();
+      await call.done;
+      expect(await call.status).toBe(200);
+      expect(call.frames).toHaveLength(1);
+      expect(call.frames[0]?.flags).toBe(2);
+      expect(call.frames[0]?.value).toMatchObject({ error: { code: 'unauthenticated' } });
+    },
+  );
+
+  specTest(
     'keeps answering the same RPCs unimplemented over HTTP/1.1',
     {
       feature: 'typescript/grpc-services',
@@ -354,6 +448,90 @@ describe('Connect client and bidirectional streams', () => {
         expect(response.status).toBe(501);
         expect(await response.json()).toMatchObject({ code: 'unimplemented' });
       }
+    },
+  );
+});
+
+describe('Connect duplex stream bounds', () => {
+  /** A body that delivers `bytes` in chunks of `size`. */
+  function chunked(bytes: Uint8Array, size: number): ReadableStream<Uint8Array> {
+    let offset = 0;
+    return new ReadableStream({
+      pull(controller) {
+        if (offset >= bytes.length) {
+          controller.close();
+          return;
+        }
+        controller.enqueue(bytes.slice(offset, offset + size));
+        offset += size;
+      },
+    });
+  }
+
+  specTest(
+    'reads a large message in small chunks in linear time',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-stream-budgets',
+      check: 'a-connect-duplex-stream-runs-under-its-declared-budgets',
+    },
+    async () => {
+      const length = 4 * 1024 * 1024;
+      const message = new Uint8Array(5 + length);
+      new DataView(message.buffer).setUint32(1, length);
+      message.fill(7, 5);
+      const requests = new ConnectRequestStream(chunked(message, 256), null);
+      const started = performance.now();
+      const payload = await requests.next();
+      const elapsed = performance.now() - started;
+      expect(payload?.length).toBe(length);
+      expect(payload?.[length - 1]).toBe(7);
+      expect(await requests.next()).toBeUndefined();
+      // A reader that copies its whole pending buffer per chunk takes seconds
+      // here; one that fills a single buffer takes milliseconds.
+      expect(elapsed).toBeLessThan(1500);
+    },
+  );
+
+  specTest(
+    'ends a stream whose caller does not read with resource_exhausted',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-stream-budgets',
+      check: 'a-connect-duplex-stream-runs-under-its-declared-budgets',
+    },
+    async () => {
+      const definition = endpoint()
+        .body(Stream({ n: Number }))
+        .returns(Stream({ blob: String }))
+        .handle(async (ctx) => {
+          for (let i = 0; i < 64; i++) ctx.send({ blob: 'x'.repeat(1024) });
+          return { blob: '' };
+        }) as unknown as StreamEndpointDefinition;
+      const handler = buildDuplexRpcHandler(
+        definition,
+        { method: 'GET', path: '/flood', streamMode: 'bidirectional' } as DiscoveredRoute,
+        {},
+        undefined,
+        false,
+        { maxQueuedBytes: 8 * 1024 },
+      );
+      const req = new Request('http://localhost/test.v1.FloodService/ListFlood', {
+        method: 'POST',
+        headers: { 'content-type': 'application/connect+json' },
+        body: chunked(envelope({}), 64),
+        duplex: 'half',
+      } as RequestInit);
+      expect(arrivedOverHttp2(req)).toBe(true);
+      const response = await handler(buildHttpContext({ req }) as never);
+      // Nobody reads while the handler sends; only then is the body drained.
+      await Bun.sleep(50);
+      const bytes = new Uint8Array(await new Response(response.getBodyInit()).arrayBuffer());
+      const frames = new FrameReader().push(bytes);
+      const terminal = frames.at(-1);
+      expect(frames.length).toBeLessThan(20);
+      expect(terminal?.flags).toBe(2);
+      expect(terminal?.value).toMatchObject({ error: { code: 'resource_exhausted' } });
     },
   );
 });

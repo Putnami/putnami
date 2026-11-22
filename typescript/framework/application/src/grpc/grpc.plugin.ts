@@ -1,6 +1,7 @@
 import type { Type } from '@putnami/runtime';
 import { useLogger } from '@putnami/runtime';
 import { ApiPlugin } from '../api';
+import { resolveStreamBudgets } from '../api/stream/first-party-stream-dispatcher';
 import type { Module, Plugin } from '../application';
 import { HttpPlugin } from '../http/http.plugin';
 import { HttpResponse } from '../http/http-response';
@@ -156,7 +157,13 @@ export class GrpcPlugin implements Plugin {
         if (streamDef?.mode === 'server') {
           handler = buildStreamRpcHandler(streamDef, route, proto.messageMeta, enums, useCompression);
         } else if (streamDef?.mode === 'client' || streamDef?.mode === 'bidirectional') {
-          handler = buildDuplexRpcHandler(streamDef, route, proto.messageMeta, enums, useCompression);
+          // The budgets the endpoint declares bound it on Connect exactly as
+          // they bound it on WebSocket.
+          const budgets = resolveStreamBudgets(apiPlugin.clientContract, streamDef);
+          handler = buildDuplexRpcHandler(streamDef, route, proto.messageMeta, enums, useCompression, {
+            maxFrameBytes: budgets.maxFrameBytes,
+            idleTimeoutMs: budgets.idleTimeoutMs,
+          });
         } else {
           handler = buildUnaryRpcHandler(resolved.handler, route, proto.messageMeta, enums, useCompression);
         }

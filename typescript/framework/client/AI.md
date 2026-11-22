@@ -117,6 +117,11 @@ Most code should not instantiate transports directly. Generated clients + `Clien
   sets a reserved flag, or compresses without declaring an encoding is a **failure**, never a
   completion.
 - The deadline sent is the call's *remaining* budget, as `Connect-Timeout-Ms`.
+- `ConnectTransport.duplex(path, { params, query, headers, signal })` carries a client or
+  bidirectional stream over a `node:http2` session (cleartext prior knowledge for `http:`, TLS for
+  `https:`), since `fetch` cannot stream a request over cleartext HTTP/2. An opening message with
+  `params` and `query` leaves at once; each `send(value)` is one message whose `body` is the value.
+  Unary calls and server streams keep riding `fetch`; generated duplex methods keep WebSocket.
 
 ## Opaque JSON
 

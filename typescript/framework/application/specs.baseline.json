@@ -54,6 +54,7 @@
     "typescript/cache-lifecycle#single-flight",
     "typescript/cache-lifecycle#value-isolation",
     "typescript/grpc-services#binary-codec",
+    "typescript/grpc-services#duplex-stream-budgets",
     "typescript/grpc-services#duplex-streams-over-http2",
     "typescript/grpc-services#endpoint-pipeline",
     "typescript/grpc-services#error-projection",

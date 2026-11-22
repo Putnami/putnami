@@ -28,6 +28,7 @@ import {
   CT_GRPC_WEB_PROTO,
   CT_JSON,
   CT_PROTO,
+  MAX_GRPC_MESSAGE_BYTES,
   acceptContains,
   buildGrpcWebErrorResponse,
   clientAcceptsGzip,
@@ -402,6 +403,23 @@ export function buildStreamRpcHandler(
 // ---------------------------------------------------------------------------
 
 /**
+ * Unread response bytes a duplex stream holds before it ends
+ * `resource_exhausted`: 16 MiB, the WebSocket transport's default
+ * backpressure limit.
+ */
+export const MAX_DUPLEX_QUEUED_BYTES = 16 * 1024 * 1024;
+
+/** The bounds a Connect client or bidirectional stream runs under. */
+export interface DuplexStreamLimits {
+  /** Largest request message, in bytes. Defaults to the gRPC message limit. */
+  readonly maxFrameBytes?: number;
+  /** A stream with no message in either direction for this long ends `deadline_exceeded`; 0 disables it. */
+  readonly idleTimeoutMs?: number;
+  /** Unread response bytes held before the stream ends `resource_exhausted`. */
+  readonly maxQueuedBytes?: number;
+}
+
+/**
  * Build an HTTP handler for a client- or bidirectional-streaming Connect RPC.
  *
  * Over HTTP/2 the request body is a sequence of envelope frames read as they
@@ -413,6 +431,17 @@ export function buildStreamRpcHandler(
  * bidirectional stream answers each value it sends, then its returned value
  * when it has one. Exactly one end-of-stream message ends the response.
  *
+ * The stream runs under the endpoint's declared budgets, the ones its
+ * WebSocket transport enforces: a request message larger than
+ * `maxFrameBytes` is refused, and a stream with no message in either
+ * direction for `idleTimeoutMs` ends `deadline_exceeded`. The request side is
+ * read one message at a time as the handler pulls, so no more than one
+ * message is ever buffered, within any `maxBufferedMessages`. The response
+ * side holds at most `maxQueuedBytes` the caller has not read yet: a handler
+ * that sends faster than its caller reads ends the stream
+ * `resource_exhausted`, as the WebSocket transport closes a socket past its
+ * backpressure limit.
+ *
  * Over HTTP/1.1, which cannot carry a client stream, the RPC answers
  * UNIMPLEMENTED as {@link buildUnimplementedRpcHandler} does.
  */
@@ -422,7 +451,10 @@ export function buildDuplexRpcHandler(
   messageMeta: Record<string, ProtoFieldMeta[]>,
   enums?: ProtoEnumRegistry,
   compressionEnabled = false,
+  limits: DuplexStreamLimits = {},
 ): (ctx: HttpRequestContext) => Promise<HttpResponse> {
+  const maxQueuedBytes = limits.maxQueuedBytes ?? MAX_DUPLEX_QUEUED_BYTES;
+  const idleTimeoutMs = limits.idleTimeoutMs ?? 0;
   const rpcName = buildRpcName(route);
   const requestMeta = messageMeta[`${rpcName}Request`];
   const responseMeta = messageMeta[`${rpcName}Response`];
@@ -471,7 +503,11 @@ export function buildDuplexRpcHandler(
       );
     }
 
-    const requests = new ConnectRequestStream(ctx.req.body, ctx.headers.get(CONNECT_CONTENT_ENCODING_HEADER));
+    const requests = new ConnectRequestStream(
+      ctx.req.body,
+      ctx.headers.get(CONNECT_CONTENT_ENCODING_HEADER),
+      limits.maxFrameBytes ?? MAX_GRPC_MESSAGE_BYTES,
+    );
     const decodeMessage = (payload: Uint8Array): Record<string, unknown> => {
       if (useBinaryRequest && requestMeta) {
         return decodeProto(payload, requestMeta, messageMeta, enums?.types, enums?.values);
@@ -516,106 +552,148 @@ export function buildDuplexRpcHandler(
     ctx.req.signal.addEventListener('abort', onClientGone, { once: true });
 
     let terminated = false;
-    const stream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const terminate = (failure?: ConnectError) => {
-          if (terminated) return;
-          terminated = true;
-          requests.cancel();
-          try {
-            controller.enqueue(endStreamFrame(failure ? { error: failure } : {}));
-            controller.close();
-          } catch {
-            // The caller already left.
-          }
-        };
-        const deadlineTimer = deadline
-          ? setTimeout(() => {
-              deadline.controller.abort();
-              terminate({ code: 'deadline_exceeded', message: 'Stream deadline exceeded' });
-            }, deadline.timeoutMs)
-          : undefined;
-
-        let failure: ConnectError | undefined;
-        try {
-          const first = await requests.next();
-          const opening = first === undefined ? {} : decodeMessage(first);
-          const envelope = readRequestEnvelope(opening);
-          // The declared params and query are validated, and coerced, as the
-          // WebSocket admission does: a stream refuses what its schema refuses
-          // whatever transport carries it.
-          const params = streamDef.schemas?.params
-            ? (validateSchema(streamDef.schemas.params, envelope.params, {
-                coerce: true,
-                label: 'params',
-              }) as Record<string, string>)
-            : envelope.params;
-          const query = streamDef.schemas?.query
-            ? (validateSchema(streamDef.schemas.query, envelope.query, {
-                coerce: true,
-                label: 'query',
-              }) as Record<string, string>)
-            : envelope.query;
-          const firstMessage = first === undefined ? { present: false } : streamMessage(opening);
-
-          async function* messages(): AsyncGenerator<unknown> {
-            if (firstMessage.present) yield firstMessage.value;
-            for (;;) {
-              if (terminated) return;
-              // biome-ignore lint/performance/noAwaitInLoops: the caller's messages are delivered in order
-              const payload = await requests.next();
-              if (payload === undefined) return;
-              const next = streamMessage(decodeMessage(payload));
-              if (next.present) yield next.value;
-            }
-          }
-          const inbound = messages();
-
-          const send = (value: unknown) => {
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const stream = new ReadableStream<Uint8Array>(
+      {
+        async start(controller) {
+          const terminate = (failure?: ConnectError) => {
             if (terminated) return;
-            controller.enqueue(encodeMessage(value));
+            terminated = true;
+            if (idleTimer) clearTimeout(idleTimer);
+            requests.cancel();
+            try {
+              controller.enqueue(endStreamFrame(failure ? { error: failure } : {}));
+              controller.close();
+            } catch {
+              // The caller already left.
+            }
           };
-          const result = await streamDef.handler({
-            req: ctx.req,
-            headers: ctx.headers,
-            url: ctx.url,
-            params,
-            queryParams: () => query,
-            secured: ctx.secured,
-            host: ctx.host,
-            domain: ctx.domain,
-            path: ctx.path,
-            query: ctx.query,
-            signal: abort.signal,
-            messages: () => inbound,
-            send,
-          });
-          // A client stream answers one message, its result. A bidirectional
-          // stream already answered as it went; a returned value is its last.
-          if (result !== undefined || streamDef.mode === 'client') send(result);
-        } catch (err) {
-          if (deadline?.controller.signal.aborted) {
-            failure = { code: 'deadline_exceeded', message: 'Stream deadline exceeded' };
-          } else {
-            const projection = projectConnectError(err, route.responses);
-            failure = {
-              code: projection.connectCode,
-              message: projection.message,
-              ...(projection.details ? { details: projection.details } : {}),
+          // A stopped stream ends with its error, stops reading and tells its
+          // handler through the signal.
+          const stop = (failure: ConnectError) => {
+            terminate(failure);
+            abort.abort();
+          };
+          const deadlineTimer = deadline
+            ? setTimeout(
+                () => stop({ code: 'deadline_exceeded', message: 'Stream deadline exceeded' }),
+                deadline.timeoutMs,
+              )
+            : undefined;
+          // Re-armed by every message in either direction.
+          const touch = () => {
+            if (idleTimeoutMs <= 0 || terminated) return;
+            if (idleTimer) clearTimeout(idleTimer);
+            idleTimer = setTimeout(
+              () => stop({ code: 'deadline_exceeded', message: 'Stream idle deadline exceeded' }),
+              idleTimeoutMs,
+            );
+          };
+          touch();
+
+          let failure: ConnectError | undefined;
+          try {
+            const first = await requests.next();
+            touch();
+            const opening = first === undefined ? {} : decodeMessage(first);
+            const envelope = readRequestEnvelope(opening);
+            // The declared params and query are validated, and coerced, as the
+            // WebSocket admission does: a stream refuses what its schema refuses
+            // whatever transport carries it.
+            const params = streamDef.schemas?.params
+              ? (validateSchema(streamDef.schemas.params, envelope.params, {
+                  coerce: true,
+                  label: 'params',
+                }) as Record<string, string>)
+              : envelope.params;
+            const query = streamDef.schemas?.query
+              ? (validateSchema(streamDef.schemas.query, envelope.query, {
+                  coerce: true,
+                  label: 'query',
+                }) as Record<string, string>)
+              : envelope.query;
+            const firstMessage = first === undefined ? { present: false } : streamMessage(opening);
+
+            async function* messages(): AsyncGenerator<unknown> {
+              if (firstMessage.present) yield firstMessage.value;
+              for (;;) {
+                if (terminated) return;
+                // biome-ignore lint/performance/noAwaitInLoops: the caller's messages are delivered in order
+                const payload = await requests.next();
+                if (payload === undefined) return;
+                touch();
+                const next = streamMessage(decodeMessage(payload));
+                if (next.present) yield next.value;
+              }
+            }
+            const inbound = messages();
+
+            const send = (value: unknown) => {
+              if (terminated) return;
+              controller.enqueue(encodeMessage(value));
+              touch();
+              // The caller is not reading what it is sent: end the stream rather
+              // than let its unread answers grow without bound.
+              if ((controller.desiredSize ?? 0) < 0) {
+                stop({ code: 'resource_exhausted', message: 'Stream receiver is not reading its messages' });
+              }
             };
+            const result = await streamDef.handler({
+              req: ctx.req,
+              headers: ctx.headers,
+              url: ctx.url,
+              params,
+              queryParams: () => query,
+              secured: ctx.secured,
+              host: ctx.host,
+              domain: ctx.domain,
+              path: ctx.path,
+              query: ctx.query,
+              signal: abort.signal,
+              messages: () => inbound,
+              send,
+            });
+            // A client stream answers one message, its result. A bidirectional
+            // stream already answered as it went; a returned value is its last.
+            if (result !== undefined || streamDef.mode === 'client') send(result);
+          } catch (err) {
+            if (terminated) {
+              // The stream already ended with its own reason; the handler's
+              // failure is what that stop caused.
+            } else if (deadline?.controller.signal.aborted) {
+              failure = { code: 'deadline_exceeded', message: 'Stream deadline exceeded' };
+            } else {
+              // An unexpected failure is logged with its cause, as the unary and
+              // WebSocket paths do; the caller reads only its category.
+              if (!(err instanceof HttpException) && !abort.signal.aborted) {
+                useLogger('putnami:grpc').error(
+                  'Connect stream handler error',
+                  err instanceof Error ? err : new Error(String(err), { cause: err }),
+                  { path: ctx.path() },
+                );
+              }
+              const projection = projectConnectError(err, route.responses);
+              failure = {
+                code: projection.connectCode,
+                message: projection.message,
+                ...(projection.details ? { details: projection.details } : {}),
+              };
+            }
+          } finally {
+            if (deadlineTimer) clearTimeout(deadlineTimer);
+            ctx.req.signal.removeEventListener('abort', onClientGone);
+            terminate(failure);
           }
-        } finally {
-          if (deadlineTimer) clearTimeout(deadlineTimer);
-          ctx.req.signal.removeEventListener('abort', onClientGone);
-          terminate(failure);
-        }
+        },
+        cancel() {
+          terminated = true;
+          if (idleTimer) clearTimeout(idleTimer);
+          requests.cancel();
+          abort.abort();
+        },
       },
-      cancel() {
-        terminated = true;
-        requests.cancel();
-        abort.abort();
-      },
-    });
+      new ByteLengthQueuingStrategy({ highWaterMark: maxQueuedBytes }),
+    );
 
     return new HttpResponse(stream, { headers: responseHeaders });
   };

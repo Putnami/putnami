@@ -256,7 +256,18 @@ provider is held to it by a corpus transcribed from that text
   request stream is enveloped too, and must never set the end-stream bit.
 - The deadline header is `Connect-Timeout-Ms` (whole milliseconds). `grpc-timeout` is still read,
   because gRPC-Web shares the route.
-- Per-message compression on a stream is declared with `Connect-Content-Encoding`.
+- Per-message compression on a stream is declared with `Connect-Content-Encoding`, and a stream
+  compresses only for a caller that names gzip in `Connect-Accept-Encoding`.
+- Client and bidirectional streams ride Connect over **HTTP/2** only. The server accepts cleartext
+  HTTP/2 with prior knowledge on its one port (`http({ http2: false })` turns it off). A request is
+  read as HTTP/1.1 when it has no body or carries `Content-Length`, `Transfer-Encoding` or a
+  connection-specific header; such a request, or a non-Connect media type, gets `unimplemented`.
+- On such a stream the first request envelope carries `params` and `query`, validated against the
+  declared schemas; each envelope's `body` is one `ctx.messages()` value. A client stream answers its
+  returned value; a bidirectional stream answers each `ctx.send()`, then its returned value if any.
+- The endpoint's declared `resilience.stream` budgets apply as on WebSocket: past `maxFrameBytes` →
+  `resource_exhausted`, no message either way for `idleTimeoutMs` → `deadline_exceeded`, 16 MiB of
+  unread answers → `resource_exhausted`.
 
 ## File-Based Routing
 

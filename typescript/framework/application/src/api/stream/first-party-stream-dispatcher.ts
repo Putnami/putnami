@@ -899,9 +899,6 @@ export function resolveFirstPartyStreamAdmission(options: {
 }): FirstPartyStreamAdmission {
   const policy = options.definition.meta?.client;
   const security: ClientSecurityPolicy = policy?.security ?? { alternatives: [{ allOf: [] }] };
-  const stream = { ...options.contract.defaults?.resilience?.stream, ...policy?.resilience?.stream };
-  const attemptTimeoutMs =
-    policy?.resilience?.attemptTimeoutMs ?? options.contract.defaults?.resilience?.attemptTimeoutMs;
   return {
     operationId: options.operationId,
     contract: options.contract,
@@ -918,13 +915,29 @@ export function resolveFirstPartyStreamAdmission(options: {
         resume: policy?.resume === true && options.definition.mode === 'server',
       },
     },
-    budgets: {
-      handshakeTimeoutMs: positive(stream.handshakeTimeoutMs ?? attemptTimeoutMs, BUDGET_FLOORS.handshakeTimeoutMs),
-      idleTimeoutMs: positive(stream.idleTimeoutMs, BUDGET_FLOORS.idleTimeoutMs),
-      heartbeatMs: positive(stream.heartbeatMs, BUDGET_FLOORS.heartbeatMs),
-      maxFrameBytes: positive(stream.maxFrameBytes, BUDGET_FLOORS.maxFrameBytes),
-      maxBufferedMessages: positive(stream.maxBufferedMessages, BUDGET_FLOORS.maxBufferedMessages),
-    },
+    budgets: resolveStreamBudgets(options.contract, options.definition),
+  };
+}
+
+/**
+ * The budgets a stream runs under: the endpoint's declared stream resilience
+ * over the contract's defaults, and the framework floors where both are
+ * silent. Every transport that carries a first-party stream reads them here,
+ * so a declared bound means the same thing on WebSocket and on Connect.
+ */
+export function resolveStreamBudgets(
+  contract: ClientServiceContract | undefined,
+  definition: StreamEndpointDefinition,
+): FirstPartyStreamBudgets {
+  const policy = definition.meta?.client;
+  const stream = { ...contract?.defaults?.resilience?.stream, ...policy?.resilience?.stream };
+  const attemptTimeoutMs = policy?.resilience?.attemptTimeoutMs ?? contract?.defaults?.resilience?.attemptTimeoutMs;
+  return {
+    handshakeTimeoutMs: positive(stream.handshakeTimeoutMs ?? attemptTimeoutMs, BUDGET_FLOORS.handshakeTimeoutMs),
+    idleTimeoutMs: positive(stream.idleTimeoutMs, BUDGET_FLOORS.idleTimeoutMs),
+    heartbeatMs: positive(stream.heartbeatMs, BUDGET_FLOORS.heartbeatMs),
+    maxFrameBytes: positive(stream.maxFrameBytes, BUDGET_FLOORS.maxFrameBytes),
+    maxBufferedMessages: positive(stream.maxBufferedMessages, BUDGET_FLOORS.maxBufferedMessages),
   };
 }
 

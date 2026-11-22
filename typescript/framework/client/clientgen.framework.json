@@ -59,7 +59,7 @@
       ],
       "owner": "@putnami/client",
       "tests": ["typescript/framework/client/test/runtime/connect-transport.test.ts"],
-      "reason": "The Connect transport a generated binding dispatches to, including its unary and server-stream paths."
+      "reason": "The Connect transport a generated binding dispatches to: its unary and server-stream paths over fetch, and its client and bidirectional stream path over a node:http2 session, which this inventory does not detect."
     },
     {
       "runtime": "@putnami/client",
