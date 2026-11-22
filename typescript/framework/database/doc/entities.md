@@ -255,6 +255,32 @@ const UsersTable = Table("users", {
 > createdAt: Column(DateIso, { columnName: "created_at" }), // Just works — Date → string
 > ```
 
+### Date and Time Columns
+
+A date or time column reads back as the instant that was written, whatever the
+time zone of the process:
+
+| PostgreSQL type | Read as | Written by the framework as |
+| --- | --- | --- |
+| `DATE` | a `Date` at UTC midnight | the UTC calendar date |
+| `TIMESTAMP` (without time zone) | a `Date` that takes the stored clock as UTC | the UTC wall clock |
+| `TIMESTAMPTZ` | a `Date` at the stored instant | the instant, in UTC |
+
+A `TIMESTAMP` holds a wall clock and no zone, so the framework takes that clock
+as UTC when it writes and when it reads: a laptop with `TZ=Europe/Paris` and a
+container in UTC read the same instant. The Go adapter
+(`go.putnami.dev/database`, through pgx) reads `TIMESTAMP` as UTC too. A
+`DateIso` column receives that instant as an ISO 8601 string ending in `Z`, and
+a `DateIso` string saved to a `TIMESTAMP` column is written as its UTC clock.
+
+A bare `Date` bound in a raw query is sent as `TIMESTAMPTZ`, and PostgreSQL
+converts it to a `TIMESTAMP` column's clock in the session's `TimeZone`
+setting, UTC unless the server or the role sets another. Prefer `TIMESTAMPTZ`
+for a new column, which stores the instant itself.
+
+`infinity` and `-infinity` have no JavaScript `Date`: in any of these columns
+they read as an Invalid Date.
+
 ### Optional Columns
 
 Use `Optional()` to mark a column as nullable:
