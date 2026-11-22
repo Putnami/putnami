@@ -13,13 +13,17 @@ import { StaticPlugin } from '../../src/static/static.plugin';
  *
  * The temporary tree is a workspace: `workload/` is the project being built,
  * whose root carries no putnami.json, as in the framework's other generate
- * tests, and `libs/fonts/` is a library project that carries one.
+ * tests, `libs/fonts/` is a library project that carries one, and `libs/` is
+ * a scope, whose putnami.json configures no project.
  */
 describe('static scan roots', () => {
   const originalProjectRoot = process.env['PUTNAMI_PROJECT_ROOT'];
+  const originalWorkspaceRoot = process.env['PUTNAMI_WORKSPACE_ROOT'];
+  const originalPrebuildContext = process.env['PUTNAMI_PREBUILD_CONTEXT'];
   let workspace: string;
   let workload: string;
   let library: string;
+  const outsideRoots: string[] = [];
 
   beforeEach(() => {
     workspace = realpathSync(mkdtempSync(join(tmpdir(), 'putnami-static-scan-root-')));
@@ -28,13 +32,25 @@ describe('static scan roots', () => {
     mkdirSync(workload, { recursive: true });
     mkdirSync(library, { recursive: true });
     writeFileSync(join(library, 'putnami.json'), '{}');
+    writeFileSync(
+      join(workspace, 'libs', 'putnami.json'),
+      JSON.stringify({ $schema: 'https://putnami.dev/schemas/putnami-scope.json', tags: ['ts'] }),
+    );
     process.env['PUTNAMI_PROJECT_ROOT'] = workload;
+    // As the pre-build hook of a build sets them.
+    process.env['PUTNAMI_WORKSPACE_ROOT'] = workspace;
+    process.env['PUTNAMI_PREBUILD_CONTEXT'] = 'true';
   });
 
   afterEach(() => {
     if (originalProjectRoot === undefined) delete process.env.PUTNAMI_PROJECT_ROOT;
     else process.env['PUTNAMI_PROJECT_ROOT'] = originalProjectRoot;
+    if (originalWorkspaceRoot === undefined) delete process.env['PUTNAMI_WORKSPACE_ROOT'];
+    else process.env['PUTNAMI_WORKSPACE_ROOT'] = originalWorkspaceRoot;
+    if (originalPrebuildContext === undefined) delete process.env['PUTNAMI_PREBUILD_CONTEXT'];
+    else process.env['PUTNAMI_PREBUILD_CONTEXT'] = originalPrebuildContext;
     rmSync(workspace, { recursive: true, force: true });
+    for (const outside of outsideRoots.splice(0)) rmSync(outside, { recursive: true, force: true });
   });
 
   function writeFile(path: string, content: string): void {
@@ -65,6 +81,30 @@ describe('static scan roots', () => {
   );
 
   specTest(
+    'stages a scan root inside an installed package or the generated public folder, which the key also reads',
+    {
+      feature: 'typescript/http-services',
+      requirement: 'static-scan-root',
+      check: 'a-scan-root-under-a-project-public-folder-is-staged',
+    },
+    async () => {
+      // An installed package is pinned by the workspace lockfiles the key reads.
+      writeFile(join(workload, 'node_modules', '@acme', 'fonts', 'fonts', 'mono.woff2'), 'mono');
+      // An earlier hook or options.generate.assets wrote it, and the key reads its source.
+      writeFile(join(workload, '.gen', 'public', 'vendor', 'chart.js'), 'chart');
+
+      await new StaticPlugin({
+        scanPath: join(workload, 'node_modules', '@acme', 'fonts', 'fonts'),
+        compress: 0,
+      }).generate();
+      await new StaticPlugin({ scanPath: '.gen/public', compress: 0 }).generate();
+
+      expect(readFileSync(staged('mono.woff2'), 'utf8')).toBe('mono');
+      expect(readFileSync(staged('vendor/chart.js'), 'utf8')).toBe('chart');
+    },
+  );
+
+  specTest(
     'fails generate for a scan root outside every public/ folder, naming the folder to move it under',
     {
       feature: 'typescript/http-services',
@@ -90,7 +130,19 @@ describe('static scan roots', () => {
       await expect(generate(join(workspace, 'shared', 'public'))).rejects.toThrow(
         "the scan root '../shared/public' lies outside",
       );
+      // A scope's public/ belongs to no project.
+      writeFile(join(workspace, 'libs', 'public', 'shared.css'), 'body{}');
+      await expect(generate(join(workspace, 'libs', 'public'))).rejects.toThrow(
+        "the scan root '../libs/public' lies outside every project's public/ folder",
+      );
+      // A folder outside the workspace is read by no key, whatever its name.
+      const outside = realpathSync(mkdtempSync(join(tmpdir(), 'putnami-static-scan-root-outside-')));
+      outsideRoots.push(outside);
+      writeFile(join(outside, 'public', 'outside.txt'), 'outside');
+      await expect(generate(join(outside, 'public'))).rejects.toThrow('lies outside the workspace');
       expect(existsSync(staged('inter.woff2'))).toBe(false);
+      expect(existsSync(staged('shared.css'))).toBe(false);
+      expect(existsSync(staged('outside.txt'))).toBe(false);
       expect(existsSync(staged('logo.svg'))).toBe(false);
       expect(existsSync(staged('robots.txt'))).toBe(false);
     },

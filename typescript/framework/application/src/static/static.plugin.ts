@@ -317,7 +317,10 @@ export class StaticPlugin implements Plugin {
     const stagesSource =
       source.exists && sourcePath !== generatedPublicPath && !sourcePath.startsWith(generatedPublicPath);
     if (stagesSource) {
-      assertKeyedScanRoot(sourcePath, projectRoot);
+      // The workspace bound holds inside the build's pre-build hook, the run whose key it guards.
+      const hookWorkspaceRoot =
+        process.env['PUTNAMI_PREBUILD_CONTEXT'] === 'true' ? process.env['PUTNAMI_WORKSPACE_ROOT'] : undefined;
+      assertKeyedScanRoot(sourcePath, projectRoot, hookWorkspaceRoot);
       const sourceStat = statSync(sourcePath);
       if (sourceStat.isDirectory()) {
         copyDirRecursive(sourcePath, generatedPublicPath);
@@ -431,35 +434,67 @@ const KEYED_PUBLIC_FOLDER = 'public';
  * Refuses a scan root the build-generate cache key does not read.
  *
  * The key of the task that runs this hook reads the `public/` folder of every
- * project in the workload's dependency closure, the workload included, so a
- * change to a file staged from one of them rebuilds the workload. A scan root
- * anywhere else, such as a library's `fonts/` folder or a workload's `assets/`,
- * would stage new bytes only when something else moved the key, and a cache
- * hit would ship the old ones. So the scan root must lie under a `public/`
- * folder whose parent is the workload's root or holds a `putnami.json`.
+ * project in the workload's dependency closure, the workload included, the
+ * workspace lockfiles, which pin every installed package, and the workload's
+ * own `.gen/`. A scan root anywhere else, such as a library's `fonts/` folder
+ * or a workload's `assets/`, would stage new bytes only when something else
+ * moved the key, and a cache hit would ship the old ones. So the scan root
+ * lies under the workload's generated public folder, inside an installed
+ * package, or under a `public/` folder whose parent is the workload's root or a
+ * project of the workspace: a directory whose `putnami.json` is no scope
+ * configuration. The hook cannot see the dependency closure, so a project's
+ * `public/` counts even when the workload does not depend on it; a scan root
+ * that the workload's own code computes lies in a project it imports.
  */
-function assertKeyedScanRoot(scanRoot: string, projectRoot: string): void {
+function assertKeyedScanRoot(scanRoot: string, projectRoot: string, workspaceRoot: string | undefined): void {
   const root = resolve(scanRoot);
   const workloadRoot = resolve(projectRoot);
+  if (isWithin(root, resolve(workloadRoot, '.gen', 'public'))) return;
+  if (root.split(/[\\/]/).includes('node_modules')) return;
+  const relativeToWorkload = (path: string) => toPosixPath(relativePath(workloadRoot, path)) || '.';
+  const workspace = workspaceRoot ? resolve(workspaceRoot) : undefined;
+  if (workspace && !isWithin(root, workspace)) {
+    throw new Error(
+      `StaticPlugin: the scan root '${relativeToWorkload(root)}' lies outside the workspace, whose files the build-generate cache key reads; ` +
+        `move it under the ${KEYED_PUBLIC_FOLDER}/ folder of a workspace project.`,
+    );
+  }
+  const isProject = (dir: string) => dir === workloadRoot || isProjectConfig(joinPath(dir, 'putnami.json'));
   let owner: string | undefined;
   for (let current = root; ; current = dirname(current)) {
     const parent = dirname(current);
-    const isProject = (dir: string) => dir === workloadRoot || fileExists(joinPath(dir, 'putnami.json'));
-    if (basename(current) === KEYED_PUBLIC_FOLDER && isProject(parent)) {
-      return;
-    }
-    if (owner === undefined && isProject(current)) {
-      owner = current;
-    }
-    if (parent === current) break;
+    if (basename(current) === KEYED_PUBLIC_FOLDER && isProject(parent)) return;
+    if (owner === undefined && isProject(current)) owner = current;
+    if (parent === current || current === workspace) break;
   }
-  const relativeToWorkload = (path: string) => toPosixPath(relativePath(workloadRoot, path)) || '.';
   const target = joinPath(owner ?? workloadRoot, KEYED_PUBLIC_FOLDER);
   throw new Error(
     `StaticPlugin: the scan root '${relativeToWorkload(root)}' lies outside every project's ${KEYED_PUBLIC_FOLDER}/ folder, ` +
-      `the only folders the build-generate cache key reads, so a change to its files would not rebuild the workload. ` +
+      `so the build-generate cache key does not read it, and a change to its files would not rebuild the workload. ` +
       `Move it under '${relativeToWorkload(target)}'.`,
   );
+}
+
+/** Whether `path` is `dir` or lies under it; both are resolved. */
+function isWithin(path: string, dir: string): boolean {
+  const relativeToDir = relativePath(dir, path);
+  return relativeToDir === '' || (!relativeToDir.startsWith('..') && !isAbsolutePath(relativeToDir));
+}
+
+/**
+ * Whether the `putnami.json` at `path` configures a project rather than a
+ * scope: a scope's names the putnami-scope schema or lists the projects it
+ * includes. An unreadable or malformed file configures nothing.
+ */
+function isProjectConfig(path: string): boolean {
+  if (!fileExists(path)) return false;
+  try {
+    const config = JSON.parse(readFileContent(path, 'utf8')) as { $schema?: unknown; includes?: unknown };
+    const schema = typeof config.$schema === 'string' ? config.$schema : '';
+    return !schema.endsWith('putnami-scope.json') && config.includes === undefined;
+  } catch {
+    return false;
+  }
 }
 
 function discoverStaticSource(sourcePath: string): {

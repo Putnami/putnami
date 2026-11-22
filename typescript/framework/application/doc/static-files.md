@@ -44,20 +44,30 @@ Files are served at their relative paths:
 
 The build stages a static folder into `.gen/public/` and caches the result. The
 cache key of that step reads the `public/` folder of the workload and of every
-project it depends on, and no other folder a scan could name. So a folder the
-plugin scans lies under one of those `public/` folders: the workload's own, or a
-library's, whose root holds a `putnami.json`. A change to any file there
-rebuilds every workload that stages it.
+project it depends on, the workspace lockfiles and the files
+`options.generate.assets` copies. So a folder the plugin scans lies in one of
+these places:
 
-A scan root anywhere else, such as a library's `fonts/` folder or a workload's
-`assets/`, fails the build:
+- under the `public/` folder of the workload, or of a library whose root holds a
+  project `putnami.json` (not a scope's). A change to any file there rebuilds
+  every workload that depends on the library and stages it;
+- inside an installed package under `node_modules/`, which the lockfiles pin;
+- under the workload's `.gen/public/`, where `options.generate.assets` or an
+  earlier build step put it.
+
+A scan root anywhere else, such as a library's `fonts/` folder, a workload's
+`assets/` or, during a build, a folder outside the workspace, fails the build:
 
 ```
-StaticPlugin: the scan root '../libs/fonts/fonts' lies outside every project's public/ folder, the only folders the build-generate cache key reads, so a change to its files would not rebuild the workload. Move it under '../libs/fonts/public'.
+StaticPlugin: the scan root '../libs/fonts/fonts' lies outside every project's public/ folder, so the build-generate cache key does not read it, and a change to its files would not rebuild the workload. Move it under '../libs/fonts/public'.
 ```
 
-Move the folder under the `public/` the message names. A scan root that does
-not exist stages nothing and fails nothing.
+Move the folder under the `public/` the message names, or copy it into
+`.gen/public/` with `options.generate.assets`. A scan root that does not exist
+stages nothing and fails nothing. The plugin cannot see which projects the
+workload depends on: it accepts the `public/` of any workspace project, and the
+key reads it only when the workload depends on that project, as it does on a
+library whose code computes the scan root.
 
 During `putnami build`, these routes are also included in
 `.gen/schema/http-routes.json`. Root files are emitted as exact matches;
@@ -103,8 +113,8 @@ staticFiles({
 **Default:** `'public'`
 
 Folder the plugin scans when no `scanPath` is given, relative to the project,
-and the name of the staged folder under `.gen/` and in the packaged workload.
-A scanned folder must lie under a project's `public/` (see
+and the folder the packaged workload serves its files from. The build always
+stages into `.gen/public/`. A scanned folder must lie under a project's `public/` (see
 [where a static folder lives](#where-a-static-folder-lives)), so keep the default
 for a scanned folder.
 
