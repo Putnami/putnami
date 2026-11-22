@@ -10,38 +10,32 @@ bun add @putnami/database
 
 ## Step 1: Configure Database Connection
 
-Create `conf/.env.local.yaml` with your PostgreSQL connection details. Each
-datasource has its own key under `database`; `default` is the one
-`database()` and repositories use when you name none:
+Give the connection as one Postgres URL, in the `DATABASE_URL` environment
+variable or under the datasource's `url` key. Each datasource has its own key
+under `database`; `default` is the one `database()` and repositories use when
+you name none. In `conf/.env.local.yaml`:
 
 ```yaml
 database:
   default:
-    host: localhost
-    port: 5432
-    database: myapp
-    user: postgres
-    password: your_password
+    url: postgres://postgres:your_password@localhost:5432/myapp
 ```
 
-For named datasources:
+Every other datasource gets its own URL: `DATABASE_URL` configures only the
+primary datasource (`default`, unless `sql({ datasource })` names another):
 
 ```yaml
 database:
   default:
-    host: localhost
-    port: 5432
-    database: myapp
-    user: postgres
-    password: your_password
+    url: postgres://postgres:your_password@localhost:5432/myapp
 
   # Named datasources
   auth:
-    host: auth-db.example.com
-    database: auth_db
-    user: auth_user
-    password: auth_password
+    url: postgres://auth_user:auth_password@auth-db.example.com:5432/auth_db
 ```
+
+See [Connections](./connections.md) for the structured `host`/`port`/`database`
+keys and the order in which bindings, URLs and keys apply.
 
 ## Step 2: Define Your First Table
 

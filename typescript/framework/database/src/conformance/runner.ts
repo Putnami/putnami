@@ -309,7 +309,8 @@ export function registerConformanceTests(): void {
     });
 
     it.skipIf(!hasBinding)('Go and TypeScript pass the same transaction and concurrency corpus', async () => {
-      const result = await provision();
+      // The corpus creates its own tables: no migration of the workload under test.
+      const result = await provision({ sources: [] });
       try {
         const names = Object.keys(result.binding.databases ?? {}).sort();
         expect(names.length).toBeGreaterThan(0);

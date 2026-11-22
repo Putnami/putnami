@@ -423,7 +423,7 @@ func TestProvidedBindingArtifactFixture(t *testing.T) {
 
 	const params = `"params":{"pool_max_conn_idle_time":"5s","pool_max_conns":"2","pool_min_conns":"0",` +
 		`"sslmode":"disable"}`
-	const want = `{"protocolVersion":1,"mode":"require","isolation":"schema","reuse":"none","databases":{` +
+	const want = `{"protocolVersion":1,"mode":"require","isolation":"schema","reuse":"none","applyMigrations":true,"databases":{` +
 		`"analytics":{"engine":"postgres","schema":"metrics","connection":` +
 		`{"host":"10.0.0.5","port":6543,"database":"pgtest","user":"ci","password":"provided-only-secret",` +
 		params + `}},` +

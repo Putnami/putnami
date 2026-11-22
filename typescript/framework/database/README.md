@@ -28,17 +28,17 @@ bun add @putnami/database
 
 ### 1. Configure Database
 
-Create `.env.local.yaml`:
+Set `DATABASE_URL`, or put the URL in `conf/.env.local.yaml`:
 
 ```yaml
 database:
   default:
-    host: localhost
-    port: 5432
-    database: myapp
-    user: postgres
-    password: your_password
+    url: postgres://postgres:your_password@localhost:5432/myapp
 ```
+
+The structured `host`, `port`, `database`, `user` and `password` keys work
+too; each part the URL carries replaces its key. See
+[Connections](./doc/connections.md).
 
 #### Cloud SQL on GCP
 

@@ -5,7 +5,7 @@ import { closeAllDatabases, database, sql } from '@putnami/database';
 import '../src/tables/users';
 
 // Skip tests when the `default` datasource is not reachable. `database()` reads
-// DATABASE_BINDINGS, then conf/.env.test.yaml. It never reads the
+// DATABASE_BINDINGS, then DATABASE_URL, then conf/.env.test.yaml. It never reads the
 // DATABASE_TEST_BINDINGS that `putnami test` provides: only `provision()` does.
 const dbAvailable = await (async () => {
   try {

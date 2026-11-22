@@ -167,11 +167,14 @@ describe('GET /api/users', () => {
 
 `putnami test` starts a throwaway Postgres for a project that uses `sql()` and
 passes it to the tests in `DATABASE_TEST_BINDINGS`. `provision()` creates an
-empty, isolated database for the suite and points `DATABASE_BINDINGS` at it.
-`cleanup()` drops it. Apply the migrations by starting the application with
-`sql({ autoApply: true })`: `provision()` applies the `sources` you pass only
-when the test binding sets `applyMigrations`, and the binding `putnami test`
-passes does not set it.
+isolated database for the suite, applies the project's migrations, and points
+`DATABASE_BINDINGS` at it. `cleanup()` drops it. The migrations come from the
+bundle `putnami build` writes under `.gen/migration-bundle/`: run
+`putnami build` once, and again after you change a migration; `provision()`
+warns when the bundle is missing or older than `src/`. Pass
+`provision({ sources })` to choose the sources, or `provision({ sources: [] })`
+to apply none. Start the application with `sql()`: the database is already
+migrated.
 
 ### Integration tests
 
@@ -184,7 +187,6 @@ import { afterAll, beforeAll, beforeEach, describe, expect, test } from 'bun:tes
 import { api } from '@putnami/application';
 import { createTestApp, type TestApp } from '@putnami/application/testing';
 import { closeAllDatabases, database, provision, sql } from '@putnami/database';
-import { usersMigrations } from '../src/db/users';
 
 describe('users (integration)', () => {
   let db: Awaited<ReturnType<typeof provision>>;
@@ -193,7 +195,7 @@ describe('users (integration)', () => {
   beforeAll(async () => {
     db = await provision();
     testApp = await createTestApp({
-      plugins: [sql({ autoApply: true }), usersMigrations, api({ scanPath: 'src/api' })],
+      plugins: [sql(), api({ scanPath: 'src/api' })],
     });
   });
 

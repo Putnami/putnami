@@ -89,6 +89,15 @@
             "kind": "acceptance",
             "checks": ["tables-derive-the-infra-requirements-sidecar", "pool-schemas-union-deduped-and-sorted"]
           }
+        },
+        {
+          "id": "connection-url",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": ["a-connection-url-configures-the-datasource", "a-malformed-url-names-its-origin-never-its-value"]
+          }
         }
       ]
     },
@@ -271,6 +280,18 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["an-ambiguous-basename-fails-with-candidates"]
+          }
+        },
+        {
+          "id": "migrated-test-databases",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "provision-defaults-to-the-project-migration-bundle",
+              "provision-warns-when-the-bundle-cannot-migrate"
+            ]
           }
         }
       ]

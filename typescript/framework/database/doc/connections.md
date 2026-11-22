@@ -16,10 +16,39 @@ This guide covers how to configure and manage database connections, including mu
 
 ## Basic Configuration
 
-### YAML Configuration
+### One Connection URL
 
-Configure your database connection in `conf/.env.local.yaml`, under the
-datasource name (`default` unless you name another):
+Give the connection as one Postgres URL. Set `DATABASE_URL` in the
+environment:
+
+```bash
+DATABASE_URL=postgres://postgres:your_password@localhost:5432/myapp
+```
+
+Or commit it under the datasource's `url` key, for example in
+`conf/.env.local.yaml`:
+
+```yaml
+database:
+  default:
+    url: postgres://postgres:your_password@localhost:5432/myapp
+    poolSize: 10
+```
+
+Each part the URL carries replaces the matching key of its section: host,
+port, database, user, password, and `sslmode` for `ssl` (`disable` turns TLS
+off, any other value turns it on). A part it omits, such as the port, keeps the
+section's key or its default. Without `sslmode`, TLS is on for every host
+except `localhost`, `127.0.0.1`, `::1` and Unix sockets, so add
+`?sslmode=disable` for a server without TLS. Other query parameters, such as
+`application_name`, become connection parameters, and `pool_max_conns` sets
+`poolSize`. The tuning keys (`poolSize`, `maxRowLimit`, timeouts) still apply.
+A URL that does not parse fails naming where it came from (`DATABASE_URL`,
+`database.default.url`), never its value.
+
+### Structured Fields
+
+The section may instead spell the connection out:
 
 ```yaml
 database:
@@ -33,20 +62,31 @@ database:
     poolSize: 10
 ```
 
-### Environment Variables
+### Where the Connection Comes From
 
-No `DATABASE_HOST`-style variable is read. Use one of these:
+The connection of the primary datasource (`default`, unless `sql()` names
+another) comes from the first of these that is present:
 
-- `DATABASE_BINDINGS`: a binding document, such as
-  `{"protocolVersion":1,"databases":{"default":{"engine":"postgres","schema":"public","connection":{"dsn":"postgres://user:pass@localhost:5432/myapp"}}}}`.
-  It wins over the `database.default` configuration.
-- A `${VAR}` reference in a config file, which expands from the environment:
+1. A database binding: the `database.databases` section of the configuration,
+   or `DATABASE_BINDINGS`, a binding document such as
+   `{"protocolVersion":1,"databases":{"default":{"engine":"postgres","schema":"public","connection":{"dsn":"postgres://user:pass@localhost:5432/myapp"}}}}`.
+   A deploy target injects one; `provision()` injects one in tests.
+2. The `url` key of the section, `database.default.url`.
+3. The `DATABASE_URL` environment variable. It replaces the `host` and
+   `database` keys a committed file sets, `conf/.env.test.yaml` included.
+4. The structured fields of the section.
+
+Every other datasource reads the same list without `DATABASE_URL`, since one
+URL names one database: give `database('auth')` a `database.auth.url`. A
+config object passed to `database(name, config)` with a `url` uses that URL
+before all of these but the binding. No
+`DATABASE_HOST`-style variable is read; a `${VAR}` reference in a config file
+expands from the environment:
 
 ```yaml
 database:
-  default:
-    host: ${DB_HOST}
-    password: ${DB_PASSWORD}
+  auth:
+    url: ${AUTH_DATABASE_URL}
 ```
 
 ### Programmatic Configuration
@@ -215,9 +255,10 @@ This means:
 
 ```typescript
 interface PostgresConfig {
+  url?: string;           // postgres:// URL; each part it carries replaces host, port, database, user, password or ssl
   host: string;           // Database host or Unix socket directory (default: 'localhost')
   port: number;           // Database port — ignored when host is a Unix socket (default: 5432)
-  database: string;       // Database name (required)
+  database: string;       // Database name (required unless url names it)
   user?: string;          // Database user — auto-resolved from GCP identity when omitted
   password?: string;      // Database password — auto-resolved as IAM token on socket hosts
   ssl: boolean;           // Enable SSL (default: false)

@@ -18,16 +18,18 @@ This guide walks through the PostgreSQL path. If your feature is document-shaped
 bunx putnami deps add @putnami/database
 ```
 
-Create `.env.local.yaml`:
+Set the connection as one Postgres URL in `DATABASE_URL`, or commit it in
+`conf/.env.local.yaml` under the `default` datasource:
 
 ```yaml
 database:
-  host: localhost
-  port: 5432
-  database: myapp
-  user: postgres
-  password: your_password
+  default:
+    url: postgres://postgres:your_password@localhost:5432/myapp
 ```
+
+Add `?sslmode=disable` for a server without TLS other than `localhost`. A
+deploy target's binding wins over both. See
+[Persistence](/docs/frameworks/typescript/persistence#database-configuration).
 
 ### 2) Define a table + repository
 

@@ -569,6 +569,11 @@ func withTestPoolDefaults(conn pdb.Connection) pdb.Connection {
 // it is the provider's choice: an empty Isolation or Reuse is omitted from the
 // JSON, leaving the runtime provider's own defaults in force.
 //
+// Every binding emitted here asks for migrations (ApplyMigrations): a test
+// database is useful only once the project's schema is in it. A provider applies
+// the migrations its caller hands it (the Go provider's Options.Bundle) or, in
+// TypeScript, the project's build-emitted migration bundle by default.
+//
 // The pool a test datasource gets is decided here too, and for both providers:
 // this is the one place every emitted binding passes through, and the reason to
 // bound a test pool does not depend on who started the server (see
@@ -580,6 +585,7 @@ func SynthesizeBinding(policy TestPolicy, databases []infra.Database, conn pdb.C
 		Mode:            policy.Mode,
 		Isolation:       policy.Isolation,
 		Reuse:           policy.Reuse,
+		ApplyMigrations: true,
 		Databases:       make(map[string]pdb.Database, len(databases)),
 	}
 	for _, db := range databases {

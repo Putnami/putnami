@@ -30,49 +30,48 @@ listens. Without it, `sql()` applies none.
 
 ### Database configuration
 
-The connection of the datasource `default` comes from the first of these that
-is present:
+Give the connection as one Postgres URL. Set `DATABASE_URL` in the
+environment:
 
-1. A database binding: the `database.databases` section of the configuration,
-   or the `DATABASE_BINDINGS` environment variable. A deploy target injects one
-   of them.
-2. The `database.default` section of the configuration.
+```bash
+DATABASE_URL=postgres://postgres:postgres@localhost:5432/myapp
+```
 
-For local development, put the connection in `conf/.env.local.yaml`:
+Or commit it under the datasource's `url` key, for example in
+`conf/.env.local.yaml` for local development:
 
 ```yaml
 database:
   default:
-    host: localhost
-    port: 5432
-    database: myapp
-    user: postgres
-    password: your_password
+    url: postgres://postgres:postgres@localhost:5432/myapp
 ```
 
-The framework reads no `DATABASE_URL` or `DATABASE_HOST` variable. To pass a
-plain Postgres URL at run time, set `DATABASE_BINDINGS` to a binding document:
+Each part the URL carries (host, port, database, user, password, `sslmode`)
+replaces the matching key of the section; a part it omits, such as the port,
+keeps the section's key or its default. Without `sslmode`, TLS is on for every
+host except `localhost`, `127.0.0.1`, `::1` and Unix sockets: add
+`?sslmode=disable` for a server without TLS. Other query parameters, such as
+`application_name`, become connection parameters. The tuning keys of the
+section, such as `poolSize`, `maxRowLimit` or `statementTimeoutMs`, still
+apply.
 
-```bash
-DATABASE_BINDINGS='{"protocolVersion":1,"databases":{"default":{"engine":"postgres","schema":"public","connection":{"dsn":"postgres://user:pass@127.0.0.1:5432/myapp"}}}}'
-```
+The connection of the primary datasource (`default`, unless `sql()` names
+another) comes from the first of these that is present:
 
-Or reference the variable from a config file: string values expand `${VAR}`
-from the environment.
+1. A database binding: the `database.databases` section of the configuration,
+   or the `DATABASE_BINDINGS` environment variable. A deploy target injects
+   one of them; `provision()` injects one in tests.
+2. The `url` key of the datasource's section, `database.default.url`.
+3. The `DATABASE_URL` environment variable. It replaces the `host` and
+   `database` keys a committed file sets, `conf/.env.test.yaml` included.
+4. The `host`, `port`, `database`, `user` and `password` keys of the section.
 
-```yaml
-database:
-  protocolVersion: 1
-  databases:
-    default:
-      engine: postgres
-      schema: public
-      connection:
-        dsn: ${DATABASE_URL}
-```
+Every other datasource, such as `database('auth')`, reads the same list
+without `DATABASE_URL`: one URL names one database. Give it
+`database.auth.url`.
 
-A compiled binary or container image ships no `conf/` directory. There, use
-`DATABASE_BINDINGS` or `CONFIG_DATA`; see
+A compiled binary or container image ships no `conf/` directory. There, set
+`DATABASE_URL`; see
 [Publish & Docker](/docs/frameworks/typescript/extension/publish-and-docker).
 
 ### Configuration options
@@ -80,6 +79,7 @@ A compiled binary or container image ships no `conf/` directory. There, use
 ```yaml
 database:
   default:
+    url: postgres://...       # The whole connection; wins over host, port, database, user, password and ssl
     host: localhost           # Database host; a path starting with / is a Unix socket directory
     port: 5432                # Database port
     database: myapp           # Database name
@@ -248,24 +248,26 @@ bun src/migrate.ts status   # list known and applied migrations
 ### Test against Postgres
 
 `putnami test` starts a throwaway Postgres and passes it to the tests in
-`DATABASE_TEST_BINDINGS`. `provision()` creates an empty, isolated database
-for the suite. Start the application on it with `createTestApp`, and let
-`sql({ autoApply: true })` apply the migrations:
+`DATABASE_TEST_BINDINGS`. `provision()` creates an isolated database for the
+suite, applies the project's migrations to it, and points every datasource of
+the binding at it. The migrations come from the bundle `putnami build` writes
+under `.gen/migration-bundle/` from the sources your plugins contribute: run
+`putnami build` once, and again after you add or change a migration.
+`provision()` warns when the bundle is missing or older than `src/`.
 
 ```ts
 import { afterAll, beforeAll, expect, it } from 'bun:test';
 import { createTestApp, type TestApp } from '@putnami/application/testing';
 import { api } from '@putnami/application';
 import { provision, sql } from '@putnami/database';
-import { usersMigrations } from '../src/db/users';
 
 let db: Awaited<ReturnType<typeof provision>>;
 let testApp: TestApp;
 
 beforeAll(async () => {
-  db = await provision();
+  db = await provision(); // the users table exists from here on
   testApp = await createTestApp({
-    plugins: [sql({ autoApply: true }), usersMigrations, api({ scanPath: 'src/api' })],
+    plugins: [sql(), api({ scanPath: 'src/api' })],
   });
 });
 
@@ -280,8 +282,12 @@ it('lists users', async () => {
 });
 ```
 
-`provision({ sources })` applies those sources only when the test binding sets
-`applyMigrations`; the binding `putnami test` passes does not.
+The database is migrated before the application starts, so start it with
+`sql()`, without `autoApply`. A repository test needs no application: after
+`provision()`, `new UserRepository()` reads and writes the migrated tables.
+
+`provision({ sources })` applies those sources instead of the bundle, and
+`provision({ sources: [] })` applies none.
 
 `putnami test` starts the database only for a project that commits an
 `infra/requirements.json` declaring one. The build writes that file when the

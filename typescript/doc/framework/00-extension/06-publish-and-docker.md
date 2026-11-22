@@ -27,7 +27,7 @@ with the same name, so `"docker": true` is `--docker` and `"port": 8080` is
 
 ```bash
 putnami package --projects api --docker-load --docker-tag local
-docker run --rm -p 8080:8080 -e DATABASE_BINDINGS='<binding JSON>' api:local
+docker run --rm -p 8080:8080 -e DATABASE_URL='postgres://user:pass@host.docker.internal:5432/app?sslmode=disable' api:local
 ```
 
 Add `--platform linux/arm64` on Apple silicon. The image holds the compiled
@@ -58,7 +58,7 @@ The binary embeds no `conf/` directory. It reads `conf/.env*.yaml` from its
 working directory (or `PUTNAMI_PROJECT_ROOT`) when it finds one there, and the
 image ships none. In a container, configure the service with environment
 variables: fields declared with `Env(...)`, `CONFIG_DATA` (a YAML document),
-and `DATABASE_BINDINGS` for the database. See
+and `DATABASE_URL` for the database. See
 [Configuration](/docs/frameworks/typescript/configuration) and
 [Persistence](/docs/frameworks/typescript/persistence#database-configuration).
 

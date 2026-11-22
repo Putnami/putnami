@@ -262,8 +262,9 @@ cleanup. When no database answers, it skips the test on a developer run, and
 leaves the decision to you.
 
 `Options.Bundle` applies a migration bundle, such as the
-`.gen/migration-bundle/` the build writes, only when the test binding sets
-`applyMigrations`. The binding `putnami test` passes does not set it.
+`.gen/migration-bundle/` the build writes, when the test binding sets
+`applyMigrations`. The binding `putnami test` passes sets it, so a suite that
+passes a bundle gets a migrated database.
 
 ## Testing events
 

@@ -1,4 +1,4 @@
-import { type InferConfig, useConfig } from '@putnami/runtime';
+import type { InferConfig } from '@putnami/runtime';
 import type postgres from 'postgres';
 import {
   type PoolHealthStats,
@@ -8,12 +8,13 @@ import {
   recordPoolHealth,
   recordPoolSize,
 } from './observability';
-import { type ResolvedDatabaseBinding, resolveDatabaseBinding } from './postgres/binding';
-import { PostgresConfig } from './postgres/config';
+import { effectiveConfig, resolveConnectionTarget } from './datasource-config';
+import type { ResolvedDatabaseBinding } from './postgres/binding';
+import type { PostgresConfig } from './postgres/config';
 import { createDatasourceClient } from './postgres/datasource-client';
 import { applyConnectionParams, buildOptions } from './postgres/options';
 import { acquirePhysical, endAllPhysicalPools, type PhysicalTuning, physicalPoolCount } from './postgres/physical-pool';
-import { primarySearchPath, resolveDatasourceName } from './primary-datasource';
+import { primarySearchPath } from './primary-datasource';
 import type { SqlClient } from './sql-client';
 
 export { physicalPoolCount } from './postgres/physical-pool';
@@ -44,48 +45,6 @@ const loading = new Map<string, Promise<SqlClient>>();
 function buildKey(config: InferConfig<typeof PostgresConfig>, connectionName?: string): string {
   const prefix = connectionName ? `[${connectionName}]` : '';
   return `${prefix}postgres://${config.user ?? ''}@${config.host}:${config.port}/${config.database}`;
-}
-
-function resolveConnectionTarget(
-  name: string | undefined,
-  init?: InferConfig<typeof PostgresConfig>,
-): { resolvedName: string; connectionName?: string } {
-  const resolvedName = init === undefined ? resolveDatasourceName(name) || 'default' : name || 'default';
-  const connectionName = name || (init === undefined && resolvedName !== 'default' ? resolvedName : undefined);
-  return { resolvedName, connectionName };
-}
-
-/**
- * effectiveConfig resolves the connection config for a logical datasource. When
- * the deployer injected a canonical database binding — the document merged into
- * the `database` config section, falling back to DATABASE_BINDINGS (see
- * resolveDatabaseBinding) — the named datasource's connection and owning schema
- * are taken from it and are authoritative: the binding's connection fields
- * override any committed `database.<name>` config, while tuning (poolSize,
- * timeouts) still comes from config/defaults. With no binding, behaviour is
- * unchanged: config drives the connection. This is the TypeScript counterpart
- * of the Go adapter's datasource-from-binding resolution, so both languages
- * share one contract.
- */
-function effectiveConfig(
-  name: string | undefined,
-  init?: InferConfig<typeof PostgresConfig>,
-): {
-  conf: InferConfig<typeof PostgresConfig>;
-  binding?: ResolvedDatabaseBinding;
-  resolvedName: string;
-  connectionName?: string;
-} {
-  const { resolvedName, connectionName } = resolveConnectionTarget(name, init);
-  const path = `database.${resolvedName}`;
-  const binding = resolveDatabaseBinding(resolvedName);
-  // Pass the binding connection as confInit so a required field (database) is
-  // satisfied even with no config file; then re-apply it on top so the binding
-  // wins over any committed config.
-  const confInit = binding ? ({ ...binding.config, ...(init ?? {}) } as InferConfig<typeof PostgresConfig>) : init;
-  const base = useConfig(PostgresConfig, { path, confInit });
-  const conf = binding ? { ...base, ...binding.config } : base;
-  return { conf, binding, resolvedName, connectionName };
 }
 
 /**
@@ -157,7 +116,7 @@ function tuningOf(conf: InferConfig<typeof PostgresConfig>): PhysicalTuning {
  * @param config Optional explicit config (overrides name parameter).
  */
 export const database = async (name?: string, _config?: InferConfig<typeof PostgresConfig>): Promise<SqlClient> => {
-  const { conf, binding, resolvedName, connectionName } = effectiveConfig(name, _config);
+  const { conf, binding, url, resolvedName, connectionName } = effectiveConfig(name, _config);
 
   const key = buildKey(conf, connectionName);
 
@@ -170,7 +129,7 @@ export const database = async (name?: string, _config?: InferConfig<typeof Postg
     return inflight;
   }
 
-  const open = openDatasource(key, conf, binding, resolvedName, connectionName).finally(() => {
+  const open = openDatasource(key, conf, binding, url?.connectionParams, resolvedName, connectionName).finally(() => {
     loading.delete(key);
   });
   loading.set(key, open);
@@ -181,15 +140,17 @@ async function openDatasource(
   key: string,
   conf: InferConfig<typeof PostgresConfig>,
   binding: ResolvedDatabaseBinding | undefined,
+  urlParams: Record<string, string> | undefined,
   resolvedName: string,
   connectionName: string | undefined,
 ): Promise<SqlClient> {
   const options = await buildOptions(conf);
   // search_path is not a startup parameter: the shared physical pool has no
   // single value, so the datasource-bound client sets it per operation. A
-  // binding's extra connection params (e.g. application_name) ride the startup
-  // packet and are part of the connection identity.
-  applyConnectionParams(options, undefined, binding?.connectionParams);
+  // binding's (or connection URL's) extra connection params (e.g.
+  // application_name) ride the startup packet and are part of the connection
+  // identity.
+  applyConnectionParams(options, undefined, binding ? binding.connectionParams : urlParams);
   // A binding's schema always wins; without a binding, the primary datasource
   // may declare one for local dev (see primarySearchPath).
   const searchPath = binding ? binding.searchPath : primarySearchPath(resolvedName);

@@ -55,7 +55,17 @@
     {
       "id": "unambiguous-target",
       "text": "A migration named by bare basename resolves only when it is unique; an ambiguous basename fails with the candidate list rather than picking one."
+    },
+    {
+      "id": "migrated-test-databases",
+      "text": [
+        "When the test binding sets applyMigrations and the caller passes no sources, provision() applies the project's migration bundle that the build wrote under .gen/migration-bundle/.",
+        "provision() warns when that bundle is missing, older than the project's sources, targets none of the provisioned datasources, or the binding does not ask for migrations."
+      ]
     }
   ],
-  "decisions": ["typescript/framework/database/doc/adr/0002-migration-order-is-the-name-not-the-clock.md"]
+  "decisions": [
+    "typescript/framework/database/doc/adr/0002-migration-order-is-the-name-not-the-clock.md",
+    "typescript/framework/database/doc/adr/0004-provision-applies-the-project-migration-bundle.md"
+  ]
 }

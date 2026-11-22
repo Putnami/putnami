@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'bun:test';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { emitMigrationBundle } from '@putnami/migration';
 import { join } from 'node:path';
 import { specTest } from '@putnami/spectest';
 import type { DatabaseConnectionSpec, DatabaseTestBinding } from '../src/postgres/binding';
@@ -9,8 +11,10 @@ import {
   assignTemplates,
   bundleDigest,
   connectionDatabase,
+  defaultSources,
   effectiveMode,
   isolationOf,
+  migrationsApply,
   pgIdent,
   planDatabases,
   provision,
@@ -457,5 +461,116 @@ describe('selectDatasources', () => {
   it('does not take an inherited property for a datasource', () => {
     const binding = tb({ auth: { engine: 'postgres', connection: tcp('auth') } });
     expect(() => selectDatasources(binding, ['toString'])).toThrow(/has no datasource "toString"/);
+  });
+});
+
+describe('the migrations provision applies', () => {
+  const tasks = new SQLSource({
+    namespace: 'tasks',
+    datasource: { name: 'default', schema: 'public' },
+    definitions: [
+      {
+        name: '20260101000000_create_tasks',
+        sql: 'CREATE TABLE tasks (id UUID PRIMARY KEY);',
+        down: 'DROP TABLE tasks;',
+      },
+    ],
+  });
+
+  async function projectWithBundle(sources: SQLSource[]): Promise<string> {
+    const root = mkdtempSync(join(tmpdir(), 'provision-bundle-'));
+    await emitMigrationBundle(sources, 'tasks-api', root);
+    return root;
+  }
+
+  it('applies when the binding sets applyMigrations and a source exists', () => {
+    expect(migrationsApply(tb({}, { applyMigrations: true }), [tasks])).toBe(true);
+    expect(migrationsApply(tb({}), [tasks])).toBe(false);
+    expect(migrationsApply(tb({}, { applyMigrations: true }), [])).toBe(false);
+  });
+
+  specTest(
+    "defaults to the sources of the project's build-emitted migration bundle",
+    {
+      feature: 'typescript/sql-migrations',
+      requirement: 'migrated-test-databases',
+      check: 'provision-defaults-to-the-project-migration-bundle',
+    },
+    async () => {
+      const root = await projectWithBundle([tasks]);
+      const found = defaultSources(tb({ default: {} }, { applyMigrations: true }), root);
+      expect(found.warnings).toEqual([]);
+      expect(found.sources).toHaveLength(1);
+      const source = found.sources[0] as SQLSource;
+      expect(source.datasource).toBe('default');
+      expect(source.schema).toBe('public');
+      expect(source.namespace).toBe('tasks');
+      expect(source.definitions.map((d) => [d.name, d.sql, d.down])).toEqual([
+        ['tasks/20260101000000_create_tasks', 'CREATE TABLE tasks (id UUID PRIMARY KEY);', 'DROP TABLE tasks;'],
+      ]);
+    },
+  );
+
+  specTest(
+    'warns, naming the remedy, when the project has no bundle',
+    {
+      feature: 'typescript/sql-migrations',
+      requirement: 'migrated-test-databases',
+      check: 'provision-warns-when-the-bundle-cannot-migrate',
+    },
+    () => {
+      const root = mkdtempSync(join(tmpdir(), 'provision-nobundle-'));
+      const found = defaultSources(tb({ default: {} }, { applyMigrations: true }), root);
+      expect(found.sources).toEqual([]);
+      expect(found.warnings.join('\n')).toContain('Run `putnami build`');
+    },
+  );
+
+  specTest(
+    'warns when the bundle targets none of the provisioned datasources, or the binding does not apply',
+    {
+      feature: 'typescript/sql-migrations',
+      requirement: 'migrated-test-databases',
+      check: 'provision-warns-when-the-bundle-cannot-migrate',
+    },
+    async () => {
+      const root = await projectWithBundle([tasks]);
+      expect(defaultSources(tb({ auth: {} }, { applyMigrations: true }), root).warnings.join('\n')).toContain(
+        'has no migration for the datasources auth',
+      );
+      expect(defaultSources(tb({ default: {} }), root).warnings.join('\n')).toContain(
+        'does not set applyMigrations: true',
+      );
+    },
+  );
+
+  specTest(
+    'warns when a source file is newer than the bundle',
+    {
+      feature: 'typescript/sql-migrations',
+      requirement: 'migrated-test-databases',
+      check: 'provision-warns-when-the-bundle-cannot-migrate',
+    },
+    async () => {
+      const root = await projectWithBundle([tasks]);
+      mkdirSync(join(root, 'src'));
+      writeFileSync(join(root, 'src', 'main.ts'), 'export {};\n');
+      const later = new Date(Date.now() + 60_000);
+      utimesSync(join(root, 'src', 'main.ts'), later, later);
+      expect(defaultSources(tb({ default: {} }, { applyMigrations: true }), root).warnings.join('\n')).toContain(
+        'is older than the project',
+      );
+    },
+  );
+
+  it('refuses a bundle whose payload does not match its pinned hash', async () => {
+    const root = await projectWithBundle([tasks]);
+    writeFileSync(
+      join(root, '.gen/migration-bundle/payload/sql/default/tasks/20260101000000_create_tasks.up.sql'),
+      'DROP TABLE x;',
+    );
+    expect(() => defaultSources(tb({ default: {} }, { applyMigrations: true }), root)).toThrow(
+      /hashes to .* but the manifest pins/,
+    );
   });
 });

@@ -13,16 +13,27 @@ export const app = () =>
     .use(sql({ autoApply: true }));  // Registers the database plugin; autoApply applies migrations at startup
 ```
 
-Configuration in `conf/.env.local.yaml` (the `default` datasource):
+Configure the connection with one Postgres URL: `DATABASE_URL` in the
+environment, or the datasource's `url` key (here in `conf/.env.local.yaml`):
 ```yaml
 database:
   default:
-    host: localhost
-    port: 5432
-    database: mydb
-    user: user
-    password: pass
+    url: postgres://user:pass@localhost:5432/mydb
+    poolSize: 10   # tuning keys still apply next to url
 ```
+
+Each part the URL carries (host, port, database, user, password, `sslmode`)
+replaces the matching structured key; a part it omits keeps the key or its
+default. Without `sslmode`, TLS is on for every host except localhost and Unix
+sockets: add `?sslmode=disable` for a server without TLS. Resolution order: a
+programmatic binding pin (`provision()`), the `database.databases` binding,
+`DATABASE_BINDINGS`, then the `url` of a config object passed to
+`database(name, config)`, `database.<name>.url`, `DATABASE_URL` (the primary
+datasource only: `default`, or the one `sql({ datasource })` names), and the
+structured keys. `DATABASE_URL` therefore replaces the host and database a
+committed `conf/.env.*.yaml` sets. Tuning keys (`poolSize`, `maxRowLimit`,
+timeouts) apply in every case. A malformed URL fails naming where it came from,
+never echoing the value.
 
 In a deployed/test environment the connection is instead injected as a canonical
 binding — merged into the `database` config section, or via the legacy
@@ -87,8 +98,9 @@ config, or via the legacy `DATABASE_BINDINGS` environment variable, with config
 winning when both are present — the connection and owning schema for each
 datasource come from it and are authoritative; the schema becomes the
 datasource's `search_path`, set on every connection the datasource uses. With
-no binding, behaviour is unchanged — the `database.<name>` config drives the
-connection. Connection tuning (pool size, timeouts) always comes from
+no binding, a connection URL (`database.<name>.url`, or `DATABASE_URL` for the
+primary datasource) supplies the connection; with neither, the
+`database.<name>` config drives the connection. Connection tuning (pool size, timeouts) always comes from
 config/defaults.
 
 Datasources are logical; pools are per database. Datasources whose effective
@@ -130,12 +142,10 @@ externally provided Postgres (`mode: require`).
 
 ```ts
 import { provision, TestProviderSkip } from '@putnami/database';
-import { usersMigrationSource } from '../src/db/users'; // your SQLSource values
-
 let db: Awaited<ReturnType<typeof provision>>;
 beforeAll(async () => {
   try {
-    db = await provision({ sources: [usersMigrationSource] });
+    db = await provision(); // applies the project's build-emitted migration bundle
   } catch (e) {
     if (e instanceof TestProviderSkip) return; // mode: skip
     throw e;
@@ -147,9 +157,18 @@ afterAll(() => db?.cleanup());
 ```
 
 `provision` creates an isolated database (or schema) per datasource, applies the
-workload's migration sources when the test binding sets `applyMigrations`
-(the binding `putnami test` passes does not: there, start the application with
-`sql({ autoApply: true })`) with the existing machinery (a one-off
+workload's migration sources when the test binding sets `applyMigrations` (the
+binding `putnami test` passes does) — `options.sources` when given (`[]`
+applies none), otherwise the project's own: the bundle `putnami build` writes
+under `<projectRoot>/.gen/migration-bundle/`, the TypeScript counterpart of the
+Go provider's `Options.Bundle`. It warns when the bundle is missing, older than
+`src/`, targets none of the provisioned datasources, or the binding does not
+ask for migrations. Each source loses its declared schema, as in Go: the
+binding's schema is the search_path the migrations run in. Under schema
+isolation each suite records its migrations under its isolated schema's name,
+so two suites never share state-store rows; the teardown deletes them. The
+database is migrated before the application starts: start it with `sql()`, not
+`autoApply`. It applies them with the existing machinery (a one-off
 `MigrationRegistry` + `SQLRunner`, which routes each datasource to its own
 database), sets the owning schema as the session `search_path`, and injects the
 resolved runtime binding into `DATABASE_BINDINGS` — pinning it as the

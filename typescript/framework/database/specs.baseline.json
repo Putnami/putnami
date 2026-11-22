@@ -3,6 +3,7 @@
   "protocolVersion": 2,
   "executableRequirements": [
     "typescript/relational-persistence#cancellation",
+    "typescript/relational-persistence#connection-url",
     "typescript/relational-persistence#declared-infrastructure",
     "typescript/relational-persistence#lazy-transaction",
     "typescript/relational-persistence#partial-commit-is-an-error",
@@ -18,6 +19,7 @@
     "typescript/sql-migrations#body-drift-fails",
     "typescript/sql-migrations#byte-order-apply",
     "typescript/sql-migrations#failure-is-recorded",
+    "typescript/sql-migrations#migrated-test-databases",
     "typescript/sql-migrations#reverse-order-rollback",
     "typescript/sql-migrations#rollback-integrity",
     "typescript/sql-migrations#schema-scoped-ddl",

@@ -50,6 +50,7 @@ describe.skipIf(!RAW)('analytics in a named schema (live)', () => {
     // The datasource's own search path stays `public`: every write below finds
     // the tables only through the schema the sink sets for its transaction.
     provisioned = await provision({
+      sources: [],
       binding: {
         protocolVersion: 1,
         mode: 'require',
@@ -182,6 +183,7 @@ describe.skipIf(!CRON_RAW)('analytics pg_cron retention in a named schema (live)
 
   beforeAll(async () => {
     provisioned = await provision({
+      sources: [],
       binding: {
         protocolVersion: 1,
         mode: 'require',

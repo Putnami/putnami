@@ -1,4 +1,4 @@
-import { Config, Default, Int, Optional } from '@putnami/runtime';
+import { Config, Default, Int, Optional, Sensitive } from '@putnami/runtime';
 
 /**
  * Database connectivity configuration.
@@ -17,8 +17,15 @@ import { Config, Default, Int, Optional } from '@putnami/runtime';
  * access token from the metadata server is used per-connection. On a
  * regular TCP host, leaving it unset is fine when the local
  * `cloud-sql-proxy` (or any other auth-managing proxy) handles login.
+ *
+ * `url` is the whole connection in one `postgres://` URL. When set, its host,
+ * port, database, user, password and `sslmode` win over the fields of the
+ * same section, and `database` may be omitted. The primary datasource also
+ * reads the `DATABASE_URL` environment variable when its section sets no
+ * `url` (see resolveDatabaseUrl).
  */
 export const PostgresConfig = Config('database', {
+  url: Sensitive(Optional(String)),
   host: Default(String, 'localhost'),
   port: Default(Int, 5432),
   database: String,

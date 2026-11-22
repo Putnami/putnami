@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'bun:test';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { emitMigrationBundle } from '@putnami/migration';
 import { resetConfigLoader } from '@putnami/runtime';
 import postgres from 'postgres';
 import { closeAllDatabases, database } from '../src/factory';
+import { SQLSource } from '../src/migrations/sql-source';
 import {
   type DatabaseBindingEntry,
   type DatabaseConnectionSpec,
@@ -30,7 +35,7 @@ const HAS_BINDING = !!process.env['DATABASE_TEST_BINDINGS']?.trim();
 
 describe('provision (live)', () => {
   it.skipIf(!HAS_BINDING)('provisions reachable datasources with the owning schema on search_path', async () => {
-    const result = await provision();
+    const result = await provision({ sources: [] });
     try {
       const names = Object.keys(result.binding.databases ?? {});
       expect(names.length).toBeGreaterThan(0);
@@ -58,7 +63,7 @@ describe('provision (live)', () => {
   });
 
   it.skipIf(!HAS_BINDING)('keeps the provisioned databases authoritative over a managed config binding', async () => {
-    const result = await provision();
+    const result = await provision({ sources: [] });
     // A managed `database` config-section binding appearing in the test
     // environment (here via CONFIG_DATA) must NOT re-route the suite: the
     // provider pins its provisioned binding above both deploy transports.
@@ -141,6 +146,7 @@ describe('provision reclaims orphans (live)', () => {
       await liveClient`SELECT 1`;
 
       const result = await provision({
+        sources: [],
         binding: { protocolVersion: 1, mode: 'require', isolation: 'database', databases: { reclaim: entry } },
       });
       const provisioned = result.binding.databases?.['reclaim']?.connection?.database as string;
@@ -159,4 +165,60 @@ describe('provision reclaims orphans (live)', () => {
       await admin.end();
     }
   });
+});
+
+describe("provision applies the project's migration bundle (live)", () => {
+  const tasks = new SQLSource({
+    namespace: 'tasks',
+    datasource: { name: 'default', schema: 'public' },
+    definitions: [
+      { name: '20260101000000_create_tasks', sql: 'CREATE TABLE tasks (id INT PRIMARY KEY, title TEXT NOT NULL);' },
+    ],
+  });
+
+  // The binding `putnami test` passes, on the live server, with the isolation
+  // under test.
+  function bindingFor(isolation: 'database' | 'schema'): DatabaseTestBinding {
+    const tb = LIVE_BINDING as DatabaseTestBinding;
+    const entry = Object.values(tb.databases ?? {})[0] as DatabaseBindingEntry;
+    return {
+      protocolVersion: 1,
+      mode: 'require',
+      isolation,
+      applyMigrations: true,
+      databases: { default: { ...entry, schema: 'public' } },
+    };
+  }
+
+  // Each isolation runs where the live server's binding uses it: a server set
+  // up for database isolation need not let its role create schemas in the
+  // maintenance database.
+  for (const isolation of ['database', 'schema'] as const) {
+    it.skipIf(!LIVE_BINDING || isolationOf(LIVE_BINDING) !== isolation)(
+      `migrates each suite's ${isolation} with no sources passed`,
+      async () => {
+        const projectRoot = mkdtempSync(join(tmpdir(), 'provision-live-'));
+        await emitMigrationBundle([tasks], 'tasks-api', projectRoot);
+
+        // Two suites in turn, as two test processes of one run: the second must
+        // not read the first's migrations as already applied.
+        for (const title of ['first suite', 'second suite']) {
+          const result = await provision({ binding: bindingFor(isolation), projectRoot });
+          const schema = result.binding.databases?.['default']?.schema as string;
+          try {
+            const sql = await database('default');
+            await sql`INSERT INTO tasks (id, title) VALUES (1, ${title})`;
+            const rows = await sql<{ title: string }[]>`SELECT title FROM tasks`;
+            expect(rows.map((r) => r.title)).toEqual([title]);
+            const where = await sql<{ schema: string }[]>`
+            SELECT table_schema AS schema FROM information_schema.tables WHERE table_name = 'tasks'`;
+            expect(where.map((r) => r.schema)).toEqual([schema]);
+          } finally {
+            await closeAllDatabases();
+            await result.cleanup();
+          }
+        }
+      },
+    );
+  }
 });

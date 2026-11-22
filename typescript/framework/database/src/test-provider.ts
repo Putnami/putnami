@@ -4,10 +4,13 @@ import {
   MigrationRegistry,
   normalizeBundle,
 } from '@putnami/migration';
+import { existsSync, readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
 import postgres from 'postgres';
 import { closeAllDatabases } from './factory';
+import { loadProjectBundle, projectBundleDir } from './migrations/bundle-sources';
 import { SQLRunner } from './migrations/sql-runner';
-import type { SQLSource } from './migrations/sql-source';
+import { SQLSource } from './migrations/sql-source';
 import {
   connectionToConfig,
   type DatabaseBinding,
@@ -22,8 +25,8 @@ import {
 } from './postgres/binding';
 import { applyConnectionParams, buildOptions } from './postgres/options';
 import type { PostgresConfig } from './postgres/config';
-import type { InferConfig } from '@putnami/runtime';
-import { restoreEnv } from '@putnami/utils';
+import { type InferConfig, useLogger } from '@putnami/runtime';
+import { getProjectRoot, restoreEnv } from '@putnami/utils';
 import { isolatedSuffix, pgOrphanServer, reclaimOrphans, SUFFIX_LEN } from './test-provider-reclaim';
 
 /**
@@ -35,7 +38,8 @@ import { isolatedSuffix, pgOrphanServer, reclaimOrphans, SUFFIX_LEN } from './te
  * externally provided Postgres selected by `mode: require`.
  *
  * `provision` creates an isolated database (or schema) per datasource, applies the
- * workload's migration sources with the existing migration machinery (a one-off
+ * workload's migration sources — those passed, or else the project's
+ * build-emitted migration bundle (see defaultSources) — with the existing migration machinery (a one-off
  * `MigrationRegistry` + `SQLRunner`), sets the owning schema as the session
  * `search_path`, and injects the resolved runtime binding into
  * `DATABASE_BINDINGS` so the workload's own `database(datasource)` connects to the
@@ -64,7 +68,13 @@ export class TestProviderSkip extends Error {
 export interface ProvisionOptions {
   /** The test binding; when omitted it is read and validated from ENV_TEST_BINDING. */
   binding?: DatabaseTestBinding;
-  /** The workload's migration sources, applied when the binding sets applyMigrations. */
+  /**
+   * The migration sources applied to the provisioned databases when the binding
+   * sets `applyMigrations` (the binding `putnami test` passes does). Omitted,
+   * they are the project's own: the SQL sources of the migration bundle the
+   * build wrote under `<projectRoot>/.gen/migration-bundle/` (see
+   * loadProjectBundle). `[]` applies none.
+   */
   sources?: readonly SQLSource[];
   /**
    * The datasources the suite uses. When set, only those entries of the binding are
@@ -73,6 +83,8 @@ export interface ProvisionOptions {
    * selectDatasources). Omitted or empty provisions every datasource of the binding.
    */
   datasources?: readonly string[];
+  /** The project whose migration bundle provides the default sources; defaults to the project root of the process. */
+  projectRoot?: string;
   /** Injects the isolated-identifier suffix; defaults to the creation time followed by random hex. */
   newSuffix?: () => string;
 }
@@ -115,6 +127,80 @@ interface Plan {
 
 function failProvider(message: string): never {
   throw new Error(`${ENV_TEST_BINDING}: ${message}`);
+}
+
+/**
+ * migrationsApply reports whether provision applies `sources`: the binding asks
+ * for it with `applyMigrations: true`, as the protocol defines, and there is at
+ * least one source.
+ */
+export function migrationsApply(tb: DatabaseTestBinding, sources: readonly SQLSource[]): boolean {
+  return !!tb.applyMigrations && sources.length > 0;
+}
+
+/**
+ * defaultSources returns the project's own migration sources — those of the
+ * bundle the build wrote under `projectRoot` — and the warnings a suite needs
+ * to see when they cannot migrate its databases: no bundle, a bundle that names
+ * none of the provisioned datasources, a bundle older than the project's
+ * sources, or a binding that does not ask for migrations.
+ */
+export function defaultSources(
+  tb: DatabaseTestBinding,
+  projectRoot: string,
+): { sources: readonly SQLSource[]; warnings: string[] } {
+  const dir = projectBundleDir(projectRoot);
+  if (!tb.applyMigrations) {
+    // Nothing would be applied: report it, without reading (or failing on) the bundle.
+    return {
+      sources: [],
+      warnings: [
+        'provision: the test binding does not set applyMigrations: true, so no migration is applied and the provisioned databases are empty.',
+      ],
+    };
+  }
+  const bundle = loadProjectBundle(projectRoot);
+  if (!bundle) {
+    return {
+      sources: [],
+      warnings: [
+        `provision: no migration bundle at ${dir}, so the provisioned databases are empty. Run \`putnami build\` on the project (it writes the bundle from the sources your plugins contribute), or pass provision({ sources }).`,
+      ],
+    };
+  }
+  const warnings: string[] = [];
+  const planned = new Set(Object.keys(tb.databases ?? {}));
+  if (sourcesTargeting(bundle.sources, planned).length === 0) {
+    warnings.push(
+      `provision: the migration bundle at ${dir} has no migration for the datasources ${[...planned].sort().join(', ')}, so their databases are empty.`,
+    );
+  }
+  const newer = newestSourceChange(projectRoot);
+  if (newer !== undefined && newer > bundle.writtenAt) {
+    warnings.push(
+      `provision: the migration bundle at ${dir} is older than the project's src/ files: run \`putnami build\` again if you changed a migration.`,
+    );
+  }
+  return { sources: bundle.sources, warnings };
+}
+
+/** newestSourceChange returns the newest modification time of a TypeScript file under `<projectRoot>/src`. */
+function newestSourceChange(projectRoot: string): number | undefined {
+  const root = join(projectRoot, 'src');
+  if (!existsSync(root)) {
+    return undefined;
+  }
+  let newest: number | undefined;
+  for (const entry of readdirSync(root, { recursive: true, withFileTypes: true })) {
+    if (!entry.isFile() || !/\.tsx?$/.test(entry.name)) {
+      continue;
+    }
+    const mtime = statSync(join(entry.parentPath, entry.name)).mtimeMs;
+    if (newest === undefined || mtime > newest) {
+      newest = mtime;
+    }
+  }
+  return newest;
 }
 
 /** isolationOf returns the binding's isolation, defaulting to database. */
@@ -251,13 +337,15 @@ export function assignTemplates(
   if (!reuseTemplates(tb, apply)) {
     return plans;
   }
-  const digest = bundleDigest(sources);
   for (const p of plans) {
-    if (sourcesTargeting(sources, new Set([p.name])).length === 0) {
+    const targeting = sourcesTargeting(sources, new Set([p.name]));
+    if (targeting.length === 0) {
       continue;
     }
+    // Keyed by this datasource's own migrations, so another datasource's
+    // sources never fork its template.
     const base = connectionDatabase(p.entry.connection as DatabaseConnectionSpec);
-    p.template = templateName(firstNonEmpty(base, p.name), p.name, digest);
+    p.template = templateName(firstNonEmpty(base, p.name), p.name, bundleDigest(targeting));
   }
   return plans;
 }
@@ -306,9 +394,20 @@ export async function provision(options: ProvisionOptions = {}): Promise<Provisi
   const tb = selectDatasources(bound, options.datasources);
 
   const suffix = options.newSuffix ?? (() => isolatedSuffix(new Date()));
-  const sources = options.sources ?? [];
-  const apply = !!tb.applyMigrations && sources.length > 0;
-  const plans = assignTemplates(planDatabases(tb, suffix), tb, sources, apply);
+  // Plan first: a binding the plan refuses fails before the bundle is read.
+  const planned = planDatabases(tb, suffix);
+  let sources: readonly SQLSource[];
+  if (options.sources !== undefined) {
+    sources = options.sources;
+  } else {
+    const found = defaultSources(tb, options.projectRoot ?? getProjectRoot());
+    sources = found.sources;
+    for (const warning of found.warnings) {
+      useLogger('database').warn(warning);
+    }
+  }
+  const apply = migrationsApply(tb, sources);
+  const plans = assignTemplates(planned, tb, sources, apply);
 
   const drops: Array<() => Promise<void>> = [];
   let prevOverride: string | undefined;
@@ -346,9 +445,9 @@ export async function provision(options: ProvisionOptions = {}): Promise<Provisi
     // plans got a template (a datasource the bundle has no migrations for gets
     // none) must therefore neither skip the remaining plans nor re-apply the
     // cloned ones; `applyInto` is a no-op for plans no source targets.
-    const fresh = plans.filter((p) => !p.template).map((p) => p.name);
+    const fresh = plans.filter((p) => !p.template);
     if (apply && fresh.length > 0) {
-      await applyInto(binding, sources, new Set(fresh));
+      await applyPlans(binding, fresh, sources);
     }
     return { binding, cleanup };
   } catch (err) {
@@ -425,6 +524,11 @@ async function provisionSchema(p: Plan, _apply: boolean): Promise<() => Promise<
     const a = await openAdmin(p.entry.connection as DatabaseConnectionSpec);
     try {
       await a.unsafe(`DROP SCHEMA IF EXISTS ${quoteIdent(p.isoSchema as string)} CASCADE`);
+      // The rows applyPlans recorded for this suite in the shared state store.
+      const [store] = await a`SELECT to_regclass('migration.migrations') IS NOT NULL AS present`;
+      if (store?.['present']) {
+        await a`DELETE FROM migration.migrations WHERE db_name = ${p.isoSchema as string}`;
+      }
     } finally {
       await a.end();
     }
@@ -463,7 +567,7 @@ async function ensureTemplate(admin: postgres.Sql, p: Plan, sources: readonly SQ
       protocolVersion: DATABASE_PROTOCOL_VERSION,
       databases: { [p.name]: { engine: 'postgres', schema: p.entry.schema, connection: templateConn } },
     };
-    await applyInto(targetBinding, sources, new Set([p.name]));
+    await applyInto(targetBinding, retarget(sourcesTargeting(sources, new Set([p.name])), p.name), new Set([p.name]));
     created = false;
   } catch (err) {
     if (created) {
@@ -473,6 +577,53 @@ async function ensureTemplate(admin: postgres.Sql, p: Plan, sources: readonly SQ
   } finally {
     await admin.unsafe(`SELECT pg_advisory_unlock(${key})`);
   }
+}
+
+/**
+ * applyPlans migrates the provisioned databases of `plans` in place, through the
+ * runtime `binding` the suite uses. Each source loses its declared schema, as in
+ * the Go provider: the binding's schema — the owning schema, or the isolated
+ * schema under schema isolation — is the search_path the migrations run in.
+ *
+ * Under schema isolation every suite migrates the same database, whose
+ * `migration.migrations` state store is shared. Each plan therefore applies
+ * under its isolated schema's name as the datasource key, so the store records
+ * its own rows and a later suite never reads its migrations as already applied;
+ * the teardown removes those rows with the schema.
+ */
+async function applyPlans(
+  binding: DatabaseBinding,
+  plans: readonly Plan[],
+  sources: readonly SQLSource[],
+): Promise<void> {
+  const databases: Record<string, DatabaseBindingEntry> = {};
+  const scoped: SQLSource[] = [];
+  for (const p of plans) {
+    const key = stateKey(p);
+    databases[key] = binding.databases?.[p.name] as DatabaseBindingEntry;
+    scoped.push(...retarget(sourcesTargeting(sources, new Set([p.name])), key));
+  }
+  await applyInto({ protocolVersion: DATABASE_PROTOCOL_VERSION, databases }, scoped, new Set(Object.keys(databases)));
+}
+
+/** stateKey is the datasource name a plan's migrations are recorded under. */
+function stateKey(p: Plan): string {
+  return p.isolation === 'schema' ? (p.isoSchema as string) : p.name;
+}
+
+/**
+ * retarget returns copies of `sources` aimed at datasource `name` with no
+ * declared schema, so the binding's search_path governs where they apply.
+ */
+function retarget(sources: readonly SQLSource[], name: string): SQLSource[] {
+  return sources.map(
+    (s) =>
+      new SQLSource({
+        namespace: s.namespace,
+        datasource: { name, schema: '' },
+        definitions: s.definitions.map(({ datasource: _datasource, ...def }) => def),
+      }),
+  );
 }
 
 /**

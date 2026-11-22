@@ -535,12 +535,16 @@ export function resolveDatabaseBinding(datasource: string, raw?: string): Resolv
  * the pgx pool parameters are taken out of the query (see splitPoolParams).
  * Remaining query parameters are returned as connectionParams.
  */
-function dsnToConfig(dsn: string): ResolvedDatabaseBinding {
+function dsnToConfig(
+  dsn: string,
+  invalid: () => never = () =>
+    fail('connection dsn is not a valid postgres URL (the value is not repeated because it may carry a password)'),
+): ResolvedDatabaseBinding {
   let url: URL;
   try {
     url = new URL(dsn);
   } catch {
-    fail(`connection dsn is not a valid postgres URL: ${dsn}`);
+    invalid();
   }
   const params = new Map<string, string>();
   for (const [k, v] of url.searchParams.entries()) {
@@ -577,6 +581,82 @@ function dsnToConfig(dsn: string): ResolvedDatabaseBinding {
 
   const { pool, connectionParams } = splitPoolParams(params.size > 0 ? Object.fromEntries(params) : undefined);
   return { config: { ...config, ...pool }, connectionParams };
+}
+
+/**
+ * ENV_DATABASE_URL is the environment variable holding one `postgres://` URL
+ * for the workload's primary datasource — the convention most hosts and tools
+ * set. It is read after every binding transport and after the datasource's own
+ * `url` config field (see resolveDatabaseUrl).
+ */
+export const ENV_DATABASE_URL = 'DATABASE_URL';
+
+/** A connection URL resolved into the inputs the connection factory consumes. */
+export interface ResolvedDatabaseUrl {
+  config: Partial<InferConfig<typeof PostgresConfig>>;
+  connectionParams?: Record<string, string>;
+  /** Where the URL came from: the config field, the `database()` argument, or ENV_DATABASE_URL. */
+  origin: string;
+}
+
+/**
+ * parseDatabaseUrl decomposes a `postgres://` (or `postgresql://`) URL the way
+ * a binding `dsn` is decomposed: host, port, database, user and password, the
+ * Cloud SQL `?host=/cloudsql/...` form, `sslmode` mapped onto `ssl`, the pgx
+ * pool parameters taken out, and every other query parameter returned as a
+ * connection parameter. `origin` names where the URL came from; the error a
+ * malformed URL raises names that origin and never repeats the URL, which
+ * carries the password.
+ */
+export function parseDatabaseUrl(raw: string, origin: string): ResolvedDatabaseUrl {
+  const value = raw.trim();
+  const invalid = (): never => {
+    throw new Error(
+      `${origin} is not a valid postgres URL: expected postgres://user:password@host:5432/database (the value is not repeated because it may carry a password)`,
+    );
+  };
+  if (!/^postgres(ql)?:\/\//i.test(value)) {
+    invalid();
+  }
+  const { config, connectionParams } = dsnToConfig(value, invalid);
+  return { config, connectionParams, origin };
+}
+
+/**
+ * resolveDatabaseUrl returns the connection URL a datasource is configured
+ * with, decomposed, or undefined when it has none. The first of these wins:
+ *
+ * 1. `explicit`, the `url` of the config object passed to `database()`;
+ * 2. the `url` field of the datasource's config section, `database.<name>.url`;
+ * 3. ENV_DATABASE_URL, for the primary datasource only: one URL names one
+ *    database, so it never configures a second datasource.
+ *
+ * The factory consults it only when no binding resolved the datasource, so a
+ * deploy target's binding always wins over a URL.
+ */
+export function resolveDatabaseUrl(
+  datasource: string,
+  primary: boolean,
+  explicit?: string,
+): ResolvedDatabaseUrl | undefined {
+  if (explicit?.trim()) {
+    return parseDatabaseUrl(explicit, 'the url passed to database()');
+  }
+  const field = `${CONFIG_SECTION_DATABASE}.${datasource}.url`;
+  const configured = useRawConfigSection(`${CONFIG_SECTION_DATABASE}.${datasource}`)?.['url'];
+  if (configured !== undefined && configured !== null) {
+    if (typeof configured !== 'string') {
+      throw new Error(`${field} must be a string postgres URL`);
+    }
+    if (configured.trim()) {
+      return parseDatabaseUrl(configured, field);
+    }
+  }
+  const fromEnv = primary ? process.env[ENV_DATABASE_URL]?.trim() : undefined;
+  if (fromEnv) {
+    return parseDatabaseUrl(fromEnv, ENV_DATABASE_URL);
+  }
+  return undefined;
 }
 
 function pruneUndefined<T extends Record<string, unknown>>(obj: T): Partial<T> {

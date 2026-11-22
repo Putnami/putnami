@@ -40,7 +40,7 @@ afterEach(() => {
 
 describe('database logging conformance (live)', () => {
   it.skipIf(!hasBinding)('emits the corpus records for queries and transactions', async () => {
-    const result: ProvisionResult = await provision();
+    const result: ProvisionResult = await provision({ sources: [] });
     try {
       const names = Object.keys(result.binding.databases ?? {}).sort();
       expect(names.length).toBeGreaterThan(0);

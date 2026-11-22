@@ -1,10 +1,11 @@
-import { useConfig, type InferConfig } from '@putnami/runtime';
+import type { InferConfig } from '@putnami/runtime';
 import type postgres from 'postgres';
 import { abortableQuery, throwIfAborted } from '../abort';
+import { effectiveConfig } from '../datasource-config';
 import { classifyOutcome, RepositoryError, type RepositoryErrorCode } from '../errors';
 import { assertSafeIdentifier, type EntityHelper, entityHelper, quoteIdentifier } from '../metadata';
 import { type QueryMetrics, type SqlOperation, recordQuery, recordQueryError, recordSlowQuery } from '../observability';
-import { PostgresConfig } from '../postgres/config';
+import type { PostgresConfig } from '../postgres/config';
 import { resolveDatasourceName } from '../primary-datasource';
 import type { SqlClient } from '../sql-client';
 import type { TableDefinition } from '../table';
@@ -107,8 +108,10 @@ export class Repository<T extends TableDefinition> {
    * Get database config
    */
   private useConfig(): InferConfig<typeof PostgresConfig> {
-    const resolvedDb = this.datasourceName() || 'default';
-    return useConfig(PostgresConfig, { path: `database.${resolvedDb}` });
+    // The datasource's effective config: a binding or connection URL supplies
+    // the connection fields, so the tuning keys of a section that sets only
+    // `url` still resolve.
+    return effectiveConfig(this.datasourceName()).conf;
   }
 
   /**
