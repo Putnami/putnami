@@ -677,18 +677,24 @@ container. A workload turns HTTP/2 on in its own `infra/runtime.json`:
 The value reaches `.gen/requirements.json` and the deployment declaration as
 written; `"http2": false` is kept the same way.
 
+With HTTP/2 on, Connect client and bidirectional streams reach the workload
+from callers that open Connect over HTTP/2, such as `ConnectTransport.duplex()`
+or a Go Connect client.
+
 Bun does not carry WebSockets over HTTP/2. If the deploy target's ingress sends
 every request to the container over HTTP/2 once `http2` is on, a workload that
-opts in can lose its WebSocket transport, and the streams its generated
-clients carry over WebSocket with it. With HTTP/2 on, Connect client and
-bidirectional streams work over HTTP/2 instead.
+opts in can lose its WebSocket transport. Generated TypeScript clients carry
+client and bidirectional streams over WebSocket with no Connect fallback, so
+those streams then fail too.
 
 The default stays off until a deployment test shows the WebSocket transport
-survives (ADR 0013). To run that test:
+survives ([ADR 0013](./adr/0013-a-workload-states-http2-in-its-own-runtime-file.md)).
+To run that test:
 
 1. Take a sample workload that serves a unary RPC, a bidirectional Connect
-   stream and a WebSocket stream, and add `"protocols": { "http2": true }` to
-   its `infra/runtime.json`.
+   stream and a WebSocket stream, such as
+   `typescript/samples/10-service-to-service`, and add
+   `"protocols": { "http2": true }` to its `infra/runtime.json`.
 2. Build it and check that `.gen/requirements.json` carries
    `"runtime": {"protocols": {"http2": true}}`, then deploy it to a
    non-production environment.
@@ -696,7 +702,7 @@ survives (ADR 0013). To run that test:
    Connect stream and exchange a few messages, and open the WebSocket stream
    and exchange a few messages.
 4. Record each of the three results, with the deploy target and the Bun
-   version, on the issue that tracks the default. If all three work, the
+   version, on issue #1324, which tracks the default. If all three work, the
    default can turn on; if the WebSocket stream fails, it stays off.
 
 ## Output Layout

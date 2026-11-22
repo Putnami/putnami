@@ -76,10 +76,11 @@
     {
       "id": "a-workload-always-has-a-runtime",
       "text": [
-        "DefaultRuntime returns, at each call, a fresh runtime with the default scaling max, concurrency and ingress visibility.The extension SDK aggregator gives a workload without infra/runtime.json those defaults, in its manifest and in .gen/infra/runtime.json;",
-        "an authored runtime.json wins and removes that sidecar;",
-        "one with scaling.min is infra.unknown_field naming the cost policy and the migration, and drops the whole runtime block.",
-        "The TypeScript extension sets runtime.protocols.http2 to false in both files when the runtime block states none, and keeps the value an authored runtime.json states."
+        "DefaultRuntime returns a fresh runtime with the default scaling max, concurrency and ingress visibility.",
+        "The SDK aggregator gives a workload without infra/runtime.json those defaults, in its manifest and .gen/infra/runtime.json;",
+        "an authored one wins and removes that sidecar;",
+        "one with scaling.min is infra.unknown_field naming the cost policy and the migration, and drops the runtime block.",
+        "The TypeScript extension sets runtime.protocols.http2 to false in the files it writes unless an authored file states it."
       ]
     },
     {

@@ -35,9 +35,10 @@ tell them apart only from their headers.
    the same resolution as a first-party WebSocket stream; a route without a
    contract gets the framework floors. A caller that resets the stream is read
    as a cancellation as far as Bun lets the server tell: see Consequences.
-5. **Deployment is a separate decision.** The TypeScript extension still states
-   `runtime.protocols.http2: false` for every workload, so the platform keeps
-   speaking HTTP/1.1 to the container.
+5. **Deployment is a separate decision.** The TypeScript extension states
+   `runtime.protocols.http2: false` by default, so the platform keeps speaking
+   HTTP/1.1 to the container; a workload's own `infra/runtime.json` may state
+   `true` (`@putnami/typescript` ADR 0013).
 
 ## Consequences
 

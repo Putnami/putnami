@@ -7,8 +7,8 @@ import (
 )
 
 // buildInfra is the workload's infra-aggregation task: the SDK's shared body
-// plus the one thing that is TypeScript's to say — what a Bun-backed workload
-// can actually serve.
+// plus the one thing that is TypeScript's to say — the HTTP/2 default a
+// Bun-backed workload runs under.
 func buildInfra() cli.JobFunc {
 	return infraagg.Job(infraagg.Options{RuntimeCompatibility: disableHTTP2})
 }
