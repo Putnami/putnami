@@ -273,7 +273,7 @@ public/
 
 In production, consider serving static files from a CDN:
 
-```ts
+```ts nocheck
 const isProduction = process.env.NODE_ENV === 'production';
 
 // In React components

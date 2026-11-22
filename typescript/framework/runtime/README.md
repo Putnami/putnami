@@ -5,7 +5,7 @@ Core utilities for dependency injection, context management, configuration, HTTP
 ## Installation
 
 ```bash
-bun add @putnami/runtime
+putnami deps add @putnami/runtime
 ```
 
 ## Features
@@ -48,14 +48,12 @@ const providers = [
 ### Configuration
 
 ```typescript
-import { Config, useConfig } from '@putnami/runtime';
-import { IsString, IsNumber } from 'class-validator';
+import { Config, Default, Int, useConfig } from '@putnami/runtime';
 
-@Config({ path: 'database' })
-class DatabaseConfig {
-  @IsString() host = 'localhost';
-  @IsNumber() port = 5432;
-}
+const DatabaseConfig = Config('database', {
+  host: Default(String, 'localhost'),
+  port: Default(Int, 5432),
+});
 
 const dbConfig = useConfig(DatabaseConfig);
 console.log(dbConfig.host);
@@ -161,7 +159,7 @@ Comprehensive guides for all features:
 ### Service with Dependencies
 
 ```typescript
-import { application, module, provide } from '@putnami/runtime';
+import { application } from '@putnami/application';
 
 class DatabaseService {
   query(sql: string) { /* ... */ }
@@ -179,8 +177,8 @@ const app = application()
   .provide(UserRepository, { deps: [DatabaseService] });
 
 await app.start();
-const repo = app.get(UserRepository);
-await app.close();
+const repo = app.context.get(UserRepository);
+await app.stop();
 ```
 
 ### Scoped Services
@@ -195,22 +193,21 @@ const app = application()
 
 await app.start();
 
-await app.scope(async (scope) => {
+await app.context.scope(async (scope) => {
   const data = scope.get(RequestData);
   console.log(data.requestId); // Unique per scope
 });
 
-await app.close();
+await app.stop();
 ```
 
 ### Multi-Datasource Configuration
 
 ```typescript
-@Config({ path: 'database' })
-class DatabaseConfig {
-  @IsString() host = 'localhost';
-  @IsNumber() port = 5432;
-}
+const DatabaseConfig = Config('database', {
+  host: Default(String, 'localhost'),
+  port: Default(Int, 5432),
+});
 
 // Load from different paths
 const authDb = useConfig(DatabaseConfig, { path: 'database.auth' });

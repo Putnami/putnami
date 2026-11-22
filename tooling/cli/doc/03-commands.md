@@ -325,12 +325,15 @@ does not, the job first runs with `stage` set to `prepare`, which only writes
 the files a pin derives from, such as the `go.work` of a new Go project. The
 command then runs the toolchain pins phase of `putnami install`: the
 extensions answer their pins, and the CLI installs each pinned release the
-machine lacks under the Putnami home. When a toolchain the extension locks
-gained or changed a pin, the workspace installers run. The job then runs once.
+machine lacks under the Putnami home. The job then runs once, and after it,
+when a toolchain the extension locks gained or changed a pin, the workspace
+installers run: the job rewrites the template's placeholder requirements, such
+as a Go `require` at `v0.0.0`, which the installers cannot resolve before it.
 A pinned toolchain that is not installed ends that run with an error that
 names `putnami install`.
-When the installers fail but the job then succeeds, the project stays and the
-command exits non-zero with the command to run next: `putnami deps install`.
+When the job succeeds and the installers fail, the project stays and the
+command exits non-zero with the command to run next: `putnami deps install`;
+`init --project` does the same.
 
 `--channel <channel>` resolves the create on one release channel, chosen as
 `putnami init` chooses it: the flag, then `PUTNAMI_CHANNEL`, then the channel
@@ -457,14 +460,16 @@ Without `--extension`, `--from` or `--project`, `init` looks for the markers of 
 
 Without a terminal `init` declares nothing rather than guess: declaring TypeScript in another language's repository, or running sync tasks that rewrite tracked manifests unasked, is worse than a failure that writes nothing and names the command. Detection matches file names and reads no file. It skips `.git`, `.putnami`, the directories git ignores and the directories a language's extension excludes, such as `node_modules` and `target`. The languages, their markers and their excludes come from the workspace adapter of each language extension: the CLI carries a copy generated from those manifests, so a new language extension reaches `init` with the CLI release that ships it. See [ADR 0086](adr/0086-init-declares-the-languages-a-repository-holds.md).
 
-`init` can also scaffold a starter project with `--project <name>`, from the starter of the first `--extension` language: `typescript-web`, `go-server` or `python-server`. Without `--extension` it takes the TypeScript starter and looks for no language. A first language that ships no starter, such as `rust`, refuses `--project` before anything is written, and the error names the languages that have one. Use `--project-path <path>` to place that project somewhere other than the default `<project-name>` (at workspace root).
+`init` can also scaffold a starter project with `--project <name>`, from the starter of the first `--extension` language: its server template, `typescript-server`, `go-server` or `python-server`. `--template <name>` renders another template of that language instead, such as `typescript-web` for a React SSR application or `go-library`; `putnami init --help` lists each language's templates, and a template the language does not ship is refused before anything is written. Without `--extension` it takes the TypeScript starter and looks for no language. A first language that ships no starter, such as `rust`, refuses `--project` before anything is written, and the error names the languages that have one. Use `--project-path <path>` to place that project somewhere other than the default `<project-name>` (at workspace root).
 
 ```bash
 putnami init --extension go --project api            # A Go server starter
-putnami init --extension typescript,rust --project web  # A TypeScript web starter beside the Rust crates
+putnami init --project api                            # A TypeScript HTTP API starter
+putnami init --project web --template typescript-web  # A TypeScript React SSR starter
+putnami init --extension typescript,rust --project api  # A TypeScript API starter beside the Rust crates
 ```
 
-`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold one of the tool's marker files, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path` or `--extension`: the tool's packages are the projects, and only those: a directory that holds a manifest the tool does not list, such as a test fixture's `package.json`, is no project. When two new members share a directory name, `projects sync` writes a name for each in its `putnami.json`: the name its provider reports, or its path when there is none or when that name is taken.
+`init --from <tool>` turns a repository that a monorepo tool already describes into a workspace. It runs at the repository root, which must hold one of the tool's marker files, declares and installs the tool's extension instead of a language starter, and runs `putnami projects sync`, whose extension sync task writes each package's `putnami.json`. It takes no `--project`, `--project-path`, `--template` or `--extension`: the tool's packages are the projects, and only those: a directory that holds a manifest the tool does not list, such as a test fixture's `package.json`, is no project. When two new members share a directory name, `projects sync` writes a name for each in its `putnami.json`: the name its provider reports, or its path when there is none or when that name is taken.
 
 | Tool | Marker | Extension | What the sync writes |
 |---|---|---|---|
@@ -1048,6 +1053,8 @@ manifest for you, through the `deps-edit` job of the project's extension.
 putnami deps install                       # Install all dependencies (default)
 putnami deps add golang.org/x/text@latest  # Add a Go module (sole editable project, or --projects <name>)
 putnami deps add rsc.io/quote@v1.5.2 --projects api
+putnami deps add @putnami/database --projects web  # Add an npm package to a TypeScript project
+putnami deps add zod@^3.23.0 --projects web
 putnami deps remove golang.org/x/text      # Drop a Go module and tidy
 putnami deps remove golang.org/x/text --dry-run  # Print the planned edit and change nothing
 putnami deps prune                         # Remove declared edges no import backs
@@ -1062,12 +1069,18 @@ whose extensions declare no `deps-edit` job is refused, and the error names its
 extensions. `add <module>@none` is a usage error before any job runs, and the
 error names `putnami deps remove <module>`. With `--dry-run`, they hand the job
 the param `dry-run`, and the job prints the planned edit and writes no file. `@putnami/go` declares the job: it edits `go.mod` and tidies the
-module, without `go get`, with the Go the workspace lock pins. Under `--dry-run`
+module, without `go get`, with the Go the workspace lock pins. A module the add
+required that nothing imports yet stays in `go.mod` as `// indirect`, and the
+command says so; the next tidy drops it unless code imports it by then. Under `--dry-run`
 it makes the edit and the tidy on a copy of `go.mod` and `go.sum`, and prints
 each requirement that would change. When that Go is
 missing, the error names `putnami install`. See
 [the Go extension](../../../go/extension/doc/getting-started.md#project-setup-and-dependency-edits).
-For TypeScript, edit `package.json` and run `putnami deps install`.
+`@putnami/typescript` declares it too: it edits the project's `package.json`,
+keeps a shared version in the workspace catalog (the root `package.json` for
+Bun, `pnpm-workspace.yaml` for pnpm) and references it with `catalog:`, then
+installs with the workspace's package manager. See
+[the TypeScript extension](../../../typescript/extension/doc/08-workspace-install.md#add-and-remove-dependencies).
 
 `prune` reads the provider view that the last install or build recorded. When a
 file that view was recorded from changed since, such as a hand-edited `go.mod`,
@@ -1141,13 +1154,15 @@ extensions the workspace declares by path and opts into, and nothing else. It
 writes no host configuration file. `install` and `upgrade` remove the `.mcp.json`
 entry that an earlier Putnami wrote.
 
-The block holds the rules and the gate line. It names the decision registries
-in one line and lists no decision. The line follows the registry form the
-workspace holds: `decisions/<id>.json` files, `decisions.json` files, or both
-across different scopes. The line appears with a registry's first decision and
-goes with its last, and those two changes regenerate the block; any other
-decision change leaves both files as they were. The registries hold the
-decisions in full.
+The block holds the rules and the gate line. A workspace that loads
+`@putnami/go` or `@putnami/typescript` gets one line that links the putnami.dev
+recipe building an HTTP API with Postgres in that language. The block names the
+decision registries in one line and lists no decision. The line follows the
+registry form the workspace holds: `decisions/<id>.json` files,
+`decisions.json` files, or both across different scopes. The line appears with
+a registry's first decision and goes with its last, and those two changes
+regenerate the block; any other decision change leaves both files as they were.
+The registries hold the decisions in full.
 
 #### `context pack`
 

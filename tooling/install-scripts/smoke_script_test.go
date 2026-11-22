@@ -112,7 +112,7 @@ func TestSmokeScriptPinsExactPublicCommands(t *testing.T) {
 	text := string(script)
 	for _, command := range []string{
 		"curl -fsSL https://putnami.dev/install.sh | bash",
-		"putnami init --project webapp --extension ts",
+		"putnami init --project webapp --extension ts --template typescript-web",
 		"putnami serve webapp",
 		`curl -fsSL "https://putnami.dev/install.sh?run=${run_command}" | bash`,
 	} {
@@ -333,7 +333,7 @@ func TestSmokeCLIHelperProcess(t *testing.T) {
 	case "--version":
 		_, _ = os.Stdout.WriteString("Putnami   " + stubVersion + "\n")
 		return
-	case "init\x00--project\x00webapp\x00--extension\x00ts":
+	case "init\x00--project\x00webapp\x00--extension\x00ts\x00--template\x00typescript-web":
 		writeGoldenPathFixture(t)
 		_, _ = os.Stdout.WriteString("  ✓ Workspace ready: smoke\n")
 		return
@@ -622,7 +622,7 @@ func TestSmokeRunsExactTypeScriptGoldenPathThroughHTTPAndCleanStop(t *testing.T)
 	}
 	for _, want := range []string{
 		"curl -fsSL " + server.URL + "/install.sh | bash",
-		"putnami init --project webapp --extension ts",
+		"putnami init --project webapp --extension ts --template typescript-web",
 		"generated workspace, webapp, locks and extension verified, no .mcp.json written; build plan validates",
 		"putnami serve webapp",
 		"smoke: GET http://127.0.0.1:",
@@ -703,7 +703,7 @@ func TestSmokeHandsTheCandidateChannelToInit(t *testing.T) {
 		t.Fatalf("the golden path on %s failed (exit %d):\n%s", smokeCandidateChannel, res.exitCode, res.output)
 	}
 	for _, want := range []string{
-		"smoke: putnami init --project webapp --extension ts",
+		"smoke: putnami init --project webapp --extension ts --template typescript-web",
 		"channel '" + smokeCandidateChannel + "'",
 		"HTTP → clean stop",
 	} {
@@ -726,7 +726,7 @@ func TestSmokeScriptExportsTheChannelForInit(t *testing.T) {
 	cleared := strings.Index(text, `for putnami_env_name in "${!PUTNAMI_@}"; do`)
 	installer := strings.Index(text, `export PUTNAMI_VERSION="$channel"`)
 	exported := strings.Index(text, `export PUTNAMI_CHANNEL="$channel"`)
-	initLeg := strings.Index(text, "putnami init --project webapp --extension ts </dev/null")
+	initLeg := strings.Index(text, "putnami init --project webapp --extension ts --template typescript-web </dev/null")
 	if cleared < 0 || installer < 0 || exported < 0 || initLeg < 0 {
 		t.Fatalf("release smoke misses a pinned line: clear %d, PUTNAMI_VERSION %d, PUTNAMI_CHANNEL %d, init %d", cleared, installer, exported, initLeg)
 	}

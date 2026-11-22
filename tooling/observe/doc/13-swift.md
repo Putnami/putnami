@@ -2,7 +2,8 @@
 
 Two detectors read a Swift repository: the Swift Package Manager detector
 reads each `Package.swift`, and the Xcode detector each `.xcodeproj`. Neither
-runs `swift`, `xcodebuild` or `pod`. The change analyses use what they find
+runs `swift`, `xcodebuild` or `pod`; `putnami observe` runs `xcrun` only to
+read an `.xcresult` bundle. The change analyses use what they find
 to name the changed and dependent components, place tests and coverage, and
 diff `Package.resolved` and `Podfile.lock`.
 
@@ -83,7 +84,51 @@ are read on their own.
 
 ## Reports
 
-`putnami observe` reads no `.xcresult` bundle. Convert it in the CI:
+### The `.xcresult` bundle
+
+On a macOS runner, keep the bundle `xcodebuild test` writes, and `putnami
+observe` reads its tests and its coverage, with nothing to convert:
+
+```bash
+xcodebuild test -scheme Shop -destination 'platform=iOS Simulator,name=iPhone 16' \
+  -enableCodeCoverage YES -resultBundlePath build/Test.xcresult
+```
+
+A directory named `*.xcresult` that holds an `Info.plist` is a bundle: the
+walk finds it anywhere in the checkout and does not enter it. Outside the
+checkout, such as under `DerivedData`, name it with `--junit` and
+`--coverage`, which take a bundle's path or a glob pattern, such as
+`--junit 'build/*.xcresult'`.
+
+With `xcrun` on the `PATH`, `putnami observe` runs three commands on each
+bundle, each stopped after five minutes or 256 MiB of output:
+
+| Command | Gives |
+|---|---|
+| `xcrun xcresulttool get test-results tests --path <bundle>` | Each test case, its result, its duration and its failure message; one case per `Test Case` node, its class `Module.Class`, the test bundle and the outermost suite |
+| `xcrun xccov view --report --json <bundle>` | Each covered file's executable and covered line totals |
+| `xcrun xccov view --archive --json <bundle>` | Each covered file's executable lines and how often they ran, so the change's lines are measured |
+
+`get test-results` needs Xcode 16 or later. A file the archive lists keeps
+its lines; a file only the report lists keeps its totals. A job that also
+converts the bundle, such as with `xcbeautify --report junit`, counts each
+case once: when the walk finds a JUnit report anywhere in the repository
+besides a bundle, the bundle's tests are not read, its coverage still is, and
+the `observe.xcresult_tests_skipped` warning says so. To read the bundle's
+tests with other JUnit reports, such as a backend's, name with `--junit` the
+bundle and the reports that are not its conversion. A command that
+fails, or prints what `putnami observe` cannot read, is the
+`observe.xcresult_unread` warning, which names the command, its error and the
+conversion below, and the bundle's other outputs are still read.
+
+Without `xcrun`, as when a Linux job downloads the bundle as an artifact,
+each bundle is one `observe.xcresult_tools_missing` warning that names the
+conversion, the other reports are still read, and the job exits 0. Convert
+the bundle on the macOS runner then.
+
+### Converted reports
+
+Without the bundle, or on a runner without `xcrun`, convert it in the CI:
 
 | Report | Command |
 |---|---|
@@ -92,8 +137,8 @@ are read on their own.
 | Cobertura | `xcresultparser --output-format cobertura --project-root . Test.xcresult > coverage.xml`, or slather |
 | LCOV | `swift test --enable-code-coverage`, then `llvm-cov export -format=lcov` |
 
-These reporters name a test case's class `Module.Class`, such as
-`PricingTests.PriceCalculatorTests`, and write no file. The case goes to the
+These reporters, like the bundle, name a test case's class `Module.Class`,
+such as `PricingTests.PriceCalculatorTests`, and write no file. The case goes to the
 component of the test target named `Module`: a test target of a Swift package,
 or a unit or UI test target of an Xcode project. A target name with characters
 Swift does not allow in a module name, such as `-`, matches with `_` in their

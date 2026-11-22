@@ -16,6 +16,7 @@ import (
 	protocolcli "go.putnami.dev/protocol/cli"
 	"go.putnami.dev/protocol/features/spectest"
 	wsproto "go.putnami.dev/protocol/workspace"
+	"go.putnami.dev/tooling/cli/internal/commandmeta"
 )
 
 const initLanguageFeature = "cli/init-a-language"
@@ -148,8 +149,8 @@ func TestInitStartersNameTheirExtension(t *testing.T) {
 			t.Errorf("starter %q names no language of the index", name)
 			continue
 		}
-		if starter.packageName != language.Extension || starter.template == "" {
-			t.Errorf("starter %q = %+v, want the extension %s and a template", name, starter, language.Extension)
+		if starter.packageName != language.Extension || len(starter.templates) == 0 || starter.template != starter.templates[0] {
+			t.Errorf("starter %q = %+v, want the extension %s and templates, the default first", name, starter, language.Extension)
 			continue
 		}
 		dir, ok := dirs[starter.packageName]
@@ -157,10 +158,29 @@ func TestInitStartersNameTheirExtension(t *testing.T) {
 			t.Errorf("starter %q: the root declares no %s by path", name, starter.packageName)
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(filepath.Dir(dir), "templates", starter.template, "putnami.template.json"))
-		if err != nil {
-			t.Errorf("starter %q: %v", name, err)
+		shipped := shippedTemplates(t, filepath.Join(filepath.Dir(dir), "templates"), starter.packageName)
+		if got := slices.Sorted(slices.Values(starter.templates)); !slices.Equal(got, shipped) {
+			t.Errorf("starter %q offers the templates %v, want every template next to %s: %v", name, got, starter.packageName, shipped)
+		}
+	}
+}
+
+// shippedTemplates returns, sorted, the names of the templates under dir
+// whose manifest names extension; a manifest's name is its directory's.
+func shippedTemplates(t *testing.T, dir, extension string) []string {
+	t.Helper()
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, entry := range entries {
+		data, err := os.ReadFile(filepath.Join(dir, entry.Name(), "putnami.template.json"))
+		if errors.Is(err, os.ErrNotExist) {
 			continue
+		}
+		if err != nil {
+			t.Fatal(err)
 		}
 		var template struct {
 			Name      string `json:"name"`
@@ -169,9 +189,126 @@ func TestInitStartersNameTheirExtension(t *testing.T) {
 		if err := json.Unmarshal(data, &template); err != nil {
 			t.Fatal(err)
 		}
-		if template.Name != starter.template || template.Extension != starter.packageName {
-			t.Errorf("starter %q: template manifest names %q for %q, want %q for %q", name, template.Name, template.Extension, starter.template, starter.packageName)
+		if template.Name != entry.Name() || template.Extension != extension {
+			t.Errorf("template %s names %q for %q, want %q for %q", entry.Name(), template.Name, template.Extension, entry.Name(), extension)
+			continue
 		}
+		names = append(names, template.Name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// putnami init --help describes --template with the templates of each
+// starter, the default first, as initTemplateHelp lists them.
+func TestInitTemplateHelpListsTheStarterTemplates(t *testing.T) {
+	spectest.Proves(t, initLanguageFeature, "init-takes-a-template", "init-help-lists-the-templates-of-each-starter")
+	command, ok := commandmeta.Lookup("workspace init")
+	if !ok {
+		t.Fatal("the catalog has no workspace init")
+	}
+	for _, flag := range command.Flags {
+		if flag.Long != "--template" {
+			continue
+		}
+		if want := initTemplateHelp(); flag.Description != want {
+			t.Errorf("--template description = %q, want %q", flag.Description, want)
+		}
+		return
+	}
+	t.Fatal("putnami init --help describes no --template")
+}
+
+// --template renders that template of the first language instead of its
+// default; without it TypeScript renders typescript-server.
+func TestInitTemplateRendersThatTemplateOfTheFirstLanguage(t *testing.T) {
+	spectest.Proves(t, initLanguageFeature, "init-takes-a-template", "template-renders-that-template-of-the-first-language")
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"the TypeScript default", []string{"--project", "api"}, "typescript-server"},
+		{"a TypeScript web app", []string{"--project", "api", "--template", "typescript-web"}, "typescript-web"},
+		{"a Go library", []string{"--extension", "go", "--project", "api", "--template=go-library"}, "go-library"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			stubInitFrom(t, false, "")
+			var templates, created []string
+			installInitTemplate = func(_ context.Context, _ string, _ *wsproto.Config, args []string, _ string) error {
+				templates = append(templates, args...)
+				return nil
+			}
+			createInitProject = func(_ context.Context, _ string, _ *wsproto.Config, args []string, _ LifecycleEnv) error {
+				created = args
+				return nil
+			}
+			out, err := runInit(t, tc.args...)
+			if err != nil {
+				t.Fatalf("WorkspaceInit: %v\n%s", err, out)
+			}
+			cfg := readInitConfig(t, dir)
+			if !slices.Equal(cfg.Templates, []string{tc.want}) || !slices.Equal(templates, []string{tc.want}) || !slices.Equal(created, []string{"api", "--template", tc.want}) {
+				t.Errorf("templates %v, installed %v, created %v: want %s", cfg.Templates, templates, created, tc.want)
+			}
+		})
+	}
+}
+
+// A template the first language does not ship, --template without --project
+// and --template with --from are usage errors raised before anything is
+// written.
+func TestInitRefusesAnUnknownTemplate(t *testing.T) {
+	spectest.Proves(t, initLanguageFeature, "init-takes-a-template", "an-unknown-template-is-refused-before-anything-is-written")
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"another language's template", []string{"--project", "api", "--template", "go-server"},
+			`--template "go-server" is a go template, and the first --extension language is typescript: give --extension go`},
+		{"no template", []string{"--project", "api", "--template", "typescript-cli"},
+			`--template "typescript-cli" is no typescript template (choose: typescript-server, typescript-web, typescript-library)`},
+		{"no project", []string{"--extension", "go", "--template", "go-library"}, "--template requires --project"},
+		{"from a monorepo tool", []string{"--from", "nx", "--template", "typescript-web"}, "does not combine with --project, --project-path, --template or --extension"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			t.Chdir(dir)
+			stubInitFrom(t, false, "")
+			_, err := runInit(t, tc.args...)
+			if err == nil || !errors.Is(err, protocolcli.ErrUsage) || !strings.Contains(err.Error(), tc.want) {
+				t.Fatalf("err = %v, want a usage error with %q", err, tc.want)
+			}
+			assertNothingWritten(t, dir)
+		})
+	}
+}
+
+// When the installers the project setup ran fail, the project exists: init
+// stops before its ready summary and names the install, not a create to run
+// again.
+func TestInitReportsTheInstallersTheProjectSetupRan(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "project-setup-runs-in-the-project-extension",
+		"init-reports-the-installers-the-project-setup-ran")
+	dir := t.TempDir()
+	t.Chdir(dir)
+	stubInitFrom(t, false, "")
+	failure := errors.New("resolve the workspace build list")
+	createInitProject = func(context.Context, string, *wsproto.Config, []string, LifecycleEnv) error {
+		return initInstallError{err: failure}
+	}
+	out, err := runInit(t, "--extension", "go", "--project", "api")
+	if !errors.Is(err, failure) || protocolcli.SuggestedNext(err) != "putnami deps install" {
+		t.Fatalf("WorkspaceInit = %v (next %q), want the install failure and putnami deps install", err, protocolcli.SuggestedNext(err))
+	}
+	if !strings.Contains(err.Error(), "install workspace dependencies after creating api") {
+		t.Errorf("err = %v, want it to name the install after creating api", err)
+	}
+	if strings.Contains(out, "Workspace ready") {
+		t.Errorf("a failed install printed the ready summary:\n%s", out)
 	}
 }
 
@@ -547,5 +684,44 @@ func TestInitPointsAMonorepoToolAtFrom(t *testing.T) {
 	calls := stubInitFrom(t, false, "")
 	if out, err := runInit(t, "--extension", "ts"); err != nil || !slices.Equal(calls.installed, []string{"@putnami/typescript"}) {
 		t.Fatalf("WorkspaceInit = %v, installed %v\n%s", err, calls.installed, out)
+	}
+}
+
+// A library project, which putnami serve cannot run, gets the gate alone as
+// init's next step; any other project also gets putnami serve.
+func TestInitNextStepsServeNoLibrary(t *testing.T) {
+	spectest.Proves(t, initLanguageFeature, "init-takes-a-template", "a-library-project-names-no-serve")
+	dir := t.TempDir()
+	writeRawFile(t, filepath.Join(dir, "lib", wsproto.ConfigFilename), `{"name":"lib","type":"library"}`)
+	writeRawFile(t, filepath.Join(dir, "api", wsproto.ConfigFilename), `{"name":"api"}`)
+	if !initProjectIsLibrary(filepath.Join(dir, "lib")) || initProjectIsLibrary(filepath.Join(dir, "api")) || initProjectIsLibrary(filepath.Join(dir, "none")) {
+		t.Fatal("initProjectIsLibrary reads no library type from putnami.json")
+	}
+	for _, step := range initNextSteps(dir, "lib", true, false, "", "") {
+		if strings.Contains(step, "serve") {
+			t.Errorf("next steps of a library name %q", step)
+		}
+	}
+	if steps := initNextSteps(dir, "api", false, false, "", ""); !slices.Contains(steps, "putnami serve api") {
+		t.Errorf("next steps of a service = %v, want putnami serve api", steps)
+	}
+}
+
+// init's create returns the failure of the installers the project setup ran
+// as an initInstallError, and a create failure as it is.
+func TestInitCreateReportsTheSetupInstallers(t *testing.T) {
+	spectest.Proves(t, "cli/job-planning-execution", "project-setup-runs-in-the-project-extension",
+		"init-reports-the-installers-the-project-setup-ran")
+	installs := errors.New("resolve the workspace build list")
+	var installErr initInstallError
+	if err := initCreateError(createdProject{name: "api", installErr: installs}, nil); !errors.As(err, &installErr) || !errors.Is(err, installs) {
+		t.Errorf("installers failed: err = %v, want an initInstallError wrapping %v", err, installs)
+	}
+	create := errors.New("template not found")
+	if err := initCreateError(createdProject{installErr: installs}, create); !errors.Is(err, create) {
+		t.Errorf("create failed: err = %v, want %v", err, create)
+	}
+	if err := initCreateError(createdProject{name: "api"}, nil); err != nil {
+		t.Errorf("create succeeded: err = %v, want nil", err)
 	}
 }

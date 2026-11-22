@@ -122,27 +122,26 @@ api({
 })
 ```
 
-#### `openapi`
+#### OpenAPI
 
-**Type:** `{ title: string; version: string; description?: string; servers?: { url: string; description?: string }[] } | undefined`
-**Default:** `undefined`
-
-Enable build-time OpenAPI 3.0.3 spec generation. When set, the plugin generates an `openapi.json` file in `.gen/` during the build step.
+`api()` takes no OpenAPI option: add the `openapi()` plugin next to it. During the build it writes the spec to `schema/openapi.json` (`output: false` keeps it in `.gen/schema/openapi.json`):
 
 ```typescript
-api({
-  openapi: {
-    title: 'My API',
-    version: '1.0.0',
-    description: 'My service API',
-    servers: [
-      { url: 'https://api.example.com', description: 'Production' },
-    ],
-  },
-})
+import { api, application, openapi } from '@putnami/application';
+
+application()
+  .use(api())
+  .use(
+    openapi({
+      title: 'My API',
+      version: '1.0.0',
+      description: 'My service API',
+      servers: [{ url: 'https://api.example.com', description: 'Production' }],
+    }),
+  );
 ```
 
-Routes defined with the `route()` builder automatically contribute their `.params()`, `.query()`, `.body()`, and `.returns()` schemas to the generated spec.
+Routes defined with the `endpoint()` builder automatically contribute their `.params()`, `.query()`, `.body()`, and `.returns()` schemas to the generated spec.
 
 ### YAML Configuration
 
@@ -351,7 +350,7 @@ const isProduction = process.env.NODE_ENV === 'production';
 
 export const app = () => application()
   .use(http({
-    port: process.env.PORT || 3000,
+    port: Number(process.env.PORT) || 3000,
   }))
   .use(api({
     prefix: isProduction ? '/api' : undefined,

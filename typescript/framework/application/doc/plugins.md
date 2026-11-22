@@ -71,6 +71,7 @@ facts in a wrapper:
 import type { DesignDelegate, Plugin } from '@putnami/application';
 
 class RelayController implements Plugin, DesignDelegate {
+  readonly name = 'relay';
   private readonly inner = events({ outboxes: [IdentityOutbox] });
 
   designDelegates() {
@@ -149,7 +150,7 @@ manifest is published.
 
 All plugins implement the `Plugin` interface:
 
-```typescript
+```typescript nocheck
 import type { Module, Plugin, GenerateResult } from '@putnami/application';
 
 export interface Plugin {
@@ -505,6 +506,7 @@ Plugins can communicate through the Application instance:
 
 ```typescript
 class PluginA implements Plugin {
+  readonly name = 'plugin-a';
   sharedData = { value: 42 };
 }
 
@@ -573,7 +575,7 @@ export function database(config: DatabaseConfig): DatabasePlugin {
 // Usage
 const app = application()
   .use(database({ connectionString: process.env.DATABASE_URL! }))
-  .run(async (app) => {
+  .run(async () => {
     const db = app.getPlugin(DatabasePlugin);
     const users = await db.getConnection().query('SELECT * FROM users');
   });

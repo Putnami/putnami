@@ -6,7 +6,7 @@ are derived from the endpoint's `Params`, `Query`, `Body`, and `Returns` types.
 
 ## Usage
 
-```go
+```go nocheck
 import (
     "go.putnami.dev/api"
     "go.putnami.dev/app"

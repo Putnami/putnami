@@ -11,7 +11,7 @@ This guide will help you get started with `@putnami/utils`, a comprehensive coll
 ## Installation
 
 ```bash
-bun add @putnami/utils
+putnami deps add @putnami/utils
 ```
 
 ## Quick Start

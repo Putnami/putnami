@@ -17,7 +17,7 @@ export default handler(UserCreated)
 
 ## Handler Options
 
-```typescript
+```typescript nocheck
 handler(OrderPlaced)
   .options({
     group: 'billing.reserve-credit', // stable external transport subscription id

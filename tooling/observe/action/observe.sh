@@ -26,10 +26,44 @@ unset PUTNAMI_OBSERVE_TOKEN PUTNAMI_OBSERVE_GITHUB_TOKEN GITHUB_TOKEN PUTNAMI_CL
 
 publish="${PUTNAMI_OBSERVE_PUBLISH:-}"
 case "$publish" in
-  '') if [[ -n "$token" ]]; then publish=true; else publish=false; fi ;;
-  true | false) ;;
+  '' | true | false) ;;
   *) fail "publish is \"$publish\": use true, false, or leave it empty." ;;
 esac
+
+warn() {
+  echo "::warning title=Putnami Observe::$1" >&2
+}
+
+# from-artifact relays the evidence document a pull request run kept, such as
+# a run from a fork, from the workflow_run job of the base repository. The
+# artifact is untrusted: only its observe-evidence.json is read, as data.
+from_artifact="${PUTNAMI_OBSERVE_FROM_ARTIFACT:-}"
+relayed=""
+if [[ -n "$from_artifact" ]]; then
+  for input in JUNIT COVERAGE SBOM BASE_SBOM BASE; do
+    variable="PUTNAMI_OBSERVE_$input"
+    if [[ -n "${!variable:-}" ]]; then
+      fail "from-artifact relays the document another run kept, so it takes no junit, coverage, sbom, base-sbom or base input."
+    fi
+  done
+  if [[ "${PUTNAMI_OBSERVE_EVENT:-}" != workflow_run ]]; then
+    warn "from-artifact relays from a workflow_run job; this job runs for ${PUTNAMI_OBSERVE_EVENT:-no event}, so nothing was relayed."
+    exit 0
+  fi
+  if [[ "${PUTNAMI_OBSERVE_DOWNLOAD:-}" == failure ]]; then
+    warn "the download of the artifact $from_artifact from the run that triggered this workflow failed, as the step above says, so nothing was relayed."
+    exit 0
+  fi
+  relayed="${PUTNAMI_OBSERVE_ARTIFACT_DIR:-}/observe-evidence.json"
+  if [[ -z "${PUTNAMI_OBSERVE_ARTIFACT_DIR:-}" || -L "$relayed" || ! -f "$relayed" ]]; then
+    warn "the artifact $from_artifact of the run that triggered this workflow holds no observe-evidence.json, so nothing was relayed."
+    exit 0
+  fi
+fi
+
+if [[ -z "$publish" ]]; then
+  if [[ -n "$token" || -n "$relayed" ]]; then publish=true; else publish=false; fi
+fi
 
 # A channel follows the channel alphabet of putnami init; a version names no
 # release set, since the release lines do not share one version. stable reads
@@ -47,12 +81,20 @@ fi
 curl -fsSL "$INSTALL_URL" | bash -s -- --version "$registry_channel"
 export PATH="$HOME/.putnami/bin:$PATH"
 putnami extensions install --user "@putnami/observe@$registry_channel"
-if [[ -n "$token" ]]; then
+# A relay uploads whether the token input or the job's ID token is the
+# credential.
+upload=false
+if [[ -n "$token" || -n "$relayed" ]]; then
+  upload=true
   putnami extensions install --user "@putnami/cloud@$registry_channel"
 fi
 
 evidence="${RUNNER_TEMP:-${TMPDIR:-/tmp}}/observe-evidence.json"
 args=(observe --evidence "$evidence")
+if [[ -n "$relayed" ]]; then
+  evidence="$relayed"
+  args=(observe --from-evidence "$relayed")
+fi
 add_flag() {
   if [[ -n "$2" ]]; then
     args+=("$1" "$2")
@@ -64,7 +106,7 @@ add_flag --sbom "${PUTNAMI_OBSERVE_SBOM:-}"
 add_flag --base-sbom "${PUTNAMI_OBSERVE_BASE_SBOM:-}"
 add_flag --base "${PUTNAMI_OBSERVE_BASE:-}"
 
-if [[ -n "$token" ]]; then
+if [[ "$upload" == true ]]; then
   args+=(--upload)
 fi
 if [[ "$publish" == true ]]; then
@@ -72,11 +114,15 @@ if [[ "$publish" == true ]]; then
 fi
 
 (
+  # The summary's last line names this action's token input, not a setting
+  # the action does not read.
+  export PUTNAMI_OBSERVE_ACTION=true
   if [[ -n "$token" ]]; then
     export PUTNAMI_CLOUD_TOKEN="$token"
   fi
-  # --publish without --upload posts nothing, so the run token stays out.
-  if [[ "$publish" == true && -n "$token" ]]; then
+  # --publish without --upload posts nothing, so the run token stays out. A
+  # relay reads the pull request and the commits with it, publishing or not.
+  if [[ -n "$relayed" || ( "$publish" == true && "$upload" == true ) ]]; then
     export GITHUB_TOKEN="$run_token"
   fi
   exec putnami "${args[@]}"

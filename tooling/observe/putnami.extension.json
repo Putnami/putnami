@@ -124,6 +124,10 @@
           "type": "string",
           "description": "Write the change evidence document (protocol/evidence v1) to this path, resolved against the invocation directory."
         },
+        "from-evidence": {
+          "type": "string",
+          "description": "Relay the evidence document another run kept, such as a pull request run from a fork, instead of observing: in a GitHub Actions workflow_run job, check that it names this job's repository and pull request, then --upload and --publish it with this job's credentials. A refused document is a diagnostic; the exit code does not change."
+        },
         "upload": {
           "type": "boolean",
           "default": false,

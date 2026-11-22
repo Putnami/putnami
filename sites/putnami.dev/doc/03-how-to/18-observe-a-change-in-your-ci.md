@@ -12,7 +12,7 @@ For each pull or merge request, the step answers:
 
 It writes a short summary in the log, which ends with the one command that keeps the full report, and the whole answer as a change evidence document you keep as an artifact. Once it uploads the evidence, it also posts a status and a note on the pull or merge request that link to the full report when the reporter answers its URL, else to the CI run. It never fails your job.
 
-`putnami observe` comes with the `@putnami/observe` extension. It is `experimental`: being on the stable channel is not a compatibility promise. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
+`putnami observe` comes with the `@putnami/observe` extension. It is `preview` in the [support catalog](/docs/support): the change evidence document it writes keeps version 1 by addition only, so a document that validates today keeps validating, while its flags, its text summary and its note may still change in a minor release whose notes say so. [Observe](/docs/tooling-&-workspace/observe) lists every CI, repository tool, report format, lockfile and SBOM format it reads.
 
 ## Start on your laptop
 
@@ -95,7 +95,7 @@ With Jest, add `jest-junit` to the dev dependencies, then run:
 npx jest --ci --coverage --reporters=default --reporters=jest-junit
 ```
 
-Each member of the workspace that `package.json` `workspaces` or `pnpm-workspace.yaml` lists is a component. A `workspace:`, `file:`, `link:` or `portal:` dependency on another member is an edge, and so is a version range another member satisfies. A `package-lock.json`, `pnpm-lock.yaml` or `yarn.lock` change is a dependency change of ecosystem `npm`. A `bun.lock` change is not read.
+Each member of the workspace that `package.json` `workspaces` or `pnpm-workspace.yaml` lists is a component. A `workspace:`, `file:`, `link:` or `portal:` dependency on another member is an edge, and so is a version range another member satisfies. A `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` or `bun.lock` change is a dependency change of ecosystem `npm`. Bun's binary `bun.lockb` is not read, and a change to it says so in a diagnostic.
 
 #### Nx
 
@@ -210,21 +210,19 @@ In a Maven repository, add the `prepare-agent` and `report` goals of `jacoco-mav
 </plugin>
 ```
 
-Each module the POMs list is a component, and a dependency on another module is an edge. The reports under `target/surefire-reports`, `target/failsafe-reports` and `target/site/jacoco` land on the modules. Maven has no lockfile, so a Maven repository has no dependency change. To read only some reports, name them, for example `--junit '**/target/surefire-reports/*.xml' --coverage '**/target/site/jacoco/jacoco.xml'`.
+Each module the POMs list is a component, and a dependency on another module is an edge. The reports under `target/surefire-reports`, `target/failsafe-reports` and `target/site/jacoco` land on the modules. Maven has no lockfile: a change to a version a POM declares, in `dependencies`, `dependencyManagement`, a property or the parent, is a dependency change of ecosystem `maven`, marked declared, since Maven may resolve another version. To read only some reports, name them, for example `--junit '**/target/surefire-reports/*.xml' --coverage '**/target/site/jacoco/jacoco.xml'`.
 
 #### iOS and Swift
 
-In an iOS or Swift repository, write each package's description and convert the `.xcresult` bundle to JUnit and Cobertura, before the observe step. The same lines run in a GitHub Actions job on `runs-on: macos-15` and in a GitLab job on a macOS runner (`tags: [saas-macos-medium-m1]`), with xcbeautify and xcresultparser installed (`brew install xcbeautify xcresultparser`):
+In an iOS or Swift repository, write each package's description and keep the `.xcresult` bundle, before the observe step, in the same macOS job. The same lines run in a GitHub Actions job on `runs-on: macos-15` and in a GitLab job on a macOS runner (`tags: [saas-macos-medium-m1]`):
 
 ```bash
 (cd Packages/Pricing && swift package describe --type json > swiftpm.json)
-set -o pipefail
 xcodebuild test -workspace Shop.xcworkspace -scheme Shop -destination 'platform=iOS Simulator,name=iPhone 16' \
-  -enableCodeCoverage YES -resultBundlePath build/Test.xcresult | xcbeautify --report junit --report-path build/reports
-xcresultparser --output-format cobertura --project-root . build/Test.xcresult > build/reports/coverage.xml
+  -enableCodeCoverage YES -resultBundlePath build/Test.xcresult
 ```
 
-For a package on its own, `swift test --enable-code-coverage --xunit-output build/reports/xunit.xml` writes the JUnit report, and `llvm-cov export -format=lcov` the coverage. `putnami observe` reads no `.xcresult` itself. Each Swift package, each of its targets and each Xcode project is a component; the export gives the targets' dependencies, and a local package the Xcode project references is an edge, so a change to a package marks the packages and the app that use it. Without the export, the summary says how to write it. A test case named `PricingTests.PriceCalculatorTests` lands on the test target `PricingTests`, and a change to `Package.resolved` or `Podfile.lock` is a dependency change of ecosystem `swift` or `cocoapods`.
+`putnami observe` finds `build/Test.xcresult` and reads its tests and coverage with `xcrun xcresulttool` (Xcode 16 and later) and `xcrun xccov`. When the repository holds other JUnit reports, it reads only the bundle's coverage, so a converted copy is not counted twice: name the bundle and those reports with `--junit` to read its tests too. To observe on a runner without `xcrun`, such as a Linux job, convert the bundle to JUnit and Cobertura on the macOS runner (`brew install xcresultparser`, then `xcresultparser --output-format junit` and `--output-format cobertura`); otherwise the summary names that conversion and the job still exits 0. For a package on its own, `swift test --enable-code-coverage --xunit-output build/reports/xunit.xml` writes the JUnit report, and `llvm-cov export -format=lcov` the coverage. Each Swift package, each of its targets and each Xcode project is a component; the export gives the targets' dependencies, and a local package the Xcode project references is an edge, so a change to a package marks the packages and the app that use it. Without the export, the summary says how to write it. A test case named `PricingTests.PriceCalculatorTests` lands on the test target `PricingTests`, and a change to `Package.resolved` or `Podfile.lock` is a dependency change of ecosystem `swift` or `cocoapods`.
 
 #### Dart and Flutter
 
@@ -453,20 +451,20 @@ putnami observe: GitHub Actions, github.com/Putnami/demo-observe-go (project 144
     dependent api [go, go.mod], depends on pricing
   changed lines  8 of 10 lines (80.0%) covered
   dependencies  1 change; without an SBOM, their licenses and vulnerabilities are unknown
-Next: set PUTNAMI_CLOUD_TOKEN in this CI to a token from `putnami cloud token create --name ci --scopes delivery.ingest`, then add --upload to keep the full report
+Next: pass a token from `putnami cloud token create --organization <id> --name ci` as this action's token input to keep the full report
 ```
 
-A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The last line names what keeps the full report: the token to set, `--upload` once the job holds one, or the report URL once an upload answered it. `--details` prints the changed files, the reports, each component's tests and coverage, and each dependency change instead. The evidence document is the `observe-evidence` artifact of the job.
+A report it cannot find or read is a warning in the same summary, such as `observe.report_missing`. The last line names what keeps the full report: the action's `token` input; in another GitHub Actions job, the organization to name for the ID token exchange or the token to set; in another CI, the token to set; `--upload` once the job holds one, or the report URL once an upload answered it. `--details` prints the changed files, the reports, each component's tests and coverage, and each dependency change instead. The evidence document is the `observe-evidence` artifact of the job.
 
 ### 5) Read the pull or merge request
 
 With `--upload --publish`, on a pull or merge request, `putnami observe` sets the commit status `putnami/observe` on the pull request's head commit, or on the commit of the merge request pipeline, with a one-line summary such as `1 changed, 2 dependent components; changed lines 80.0% covered; 1 dependency change`. It also writes one summary note with the components, their tests and coverage, the least covered changed lines and the dependency changes. The status and the note's first link open the full report the upload stored, once the reporter answers its URL; until then they link the CI run. The next run updates the same note instead of adding one.
 
-Without `--upload`, after a failed upload, without the code host token, or on a branch push, the summary says why nothing was posted, and the job still passes. On a pull request from a fork, GitHub gives a read-only `GITHUB_TOKEN` and refuses the post; the job still passes.
+Without `--upload`, after a failed upload, without the code host token, or on a branch push, the summary says why nothing was posted, and the job still passes. On a pull request from a fork, GitHub gives a read-only `GITHUB_TOKEN` and refuses the post; the job still passes. [Pull requests from forks](#pull-requests-from-forks) relays it from your repository instead.
 
 ### 6) Upload the evidence to Putnami Cloud
 
-To send the evidence to Putnami Cloud, store a workspace token with the `delivery.ingest` scope as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. The token names the Putnami Cloud workspace that receives the uploads. `putnami cloud token create --name ci --scopes delivery.ingest` creates it and prints it once; it runs, signed in, in a Putnami workspace that `putnami cloud setup --workspace <id>` linked to that Cloud workspace, which does not have to be the repository you observe.
+To send the evidence to Putnami Cloud, store your organization's ingest token as the secret or masked CI/CD variable `PUTNAMI_CLOUD_TOKEN`. Signed in with `putnami observe --open`, run `putnami cloud token create --organization <organization-id> --name ci` anywhere: it needs no Putnami workspace, creates a token with the `delivery.ingest` scope only, and prints it once. It needs the right to manage the organization. The upload names the repository, and its first upload opens the repository's observed workspace in the organization. `putnami cloud token list --organization <organization-id>` lists the tokens without their secrets, and `putnami cloud token revoke <name> --organization <organization-id>` revokes one. On GitHub Actions, the job can skip the secret and exchange its ID token instead, as [below](#on-github-without-a-secret) shows.
 
 On GitHub, pass it to the action as `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}`, as step 2 shows. With a token, the action uploads the evidence and publishes unless you set `publish` to `false`, so the job needs the permissions of step 2. On GitLab, use the commented `--upload --publish` line in place of the line above it. An upload that fails is a diagnostic in the summary, and the job still passes.
 
@@ -504,7 +502,53 @@ jobs:
 
 The workflow runs on each pull request and on each push to the default branch, where `putnami observe` measures the push against the commit before it. It needs no test report: add the reports of [step 1](#1-write-the-reports-your-stack-needs) to the same job, before the last step, when you want tests and coverage in the report. `PUTNAMI_ORGANIZATION` is an id, not a secret, so it sits in the file.
 
-`id-token: write` lets the job ask GitHub for an ID token that names its repository. With `PUTNAMI_ORGANIZATION` set and no `PUTNAMI_CLOUD_TOKEN`, `@putnami/cloud` asks for that token and exchanges it at `auth.putnami.cloud`, which answers an upload token only when the organization trusts the repository, or its owner, for observation. When it does not, the summary names that refusal and the trust to add; without `id-token: write`, it names the missing permission. GitHub withholds the ID token from a pull request from a fork in most repositories, so such a run uploads nothing. As always, an upload that fails is a warning, and the job still passes. A `PUTNAMI_CLOUD_TOKEN` set in the job wins over the exchange.
+`id-token: write` lets the job ask GitHub for an ID token that names its repository. With `PUTNAMI_ORGANIZATION` set and no `PUTNAMI_CLOUD_TOKEN`, `@putnami/cloud` asks for that token and exchanges it at `auth.putnami.cloud`, which answers an upload token only when the organization trusts the repository, or its owner, for observation. When it does not, the summary names that refusal and the trust to add; without `id-token: write`, it names the missing permission. GitHub withholds the ID token from a pull request from a fork in most repositories, so such a run uploads nothing: relay it as the next section says. As always, an upload that fails is a warning, and the job still passes. A `PUTNAMI_CLOUD_TOKEN` set in the job wins over the exchange.
+
+#### Pull requests from forks
+
+GitHub runs the workflow of a pull request from a fork with no ID token and a read-only `GITHUB_TOKEN`, and keeps your secrets from it, so that run can neither upload nor post. It keeps its evidence document as an artifact instead, and a second workflow of your repository relays it with your repository's credentials.
+
+The workflow that runs your tests on `pull_request`, here named `Test`, keeps the step of step 2 without a token, and keeps its document:
+
+```yaml
+      - id: observe
+        uses: Putnami/observe-action@v1
+        if: ${{ !cancelled() }}
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: observe-evidence
+          path: ${{ steps.observe.outputs.evidence }}
+```
+
+Then commit this workflow as `.github/workflows/putnami-relay.yml` on your default branch, where GitHub reads `workflow_run` workflows, with the name of your test workflow in `workflows` and your organization's id in place of `<organization-id>`:
+
+```yaml
+name: Putnami relay
+on:
+  workflow_run:
+    workflows: [Test]
+    types: [completed]
+permissions:
+  actions: read
+  id-token: write
+  statuses: write
+  pull-requests: write
+jobs:
+  relay:
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    env:
+      PUTNAMI_ORGANIZATION: <organization-id>
+    steps:
+      - uses: Putnami/observe-action@v1
+        with:
+          from-artifact: observe-evidence
+```
+
+When the test run completes, the step downloads its `observe-evidence` artifact and runs `putnami observe --from-evidence` on it with `--upload --publish`, with this job's ID token and `GITHUB_TOKEN`. `actions: read` lets it download the artifact; pass `token: ${{ secrets.PUTNAMI_CLOUD_TOKEN }}` instead of `PUTNAMI_ORGANIZATION` to upload with a workspace token. The pull request gets the status and the note as a pull request from a branch does, and they link the fork's run. A branch of your repository goes the same way, so one setup serves both.
+
+The document comes from the fork, so `putnami observe` checks it before it relays it. It refuses a document over 64 MiB, one that does not validate, or one that names another repository, pull request or commit than the run that triggered the job, with the warning `observe.evidence_refused`, and the job still passes: the commit must be the run's head commit, or the merge commit GitHub keeps for the pull request, as the GitHub API answers, and the base must be that merge commit's first parent or an ancestor of the head. It takes the repository, the pull request and the run from the job and the event, never from the document. The note quotes every text of the document as code, so a test name renders no link, mention or HTML, and the log prints only counts and observe's own diagnostics. The relay job checks out nothing and runs nothing the artifact holds: keep it that way, since it holds your repository's credentials. GitHub lists no pull request in the event of a fork's run, so observe finds it with `GITHUB_TOKEN` among the open pull requests of your repository, by the fork's owner, branch and head commit; when none matches, as after a new push to the fork or once the pull request closed, it relays nothing. The action hands `GITHUB_TOKEN` to `putnami observe` for these reads, even with `publish: false`.
 
 ### 7) Add licences and known vulnerabilities from an SBOM
 

@@ -141,7 +141,12 @@ func buildCompileArgs(config, entrypoint, outputFile, target string, bytecode bo
 	if config != "" {
 		args = append(args, "--config="+config)
 	}
-	args = append(args, "--compile")
+	// --env=disable keeps every process.env read, NODE_ENV included, a run-time
+	// read, as the transpile and the Node bundle do. Without it Bun inlines the
+	// builder's NODE_ENV ("development" by default), so an executable an image
+	// runs with NODE_ENV=production would read the local config environment,
+	// serve development error pages and run JSX through jsxDEV.
+	args = append(args, "--compile", "--env=disable")
 	if bytecode {
 		args = append(args, "--bytecode", "--format=esm")
 	}

@@ -18,9 +18,8 @@ platformPlugin := platform.NewPlugin(platform.Config{
     Version: platform.VersionInfo{Name: "my-service", Version: "1.0.0"},
 })
 
-a := app.New("my-service").
-    Use(server).
-    Use(platformPlugin)
+a := app.New("my-service")
+a.Use(server).Use(platformPlugin)
 a.ListenAndServe()
 ```
 

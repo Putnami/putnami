@@ -92,10 +92,65 @@ func GetVersionInfo(workspaceRoot string) (*VersionInfo, error) {
 	return info, nil
 }
 
+// NoCommitSuffix is the suffix of a version read in a repository before its
+// first commit. The Go extension falls back to the same word.
+const NoCommitSuffix = "nogit"
+
+// HasCommit reports whether HEAD in workspaceRoot names a commit. It answers
+// false only for a repository whose HEAD is unborn, before its first commit:
+// git rev-parse --verify --quiet HEAD exits 1 there. It asks no ^{commit}
+// peel, which also exits 1 when HEAD names a missing object, so a repository
+// that lost its objects still fails in GetVersionInfo. Any other failure (a
+// directory outside a repository, an untrusted or broken one, a git that
+// cannot run) is an error.
+func HasCommit(workspaceRoot string) (bool, error) {
+	args := []string{"rev-parse", "--verify", "--quiet", "HEAD"}
+	result, err := exec.Run("git", args, exec.Dir(workspaceRoot), exec.Timeout(30*time.Second))
+	if err != nil {
+		return false, err
+	}
+	switch {
+	case result.Success:
+		return true, nil
+	case result.ExitCode == 1:
+		return false, nil
+	}
+	stderr := strings.TrimSpace(result.Stderr)
+	if stderr == "" {
+		stderr = fmt.Sprintf("exit code %d", result.ExitCode)
+	}
+	return false, errs.Newf(errs.CodeGitFailed, "git %s: %s", strings.Join(args, " "), stderr).WithCategory(errs.CategoryInfra)
+}
+
+// BoundRevision is the commit SourceRevisionEnv binds a publication to, or ""
+// when the publication is HEAD's.
+func BoundRevision() string {
+	return strings.TrimSpace(os.Getenv(SourceRevisionEnv))
+}
+
+// GetImageVersionInfo is GetVersionInfo for an image, whose version is
+// advisory: its identity is the content hash. Where HEAD names no commit yet
+// and no SourceRevisionEnv binds one, it answers the NoCommitSuffix instead of
+// failing, so a fresh workspace packages an image. Any other git failure is
+// an error, as in GetVersionInfo.
+func GetImageVersionInfo(workspaceRoot string) (*VersionInfo, error) {
+	info, err := GetVersionInfo(workspaceRoot)
+	if err == nil {
+		return info, nil
+	}
+	if BoundRevision() != "" {
+		return nil, err
+	}
+	if committed, commitErr := HasCommit(workspaceRoot); commitErr != nil || committed {
+		return nil, err
+	}
+	return &VersionInfo{SHA: NoCommitSuffix, Suffix: NoCommitSuffix}, nil
+}
+
 // boundCommit answers the short SHA and committer time the suffix is built
 // from: HEAD's, unless SourceRevisionEnv names the bound commit.
 func boundCommit(workspaceRoot string) (string, time.Time, error) {
-	revision := strings.TrimSpace(os.Getenv(SourceRevisionEnv))
+	revision := BoundRevision()
 	if revision == "" {
 		sha, err := gitCmd(workspaceRoot, "rev-parse", "--short", "HEAD")
 		if err != nil {

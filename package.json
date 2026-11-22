@@ -39,6 +39,7 @@
     "go/samples/service-to-service/clients/ts",
     "go/samples/service-to-service/consumer-ts",
     "sites/putnami.dev",
+    "typescript/doc-examples",
     "typescript/framework/analytics",
     "typescript/framework/application",
     "typescript/framework/cli-protocol",

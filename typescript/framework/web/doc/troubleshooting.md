@@ -120,7 +120,7 @@ Common issues and solutions when building React applications with `@putnami/web`
        const data = await fetchData();
        return { data };
      } catch (error) {
-       throw new HttpException(500, 'Failed to load data');
+       throw new HttpException('Failed to load data', 500);
      }
    });
    ```
@@ -410,10 +410,12 @@ export default action(async (ctx) => {
 
 ### Checking Route Generation
 
-```typescript
-// Add logging to see generated routes
-const reactApp = new ReactApplication();
-console.log('Routes:', reactApp.getHttpPlugin().getRoutes());
+The build writes every route it generates, pages and actions included, to the
+project's committed route inventory. Read it after a build:
+
+```bash
+putnami build --projects <project>
+cat <project>/schema/http-routes.json
 ```
 
 ## Getting Help

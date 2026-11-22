@@ -34,8 +34,8 @@ import { isolatedSuffix, pgOrphanServer, reclaimOrphans, SUFFIX_LEN } from './te
  *
  * The counterpart of `go.putnami.dev/database/testprovider`: it turns a canonical
  * test binding (the same `DATABASE_TEST_BINDINGS` contract the Go provider reads)
- * into isolated, migrated databases for one or more named datasources, against an
- * externally provided Postgres selected by `mode: require`.
+ * into isolated, migrated databases for one or more named datasources, on the
+ * Postgres server the binding names.
  *
  * `provision` creates an isolated database (or schema) per datasource, applies the
  * workload's migration sources — those passed, or else the project's
@@ -46,7 +46,17 @@ import { isolatedSuffix, pgOrphanServer, reclaimOrphans, SUFFIX_LEN } from './te
  * isolated database — then returns that binding and a `cleanup` that tears
  * everything down. `reuse: bundle-template` clones per-suite databases from a
  * migrated template keyed by maintenance database + datasource + bundle digest
- * (advisory-lock guarded). Docker `mode: auto` is a later slice.
+ * (advisory-lock guarded).
+ *
+ * The provider connects to the Postgres server the binding names; it starts
+ * none itself. `putnami test` hands it the binding through
+ * `DATABASE_TEST_BINDINGS`: an externally set one always wins, such as a CI
+ * service container. Otherwise, when the project declares a database in
+ * `infra/requirements.json`, the `test-env-up` step of a local run
+ * (`--infra auto`, the default off CI) starts a throwaway Postgres (a Docker
+ * container when a Docker daemon answers, the PostgreSQL installed on the
+ * machine otherwise) and injects its binding; on CI (`require`) it starts
+ * nothing.
  *
  * Unit tests pay no database cost: the live path runs only when
  * `DATABASE_TEST_BINDINGS` is injected.
@@ -376,7 +386,9 @@ export function runtimeBinding(plans: Plan[]): DatabaseBinding {
  * test binding, or only for those `options.datasources` names, and returns their
  * runtime binding + a cleanup. With no usable
  * binding it honors the mode: skip → TestProviderSkip, require/auto → a loud
- * error (Docker auto-provisioning is a later slice).
+ * error. The provider starts no server in auto mode: in a local run the
+ * `test-env-up` step of `putnami test` does, before the suite runs, and injects
+ * the binding.
  *
  * A test process that is killed never runs `cleanup`. With database isolation
  * and without keepDatabases, provision therefore first reclaims the per-suite

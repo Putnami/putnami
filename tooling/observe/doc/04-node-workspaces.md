@@ -58,6 +58,20 @@ Each member carries this metadata in the probe result:
 | `reports.junit` | Where the member writes JUnit XML by default, relative to its directory: `junit.xml`, `junit/*.xml`, `reports/junit.xml`, `reports/junit/*.xml`, `test-results/*.xml`. |
 | `reports.coverage` | Where it writes coverage, relative to its directory: `lcov.info`, `coverage-final.json`, `cobertura-coverage.xml` and `clover.xml`, under `coverage/` or `reports/coverage/`. |
 
+## Dependency changes
+
+A changed `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` or `bun.lock` is
+read at the merge base and at the head, and each package it moved is a
+dependency change of ecosystem `npm`. `bun.lock` is the text lockfile Bun 1.2
+and later write: each entry of its `packages` gives the name and version its
+first member names, `name@version`, and the workspace's own packages, its
+`workspace:`, `link:`, `file:` and `root:` entries, are left out.
+
+`bun.lockb`, the binary lockfile of Bun before 1.2, is not read: a change that
+adds or edits one gets the `observe.lockfile_unsupported` warning, and its
+dependency changes do not show. `bun install --save-text-lockfile` writes
+`bun.lock` once; Bun 1.2 and later keep it.
+
 ## Diagnostics
 
 The detector never fails a run. A file it cannot read is a diagnostic, and it

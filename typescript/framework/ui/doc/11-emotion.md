@@ -19,7 +19,7 @@ import { styled, css, Global, keyframes } from '@putnami/ui';
 
 The Emotion `Theme` interface is augmented to include the full Putnami theme shape:
 
-```typescript
+```typescript nocheck
 declare module '@emotion/react' {
   export interface Theme {
     colorMode: ResolvedColorMode;

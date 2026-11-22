@@ -225,6 +225,7 @@ func run(m *testing.M) int {
     _ = os.Setenv("PORT", "0")                          // the server listens on a free port
 
     a, server := newApp() // the composition main uses: Datasource "default", AutoApply true
+    a.Run(func(context.Context) error { return nil }) // Start returns once the plugins started
     if err := a.Start(ctx); err != nil { // applies the migrations
         fmt.Fprintln(os.Stderr, err)
         return 1

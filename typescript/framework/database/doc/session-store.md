@@ -67,30 +67,27 @@ The session store is automatically registered when you import `@putnami/database
 
 ```typescript
 import "@putnami/database"; // Registers 'database' session store
-import { createApp } from "@putnami/application";
+import { application, http } from "@putnami/application";
+import { sql } from "@putnami/database";
 
-const app = createApp({
-  // Session store is automatically used based on config
-});
-
-app.listen(3000);
+// The session store named by `session.store` in the configuration is used
+export const app = () => application().use(http()).use(sql());
 ```
 
 ### 3. Use Sessions
 
 ```typescript
-import { useSession } from "@putnami/application";
+import { deleteSession, deleteSessionAll, setSession, useSession, useSessionAll } from "@putnami/application";
 
 export async function handler(req: Request) {
-  const session = useSession(req);
 
   // Set session data
-  session.set("userId", "user-123");
-  session.set("cart", { items: ["item-1", "item-2"] });
+  setSession("userId", "user-123");
+  setSession("cart", { items: ["item-1", "item-2"] });
 
   // Get session data
-  const userId = session.get<string>("userId");
-  const cart = session.get<{ items: string[] }>("cart");
+  const userId = useSession<string>("userId");
+  const cart = useSession<{ items: string[] }>("cart");
 
   return new Response("OK");
 }
@@ -178,27 +175,26 @@ session:
 ### Basic Session Operations
 
 ```typescript
-import { useSession } from "@putnami/application";
+import { deleteSession, deleteSessionAll, setSession, useSession, useSessionAll } from "@putnami/application";
 
 export async function handler(req: Request) {
-  const session = useSession(req);
 
   // Set values
-  session.set("userId", "user-123");
-  session.set("username", "john_doe");
+  setSession("userId", "user-123");
+  setSession("username", "john_doe");
 
   // Get values
-  const userId = session.get<string>("userId");
-  const username = session.get<string>("username");
+  const userId = useSession<string>("userId");
+  const username = useSession<string>("username");
 
   // Delete values
-  session.delete("username");
+  deleteSession("username");
 
   // Get all session data
-  const allData = session.getAll();
+  const allData = useSessionAll();
 
   // Delete entire session
-  session.deleteAll();
+  deleteSessionAll();
 
   return new Response("OK");
 }
@@ -209,10 +205,9 @@ export async function handler(req: Request) {
 The session store uses JSONB, so you can store complex objects:
 
 ```typescript
-const session = useSession(req);
 
 // Store objects
-session.set("user", {
+setSession("user", {
   id: "user-123",
   email: "john@example.com",
   preferences: {
@@ -222,13 +217,13 @@ session.set("user", {
 });
 
 // Store arrays
-session.set("cart", [
+setSession("cart", [
   { id: "item-1", quantity: 2 },
   { id: "item-2", quantity: 1 },
 ]);
 
 // Retrieve with type safety
-const user = session.get<{
+const user = useSession<{
   id: string;
   email: string;
   preferences: { theme: string; language: string };
@@ -270,7 +265,7 @@ const exists = await store.existsAsync("session-id");
 
 #### Constructor
 
-```typescript
+```typescript nocheck
 new DatabaseSessionStore(dbName?: string)
 ```
 
@@ -403,11 +398,11 @@ Keep session data small and focused:
 
 ```typescript
 // ✅ Good - Store identifiers only
-session.set("userId", "user-123");
-session.set("role", "admin");
+setSession("userId", "user-123");
+setSession("role", "admin");
 
 // ❌ Bad - Don't store large objects
-session.set("user", {
+setSession("user", {
   // ... 100+ fields
 });
 ```
@@ -468,8 +463,7 @@ setInterval(async () => {
 
 ```typescript
 try {
-  const session = useSession(req);
-  session.set("userId", userId);
+  setSession("userId", userId);
 } catch (error) {
   // Handle session store errors
   console.error("Session error:", error);
@@ -490,8 +484,7 @@ interface UserSession {
   };
 }
 
-const session = useSession(req);
-const userSession = session.get<UserSession>("user");
+const userSession = useSession<UserSession>("user");
 if (userSession) {
   // TypeScript knows the structure
   console.log(userSession.userId);

@@ -28,11 +28,14 @@ No decorators or runtime imports needed — services are plain classes.
 
 ### 3) Use it in an app
 
-In your app `package.json`, add the shared package as a dependency:
+Add the shared package as a dependency of your app, named by its project name:
 
-```json
-"@workspace/shared": "workspace:*"
+```bash
+putnami deps add @workspace/shared --projects <app>
 ```
+
+For a TypeScript project this writes `"@workspace/shared": "workspace:*"` in
+the app's `package.json` (with npm or Yarn 1, a version range) and installs.
 
 Register the service in your application entry point (`src/main.ts`):
 

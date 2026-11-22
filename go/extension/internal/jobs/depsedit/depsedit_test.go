@@ -857,3 +857,135 @@ func TestPrunedModulesReadTheTargetGoMod(t *testing.T) {
 		}
 	}
 }
+
+// The usual order is to add a module, then write the code that imports it. The
+// tidy after the edit drops a requirement nothing imports, so deps add states
+// it again as indirect in the tidied go.mod and writes its checksums from `go
+// mod download`: go.mod keeps it, go.sum holds its checksums, and the summary
+// the CLI always prints says why it is indirect and what drops it. It runs no
+// go get, so no other requirement moves: a version below the one the graph
+// selects drops nothing the code imports. A go.work member, replaced by its
+// directory, needs no checksum. A dry run reports the same requirement and
+// line, and writes no file.
+func TestDepsEditAddKeepsAModuleNothingImportsYet(t *testing.T) {
+	t.Parallel()
+	spectest.Proves(t, "go/deps-edit", "deps-add-keeps-a-module-nothing-imports-yet",
+		"add-keeps-a-module-nothing-imports-yet-and-says-so")
+	jobtest.RequireGo(t)
+	proxyDir := t.TempDir()
+	for _, version := range []string{"v0.3.0", "v0.5.0"} {
+		jobtest.WriteModuleProxyAt(t, proxyDir, jobtest.ProxyModule{
+			Path: "example.com/lib", Version: version,
+			GoMod:  "module example.com/lib\n\ngo 1.22\n",
+			Source: "package lib\n\nconst Name = \"lib\"\n",
+		})
+	}
+	jobtest.WriteVersionList(t, proxyDir, "example.com/lib", "v0.3.0", "v0.5.0")
+	// example.com/dep requires lib v0.5.0, which no package of dep imports.
+	jobtest.WriteModuleProxyAt(t, proxyDir, jobtest.ProxyModule{
+		Path: "example.com/dep", Version: "v1.2.0",
+		GoMod:  "module example.com/dep\n\ngo 1.22\n\nrequire example.com/lib v0.5.0\n",
+		Source: "package dep\n\nconst Name = \"dep\"\n",
+	})
+	jobtest.WriteVersionList(t, proxyDir, "example.com/dep", "v1.2.0")
+	proxy := jobtest.FileURL(proxyDir)
+	note := func(module, version string) string {
+		return "nothing imports " + module + " yet: go.mod keeps " + version + " as an indirect requirement; " +
+			"import one of its packages before the next putnami build, whose tidy drops a module nothing imports " +
+			"(and whose tidy check, the default under CI, fails on one)"
+	}
+	newWorkspace := func(t *testing.T, source, goMod string) (string, string) {
+		ws := jobtest.RealTempDir(t)
+		jobtest.WriteFile(t, ws, "go.work", "go 1.22\n\nuse ./api\n")
+		jobtest.WriteFile(t, ws, "api/main.go", source)
+		return ws, jobtest.WriteFile(t, ws, "api/go.mod", goMod)
+	}
+	const bare = "module example.com/api\n\ngo 1.22\n"
+	params := editParams(t, actionAdd, edit{Project: "api", Path: "api", Modules: []string{"example.com/lib@v0.3.0"}})
+	requireIndirect := func(t *testing.T, goMod, module, version string) {
+		t.Helper()
+		file, err := modfile.Parse(goMod, []byte(jobtest.ReadFile(t, goMod)), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, require := range file.Require {
+			if require.Mod.Path == module && require.Mod.Version == version && require.Indirect {
+				return
+			}
+		}
+		t.Errorf("go.mod =\n%s\nwant %s %s // indirect", jobtest.ReadFile(t, goMod), module, version)
+	}
+
+	t.Run("add", func(t *testing.T) {
+		t.Parallel()
+		ws, goMod := newWorkspace(t, "package main\n\nfunc main() {}\n", bare)
+		run := runEdit(t, ws, params, proxy)
+		run.requireStatus(t, statusOK)
+		run.requireTranscript(t, note("example.com/lib", "v0.3.0"), "✓ updated api/go.mod")
+		if len(run.goCalls) != 4 || !strings.HasPrefix(run.goCalls[3], "mod download -json example.com/lib@v0.3.0|") {
+			t.Errorf("go calls = %q, want go list, go mod edit, go mod tidy, then go mod download of lib", run.goCalls)
+		}
+		run.requireGoCalls(t, append([]string{
+			"list -m -json -mod=readonly example.com/lib@v0.3.0|api",
+			"mod edit -require=example.com/lib@v0.3.0|api",
+			"mod tidy -modfile=<copy>|api"}, run.goCalls[min(3, len(run.goCalls)):]...)...)
+		requireIndirect(t, goMod, "example.com/lib", "v0.3.0")
+		if got := jobtest.ReadFile(t, goMod); strings.Count(got, "require") != 1 || !strings.Contains(got, "\ngo 1.22\n") {
+			t.Errorf("go.mod changed more than the requirement:\n%s", got)
+		}
+		sum := jobtest.ReadFile(t, filepath.Join(ws, "api", "go.sum"))
+		for _, want := range []string{"example.com/lib v0.3.0 h1:", "example.com/lib v0.3.0/go.mod h1:"} {
+			if !strings.Contains(sum, want) {
+				t.Errorf("go.sum = %q, want a line %q", sum, want)
+			}
+		}
+	})
+
+	t.Run("below the selected version", func(t *testing.T) {
+		t.Parallel()
+		ws, goMod := newWorkspace(t, "package main\n\nimport \"example.com/dep\"\n\nfunc main() { _ = dep.Name }\n",
+			bare+"\nrequire example.com/dep v1.2.0\n")
+		run := runEdit(t, ws, params, proxy)
+		run.requireStatus(t, statusOK)
+		run.requireTranscript(t, note("example.com/lib", "v0.3.0"))
+		if got := requires(t, goMod, "example.com/dep"); got != "v1.2.0" {
+			t.Errorf("go.mod requires example.com/dep %q, want v1.2.0 kept:\n%s", got, jobtest.ReadFile(t, goMod))
+		}
+		requireIndirect(t, goMod, "example.com/lib", "v0.3.0")
+	})
+
+	t.Run("go.work member", func(t *testing.T) {
+		t.Parallel()
+		ws, goMod := memberWorkspace(t, bareAPIGoMod, importsNoneGo)
+		member := editParams(t, actionAdd, edit{Project: "api", Path: "api", Modules: []string{"example.com/proto"}})
+		run := runEdit(t, ws, member, "off")
+		run.requireStatus(t, statusOK)
+		run.requireTranscript(t, note("example.com/proto", "v0.0.0"))
+		run.requireGoCalls(t,
+			"mod edit -require=example.com/proto@v0.0.0 -replace=example.com/proto=../libs/proto|api",
+			"mod tidy -modfile=<copy>|api")
+		requireIndirect(t, goMod, "example.com/proto", "v0.0.0")
+		if target, _ := replaceTarget(t, goMod, "example.com/proto"); target != "../libs/proto" {
+			t.Errorf("go.mod replaces example.com/proto with %q, want ../libs/proto", target)
+		}
+	})
+
+	t.Run("dry run", func(t *testing.T) {
+		t.Parallel()
+		ws, goMod := newWorkspace(t, "package main\n\nfunc main() {}\n", bare)
+		data, err := json.Marshal(map[string]any{"action": actionAdd, "dry-run": true,
+			"edits": []edit{{Project: "api", Path: "api", Modules: []string{"example.com/lib@v0.3.0"}}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		run := runEdit(t, ws, string(data), proxy)
+		run.requireStatus(t, statusOK)
+		run.requireTranscript(t, "+ require example.com/lib v0.3.0 // indirect", note("example.com/lib", "v0.3.0"))
+		if got := jobtest.ReadFile(t, goMod); got != bare {
+			t.Errorf("the dry run wrote go.mod:\n%s", got)
+		}
+		if _, ok := jobtest.ReadOptional(t, filepath.Join(ws, "api", "go.sum")); ok {
+			t.Error("the dry run wrote go.sum")
+		}
+	})
+}

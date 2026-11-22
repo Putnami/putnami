@@ -41,7 +41,9 @@ apiPlugin.Register(api.Endpoint("GET", "/users").
     MayThrow(errors.CodeUnauthorized).
     Handle(listUsers))
 
-app.New("my-service").Use(server).Use(apiPlugin).ListenAndServe()
+a := app.New("my-service")
+a.Use(server).Use(apiPlugin)
+a.ListenAndServe()
 ```
 
 `api.Type[T]()` turns a Go type into the schema descriptor the builder stores.
@@ -74,7 +76,7 @@ recorded on the request and logged, never returned.
 
 ## Handler shapes
 
-```go
+```go nocheck
 // Typed handler — validated params/query/body plus resolved dependencies
 .Handle(func(ctx *fhttp.EndpointContext) *fhttp.Response { … })
 

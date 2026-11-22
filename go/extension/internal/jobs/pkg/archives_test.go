@@ -56,7 +56,8 @@ func TestCreateExtensionArchivesIncludesCommonFiles(t *testing.T) {
 	// Sources stay behind: an archive ships the extension, not its repository.
 	mustWrite(t, filepath.Join(projectRoot, "go.mod"), "module example.com/testext\n")
 	mustWrite(t, filepath.Join(projectRoot, "internal", "jobs", "run.go"), "package jobs\n")
-	// Framework guidance is a workspace asset and keeps its own subtree.
+	// Framework guidance is the Go extension's: this extension is another
+	// one, so the workspace's framework AI.md stays behind.
 	mustWrite(t, filepath.Join(workspaceRoot, "go", "framework", "http", "AI.md"), "# http framework\n")
 
 	ctx := &pctx.Context{
@@ -78,7 +79,6 @@ func TestCreateExtensionArchivesIncludesCommonFiles(t *testing.T) {
 		"README.md",
 		"bin/prepare",
 		"config/defaults.json",
-		"framework-docs/http/AI.md",
 		"package.json",
 		"putnami.extension.json",
 		"templates/service/putnami.template.json",
@@ -141,7 +141,6 @@ func TestCreateExtensionArchivesOmitsAbsentGuidance(t *testing.T) {
 	archivePath := filepath.Join(outputRoot, "archives", "putnami-testext-linux-x64.tar.gz")
 	entries := readArchiveEntries(t, archivePath)
 	want := []string{
-		"framework-docs/http/AI.md",
 		"putnami.extension.json",
 		"tools/versions.json",
 	}

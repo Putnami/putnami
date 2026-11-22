@@ -11,20 +11,31 @@ This path starts with the workspace template, then moves into the Go framework p
 | An HTTP service | `go-server` | Service entry point, operational endpoints (`/readyz`, `/version`, `/_/health`), tests |
 | A shared Go package | `go-library` | Go module, exported function, tests, workspace wiring |
 
-If you are starting from an empty directory:
+If you are starting from an empty directory, create the workspace and a
+`go-server` project in one command:
 
 ```bash
-putnami init
+putnami init --extension go --project api
 ```
 
-## Create the project
+`--template go-library` creates a library instead. Run `putnami init --extension go`
+without `--project` to start with no project.
 
-For a service:
+Then check and run it:
 
 ```bash
-putnami projects create api --template go-server
 putnami test api
 putnami serve api
+```
+
+## Add a project
+
+In a workspace that already declares `@putnami/go`, add a service:
+
+```bash
+putnami projects create orders --template go-server
+putnami test orders
+putnami serve orders
 ```
 
 For a library:

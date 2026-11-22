@@ -7,7 +7,7 @@
       "id": "evidence/change-evidence-document",
       "type": "feature",
       "name": "Change evidence document",
-      "outcome": "A repository that keeps its own CI describes one change, what it touches, its tests, its coverage, its architecture rules and their violations, its dependency changes, the licences and known vulnerabilities of those dependencies and the decision records that govern the files it touches, in one versioned, strict, bounded document that a producer and every reader interpret the same way.",
+      "outcome": "A repository that keeps its own CI describes one change, what it touches, its tests and each test case that ran, its coverage, its architecture rules and their violations, its dependency changes, the licences and known vulnerabilities of those dependencies and the decision records that govern the files it touches, in one versioned, strict, bounded document that a producer and every reader interpret the same way.",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -203,6 +203,34 @@
           }
         },
         {
+          "id": "test-cases-are-named",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-test-case-defect-gets-its-code",
+              "a-document-without-cases-validates-as-before"
+            ]
+          }
+        },
+        {
+          "id": "test-cases-are-bounded",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-test-case-bound-is-enforced",
+              "the-listed-cases-add-up"
+            ]
+          }
+        },
+        {
           "id": "timestamps-and-diagnostics-are-well-formed",
           "stage": "coded",
           "evidenceKinds": [
@@ -334,6 +362,23 @@
             "kind": "acceptance",
             "checks": [
               "the-spec-verification-record-is-one-bounded-object"
+            ]
+          }
+        },
+        {
+          "id": "version-1-changes-only-by-addition",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-frozen-v1-files-keep-their-digests",
+              "every-frozen-v1-document-validates",
+              "the-reader-bounds-only-grow",
+              "the-schema-extends-the-frozen-v1-schema",
+              "a-breaking-schema-change-is-refused"
             ]
           }
         }

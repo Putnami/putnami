@@ -54,12 +54,11 @@ When no user JWT is present (background jobs, cron, service-initiated calls), `t
 
 ```typescript
 import { authInterceptor } from '@putnami/client';
-import { OAuthService } from '@putnami/application';
-import { get } from '@putnami/runtime';
+import { clientToken } from '@putnami/application';
 
 authInterceptor({
   clientId: 'orders-service',
-  tokenProvider: () => get(OAuthService).clientToken(), // cached + auto-refreshed
+  tokenProvider: () => clientToken(), // cached + auto-refreshed
 })
 ```
 
@@ -180,8 +179,7 @@ import {
   contextInterceptor,
   circuitBreakerInterceptor,
 } from '@putnami/client';
-import { OAuthService } from '@putnami/application';
-import { get } from '@putnami/runtime';
+import { clientToken } from '@putnami/application';
 
 new UsersClient({
   baseUrl: 'http://users-api:3000',
@@ -189,7 +187,7 @@ new UsersClient({
   interceptors: [
     authInterceptor({
       clientId: 'orders-service',
-      tokenProvider: () => get(OAuthService).clientToken(),
+      tokenProvider: () => clientToken(),
     }),
     telemetryInterceptor('users'),       // measures full round-trip including auth
     contextInterceptor(),                // propagates trace headers

@@ -25,7 +25,7 @@ On macOS or Linux, on `amd64` or `arm64`, from an empty directory:
 ```bash
 curl -fsSL https://putnami.dev/install.sh | bash
 export PATH="$HOME/.putnami/bin:$PATH"
-putnami init --project webapp --extension ts
+putnami init --project webapp --extension ts --template typescript-web
 putnami serve webapp
 ```
 
@@ -33,7 +33,7 @@ On Windows 10 version 1803 or later, or Windows 11, on `amd64`, in PowerShell:
 
 ```powershell
 irm https://putnami.dev/install.ps1 | iex
-putnami init --project webapp --extension ts
+putnami init --project webapp --extension ts --template typescript-web
 putnami serve webapp
 ```
 

@@ -2,7 +2,7 @@
 
 This repository maps part of its projects to **11 architecture domains**.
 The others are **excluded on purpose**: samples, templates, template proofs,
-protocol proofs, the standalone area detector, the Cloud runtime destinations,
+documentation example proofs, protocol proofs, the standalone area detector, the Cloud runtime destinations,
 the Cloud CLI extension with its generated clients, the new development verb
 vocabulary, the new evidence report readers, and the new stack core with its
 stack extensions. Every workspace project appears in a table below, mapped or
@@ -351,7 +351,7 @@ protocols and the extension SDK need.
 
 ### Evidence report readers
 
-**Why excluded:** `@putnami/evidence-readers` is a new project. It reads the
+**Why excluded:** `go.putnami.dev/evidence/readers` is a new project. It reads the
 JUnit, LCOV, Cobertura, Clover and Go cover reports a CI already wrote into
 test cases and line coverage. Unlike the other excluded libraries, it already
 has a workspace consumer: `/typescript/extension` reads its own reports
@@ -510,6 +510,24 @@ authority and needs a domain.
 |---|---|---|
 | `/go/templates/proof` | Go template proof | `extension-providers` |
 | `/typescript/templates/proof` | TypeScript template proof | `extension-providers` |
+
+### Documentation example proofs
+
+**Why excluded:** a documentation example proof is a *test*. It extracts the
+Go or TypeScript code blocks of the documents its `examples.json` names and
+type-checks them against this repository's framework sources, so an example
+that drifts from the API fails the gate. It declares no export, and nothing
+depends on it. It reads documents and framework sources; it decides nothing
+another project reads.
+
+**What would change it:** a proof whose findings other projects start to read
+— for example, one that publishes a report as a contract — has acquired an
+authority and needs a domain.
+
+| Project | Class | Owner |
+|---|---|---|
+| `/go/doc-examples` | Go documentation example proof | `public-docs` |
+| `/typescript/doc-examples` | TypeScript documentation example proof | `public-docs` |
 
 ### Protocol proofs
 

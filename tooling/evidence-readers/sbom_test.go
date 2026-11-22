@@ -199,3 +199,16 @@ func TestAnUnsupportedSBOMIsMalformed(t *testing.T) {
 		t.Error("severity order")
 	}
 }
+
+func TestTheReadListsAreCopies(t *testing.T) {
+	for name, list := range map[string]func() []string{"Severities": Severities, "CycloneDXVersions": CycloneDXVersions, "SPDXVersions": SPDXVersions} {
+		first := list()
+		first[0] = "changed"
+		if list()[0] == "changed" {
+			t.Errorf("%s returns the list ReadSBOM reads, not a copy", name)
+		}
+	}
+	if got := Severities(); got[0] != SeverityCritical || got[len(got)-1] != SeverityUnknown {
+		t.Errorf("Severities() = %v, want critical first and unknown last", got)
+	}
+}

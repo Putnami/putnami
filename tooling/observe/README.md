@@ -65,7 +65,9 @@ putnami observe --base origin/main
 `--evidence <path>` also writes the change evidence document, a CI artifact a
 reporter can upload. `--upload --publish` uploads it, then posts a commit
 status and one summary note that link to the report on the pull or merge
-request, which the next run updates in place.
+request, which the next run updates in place. A pull request from a fork
+cannot upload or post: `--from-evidence <path> --upload --publish`, in a
+`workflow_run` job of the base repository, relays the document its run kept.
 
 See [doc/01-observe.md](doc/01-observe.md) for what each CI provides, how the
 base is found and how reports are discovered.
@@ -86,8 +88,8 @@ Bazel repository and their edges, from a `bazel query` export.
 See [doc/11-rush.md](doc/11-rush.md) for how it reads the projects, edges and
 lockfiles of a Rush monorepo.
 See [doc/12-jvm.md](doc/12-jvm.md) for how it reads the projects, modules and
-edges of a Gradle or Maven repository, Android included, and its JaCoCo
-coverage.
+edges of a Gradle or Maven repository, Android included, its JaCoCo
+coverage, and the versions its Gradle lockfiles and Maven POMs pin or declare.
 See [doc/13-swift.md](doc/13-swift.md) for how it reads the Swift packages,
 their targets and the Xcode projects of an iOS or Swift repository.
 See [doc/14-dart.md](doc/14-dart.md) for how it reads the packages and
@@ -110,6 +112,12 @@ ArchUnit, deptrac and import-linter results and places each violation.
 
 ## Support
 
-`@putnami/observe` is `experimental` in the
-[support catalog](../../putnami.support.json): it promises no compatibility
-yet, and no consumer in this repository runs it.
+`@putnami/observe` is `preview` in the
+[support catalog](../../putnami.support.json). The change evidence document it
+writes follows [`protocol/evidence`](../../protocols/evidence/README.md#support-status)
+version 1, which changes only by addition: a document that validates today
+keeps validating. Its flags, its text summary and its note may still change in
+a minor release whose notes say so. The language extensions and monorepo
+integrations of this repository build on its detectors, and the observe action
+runs it. Missing for `stable`: adopters outside this repository who rely on it,
+and a version gate that fails a release on an undeclared break of its flags.

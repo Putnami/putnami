@@ -5,10 +5,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/protocol/features/spectest"
+	"go.putnami.dev/tooling/observe/internal/analyze"
 )
 
 const jvmFeature = "tooling/observe-jvm"
@@ -90,8 +92,22 @@ func TestTheMavenDemoIsExplained(t *testing.T) {
 		"  components  1 changed, 1 dependent, 0 unaffected\n",
 		"    changed   pricing (com.acme:pricing) [maven, workspace]\n",
 		"    dependent api (com.acme:api) [maven, workspace], depends on pricing\n",
+		"    upgraded   org.junit:junit-bom 5.11.3 -> 5.11.4, in pom.xml, declared\n",
 	)
-	if doc := validEvidence(t, o); len(doc.DependencyChanges) != 0 {
-		t.Errorf("dependency changes %+v", doc.DependencyChanges)
+	want := []evidence.DependencyChange{{Ecosystem: "maven", Lockfile: "pom.xml", Name: "org.junit:junit-bom", Change: evidence.DependencyUpgraded, From: "5.11.3", To: "5.11.4"}}
+	if doc := validEvidence(t, o); !reflect.DeepEqual(doc.DependencyChanges, want) {
+		t.Errorf("dependency changes %+v, want %+v", doc.DependencyChanges, want)
 	}
+}
+
+func TestAPOMChangeIsMarkedDeclared(t *testing.T) {
+	spectest.Proves(t, jvmFeature, "maven-declared-versions", "a-pom-change-is-marked-declared")
+	gradle := evidence.DependencyChange{Ecosystem: "maven", Lockfile: "pricing/gradle.lockfile", Name: "com.google.guava:guava", Change: evidence.DependencyUpgraded, From: "33.3.1-jre", To: "33.4.0-jre"}
+	pom := evidence.DependencyChange{Ecosystem: "maven", Lockfile: "services/api/pom.xml", Name: "com.google.guava:guava", Change: evidence.DependencyAdded, To: "33.4.0-jre"}
+	var b strings.Builder
+	writeAnalysis(&b, analyze.Result{DependencyChanges: []evidence.DependencyChange{gradle, pom}})
+	requireLines(t, b.String(),
+		"    upgraded   com.google.guava:guava 33.3.1-jre -> 33.4.0-jre, in pricing/gradle.lockfile\n",
+		"    added      com.google.guava:guava 33.4.0-jre, in services/api/pom.xml, declared\n",
+	)
 }

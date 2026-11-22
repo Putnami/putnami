@@ -34,6 +34,8 @@ How-To is organized by user intent, not architecture.
 
 - [Build a web app](/docs/how-to/build-a-web-app)
 - [Build an API service](/docs/how-to/build-an-api-service)
+- [Build a Postgres API in Go](/docs/how-to/build-a-postgres-api-in-go)
+- [Build a Postgres API in TypeScript](/docs/how-to/build-a-postgres-api-in-typescript)
 - [Share code between projects](/docs/how-to/share-code-between-projects)
 - [Configure your app](/docs/how-to/configure-your-app)
 - [Adopt Putnami on an existing monorepo](/docs/how-to/adopt-putnami-on-an-existing-monorepo)

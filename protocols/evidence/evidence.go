@@ -200,6 +200,16 @@ const (
 // DecisionStatuses is the closed decision-status vocabulary.
 var DecisionStatuses = []string{DecisionProposed, DecisionAccepted, DecisionRejected, DecisionDeprecated, DecisionSuperseded, DecisionUnknown}
 
+// Test case outcomes.
+const (
+	OutcomePassed  = "passed"
+	OutcomeFailed  = "failed"
+	OutcomeSkipped = "skipped"
+)
+
+// TestOutcomes is the closed test-outcome vocabulary.
+var TestOutcomes = []string{OutcomePassed, OutcomeFailed, OutcomeSkipped}
+
 // Architecture rule statuses: a checker kept the rule or found it broken.
 const (
 	ArchitectureKept   = "kept"
@@ -228,8 +238,12 @@ const (
 	MaxChangedLineCoverageFile = 20000
 	MaxDiagnostics             = 500
 	MaxFailingCases            = 50
-	MaxUncoveredLines          = 200
-	MaxDecisions               = 1000
+	// MaxTestCases caps the cases of one tests entry; MaxDocumentTestCases
+	// caps the cases of all tests entries together.
+	MaxTestCases         = 10000
+	MaxDocumentTestCases = 50000
+	MaxUncoveredLines    = 200
+	MaxDecisions         = 1000
 	// MaxDeclarations caps the declaration files; MaxDeclarationBytes caps
 	// one declaration document, which no other string bound applies to.
 	MaxDeclarations     = 1024
@@ -402,7 +416,41 @@ type ComponentTests struct {
 	DurationMs int64 `json:"durationMs,omitempty"`
 	// FailingCases lists failing cases, at most Failed and at most MaxFailingCases.
 	FailingCases []FailingCase `json:"failingCases,omitempty"`
+	// Cases lists each test case that ran in the component, at most
+	// MaxTestCases, and MaxDocumentTestCases over the document. A case's suite
+	// and name are its stable id, unique in the entry. Absent when the
+	// producer lists no case.
+	Cases []TestCase `json:"cases,omitempty"`
+	// OmittedCases counts the cases the producer left out of Cases to keep
+	// within the bounds, or because their report gave their id to another
+	// case. See ListsEveryCase.
+	OmittedCases int `json:"omittedCases,omitempty"`
 }
+
+// ListsEveryCase reports whether the entry lists every test case it ran: it
+// carries cases and omits none. A reader concludes that a case vanished only
+// when the later entry lists every case; an entry without cases, as every
+// producer before them writes, says nothing of its cases.
+func (t ComponentTests) ListsEveryCase() bool { return len(t.Cases) > 0 && t.OmittedCases == 0 }
+
+// TestCase is one test case that ran, as its test report names it.
+type TestCase struct {
+	// Suite is the suite or class that holds the case.
+	Suite string `json:"suite,omitempty"`
+	// Name is the test case name.
+	Name string `json:"name"`
+	// Outcome is passed, failed or skipped.
+	Outcome string `json:"outcome"`
+}
+
+// TestCaseID is the stable id of a test case: its suite and its name.
+type TestCaseID struct {
+	Suite string
+	Name  string
+}
+
+// ID returns the stable id of the case.
+func (c TestCase) ID() TestCaseID { return TestCaseID{Suite: c.Suite, Name: c.Name} }
 
 // FailingCase is one failing test case.
 type FailingCase struct {

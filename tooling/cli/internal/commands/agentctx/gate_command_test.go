@@ -563,7 +563,7 @@ func TestGeneratedGuidanceMatchesRepositoryCIDocument(t *testing.T) {
 	// Putnami owns one block inside each entrypoint, so that block is what is
 	// compared: the repository may keep its own text around it. CLAUDE.md may
 	// instead import AGENTS.md, which then carries the block for both.
-	want := guidanceBlock(gateCommandForWorkspace(root), decisionsGuidanceForWorkspace(root))
+	want := guidanceBlock(gateCommandForWorkspace(root), decisionsGuidanceForWorkspace(root), recipeGuidanceForWorkspace(root))
 	for _, path := range []string{agentEntrypointPath, ClaudeEntrypointPath} {
 		got, readErr := repositoryGuidanceBytes(root, path)
 		if readErr != nil {

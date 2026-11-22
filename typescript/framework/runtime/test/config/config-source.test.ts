@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import { getEnv } from '../../src/config/config';
 import type { ConfigSource } from '../../src/config/config-source';
-import { getDefaultSources, loadGlobalConfig } from '../../src/config/config-source';
+import {
+  getDefaultSources,
+  getLocalSources,
+  loadGlobalConfig,
+  registerEmbeddedConfig,
+} from '../../src/config/config-source';
 import { specTest } from '../../src/spectest';
 
 describe('ConfigSource', () => {
@@ -84,22 +89,30 @@ describe('ConfigSource', () => {
   });
 
   describe('getDefaultSources', () => {
-    it('returns the 5 file-and-env built-in sources by default', () => {
+    it('returns the 7 file-and-env built-in sources by default', () => {
       const sources = getDefaultSources();
-      expect(sources).toHaveLength(5);
+      expect(sources).toHaveLength(7);
     });
 
     specTest(
-      'includes base, env, gen, secrets, and CONFIG_DATA sources',
+      'includes base, env, gen, secrets, CONFIG_DATA and the embedded conf sources',
       {
         feature: 'typescript/typed-configuration',
         requirement: 'source-precedence',
-        check: 'the-five-built-in-sources-are-registered',
+        check: 'the-built-in-sources-are-registered',
       },
       () => {
         const sources = getDefaultSources();
         const names = sources.map((s) => s.name).sort();
-        expect(names).toEqual(['.gen/conf', 'CONFIG_DATA', 'conf', 'conf/.secrets', 'conf/base']);
+        expect(names).toEqual([
+          '.gen/conf',
+          'CONFIG_DATA',
+          'conf',
+          'conf/.secrets',
+          'conf/base',
+          'embedded conf/.env.yaml',
+          'embedded conf/.env.{env}.yaml',
+        ]);
       },
     );
 
@@ -136,6 +149,8 @@ describe('ConfigSource', () => {
         'conf',
         'conf/.secrets',
         'conf/base',
+        'embedded conf/.env.yaml',
+        'embedded conf/.env.{env}.yaml',
       ]);
       expect(loadGlobalConfig(sources)).toEqual({ server: { port: 8080 } });
     });
@@ -162,6 +177,54 @@ describe('ConfigSource', () => {
         expect(base?.priority).toBe(10);
       },
     );
+  });
+
+  describe('embedded conf files', () => {
+    let nodeEnv: string | undefined;
+
+    beforeEach(() => {
+      nodeEnv = process.env.NODE_ENV;
+      delete process.env.NODE_ENV;
+    });
+
+    afterEach(() => {
+      registerEmbeddedConfig({});
+      if (nodeEnv === undefined) delete process.env.NODE_ENV;
+      else process.env.NODE_ENV = nodeEnv;
+    });
+
+    const embeddedSources = () => getLocalSources().filter((source) => source.name.startsWith('embedded '));
+
+    specTest(
+      'an embedded conf file ranks just below its on-disk copy',
+      {
+        feature: 'typescript/typed-configuration',
+        requirement: 'source-precedence',
+        check: 'an-embedded-conf-file-ranks-below-its-disk-copy',
+      },
+      () => {
+        const priority = (name: string) => getLocalSources().find((source) => source.name === name)?.priority ?? -1;
+        expect(priority('embedded conf/.env.yaml')).toBeLessThan(priority('conf/base'));
+        expect(priority('conf/base')).toBeLessThan(priority('embedded conf/.env.{env}.yaml'));
+        expect(priority('embedded conf/.env.{env}.yaml')).toBeLessThan(priority('conf'));
+
+        registerEmbeddedConfig({
+          base: 'putnami:\n  port: 8080\nname: base\n',
+          envs: { local: 'name: local\n', production: 'putnami:\n  port: 9090\n' },
+        });
+        expect(loadGlobalConfig(embeddedSources())).toEqual({ putnami: { port: 8080 }, name: 'local' });
+        process.env.APP_ENV = 'production';
+        expect(loadGlobalConfig(embeddedSources())).toEqual({ putnami: { port: 9090 }, name: 'base' });
+        process.env.APP_ENV = 'staging';
+        expect(loadGlobalConfig(embeddedSources())).toEqual({ putnami: { port: 8080 }, name: 'base' });
+      },
+    );
+
+    it('contributes nothing without embedded files, or for a file that does not parse', () => {
+      expect(loadGlobalConfig(embeddedSources())).toBeUndefined();
+      registerEmbeddedConfig({ base: 'a: [unclosed\n', envs: { local: 'b: 1\n' } });
+      expect(loadGlobalConfig(embeddedSources())).toEqual({ b: 1 });
+    });
   });
 
   describe('loadGlobalConfig', () => {

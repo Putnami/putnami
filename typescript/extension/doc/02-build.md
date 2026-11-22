@@ -588,11 +588,33 @@ before it compiles, and fails when it cannot read it.
 
 For an application built on `@putnami/application`, the build loads
 `package.json#main`, calls `Application.build()` and records the capability
-manifest, so its binary runs `.gen/src/serve.bundled.ts`. That file imports `app` from
-`package.json#main` (`src/main.ts` by default) and calls `bootstrapServe(app)`:
-the `./serve` export never runs in the binary. The binary embeds no `conf/`
-directory; it reads `conf/` from its working directory or
-`PUTNAMI_PROJECT_ROOT`, and a container image ships none.
+manifest, so its binary runs `.gen/src/serve.bundled.ts`. That file:
+
+1. embeds the project's `conf/.env.yaml` and every `conf/.env.<env>.yaml`,
+   except the machine-local overrides `conf/.env.local.yaml` and
+   `conf/.env.prod.yaml` that a workspace's `.gitignore` ignores, and never a
+   `conf/.secrets.*` file;
+2. imports `package.json#main` (`src/main.ts` by default) first, so its static
+   activation runs before any generated module reads config;
+3. registers the generated server modules;
+4. runs the project's serve entry, the file under `src/` the `./serve` export
+   names, else `src/serve.ts`: the entry `putnami serve` runs. A project with
+   neither gets `bootstrapServe(app)` on the `app` that `main` exports. A
+   serve entry that starts no `Application` is logged as a warning.
+
+So the binary, its image and `putnami serve` run one entry and read the same
+base and environment files, `putnami.port` included, from any working
+directory; a `PORT` variable, which an image sets, still outranks it. The
+config `putnami serve` merges from dependencies into `.gen/conf` for the local
+and test environments is not embedded, and on the Node runtime the bundle
+reads no YAML config. Each embedded file ranks
+just below its on-disk copy, so a `conf/` the binary finds in its project
+still wins. The compile reads `NODE_ENV` and `APP_ENV` when the binary runs
+(`--env=disable`): an image's `NODE_ENV=production` selects
+`conf/.env.production.yaml` and runs the framework in production mode, with no
+development error pages, no response validation and the disk-backed cache,
+which falls back to memory when the working directory is not writable. The conf files are inputs of `build-generate`, so
+an edit to one rebuilds the binary.
 
 **Default targets** — the distribution matrix an unbound compile produces:
 

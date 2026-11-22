@@ -269,7 +269,7 @@ describe('users loader', () => {
 
 ### Using Bun's mock
 
-```ts
+```ts nocheck
 import { mock, spyOn } from 'bun:test';
 
 // Create a mock function
@@ -307,7 +307,7 @@ import { sendEmail } from './email-client';
 
 ### Mocking fetch
 
-```ts
+```ts nocheck
 import { mock } from 'bun:test';
 
 const originalFetch = global.fetch;
@@ -348,7 +348,7 @@ test('user can be created', async () => {
 
 ### Test fixtures
 
-```ts
+```ts nocheck
 // test/fixtures/users.ts
 export const testUsers = {
   admin: {

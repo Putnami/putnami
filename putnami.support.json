@@ -170,7 +170,7 @@
     {
       "id": "@putnami/observe",
       "kind": "package",
-      "status": "experimental",
+      "status": "preview",
       "default": false,
       "parity": "unsupported"
     },
@@ -336,6 +336,11 @@
       "id": "go.putnami.dev/events",
       "kind": "package",
       "status": "stable"
+    },
+    {
+      "id": "go.putnami.dev/evidence/readers",
+      "kind": "package",
+      "status": "preview"
     },
     {
       "id": "go.putnami.dev/grpc",
@@ -535,7 +540,7 @@
     {
       "id": "go.putnami.dev/protocol/evidence",
       "kind": "protocol",
-      "status": "experimental",
+      "status": "preview",
       "default": false
     },
     {

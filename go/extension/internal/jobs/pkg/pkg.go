@@ -141,9 +141,7 @@ func Run(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (string, map[str
 			// the platform its binary was compiled for cannot drift apart.
 			params.Platform = platform.DefaultDockerPlatform
 		}
-		if params.Port == "" {
-			params.Port = "3000"
-		}
+		params.Port = resolveImagePort(emit, params.Port, ctx.Project.Options)
 		if baseProject := resolveString(flags, "docker-base-project", ctx.Params, "dockerBaseProject", "docker-base-project"); baseProject != "" {
 			resolvedBase, err := imagepkg.ResolveBaseArtifact(ctx, params.BaseImage, baseProject, params.Platform)
 			if err != nil {

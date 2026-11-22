@@ -63,6 +63,8 @@ result, err := exec.Run("jq", []string{".name"},
 For long-running processes where you need real-time output (e.g., serve jobs), use `os/exec` directly with [jsonl.ForwardPipe](./01-jsonl-emitter.md):
 
 ```go
+import "os/exec"
+
 cmd := exec.Command("bun", "run", entrypoint)
 stdoutPipe, _ := cmd.StdoutPipe()
 stderrPipe, _ := cmd.StderrPipe()

@@ -46,19 +46,27 @@ port out of `http()` so the service follows `PORT`, and set
 
 `putnami build --compile` and the image compile one entry point. For an
 application built on `@putnami/application`, it is a generated file,
-`.gen/src/serve.bundled.ts`. That file imports `app` from the module that
-`package.json#main` names (`src/main.ts` by default) and calls
-`bootstrapServe(app)`. So:
+`.gen/src/serve.bundled.ts`. That file runs the same entry as `putnami serve`:
+`src/serve.ts`, or the file under `src/` the `./serve` export names. A project with neither
+gets `bootstrapServe(app)` on the `app` that `package.json#main` exports
+(`src/main.ts` by default).
 
-- The binary never runs `src/serve.ts`. Code there runs only under
-  `putnami serve`. Put startup code in the `app` builder that `main` exports.
-- `main` must export `app`, a function that returns the application.
+The binary embeds the project's `conf/.env.yaml` and every
+`conf/.env.<env>.yaml`, so it reads the same base and environment files as
+`putnami serve`, `putnami.port` included, from any directory and in the
+image, where the `PORT` the image sets outranks `putnami.port`. The
+machine-local overrides `conf/.env.local.yaml` and `conf/.env.prod.yaml`, which
+the workspace's `.gitignore` ignores, stay out of it. It reads `NODE_ENV` and
+`APP_ENV` when it runs: the image sets `NODE_ENV=production`, so
+`conf/.env.production.yaml` applies over `conf/.env.yaml`, and the framework
+runs in production mode (no development error pages). With
+`putnami.port: 8080` in `conf/.env.yaml`, the binary listens on 8080 wherever
+it runs; the image's `PORT` follows [The image port](#the-image-port).
 
-The binary embeds no `conf/` directory. It reads `conf/.env*.yaml` from its
-working directory (or `PUTNAMI_PROJECT_ROOT`) when it finds one there, and the
-image ships none. In a container, configure the service with environment
-variables: fields declared with `Env(...)`, `CONFIG_DATA` (a YAML document),
-and `DATABASE_URL` for the database. See
+The binary embeds no `conf/.secrets.*` file. Pass secrets and per-deployment
+values with environment variables: fields declared with `Env(...)`,
+`${VAR}` references in the conf files, `CONFIG_DATA` (a YAML document), and
+`DATABASE_URL` for the database. See
 [Configuration](/docs/frameworks/typescript/configuration) and
 [Persistence](/docs/frameworks/typescript/persistence#database-configuration).
 

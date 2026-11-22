@@ -1388,8 +1388,9 @@ run, create checks whether the toolchains the extension's runtime locks
 resolve. When one does not, the job first runs with `stage` set to `prepare`,
 which only writes the files a pin derives from, such as the `go.work` of a new
 Go project. Create then runs the toolchain pins phase, which installs each
-pinned release the machine lacks. When a toolchain the extension locks gained
-or changed a pin, the workspace installers run. The job then runs once. A
+pinned release the machine lacks. The job then runs once, and after it, when a
+toolchain the extension locks gained or changed a pin, the workspace installers
+run, once the job rewrote the template's placeholder requirements. A
 pinned toolchain that is not installed ends that run with an error that names
 `putnami install`. See ADR 0019 and ADR 0077. When the job fails, create keeps
 the project and exits non-zero, naming the create command to run again with

@@ -25,7 +25,16 @@
       "id": "languages-come-from-the-extensions",
       "text": [
         "The language index the CLI embeds holds, for every extension the root putnami.workspace.json declares by path whose manifest declares workspace.language, its name, language, markers and excludes as that manifest states them, and nothing else.",
-        "Each starter's template exists next to its language extension and names that extension."
+        "Each starter's templates exist next to its language extension and name that extension, and they are every template that sits there."
+      ]
+    },
+    {
+      "id": "init-takes-a-template",
+      "text": [
+        "putnami init --project <name> --template <template> renders that template of the first --extension language instead of its default, such as typescript-web or go-library.",
+        "A template the language does not ship, --template without --project, and --template with --from are usage errors raised before anything is written.",
+        "putnami init --help lists the templates of each language that ships a starter, its default first.",
+        "A library project's next step names no putnami serve."
       ]
     },
     {
@@ -38,7 +47,7 @@
     {
       "id": "project-needs-a-starter",
       "text": [
-        "--project renders the starter of the first language of --extension: typescript-web, go-server or python-server.",
+        "--project renders the starter of the first language of --extension: typescript-server, go-server or python-server.",
         "A first language without a starter is a usage error, raised before anything is written, that names the languages that have one."
       ]
     },

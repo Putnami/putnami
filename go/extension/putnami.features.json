@@ -45,6 +45,22 @@
           }
         },
         {
+          "id": "archive-guidance-is-self-contained",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-extension-archive-ships-its-doc-and-specs-trees",
+              "a-shipped-link-that-leaves-the-archive-warns",
+              "only-the-go-extension-bundles-go-framework-guidance",
+              "the-go-and-typescript-extension-guidance-resolves-inside-their-archives"
+            ]
+          }
+        },
+        {
           "id": "bounded-test-output",
           "stage": "coded",
           "evidenceKinds": [
@@ -385,6 +401,18 @@
           "verification": {
             "kind": "acceptance",
             "checks": ["image-packaging-requires-build-producers-without-go-compilation"]
+          }
+        },
+        {
+          "id": "image-tag-and-port",
+          "stage": "coded",
+          "evidenceKinds": ["attestation"],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-docker-tag-with-a-repository-is-the-whole-reference",
+              "the-image-port-is-the-project-port"
+            ]
           }
         },
         {
@@ -1182,6 +1210,19 @@
               "add-keeps-a-required-version-newer-than-the-latest",
               "add-refuses-the-version-none-naming-deps-remove",
               "add-reports-a-failed-go-list"
+            ]
+          }
+        },
+        {
+          "id": "deps-add-keeps-a-module-nothing-imports-yet",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "add-keeps-a-module-nothing-imports-yet-and-says-so"
             ]
           }
         },

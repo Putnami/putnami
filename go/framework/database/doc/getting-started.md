@@ -25,13 +25,13 @@ import (
 )
 
 func main() {
-    app.New("my-service").
-        Use(database.NewPlugin(database.PluginConfig{
-            Pool: database.PoolConfig{
-                DSN: "postgres://user:pass@localhost:5432/mydb?sslmode=disable",
-            },
-        })).
-        Run()
+    a := app.New("my-service")
+    a.Use(database.NewPlugin(database.PluginConfig{
+        Pool: database.PoolConfig{
+            DSN: "postgres://user:pass@localhost:5432/mydb?sslmode=disable",
+        },
+    }))
+    a.ListenAndServe()
 }
 ```
 
@@ -644,13 +644,13 @@ database plugin. The framework's Migrate lifecycle phase runs every
 runner's `Apply` after `Configure` and before HTTP starts:
 
 ```go
-app.New("my-service").
-    Use(database.NewPlugin(database.PluginConfig{
-        Pool:      database.PoolConfig{DSN: "postgres://..."},
-        Migration: &database.MigrationConfig{AutoApply: true},
-    })).
-    Use(iam.New()).
-    ListenAndServe()
+a := app.New("my-service")
+a.Use(database.NewPlugin(database.PluginConfig{
+    Pool:      database.PoolConfig{DSN: "postgres://..."},
+    Migration: &database.MigrationConfig{AutoApply: true},
+})).
+    Use(iam.New())
+a.ListenAndServe()
 ```
 
 **Via the migrate CLI (recommended for production):** keep `AutoApply: false`

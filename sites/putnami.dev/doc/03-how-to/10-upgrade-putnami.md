@@ -122,7 +122,7 @@ missing release.
 For Go workspaces, the selected release is written to root `go.work` as
 `replace` directives:
 
-```go
+```go nocheck
 replace (
     go.putnami.dev/app => go.putnami.dev/app v1.2.0
     go.putnami.dev/http => go.putnami.dev/http v1.2.0

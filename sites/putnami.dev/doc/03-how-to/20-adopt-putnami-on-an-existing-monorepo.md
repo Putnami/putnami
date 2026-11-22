@@ -115,10 +115,9 @@ A package is a directory whose `BUILD` file declares a first-party target.
 `3rdparty/python`, which only declares requirements, joins the workspace as a
 bare member that runs nothing; each package that uses its requirements depends
 on it. A package with no test target also gets
-`"disable": { "jobs": ["test"] }`. Add `.putnami/` and `.gen/` to
-`.gitignore`, then commit the files: they are the package graph Putnami
-selects on. Run `putnami projects sync` again after a change to the
-dependencies between packages.
+`"disable": { "jobs": ["test"] }`. Commit the files: they are the package
+graph Putnami selects on. Run `putnami projects sync` again after a change to
+the dependencies between packages.
 
 In a CI without Pants on the machine that syncs, write the export first and
 the sync reads it instead:
@@ -215,9 +214,9 @@ The sync runs `bazel query //...` and writes, in each package's
 A package is a directory whose `BUILD` or `BUILD.bazel` file declares a rule
 the query lists. Any other directory with a `BUILD` file, the root included,
 joins the workspace as a bare member that runs nothing. A package with no
-test rule also gets `"disable": { "jobs": ["test"] }`. Add `.putnami/`,
-`.gen/` and `/bazel-*` to `.gitignore`, then commit the files: they are the package graph
-Putnami selects on. Run `putnami projects sync` again after a
+test rule also gets `"disable": { "jobs": ["test"] }`. Add `/bazel-*` to
+`.gitignore`, then commit the files: they are the package graph Putnami
+selects on. Run `putnami projects sync` again after a
 change to the dependencies between packages.
 
 In a CI without Bazel on the machine that syncs, write the export first and
@@ -284,7 +283,9 @@ with **Import** preselected; in CI or from an agent it imports unless you pass
   ESLint with `--max-warnings` or a lint chained with `prettier` for example,
   keeps running through Nx, listed with its reason, so no target changes the
   tool that checks it. Move such ESLint arguments to the ESLint configuration,
-  then rerun `putnami projects sync`.
+  then rerun `putnami projects sync`. An ESLint `--flag` cannot move: ESLint
+  reads it from its command line or the `ESLINT_FLAGS` environment variable
+  only, and the sync says so.
 - **Delegate**: you keep Nx and its cache, local or Nx Cloud. Each task runs
   `nx run <project>:<target>` on one affected project, and Putnami caches
   nothing for it.
@@ -669,9 +670,8 @@ A TypeScript package that is imported and whose `start` script runs `node`
 gets `"runtime": "node"` under `options["@putnami/typescript"]`, so
 `putnami serve`, `run` and `package --docker` run it on Node, as for Nx above.
 
-Add `.putnami/` and `.gen/` to `.gitignore`, then commit the files. Run
-`putnami projects sync` again after a change to the dependencies between
-packages: `putnami validate` fails with `turbo.sync_stale` until the files
+Commit the files. Run `putnami projects sync` again after a change to the
+dependencies between packages: `putnami validate` fails with `turbo.sync_stale` until the files
 match the package manifests.
 
 ### Run what a change affects in delegate mode

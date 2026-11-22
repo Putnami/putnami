@@ -17,11 +17,19 @@ const (
 	FormatSPDX      = "spdx"
 )
 
-// CycloneDXVersions and SPDXVersions are the spec versions ReadSBOM reads.
+// cycloneDXVersions and spdxVersions are the spec versions ReadSBOM reads.
 var (
-	CycloneDXVersions = []string{"1.4", "1.5", "1.6"}
-	SPDXVersions      = []string{"2.3"}
+	cycloneDXVersions = []string{"1.4", "1.5", "1.6"}
+	spdxVersions      = []string{"2.3"}
 )
+
+// CycloneDXVersions returns the CycloneDX spec versions ReadSBOM reads. The
+// slice is a copy: changing it changes no reader.
+func CycloneDXVersions() []string { return slices.Clone(cycloneDXVersions) }
+
+// SPDXVersions returns the SPDX versions ReadSBOM reads. The slice is a copy:
+// changing it changes no reader.
+func SPDXVersions() []string { return slices.Clone(spdxVersions) }
 
 // Vulnerability severities, from the most to the least severe, unknown last.
 const (
@@ -34,8 +42,12 @@ const (
 	SeverityUnknown  = "unknown"
 )
 
-// Severities orders the severities from the most to the least severe.
-var Severities = []string{SeverityCritical, SeverityHigh, SeverityMedium, SeverityLow, SeverityInfo, SeverityNone, SeverityUnknown}
+// severities orders the severities from the most to the least severe.
+var severities = []string{SeverityCritical, SeverityHigh, SeverityMedium, SeverityLow, SeverityInfo, SeverityNone, SeverityUnknown}
+
+// Severities returns the severities from the most to the least severe. The
+// slice is a copy: changing it changes no reader.
+func Severities() []string { return slices.Clone(severities) }
 
 // SBOM is one software bill of materials.
 type SBOM struct {
@@ -65,7 +77,7 @@ type Package struct {
 type Vulnerability struct {
 	// ID is the advisory's id: CVE-..., GHSA-..., GO-...
 	ID string `json:"id"`
-	// Severity is one of Severities.
+	// Severity is one of Severities().
 	Severity string `json:"severity"`
 }
 
@@ -76,10 +88,10 @@ func MoreSevere(a, b string) bool {
 }
 
 func severityRank(severity string) int {
-	if rank := slices.Index(Severities, severity); rank >= 0 {
+	if rank := slices.Index(severities, severity); rank >= 0 {
 		return rank
 	}
-	return len(Severities)
+	return len(severities)
 }
 
 // ReadSBOM reads a CycloneDX 1.4 to 1.6 or an SPDX 2.3 JSON document.
@@ -139,8 +151,8 @@ func readCycloneDX(data []byte) (SBOM, []diag.Diagnostic) {
 	if err := json.Unmarshal(data, &bom); err != nil {
 		return SBOM{}, malformed("the CycloneDX document does not decode: %v", err)
 	}
-	if !slices.Contains(CycloneDXVersions, bom.SpecVersion) {
-		return SBOM{}, malformed("CycloneDX %q is not read: specVersion %s are", bom.SpecVersion, strings.Join(CycloneDXVersions, ", "))
+	if !slices.Contains(cycloneDXVersions, bom.SpecVersion) {
+		return SBOM{}, malformed("CycloneDX %q is not read: specVersion %s are", bom.SpecVersion, strings.Join(cycloneDXVersions, ", "))
 	}
 	out := SBOM{Format: FormatCycloneDX, SpecVersion: bom.SpecVersion, Packages: []Package{}}
 	byRef := map[string][]int{}
@@ -171,7 +183,7 @@ func readCycloneDX(data []byte) (SBOM, []diag.Diagnostic) {
 		}
 		severity := SeverityUnknown
 		for _, rating := range v.Ratings {
-			if s := strings.ToLower(rating.Severity); slices.Contains(Severities, s) && s != SeverityUnknown && MoreSevere(s, severity) {
+			if s := strings.ToLower(rating.Severity); slices.Contains(severities, s) && s != SeverityUnknown && MoreSevere(s, severity) {
 				severity = s
 			}
 		}
@@ -307,8 +319,8 @@ func readSPDX(data []byte) (SBOM, []diag.Diagnostic) {
 		return SBOM{}, malformed("the SPDX document does not decode: %v", err)
 	}
 	version := strings.TrimPrefix(doc.SPDXVersion, "SPDX-")
-	if !slices.Contains(SPDXVersions, version) {
-		return SBOM{}, malformed("SPDX %q is not read: spdxVersion SPDX-%s is", doc.SPDXVersion, strings.Join(SPDXVersions, ", SPDX-"))
+	if !slices.Contains(spdxVersions, version) {
+		return SBOM{}, malformed("SPDX %q is not read: spdxVersion SPDX-%s is", doc.SPDXVersion, strings.Join(spdxVersions, ", SPDX-"))
 	}
 	described := map[string]bool{}
 	for _, id := range doc.DocumentDescribes {

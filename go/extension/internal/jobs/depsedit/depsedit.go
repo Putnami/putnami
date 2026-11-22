@@ -153,7 +153,8 @@ func run(j *workspacejob.Job, params map[string]json.RawMessage, contextFile str
 		}
 	}
 	j.Trap().Disarm()
-	// Each go.work pin a tidy read is a summary the CLI always prints.
+	// Each go.work pin a tidy read, and each added module the tidy would have
+	// dropped, is a summary the CLI always prints.
 	if len(pins) > 0 {
 		j.Emit.SummaryWithData(strings.Join(pins, "\n"), map[string]any{"visibility": "always"})
 	}
@@ -213,7 +214,8 @@ func refuseDropOnAdd(edits []edit) string {
 // fix it.
 //
 // A run returns one line per go.work pin the tidy read for a version no proxy
-// serves (tidyModule). A dry run makes the same edit and the same tidy on a
+// serves and one per added module nothing imports yet, which go.mod keeps
+// although the tidy dropped it (tidyModule). A dry run makes the same edit and the same tidy on a
 // copy of go.mod and go.sum (planEdit), logs what would change in them and
 // those pins, and returns those lines.
 func apply(j *workspacejob.Job, action string, e edit, dryRun bool) ([]string, error) {
@@ -258,7 +260,7 @@ func apply(j *workspacejob.Job, action string, e edit, dryRun bool) ([]string, e
 	if err := editModule(j, dir, "", editArgs); err != nil {
 		return nil, err
 	}
-	pins, err := tidyModule(j, dir, filepath.Join(dir, "go.mod"))
+	pins, err := tidyModule(j, dir, filepath.Join(dir, "go.mod"), requiredPaths(editArgs))
 	if err != nil {
 		return nil, err
 	}
@@ -267,6 +269,20 @@ func apply(j *workspacejob.Job, action string, e edit, dryRun bool) ([]string, e
 	}
 	j.Emit.Log("info", "✓ updated "+filepath.ToSlash(filepath.Join(e.Path, "go.mod")))
 	return pins, nil
+}
+
+// requiredPaths are the module paths the -require arguments of editArgs
+// name: the modules an add requires, which the tidy keeps (tidyModule). A
+// remove or a prune requires none.
+func requiredPaths(editArgs []string) []string {
+	var paths []string
+	for _, arg := range editArgs {
+		if spec, ok := strings.CutPrefix(arg, "-require="); ok {
+			path, _, _ := strings.Cut(spec, "@")
+			paths = append(paths, path)
+		}
+	}
+	return paths
 }
 
 // editModule runs `go mod edit` with editArgs on the go.mod of the module in
@@ -313,7 +329,7 @@ func planEdit(j *workspacejob.Job, dir string, e edit, editArgs []string) ([]str
 	if err := editModule(j, dir, copyMod, editArgs); err != nil {
 		return nil, err
 	}
-	pins, err := tidyModule(j, dir, copyMod)
+	pins, err := tidyModule(j, dir, copyMod, requiredPaths(editArgs))
 	if err != nil {
 		return nil, err
 	}

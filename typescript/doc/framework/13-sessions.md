@@ -1,6 +1,6 @@
 # Sessions
 
-Sessions in `@putnami/application` provide stateful user data storage across requests with multiple backend options.
+Sessions in `@putnami/application` provide stateful user data storage across requests with multiple backend options. The session helpers are synchronous and read the current request's session: `useSession(key)` and `setSession(key, value)` work on one key, `useSessionAll()` and `setSessionAll(data)` on the whole session, `deleteSession(key)` and `deleteSessionAll()` remove data.
 
 ## Getting started
 
@@ -35,39 +35,36 @@ session:
 ```ts
 import { endpoint, setSession } from '@putnami/application';
 
-export default endpoint()
-  .body({ userId: String })
-  .handle(async (ctx) => {
-    const body = await ctx.body();
+export default endpoint(async (ctx) => {
+  const body = await ctx.body<{ userId: string }>();
+  if (!body) return ctx.throw(400, 'userId is required');
 
-    // Set session data
-    await setSession({
-      userId: body.userId,
-      loginTime: Date.now(),
-    });
+  // Set session data, one key at a time
+  setSession('userId', body.userId);
+  setSession('loginTime', Date.now());
 
-    return { ok: true };
-  });
+  return { ok: true };
+});
 ```
 
 ### Getting session data
 
 ```ts
-import { endpoint, useSession } from '@putnami/application';
+import { endpoint, useSession, useSessionAll } from '@putnami/application';
 
 export default endpoint(async () => {
-  const session = await useSession<{
-    userId: string;
-    loginTime: number;
-  }>();
+  const userId = useSession<string>('userId');
 
-  if (!session) {
+  if (!userId) {
     return { authenticated: false };
   }
 
+  // Or read the whole session at once
+  const session = useSessionAll<{ userId: string; loginTime: number }>();
+
   return {
     authenticated: true,
-    userId: session.userId,
+    userId,
     loginTime: session.loginTime,
   };
 });
@@ -76,11 +73,14 @@ export default endpoint(async () => {
 ### Deleting session data
 
 ```ts
-import { endpoint, deleteSession } from '@putnami/application';
+import { endpoint, deleteSession, deleteSessionAll } from '@putnami/application';
 
 export default endpoint(async () => {
-  // Clear the session (logout)
-  await deleteSession();
+  // Remove one key
+  deleteSession('loginTime');
+
+  // Clear the whole session (logout)
+  deleteSessionAll();
 
   return { ok: true };
 });
@@ -167,16 +167,26 @@ database:
 ### User authentication
 
 ```ts
+import type { HttpRequestContext } from '@putnami/application';
+import { deleteSessionAll, setSessionAll, unauthorized, useSessionAll } from '@putnami/application';
+
+interface UserSession {
+  userId: string;
+  email: string;
+  roles: string[];
+}
+
 // Login
 export async function login(ctx: HttpRequestContext) {
-  const { email, password } = await ctx.body<LoginInput>();
+  const input = await ctx.body<LoginInput>();
+  if (!input) return ctx.throw(400, 'Credentials are required');
 
-  const user = await validateCredentials(email, password);
+  const user = await validateCredentials(input.email, input.password);
   if (!user) {
-    throw new UnauthorizedException('Invalid credentials');
+    return unauthorized('Invalid credentials');
   }
 
-  await setSession({
+  setSessionAll<UserSession>({
     userId: user.id,
     email: user.email,
     roles: user.roles,
@@ -187,15 +197,15 @@ export async function login(ctx: HttpRequestContext) {
 
 // Logout
 export async function logout() {
-  await deleteSession();
+  deleteSessionAll();
   return { ok: true };
 }
 
 // Get current user
 export async function getCurrentUser() {
-  const session = await useSession<UserSession>();
+  const session = useSessionAll<Partial<UserSession>>();
 
-  if (!session) {
+  if (!session.userId) {
     return null;
   }
 
@@ -220,9 +230,7 @@ interface UserSession {
 }
 
 export const requireSession: HttpMiddleware = async (ctx, next) => {
-  const session = await useSession<UserSession>();
-
-  if (!session) {
+  if (!useSession<string>('userId')) {
     return unauthorized('Session required');
   }
 
@@ -231,13 +239,13 @@ export const requireSession: HttpMiddleware = async (ctx, next) => {
 
 export const requireRole = (role: string): HttpMiddleware => {
   return async (ctx, next) => {
-    const session = await useSession<UserSession>();
+    const roles = useSession<UserSession['roles']>('roles');
 
-    if (!session) {
+    if (!roles) {
       return unauthorized('Session required');
     }
 
-    if (!session.roles.includes(role)) {
+    if (!roles.includes(role)) {
       return forbidden(`Role '${role}' required`);
     }
 
@@ -249,40 +257,28 @@ export const requireRole = (role: string): HttpMiddleware => {
 ### Flash messages
 
 ```ts
-import { useSession, setSession } from '@putnami/application';
+import { deleteSession, setSession, useSession } from '@putnami/application';
 
-interface SessionWithFlash {
-  flash?: {
-    type: 'success' | 'error' | 'info';
-    message: string;
-  };
-  // ... other session data
+interface Flash {
+  type: 'success' | 'error' | 'info';
+  message: string;
 }
 
 // Set a flash message
-export async function setFlash(type: 'success' | 'error' | 'info', message: string) {
-  const session = await useSession<SessionWithFlash>() || {};
-  await setSession({
-    ...session,
-    flash: { type, message },
-  });
+export function setFlash(type: Flash['type'], message: string) {
+  setSession<Flash>('flash', { type, message });
 }
 
 // Get and clear flash message
-export async function getFlash() {
-  const session = await useSession<SessionWithFlash>();
+export function getFlash(): Flash | null {
+  const flash = useSession<Flash>('flash');
 
-  if (!session?.flash) {
+  if (!flash) {
     return null;
   }
 
-  const flash = session.flash;
-
   // Clear the flash message
-  await setSession({
-    ...session,
-    flash: undefined,
-  });
+  deleteSession('flash');
 
   return flash;
 }
@@ -291,38 +287,31 @@ export async function getFlash() {
 ### Session renewal
 
 ```ts
-import { useSession, setSession } from '@putnami/application';
-
-interface UserSession {
-  userId: string;
-  lastActivity: number;
-}
+import { deleteSessionAll, setSession, useSession } from '@putnami/application';
+import { UnauthorizedException } from '@putnami/runtime';
 
 const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
 const RENEWAL_THRESHOLD = 5 * 60 * 1000; // 5 minutes
 
-export async function renewSessionIfNeeded() {
-  const session = await useSession<UserSession>();
+export function renewSessionIfNeeded() {
+  const lastActivity = useSession<number>('lastActivity');
 
-  if (!session) {
+  if (lastActivity === undefined) {
     return;
   }
 
   const now = Date.now();
-  const timeSinceActivity = now - session.lastActivity;
+  const timeSinceActivity = now - lastActivity;
 
   // Check if session expired
   if (timeSinceActivity > SESSION_TIMEOUT) {
-    await deleteSession();
+    deleteSessionAll();
     throw new UnauthorizedException('Session expired');
   }
 
   // Renew if close to expiry
   if (timeSinceActivity > SESSION_TIMEOUT - RENEWAL_THRESHOLD) {
-    await setSession({
-      ...session,
-      lastActivity: now,
-    });
+    setSession('lastActivity', now);
   }
 }
 ```
@@ -361,14 +350,16 @@ Regenerate session ID after authentication:
 
 ```ts
 export async function login(ctx: HttpRequestContext) {
-  const { email, password } = await ctx.body<LoginInput>();
-  const user = await validateCredentials(email, password);
+  const input = await ctx.body<LoginInput>();
+  if (!input) return ctx.throw(400, 'Credentials are required');
+  const user = await validateCredentials(input.email, input.password);
+  if (!user) return unauthorized('Invalid credentials');
 
   // Clear any existing session first
-  await deleteSession();
+  deleteSessionAll();
 
   // Create new session with user data
-  await setSession({
+  setSessionAll({
     userId: user.id,
     createdAt: Date.now(),
   });
@@ -383,12 +374,10 @@ Only store necessary data in sessions:
 
 ```ts
 // Good - minimal data
-await setSession({
-  userId: user.id,
-});
+setSession('userId', user.id);
 
 // Bad - too much data
-await setSession({
+setSessionAll({
   userId: user.id,
   email: user.email,
   name: user.name,

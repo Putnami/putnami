@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"go.putnami.dev/protocol/features/spectest"
 	"go.putnami.dev/sdk/extension/gittest"
 )
 
@@ -324,5 +325,102 @@ func TestGetVersionInfo_DirtyHashMatchesCLI(t *testing.T) {
 	}
 	if want := "-" + info.SHA + "-" + sha256Hash(""); !info.IsDirty || !strings.HasSuffix(info.Suffix, want) {
 		t.Errorf("untracked change: got suffix=%q dirty=%v, want it to end with %q", info.Suffix, info.IsDirty, want)
+	}
+}
+
+// ---- GetImageVersionInfo ----
+
+func TestGetImageVersionInfo_BeforeTheFirstCommitTakesTheNoCommitSuffix(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "image-on-a-fresh-workspace", "an-image-packages-before-the-first-commit")
+	t.Setenv(SourceRevisionEnv, "")
+	dir := t.TempDir()
+	gittest.Run(t, dir, "init")
+	os.WriteFile(filepath.Join(dir, "file.txt"), []byte("hello"), 0o644)
+
+	if _, err := GetVersionInfo(dir); err == nil {
+		t.Fatal("GetVersionInfo succeeded before the first commit; the fallback is not exercised")
+	}
+	info, err := GetImageVersionInfo(dir)
+	if err != nil {
+		t.Fatalf("GetImageVersionInfo() error = %v, want the no-commit fallback", err)
+	}
+	if info.Suffix != NoCommitSuffix || info.SHA != NoCommitSuffix {
+		t.Errorf("GetImageVersionInfo() = %+v, want suffix and SHA %q", info, NoCommitSuffix)
+	}
+}
+
+func TestGetImageVersionInfo_AfterACommitIsTheCommitVersion(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "image-on-a-fresh-workspace", "an-image-packages-before-the-first-commit")
+	t.Setenv(SourceRevisionEnv, "")
+	dir := initTestRepo(t)
+	want, err := GetVersionInfo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := GetImageVersionInfo(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Suffix != want.Suffix || got.Suffix == NoCommitSuffix {
+		t.Errorf("GetImageVersionInfo().Suffix = %q, want the commit suffix %q", got.Suffix, want.Suffix)
+	}
+}
+
+func TestGetImageVersionInfo_ABoundRevisionStillFails(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "image-on-a-fresh-workspace", "an-image-packages-before-the-first-commit")
+	dir := t.TempDir()
+	gittest.Run(t, dir, "init")
+	t.Setenv(SourceRevisionEnv, strings.Repeat("a", 40))
+	t.Setenv(SourceCommitTimeEnv, "")
+	if _, err := GetImageVersionInfo(dir); err == nil {
+		t.Fatal("GetImageVersionInfo() succeeded with a bound revision it cannot read, want the git failure")
+	}
+}
+
+func TestHasCommit(t *testing.T) {
+	empty := t.TempDir()
+	gittest.Run(t, empty, "init")
+	if got, err := HasCommit(empty); err != nil || got {
+		t.Errorf("before the first commit: HasCommit() = %v, %v; want false, nil", got, err)
+	}
+	if got, err := HasCommit(initTestRepo(t)); err != nil || !got {
+		t.Errorf("after a commit: HasCommit() = %v, %v; want true, nil", got, err)
+	}
+	if _, err := HasCommit(t.TempDir()); err == nil {
+		t.Error("outside a repository: HasCommit() answered no error, want the git failure")
+	}
+}
+
+// A repository whose HEAD git cannot read is a git failure, never a fresh
+// workspace: the image must not be stamped nogit.
+func TestGetImageVersionInfo_ABrokenRepositoryStillFails(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "image-on-a-fresh-workspace", "an-image-packages-before-the-first-commit")
+	t.Setenv(SourceRevisionEnv, "")
+	dir := initTestRepo(t)
+	if err := os.WriteFile(filepath.Join(dir, ".git", "HEAD"), []byte("garbage\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetImageVersionInfo(dir); err == nil {
+		t.Fatal("GetImageVersionInfo() succeeded on a repository with an unreadable HEAD, want the git failure")
+	}
+	if _, err := GetImageVersionInfo(t.TempDir()); err == nil {
+		t.Fatal("GetImageVersionInfo() succeeded outside a repository, want the git failure")
+	}
+}
+
+// A repository whose HEAD names a commit it lost the objects of is broken,
+// not fresh: HasCommit asks no ^{commit} peel, so it is not stamped nogit.
+func TestGetImageVersionInfo_MissingObjectsStillFail(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "image-on-a-fresh-workspace", "an-image-packages-before-the-first-commit")
+	t.Setenv(SourceRevisionEnv, "")
+	dir := initTestRepo(t)
+	if err := os.RemoveAll(filepath.Join(dir, ".git", "objects")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, ".git", "objects"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := GetImageVersionInfo(dir); err == nil {
+		t.Fatal("GetImageVersionInfo() succeeded on a repository that lost HEAD's objects, want the git failure")
 	}
 }

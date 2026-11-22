@@ -6,10 +6,11 @@
     "In an iOS or Swift repository, each Swift package, each of its targets and each Xcode project is a component, named by its manifest, without a Putnami file",
     "When the CI ran swift package describe --type json > swiftpm.json beside a Package.swift, the target and product dependencies are the edges; without it, the local package paths of Package.swift are, and observe says what the static read cannot see",
     "A local package an Xcode project references is an edge, so a change to a package marks the packages and the app that use it as dependent",
-    "The JUnit and coverage reports converted from an .xcresult or written by swift test land on the components that hold the tests and the covered files, and a version bump in Package.resolved or Podfile.lock is a dependency change"
+    "The JUnit and coverage reports converted from an .xcresult or written by swift test, and the tests and coverage of an .xcresult bundle itself when xcrun is on the runner, land on the components that hold the tests and the covered files, and a version bump in Package.resolved or Podfile.lock is a dependency change"
   ],
   "nonGoals": [
-    "Running swift, xcodebuild, pod or any Apple tool, or reading an .xcresult bundle: the CI converts it to JUnit and Cobertura or LCOV",
+    "Running swift, xcodebuild, pod or any Apple tool other than xcrun xcresulttool and xcrun xccov, which read an .xcresult bundle",
+    "Reading an .xcresult bundle without xcrun, or with an Xcode older than 16, whose xcresulttool has no test-results command: the CI converts it to JUnit and Cobertura or LCOV",
     "Evaluating Package.swift: the static read matches its literal .package(path:) calls and lists the target directories",
     "Reading the targets, build phases or file references of an Xcode project beyond its local package references and its test target names",
     "Components for CocoaPods pods, Carthage frameworks or remote Swift packages",
@@ -76,6 +77,26 @@
         "The file of a case placed by its class name is Class.swift under the test target's directory, else the Swift file there that declares Class.",
         "The directory of an Xcode test target is the one named by the target beside the project, else the project's directory."
       ]
+    },
+    {
+      "id": "xcresult-discovery",
+      "text": [
+        "Discovery takes each .xcresult directory that holds an Info.plist as both a test report and a coverage report of format xcresult, and does not walk into it.",
+        "When discovery also finds a JUnit report, a discovered bundle gives no tests, so a converted copy is not counted twice, and the observe.xcresult_tests_skipped warning names --junit.",
+        "--junit and --coverage take a bundle's path, or a glob pattern that matches it."
+      ]
+    },
+    {
+      "id": "xcresult-read",
+      "text": [
+        "With xcrun on the PATH, a bundle's tests are the output of xcrun xcresulttool get test-results tests, and its coverage that of xcrun xccov view --report --json and --archive --json, each bounded in time and size, read as the readers module reads them.",
+        "Cases and files land as a JUnit and a coverage report's do; a file only the report lists keeps its totals.",
+        "A failed or refused output is one observe.xcresult_unread warning naming the command and the conversion; the other outputs are still read."
+      ]
+    },
+    {
+      "id": "xcresult-tools-missing",
+      "text": "Without xcrun on the PATH, as on a Linux runner, each bundle is one observe.xcresult_tools_missing warning that names the conversion to JUnit and Cobertura, the other reports are still read, and observe exits 0."
     },
     {
       "id": "swift-package-resolved",

@@ -6,7 +6,7 @@ branding:
   color: purple
 inputs:
   token:
-    description: Putnami Cloud workspace token with the delivery.ingest scope. When set, the step uploads the evidence and, by default, publishes on the pull request.
+    description: Putnami Cloud token with the delivery.ingest scope, such as the organization ingest token from putnami cloud token create --organization. When set, the step uploads the evidence and, by default, publishes on the pull request.
     required: false
     default: ''
   publish:
@@ -33,17 +33,32 @@ inputs:
     description: The commit or branch the change is measured against. Empty takes it from the pull request or the push.
     required: false
     default: ''
+  from-artifact:
+    description: In a workflow_run job, the name of the artifact that holds the evidence document a pull request run kept, such as a run from a fork. The step downloads it from the run that triggered the workflow, then uploads and, by default, publishes it with this job's credentials. Empty observes the checkout.
+    required: false
+    default: ''
   channel:
     description: Release channel of the Putnami CLI and its extensions, such as stable or canary; stable reads the latest channel. A version is refused.
     required: false
     default: stable
 outputs:
   evidence:
-    description: Path of the change evidence document the step wrote.
+    description: Path of the change evidence document the step wrote, or relayed with from-artifact.
     value: ${{ steps.observe.outputs.evidence }}
 runs:
   using: composite
   steps:
+    # A fork's evidence: download the artifact of the run that triggered this
+    # workflow_run job. Nothing it holds runs; observe.sh reads one JSON file.
+    - id: artifact
+      if: ${{ inputs.from-artifact != '' && github.event_name == 'workflow_run' }}
+      continue-on-error: true
+      uses: actions/download-artifact@v4
+      with:
+        name: ${{ inputs.from-artifact }}
+        run-id: ${{ github.event.workflow_run.id }}
+        github-token: ${{ github.token }}
+        path: ${{ runner.temp }}/observe-artifact
     - id: observe
       shell: bash
       env:
@@ -54,6 +69,10 @@ runs:
         PUTNAMI_OBSERVE_SBOM: ${{ inputs.sbom }}
         PUTNAMI_OBSERVE_BASE_SBOM: ${{ inputs.base-sbom }}
         PUTNAMI_OBSERVE_BASE: ${{ inputs.base }}
+        PUTNAMI_OBSERVE_FROM_ARTIFACT: ${{ inputs.from-artifact }}
         PUTNAMI_OBSERVE_CHANNEL: ${{ inputs.channel }}
+        PUTNAMI_OBSERVE_EVENT: ${{ github.event_name }}
+        PUTNAMI_OBSERVE_ARTIFACT_DIR: ${{ runner.temp }}/observe-artifact
+        PUTNAMI_OBSERVE_DOWNLOAD: ${{ steps.artifact.outcome }}
         PUTNAMI_OBSERVE_GITHUB_TOKEN: ${{ github.token }}
       run: bash "$GITHUB_ACTION_PATH/observe.sh"

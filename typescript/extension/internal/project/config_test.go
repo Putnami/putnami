@@ -193,3 +193,54 @@ func TestResolveTsConfig_NoneFound(t *testing.T) {
 		t.Errorf("expected empty string when no tsconfig found, got %q", result)
 	}
 }
+
+func TestParsePort(t *testing.T) {
+	for _, tc := range []struct {
+		value any
+		want  int
+	}{
+		{8080, 8080}, {float64(8080), 8080}, {"8080", 8080}, {" 443 ", 443},
+		{float64(8080.5), 0}, {0, 0}, {70000, 0}, {"${PORT}", 0}, {nil, 0}, {true, 0},
+	} {
+		if got := ParsePort(tc.value); got != tc.want {
+			t.Errorf("ParsePort(%#v) = %d, want %d", tc.value, got, tc.want)
+		}
+	}
+}
+
+func TestConfiguredPort(t *testing.T) {
+	write := func(files map[string]string) string {
+		dir := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(dir, "conf"), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		for name, body := range files {
+			if err := os.WriteFile(filepath.Join(dir, "conf", name), []byte(body), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		}
+		return dir
+	}
+	for name, tc := range map[string]struct {
+		files map[string]string
+		want  int
+	}{
+		"no conf":                 {nil, 0},
+		"base file":               {map[string]string{".env.yaml": "putnami:\n  port: 8080\n"}, 8080},
+		"environment file wins":   {map[string]string{".env.yaml": "putnami:\n  port: 8080\n", ".env.production.yaml": "putnami:\n  port: 9090\n"}, 9090},
+		"environment without one": {map[string]string{".env.yaml": "putnami:\n  port: 8080\n", ".env.production.yaml": "putnami:\n  name: api\n"}, 8080},
+		"last duplicate key wins": {map[string]string{".env.yaml": "putnami:\n  port: 8080\n  port: 8081\nother: 1\nother: 2\n"}, 8081},
+		"last putnami block wins": {map[string]string{".env.yaml": "putnami:\n  port: 8080\nputnami:\n  port: 8082\n"}, 8082},
+		"unparsable file":         {map[string]string{".env.yaml": "putnami: [\n"}, 0},
+		"not a mapping":           {map[string]string{".env.yaml": "- 8080\n"}, 0},
+		"an aliased port":         {map[string]string{".env.yaml": "default: &p 8080\nputnami:\n  port: *p\n"}, 8080},
+		"an aliased block":        {map[string]string{".env.yaml": "base: &b\n  port: 8080\nputnami: *b\n"}, 8080},
+		"a merged block":          {map[string]string{".env.yaml": "base: &b\n  port: 8080\nputnami:\n  <<: *b\n  name: api\n"}, 8080},
+		"own key beats the merge": {map[string]string{".env.yaml": "base: &b\n  port: 8080\nputnami:\n  <<: *b\n  port: 9000\n"}, 9000},
+		"first merge source wins": {map[string]string{".env.yaml": "a: &a\n  port: 8081\nb: &b\n  port: 8082\nputnami:\n  <<: [*a, *b]\n"}, 8081},
+	} {
+		if got := ConfiguredPort(write(tc.files), "production"); got != tc.want {
+			t.Errorf("%s: ConfiguredPort() = %d, want %d", name, got, tc.want)
+		}
+	}
+}

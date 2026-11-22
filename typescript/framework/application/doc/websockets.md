@@ -154,6 +154,8 @@ apiPlugin.register('/chat', endpoint()
     for await (const msg of ctx.messages()) {
       ctx.send({ event: 'echo', payload: msg.data });
     }
+    // A bidirectional handler ends with its terminal value
+    return { event: 'closed', payload: ctx.params.roomId };
   }),
 );
 

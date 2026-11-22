@@ -7,8 +7,8 @@ You will create an API service with file-based routing, then add schema validati
 ### 1) Create the workspace and API project
 
 ```bash
-putnami init --workspace my-workspace
-cd my-workspace
+mkdir my-workspace && cd my-workspace
+putnami init
 putnami projects create api --template typescript-server
 ```
 
@@ -24,10 +24,10 @@ Open `http://localhost:3000`. You see the default JSON response from the GET end
 
 ### 3) Explore the project structure
 
-The scaffolded project lives in `packages/api/`:
+The scaffolded project lives in `api/`:
 
 ```
-packages/api/
+api/
 ├── src/
 │   ├── main.ts          # Application entrypoint
 │   ├── serve.ts          # Server bootstrap
@@ -40,7 +40,7 @@ packages/api/
 
 ### 4) Add a health check route
 
-Create `packages/api/src/api/health/get.ts`:
+Create `api/src/api/health/get.ts`:
 
 ```ts
 import { endpoint } from '@putnami/application';
@@ -54,7 +54,7 @@ Navigate to `http://localhost:3000/health`.
 
 ### 5) Add a validated route
 
-Create `packages/api/src/api/items/post.ts`:
+Create `api/src/api/items/post.ts`:
 
 ```ts
 import { endpoint, MinLength, Optional, ArrayOf } from '@putnami/application';
@@ -92,7 +92,7 @@ A body that is not valid JSON also answers `400`, with `"message": "Malformed JS
 
 ### 6) Add a route with path parameter validation
 
-Create `packages/api/src/api/items/[id]/get.ts`:
+Create `api/src/api/items/[id]/get.ts`:
 
 ```ts
 import { endpoint, Uuid } from '@putnami/application';
@@ -107,7 +107,7 @@ export default endpoint()
 
 ### 7) Add a route that answers no content
 
-Create `packages/api/src/api/items/[id]/delete.ts`. A handler that returns nothing answers `204 No Content`:
+Create `api/src/api/items/[id]/delete.ts`. A handler that returns nothing answers `204 No Content`:
 
 ```ts
 import { endpoint, Uuid } from '@putnami/application';
@@ -126,7 +126,7 @@ You have a running API service with file-based routing and built-in schema valid
 ## Next steps
 
 - See the [API reference](/docs/frameworks/typescript/api) for all schema types (`Uuid`, `Email`, `Int`, `Min`, `Max`, `Pattern`, ...) and builder methods
-- Add [persistence](/docs/how-to/add-persistence) for a database-backed API
+- Add [persistence](/docs/how-to/add-persistence) for a database-backed API, or follow [Build a Postgres API in TypeScript](/docs/how-to/build-a-postgres-api-in-typescript) from the template to a running image
 - Add [authentication](/docs/how-to/add-authentication) to protect routes
 
 > **Companion sample:** [`typescript/samples/02-rest-api`](https://github.com/putnami/putnami/tree/main/typescript/samples/02-rest-api) — a runnable CRUD API with validation and OpenAPI. Run `putnami serve @example/rest-api` from the workspace root.

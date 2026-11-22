@@ -141,7 +141,7 @@ Finally, declare that the API is a client contract. The generator is a
 build-time concern, so it comes from the `@putnami/client/generator` subpath —
 the package root exports the runtime only:
 
-```typescript
+```typescript nocheck
 import { clientGenerator } from '@putnami/client/generator';
 
 .use(clientGenerator())

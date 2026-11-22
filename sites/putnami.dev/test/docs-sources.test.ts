@@ -153,7 +153,7 @@ describe('public install to serve golden path', () => {
   const commands = [
     'curl -fsSL https://putnami.dev/install.sh | bash',
     'export PATH="$HOME/.putnami/bin:$PATH"',
-    'putnami init --project webapp --extension ts',
+    'putnami init --project webapp --extension ts --template typescript-web',
     'putnami serve webapp',
   ].join('\n');
 

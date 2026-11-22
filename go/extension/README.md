@@ -108,14 +108,15 @@ To enable package channels:
 ```
 
 Without a channel on, `putnami package --projects <name>` fails and names the
-option to set; under `--all` or `--impacted` it warns. The image sets
-`PORT=3000` unless `port` names another value, and the Go HTTP server listens
-on `PORT`. See [Package & Docker](../doc/framework/00-extension/04-package-and-docker.md).
+option to set; under `--all` or `--impacted` it warns. The image sets and
+exposes `PORT`: `port`, else the project's `options.serve.port`, else 8080, as
+for `putnami serve`. The Go HTTP server listens on `PORT`. See
+[Package & Docker](https://putnami.dev/docs/frameworks/go/extension/package-and-docker).
 
 ## Support and contract
 
 `@putnami/go` is a public, documented, maintained package classified `stable` in
-the workspace [support catalog](../../putnami.support.json). The
+the [support catalog](https://putnami.dev/docs/support). The
 [go-project-toolchain specification](specs/go-project-toolchain.json) states the
 observable promise, and three accepted decisions explain the durable choices
 behind it:
@@ -132,11 +133,11 @@ per-project failure attribution in tests, batch/solo equivalence in lint, and an
 additive package-channel index. Registry upload belongs to `publish`, and client
 generation for other languages belongs to `@putnami/clientgen`. No default or
 cross-language parity claim is made. Before v1.0.0, minor `0.x` releases may
-contain documented breaking changes — see [RELEASE.md](../../RELEASE.md).
+contain documented breaking changes — see [the support status page](https://putnami.dev/docs/support).
 
 ## License
 
-[FSL-1.1-MIT](../../LICENSE.md)
+[FSL-1.1-MIT](https://putnami.dev/LICENSE.md)
 
 
 Image-project packaging declares `build` as a conditional session prerequisite.

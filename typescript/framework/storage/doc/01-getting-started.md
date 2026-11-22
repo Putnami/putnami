@@ -5,7 +5,7 @@
 ## Installation
 
 ```bash
-bunx putnami deps add @putnami/storage
+putnami deps add @putnami/storage
 ```
 
 ## Quick Start

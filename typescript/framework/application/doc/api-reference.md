@@ -10,7 +10,7 @@ Base class for composable units. Groups plugins, sub-modules, and DI providers. 
 
 #### Constructor
 
-```typescript
+```typescript nocheck
 new Module(name: string)
 ```
 
@@ -42,6 +42,8 @@ Set the base path for this module. Child plugins (`api()`, `react()`, `staticFil
 
 **Example:**
 ```typescript
+import { module } from '@putnami/application';
+
 module('tasks')
   .path('/tasks')
   .use(api())     // Routes prefixed with /tasks
@@ -65,6 +67,8 @@ Apply security to all handlers registered by plugins in this module.
 
 **Example:**
 ```typescript
+import { module } from '@putnami/application';
+
 module('admin')
   .secure({ roles: ['admin'] })
   .use(api());
@@ -381,6 +385,8 @@ Create an API plugin instance for file-based routing.
 
 **Example:**
 ```typescript
+import { module } from '@putnami/application';
+
 // Default: no prefix — routes mount at root
 const app = application()
   .use(api());  // src/api/users/get.ts → GET /users
@@ -591,7 +597,7 @@ Create a config plugin instance.
 **Example:**
 ```typescript
 const app = application()
-  .use(config('production'));
+  .use(config({ env: 'production' }));
 ```
 
 ## OAuth Plugin
@@ -907,7 +913,7 @@ Exception class for HTTP errors.
 
 #### Constructor
 
-```typescript
+```typescript nocheck
 new HttpException(status: number, message?: string)
 ```
 
@@ -921,7 +927,7 @@ Exception for aborting requests.
 
 #### Constructor
 
-```typescript
+```typescript nocheck
 new HttpAbortException(message?: string)
 ```
 
@@ -1060,7 +1066,7 @@ setCacheStorage(new LayeredCacheStorage([
 
 ### Cache Interface
 
-```typescript
+```typescript nocheck
 interface CacheStorage {
   get<T>(key: string): Promise<CacheEntry<T> | undefined>;
   set<T>(key: string, value: T, ttl?: number): Promise<void>;

@@ -1,6 +1,6 @@
 import { fileExists, getCurrentProject, joinPath, mergeDeep, readFileContent } from '@putnami/utils';
 import { isMissingOptionalCloudRuntime, loadCloudRuntimeModule } from './cloud-runtime-loader';
-import { getEnv } from './config';
+import { getEnv, resetConfigLoader } from './config';
 import { registerConfigLoaderResetHook } from './loader-hooks';
 
 // Parse YAML via Bun's native implementation. Bun.YAML.parse returns `unknown`,
@@ -187,6 +187,77 @@ class BaseConfFileSource implements ConfigSource {
   }
 }
 
+/**
+ * The project's `conf/` files a compiled entrypoint carries, as their YAML
+ * text: `base` is `conf/.env.yaml`, `envs` maps an environment name to the
+ * text of `conf/.env.<env>.yaml`. A compiled executable runs away from its
+ * project, so the files it was built from travel inside it.
+ */
+export type EmbeddedConfigFiles = {
+  readonly base?: string;
+  readonly envs?: Readonly<Record<string, string>>;
+};
+
+let embeddedConfigFiles: EmbeddedConfigFiles | undefined;
+
+/**
+ * Registers the `conf/` files a compiled entrypoint embeds, so the executable
+ * resolves the same base and environment config as `putnami serve` wherever
+ * it runs. Each embedded file ranks just below its on-disk counterpart: a
+ * `conf/.env.yaml` the process finds in its project still overrides the
+ * embedded base, and any environment file outranks either base. Registering
+ * again replaces the files and resets the config loader.
+ *
+ * @internal Generated bundled entrypoints call this before any module reads
+ * config.
+ */
+export function registerEmbeddedConfig(files: EmbeddedConfigFiles): void {
+  embeddedConfigFiles = files;
+  resetConfigLoader();
+}
+
+/**
+ * Reads the embedded `conf/.env.yaml` (see {@link registerEmbeddedConfig}).
+ *
+ * Priority 9: just below the on-disk base file (10).
+ */
+class EmbeddedBaseConfSource implements ConfigSource {
+  readonly name = 'embedded conf/.env.yaml';
+  readonly priority = 9;
+
+  load(): Record<string, unknown> | undefined {
+    return parseEmbedded(embeddedConfigFiles?.base);
+  }
+}
+
+/**
+ * Reads the embedded `conf/.env.{env}.yaml` (see {@link registerEmbeddedConfig}).
+ *
+ * Priority 19: above both base files, just below the on-disk env file (20).
+ */
+class EmbeddedEnvConfSource implements ConfigSource {
+  readonly name = 'embedded conf/.env.{env}.yaml';
+  readonly priority = 19;
+
+  load(): Record<string, unknown> | undefined {
+    const envs = embeddedConfigFiles?.envs;
+    const env = getEnv();
+    return envs && Object.hasOwn(envs, env) ? parseEmbedded(envs[env]) : undefined;
+  }
+}
+
+// Like the on-disk sources, a file that does not parse contributes nothing.
+function parseEmbedded(text: string | undefined): Record<string, unknown> | undefined {
+  if (text === undefined) {
+    return undefined;
+  }
+  try {
+    return parseYaml(text);
+  } catch {
+    return undefined;
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -216,8 +287,9 @@ function loadFromFile(folder: string, prefix = '.env'): Record<string, unknown> 
  * priority, so the array order carries no meaning.
  *
  * Priority, lowest first:
- * 1. `conf/.env.yaml` (10) — env-agnostic base
- * 2. `conf/.env.{env}.yaml` (20) — env-specific
+ * 1. `conf/.env.yaml` (10) — env-agnostic base, above the copy a compiled
+ *    entrypoint embeds (9, see {@link registerEmbeddedConfig})
+ * 2. `conf/.env.{env}.yaml` (20) — env-specific, above its embedded copy (19)
  * 3. `.gen/conf/.env.{env}.yaml` (30) — build-merged from deps
  * 4. `conf/.secrets.{env}.yaml` (35) — local secrets (gitignored)
  * 5. Registered extension sources, such as `@putnami/cloud/runtime`, at the
@@ -247,7 +319,9 @@ export function getDefaultSources(): ConfigSource[] {
  */
 export function getLocalSources(): ConfigSource[] {
   return [
+    new EmbeddedBaseConfSource(),
     new BaseConfFileSource(),
+    new EmbeddedEnvConfSource(),
     new ConfFileSource(),
     new GenConfFileSource(),
     new SecretsFileSource(),

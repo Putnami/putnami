@@ -32,9 +32,9 @@ oauth:
     - 'openid'
     - 'profile'
     - 'email'
-  callbackPath: '/auth/callback'
-  loginPath: '/login'
-  logoutPath: '/logout'
+  callbackRoute: '/auth/callback'
+  loginRoute: '/login'
+  logoutRoute: '/logout'
 ```
 
 ### Configuration options
@@ -42,12 +42,12 @@ oauth:
 ```ts
 oAuth2({
   // Custom routes (optional)
-  loginPath: '/login',
-  logoutPath: '/logout',
-  callbackPath: '/auth/callback',
+  loginRoute: '/login',
+  logoutRoute: '/logout',
+  callbackRoute: '/auth/callback',
 
   // Post-auth redirect (optional)
-  defaultRedirect: '/dashboard',
+  defaultLoginRedirectUrl: '/dashboard',
 })
 ```
 
@@ -193,7 +193,7 @@ export const requireAuth: HttpMiddleware = async (ctx, next) => {
 };
 
 export const requireAdmin: HttpMiddleware = async (ctx, next) => {
-  const user = await useUser();
+  const user = await useUser<{ uid: string; roles?: string[] }>();
 
   if (!user) {
     return unauthorized('Authentication required');
@@ -250,7 +250,8 @@ export default endpoint(async () => {
 import { endpoint, useUser } from '@putnami/application';
 
 export default endpoint(async () => {
-  const user = await useUser();
+  // Name the claims you read; OAuthUser is described below
+  const user = await useUser<OAuthUser>();
 
   if (user) {
     // User object contains claims from the ID token
@@ -266,6 +267,7 @@ export default endpoint(async () => {
 
 ```ts
 interface OAuthUser {
+  uid: string;           // Identifier every user carries
   sub: string;           // Subject (unique ID)
   email?: string;        // Email address
   email_verified?: boolean;
@@ -302,7 +304,7 @@ import { useUser } from '@putnami/application';
 import { UserRepository } from '../entities/user';
 
 export async function getAppUser() {
-  const oauthUser = await useUser();
+  const oauthUser = await useUser<OAuthUser>();
 
   if (!oauthUser) {
     return null;
@@ -397,16 +399,15 @@ session:
 ### Accessing tokens
 
 ```ts
-import { endpoint, getAccessToken, getIdToken } from '@putnami/application';
+import { accessToken, endpoint } from '@putnami/application';
 
 export default endpoint(async () => {
-  const accessToken = await getAccessToken();
-  const idToken = await getIdToken();
+  const token = await accessToken();
 
   // Use access token for API calls
   const response = await fetch('https://api.example.com/data', {
     headers: {
-      Authorization: `Bearer ${accessToken}`,
+      Authorization: `Bearer ${token}`,
     },
   });
 

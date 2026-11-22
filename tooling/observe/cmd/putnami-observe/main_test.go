@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -588,5 +589,41 @@ func TestTheDecisionsFlagNamesTheDirectories(t *testing.T) {
 	}
 	if _, _, err := parseRun([]string{"--decisions"}, nil); err == nil || !strings.Contains(err.Error(), "--decisions needs a value") {
 		t.Errorf("an empty --decisions: %v", err)
+	}
+}
+
+func TestABundleWithoutXcrunExitsZero(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-swift", "xcresult-tools-missing", "a-missing-xcrun-names-the-conversion")
+	repo := workspacelessRepo(t)
+	write(t, repo, "packages/web/reports/Test.xcresult/Info.plist", "<plist/>")
+	gitPath, err := exec.LookPath("git")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bin := t.TempDir()
+	if err := os.Symlink(gitPath, filepath.Join(bin, "git")); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", bin)
+	invocation := filepath.Join(repo, "packages", "web")
+	t.Chdir(invocation)
+	var stdout, stderr bytes.Buffer
+	code := run([]string{"run", "--no-fetch", "--junit", "reports/junit.xml,reports/Test.xcresult", "--coverage", "reports/Test.xcresult", "--putnamiContext", jobContext(t, invocation, invocation, "json")},
+		func(string) string { return "" }, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("exit %d: %s", code, stderr.String())
+	}
+	var o observe.Observation
+	if err := json.Unmarshal(stdout.Bytes(), &o); err != nil {
+		t.Fatalf("output is not one JSON document: %v\n%s", err, stdout.String())
+	}
+	missing := 0
+	for _, d := range o.Diagnostics {
+		if d.Code == "observe.xcresult_tools_missing" {
+			missing++
+		}
+	}
+	if missing != 1 || len(o.Reports) != 3 {
+		t.Fatalf("reports %+v diagnostics %+v, want the three reports and one diagnostic for the bundle", o.Reports, o.Diagnostics)
 	}
 }

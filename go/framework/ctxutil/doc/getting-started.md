@@ -48,7 +48,7 @@ The wedge this helper exists to prevent: a background operation is sometimes run
 
 `WithRequestTimeout` re-installs a bounded deadline immediately after detaching, restoring fail-closed behavior:
 
-```go
+```go nocheck
 // Leader runs on a cancellation-detached context so a waiter's cancel does not
 // abort the shared call — but re-bound it at once so a hung resolver fails
 // closed instead of wedging the whole cohort.

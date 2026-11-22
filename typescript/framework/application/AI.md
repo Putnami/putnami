@@ -211,7 +211,7 @@ endpoint()
   zero value such as `resume: false` is not a declaration, exactly as in Go. See
   `protocols/clientcontract/doc/adr/0011-an-external-authority-can-own-an-operation.md`.
 
-```ts
+```ts nocheck
 endpoint()
   .params({ id: String })
   .returns(Stream(itemRevisionSchema))
@@ -305,7 +305,7 @@ src/api/
 Dynamic segments use `[param]` brackets. Each file exports a default `endpoint()`.
 
 Multi-method routes use `route.ts` with named exports:
-```ts
+```ts nocheck
 // src/api/items/route.ts
 export const GET = endpoint().handle((ctx) => ({ items: [] }));
 export const POST = endpoint().body({ name: String }).handle(async (ctx) => { ... });
@@ -386,15 +386,18 @@ database:
     database: mydb
 ```
 
-A compiled binary and its image ship no `conf/`: there, configure with
-environment variables (`Env(...)` fields, `CONFIG_DATA`, `DATABASE_BINDINGS`).
-The binary runs a generated entry that imports `app` from `main`, never
-`src/serve.ts`.
+A compiled binary and its image embed `conf/.env.yaml` and every
+`conf/.env.<env>.yaml`, never a secrets file nor the gitignored
+`conf/.env.local.yaml` and `conf/.env.prod.yaml`, and run `src/serve.ts` (the
+`./serve` export) as `putnami serve` does: same config, `putnami.port`
+included, though a `PORT` variable, which an image sets, outranks it. Pass
+secrets and per-deployment values with environment variables (`Env(...)`
+fields, `CONFIG_DATA`, `DATABASE_BINDINGS`).
 
 Define typed config schemas:
 
 ```ts
-import { Config, Int, Optional } from '@putnami/application';
+import { Config, Int, Optional } from '@putnami/runtime';
 const AppConfig = Config('app', { port: Int, debug: Optional(Boolean) });
 ```
 
@@ -691,9 +694,9 @@ middleware and the SSR renderer record their steps with `within()`.
 ```ts
 import { createTestApp } from '@putnami/application/testing';
 
-const app = await createTestApp(() =>
-  application().provide(UserService).use(api())
-);
+const app = await createTestApp({
+  configure: (application) => application.provide(UserService).use(api()),
+});
 const res = await app.fetch('/users');
 expect(res.status).toBe(200);
 ```
@@ -755,7 +758,7 @@ than restating the phase rules.
 A route that speaks a wire the provider owns — not the first-party
 `putnami.service.v1` conversation — declares it on a bidirectional stream:
 
-```typescript
+```typescript nocheck
 // Raw octets in binary messages; ctx.messages() yields Uint8Array, ctx.send() takes one.
 endpoint().query({ database: String }).body(ByteStream()).returns(ByteStream()).handle(async (ctx) => { ... });
 

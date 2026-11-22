@@ -60,11 +60,11 @@ func main() {
         GoPackage:   "example.com/myapp/proto/v1",
     }).From(apiPlugin)
 
-    app.New("myapp").
-        Use(httpServer).
+    a := app.New("myapp")
+    a.Use(httpServer).
         Use(apiPlugin).
-        Use(protoPlugin).
-        ListenAndServe()
+        Use(protoPlugin)
+    a.ListenAndServe()
 }
 
 func listUsers(ctx *http.EndpointContext) *http.Response  { return http.JSON([]User{}) }

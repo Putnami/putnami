@@ -9,7 +9,9 @@
 // starts with its mode line, a CycloneDX document states its bomFormat and an
 // SPDX one its spdxVersion. A deptrac report is a JUnit report whose suites
 // deptrac wrote, one per layer; an import-linter report is the text
-// lint-imports printed. Named paths replace discovery for their kind. The
+// lint-imports printed. An Xcode .xcresult bundle, a directory that holds an
+// Info.plist, is both a test and a coverage report: discovery does not walk
+// into it. Named paths replace discovery for their kind. The
 // SBOM of the base is only named, never discovered, and each side keeps at most
 // one SBOM. A missing, unreadable or unrecognized report is a diagnostic.
 package reports
@@ -57,6 +59,9 @@ const (
 	// FormatImportLinter the text lint-imports prints.
 	FormatDeptrac      = "deptrac"
 	FormatImportLinter = "import-linter"
+	// FormatXCResult is an Xcode .xcresult bundle, which holds a job's tests
+	// and its coverage.
+	FormatXCResult = "xcresult"
 )
 
 // Report sources.
@@ -73,6 +78,9 @@ const (
 	CodeDiscoveryBounded   = "observe.discovery_bounded"
 	CodePatternInvalid     = "observe.report_pattern_invalid"
 	CodeSBOMAmbiguous      = "observe.sbom_ambiguous"
+	// CodeXCResultTestsSkipped is a discovered .xcresult bundle whose tests
+	// are not read because discovery found JUnit reports too.
+	CodeXCResultTestsSkipped = "observe.xcresult_tests_skipped"
 )
 
 // Bounds of discovery: the entries walked, the files sniffed, the reports
@@ -147,6 +155,7 @@ func Collect(req Request) ([]Report, []diag.Diagnostic) {
 	}
 	if len(discover) > 0 {
 		found, d := discoverReports(req.Root, discover)
+		found, d = bundleTestsBesideJUnit(found, d)
 		// A file named as the base SBOM is not the commit's.
 		found = slices.DeleteFunc(found, func(r Report) bool {
 			return r.Kind == KindSBOM && slices.ContainsFunc(reports, func(n Report) bool { return n.Kind == KindBaseSBOM && n.Path == r.Path })
@@ -197,20 +206,24 @@ func collectNamed(req Request, kind string, patterns []string) ([]Report, []diag
 				diags = append(diags, diag.Warningf(CodeDiscoveryBounded, kind,
 					"the --%s pattern %q stopped after %d entries or %d reports: name the reports more narrowly", kind, pattern, MaxWalkedEntries, MaxReports))
 			}
-		} else if info, err := os.Stat(abs); err == nil && info.Mode().IsRegular() {
+		} else if info, err := os.Stat(abs); err == nil && (info.Mode().IsRegular() || info.IsDir() && IsXCResultBundle(abs)) {
 			files = []string{abs}
 		}
 		if len(files) == 0 {
+			if info, err := os.Stat(abs); err == nil && info.IsDir() && strings.HasSuffix(strings.ToLower(abs), xcresultSuffix) {
+				diags = append(diags, diag.Warningf(CodeReportUnrecognized, kind, "the --%s report %q is no .xcresult bundle: it holds no %s", kind, pattern, xcresultInfo))
+				continue
+			}
 			diags = append(diags, diag.Warningf(CodeReportMissing, kind, "the --%s report %q matches no file", kind, pattern))
 			continue
 		}
 		for _, file := range files {
-			format, err := sniffFile(file)
+			format, err := formatOf(file)
 			display := relative(req.Root, file)
 			switch {
 			case err != nil:
 				diags = append(diags, diag.Warningf(CodeReportUnreadable, kind, "the %s report %s cannot be read: %v", label(kind), display, err))
-			case kindOf(format) != family(kind):
+			case !holds(format, family(kind)):
 				diags = append(diags, diag.Warningf(CodeReportUnrecognized, kind, "%s is not a %s report%s", display, label(kind), recognizedAs(format)))
 			default:
 				reports = append(reports, Report{Path: display, Kind: kind, Format: format, Source: SourceNamed})
@@ -239,6 +252,14 @@ func discoverReports(root string, kinds map[string]bool) ([]Report, []diag.Diagn
 		if entry.IsDir() {
 			if file == root {
 				return nil
+			}
+			if IsXCResultBundle(file) {
+				for _, kind := range []string{KindJUnit, KindCoverage} {
+					if kinds[kind] {
+						reports = append(reports, Report{Path: relative(root, file), Kind: kind, Format: FormatXCResult, Source: SourceDiscovered})
+					}
+				}
+				return filepath.SkipDir
 			}
 			if skippedDirs[entry.Name()] || skippedOutputs[filepath.Base(filepath.Dir(file))][entry.Name()] {
 				return filepath.SkipDir
@@ -352,6 +373,40 @@ func candidate(name string) bool {
 	return false
 }
 
+// holds reports whether a report of format holds a report of kind: an
+// .xcresult bundle holds both tests and coverage.
+func holds(format, kind string) bool {
+	if format == FormatXCResult {
+		return kind == KindJUnit || kind == KindCoverage
+	}
+	return kindOf(format) == kind
+}
+
+// xcresultSuffix names an Xcode result bundle, and xcresultInfo the file
+// every bundle holds at its top.
+const (
+	xcresultSuffix = ".xcresult"
+	xcresultInfo   = "Info.plist"
+)
+
+// IsXCResultBundle reports whether dir is an Xcode result bundle: a directory
+// named *.xcresult that holds an Info.plist.
+func IsXCResultBundle(dir string) bool {
+	if !strings.HasSuffix(strings.ToLower(filepath.Base(dir)), xcresultSuffix) {
+		return false
+	}
+	info, err := os.Stat(filepath.Join(dir, xcresultInfo))
+	return err == nil && info.Mode().IsRegular()
+}
+
+// formatOf returns the report format of a file, or of an .xcresult bundle.
+func formatOf(file string) (string, error) {
+	if info, err := os.Stat(file); err == nil && info.IsDir() && IsXCResultBundle(file) {
+		return FormatXCResult, nil
+	}
+	return sniffFile(file)
+}
+
 func kindOf(format string) string {
 	switch format {
 	case FormatJUnit, FormatTRX:
@@ -387,6 +442,25 @@ func label(kind string) string {
 		return "architecture"
 	}
 	return "coverage"
+}
+
+// bundleTestsBesideJUnit drops the tests of the discovered .xcresult bundles
+// when discovery found a JUnit report too: a job that keeps its bundle and
+// converts it would count each case twice, and the names a converter gives a
+// case do not reliably match the bundle's. The bundles keep their coverage,
+// which merges by line.
+func bundleTestsBesideJUnit(found []Report, diags []diag.Diagnostic) ([]Report, []diag.Diagnostic) {
+	isBundleTests := func(r Report) bool { return r.Kind == KindJUnit && r.Format == FormatXCResult }
+	if !slices.ContainsFunc(found, func(r Report) bool { return r.Kind == KindJUnit && r.Format != FormatXCResult }) {
+		return found, diags
+	}
+	for _, r := range found {
+		if isBundleTests(r) {
+			diags = append(diags, diag.Warningf(CodeXCResultTestsSkipped, r.Path,
+				"the tests of the .xcresult bundle %s are not read: discovery found JUnit reports elsewhere in the repository too, which may hold its conversion; to read its tests, name with --junit the bundle and the JUnit reports that are not its conversion", r.Path))
+		}
+	}
+	return slices.DeleteFunc(found, isBundleTests), diags
 }
 
 // oneSBOMPerSide keeps at most one SBOM per side: several make that side
@@ -626,6 +700,14 @@ func glob(pattern string) ([]string, bool) {
 		}
 		if entry.IsDir() {
 			if file != walk && skippedDirs[entry.Name()] {
+				return filepath.SkipDir
+			}
+			if file != walk && IsXCResultBundle(file) {
+				// A bundle is one report: it matches whole, and its own
+				// files are none.
+				if rel, err := filepath.Rel(walk, file); err == nil && matchSegments(rest, strings.Split(filepath.ToSlash(rel), "/")) {
+					files = append(files, filepath.Join(start, rel))
+				}
 				return filepath.SkipDir
 			}
 			return nil

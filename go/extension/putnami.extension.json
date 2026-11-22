@@ -448,7 +448,7 @@
         },
         "docker-tag": {
           "type": "string",
-          "description": "Override Docker image tag"
+          "description": "Extra local alias next to the content-addressed tag: a bare tag tags the project's image, a reference holding ':' or '/' is used as given"
         },
         "docker-base-image": {
           "type": "string",
@@ -478,7 +478,7 @@
         },
         "port": {
           "type": "number",
-          "description": "Container port to expose, 3000 by default"
+          "description": "Container port the image sets as PORT and exposes; defaults to the project's options.serve.port, then 8080 like putnami serve"
         },
         "archives": { "type": "boolean", "default": false, "description": "Create platform-specific archive packages" },
         "go": { "type": "boolean", "default": false, "description": "Prepare Go module for publishing" },

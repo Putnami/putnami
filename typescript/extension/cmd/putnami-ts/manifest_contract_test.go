@@ -416,6 +416,7 @@ func TestTaskEffectTable(t *testing.T) {
 		"build-transpile":     {"toolchain-cache"},
 		"build-types":         {"toolchain-cache"},
 		"config-extract-exec": {"toolchain-cache"},
+		"deps-edit-exec":      {"network", "toolchain-cache", "workspace-files"},
 		"deps-upgrade-exec":   {"network", "toolchain-cache", "workspace-files"},
 		"package-docker":      {"network", "toolchain-cache"},
 		// The archive step bundles its entry points with bun, which reads and
@@ -661,6 +662,33 @@ func TestGenerateKeysPublicAcrossTheDependencyClosure(t *testing.T) {
 	}
 	if got := proto.RequiredCLIContract(m); got > m.CLIContract {
 		t.Errorf("the manifest is stamped %d and requires %d", m.CLIContract, got)
+	}
+}
+
+// TestGenerateKeysTheConfFiles pins that the generate key reads the conf
+// files the bundled serve entry embeds, conf/.env.yaml and every
+// conf/.env.<env>.yaml of the project, so an edit to one moves the generate
+// key and the compile key that folds it.
+func TestGenerateKeysTheConfFiles(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "compiled-service-config", "the-generate-key-reads-the-conf-files")
+	m := loadExtensionManifest(t)
+	generate, ok := m.Tasks["build-generate"]
+	if !ok {
+		t.Fatal("manifest task \"build-generate\" is missing")
+	}
+	key := proto.DeriveTaskCacheKey(generate.Inputs)
+	for _, file := range []string{"conf/.env.yaml", "conf/.env.*.yaml"} {
+		if !slices.Contains(key.Files, file) {
+			t.Errorf("generate key files = %v, want %q", key.Files, file)
+		}
+	}
+	for _, file := range []string{"!conf/.env.local.yaml", "!conf/.env.prod.yaml"} {
+		if !slices.Contains(key.Files, file) {
+			t.Errorf("generate key files = %v, want %q: a machine-local override is never embedded", key.Files, file)
+		}
+	}
+	if slices.ContainsFunc(key.Files, func(file string) bool { return strings.Contains(file, ".secrets") }) {
+		t.Errorf("generate key files = %v read a secrets file the entry never embeds", key.Files)
 	}
 }
 
@@ -1275,4 +1303,37 @@ func TestArchivesStepActivatesOnlyOnATypeScriptProject(t *testing.T) {
 		return
 	}
 	t.Fatal("package command has no package-archives step")
+}
+
+// TestThePortConfigKeysTheImageThroughTheCompileStep pins where the image
+// port's conf files enter the docker step's key. package-docker keeps the
+// default project-tree hash, which skips hidden files, so the two conf files
+// are config inputs of build-compile, whose key the docker step folds. A files
+// list on package-docker would replace that tree hash for the image step of an
+// image project and make every git-ignored file it selects a required input.
+func TestThePortConfigKeysTheImageThroughTheCompileStep(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "image-on-a-fresh-workspace", "the-image-port-is-the-project-port")
+	m := loadExtensionManifest(t)
+	docker := m.Tasks["package-docker"]
+	if docker.Cache != nil && docker.Cache.Key != nil && len(docker.Cache.Key.Files) > 0 {
+		t.Errorf("package-docker cache key files = %v, want none: the default project-tree hash", docker.Cache.Key.Files)
+	}
+	var dockerStep *proto.PipelineStep
+	for i, step := range m.Commands["package"].Run {
+		if step.ID == "docker" {
+			dockerStep = &m.Commands["package"].Run[i]
+		}
+	}
+	if dockerStep == nil || dockerStep.Task != "package-docker" || !slices.Contains(dockerStep.DependsOn, "compile") {
+		t.Fatalf("package's docker step = %+v, want package-docker after compile, whose key holds the port config", dockerStep)
+	}
+	config, ok := m.Tasks["build-compile"].Inputs["config"]
+	if !ok {
+		t.Fatal("build-compile declares no config input")
+	}
+	for _, want := range []string{"conf/.env.yaml", "conf/.env.production.yaml"} {
+		if !slices.Contains(config.Files, want) {
+			t.Errorf("build-compile config input files = %v, want %q among them", config.Files, want)
+		}
+	}
 }

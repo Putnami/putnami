@@ -421,6 +421,47 @@
           "items": {
             "$ref": "#/$defs/failingCase"
           }
+        },
+        "cases": {
+          "type": "array",
+          "maxItems": 10000,
+          "description": "Each test case that ran in the component, at most 50000 over the document. A case's suite and name are its stable id, unique in the entry. Absent when the producer lists no case.",
+          "items": {
+            "$ref": "#/$defs/testCase"
+          }
+        },
+        "omittedCases": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "The cases the producer left out of cases to keep within the bounds, or because their report gave their id to another case. A case vanished only when the later entry carries cases and omits none."
+        }
+      }
+    },
+    "testCase": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "outcome"
+      ],
+      "properties": {
+        "suite": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "The suite or class that holds the case."
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "passed",
+            "failed",
+            "skipped"
+          ]
         }
       }
     },

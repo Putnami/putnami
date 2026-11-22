@@ -6,7 +6,7 @@ Putnami applications are composed from plugins. Each plugin can hook into a life
 
 A plugin is an object that implements one or more lifecycle hooks:
 
-```ts
+```ts nocheck
 import type { Module, Plugin, GenerateResult } from '@putnami/application';
 import type { ReadyEndpoint } from '@putnami/runtime/jobs';
 
@@ -46,8 +46,9 @@ export function routeTypesPlugin(): Plugin {
 
       writeFileSync('.gen/routes.d.ts', types);
 
+      // Each asset maps the path it is published at to the file written
       return {
-        files: ['.gen/routes.d.ts'],
+        assets: { '.gen/routes.d.ts': '.gen/routes.d.ts' },
       };
     },
   };
@@ -297,7 +298,9 @@ export class HealthCheckPlugin implements Plugin {
 // Usage
 const healthCheck = new HealthCheckPlugin();
 healthCheck.addCheck('database', async () => {
-  return await database().query('SELECT 1');
+  const sql = await database();
+  await sql`SELECT 1`;
+  return true;
 });
 
 const app = application()
@@ -549,7 +552,7 @@ export function typeGenPlugin(): Plugin {
     async generate(app) {
       // Only runs during `putnami build`
       await generateTypes();
-      return { files: ['.gen/types.ts'] };
+      return { assets: { '.gen/types.ts': '.gen/types.ts' } };
     },
     // No runtime hooks
   };

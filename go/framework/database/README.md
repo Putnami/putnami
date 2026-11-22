@@ -257,7 +257,7 @@ migrator := database.NewMigrator(stdDB, database.MigrationConfig{
 applied, err := migrator.Up(ctx)    // Run pending migrations
 last, err := migrator.Rollback(ctx) // Roll back the most recent migration
 status, err := migrator.Status(ctx) // Read recorded migrations without DDL or a writer lock
-err = migrator.Reset(ctx)           // Roll back every applied migration
+reset, err := migrator.Reset(ctx)   // Roll back every applied migration
 ```
 
 `Status` and drift inspection are safe for the restricted application runtime
@@ -337,7 +337,7 @@ One `databases` entry is emitted per logical datasource:
 Schemas for the same database are merged into a sorted union, so two libraries
 that migrate the same datasource contribute their schemas additively.
 
-```go
+```go nocheck
 Pool: database.PoolConfig{
     DSN:      os.Getenv("DATABASE_URL"),
     Database: "primary",      // → databases[].name

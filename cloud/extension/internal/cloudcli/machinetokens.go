@@ -28,8 +28,25 @@ import (
 //	putnami cloud token create --name <n> --scopes <s,...> [--allowed-clients <name,...>] [--allowed-client-ids <uuid,...>] [--expires <dur>]
 //	putnami cloud token list
 //	putnami cloud token revoke <id|name>
+//
+// With --organization <id>, create, list and revoke manage that organization's
+// ingest tokens instead (orgtokens.go), with no workspace.
 func machineTokens(params map[string]any, args []string, workspaceRoot string, env map[string]string, ioctx IO) error {
-	switch sub := clicore.FirstPositional(args); sub {
+	sub := clicore.FirstPositional(args)
+	if organizationID := organizationParam(params); organizationID != "" {
+		switch sub {
+		case "create":
+			return organizationTokensCreate(params, organizationID, workspaceRoot, env, ioctx)
+		case "list":
+			return organizationTokensList(params, organizationID, workspaceRoot, env, ioctx)
+		case "revoke":
+			return organizationTokensRevoke(params, args, organizationID, workspaceRoot, env, ioctx)
+		case "", "help":
+		default:
+			return newError("cloud token "+sub+" takes no --organization; it serves create, list and revoke", ExitUsage)
+		}
+	}
+	switch sub {
 	case "create":
 		return machineTokensCreate(params, workspaceRoot, env, ioctx)
 	case "list":
@@ -310,6 +327,12 @@ func activeMachineTokens(rows []map[string]any) []map[string]any {
 // idempotent; otherwise a unique name match among live tokens is used.
 // Ambiguous or missing names are usage errors so a revoke never guesses.
 func resolveMachineTokenID(rows []map[string]any, target string) (string, error) {
+	return resolveTokenID(rows, target, "workspace machine token")
+}
+
+// resolveTokenID is resolveMachineTokenID for any token list; kind names the
+// tokens in its refusals.
+func resolveTokenID(rows []map[string]any, target, kind string) (string, error) {
 	for _, row := range rows {
 		if valueString(row, "id") == target {
 			return target, nil
@@ -325,9 +348,9 @@ func resolveMachineTokenID(rows []map[string]any, target string) (string, error)
 	case 1:
 		return matches[0], nil
 	case 0:
-		return "", newError(fmt.Sprintf("no workspace machine token matches %q", target), ExitUsage)
+		return "", newError(fmt.Sprintf("no %s matches %q", kind, target), ExitUsage)
 	default:
-		return "", newError(fmt.Sprintf("%q matches multiple machine tokens (%s); revoke by id", target, strings.Join(matches, ", ")), ExitUsage)
+		return "", newError(fmt.Sprintf("%q matches multiple %ss (%s); revoke by id", target, kind, strings.Join(matches, ", ")), ExitUsage)
 	}
 }
 

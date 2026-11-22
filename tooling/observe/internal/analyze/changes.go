@@ -1,6 +1,7 @@
 package analyze
 
 import (
+	"path"
 	"sort"
 
 	"go.putnami.dev/protocol/evidence"
@@ -63,6 +64,12 @@ func (r *Result) dependencyChanges(in Input) {
 		return
 	}
 	for _, file := range in.ChangedFiles {
+		if path.Base(file.Path) == lockdiff.BunLockBinary {
+			if file.Status != gitbase.StatusDeleted {
+				r.warn(CodeLockfileUnsupported, file.Path, "the lockfile %s is Bun's binary lockfile, which is not read: Bun 1.2 and later write the text lockfile bun.lock", file.Path)
+			}
+			continue
+		}
 		ecosystem, read, ok := lockReader(in, file.Path)
 		if !ok {
 			continue

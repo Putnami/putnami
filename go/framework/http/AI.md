@@ -192,7 +192,7 @@ lives at `websocket.go`. SSE serving is at `stream.go::serveSSE`.
 
 A route may declare the single `Sec-WebSocket-Protocol` token it speaks:
 
-```go
+```go nocheck
 plugin.HandleStream("/chat", http.StreamHandler{
     Mode:        http.StreamModeBidirectional,
     Subprotocol: "example.chat.v1",
@@ -259,7 +259,9 @@ apiPlugin.Register(api.Endpoint("POST", "/users").
         return http.JSONStatus(201, svc.Create(body))
     })))
 
-app.New("myapp").Use(httpServer).Use(apiPlugin).ListenAndServe()
+a := app.New("myapp")
+a.Use(httpServer).Use(apiPlugin)
+a.ListenAndServe()
 ```
 
 See `go.putnami.dev/api` (and its `AI.md`) for the full builder reference.

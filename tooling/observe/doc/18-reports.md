@@ -1,7 +1,7 @@
 # Reports
 
 `putnami observe` reads test reports, coverage reports, software bills of
-materials (SBOM) and architecture results with one set of readers, `@putnami/evidence-readers`. The
+materials (SBOM) and architecture results with one set of readers, `go.putnami.dev/evidence/readers`. The
 TypeScript extension reads bun's test and coverage reports with the same
 readers. This page says what each reader keeps from a report and when it
 rejects one.
@@ -17,6 +17,7 @@ failure or skip message.
 |---|---|---|
 | JUnit XML | A root `testsuites` or `testsuite` element | One case per `testcase` element. A `failure` or an `error` element fails the case. A case without a `file` takes the one of its nearest suite. |
 | TRX | A root `TestRun` element, as `dotnet test --logger trx` writes it | One case per top-level `UnitTestResult`. Its class name comes from the test method, and its suite is the test assembly. A TRX report names no test file. |
+| `.xcresult` bundle | A `*.xcresult` directory that holds an `Info.plist`, read through `xcrun xcresulttool get test-results tests` | One case per `Test Case` node. Its class name is the test bundle and the outermost suite, `Module.Class`; its suites the test plan, the bundle and the suites. The first failure message is the case's message. It names no test file. |
 
 TRX outcomes map to the three statuses:
 
@@ -28,6 +29,12 @@ TRX outcomes map to the three statuses:
 
 The inner results of a data-driven test are not cases: their parent stands
 for them.
+
+`.xcresult` results map the same way: `Passed` and `Expected Failure` pass,
+`Failed` fails, and any other result, `Skipped` included, skips. A retried or
+parameterized case is one case, with its own result. See
+[iOS and Swift](/docs/tooling-&-workspace/observe/swift#reports) for the
+commands and what happens without `xcrun`.
 
 ## Coverage reports
 
@@ -41,6 +48,7 @@ hit counts, and its line and function totals.
 | Clover XML | Each line and its count. A file's `path` wins over its `name`. |
 | JaCoCo XML, Kover included | Whether each line ran, not how often: a line with a covered instruction counts one hit. A file is its package path and source file name, such as `com/acme/pricing/Price.kt`. The modules of a `report-aggregate` report are all read. |
 | Go cover profile | Each block marks every line from its start to its end. Paths are import paths, such as `example.com/calc/calc.go`. |
+| `.xcresult` bundle | Each executable line and how often it ran, from `xcrun xccov view --archive --json`; a file only `xccov view --report --json` lists keeps its line totals. Paths are absolute, on the machine that ran the tests. |
 
 A line stated twice keeps its largest count. `putnami observe` then maps each
 path to a file of the repository, and each file to its component: see
@@ -74,7 +82,10 @@ A reader never returns half a report. It rejects a report whole, and
 - it is larger than 256 MiB, or marks more than 4,000,000 lines;
 - it is an SBOM of another format or version.
 
-The other reports of the job are still read.
+The other reports of the job are still read. An `.xcresult` bundle whose
+`xcrun` command fails, or prints what a reader rejects, is
+`observe.xcresult_unread` instead, and one read on a runner without `xcrun`
+is `observe.xcresult_tools_missing`.
 
 ## Architecture results
 

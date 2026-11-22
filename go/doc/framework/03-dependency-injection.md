@@ -73,7 +73,7 @@ reg := inject.AutoProvide(NewUserService)
 
 Supported constructor signatures:
 
-```go
+```go nocheck
 func() T
 func() (T, error)
 func(dep1 A, dep2 B) T
@@ -102,7 +102,6 @@ inject.Provide(token, factory,
     inject.WithDeps(inject.TokenOf[*Database]()),
     inject.WithOnClose(func() error { return db.Close() }),
     inject.WithLazy(),
-    inject.WithDynamic(),
 )
 ```
 
@@ -114,7 +113,6 @@ inject.Provide(token, factory,
 | `WithDeps(...)` | — | Explicit dependency declarations for validation |
 | `WithOnClose(fn)` | — | Cleanup hook called on `Close()` |
 | `WithLazy()` | — | Skip resolution at startup; resolve on first access |
-| `WithDynamic()` | — | Allow refresh after startup |
 
 ## Container
 

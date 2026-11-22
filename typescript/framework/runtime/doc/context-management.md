@@ -110,7 +110,7 @@ const app = application()
 
 await app.start();
 
-await app.scope(async (scope) => {
+await app.context.scope(async (scope) => {
   const logger = scope.get(RequestLogger);
   logger.log('Processing request'); // [abc-123] Processing request (5ms)
 });
@@ -162,12 +162,12 @@ console.log(ctx.userId); // TypeScript knows this exists
 
 ## Integration with HTTP Handlers
 
-In a typical HTTP application, `app.scope()` wraps each request:
+In a typical HTTP application, `app.context.scope()` wraps each request:
 
 ```typescript
 // The framework handles this automatically, but conceptually:
 export async function handler(req: Request) {
-  return await app.scope(async (scope) => {
+  return await app.context.scope(async (scope) => {
     const userService = scope.get(UserService);
     return userService.getCurrentUser();
   });
@@ -186,7 +186,7 @@ Context only propagates through async operations. Synchronous code outside the a
 
 ### Scoped Services Not Working
 
-Scoped services require a scope. Make sure you're calling `scope.get()` inside `app.scope()`.
+Scoped services require a scope. Make sure you're calling `scope.get()` inside `app.context.scope()`.
 
 ## Next Steps
 

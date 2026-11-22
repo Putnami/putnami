@@ -1,0 +1,17 @@
+{
+  "include": [
+    "typescript/doc/**/*.md",
+    "typescript/framework/*/AI.md",
+    "typescript/framework/**/doc/**/*.md",
+    "typescript/extension/AI.md",
+    "typescript/extension/doc/**/*.md",
+    "sites/putnami.dev/doc/**/*.md",
+    "tooling/doc/**/*.md",
+    "tooling/sdd-extension/doc/**/*.md",
+    "tooling/observe/doc/**/*.md",
+    "typescript/framework/*/README.md",
+    "typescript/extension/README.md",
+    "tooling/extension-sdk/doc/**/*.md"
+  ],
+  "exclude": ["**/adr/**"]
+}

@@ -1,0 +1,19 @@
+{
+  "include": [
+    "go/doc/**/*.md",
+    "go/framework/**/AI.md",
+    "go/framework/**/doc/**/*.md",
+    "go/extension/AI.md",
+    "go/extension/doc/**/*.md",
+    "sites/putnami.dev/doc/**/*.md",
+    "tooling/doc/**/*.md",
+    "tooling/sdd-extension/doc/**/*.md",
+    "tooling/observe/doc/**/*.md",
+    "go/framework/**/README.md",
+    "go/extension/README.md",
+    "tooling/extension-sdk/doc/**/*.md"
+  ],
+  "exclude": [
+    "**/adr/**"
+  ]
+}

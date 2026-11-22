@@ -67,6 +67,20 @@
         }
       },
       {
+        "id": "generated-service-recipe",
+        "stage": "coded",
+        "evidenceKinds": [
+          "attestation"
+        ],
+        "verification": {
+          "kind": "acceptance",
+          "checks": [
+            "the-guidance-links-the-recipe-of-each-loaded-language",
+            "every-linked-recipe-is-a-published-page"
+          ]
+        }
+      },
+      {
         "id": "support-maturity-separation",
         "stage": "coded",
         "evidenceKinds": [

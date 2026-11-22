@@ -5,7 +5,7 @@
 ## Installation
 
 ```bash
-bunx putnami deps add @putnami/events
+putnami deps add @putnami/events
 ```
 
 ## Quick Start

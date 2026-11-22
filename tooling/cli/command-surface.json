@@ -560,6 +560,10 @@
           "type": "value"
         },
         {
+          "long": "--template",
+          "type": "value"
+        },
+        {
           "long": "--workspace",
           "type": "value"
         }
@@ -1070,6 +1074,10 @@
         },
         {
           "long": "--project-path",
+          "type": "value"
+        },
+        {
+          "long": "--template",
           "type": "value"
         },
         {

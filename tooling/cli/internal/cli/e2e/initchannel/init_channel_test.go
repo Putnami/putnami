@@ -44,7 +44,7 @@ const (
 	templatePath    = "/putnami/go-server/download"
 
 	typeScriptExtensionPath = "/putnami/typescript/download"
-	typeScriptTemplatePath  = "/putnami/typescript-web/download"
+	typeScriptTemplatePath  = "/putnami/typescript-server/download"
 
 	// starterNPMRegistry is the registry the TypeScript starter declares for the
 	// @putnami scope.
@@ -233,8 +233,8 @@ func TestInit_OnACandidateChannelHandsTheTypeScriptInstallerTheChannelAndItsRegi
 	if pin, ok := lock.GetExtension("@putnami/typescript"); !ok || pin.Version != candidateSet.extension {
 		t.Errorf("extensions.@putnami/typescript = %+v (present %v), want %s\n%s", pin, ok, candidateSet.extension, output)
 	}
-	if pin, ok := lock.GetTemplate("typescript-web"); !ok || pin.Version != candidateSet.template {
-		t.Errorf("templates.typescript-web = %+v (present %v), want %s\n%s", pin, ok, candidateSet.template, output)
+	if pin, ok := lock.GetTemplate("typescript-server"); !ok || pin.Version != candidateSet.template {
+		t.Errorf("templates.typescript-server = %+v (present %v), want %s\n%s", pin, ok, candidateSet.template, output)
 	}
 	if data, err := os.ReadFile(filepath.Join(h.root, "webapp", "template.txt")); err != nil || string(data) != "template "+candidateSet.template+"\n" {
 		t.Errorf("webapp/template.txt = %q, %v; want the template release %s", data, err, candidateSet.template)
@@ -686,7 +686,7 @@ func templateArchive(t *testing.T, version string) []byte {
 	})
 }
 
-// typeScriptTemplateArchive is the fixture typescript-web template at version.
+// typeScriptTemplateArchive is the fixture typescript-server template at version.
 // It renders its own release into a text file and declares no package, so no
 // package manager runs.
 func typeScriptTemplateArchive(t *testing.T, version string) []byte {
@@ -695,7 +695,7 @@ func typeScriptTemplateArchive(t *testing.T, version string) []byte {
 		{name: "template.txt", mode: 0o644, content: "template " + version + "\n"},
 		{name: "putnami.json.template", mode: 0o644, content: `{"name":"<%= projectName %>","extensions":["@putnami/typescript"]}`},
 		{name: "putnami.template.json", mode: 0o644,
-			content: `{"name":"typescript-web","description":"TypeScript web","extension":"@putnami/typescript","version":"` + version + `"}`},
+			content: `{"name":"typescript-server","description":"TypeScript server","extension":"@putnami/typescript","version":"` + version + `"}`},
 	})
 }
 

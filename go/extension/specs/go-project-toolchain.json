@@ -245,6 +245,13 @@
       ]
     },
     {
+      "id": "image-tag-and-port",
+      "text": [
+        "A --docker-tag that holds a ':' or a '/' is the whole alias reference; a bare tag tags the project's image.",
+        "The image sets and exposes PORT: --port or options.package.port, else the project's options.serve.port, else 8080, the port putnami serve falls back to; a value that is not an integer between 1 and 65535 is skipped with a warning."
+      ]
+    },
+    {
       "id": "image-packager-route",
       "text": [
         "When a project's publish route names another extension as the producer of its OCI image, publication plans no Go image step, and no cross-compile step unless the archives channel consumes it;",
@@ -270,6 +277,14 @@
         "An extension with agent content ships, in every platform archive, one tree built from its authored source, bound by the packaged manifest's digest and stamped with the agent-content contract; a manifest without content keeps the base contract.",
         "The content takes the name putnami.extension.json declares, under which the archive publishes, and the stamped package version; a package.json name must agree.",
         "Forbidden content, a disagreeing package.json name and bytes that differ from the digest fail packaging."
+      ]
+    },
+    {
+      "id": "archive-guidance-is-self-contained",
+      "text": [
+        "An extension archive ships the project's doc and specs trees beside its README.md and AI.md, so a relative link of the archive's root README.md or AI.md names a file the installed archive carries.",
+        "Packaging warns, naming the file and the target, for each relative link of the archive's root README.md or AI.md that does not resolve inside the staged archive.",
+        "Only the @putnami/go archive bundles the Go framework guidance under framework-docs; no other extension archive carries it."
       ]
     },
     {

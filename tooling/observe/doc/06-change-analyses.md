@@ -3,7 +3,8 @@
 `putnami observe` reads the repository's manifests, the git diff, the test and
 coverage reports, the lockfiles and the software bills of materials (SBOM).
 It runs no package manager, no orchestrator, no test and no SBOM tool, and
-queries no vulnerability database.
+queries no vulnerability database; it runs `xcrun` only to read an Xcode
+`.xcresult` bundle (see [iOS and Swift](/docs/tooling-&-workspace/observe/swift#reports)).
 
 ## Components
 
@@ -126,6 +127,22 @@ A JUnit or TRX case goes to the first of:
 
 A case that none of them places is counted in `observe.tests_unattributed`.
 
+The evidence document lists each case a component ran in its tests entry's
+`cases`: its suite (its class name, else its innermost suite), its name and
+its outcome. The suite and name are the case's stable id, so a reader compares
+two changes case by case and tells a test that vanished from one that still
+passes. A case read twice under one id, such as a rerun, is listed once:
+failed when any run failed, else passed when any passed, else skipped. Two
+cases of one report under one id are a rerun in the report, or two tests it
+does not tell apart, such as top-level node:test tests of two files: the id is
+listed once, and the other cases count in the entry's `omittedCases` and in
+`observe.test_cases_ambiguous`, so a reader does not take the entry as listing
+every case. A
+component lists at most 10000 cases and the document at most 50000; the
+failed cases of every component come first, then the others, in component
+order. The rest are counted in the entry's `omittedCases` and in an
+`observe.test_cases_bounded` warning.
+
 A coverage report names files. A JaCoCo file, a package path, is first read
 under the `src/main/java` or `src/main/kotlin` of a component; see
 [Gradle and Maven](/docs/tooling-&-workspace/observe/jvm#reports). A path is read in this order: absolute under
@@ -158,6 +175,7 @@ Each changed lockfile is read at the merge base and at the head:
 | `package-lock.json` | `npm` | `packages`, else the nested `dependencies` of version 1; links left out |
 | `pnpm-lock.yaml` | `npm` | the keys of `packages`, versions 5 to 9; `file:` and `link:` packages left out |
 | `yarn.lock` | `npm` | classic and Berry entries; `workspace:`, `link:`, `portal:` and `file:` left out |
+| `bun.lock`, the text lockfile of Bun 1.2 and later | `npm` | each entry of `packages`, by the name and version its first member names; `workspace:`, `link:`, `file:` and `root:` entries left out |
 | `npm-shrinkwrap.json` of a Rush monorepo | `npm` | as `package-lock.json` |
 | `composer.lock` | `composer` | `packages` and `packages-dev`; path packages left out |
 | `go.mod` | `go` | the requires, after the `go.mod` replace directives; modules of the repository and local replacements left out |
@@ -167,6 +185,7 @@ Each changed lockfile is read at the merge base and at the head:
 | a Pants resolve lockfile | `pypi` | each locked requirement of the PEX JSON lock a `[python.resolves]` entry of `pants.toml` names |
 | `gradle.lockfile`, `settings-gradle.lockfile` | `maven` | each `group:artifact:version` line, as `group:artifact` |
 | a Gradle version catalog, `gradle/*.versions.toml` | `maven` | each library as `group:artifact` and each plugin as its id, at its version, `version.ref` or rich version |
+| each POM of a Maven build, `pom.xml` | `maven` | the parent and each dependency of `dependencies` and `dependencyManagement`, as `group:artifact` at the version the POM declares; modules of the repository left out. See [JVM](/docs/tooling-&-workspace/observe/jvm). |
 | `Package.resolved` | `swift` | each pin of format versions 1 to 3, at its version, else its revision |
 | `Podfile.lock` | `cocoapods` | each entry of `PODS`, by its root pod; pods from a `:path:` left out |
 | `pubspec.lock` | `pub` | each entry of `packages`; `path` and `sdk` sources left out |
@@ -179,13 +198,15 @@ A Rush monorepo keeps its lockfile under `common/config/rush/`: `pnpm-lock.yaml`
 and in pnpm mode one `pnpm-lock.yaml` per subspace under
 `common/config/subspaces/<name>/`. Its `@rush-temp/` packages are Rush's own
 projects and are left out. `go.sum` holds checksums, not versions, and is not
-read. A Python package
+read. `bun.lockb`, the binary lockfile of Bun before 1.2, is not read: a
+change that adds or edits one gets `observe.lockfile_unsupported`. A Python package
 name is read in its normalized form (PEP 503): lower case, with each run of
 `-`, `_` and `.` as one `-`, so `Typing_Extensions` is `typing-extensions`. A package found on
 one side only is `added` or `removed`. A package whose versions differ is
 `upgraded` or `downgraded`, or `changed` when the versions do not compare or
-the package has several versions. A lockfile that cannot be read gets
-`observe.lockfile_unreadable`. The dependency change names the component that
+the package has several versions. A POM's versions are declared, not resolved:
+the summary and the pull request note mark its changes declared. A lockfile
+that cannot be read gets `observe.lockfile_unreadable`. The dependency change names the component that
 holds the lockfile, when one does.
 
 ## Licences and vulnerabilities
@@ -327,8 +348,11 @@ Another repository carries neither member and gets no diagnostic.
 |---|---|
 | `observe.report_unread` | A reader refused a report or an SBOM: it is malformed, too large or of an unsupported version. Its side is unknown. |
 | `observe.tests_unattributed` | Test cases of a report belong to no component. |
+| `observe.test_cases_ambiguous` | Test cases of a report share their suite and name with another of its cases, a rerun or a test it does not tell apart: each id is listed once and the others count as omitted. |
+| `observe.test_cases_bounded` | Test cases over the evidence bounds are left out of the tests entries' cases and counted in their `omittedCases`. |
 | `observe.coverage_unmapped` | Files of a coverage report are not files of the repository. |
 | `observe.lockfile_unreadable` | A changed lockfile cannot be read at the base or the head. |
+| `observe.lockfile_unsupported` | The change adds or edits a `bun.lockb`, Bun's binary lockfile, which is not read. |
 | `observe.changed_lines_unread` | The diff's changed lines cannot be read. |
 | `observe.sbom_ambiguous` | One side has several SBOMs, so none is read and that side is unknown. |
 | `observe.bazel_graph_missing` | A Bazel workspace has no query export, so its packages have no edge. An info diagnostic that names the export command. |

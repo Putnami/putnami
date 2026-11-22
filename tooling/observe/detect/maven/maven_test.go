@@ -87,6 +87,12 @@ func TestPOMModulesAreComponents(t *testing.T) {
 	if !reflect.DeepEqual(got.Components, want) {
 		t.Errorf("components %+v, want %+v", got.Components, want)
 	}
+	if pom := []string{"integration-tests/pom.xml", "pom.xml", "pricing/pom.xml", "services/api/pom.xml", "services/pom.xml"}; !reflect.DeepEqual(got.POMs, pom) {
+		t.Errorf("POMs %v, want %v", got.POMs, pom)
+	}
+	if !got.IsPOM("services/pom.xml") || got.IsPOM("services/api/build.xml") || !got.IsModule("com.acme:services") || got.IsModule("com.acme:api") {
+		t.Errorf("IsPOM or IsModule: POMs %v, modules %v", got.POMs, got.Modules)
+	}
 
 	single := writeTree(t, map[string]string{"pom.xml": module("calc", "<groupId>com.example</groupId>")})
 	if got := Detect(single); !reflect.DeepEqual(got.Components, []Component{{ID: ".", Name: "com.example:calc"}}) {

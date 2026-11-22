@@ -96,7 +96,7 @@ format ──→ check
 ## Support and contract
 
 `@putnami/typescript` is a public, documented, maintained package classified
-`stable` in the workspace [support catalog](../../putnami.support.json). The
+`stable` in the [support catalog](https://putnami.dev/docs/support). The
 [typescript-project-toolchain specification](specs/typescript-project-toolchain.json)
 states the observable promise, and three accepted decisions explain the durable
 choices behind it:
@@ -115,8 +115,8 @@ ordering, and structured test/coverage reports. Registry upload belongs to
 `publish`. Application framework behaviour belongs to the `@putnami/*` packages
 this extension builds. No default or cross-language parity claim is made. Before
 v1.0.0, minor `0.x` releases may contain documented breaking changes — see
-[RELEASE.md](../../RELEASE.md).
+[the support status page](https://putnami.dev/docs/support).
 
 ## License
 
-[FSL-1.1-MIT](../../LICENSE.md)
+[FSL-1.1-MIT](https://putnami.dev/LICENSE.md)

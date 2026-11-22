@@ -6,7 +6,7 @@ Components for rendering and navigating markdown content.
 
 Styled container for rendered markdown HTML. Provides consistent typography, code blocks, tables, blockquotes, images, and support for Shiki syntax highlighting and Mermaid diagrams.
 
-```typescript
+```typescript nocheck
 import { MarkdownContent, sanitizeHtml } from '@putnami/ui';
 
 <MarkdownContent dangerouslySetInnerHTML={{ __html: sanitizeHtml(htmlContent) }} />
@@ -37,7 +37,7 @@ Full-featured markdown rendering component with interactive features:
 - Code group tab switching with persistent language preference
 - Mermaid diagram rendering (lazy-loaded from CDN)
 
-```typescript
+```typescript nocheck
 import { MarkdownRenderer } from '@putnami/ui';
 
 <MarkdownRenderer html={renderedMarkdownHtml} />
@@ -66,7 +66,7 @@ import { MarkdownRenderer } from '@putnami/ui';
 
 Sticky table of contents sidebar with scroll-spy highlighting.
 
-```typescript
+```typescript nocheck
 import { MarkdownToc, type TocItem } from '@putnami/ui';
 
 const toc: TocItem[] = [

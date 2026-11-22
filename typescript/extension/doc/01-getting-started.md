@@ -20,13 +20,7 @@ when it fits, and installs one under the Putnami home otherwise. See
 
 ## Installation
 
-Add the extension to your workspace:
-
-```bash
-putnami deps add @putnami/typescript
-```
-
-Then declare it in each project's `putnami.json`:
+Declare the extension in each project's `putnami.json`:
 
 ```json
 {
@@ -34,7 +28,16 @@ Then declare it in each project's `putnami.json`:
 }
 ```
 
-Templates do this automatically when you scaffold a project.
+Then run `putnami extensions install`. Templates do this automatically when
+you scaffold a project.
+
+Add a package to a project with `putnami deps add`, never with `bun add`:
+
+```bash
+putnami deps add @putnami/database --projects api
+```
+
+See [Add and remove dependencies](./08-workspace-install.md#add-and-remove-dependencies).
 
 ## Project Structure
 

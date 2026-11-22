@@ -1,0 +1,58 @@
+{
+  "coveredLines" : 24,
+  "executableLines" : 24,
+  "lineCoverage" : 1.0,
+  "targets" : [
+    {
+      "buildProductPath" : "/Users/runner/Library/Developer/Xcode/DerivedData/Shop-ahnqzvbmyzcrdbfzkxqoyvvdhkpa/Build/Products/Debug-iphonesimulator/Shop.app",
+      "coveredLines" : 3,
+      "executableLines" : 3,
+      "files" : [
+        {
+          "coveredLines" : 3,
+          "executableLines" : 3,
+          "functions" : [],
+          "lineCoverage" : 1.0,
+          "name" : "Checkout.swift",
+          "path" : "/Users/runner/work/demo-observe-swift/demo-observe-swift/App/Shop/Checkout.swift"
+        }
+      ],
+      "lineCoverage" : 1.0,
+      "name" : "Shop.app"
+    },
+    {
+      "buildProductPath" : "/Users/runner/Library/Developer/Xcode/DerivedData/Shop-ahnqzvbmyzcrdbfzkxqoyvvdhkpa/Build/Products/Debug-iphonesimulator/Pricing.o",
+      "coveredLines" : 10,
+      "executableLines" : 10,
+      "files" : [
+        {
+          "coveredLines" : 10,
+          "executableLines" : 10,
+          "functions" : [],
+          "lineCoverage" : 1.0,
+          "name" : "PriceCalculator.swift",
+          "path" : "/Users/runner/work/demo-observe-swift/demo-observe-swift/Packages/Pricing/Sources/Pricing/PriceCalculator.swift"
+        }
+      ],
+      "lineCoverage" : 1.0,
+      "name" : "Pricing.o"
+    },
+    {
+      "buildProductPath" : "/Users/runner/Library/Developer/Xcode/DerivedData/Shop-ahnqzvbmyzcrdbfzkxqoyvvdhkpa/Build/Products/Debug-iphonesimulator/Networking.o",
+      "coveredLines" : 11,
+      "executableLines" : 11,
+      "files" : [
+        {
+          "coveredLines" : 11,
+          "executableLines" : 11,
+          "functions" : [],
+          "lineCoverage" : 1.0,
+          "name" : "Client.swift",
+          "path" : "/Users/runner/work/demo-observe-swift/demo-observe-swift/Packages/Networking/Sources/Networking/Client.swift"
+        }
+      ],
+      "lineCoverage" : 1.0,
+      "name" : "Networking.o"
+    }
+  ]
+}

@@ -86,7 +86,7 @@
       "text": [
         "The text summary ends with one line that names the next command: the report URL when an upload answered one;",
         "else, outside a CI, putnami observe --open;",
-        "else, in a CI job whose reporter is @putnami/cloud and that holds no PUTNAMI_CLOUD_TOKEN, the PUTNAMI_CLOUD_TOKEN setting and putnami cloud token create, which creates it;",
+        "else, in a CI job whose reporter is @putnami/cloud and that holds no PUTNAMI_CLOUD_TOKEN, that setting and putnami cloud token create --organization, which needs no workspace: in Putnami/observe-action, as its token input; in another GitHub Actions job without PUTNAMI_ORGANIZATION, after the ID token exchange;",
         "else --upload."
       ]
     },

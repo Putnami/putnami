@@ -200,7 +200,7 @@ export default action(async (ctx) => {
 ```typescript
 // src/app/posts/[id]/action.ts
 import { action } from '@putnami/web';
-import { Uuid, String } from '@putnami/application';
+import { Uuid } from '@putnami/application';
 
 export default action()
   .params({ id: Uuid })
@@ -626,7 +626,7 @@ export default loader(async (ctx) => {
 
 Use route IDs and `useRouteLoaderData`:
 
-```typescript
+```typescript nocheck
 // In a child component
 import { useRouteLoaderData } from '@putnami/web';
 

@@ -95,7 +95,7 @@ func TestSmokePS1PinsExactPublicCommands(t *testing.T) {
 	for _, command := range []string{
 		"irm https://putnami.dev/install.ps1 | iex",
 		`'irm "https://putnami.dev/install.ps1?run=' + $RunCommand + '" | iex'`,
-		"putnami init --project webapp --extension ts",
+		"putnami init --project webapp --extension ts --template typescript-web",
 		"putnami serve webapp",
 	} {
 		if !strings.Contains(src, command) {
@@ -281,7 +281,7 @@ func TestSmokePS1HandsItsChannelToInit(t *testing.T) {
 	body := smokePS1Body(t, "Invoke-Smoke")
 	cleared := strings.Index(body, "if ($name -match '^PUTNAMI_') { Set-SmokeEnv $name '' }")
 	exported := strings.Index(body, "Set-SmokeEnv 'PUTNAMI_CHANNEL' $Channel")
-	initLeg := strings.Index(body, "smoke: putnami init --project webapp --extension ts")
+	initLeg := strings.Index(body, "smoke: putnami init --project webapp --extension ts --template typescript-web")
 	if cleared < 0 || exported < 0 || initLeg < 0 {
 		t.Fatalf("smoke-check-release.ps1 misses a pinned line: clear %d, PUTNAMI_CHANNEL %d, init %d", cleared, exported, initLeg)
 	}

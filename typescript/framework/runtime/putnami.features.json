@@ -109,7 +109,8 @@
           "verification": {
             "kind": "acceptance",
             "checks": [
-              "the-five-built-in-sources-are-registered",
+              "the-built-in-sources-are-registered",
+              "an-embedded-conf-file-ranks-below-its-disk-copy",
               "config-data-outranks-file-sources",
               "a-higher-priority-source-wins-the-merge",
               "three-sources-merge-in-priority-order",

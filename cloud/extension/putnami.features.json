@@ -1204,6 +1204,109 @@
           }
         }
       ]
+    },
+    {
+      "id": "cloud/ingest-token",
+      "type": "feature",
+      "name": "Organization ingest tokens from the CLI",
+      "outcome": "A team with no Putnami workspace creates its organization's ingest token from the CLI, signed in, and stores it as the CI upload token: putnami cloud token create --organization prints it once, and list and revoke manage it without ever printing it again",
+      "owner": "cloud",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "create-calls-the-organization-route",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "organization-create-posts-the-name-and-expiry",
+              "organization-create-needs-no-linked-workspace"
+            ]
+          }
+        },
+        {
+          "id": "signs-in-outside-a-workspace",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "sign-in-and-token-commands-run-without-a-workspace"
+            ]
+          }
+        },
+        {
+          "id": "create-shows-the-token-once",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "organization-create-prints-the-token-once",
+              "organization-create-json-carries-the-token"
+            ]
+          }
+        },
+        {
+          "id": "create-refuses-another-scope",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "organization-create-refuses-another-scope"
+            ]
+          }
+        },
+        {
+          "id": "list-never-shows-the-secret",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "organization-list-prints-live-tokens-without-secret"
+            ]
+          }
+        },
+        {
+          "id": "revoke-resolves-the-token",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "organization-revoke-resolves-a-name-and-deletes"
+            ]
+          }
+        },
+        {
+          "id": "refusal-names-the-route",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "organization-refusal-names-the-route-and-reason"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

@@ -7,7 +7,7 @@
       "id": "evidence-readers/report-readers",
       "type": "feature",
       "name": "Test and coverage report readers",
-      "outcome": "A tool that observes a CI it does not run reads the JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports, the CycloneDX and SPDX documents and the ArchUnit, deptrac and import-linter results that CI already wrote into typed test cases, line-level file coverage, packages with their licences and known vulnerabilities, and architecture rules with their violations, and a report it cannot read becomes a diagnostic, never a crash.",
+      "outcome": "A tool that observes a CI it does not run reads the JUnit, TRX, LCOV, Cobertura, Clover, JaCoCo and Go cover reports, the xcresulttool and xccov output of an .xcresult bundle, the CycloneDX and SPDX documents and the ArchUnit, deptrac and import-linter results that CI already wrote into typed test cases, line-level file coverage, packages with their licences and known vulnerabilities, and architecture rules with their violations, and a report it cannot read becomes a diagnostic, never a crash.",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -37,6 +37,20 @@
             "checks": [
               "real-trx-reports-read-to-their-expected-cases",
               "a-trx-outcome-maps-to-a-status"
+            ]
+          }
+        },
+        {
+          "id": "xcresult-tests-read-every-case",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-xcresulttool-output-reads-to-its-expected-cases",
+              "an-xcresult-result-maps-to-a-status"
             ]
           }
         },
@@ -81,6 +95,20 @@
             "checks": [
               "real-jacoco-reports-read-to-their-expected-lines",
               "jacoco-groups-and-the-default-package-are-read"
+            ]
+          }
+        },
+        {
+          "id": "xccov-reads-file-totals-and-lines",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-xccov-report-reads-to-its-file-totals",
+              "an-xccov-archive-reads-to-its-executable-lines"
             ]
           }
         },
@@ -177,6 +205,20 @@
             "checks": [
               "an-import-linter-output-reads-to-its-contracts",
               "an-output-without-contracts-is-malformed"
+            ]
+          }
+        },
+        {
+          "id": "exported-surface-is-pinned",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-exported-surface-matches-its-record",
+              "every-fixture-has-its-golden-output"
             ]
           }
         }

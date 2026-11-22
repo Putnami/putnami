@@ -1,0 +1,86 @@
+{
+  "totals": {
+    "tests": 0,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "assertions": 0,
+    "time": 0
+  },
+  "cases": [
+    {
+      "name": "testAdd()",
+      "classname": "CalcTests.CalcTests",
+      "suites": [
+        {
+          "name": "Calc"
+        },
+        {
+          "name": "CalcTests"
+        },
+        {
+          "name": "CalcTests"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 1
+    },
+    {
+      "name": "testSignOfNonNegativeInput()",
+      "classname": "CalcTests.CalcTests",
+      "suites": [
+        {
+          "name": "Calc"
+        },
+        {
+          "name": "CalcTests"
+        },
+        {
+          "name": "CalcTests"
+        }
+      ],
+      "status": "passed",
+      "durationMs": 0
+    },
+    {
+      "name": "testAddWrongOnPurpose()",
+      "classname": "CalcTests.CalcTests",
+      "suites": [
+        {
+          "name": "Calc"
+        },
+        {
+          "name": "CalcTests"
+        },
+        {
+          "name": "CalcTests"
+        }
+      ],
+      "status": "failed",
+      "durationMs": 2,
+      "failure": {
+        "message": "CalcTests.swift:14: XCTAssertEqual failed: (\"4\") is not equal to (\"5\") - two plus two should be five"
+      }
+    },
+    {
+      "name": "testSkipped()",
+      "classname": "CalcTests.CalcTests",
+      "suites": [
+        {
+          "name": "Calc"
+        },
+        {
+          "name": "CalcTests"
+        },
+        {
+          "name": "CalcTests"
+        }
+      ],
+      "status": "skipped",
+      "durationMs": 5,
+      "skipped": {
+        "message": "Test skipped - not ready"
+      }
+    }
+  ]
+}

@@ -37,6 +37,7 @@ const (
 	ErrorCodeInvalidDeclaration         = "evidence.invalid_declaration"
 	ErrorCodeInvalidSpecVerification    = "evidence.invalid_spec_verification"
 	ErrorCodeInvalidArchitecture        = "evidence.invalid_architecture"
+	ErrorCodeInvalidTestCase            = "evidence.invalid_test_case"
 	ErrorCodeInvalidTimestamp           = "evidence.invalid_timestamp"
 	ErrorCodeInvalidDiagnostic          = "evidence.invalid_diagnostic"
 	ErrorCodeTooLarge                   = "evidence.too_large"
@@ -62,6 +63,7 @@ var ValidErrorCodes = map[string]bool{
 	ErrorCodeInvalidDeclaration:         true,
 	ErrorCodeInvalidSpecVerification:    true,
 	ErrorCodeInvalidArchitecture:        true,
+	ErrorCodeInvalidTestCase:            true,
 	ErrorCodeInvalidTimestamp:           true,
 	ErrorCodeInvalidDiagnostic:          true,
 	ErrorCodeTooLarge:                   true,
@@ -139,6 +141,8 @@ var documentShape = object(map[string]*member{
 	"tests": array(object(map[string]*member{
 		"component": nil, "passed": nil, "failed": nil, "skipped": nil, "durationMs": nil,
 		"failingCases": array(object(map[string]*member{"name": nil, "suite": nil, "file": nil, "message": nil})),
+		"cases":        array(object(map[string]*member{"suite": nil, "name": nil, "outcome": nil})),
+		"omittedCases": nil,
 	})),
 	"coverage": array(object(map[string]*member{"component": nil, "coveredLines": nil, "totalLines": nil})),
 	"architecture": array(object(map[string]*member{
@@ -445,9 +449,13 @@ func (v *validator) bounds(document *Document) bool {
 		over(fmt.Sprintf("decisions[%d].scope", index), len(decision.Scope), MaxDecisionScope)
 		over(fmt.Sprintf("decisions[%d].governs", index), len(decision.Governs), MaxGovernedFiles)
 	}
+	cases := 0
 	for index, entry := range document.Tests {
 		over(fmt.Sprintf("tests[%d].failingCases", index), len(entry.FailingCases), MaxFailingCases)
+		over(fmt.Sprintf("tests[%d].cases", index), len(entry.Cases), MaxTestCases)
+		cases += len(entry.Cases)
 	}
+	over("tests[].cases", cases, MaxDocumentTestCases)
 	edges := 0
 	for _, component := range document.Components {
 		edges += len(component.DependsOn)
@@ -664,6 +672,44 @@ func (v *validator) tests(entries []ComponentTests, components map[string]Compon
 				v.add(ErrorCodeRequired, fmt.Sprintf("%s.failingCases[%d].name", field, caseIndex), "a failing case names its test")
 			}
 		}
+		v.testCases(field, entry)
+	}
+}
+
+// testCases checks the cases of one tests entry: each names its test once
+// with a known outcome, and the listed and omitted cases fit the counts.
+func (v *validator) testCases(field string, entry ComponentTests) {
+	ids := make(map[TestCaseID]bool, len(entry.Cases))
+	listed := map[string]int{}
+	for index, testCase := range entry.Cases {
+		caseField := fmt.Sprintf("%s.cases[%d]", field, index)
+		if strings.TrimSpace(testCase.Name) == "" {
+			v.add(ErrorCodeRequired, caseField+".name", "a test case names its test")
+		}
+		if ids[testCase.ID()] {
+			v.add(ErrorCodeDuplicate, caseField, "suite %q and name %q name two cases", testCase.Suite, testCase.Name)
+		}
+		ids[testCase.ID()] = true
+		if !slices.Contains(TestOutcomes, testCase.Outcome) {
+			v.add(ErrorCodeInvalidTestCase, caseField+".outcome", "outcome %q is not passed, failed or skipped", testCase.Outcome)
+			continue
+		}
+		listed[testCase.Outcome]++
+	}
+	if entry.OmittedCases < 0 {
+		v.add(ErrorCodeInvalidCount, field+".omittedCases", "omittedCases is non-negative")
+		return
+	}
+	for _, outcome := range []struct {
+		name  string
+		count int
+	}{{OutcomePassed, entry.Passed}, {OutcomeFailed, entry.Failed}, {OutcomeSkipped, entry.Skipped}} {
+		if listed[outcome.name] > outcome.count {
+			v.add(ErrorCodeInvalidCount, field+".cases", "%d %s cases are listed for %d %s", listed[outcome.name], outcome.name, outcome.count, outcome.name)
+		}
+	}
+	if total := entry.Passed + entry.Failed + entry.Skipped; len(entry.Cases)+entry.OmittedCases > total {
+		v.add(ErrorCodeInvalidCount, field+".omittedCases", "%d listed and %d omitted cases are more than the %d cases counted", len(entry.Cases), entry.OmittedCases, total)
 	}
 }
 

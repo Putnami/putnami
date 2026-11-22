@@ -28,6 +28,7 @@ for the canonical protocol and the route joins for each transport.
 import (
     "go.putnami.dev/app"
     "go.putnami.dev/grpc"
+    grpcgo "google.golang.org/grpc"
 )
 
 plugin := grpc.NewPlugin(grpc.Config{
@@ -35,7 +36,7 @@ plugin := grpc.NewPlugin(grpc.Config{
 })
 
 // Register gRPC services
-plugin.Register(func(s *grpc.Server) {
+plugin.Register(func(s *grpcgo.Server) {
     pb.RegisterUserServiceServer(s, &userServer{})
     pb.RegisterOrderServiceServer(s, &orderServer{})
 })
@@ -63,8 +64,8 @@ plugin.WithStreamInterceptor(myStreamInterceptor)
 // Enable server reflection (for grpcurl, etc.)
 plugin.WithReflection(true)
 
-// Pass raw grpc.ServerOption
-plugin.WithServerOption(grpc.MaxRecvMsgSize(10 << 20))
+// Pass raw grpc.ServerOption values
+plugin.WithServerOption(grpcgo.MaxRecvMsgSize(10 << 20))
 ```
 
 ## Built-in interceptors

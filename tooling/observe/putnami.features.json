@@ -141,6 +141,8 @@
             "checks": [
               "a-laptop-run-names-open",
               "a-ci-job-without-a-token-names-the-token-setting",
+              "a-github-actions-job-names-the-id-token-exchange",
+              "the-action-names-its-token-input",
               "a-ci-job-with-a-token-names-upload",
               "an-upload-names-the-report-url"
             ]
@@ -424,6 +426,20 @@
           }
         },
         {
+          "id": "test-cases",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "each-case-is-listed-once-with-its-outcome",
+              "the-cases-are-bounded-with-a-diagnostic"
+            ]
+          }
+        },
+        {
           "id": "changed-line-coverage",
           "stage": "coded",
           "evidenceKinds": [
@@ -446,6 +462,20 @@
             "kind": "acceptance",
             "checks": [
               "each-lockfile-format-gives-its-package-changes"
+            ]
+          }
+        },
+        {
+          "id": "bun-lockfiles",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bun-lock-lists-its-packages",
+              "a-bun-lockb-is-a-diagnostic"
             ]
           }
         },
@@ -1241,10 +1271,93 @@
       ]
     },
     {
+      "id": "tooling/observe-fork",
+      "type": "feature",
+      "name": "Relay the evidence of a pull request from a fork",
+      "outcome": "A pull request opened from a fork gets the evidence upload, the putnami/observe commit status and the summary note, as a pull request from a branch does: the fork's run keeps its evidence document as an artifact, and a workflow_run job of the base repository relays it with the base repository's credentials, after it checks that the document names the job's repository, without ever trusting the document's text",
+      "owner": "tooling",
+      "target": "coded",
+      "requirements": [
+        {
+          "id": "relay-reads-a-kept-document",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-kept-document-is-relayed-without-observing",
+              "an-invalid-or-oversized-document-is-refused",
+              "an-observation-flag-with-from-evidence-is-a-usage-error"
+            ]
+          }
+        },
+        {
+          "id": "relay-runs-in-a-workflow-run-job",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "outside-a-workflow-run-job-nothing-is-relayed",
+              "a-fork-workflow-run-targets-the-base-pull-request"
+            ]
+          }
+        },
+        {
+          "id": "relay-finds-the-pull-request",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-fork-workflow-run-targets-the-base-pull-request",
+              "a-same-repository-workflow-run-takes-the-payload-pull-request",
+              "an-unresolved-pull-request-relays-nothing-from-a-fork"
+            ]
+          }
+        },
+        {
+          "id": "relay-refuses-another-repository",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-document-naming-another-repository-is-refused",
+              "a-document-naming-another-pull-request-is-refused",
+              "a-document-naming-another-commit-is-refused"
+            ]
+          }
+        },
+        {
+          "id": "relay-keeps-the-text-inert",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-note-quotes-every-document-text",
+              "the-log-prints-no-document-text"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "tooling/observe-jvm",
       "type": "feature",
       "name": "Find the components of a Gradle or Maven repository that keeps its own CI",
-      "outcome": "putnami observe, in a Java or Kotlin repository built with Gradle or Maven, Android included, and without a Putnami workspace, knows one component per Gradle project or Maven module and the edges between them, without running the build, so a change to a shared library marks the projects that use it, the JUnit and JaCoCo reports land on the right component, and a Gradle lockfile or version catalog bump is a dependency change",
+      "outcome": "putnami observe, in a Java or Kotlin repository built with Gradle or Maven, Android included, and without a Putnami workspace, knows one component per Gradle project or Maven module and the edges between them, without running the build, so a change to a shared library marks the projects that use it, the JUnit and JaCoCo reports land on the right component, and a Gradle lockfile or version catalog bump, or a version a POM declares, is a dependency change",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -1359,6 +1472,33 @@
           }
         },
         {
+          "id": "maven-dependency-changes",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pom-lists-its-declared-versions"
+            ]
+          }
+        },
+        {
+          "id": "maven-declared-versions",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-pom-change-is-marked-declared",
+              "a-maven-package-url-matches-a-pom-change"
+            ]
+          }
+        },
+        {
           "id": "gradle-change-analysis",
           "stage": "coded",
           "evidenceKinds": [
@@ -1390,7 +1530,7 @@
       "id": "tooling/observe-swift",
       "type": "feature",
       "name": "Find the components of an iOS or Swift repository that keeps its own CI",
-      "outcome": "putnami observe, in an iOS or Swift repository without a Putnami workspace, knows one component per Swift package, package target and Xcode project, and the edges between them, from the describe export the CI wrote or from Package.swift and project.pbxproj, without running any Apple tool, so a change to a local package marks the packages and the app that use it, its tests and coverage land on the right component, and a Package.resolved or Podfile.lock bump is a dependency change",
+      "outcome": "putnami observe, in an iOS or Swift repository without a Putnami workspace, knows one component per Swift package, package target and Xcode project, and the edges between them, from the describe export or from Package.swift and project.pbxproj, running no Apple tool but xcrun on a kept .xcresult bundle, so a change to a local package marks the packages and the app that use it, its tests and coverage land on the right component, and a Package.resolved or Podfile.lock bump is a dependency change",
       "owner": "tooling",
       "target": "coded",
       "requirements": [
@@ -1513,6 +1653,49 @@
             "kind": "acceptance",
             "checks": [
               "a-placed-case-names-its-test-file"
+            ]
+          }
+        },
+        {
+          "id": "xcresult-discovery",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-xcresult-bundle-is-a-test-and-coverage-report",
+              "a-named-bundle-replaces-discovery",
+              "a-discovered-bundle-beside-junit-reports-gives-no-tests"
+            ]
+          }
+        },
+        {
+          "id": "xcresult-read",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bundle-reads-through-xcrun",
+              "a-failed-xcrun-command-is-a-diagnostic",
+              "each-xcrun-command-is-bounded"
+            ]
+          }
+        },
+        {
+          "id": "xcresult-tools-missing",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-missing-xcrun-names-the-conversion"
             ]
           }
         },
@@ -1972,6 +2155,21 @@
             "checks": [
               "the-install-sees-no-token",
               "a-token-in-the-job-environment-is-not-read"
+            ]
+          }
+        },
+        {
+          "id": "action-relays-a-fork-artifact",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-from-artifact-step-downloads-the-triggering-run-artifact",
+              "a-from-artifact-step-relays-with-upload-and-publish",
+              "a-from-artifact-step-without-a-document-warns-and-passes"
             ]
           }
         },

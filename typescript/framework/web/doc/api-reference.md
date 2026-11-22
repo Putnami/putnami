@@ -8,7 +8,7 @@ Main class for configuring React SSR routes manually.
 
 ### Constructor
 
-```typescript
+```typescript nocheck
 new ReactApplication(
   config?: PutnamiReactConfig,
   httpPlugin?: HttpPlugin,
@@ -56,7 +56,7 @@ reactPage(
 **Returns:** `ReactApplication` instance for chaining
 
 **Example:**
-```typescript
+```typescript nocheck
 reactApp.reactPage('/users', {
   page: <UsersPage />,
   loader: usersLoader,
@@ -234,7 +234,7 @@ useLoaderData<T = unknown>(): T
 **Returns:** The loader data cast to type T
 
 **Example:**
-```typescript
+```typescript nocheck
 interface UserData {
   name: string;
   email: string;
@@ -260,7 +260,7 @@ useActionData<T = unknown>(): (T & { ok: boolean; status: number }) | undefined
 **Returns:** The action data with `ok` and `status` fields, or `undefined`
 
 **Example:**
-```typescript
+```typescript nocheck
 interface FormResult {
   message: string;
 }
@@ -291,7 +291,7 @@ useRouteLoaderData<T = unknown>(routeId: string): T
 **Returns:** The loader data for the specified route
 
 **Example:**
-```typescript
+```typescript nocheck
 function ChildComponent() {
   const rootData = useRouteLoaderData<{ user: User }>('root');
   return <div>{rootData.user.name}</div>;
@@ -317,7 +317,7 @@ useRouteError<E = unknown>(): E
 **Returns:** The thrown value cast to type E
 
 **Example:**
-```typescript
+```typescript nocheck
 // src/app/posts/error.tsx
 import { error, isRouteErrorResponse, useRouteError } from '@putnami/web';
 
@@ -355,7 +355,7 @@ useNavigate(): NavigateFunction
 **Returns:** Navigate function
 
 **Example:**
-```typescript
+```typescript nocheck
 function Page() {
   const navigate = useNavigate();
   return <button onClick={() => navigate('/dashboard')}>Go</button>;
@@ -373,7 +373,7 @@ useNavigation(): Navigation
 **Returns:** Navigation object with `state` property ('idle' | 'loading' | 'submitting')
 
 **Example:**
-```typescript
+```typescript nocheck
 function Page() {
   const navigation = useNavigation();
   return navigation.state === 'loading' ? <Spinner /> : <Content />;
@@ -391,7 +391,7 @@ useLocation(): Location
 **Returns:** Location object with `pathname`, `search`, `hash`, and `state`
 
 **Example:**
-```typescript
+```typescript nocheck
 function Page() {
   const location = useLocation();
   return <div>Current path: {location.pathname}</div>;
@@ -412,7 +412,7 @@ useParams<Params extends Record<string, string> = Record<string, string>>(): Par
 **Returns:** Object of route parameters
 
 **Example:**
-```typescript
+```typescript nocheck
 // Route: /posts/[id]
 function PostPage() {
   const { id } = useParams<{ id: string }>();
@@ -431,7 +431,7 @@ useSearchParams(): [URLSearchParams, SetURLSearchParams]
 **Returns:** Tuple of search params and setter function
 
 **Example:**
-```typescript
+```typescript nocheck
 function SearchPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const query = searchParams.get('q') || '';
@@ -458,7 +458,7 @@ useSubmit(): SubmitFunction
 **Returns:** Submit function
 
 **Example:**
-```typescript
+```typescript nocheck
 function Page() {
   const submit = useSubmit();
   const handleSubmit = () => {
@@ -484,7 +484,7 @@ useFetcher<TData = unknown>(): FetcherWithComponents<TData>
 **Returns:** Fetcher object with `Form`, `load`, `submit`, `data`, and `state`
 
 **Example:**
-```typescript
+```typescript nocheck
 function LikeButton({ postId }: { postId: string }) {
   const fetcher = useFetcher();
   return (
@@ -506,7 +506,7 @@ useRevalidator(): Revalidator
 **Returns:** Revalidator object with `revalidate` method
 
 **Example:**
-```typescript
+```typescript nocheck
 function Page() {
   const revalidator = useRevalidator();
   return <button onClick={() => revalidator.revalidate()}>Refresh</button>;
@@ -548,7 +548,7 @@ interface LinkProps extends RouterLinkProps {
 - Outside a router, such as in a static render or a component test, `Link` renders a plain `<a href>` with the same anchor props.
 
 **Example:**
-```typescript
+```typescript nocheck
 <Link to="/dashboard" prefetch="intent">Dashboard</Link>
 ```
 
@@ -565,7 +565,7 @@ interface FormProps extends React.FormHTMLAttributes<HTMLFormElement> {
 ```
 
 **Example:**
-```typescript
+```typescript nocheck
 <Form method="post">
   <input name="email" />
   <button type="submit">Submit</button>
@@ -583,7 +583,7 @@ interface OutletProps {
 ```
 
 **Example:**
-```typescript
+```typescript nocheck
 export default function Layout() {
   return (
     <div>
@@ -635,7 +635,7 @@ interface DocumentHelper {
 
 Sets the page title.
 
-```typescript
+```typescript nocheck
 <Title>Page Title</Title>
 ```
 
@@ -643,7 +643,7 @@ Sets the page title.
 
 Adds a meta tag.
 
-```typescript
+```typescript nocheck
 <Meta name="description" content="Page description" />
 <Meta property="og:title" content="Page Title" />
 ```
@@ -652,7 +652,7 @@ Adds a meta tag.
 
 Adds a script tag.
 
-```typescript
+```typescript nocheck
 <Script src="/script.js" />
 <Script>{`console.log('inline');`}</Script>
 ```
@@ -661,7 +661,7 @@ Adds a script tag.
 
 Adds a style tag or stylesheet link.
 
-```typescript
+```typescript nocheck
 <Style href="/styles.css" />
 <Style>{`body { margin: 0; }`}</Style>
 ```
@@ -670,7 +670,7 @@ Adds a style tag or stylesheet link.
 
 Sets the HTML lang attribute.
 
-```typescript
+```typescript nocheck
 <Lang>en</Lang>
 ```
 
@@ -678,7 +678,7 @@ Sets the HTML lang attribute.
 
 Sets the favicon.
 
-```typescript
+```typescript nocheck
 <Favicon href="/favicon.ico" />
 ```
 
@@ -741,7 +741,7 @@ page(): PageBuilder
 **Returns:** `PageBuilder` instance
 
 **Example:**
-```typescript
+```typescript nocheck
 // src/app/admin/page.tsx
 import { page } from '@putnami/web';
 
@@ -773,7 +773,7 @@ layout(): LayoutBuilder
 **Returns:** `LayoutBuilder` instance
 
 **Example:**
-```typescript
+```typescript nocheck
 // src/app/dashboard/layout.tsx
 import { layout, Outlet } from '@putnami/web';
 
@@ -825,7 +825,7 @@ export default loader((ctx) => {
 
 // Builder mode
 import { loader } from '@putnami/web';
-import { Uuid, Optional, String } from '@putnami/application';
+import { Optional, Uuid } from '@putnami/application';
 
 export default loader()
   .params({ id: Uuid })
@@ -877,7 +877,7 @@ export default action(async (ctx) => {
 
 // Builder mode
 import { action } from '@putnami/web';
-import { Uuid, String, Email } from '@putnami/application';
+import { Email, Uuid } from '@putnami/application';
 
 export default action()
   .params({ id: Uuid })
@@ -930,7 +930,7 @@ error(): ErrorBuilder
 
 **Example:**
 
-```typescript
+```typescript nocheck
 // src/app/dashboard/error.tsx
 import { error, isRouteErrorResponse, useRouteError } from '@putnami/web';
 
@@ -968,7 +968,7 @@ notFound(): NotFoundBuilder
 
 **Example:**
 
-```typescript
+```typescript nocheck
 // src/app/not-found.tsx
 import { notFound } from '@putnami/web';
 
@@ -1002,7 +1002,7 @@ middleware(): MiddlewareBuilder
 
 **Example:**
 
-```typescript
+```typescript nocheck
 import { middleware } from '@putnami/web';
 
 const apiGuard = middleware()

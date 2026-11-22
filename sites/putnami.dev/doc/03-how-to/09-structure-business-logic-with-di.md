@@ -68,7 +68,7 @@ export default endpoint()
   .inject({ users: UserService })
   .handle(async (ctx) => {
     const user = await ctx.deps.users.getUser(ctx.params.id);
-    if (!user) throw new HttpException(404, 'User not found');
+    if (!user) throw new HttpException('User not found', 404);
     return { user };
   });
 ```

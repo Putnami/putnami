@@ -305,3 +305,135 @@ func ProjectID(ctx context.Context, client *http.Client, getenv func(string) str
 	}
 	return id, nil
 }
+
+// PullRequestQuery names the pull request of a run from a fork: the head
+// owner, branch and commit the run built, in the job's repository.
+type PullRequestQuery struct {
+	// Repository is the job's repository, owner/name.
+	Repository string
+	HeadOwner  string
+	HeadBranch string
+	HeadSHA    string
+	// Getenv reads GITHUB_API_URL and GITHUB_TOKEN.
+	Getenv func(string) string
+	// Client sends the request; nil uses a client with a per-request
+	// timeout. Redirects are never followed.
+	Client *http.Client
+}
+
+// queryHost is the GitHub API of the query's repository, with GITHUB_TOKEN.
+func queryHost(q PullRequestQuery) (*gitHub, error) {
+	token := strings.TrimSpace(q.Getenv(GitHubTokenEnv))
+	if token == "" {
+		return nil, fmt.Errorf("%s is unset", GitHubTokenEnv)
+	}
+	return newGitHub(apiClient(q.Client), q.Getenv, token, observe.Observation{
+		Subject: ci.Subject{Repository: q.Repository, ChangeRequest: &ci.ChangeRequest{}},
+	})
+}
+
+// FindPullRequest asks the GitHub API for the open pull requests of the
+// job's repository whose head is the query's owner and branch, and returns
+// the number of the one whose head commit is the query's, 0 when none is.
+// GitHub lists no pull request in the workflow_run payload of a fork's run,
+// so the job asks with its own GITHUB_TOKEN.
+func FindPullRequest(ctx context.Context, q PullRequestQuery) (int, error) {
+	if q.HeadOwner == "" || q.HeadBranch == "" || q.HeadSHA == "" {
+		return 0, errors.New("the workflow run names no head owner, branch and commit")
+	}
+	g, err := queryHost(q)
+	if err != nil {
+		return 0, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, Timeout)
+	defer cancel()
+	var number int
+	err = pages(func(page int) (int, bool, error) {
+		var pulls []struct {
+			Number int `json:"number"`
+			Head   struct {
+				SHA string `json:"sha"`
+			} `json:"head"`
+		}
+		query := url.Values{
+			"state":    {"open"},
+			"head":     {q.HeadOwner + ":" + q.HeadBranch},
+			"per_page": {strconv.Itoa(perPage)},
+			"page":     {strconv.Itoa(page)},
+		}
+		if err := g.do(ctx, http.MethodGet, "/repos/"+g.repository+"/pulls", query, nil, &pulls); err != nil {
+			return 0, false, err
+		}
+		for _, p := range pulls {
+			if p.Number > 0 && strings.EqualFold(p.Head.SHA, q.HeadSHA) {
+				number = p.Number
+				return len(pulls), true, nil
+			}
+		}
+		return len(pulls), false, nil
+	})
+	return number, err
+}
+
+// CommitParents returns the parents of the commit sha of the query's
+// repository, as the GitHub API answers them, lowercase.
+func CommitParents(ctx context.Context, q PullRequestQuery, sha string) ([]string, error) {
+	g, err := queryHost(q)
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, Timeout)
+	defer cancel()
+	var commit struct {
+		Parents []struct {
+			SHA string `json:"sha"`
+		} `json:"parents"`
+	}
+	if err := g.do(ctx, http.MethodGet, "/repos/"+g.repository+"/commits/"+url.PathEscape(sha), nil, nil, &commit); err != nil {
+		return nil, err
+	}
+	parents := make([]string, 0, len(commit.Parents))
+	for _, p := range commit.Parents {
+		parents = append(parents, strings.ToLower(p.SHA))
+	}
+	return parents, nil
+}
+
+// MergeBase returns the merge base of base and head in the query's
+// repository, as the GitHub API compares them, lowercase.
+func MergeBase(ctx context.Context, q PullRequestQuery, base, head string) (string, error) {
+	g, err := queryHost(q)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(ctx, Timeout)
+	defer cancel()
+	var compare struct {
+		MergeBaseCommit struct {
+			SHA string `json:"sha"`
+		} `json:"merge_base_commit"`
+	}
+	query := url.Values{"per_page": {"1"}}
+	if err := g.do(ctx, http.MethodGet, "/repos/"+g.repository+"/compare/"+url.PathEscape(base+"..."+head), query, nil, &compare); err != nil {
+		return "", err
+	}
+	return strings.ToLower(compare.MergeBaseCommit.SHA), nil
+}
+
+// MergeCommit returns the test merge commit GitHub keeps for the open pull
+// request number of the query's repository, lowercase, "" when it has none.
+func MergeCommit(ctx context.Context, q PullRequestQuery, number int) (string, error) {
+	g, err := queryHost(q)
+	if err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(ctx, Timeout)
+	defer cancel()
+	var pull struct {
+		MergeCommitSHA string `json:"merge_commit_sha"`
+	}
+	if err := g.do(ctx, http.MethodGet, "/repos/"+g.repository+"/pulls/"+strconv.Itoa(number), nil, nil, &pull); err != nil {
+		return "", err
+	}
+	return strings.ToLower(pull.MergeCommitSHA), nil
+}

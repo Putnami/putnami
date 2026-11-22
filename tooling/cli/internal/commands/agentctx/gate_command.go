@@ -71,7 +71,12 @@ const coverageFlag = "enforce-coverage"
 // gate task, nothing says which flags the tasks accept, and the flag stays, as
 // the whole default stays in gateTasksForWorkspace.
 func gateCommandForWorkspace(wsRoot string) string {
-	jobs := loadedJobs(wsRoot)
+	return gateCommand(wsRoot, extension.BuildJobMap(loadedExtensions(wsRoot)))
+}
+
+// gateCommand is gateCommandForWorkspace over the jobs the workspace's loaded
+// extensions declare, read once by the caller.
+func gateCommand(wsRoot string, jobs map[string][]*extension.JobDefinition) string {
 	tasks := strings.Split(gateTasks(wsRoot, jobs), ",")
 	command := strings.Join(tasks, ",") + " --impacted"
 	if !slices.ContainsFunc(tasks, func(task string) bool { return len(jobs[task]) > 0 }) ||
@@ -97,6 +102,12 @@ func gateDeclaresFlag(tasks []string, jobs map[string][]*extension.JobDefinition
 // and the workspace extensions list. A workspace that does not load declares
 // nothing.
 func loadedJobs(wsRoot string) map[string][]*extension.JobDefinition {
+	return extension.BuildJobMap(loadedExtensions(wsRoot))
+}
+
+// loadedExtensions returns the workspace's loaded extensions, discovered as a
+// job run discovers them. A workspace that does not load has none.
+func loadedExtensions(wsRoot string) []*extension.ExtensionDescription {
 	var projectPaths []string
 	if ws, err := workspace.Load(wsRoot); err == nil && ws != nil {
 		projectPaths = ws.ProjectPaths()
@@ -105,7 +116,7 @@ func loadedJobs(wsRoot string) map[string][]*extension.JobDefinition {
 	if err != nil {
 		return nil
 	}
-	return extension.BuildJobMap(extensions)
+	return extensions
 }
 
 // readCIDocument returns the workspace's CI document, or the zero document

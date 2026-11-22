@@ -149,7 +149,7 @@ server.GET("/files/{path...}", func(ctx *fhttp.Context) *fhttp.Response {
 
 ### Properties
 
-```go
+```go nocheck
 func handler(ctx *fhttp.Context) *fhttp.Response {
     ctx.Request     // *http.Request
     ctx.Writer      // http.ResponseWriter
@@ -157,7 +157,7 @@ func handler(ctx *fhttp.Context) *fhttp.Response {
     ctx.Path        // URL path
     ctx.Route       // Matched route pattern (e.g., "/users/{id}")
     ctx.Params      // map[string]string of path parameters
-    ctx.User        // map[string]any of authenticated user claims
+    ctx.User        // *fhttp.Claims of the authenticated user
     ctx.StatusCode  // Response status code (modifiable)
 }
 ```
@@ -392,10 +392,11 @@ server.Use(fhttp.Compression(fhttp.CompressionOptions{
 
 ## Endpoint builder
 
-For endpoints that need validation, DI injection, and OpenAPI metadata, use the fluent endpoint builder:
+For endpoints that need validation, DI injection, and OpenAPI metadata, use the fluent endpoint builder of [`go.putnami.dev/api`](./22-api-endpoints.md):
 
 ```go
 import (
+    "go.putnami.dev/api"
     fhttp "go.putnami.dev/http"
     "go.putnami.dev/inject"
 )
@@ -405,20 +406,20 @@ type CreateUserParams struct {
     Email string `json:"email" validate:"required,email"`
 }
 
-endpoint := fhttp.Endpoint("POST", "/users").
+apiPlugin := api.New(server)
+
+apiPlugin.Register(api.Endpoint("POST", "/users").
     Description("Create a new user").
-    Body(reflect.TypeOf(CreateUserParams{})).
-    Returns("The created user").
-    Throws(409, "Email already exists").
+    Body(api.Type[CreateUserParams]()).
+    ReturnsStatus(201, "The created user", api.Type[User]()).
+    Throws(409, "Email already exists", nil).
     Inject("users", inject.TokenOf[*UserService]()).
     Handle(func(ctx *fhttp.EndpointContext) *fhttp.Response {
         users := ctx.Injected["users"].(*UserService)
         body := ctx.ValidatedBody
         // ... create user
         return fhttp.JSONStatus(201, user)
-    })
-
-endpoint.Register(server)
+    }))
 ```
 
 ## Health checks

@@ -259,7 +259,7 @@ function Desc<P extends SchemaPrimitive>(description: string, type: P): SchemaDe
 ```
 
 **Example:**
-```typescript
+```typescript nocheck
 {
   name: Desc('Full name of the user', String),
   email: Desc('Primary email address', Email),
@@ -291,7 +291,7 @@ function validateSchema<S extends SchemaDefinition>(
 
 Utility type to infer TypeScript type from a schema definition.
 
-```typescript
+```typescript nocheck
 type InferSchema<S extends SchemaDefinition> = { ... }
 ```
 
@@ -375,7 +375,7 @@ provide(Database, () => new Database('postgres://localhost'))
 provide(Database, async (resolve) => {
   const config = resolve(AppConfig);
   return Database.connect(config.url);
-}, { onClose: (db) => db.disconnect() })
+}, { onClose: (db: Database) => db.disconnect() })
 ```
 
 ### `named<T>(name)`
@@ -569,7 +569,7 @@ function useContext<C = unknown>(): C
 
 Base class for all HTTP exceptions.
 
-```typescript
+```typescript nocheck
 class HttpException extends Error {
   statusCode: number;
   message: string | object;
@@ -752,7 +752,7 @@ type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 Test utility that captures `LogEntry[]`. Import from the testing subpath:
 
-```typescript
+```typescript nocheck
 import { MemoryLogger } from '@putnami/runtime/testing';
 
 class MemoryLogger extends Logger {

@@ -16,23 +16,35 @@ orchestration. It does not provide a Python framework package family.
 | An experimental FastAPI service | `python-server` | ASGI app, uvicorn serve command, tests, Docker packaging |
 | An experimental Python package | `python-library` | Importable module, packaging metadata, tests |
 
-If you are starting from an empty directory:
+If you are starting from an empty directory, create the workspace and a
+`python-server` project in one command:
 
 ```bash
-putnami init
+putnami init --extension python --project api
 ```
 
-## Create the project
+`--template python-library` creates a library instead. Run
+`putnami init --extension python` without `--project` to start with no project.
 
-For a service:
+Then check and run it:
+
+```bash
+putnami test api
+putnami serve api
+```
+
+## Add a project
+
+In an existing workspace, declare the Python extension once, then add a
+service:
 
 ```bash
 putnami deps add @putnami/python
 putnami extensions install
-putnami projects create api --template python-server
+putnami projects create orders --template python-server
 putnami deps install
-putnami test api
-putnami serve api
+putnami test orders
+putnami serve orders
 ```
 
 For a library:

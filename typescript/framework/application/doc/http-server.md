@@ -13,7 +13,7 @@ import { application, http, HttpPlugin } from '@putnami/application';
 
 const app = application()
   .use(http({ port: 3000 }))
-  .run(async (app) => {
+  .run(async () => {
     const httpPlugin = app.getPlugin(HttpPlugin);
     
     httpPlugin.get('/hello', () => {
@@ -514,10 +514,10 @@ http({
 Throw `HttpException` for HTTP errors:
 
 ```typescript
-import { HttpException } from '@putnami/application';
+import { HttpException } from '@putnami/runtime';
 
 httpPlugin.get('/error', () => {
-  throw new HttpException(404, 'Resource not found');
+  throw new HttpException('Resource not found', 404);
 });
 ```
 

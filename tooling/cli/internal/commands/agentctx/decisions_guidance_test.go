@@ -59,7 +59,7 @@ func TestBlockNamesTheDecisionFilesAndListsNoDecision(t *testing.T) {
 	if strings.Count(line, "\n") != 1 || !strings.HasSuffix(line, "\n") {
 		t.Fatalf("the block line is not one line:\n%q", line)
 	}
-	block := guidanceBlock("lint,test,build,validate", line)
+	block := guidanceBlock("lint,test,build,validate", line, "")
 	for _, banned := range []string{"D-001", "D-002", "serverless", "settled 2026"} {
 		if strings.Contains(block, banned) {
 			t.Errorf("the block lists a decision (%q):\n%s", banned, block)
@@ -91,12 +91,12 @@ func TestDecisionsGuidanceRendersNothingWithoutAUsableRegistry(t *testing.T) {
 			if rendered := decisionsGuidanceForWorkspace(dir); rendered != "" {
 				t.Fatalf("rendered %q, want nothing", rendered)
 			}
-			if got, want := guidanceBlock("lint", ""), guidanceBlock("lint", decisionsGuidanceForWorkspace(dir)); got != want {
+			if got, want := guidanceBlock("lint", "", ""), guidanceBlock("lint", decisionsGuidanceForWorkspace(dir), ""); got != want {
 				t.Fatalf("the block is not byte-identical to a registry-less one:\n%s\n%s", got, want)
 			}
 			// No empty section and no dangling bullet: the body is the same six
 			// lines a workspace without a registry has always had.
-			if lines := strings.Count(guidanceBody("lint", ""), "\n"); lines != 6 {
+			if lines := strings.Count(guidanceBody("lint", "", ""), "\n"); lines != 6 {
 				t.Fatalf("block body has %d lines, want exactly 6", lines)
 			}
 		})

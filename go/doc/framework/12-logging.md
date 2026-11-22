@@ -146,7 +146,7 @@ sink.Clear()
 
 Attach a logger to `context.Context` for propagation through the call chain:
 
-```go
+```go nocheck
 // Attach to context
 ctx := logger.WithLogger(ctx, log.With("requestId", requestID))
 
@@ -170,11 +170,10 @@ func processRequest(ctx context.Context) {
 ```go
 func requestLogger() fhttp.Middleware {
     return func(ctx *fhttp.Context, next func() *fhttp.Response) *fhttp.Response {
-        log := logger.Default().With(
-            "method", ctx.Method,
-            "path", ctx.Path,
-            "requestId", ctx.Header("X-Request-ID"),
-        )
+        log := logger.Default().
+            With("method", ctx.Method).
+            With("path", ctx.Path).
+            With("requestId", ctx.Header("X-Request-ID"))
 
         // Attach to context for downstream use
         goCtx := logger.WithLogger(ctx.Context(), log)

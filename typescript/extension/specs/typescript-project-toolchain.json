@@ -154,6 +154,10 @@
       "text": "The extension's workspace inputs and install inputs name the lockfile of every package manager it installs with and pnpm-workspace.yaml, so a change to the lockfile in use invalidates the cache of the TypeScript tasks and makes the installed workspace stale."
     },
     {
+      "id": "deps-edit-keeps-the-catalog",
+      "text": "putnami deps add, remove and prune edit one TypeScript project's package.json. add writes a member's package as workspace:* (a range with npm or Yarn 1); with Bun or pnpm another goes to the catalog, referenced as catalog:, at the spec's version, ^ its latest, or the entry's; a pinned version is kept; npm and yarn pin it in the project. remove drops it, and a catalog entry no member or override references. A failed or interrupted install restores every edited file; a dry run writes none."
+    },
+    {
       "id": "upgrade-installs-with-the-package-manager",
       "text": "putnami upgrade --deps pins the @putnami/* versions in the catalog the workspace declares, in the root package.json, else in pnpm-workspace.yaml, else in the root dependencies, then reinstalls with the workspace's package manager and its own reinstall flag. It writes no lockfile of another manager, and a failed install restores the root package.json, pnpm-workspace.yaml and that manager's lockfiles."
     },
@@ -250,6 +254,10 @@
       "text": "Once every preBuild hook reports data.httpRoutes {v:1,state:complete}, build-generate commits canonical HTTP routes atomically, skips identical bytes, commits routes [] for an empty fragment and removes the file with no fragment. An absent, malformed or unavailable evaluation, failed hook, invalid aggregate, unreadable manifest or missing Bun fails generate, naming the cause, and keeps committed routes and infra facts. Solo and batch commit identical bytes. Drift fails the task. No option controls it."
     },
     {
+      "id": "compiled-service-config",
+      "text": "A compiled executable runs the project's serve entry, the ./serve export under src/ else src/serve.ts, as putnami serve does. It embeds conf/.env.yaml and each conf/.env.<env>.yaml except the machine-local local and prod files, never a secrets file, each below its on-disk copy, and reads NODE_ENV at run time, so from any directory it and its image read the files putnami serve reads, port included. build-generate keys those files."
+    },
+    {
       "id": "source-bound-generate",
       "text": "build-generate writes the project's TypeScript feature evidence under .gen, and the evidence names the project's source binding. Its cache policy declares sourceBound, so a cached generate serves only at the binding its evidence names: an edit outside its key, such as a test file, a spec or putnami.features.json, executes generate once at the new binding and moves neither its key nor any dependent key. Hook code and manifest edits move generate and dependent keys."
     },
@@ -296,6 +304,10 @@
     {
       "id": "node-docker-base",
       "text": "The base of a Node image is the digest-pinned distroless Node image of the major the project declares: package.json engines.node, else .nvmrc or .node-version in the project, then at the workspace root. A project that declares none fails with typescript.node_version_undeclared, naming those three fields, and a major with no pinned base fails naming the majors that have one."
+    },
+    {
+      "id": "image-on-a-fresh-workspace",
+      "text": "package --docker gives a runnable image on a fresh workspace: before the first commit its advisory version ends in nogit, other git failures still fail; it runs the executable compiled for --platform, a missing one fails naming the platform and paths searched; a --docker-tag holding ':' or '/' is the whole reference; PORT is --port or options.package.port, else putnami.port of conf/.env.production.yaml then conf/.env.yaml, else options.serve.port, else 3000."
     },
     {
       "id": "tsc-compiler-choice",

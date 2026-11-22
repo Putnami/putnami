@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { useLogger } from '@putnami/runtime';
 import { robustRemove } from '@putnami/runtime/robustio';
 import { fileExistsAsync, getBuildInfo, getCurrentProject, getWorkspaceRoot, joinPath } from '@putnami/utils';
 import type { CacheEntry, CacheStorage } from './cache-storage.interface';
@@ -197,6 +198,11 @@ export class DiskCacheStorage implements CacheStorage {
   }
 
   async get<T>(key: string): Promise<CacheEntry<T> | undefined> {
+    // Once writes fail, a file on disk may predate a newer value the faster
+    // layers hold: the disk layer answers nothing rather than a stale entry.
+    if (this._writeFailed) {
+      return undefined;
+    }
     const filePath = this.getFilePath(key);
 
     if (!(await fileExistsAsync(filePath))) {
@@ -225,18 +231,35 @@ export class DiskCacheStorage implements CacheStorage {
     }
   }
 
+  /** Set once a write failed: the directory is not writable, so later writes are skipped. */
+  private _writeFailed = false;
+
+  /**
+   * Persists the entry. Persistence is best effort: a directory the process
+   * cannot write, such as the read-only working directory of a container that
+   * runs as a non-root user, keeps the value in the faster layers only. The
+   * first failure is logged once and disables later writes.
+   */
   async set<T>(key: string, value: T, ttl?: number): Promise<void> {
-    await this.ensureCacheDir();
-
-    const filePath = this.getFilePath(key);
+    if (this._writeFailed) {
+      return;
+    }
     const expiresAt = ttl ? Date.now() + ttl : null;
-
     const entry: DiskCacheEntry<T> = {
       value,
       expiresAt,
     };
 
-    await writeFile(filePath, JSON.stringify(entry), 'utf-8');
+    try {
+      await this.ensureCacheDir();
+      await writeFile(this.getFilePath(key), JSON.stringify(entry), 'utf-8');
+    } catch (error) {
+      this._writeFailed = true;
+      useLogger('putnami').warn(`disk cache disabled: cannot write ${this.cacheDir}`, {
+        cacheDir: this.cacheDir,
+        cause: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   async delete(key: string): Promise<void> {

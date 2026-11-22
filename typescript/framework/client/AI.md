@@ -283,8 +283,7 @@ import {
   contextInterceptor,
   telemetryInterceptor,
 } from '@putnami/client';
-import { OAuthService } from '@putnami/application';
-import { get } from '@putnami/runtime';
+import { clientToken } from '@putnami/application';
 import { UsersClient } from '@myorg/users-client';
 
 const users = await ClientBuilder.for(UsersClient)
@@ -293,7 +292,7 @@ const users = await ClientBuilder.for(UsersClient)
   .interceptors([
     authInterceptor({
       clientId: 'orders-service',
-      tokenProvider: () => get(OAuthService).clientToken(),
+      tokenProvider: () => clientToken(),
     }),
     telemetryInterceptor('users'),
     contextInterceptor(),
@@ -375,7 +374,7 @@ every identity — a revocation that names a `principalId` the request never
 carried:
 
 ```ts
-client.invalidateResponsesByField('principalId', event.principalId); // returns how many were dropped
+client.invalidateResponsesByField('principalId', principalId); // returns how many were dropped
 ```
 
 The value is a string, a boolean, a safe integer or a bigint, compared in the

@@ -9,7 +9,10 @@ To add it to a pipeline, follow
 [Observe a change in your CI](/docs/how-to/observe-a-change-in-your-ci). On
 GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`.
 
-`@putnami/observe` is `experimental`: it promises no compatibility yet.
+`@putnami/observe` is `preview` in the [support catalog](/docs/support): the
+change evidence document it writes keeps version 1 by addition only, so a
+document that validates today keeps validating; the command's flags, its text
+summary and its note may still change in a minor release whose notes say so.
 
 ## What it answers
 
@@ -34,7 +37,7 @@ GitHub Actions, it is one step: `uses: Putnami/observe-action@v1`.
 | A text summary | The job log. |
 | One JSON document | Standard output, with `--output=json`. |
 | The change evidence document | A file, with `--evidence <path>`. It follows the `protocol/evidence` v1 schema; keep it as a CI artifact. |
-| A commit status and one summary note | The pull or merge request, with `--publish`. The next run updates the same note. |
+| A commit status and one summary note | The pull or merge request, with `--publish`. The next run updates the same note. A fork's pull request gets them from a `workflow_run` job that runs `--from-evidence`. |
 | An upload to Putnami Cloud | With `--upload` and a `PUTNAMI_CLOUD_TOKEN`. |
 
 It exits `0` whatever it observes, so a failed test or a missing report never
@@ -101,6 +104,7 @@ summary names the command that writes the export.
 |---|---|
 | JUnit XML | Jest with jest-junit, Vitest, `node:test`, PHPUnit `--log-junit`, gotestsum, go-junit-report, pytest `--junitxml`, `pants test --test-report`, `bazel test`, Gradle, Android, Maven Surefire and Failsafe, cargo-nextest, xcbeautify `--report junit`, fastlane `scan`, `swift test --xunit-output`, junitreport's `tojunit` for Dart and Flutter, rspec_junit_formatter, minitest-reporters, `dotnet test --logger junit` |
 | TRX | `dotnet test --logger trx`, with xUnit, NUnit or MSTest |
+| `.xcresult` bundle | `xcodebuild test -resultBundlePath`, read through `xcrun` on a macOS runner |
 
 ### Coverage reports
 
@@ -111,11 +115,13 @@ summary names the command that writes the export.
 | Clover XML | PHPUnit `--coverage-clover`, Jest, Vitest |
 | JaCoCo XML | The JaCoCo Maven plugin, the Gradle `jacoco` plugin, Kover, Android unit test coverage |
 | Go cover profile | `go test -coverprofile` |
+| `.xcresult` bundle | `xcodebuild test -enableCodeCoverage YES`, read through `xcrun xccov` on a macOS runner |
 
 `putnami observe` finds the reports by their content, anywhere in the
 checkout except `.git`, `node_modules`, `vendor` and build outputs that hold
-no report. `--junit` and `--coverage` name them instead. It reads no
-`.xcresult` bundle: convert it to JUnit and Cobertura first. See
+no report. `--junit` and `--coverage` name them instead. It reads an
+`.xcresult` bundle through `xcrun` on a macOS runner; elsewhere, convert it
+to JUnit and Cobertura first. See
 [Reports](/docs/tooling-&-workspace/observe/reports) for what each format
 gives.
 
@@ -136,12 +142,13 @@ gives.
 
 | Lockfile | Ecosystem |
 |---|---|
-| `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock` | `npm` |
+| `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`, `bun.lock` | `npm` |
 | Rush's `common/config/rush/pnpm-lock.yaml`, `npm-shrinkwrap.json` and `yarn.lock`, and subspace lockfiles | `npm` |
 | `composer.lock` | `composer` |
 | `go.mod` | `go` |
 | `uv.lock`, `poetry.lock`, and the Pants lockfiles `[python.resolves]` names | `pypi` |
 | `gradle.lockfile`, `settings-gradle.lockfile`, `gradle/libs.versions.toml` | `maven` |
+| `pom.xml`, the versions a Maven POM declares, marked declared | `maven` |
 | `Package.resolved` | `swift` |
 | `Podfile.lock` | `cocoapods` |
 | `pubspec.lock` | `pub` |
@@ -149,10 +156,11 @@ gives.
 | `Gemfile.lock` | `gem` |
 | `Cargo.lock` | `cargo` |
 
-Maven has no lockfile, and `bun.lock` is not read, so their dependency
-changes do not show. A dependency ecosystem can differ from the component's:
-a Gradle project is a `gradle` component whose dependencies are `maven`
-packages.
+Maven has no lockfile: its dependency changes are the versions its POMs
+declare, not the ones Maven resolves. `bun.lockb`, the binary lockfile of Bun
+before 1.2, is not read and says so in a diagnostic. A dependency ecosystem
+can differ from the component's: a Gradle project is a `gradle` component
+whose dependencies are `maven` packages.
 
 ### Software bills of materials
 

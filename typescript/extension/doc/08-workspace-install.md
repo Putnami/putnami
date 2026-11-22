@@ -270,6 +270,50 @@ The fetch runs in a copy because bun 1.4 has no offline install: it accepts
 leave a `node_modules` that the next install treats as complete, so the trusted
 install scripts would never run.
 
+## Add and remove dependencies
+
+`putnami deps add` and `putnami deps remove` edit the `package.json` of one
+TypeScript project, the one `--projects <name>` names or the workspace's only
+editable project, then install with the workspace's package manager.
+
+```bash
+putnami deps add @putnami/database --projects api   # latest release
+putnami deps add zod@^3.23.0 --projects api         # a version or a range
+putnami deps add @acme/shared --projects api        # a workspace package
+putnami deps remove zod --projects api
+putnami deps add hono --projects api --dry-run      # print the edit, write nothing
+```
+
+- **Shared versions live in the workspace catalog.** With Bun the entry goes to
+  the `catalog` of the root `package.json`, with pnpm to the `catalog` of
+  `pnpm-workspace.yaml`, and the project references it as `"catalog:"`. An
+  entry the catalog already holds keeps its version unless the spec names one;
+  a new entry takes the version the spec names, or `^` and the version the
+  registry's `latest` dist-tag names. A project that already references a
+  named catalog (`catalog:<name>`) keeps it. A project that already pins the
+  package to a version keeps it when the spec names none: name a version to
+  change it.
+- **npm and Yarn read no catalog**: the version goes in the project's own
+  `package.json`.
+- **A workspace package** another member publishes is written as
+  `"workspace:*"`, with no registry lookup; npm and Yarn 1, which do not read
+  that protocol, get `^` and the package's version, or `*` when it has none.
+- **A package already listed** stays in its field, such as `devDependencies`;
+  a new one goes to `dependencies`.
+- **remove** drops the package from every dependency field of the project and
+  from the `dependencies` of its `putnami` section, and drops its catalog entry
+  when no member and none of the root's `overrides` or `resolutions`
+  references it any more. A package the project does not list fails the
+  command.
+- **A failed or interrupted install** puts back every file the command
+  edited, the lockfile included.
+- A hosted run refuses the edit: it reaches the registry and rewrites the
+  manifests. Rush workspaces use `rush add` and `rush remove`.
+
+`putnami deps prune` uses the same job to drop the `package.json` entries no
+import backs, in the dependency fields and in the `dependencies` of the
+`putnami` section.
+
 ## API Reference
 
 ### Flags

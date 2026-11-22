@@ -585,3 +585,21 @@ func TestHostMessages(t *testing.T) {
 		}
 	}
 }
+
+func TestTheNoteMarksAPOMChangeDeclared(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-jvm", "maven-declared-versions", "a-pom-change-is-marked-declared")
+	o := pullRequest()
+	o.Analysis.DependencyChanges = []evidence.DependencyChange{
+		{Ecosystem: "maven", Name: "com.google.guava:guava", To: "33.4.0-jre", Change: evidence.DependencyAdded, Lockfile: "services/api/pom.xml"},
+		{Ecosystem: "maven", Name: "com.google.guava:guava", From: "33.3.1-jre", To: "33.4.0-jre", Change: evidence.DependencyUpgraded, Lockfile: "pricing/gradle.lockfile"},
+	}
+	note := Note(o, "")
+	for _, row := range []string{
+		"| `com.google.guava:guava` | added | `33.4.0-jre` | `services/api/pom.xml` (declared) |\n",
+		"| `com.google.guava:guava` | upgraded | `33.3.1-jre → 33.4.0-jre` | `pricing/gradle.lockfile` |\n",
+	} {
+		if !strings.Contains(note, row) {
+			t.Errorf("the note lacks %q:\n%s", row, note)
+		}
+	}
+}

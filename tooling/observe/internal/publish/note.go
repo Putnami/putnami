@@ -8,6 +8,7 @@ import (
 	diag "go.putnami.dev/protocol/diagnostic"
 	"go.putnami.dev/protocol/evidence"
 	"go.putnami.dev/tooling/observe/internal/analyze"
+	"go.putnami.dev/tooling/observe/internal/lockdiff"
 	"go.putnami.dev/tooling/observe/internal/observe"
 )
 
@@ -191,7 +192,11 @@ func writeDependencies(b *strings.Builder, changes []evidence.DependencyChange) 
 		case evidence.DependencyRemoved:
 			version = d.From
 		}
-		fmt.Fprintf(b, "| %s | %s | %s | %s |\n", cell(code(d.Name)), d.Change, cell(code(version)), cell(code(d.Lockfile)))
+		lockfile := cell(code(d.Lockfile))
+		if lockdiff.Declared(d.Ecosystem, d.Lockfile) {
+			lockfile += " (declared)"
+		}
+		fmt.Fprintf(b, "| %s | %s | %s | %s |\n", cell(code(d.Name)), d.Change, cell(code(version)), lockfile)
 	}
 }
 

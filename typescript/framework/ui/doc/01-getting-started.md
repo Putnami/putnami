@@ -14,7 +14,7 @@ putnami deps add @putnami/ui
 
 Wrap your application with `ThemeProvider` to enable theming and global styles:
 
-```typescript
+```typescript nocheck
 import { ThemeProvider, Container, Heading, Text, Button } from '@putnami/ui';
 
 function App() {
@@ -68,7 +68,7 @@ See [Theming](./02-theming.md) for details.
 
 Layout props accept arrays for responsive values. The first value is the base (mobile), subsequent values apply at breakpoints `sm`, `md`, `lg`, `xl`:
 
-```typescript
+```typescript nocheck
 <Box p={['sm', 'md', 'lg']}>
   {/* padding: sm on mobile, md at 640px, lg at 1024px */}
 </Box>

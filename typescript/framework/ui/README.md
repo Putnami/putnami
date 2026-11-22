@@ -21,7 +21,7 @@ putnami deps add @putnami/ui
 
 ## Quick Start
 
-```typescript
+```tsx
 import { ThemeProvider, Container, Heading, Text, Button } from '@putnami/ui';
 
 function App() {

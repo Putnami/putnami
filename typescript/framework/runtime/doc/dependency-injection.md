@@ -74,7 +74,7 @@ provide(Database, async (resolve) => {
   const db = new Database(config.url);
   await db.connect();
   return db;
-}, { onClose: (db) => db.disconnect() })
+}, { onClose: (db: Database) => db.disconnect() })
 ```
 
 ### Named token
@@ -145,7 +145,7 @@ await ctx.close();
 {
   await using ctx = new ContainerContext('app');
   ctx.register(provide(Database, async () => Database.connect(url), {
-    onClose: (db) => db.disconnect(),
+    onClose: (db: Database) => db.disconnect(),
   }));
 
   await ctx.start();

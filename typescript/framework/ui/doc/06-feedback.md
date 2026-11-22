@@ -6,7 +6,7 @@ Components for communicating status, progress, and notifications to users.
 
 Status messages with icon, title, description, and optional close button.
 
-```typescript
+```typescript nocheck
 import { Alert } from '@putnami/ui';
 
 <Alert status="success" title="Saved">Your changes have been saved.</Alert>
@@ -36,7 +36,7 @@ Temporary notification system with positioning and auto-dismiss.
 
 Wrap your app with `ToastProvider`:
 
-```typescript
+```typescript nocheck
 import { ToastProvider } from '@putnami/ui';
 
 <ThemeProvider>
@@ -94,7 +94,7 @@ function SaveButton() {
 
 Horizontal progress bar with determinate and indeterminate modes.
 
-```typescript
+```typescript nocheck
 import { Progress } from '@putnami/ui';
 
 <Progress value={65} />
@@ -119,7 +119,7 @@ import { Progress } from '@putnami/ui';
 
 Animated loading indicator.
 
-```typescript
+```typescript nocheck
 import { Spinner } from '@putnami/ui';
 
 <Spinner />

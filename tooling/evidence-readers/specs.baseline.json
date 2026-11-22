@@ -6,6 +6,7 @@
     "evidence-readers/report-readers#coverage-reads-every-instrumented-line",
     "evidence-readers/report-readers#cyclonedx-reads-components",
     "evidence-readers/report-readers#deptrac-junit-reads-layers",
+    "evidence-readers/report-readers#exported-surface-is-pinned",
     "evidence-readers/report-readers#go-cover-blocks-become-lines",
     "evidence-readers/report-readers#import-linter-text-reads-contracts",
     "evidence-readers/report-readers#jacoco-reads-source-files",
@@ -13,6 +14,8 @@
     "evidence-readers/report-readers#malformed-reports-are-diagnostics",
     "evidence-readers/report-readers#paths-as-the-report-states",
     "evidence-readers/report-readers#spdx-reads-packages",
-    "evidence-readers/report-readers#trx-reads-every-result"
+    "evidence-readers/report-readers#trx-reads-every-result",
+    "evidence-readers/report-readers#xccov-reads-file-totals-and-lines",
+    "evidence-readers/report-readers#xcresult-tests-read-every-case"
   ]
 }

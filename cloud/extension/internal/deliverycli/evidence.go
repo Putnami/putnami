@@ -185,7 +185,7 @@ func EvidenceReport(params map[string]any, env map[string]string, ioctx clicore.
 				return err
 			}
 		default:
-			return clicore.NewError("cloud evidence-report needs a credential: "+evidenceTokenEnv+" set to a workspace token of scope delivery.ingest, "+evidenceOrganizationEnv+" in a GitHub Actions job with permissions id-token: write, or --sign-in to upload as the signed-in person", clicore.ExitAuth)
+			return clicore.NewError("cloud evidence-report needs a credential: "+evidenceTokenEnv+" set to an organization ingest token (putnami cloud token create --organization <id>) or a workspace token of scope delivery.ingest, "+evidenceOrganizationEnv+" in a GitHub Actions job with permissions id-token: write, or --sign-in to upload as the signed-in person", clicore.ExitAuth)
 		}
 		namesRepository = true
 	}

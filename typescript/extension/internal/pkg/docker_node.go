@@ -317,7 +317,7 @@ func nodeBundleFiles(compileOutput string) ([]oci.File, error) {
 // --enable-source-maps on the bundle.
 func nodeDockerSpec(baseRef, platform, projectDir, compileOutput, stampPath string, port int, hasAssets bool) (oci.Spec, error) {
 	if port <= 0 {
-		port = 3000
+		port = DefaultImagePort
 	}
 	bundle, err := build.ReadNodeBundle(compileOutput)
 	if err != nil {

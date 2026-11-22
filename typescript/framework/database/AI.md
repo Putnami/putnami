@@ -82,7 +82,7 @@ Same as `@putnami/application`: `String`, `Number`, `Boolean`, `Int`, `Uuid`, `E
 
 ### Named Datasources
 
-```ts
+```ts nocheck
 const AuditTable = Table('audit_logs', { ... }, { db: 'audit' });
 // Resolves the 'audit' datasource (binding first, then database.audit config)
 ```
@@ -137,8 +137,8 @@ are never written into `infra/requirements.json`.
 `provision()` is the TypeScript cross-language test database provider — the
 counterpart of Go's `go.putnami.dev/database/testprovider`. It turns a canonical
 **test binding** (the same `DATABASE_TEST_BINDINGS` contract the Go provider
-reads) into isolated, migrated databases per named datasource, against an
-externally provided Postgres (`mode: require`).
+reads) into isolated, migrated databases per named datasource, on the Postgres
+server the binding names (see the end of this section for who starts it).
 
 ```ts
 import { provision, TestProviderSkip } from '@putnami/database';
@@ -190,8 +190,15 @@ same base that have no open connection and are older than one hour. The name
 in the same format as the Go provider, so each reclaims what the other left
 behind; a live suite's database is never dropped.
 `mode: 'skip'` throws
-`TestProviderSkip`; Docker `mode: 'auto'` is a later slice. Unit tests pay no
-database cost — the live path runs only when `DATABASE_TEST_BINDINGS` is set.
+`TestProviderSkip`. The provider starts no server. `putnami test` hands it the
+binding through `DATABASE_TEST_BINDINGS`: an externally set one always wins,
+such as a CI service container. Otherwise, when the project declares a
+database in `infra/requirements.json`, the `test-env-up` step of a local run
+(`--infra auto`, the default off CI) starts a throwaway Postgres (a Docker
+container, or the PostgreSQL installed on the machine) and injects its
+binding; on CI (`require`) it starts nothing. Unit tests
+pay no database cost — the live path runs only when `DATABASE_TEST_BINDINGS` is
+set.
 
 `datasources` names the datasources a suite uses. When set, `provision` plans,
 builds templates for, reclaims, provisions and tears down only those entries,

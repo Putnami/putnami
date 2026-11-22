@@ -5,7 +5,7 @@ Get up and running with `@putnami/database` in minutes. This guide will walk you
 ## Installation
 
 ```bash
-bun add @putnami/database
+putnami deps add @putnami/database
 ```
 
 ## Step 1: Configure Database Connection

@@ -233,7 +233,7 @@ func (GradleDetector) Detect(root string) Found {
 }
 
 // MavenDetector adapts the Maven detector: each module that packages code is
-// a workspace component.
+// a workspace component. It also reads the versions each POM declares.
 type MavenDetector struct{}
 
 // Name implements Detector.
@@ -245,6 +245,16 @@ func (MavenDetector) Detect(root string) Found {
 	found := Found{Diagnostics: detection.Diagnostics}
 	for _, c := range detection.Components {
 		found.Components = append(found.Components, Component{ID: c.ID, Name: c.Name, Ecosystem: maven.Ecosystem, Source: evidence.SourceWorkspace, DependsOn: c.DependsOn})
+	}
+	if len(detection.POMs) > 0 {
+		found.Lockfile = func(file string) (string, LockReader, bool) {
+			if !detection.IsDeclaredVersions(file) {
+				return "", nil, false
+			}
+			return lockdiff.EcosystemMaven, func(data []byte) (map[string][]string, error) {
+				return detection.ReadDeclared(file, data)
+			}, true
+		}
 	}
 	return found
 }

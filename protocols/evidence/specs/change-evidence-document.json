@@ -142,6 +142,23 @@
       ]
     },
     {
+      "id": "test-cases-are-named",
+      "text": [
+        "The optional cases member of a tests entry lists each test case that ran in its component, with its suite, its name and its outcome: passed, failed or skipped.",
+        "Suite and name are the case's stable id, so a reader compares two documents case by case.",
+        "A case names its test, else evidence.required; an id twice in one entry is evidence.duplicate; another outcome is evidence.invalid_test_case.",
+        "A document without cases validates as before."
+      ]
+    },
+    {
+      "id": "test-cases-are-bounded",
+      "text": [
+        "A tests entry lists at most 10000 cases and a document at most 50000, else evidence.too_large.",
+        "omittedCases counts the cases left out to keep within them or because their report gave their id to another case: a case vanished only when the later entry carries cases and omits none.",
+        "An entry lists no more cases of an outcome than its count of it, and its listed and omitted cases are at most its passed, failed and skipped ones, else evidence.invalid_count."
+      ]
+    },
+    {
       "id": "timestamps-and-diagnostics-are-well-formed",
       "text": [
         "generatedAt is a valid RFC 3339 timestamp with a zone, else evidence.invalid_timestamp.",
@@ -224,11 +241,21 @@
         "The optional specVerification member is the features protocol's spec verification record of the repository's own workspace, carried as the engine wrote it.",
         "It is one JSON object, else evidence.invalid_spec_verification, of at most 524288 bytes, else evidence.too_large; the features protocol validates its contents."
       ]
+    },
+    {
+      "id": "version-1-changes-only-by-addition",
+      "text": [
+        "fixtures/v1 pins by digest the schema version 1 was promised with and frozen version 1 documents; each document validates, and each bound of the strict reader stays at or above its pin.",
+        "The current schema keeps the frozen dialect, each member with its type, const, $ref and pattern, the same required sets and each vocabulary value, keeps or loosens each bound, and adds no constraint.",
+        "A new optional member or vocabulary value passes."
+      ]
     }
   ],
   "decisions": [
     "protocols/evidence/doc/adr/0001-one-self-reported-change-evidence-document.md",
     "protocols/evidence/doc/adr/0003-the-decision-records-a-change-concerns.md",
-    "protocols/evidence/doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md"
+    "protocols/evidence/doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md",
+    "protocols/evidence/doc/adr/0004-test-cases-are-an-optional-member-of-version-1.md",
+    "protocols/evidence/doc/adr/0005-version-1-changes-only-by-addition.md"
   ]
 }

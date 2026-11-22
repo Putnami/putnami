@@ -6,7 +6,7 @@ Components for navigating between pages and sections.
 
 Path-based navigation showing the current location in a hierarchy.
 
-```typescript
+```typescript nocheck
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink } from '@putnami/ui';
 
 <Breadcrumb>
@@ -43,7 +43,7 @@ Renders a `<nav>` with `aria-label="Breadcrumb"`. The current page link uses `ar
 
 Tabbed interface with controlled and uncontrolled modes.
 
-```typescript
+```typescript nocheck
 import { Tabs, TabList, Tab, TabPanels, TabPanel } from '@putnami/ui';
 
 <Tabs defaultIndex={0} variant="line">
@@ -89,7 +89,7 @@ Uses ARIA `role="tablist"`, `role="tab"`, `role="tabpanel"` with proper `aria-se
 
 Page navigation with ellipsis collapsing and first/last buttons.
 
-```typescript
+```typescript nocheck
 import { Pagination } from '@putnami/ui';
 
 <Pagination page={3} totalPages={10} onChange={setPage} />
@@ -113,7 +113,7 @@ Returns `null` when `totalPages <= 1`. Uses `aria-label="Pagination"` and `aria-
 
 Styled link component built on `@putnami/web` router `Link`. Provides client-side navigation.
 
-```tsx
+```tsx nocheck
 import { Link } from '@putnami/ui';
 
 <Link to="/about">About</Link>

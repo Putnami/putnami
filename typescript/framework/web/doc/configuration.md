@@ -243,7 +243,7 @@ react({
 
 Custom HTML page wrapper component. Overrides the default HTML template.
 
-```typescript
+```typescript nocheck
 react({
   page: ({ children }) => (
     <html lang="en">
@@ -266,7 +266,7 @@ react({
 
 Custom HTML template for 404 pages.
 
-```typescript
+```typescript nocheck
 react({
   notFound: ({ children }) => (
     <html>
@@ -378,7 +378,7 @@ React settings are resolved independently.
 
 The default template is minimal. Customize it with the `page` option:
 
-```typescript
+```typescript nocheck
 import { react } from '@putnami/web';
 
 export const app = () => application().use(
@@ -402,7 +402,7 @@ export const app = () => application().use(
 
 ### Using Document Helpers in Template
 
-```typescript
+```typescript nocheck
 import { documentHelper } from '@putnami/web';
 
 react({

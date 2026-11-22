@@ -239,12 +239,11 @@ resp := http.JSON(data).
 
 ### Custom Responses
 
-Build a response from scratch with `NewResponse`:
+Build a raw response with `Bytes`, then chain `WithHeader` or `WithStatus`:
 
 ```go
-resp := http.NewResponse(200)
-resp.Headers.Set("Content-Type", "text/csv")
-resp.raw = []byte("name,email\nAlice,alice@example.com")
+resp := http.Bytes(200, "text/csv", []byte("name,email\nAlice,alice@example.com"))
+resp.WithHeader("Content-Disposition", `attachment; filename="users.csv"`)
 ```
 
 ## Middleware
@@ -394,7 +393,9 @@ import (
 httpServer := http.NewServerPlugin(http.ServerConfig{})
 apiPlugin := api.New(httpServer)
 // ... register endpoints on apiPlugin (below) ...
-app.New("myapp").Use(httpServer).Use(apiPlugin).ListenAndServe()
+a := app.New("myapp")
+a.Use(httpServer).Use(apiPlugin)
+a.ListenAndServe()
 ```
 
 ### Basic Usage
@@ -461,7 +462,7 @@ apiPlugin.Register(api.Endpoint("GET", "/users").
         if err != nil {
             return http.InternalError(err.Error())
         }
-        users, err := repo.List(ctx.Context())
+        users, err := repo.List(ctx.Context.Context())
         if err != nil {
             return http.InternalError(err.Error())
         }

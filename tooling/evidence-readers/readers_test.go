@@ -27,6 +27,9 @@ var coverageReaders = map[string]func([]byte) (CoverageReport, []diag.Diagnostic
 	"clover":    ReadClover,
 	"gocover":   ReadGoCover,
 	"jacoco":    ReadJaCoCo,
+	// The coverage of an .xcresult bundle, as xccov prints it.
+	"xccov-report":  ReadXccovReport,
+	"xccov-archive": ReadXccovArchive,
 }
 
 func read(t *testing.T, path string) []byte {
@@ -454,6 +457,8 @@ func TestEveryMalformedFixtureReturnsItsCode(t *testing.T) {
 			result, diagnostics = ReadFile(fixture, ReadJUnit)
 		case "trx":
 			result, diagnostics = ReadFile(fixture, ReadTRX)
+		case "xcresult":
+			result, diagnostics = ReadFile(fixture, ReadXCResultTests)
 		case "deptrac":
 			result, diagnostics = ReadFile(fixture, ReadDeptrac)
 		case "import-linter":
@@ -495,7 +500,11 @@ func allReaders() map[string]func([]byte) []diag.Diagnostic {
 	readers := map[string]func([]byte) []diag.Diagnostic{
 		"junit": func(data []byte) []diag.Diagnostic { _, d := ReadJUnit(data); return d },
 		"trx":   func(data []byte) []diag.Diagnostic { _, d := ReadTRX(data); return d },
-		"sbom":  func(data []byte) []diag.Diagnostic { _, d := ReadSBOM(data); return d },
+		"xcresult": func(data []byte) []diag.Diagnostic {
+			_, d := ReadXCResultTests(data)
+			return d
+		},
+		"sbom": func(data []byte) []diag.Diagnostic { _, d := ReadSBOM(data); return d },
 		"deptrac": func(data []byte) []diag.Diagnostic {
 			_, d := ReadDeptrac(data)
 			return d
@@ -577,7 +586,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 		t.Fatal(err)
 	}
 	var inputs [][]byte
-	for _, dir := range []string{"junit", "trx", "lcov", "cobertura", "clover", "gocover", "sbom", "malformed"} {
+	for _, dir := range []string{"junit", "trx", "xcresult", "lcov", "cobertura", "clover", "gocover", "xccov-report", "xccov-archive", "sbom", "malformed"} {
 		for _, fixture := range fixtures(t, dir) {
 			if expectations[filepath.Base(fixture)].Code == CodeTooLarge {
 				continue
@@ -605,7 +614,7 @@ func TestArbitraryBytesNeverPanic(t *testing.T) {
 }
 
 func FuzzReaders(f *testing.F) {
-	for _, dir := range []string{"junit", "trx", "lcov", "cobertura", "clover", "gocover", "sbom", "archunit", "deptrac", "import-linter"} {
+	for _, dir := range []string{"junit", "trx", "xcresult", "lcov", "cobertura", "clover", "gocover", "xccov-report", "xccov-archive", "sbom", "archunit", "deptrac", "import-linter"} {
 		entries, _ := os.ReadDir(filepath.Join("testdata", dir))
 		for _, entry := range entries {
 			if data, err := os.ReadFile(filepath.Join("testdata", dir, entry.Name())); err == nil {

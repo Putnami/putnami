@@ -551,6 +551,26 @@
           }
         },
         {
+          "id": "deps-edit-keeps-the-catalog",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "a-bun-add-writes-the-catalog-and-references-it",
+              "a-pnpm-add-writes-the-pnpm-workspace-catalog",
+              "an-npm-add-writes-the-version-in-the-project",
+              "an-add-of-a-member-package-writes-workspace",
+              "a-remove-drops-an-entry-no-member-references",
+              "a-prune-drops-the-target-package",
+              "a-failed-install-restores-the-edited-files",
+              "a-dry-run-writes-no-file"
+            ]
+          }
+        },
+        {
           "id": "upgrade-installs-with-the-package-manager",
           "stage": "coded",
           "evidenceKinds": [
@@ -922,6 +942,23 @@
           }
         },
         {
+          "id": "compiled-service-config",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-compiled-entry-runs-the-project-serve-entry",
+              "the-compiled-entry-embeds-the-project-conf-files",
+              "the-compile-reads-node-env-at-run-time",
+              "the-generate-key-reads-the-conf-files",
+              "the-compiled-executable-listens-on-the-configured-port"
+            ]
+          }
+        },
+        {
           "id": "source-bound-generate",
           "stage": "coded",
           "evidenceKinds": [
@@ -1076,6 +1113,22 @@
             "checks": [
               "the-image-ships-the-bundle-and-the-production-dependencies",
               "a-missing-dependency-fails-naming-putnami-install"
+            ]
+          }
+        },
+        {
+          "id": "image-on-a-fresh-workspace",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-image-packages-before-the-first-commit",
+              "the-image-runs-the-executable-compiled-for-the-platform",
+              "a-docker-tag-with-a-repository-is-the-whole-reference",
+              "the-image-port-is-the-project-port"
             ]
           }
         },

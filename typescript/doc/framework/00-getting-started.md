@@ -26,10 +26,9 @@ If you are starting from an empty directory:
 putnami init
 ```
 
-`putnami init --project <name>` also creates a first project, and that project
-is always a `typescript-web` React application. For an API service, run
-`putnami init` without `--project`, then create the project from the
-`typescript-server` template as shown below.
+`putnami init --project <name>` also creates a first project from the
+`typescript-server` template, an HTTP API service. For a React application,
+add `--template typescript-web`; `putnami init --help` lists every template.
 
 ## Create the project
 

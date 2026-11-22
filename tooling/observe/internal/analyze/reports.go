@@ -4,6 +4,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -17,6 +18,7 @@ import (
 // the architecture rules, and the merged line coverage per repository file.
 func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 	tests := map[string]*evidence.ComponentTests{}
+	cases := map[string]map[evidence.TestCaseID]string{}
 	lines := map[string]lineHits{}
 	stated := map[string]readers.Counts{}
 	arch := newArchitecture()
@@ -24,6 +26,18 @@ func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 		abs := report.Path
 		if !filepath.IsAbs(abs) {
 			abs = filepath.Join(in.Root, filepath.FromSlash(report.Path))
+		}
+		switch {
+		case report.Format == reports.FormatXCResult && report.Kind == reports.KindJUnit:
+			if result, ok := r.xcresultTests(in, report, abs); ok {
+				r.attributeTests(in, report, result, m, tests, cases, arch)
+			}
+			continue
+		case report.Format == reports.FormatXCResult && report.Kind == reports.KindCoverage:
+			for _, result := range r.xcresultCoverage(in, report, abs) {
+				r.mapCoverage(report, result, m, lines, stated)
+			}
+			continue
 		}
 		switch report.Kind {
 		case reports.KindJUnit:
@@ -35,7 +49,7 @@ func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 			if r.unread(report, diags) {
 				continue
 			}
-			r.attributeTests(in, report, result, m, tests, arch)
+			r.attributeTests(in, report, result, m, tests, cases, arch)
 		case reports.KindArchitecture:
 			r.readArchitecture(report, abs, m, arch)
 		case reports.KindCoverage:
@@ -46,6 +60,7 @@ func (r *Result) readReports(in Input, m *mapper) map[string]lineHits {
 			r.mapCoverage(report, result, m, lines, stated)
 		}
 	}
+	r.listCases(tests, cases)
 	sortedComponents(tests, &r.Tests)
 	r.Architecture = arch.result()
 	if arch.droppedRules > 0 || arch.droppedViolations > 0 {
@@ -211,7 +226,7 @@ func joinDir(base, dir string) string {
 //
 // A case whose test source imports ArchUnit, or whose class name matches
 // an --archunit-classes pattern, is an architecture rule, not a test.
-func (r *Result) attributeTests(in Input, report reports.Report, result readers.TestReport, m *mapper, tests map[string]*evidence.ComponentTests, arch *architecture) {
+func (r *Result) attributeTests(in Input, report reports.Report, result readers.TestReport, m *mapper, tests map[string]*evidence.ComponentTests, cases map[string]map[evidence.TestCaseID]string, arch *architecture) {
 	bases := m.bases(report.Path)
 	reportOwner, reportOwned := m.set.Owner(report.Path)
 	if isAbsolute(report.Path) {
@@ -225,6 +240,11 @@ func (r *Result) attributeTests(in Input, report reports.Report, result readers.
 	}
 	var testRoots []string
 	unattributed := 0
+	// ids holds the ids this report gave each component. An id read twice in
+	// one report is a rerun or two tests the report does not tell apart: its
+	// extra cases count as omitted, so the entry no longer lists every case.
+	ids := map[string]map[evidence.TestCaseID]bool{}
+	ambiguous := 0
 	for _, c := range result.Cases {
 		owner, file, ok := "", "", false
 		candidates := append([]string{c.File, c.Classname}, moduleFiles(c.Classname)...)
@@ -291,14 +311,24 @@ func (r *Result) attributeTests(in Input, report reports.Report, result readers.
 			tests[owner] = entry
 		}
 		entry.DurationMs += c.DurationMs
+		id := caseID(c)
+		if cases[owner] == nil {
+			cases[owner] = map[evidence.TestCaseID]string{}
+		}
+		if ids[owner] == nil {
+			ids[owner] = map[evidence.TestCaseID]bool{}
+		}
+		if ids[owner][id] {
+			ambiguous++
+			entry.OmittedCases++
+		}
+		ids[owner][id] = true
+		cases[owner][id] = worse(cases[owner][id], c.Status)
 		switch c.Status {
 		case readers.StatusFailed:
 			entry.Failed++
 			if len(entry.FailingCases) < evidence.MaxFailingCases {
-				failing := evidence.FailingCase{Name: bounded(c.Name), File: file}
-				if failing.Name == "" {
-					failing.Name = "(unnamed)"
-				}
+				failing := evidence.FailingCase{Name: id.Name, File: file}
 				if len(c.Suites) > 0 {
 					failing.Suite = bounded(c.Suites[len(c.Suites)-1].Name)
 				} else {
@@ -317,6 +347,104 @@ func (r *Result) attributeTests(in Input, report reports.Report, result readers.
 	}
 	if unattributed > 0 {
 		r.warn(CodeTestsUnattributed, report.Path, "%d test cases of %s belong to no component: neither their file nor the report lies in one", unattributed, report.Path)
+	}
+	if ambiguous > 0 {
+		r.warn(CodeTestCasesAmbiguous, report.Path, "%d test cases of %s share their suite and name with another case of the report, a rerun or a test it does not tell apart: each such id is listed once and the others count as omitted", ambiguous, report.Path)
+	}
+}
+
+// caseID is the stable id of a test case: its class name, else the innermost
+// suite that holds it, and its name, "(unnamed)" when the report gives a blank
+// one. The class name tells apart the tests a runner gathers under one suite,
+// such as the classes of one .NET test assembly or the modules of one pytest
+// run.
+func caseID(c readers.TestCase) evidence.TestCaseID {
+	id := evidence.TestCaseID{Name: bounded(c.Name), Suite: bounded(c.Classname)}
+	if strings.TrimSpace(id.Name) == "" {
+		id.Name = "(unnamed)"
+	}
+	if strings.TrimSpace(id.Suite) == "" && len(c.Suites) > 0 {
+		id.Suite = bounded(c.Suites[len(c.Suites)-1].Name)
+	}
+	return id
+}
+
+// outcomeRank orders the outcomes of one id read twice: a failure wins over a
+// pass, which wins over a skip.
+var outcomeRank = map[string]int{evidence.OutcomeSkipped: 1, evidence.OutcomePassed: 2, evidence.OutcomeFailed: 3}
+
+// worse returns the outcome a case read twice keeps: failed when any run
+// failed, else passed when any passed, else skipped.
+func worse(known, status string) string {
+	outcome := evidence.OutcomePassed
+	switch status {
+	case readers.StatusFailed:
+		outcome = evidence.OutcomeFailed
+	case readers.StatusSkipped:
+		outcome = evidence.OutcomeSkipped
+	}
+	if outcomeRank[known] > outcomeRank[outcome] {
+		return known
+	}
+	return outcome
+}
+
+// listCases gives each tests entry its cases, within the evidence bounds: at
+// most MaxTestCases per component and MaxDocumentTestCases over the document.
+// The failed cases of every component take the document's budget first, then
+// the other cases, each pass in component id order. An entry lists its failed
+// cases first, then the others by suite and name. The cases left out add to
+// the entry's OmittedCases, and a warning counts them.
+func (r *Result) listCases(tests map[string]*evidence.ComponentTests, cases map[string]map[evidence.TestCaseID]string) {
+	owners := make([]string, 0, len(cases))
+	for owner := range cases {
+		owners = append(owners, owner)
+	}
+	sort.Strings(owners)
+	lists := make(map[string][]evidence.TestCase, len(owners))
+	failed := make(map[string]int, len(owners))
+	for _, owner := range owners {
+		list := make([]evidence.TestCase, 0, len(cases[owner]))
+		for id, outcome := range cases[owner] {
+			list = append(list, evidence.TestCase{Suite: id.Suite, Name: id.Name, Outcome: outcome})
+			if outcome == evidence.OutcomeFailed {
+				failed[owner]++
+			}
+		}
+		sort.Slice(list, func(i, j int) bool {
+			if failedI, failedJ := list[i].Outcome == evidence.OutcomeFailed, list[j].Outcome == evidence.OutcomeFailed; failedI != failedJ {
+				return failedI
+			}
+			if list[i].Suite != list[j].Suite {
+				return list[i].Suite < list[j].Suite
+			}
+			return list[i].Name < list[j].Name
+		})
+		lists[owner] = list
+	}
+	budget := evidence.MaxDocumentTestCases
+	keep := make(map[string]int, len(owners))
+	for _, upTo := range []func(string) int{
+		func(owner string) int { return failed[owner] },
+		func(owner string) int { return len(lists[owner]) },
+	} {
+		for _, owner := range owners {
+			more := min(upTo(owner), evidence.MaxTestCases) - keep[owner]
+			more = max(0, min(more, budget))
+			keep[owner] += more
+			budget -= more
+		}
+	}
+	omitted := 0
+	for _, owner := range owners {
+		entry := tests[owner]
+		entry.Cases = lists[owner][:keep[owner]:keep[owner]]
+		entry.OmittedCases += len(lists[owner]) - keep[owner]
+		omitted += len(lists[owner]) - keep[owner]
+	}
+	if omitted > 0 {
+		r.warn(CodeTestCasesBounded, "tests", "%d test cases over the evidence bounds (%d per component, %d per document) are left out",
+			omitted, evidence.MaxTestCases, evidence.MaxDocumentTestCases)
 	}
 }
 

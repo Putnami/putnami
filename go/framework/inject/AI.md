@@ -147,7 +147,7 @@ svc, _ := cc.Get(inject.TokenOf[*MyService]())
 DI works best with **functional packages** — each package owns its domain (types,
 repository, service) and exposes interfaces for cross-package dependencies:
 
-```go
+```go nocheck
 // blob/service.go — package owns its full domain
 type Repository interface { Store(ctx, b Blob) error }
 type Service struct { repo Repository; backend storage.Backend }

@@ -191,7 +191,10 @@ token := config.Token(ServerConfig)
 reg := config.Provide(ServerConfig, fileSource, envSource)
 
 // Use with an inject.Container
-container := inject.New(reg)
+container := inject.NewContainer("app", nil)
+if err := container.Register(reg); err != nil {
+    return err
+}
 ```
 
 `config.Provide` returns a non-lazy singleton `inject.Registration`. A normal

@@ -162,7 +162,7 @@ and direct transports remain available for tests and external integrations.
 
 Each service in the spec generates a class that extends `BaseClient`:
 
-```typescript
+```typescript nocheck
 // Auto-generated src/users-client.ts
 export class UsersClient extends BaseClient {
   readonly serviceName = 'users';
@@ -275,7 +275,7 @@ operation that declares no 304 is generated as before.
 
 For proto-generated clients, the field metadata is embedded directly in the client file. This enables zero-config binary encoding without any runtime configuration:
 
-```typescript
+```typescript nocheck
 const PROTO_META = {
   messageMeta: {
     GetUserRequest: [{ name: 'id', number: 1, type: 'string', optional: false, repeated: false }],

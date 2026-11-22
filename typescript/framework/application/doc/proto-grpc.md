@@ -293,7 +293,7 @@ Server streaming works over gRPC (Connect), WebSocket, and SSE. Define once, ser
 
 ```typescript
 // src/api/events/ws.ts
-import { endpoint, Stream, String, Int } from '@putnami/application';
+import { endpoint, Int, Stream } from '@putnami/application';
 
 export default endpoint()
   .query({ topic: String })
@@ -343,7 +343,7 @@ Client streaming requires the client to send multiple messages in a single reque
 
 ```typescript
 // src/api/upload/ws.ts
-import { endpoint, Stream, String, Int } from '@putnami/application';
+import { endpoint, Int, Stream } from '@putnami/application';
 
 export default endpoint()
   .body(Stream({ chunk: String, index: Int }))
@@ -388,7 +388,7 @@ Bidirectional streaming is the same pattern but with `Stream()` on both body and
 
 ```typescript
 // src/api/chat/ws.ts
-import { endpoint, Stream, String } from '@putnami/application';
+import { endpoint, Stream } from '@putnami/application';
 
 export default endpoint()
   .body(Stream({ type: String, content: String }))
@@ -403,7 +403,9 @@ export default endpoint()
         ctx.send({ event: 'echo', content: msg.content });
       }
     }
-    // Stream ends when client disconnects
+    // The loop ends when the client disconnects; the handler then states its
+    // terminal value
+    return { event: 'closed', content: '' };
   });
 ```
 
@@ -749,7 +751,7 @@ Response:
 The `createGrpcTestClient` function provides a lightweight client for testing gRPC services in integration tests. It makes real HTTP calls via the Connect protocol — no mocking required.
 
 ```typescript
-import { createGrpcTestClient } from '@putnami/application';
+import { createGrpcTestClient } from '@putnami/application/testing';
 
 const client = createGrpcTestClient({
   baseUrl: `http://localhost:${server.port}`,

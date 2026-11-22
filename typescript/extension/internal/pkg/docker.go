@@ -2,6 +2,7 @@ package pkg
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/fs"
 	"os"
@@ -46,14 +47,6 @@ type DockerParams struct {
 // process, deterministically, and without a docker daemon. The image is
 // written as a self-contained OCI layout; publish pushes it from there.
 func PackageDocker(workspaceRoot, projectName, projectPath string, params DockerParams, versionInfo *git.VersionInfo, wsVersion string) (map[string]any, error) {
-	compileOutput := filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "build"), "compile")
-	if !project.FileExists(compileOutput) {
-		compileOutput = filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "package"), "compile")
-	}
-	if !project.FileExists(compileOutput) {
-		return nil, fmt.Errorf("compile output not found for %s", projectName)
-	}
-
 	// Resolve target platform (default: linux/amd64)
 	platform := params.Platform
 	if platform == "" {
@@ -61,14 +54,9 @@ func PackageDocker(workspaceRoot, projectName, projectPath string, params Docker
 	}
 
 	node := params.Runtime == project.RuntimeNode
-	var binaryName string
-	if !node {
-		// Find the correct binary for the target platform
-		name, err := findBinaryForPlatform(compileOutput, platform)
-		if err != nil {
-			return nil, fmt.Errorf("no binary found for %s: %w", projectName, err)
-		}
-		binaryName = name
+	compileOutput, binaryName, err := locateCompileOutput(workspaceRoot, projectPath, projectName, platform, node)
+	if err != nil {
+		return nil, err
 	}
 
 	// Copy .gen/public into the compile output so it ships with the image. When
@@ -97,7 +85,6 @@ func PackageDocker(workspaceRoot, projectName, projectPath string, params Docker
 
 	stampPath := filepath.Join(compileOutput, contentStampFile)
 	var spec oci.Spec
-	var err error
 	if node {
 		baseRef := params.BaseImage
 		if baseRef == "" {
@@ -171,7 +158,7 @@ func PackageDocker(workspaceRoot, projectName, projectPath string, params Docker
 
 	manifestTags := []string{fullTag}
 	if params.Tag != "" {
-		manifestTags = append(manifestTags, imageName+":"+params.Tag)
+		manifestTags = append(manifestTags, localAlias(imageName, params.Tag))
 	}
 	if params.Load {
 		if err := loadIntoDaemon(layoutDir, fullTag, manifestTags[1:]); err != nil {
@@ -228,7 +215,7 @@ const contentStampPlanIdentity = "putnami/typescript/content-stamp/v1"
 // inherited from the distroless :nonroot base.
 func dockerSpec(baseRef, platform, compileOutput, binaryName, appName, stampPath string, port int, hasAssets bool) (oci.Spec, error) {
 	if port <= 0 {
-		port = 3000
+		port = DefaultImagePort
 	}
 	layers := []oci.Layer{
 		{Files: []oci.File{{Source: filepath.Join(compileOutput, binaryName), Path: "/app/" + appName, Mode: 0o755}}},
@@ -337,6 +324,97 @@ func loadIntoDaemon(layoutDir, contentRef string, aliases []string) error {
 	return nil
 }
 
+// DefaultImagePort is the port an image sets and exposes when the project
+// names none.
+const DefaultImagePort = 3000
+
+// imageConfigEnv is the configuration environment the image runs in: it
+// sets NODE_ENV=production, so the runtime reads conf/.env.production.yaml.
+const imageConfigEnv = "production"
+
+// ImagePort is the port the image sets as PORT and exposes: paramPort, which
+// --port or options.package.port sets; else the port the project configures,
+// putnami.port of conf/.env.production.yaml then conf/.env.yaml; else its
+// options.serve.port, the port `putnami serve` gives it; else
+// DefaultImagePort. A value that is not an integer between 1 and 65535 counts
+// as unset.
+func ImagePort(paramPort int, projectDir string, projectOptions map[string]json.RawMessage) int {
+	if paramPort > 0 && paramPort <= 65535 {
+		return paramPort
+	}
+	if port := project.ConfiguredPort(projectDir, imageConfigEnv); port > 0 {
+		return port
+	}
+	var serve struct {
+		Port any `json:"port"`
+	}
+	if raw, ok := projectOptions["serve"]; ok && json.Unmarshal(raw, &serve) == nil {
+		if port := project.ParsePort(serve.Port); port > 0 {
+			return port
+		}
+	}
+	return DefaultImagePort
+}
+
+// localAlias is the local reference an explicit --docker-tag names. A tag
+// that holds a ':' or a '/' is a whole reference (tasks-api:local,
+// registry.example.com/team/api:1.0) and is used as given; a bare tag (v1.0.0)
+// tags the project's image.
+func localAlias(imageName, tag string) string {
+	if strings.ContainsAny(tag, ":/") {
+		return tag
+	}
+	return imageName + ":" + tag
+}
+
+// locateCompileOutput finds the compile output the image is assembled from:
+// the package command's own compile step first, the one the docker step runs
+// after, then a build --compile output. On Bun it takes the first of them
+// that holds the executable compiled for platform, so a stale build output
+// compiled for another target never hides the package step's own. It
+// answers the directory and, on Bun, the executable's name; the error names
+// the platform and every directory searched. The build output is a fallback
+// for a package compile step that wrote no executable for the platform, such
+// as one bound to another --compile-target: it ships what that build left,
+// whatever its age, so the package step's own output always comes first.
+func locateCompileOutput(workspaceRoot, projectPath, projectName, platform string, node bool) (string, string, error) {
+	candidates := []string{
+		filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "package"), "compile"),
+		filepath.Join(wsproto.CommandOutputDir(workspaceRoot, projectPath, "build"), "compile"),
+	}
+	var searched []string
+	for _, dir := range candidates {
+		if !project.FileExists(dir) {
+			searched = append(searched, dir)
+			continue
+		}
+		if node {
+			if project.FileExists(filepath.Join(dir, build.NodeBundleFile)) {
+				return dir, "", nil
+			}
+			searched = append(searched, dir)
+			continue
+		}
+		name, err := findBinaryForPlatform(dir, platform)
+		if err == nil {
+			return dir, name, nil
+		}
+		if !errors.Is(err, errNoBinaryForPlatform) {
+			return "", "", fmt.Errorf("no binary found for %s: %w", projectName, err)
+		}
+		searched = append(searched, dir)
+	}
+	what := "compile output"
+	if !node {
+		what = "executable compiled for " + platform
+	}
+	return "", "", fmt.Errorf("%s not found for %s: searched %s", what, projectName, strings.Join(searched, ", "))
+}
+
+// errNoBinaryForPlatform reports a compile output that holds no executable
+// for the requested platform.
+var errNoBinaryForPlatform = errors.New("no executable for the platform")
+
 // findBinaryForPlatform locates the compiled binary matching the Docker platform.
 // Platform format is "os/arch" (e.g. "linux/amd64"). If empty, defaults to "linux/amd64".
 //
@@ -359,7 +437,7 @@ func findBinaryForPlatform(compileOutput, platform string) (string, error) {
 			return e.Name(), nil
 		}
 	}
-	return "", fmt.Errorf("no binary with suffix %q found in %s", suffix, compileOutput)
+	return "", fmt.Errorf("%w: no binary with suffix %q found in %s", errNoBinaryForPlatform, suffix, compileOutput)
 }
 
 // resolveDockerVersion computes the Docker image version from workspace version

@@ -598,3 +598,90 @@ func TestRubyTestAndCoverageReportsAreDiscovered(t *testing.T) {
 		t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
 	}
 }
+
+func TestAnXCResultBundleIsATestAndCoverageReport(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-swift", "xcresult-discovery", "an-xcresult-bundle-is-a-test-and-coverage-report")
+	root := tree(t, map[string]string{
+		"build/Test.xcresult/Info.plist":          "<plist/>",
+		"build/Test.xcresult/Data/report.xml":     junitXML,
+		"build/Test.xcresult/Data/lcov.info":      lcovTrace,
+		"logs/Archived.XCResult/Info.plist":       "<plist/>",
+		"notes/plain.xcresult/lcov.info":          lcovTrace,
+		"DerivedData/Logs/Test/Run.xcresult/x.db": "",
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	if len(diags) != 0 {
+		t.Fatalf("diagnostics %v", diags)
+	}
+	// A directory named .xcresult without an Info.plist is no bundle and is
+	// walked; a bundle's own files are no reports.
+	want := []Report{
+		{Path: "build/Test.xcresult", Kind: KindJUnit, Format: FormatXCResult, Source: SourceDiscovered},
+		{Path: "build/Test.xcresult", Kind: KindCoverage, Format: FormatXCResult, Source: SourceDiscovered},
+		{Path: "logs/Archived.XCResult", Kind: KindJUnit, Format: FormatXCResult, Source: SourceDiscovered},
+		{Path: "logs/Archived.XCResult", Kind: KindCoverage, Format: FormatXCResult, Source: SourceDiscovered},
+		{Path: "notes/plain.xcresult/lcov.info", Kind: KindCoverage, Format: FormatLCOV, Source: SourceDiscovered},
+	}
+	if !reflect.DeepEqual(reports, want) {
+		t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
+	}
+	if IsXCResultBundle(filepath.Join(root, "notes", "plain.xcresult")) || !IsXCResultBundle(filepath.Join(root, "build", "Test.xcresult")) {
+		t.Error("a bundle is a .xcresult directory with an Info.plist")
+	}
+}
+
+func TestANamedBundleReplacesDiscovery(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-swift", "xcresult-discovery", "a-named-bundle-replaces-discovery")
+	root := tree(t, map[string]string{
+		"ios/build/Unit.xcresult/Info.plist":   "<plist/>",
+		"ios/build/UI.xcresult/Info.plist":     "<plist/>",
+		"ios/build/UI.xcresult/Data/junit.xml": junitXML,
+		"other/Other.xcresult/Info.plist":      "<plist/>",
+		"reports/junit.xml":                    junitXML,
+	})
+	reports, diags := Collect(Request{
+		Root: root, Resolve: resolver(filepath.Join(root, "ios")),
+		JUnit: []string{"build/*.xcresult"}, Coverage: []string{"build/Unit.xcresult"}, SBOM: []string{"build/Unit.xcresult"},
+	})
+	want := []Report{
+		{Path: "ios/build/UI.xcresult", Kind: KindJUnit, Format: FormatXCResult, Source: SourceNamed},
+		{Path: "ios/build/Unit.xcresult", Kind: KindJUnit, Format: FormatXCResult, Source: SourceNamed},
+		{Path: "ios/build/Unit.xcresult", Kind: KindCoverage, Format: FormatXCResult, Source: SourceNamed},
+	}
+	if !reflect.DeepEqual(reports, want) {
+		t.Fatalf("reports:\n got %+v\nwant %+v", reports, want)
+	}
+	// A bundle is no SBOM.
+	if got := codes(diags); !reflect.DeepEqual(got, []string{CodeReportUnrecognized}) || !strings.Contains(diags[0].Message, "it reads as xcresult") {
+		t.Errorf("diagnostics %v", diags)
+	}
+	// A directory named like a bundle without its Info.plist is named as such.
+	if err := os.MkdirAll(filepath.Join(root, "ios", "build", "Empty.xcresult"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	_, diags = Collect(Request{Root: root, Resolve: resolver(filepath.Join(root, "ios")), JUnit: []string{"build/Empty.xcresult"}, Coverage: []string{"build/Unit.xcresult"}})
+	if len(diags) != 1 || diags[0].Code != CodeReportUnrecognized || !strings.Contains(diags[0].Message, "no .xcresult bundle: it holds no Info.plist") {
+		t.Errorf("diagnostics %v", diags)
+	}
+}
+
+func TestADiscoveredBundleBesideJUnitReportsGivesNoTests(t *testing.T) {
+	spectest.Proves(t, "tooling/observe-swift", "xcresult-discovery", "a-discovered-bundle-beside-junit-reports-gives-no-tests")
+	root := tree(t, map[string]string{
+		"build/Test.xcresult/Info.plist": "<plist/>",
+		"build/reports/junit.xml":        junitXML,
+	})
+	reports, diags := Collect(Request{Root: root, Resolve: resolver(root)})
+	want := []Report{
+		{Path: "build/Test.xcresult", Kind: KindCoverage, Format: FormatXCResult, Source: SourceDiscovered},
+		{Path: "build/reports/junit.xml", Kind: KindJUnit, Format: FormatJUnit, Source: SourceDiscovered},
+	}
+	if !reflect.DeepEqual(reports, want) || !reflect.DeepEqual(codes(diags), []string{CodeXCResultTestsSkipped}) || diags[0].Field != "build/Test.xcresult" {
+		t.Fatalf("reports %+v diagnostics %v, want the bundle's coverage, the JUnit report and one warning", reports, diags)
+	}
+	// A named bundle is read beside the reports it is named with.
+	reports, diags = Collect(Request{Root: root, Resolve: resolver(root), JUnit: []string{"build/Test.xcresult", "build/reports/junit.xml"}})
+	if len(diags) != 0 || len(reports) != 3 {
+		t.Fatalf("reports %+v diagnostics %v, want both named and the bundle's coverage", reports, diags)
+	}
+}

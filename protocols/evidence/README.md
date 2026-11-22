@@ -26,7 +26,7 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 | `producer`, `generatedAt` | The program that wrote the document and when (RFC 3339 with a zone). |
 | `changedFiles` | The diff: path, status (`added`, `modified`, `deleted`, `renamed` with its `previousPath`), and the component the file belongs to. |
 | `components` | Repository-relative directories (`.` for the whole repository), with an open `ecosystem` slug, the `source` that found them (`orchestrator`, `workspace`, `manifest`, `fallback` for the whole repository, `fallback-codeowners` and `fallback-directories` for the directories a fallback split gives, `declared`), their `impact` and their `dependsOn` edges. |
-| `tests`, `coverage` | One entry per component: passed, failed, skipped, duration and failing cases; covered and total lines. |
+| `tests`, `coverage` | One entry per component: passed, failed, skipped, duration and failing cases; covered and total lines. A tests entry may list its `cases`, each test case that ran with its `suite`, its `name` and its `outcome` (`passed`, `failed`, `skipped`), and count in `omittedCases` the cases left out to keep within the bounds or because their report gave their id to another case. A case's suite and name are its stable id, so a reader compares two documents case by case and tells a test that vanished from one that still passes: a case vanished only when the later entry carries `cases` and omits none (`ComponentTests.ListsEveryCase`); an entry without `cases` says nothing of its cases. See `doc/adr/0004-test-cases-are-an-optional-member-of-version-1.md`. |
 | `architecture` | The rules an architecture checker evaluated: its `tool` (an open slug: `archunit`, `deptrac`, `import-linter`), the `rule` as the checker names it, its `status` (`kept` or `broken`), the `violationCount` it reported and up to 50 `violations`, each with its message and, when the producer located it, its `file`, `line` and `component`. Absent when the producer read none. |
 | `changedLineCoverage` | The coverage of the lines the change added or modified, per file, with the uncovered line numbers. |
 | `dependencyChanges` | The lockfile difference: ecosystem, lockfile, package, `added`, `removed`, `upgraded`, `downgraded` or `changed`, from and to versions. From a software bill of materials (SBOM), a `before` and an `after` state: the package's licences and known vulnerabilities, each an id and a severity (`critical`, `high`, `medium`, `low`, `info`, `none`, `unknown`). |
@@ -67,9 +67,15 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   rule counts no violation and a broken one at least one and its listed ones
   (`evidence.invalid_count`); a violation's component holds its file
   (`evidence.invalid_component`).
+  A test case names its test (`evidence.required`), once per suite and name in
+  its entry (`evidence.duplicate`), with a known outcome
+  (`evidence.invalid_test_case`); an entry lists no more cases of an outcome
+  than its count of it, and its listed and omitted cases are at most the
+  cases it counts (`evidence.invalid_count`).
 - **Bounded.** At most 20000 changed files, 5000 components, 10000 dependency
   changes, 100000 dependency edges, 20000 changed-line coverage files, 500
-  diagnostics, 50 failing cases per tests entry, 1000 architecture rules, 50
+  diagnostics, 50 failing cases and 10000 test cases per tests entry, 50000
+  test cases per document, 1000 architecture rules, 50
   violations per rule, 200 uncovered line numbers per file, 20 licences and
   200 vulnerabilities per dependency state, 1000 decisions with at most 100
   scope patterns and 1000 governed files each, 1024 declarations of at most
@@ -88,7 +94,8 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
   before its producers write it.
 - **Optional members stay optional.** The `sbom` member, the dependency
   states, the `decisions`, `architecture`, `declarations` and
-  `specVerification` members are optional
+  `specVerification` members and the `cases` and `omittedCases` of a tests
+  entry are optional
   members of version 1
   (`doc/adr/0002-architecture-results-are-an-optional-member-of-version-1.md`):
   a document without them validates as before, and a producer that read no
@@ -103,17 +110,34 @@ A document (`schemas/evidence.json`) has `protocolVersion: 1` and:
 `fixtures/expectations.json` lists every fixture: each valid one validates
 cleanly, each invalid one gets exactly its listed codes. The tests pin the
 vocabularies, check that the schema, the Go types and the strict decoder
-declare the same members, and bind each requirement of
+declare the same members, hold the schema and the frozen version 1
+documents of `fixtures/v1/` to the promise below, and bind each requirement of
 `specs/change-evidence-document.json` to its proof.
 
 ## Support status
 
 - **Owner**: `go.putnami.dev/protocol/evidence`.
-- **Status**: `experimental`, explicit opt-in and never part of the default
-  experience, recorded as
-  `{"id": "go.putnami.dev/protocol/evidence", "kind": "protocol", "status": "experimental", "default": false}`
+- **Status**: `preview`, not part of the default experience, recorded as
+  `{"id": "go.putnami.dev/protocol/evidence", "kind": "protocol", "status": "preview", "default": false}`
   in the workspace-root [`putnami.support.json`](../../putnami.support.json)
-  catalog (contract: [`protocols/support`](../support/README.md)). The wire
-  format and finding codes may change without a migration.
-- **Missing for `preview`**: an active consumer in this repository, such as
-  the observe extension writing the document.
+  catalog (contract: [`protocols/support`](../support/README.md)).
+- **Promise**: version 1 changes only by addition, a new optional member of
+  a closed object, a new vocabulary value or a looser bound, so a document that validates today
+  keeps validating through every release of version 1; anything else opens
+  version 2 (`doc/adr/0005-version-1-changes-only-by-addition.md`, decision
+  `evidence-version-1-changes-only-by-addition`). A reader still updates
+  before its producers write an addition. The Go API of the module may change
+  in a minor release whose notes say so.
+- **Evidence**: the observe extension writes the document and the cloud
+  extension uploads it; the strict reader, the schema and the fixture corpus
+  above agree; `fixtures/v1/` freezes the promised schema and version 1
+  documents, each pinned by its digest, and `frozen_v1_test.go` fails on a
+  removed, retyped, newly required or no longer required member, a removed
+  vocabulary value, a changed pattern, const or reference, a constrained
+  member of an open object, a narrower schema bound and a smaller bound of
+  the strict reader. Go is the only implementation, so no
+  cross-implementation parity is promised.
+- **Missing for `stable`**: a reader outside this repository that relies on
+  the document, an N-1 read window or a documented migration for version 2,
+  and an entry in the
+  [compatibility budget](../../tooling/cli/doc/21-compatibility-and-migration.md).

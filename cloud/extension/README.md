@@ -529,8 +529,10 @@ prints. When a report batch is refused, that result is a failure whose data
 names the run and what was stored. The result's `data.reportUrl` is the
 report URL Delivery answers when it opens the run, kept only when it is an
 absolute https URL. The command runs outside a workspace. In a CI job, set
-`PUTNAMI_CLOUD_TOKEN` to a workspace token of scope `delivery.ingest`; the
-token names the workspace.
+`PUTNAMI_CLOUD_TOKEN` to the organization's ingest token, which
+`putnami cloud token create --organization <id> --name ci` creates without a
+workspace; the upload names the repository. A workspace token of scope
+`delivery.ingest` still works and names its workspace.
 
 ```sh
 putnami extensions install --user @putnami/observe
@@ -1075,6 +1077,9 @@ putnami cloud token npm --materialize              # one-shot native credential
 putnami cloud token create --name <n> --scopes <s,...> [--expires <dur>]  # workspace-owned pkt_* machine token (shown once)
 putnami cloud token list                           # workspace machine tokens (name, scopes, created, expires, last-used, id), never the secret
 putnami cloud token revoke <id|name>               # revoke a workspace machine token
+putnami cloud token create --organization <id> --name <n> [--expires <dur>]  # organization ingest token (delivery.ingest, no workspace; shown once)
+putnami cloud token list --organization <id>       # the organization's ingest tokens, never the secret
+putnami cloud token revoke <id|name> --organization <id>  # revoke an organization ingest token
 putnami cloud token status                         # machine tokens that are not revoked, and those expiring within 7 days
 putnami cloud registries [setup|status [<registry>]]  # registry endpoints and stored key state
 putnami cloud packages status [<protocol>]         # the namespace bindings this checkout needs
@@ -1408,6 +1413,21 @@ surfaces the server's 403 cleanly.
   already-revoked tokens.
 - `putnami cloud token revoke <id|name>` revokes a token; a name is resolved to
   its id through the list (an ambiguous name is a usage error: revoke by id).
+
+With `--organization <id>`, `create`, `list` and `revoke` manage that
+organization's **ingest tokens** instead: the `pkt_*` token a repository's own
+CI uploads its evidence with. They call identity-api's
+`/v1/organizations/{organization}/tokens` routes on the control plane under
+the signed-in session, which needs `platform.organization.manage` on that
+organization; a 403 says so. They need no workspace link and run outside any
+workspace; inside one, they read only the link's control-plane URL.
+`putnami cloud login` and `logout` run outside a workspace too, so a
+person with no workspace signs in first. An organization token belongs to the organization, carries no
+workspace and the `delivery.ingest` scope only, so `create` refuses any other
+`--scopes` and the client bindings before it calls. `create` sends the name
+and, with `--expires`, the expiry, and prints the raw token **exactly once**
+with the `PUTNAMI_CLOUD_TOKEN` settings of a CI; no error of these commands
+quotes an answer body, so a malformed answer never prints the token.
 
 Give each token the fewest scopes it needs. To rotate a token, create the new
 one, switch its consumers to it, verify them, then revoke the old one.

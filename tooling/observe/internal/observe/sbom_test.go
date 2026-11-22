@@ -247,8 +247,8 @@ func TestTheSummaryCountsTheVulnerabilitiesPerDependency(t *testing.T) {
 }
 
 func TestTheReaderSeveritiesAreTheProtocolOnes(t *testing.T) {
-	if !slices.Equal(readers.Severities, evidence.Severities) {
-		t.Fatalf("reader severities %v, protocol severities %v", readers.Severities, evidence.Severities)
+	if !slices.Equal(readers.Severities(), evidence.Severities) {
+		t.Fatalf("reader severities %v, protocol severities %v", readers.Severities(), evidence.Severities)
 	}
 	if !slices.Equal([]string{readers.FormatCycloneDX, readers.FormatSPDX}, evidence.SBOMFormats) {
 		t.Fatalf("reader formats differ from the protocol's %v", evidence.SBOMFormats)

@@ -11,6 +11,7 @@ package pnpmworkspace
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -551,6 +552,69 @@ func SetCatalogEntry(text, catalog, name, version string) (string, bool, error) 
 			comment = rest[i:]
 		}
 		d.lines[e.line] = head + " " + renderScalar(version) + comment
+		return d.String(), true, nil
+	}
+	return text, false, nil
+}
+
+// RemoveCatalogEntry returns text without the name entry of the selected
+// catalog, the default one for catalog "": the entry's line goes, with the
+// catalog's key when it held that entry alone, and every other line stays. found is false, and text is returned unchanged, when the catalog
+// holds no such entry. A catalog written as a non-empty flow mapping is an
+// error: its entries are not lines one can be removed from.
+func RemoveCatalogEntry(text, catalog, name string) (string, bool, error) {
+	d := parseDocument(text)
+	keyLine, end, value, label := -1, 0, "", "catalog"
+	// parentLine is the catalogs key, when the named catalog is its only one.
+	parentLine := -1
+	if catalog == "" {
+		if b, ok := findTop(d, "catalog"); ok {
+			keyLine, end, value = b.key, b.end, b.value
+		}
+	} else if b, ok := findTop(d, "catalogs"); ok {
+		children, err := childBlocks(d, b)
+		if err != nil {
+			return "", false, fmt.Errorf("%s catalogs: %w", File, err)
+		}
+		for _, c := range children {
+			if c.name == catalog {
+				keyLine, end, value, label = c.key, c.end, c.value, "catalogs."+c.name
+			}
+		}
+		if len(children) == 1 {
+			parentLine = b.key
+		}
+	}
+	if keyLine < 0 {
+		return text, false, nil
+	}
+	if inner, isFlow, _ := flowInner(value, '{', '}'); isFlow && strings.TrimSpace(inner) != "" {
+		return "", false, fmt.Errorf("%s %s is a flow mapping: write it as a block mapping so an entry can be removed", File, label)
+	}
+	entries, err := mapping(d, keyLine, end, value)
+	if err != nil {
+		return "", false, fmt.Errorf("%s %s: %w", File, label, err)
+	}
+	for _, e := range entries {
+		if e.key != name {
+			continue
+		}
+		drop := []int{e.line}
+		if len(entries) == 1 {
+			// The catalog held this entry alone: its key goes too, and the
+			// catalogs key when it was the only named catalog.
+			drop = append(drop, keyLine)
+			if parentLine >= 0 {
+				drop = append(drop, parentLine)
+			}
+		}
+		kept := make([]string, 0, len(d.lines))
+		for i, line := range d.lines {
+			if !slices.Contains(drop, i) {
+				kept = append(kept, line)
+			}
+		}
+		d.lines = kept
 		return d.String(), true, nil
 	}
 	return text, false, nil

@@ -15,7 +15,7 @@ Layout primitives provide the foundation for building page structure. All layout
 
 The foundational styled `div` that maps props directly to CSS properties. All layout components extend `Box`.
 
-```typescript
+```typescript nocheck
 import { Box } from '@putnami/ui';
 
 <Box p="lg" bg="surface" borderRadius="md">
@@ -46,7 +46,7 @@ All props accept responsive arrays: `p={['sm', 'md', 'lg']}`.
 
 Use the `as` prop to render any HTML element:
 
-```typescript
+```typescript nocheck
 <Box as="section" p="lg">Section content</Box>
 <Box as="nav" bg="surface">Navigation</Box>
 ```
@@ -55,7 +55,7 @@ Use the `as` prop to render any HTML element:
 
 Extends `Box` with flexbox defaults and shorthand props.
 
-```typescript
+```typescript nocheck
 import { Flex } from '@putnami/ui';
 
 <Flex gap="md" align="center" justify="between" wrap="wrap">
@@ -80,7 +80,7 @@ Inherits all `BoxProps` plus:
 
 Extends `Box` with CSS grid defaults.
 
-```typescript
+```typescript nocheck
 import { Grid } from '@putnami/ui';
 
 <Grid columns={3} gap="lg">
@@ -111,7 +111,7 @@ Inherits all `BoxProps` plus:
 
 Semantic flex containers with direction, spacing, and alignment.
 
-```typescript
+```typescript nocheck
 import { Stack, HStack, VStack } from '@putnami/ui';
 
 <VStack spacing="lg">
@@ -144,7 +144,7 @@ Inherits all `BoxProps` plus:
 
 Centered content wrapper with responsive padding and max-width from theme breakpoints.
 
-```typescript
+```typescript nocheck
 import { Container } from '@putnami/ui';
 
 <Container>
@@ -158,7 +158,7 @@ Padding: `--space-lg` on mobile, `--space-2xl` at 768px+.
 
 Full-height page wrapper with theme background and text color.
 
-```typescript
+```typescript nocheck
 import { Page } from '@putnami/ui';
 
 <Page>

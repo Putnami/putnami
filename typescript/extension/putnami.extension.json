@@ -840,7 +840,7 @@
         },
         "docker-tag": {
           "type": "string",
-          "description": "Override Docker image tag"
+          "description": "Extra local tag of the image: a bare tag (v1.0.0) tags the project's image, a reference holding : or / (tasks-api:local) is used as given"
         },
         "platform": {
           "type": "string",
@@ -866,7 +866,7 @@
         },
         "port": {
           "type": "number",
-          "description": "Container port to expose, 3000 by default"
+          "description": "Container port the image sets as PORT and exposes; without it, putnami.port of the project's conf/.env.production.yaml or conf/.env.yaml, else options.serve.port, else 3000"
         },
         "npm": {
           "type": "boolean",
@@ -1163,6 +1163,17 @@
           "task": "deps-upgrade-exec"
         }
       ]
+    },
+    "deps-edit": {
+      "description": "Add, remove or prune the dependencies of TypeScript projects in their package.json, keeping shared versions in the workspace catalog, then install with the workspace's package manager.",
+      "visibility": "internal",
+      "quiet": true,
+      "run": [
+        {
+          "id": "deps-edit",
+          "task": "deps-edit-exec"
+        }
+      ]
     }
   },
   "tasks": {
@@ -1269,6 +1280,24 @@
         ]
       }
     },
+    "deps-edit-exec": {
+      "description": "Edit the dependencies of TypeScript projects in their package.json and the workspace catalog, then install with the workspace's package manager, putting every file it wrote back when a step fails or the task is stopped. Its timeout exceeds the install's own ten-minute bound so the job, not the task timeout, ends a stalled install and restores the files. Declares no outputs: the manifests are a workspace-files effect.",
+      "kind": "command",
+      "command": "{extensionRuntime}",
+      "args": [
+        "deps-edit"
+      ],
+      "cwd": "{workspaceRoot}",
+      "cache": false,
+      "timeoutMs": 660000,
+      "declares": {
+        "effects": [
+          "network",
+          "toolchain-cache",
+          "workspace-files"
+        ]
+      }
+    },
     "build-generate": {
       "description": "Generate code into the project's .gen subtree (and, when the project generates one, the configured TypeScript client directory). Ownership decision: build-generate is the SINGLE producer of <project>/.gen, minus the .gen/deployment.json it cedes to package-deployment, the .gen/requirements.json and .gen/infra/runtime.json it cedes to build-infra, which write them after this task's snapshot, the .gen/layers and .gen/site-content it cedes to cloud-image-layers and cloud-site-content-generate of @putnami/cloud, which declare them, and the .gen/config-schema.json fallback and its JSON Schema companion that config-extract-exec writes, which it cedes without a declaring owner. This task deletes the .gen/infra fragments at the start of every run, the runtime defaults file with them, which build-infra writes again after this task. Its v3 `declares` block below names these outputs; an executing run starts from a .gen emptied of everything it does not cede, except the scheduler's version stamp. Source binding: the @putnami/application pre-build hook writes .gen/schema/feature-evidence/typescript-framework.json, which names the project's source binding, the source-v1 digest the scheduler stamps into .gen/version.json. The binding covers every project file, tests, specs and putnami.features.json included, and the inputs below do not. So the cache policy declares `sourceBound`: the CLI stores and looks up this task's entry at a key that also binds the binding each execution was stamped with, so a stored result serves only at the binding it names, while this key and every dependent key stay as the inputs below define them. The evidence lives only inside the declared .gen output, so a hit restores the evidence of the binding its store key binds.",
       "kind": "command",
@@ -1303,6 +1332,15 @@
           "from": "project",
           "files": [
             "package.json"
+          ]
+        },
+        "configFiles": {
+          "from": "project",
+          "files": [
+            "conf/.env.yaml",
+            "conf/.env.*.yaml",
+            "!conf/.env.local.yaml",
+            "!conf/.env.prod.yaml"
           ]
         },
         "clear": {
@@ -1696,7 +1734,7 @@
       }
     },
     "build-compile": {
-      "description": "Compile the project's entrypoint into standalone bun executables. The target set is scoped by PACKAGE CHANNEL: under `package --docker` the compile is bound to the image's `platform` and produces that one bun target, because an image carries one executable and the other three were compiled and discarded; `--compile-target` still names one target and wins; every other invocation keeps the full four-target distribution matrix. Both deciding inputs (`docker`, `platform`) are declared `from: \"params\"`, so the resolved set is a plan-time cache-key participant and a four-target entry can never answer a one-target request. The docker intent is read as a parameter rather than from the project's `publish` declaration because a parameter is what the key can see and what a batched invocation shares across its members; a project that declares the channel without `options.package.docker` still packages an image and simply keeps the full set — extra targets, never a missing one.",
+      "description": "Compile the project's entrypoint into standalone bun executables. The target set is scoped by PACKAGE CHANNEL: under `package --docker` the compile is bound to the image's `platform` and produces that one bun target, because an image carries one executable and the other three were compiled and discarded; `--compile-target` still names one target and wins; every other invocation keeps the full four-target distribution matrix. Both deciding inputs (`docker`, `platform`) are declared `from: \"params\"`, so the resolved set is a plan-time cache-key participant and a four-target entry can never answer a one-target request. The docker intent is read as a parameter rather than from the project's `publish` declaration because a parameter is what the key can see and what a batched invocation shares across its members; a project that declares the channel without `options.package.docker` still packages an image and simply keeps the full set — extra targets, never a missing one. The project's conf/.env.yaml and conf/.env.production.yaml are config inputs too: package-docker, which keys on no hidden file of the project, takes the image port from them and folds this key.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1719,7 +1757,9 @@
             "tsconfig.app.json",
             "package.json",
             ".nvmrc",
-            ".node-version"
+            ".node-version",
+            "conf/.env.yaml",
+            "conf/.env.production.yaml"
           ]
         },
         "generateResult": {

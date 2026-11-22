@@ -296,9 +296,10 @@ func TestCreateRunsTheSetupOnceWhenItsToolchainsResolve(t *testing.T) {
 }
 
 // When a toolchain project-setup requires does not resolve, create runs the
-// job's prepare stage, then the toolchain pins phase. It runs the workspace installers
-// only when that phase pinned a toolchain the extension's runtime locks, and
-// then runs the job once.
+// job's prepare stage, then the toolchain pins phase, then the job once. Only
+// after the job, which rewrites the template's placeholder requirements, does
+// it run the workspace installers, and only when that phase pinned a toolchain
+// the extension's runtime locks.
 func TestCreatePreparesPinsAndInstallsOnlyAToolchainTheExtensionLocks(t *testing.T) {
 	t.Parallel()
 	spectest.Proves(t, "cli/job-planning-execution", "project-setup-runs-in-the-project-extension",
@@ -312,7 +313,7 @@ func TestCreatePreparesPinsAndInstallsOnlyAToolchainTheExtensionLocks(t *testing
 		name, pins string
 		want       []string
 	}{
-		{"a pin of the toolchain the extension locks", "acme", []string{prepare, install, setup}},
+		{"a pin of the toolchain the extension locks", "acme", []string{prepare, setup, install}},
 		{"a pin of a toolchain the extension does not lock", "other", []string{prepare, setup}},
 		{"no pin", "", []string{prepare, setup}},
 	}

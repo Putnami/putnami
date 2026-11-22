@@ -66,8 +66,12 @@ the languages, raised before anything is written. Without `--extension`,
 ### 3. A starter is `init`'s choice, and `--project` needs one
 
 A starter is the template `--project` renders and the registries its
-dependencies need: `typescript-web` with the `@putnami` npm scope,
-`go-server` and `python-server`. Which template greets a new user is a product
+dependencies need: `typescript-server` with the `@putnami` npm scope,
+`go-server` and `python-server`. Each language's default is its server
+template, and `--template <name>` renders another template of the same
+language, such as `typescript-web` (decision
+`init-defaults-to-a-server-template`, 2026-11-22, which replaced the
+`typescript-web` default). Which template greets a new user is a product
 choice of `init`, not language knowledge, so the starters stay in the CLI,
 keyed by language. The drift test checks that each starter's template exists
 next to its language extension and that the template manifest names that

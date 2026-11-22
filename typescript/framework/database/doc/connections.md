@@ -97,6 +97,7 @@ Configure connections programmatically:
 import { database, PostgresConfig } from "@putnami/database";
 import type { InferConfig } from "@putnami/runtime";
 
+// A programmatic configuration states every field, defaults included
 const config: InferConfig<typeof PostgresConfig> = {
   host: "localhost",
   port: 5432,
@@ -105,6 +106,14 @@ const config: InferConfig<typeof PostgresConfig> = {
   password: "your_password",
   ssl: false,
   poolSize: 10,
+  debug: false,
+  maxRowLimit: 10_000,
+  slowQueryThresholdMs: 0,
+  statementTimeoutMs: 30_000,
+  idleInTransactionTimeoutMs: 300_000,
+  connectTimeout: 10,
+  idleTimeout: 60,
+  maxLifetime: 0,
 };
 
 const sql = await database(undefined, config);
@@ -481,11 +490,11 @@ const results = await sql`
   LIMIT ${limit}
 `;
 
-// Transactions
-await sql.begin(async (sql) => {
-  await sql`INSERT INTO users (id, email) VALUES (${id}, ${email})`;
-  await sql`INSERT INTO profiles (user_id, name) VALUES (${id}, ${name})`;
-  // Both inserts are atomic
+// Transactions: every repository write and `this.conn()` query inside
+// runInTransaction joins one transaction, committed on success
+await runInTransaction(async () => {
+  await userRepo.save({ id, email });
+  await profileRepo.save({ userId: id, name });
 });
 ```
 
@@ -683,11 +692,12 @@ try {
 Group related operations in transactions:
 
 ```typescript
-const sql = await database();
+import { runInTransaction } from '@putnami/database';
 
-await sql.begin(async (sql) => {
-  await sql`INSERT INTO users (id, email) VALUES (${id}, ${email})`;
-  await sql`INSERT INTO profiles (user_id, name) VALUES (${id}, ${name})`;
+// Every repository write and `this.conn()` query inside joins one transaction
+await runInTransaction(async () => {
+  await users.save({ id, email });
+  await profiles.save({ userId: id, name });
   // Both succeed or both fail
 });
 ```

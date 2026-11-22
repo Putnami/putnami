@@ -65,6 +65,8 @@ default-deny in client UI gating.
 When used inside a module with `.path()`, the React plugin automatically inherits the module path as its basename. All routes are served under the module path prefix, and client-side navigation uses it as the router basename:
 
 ```ts
+import { module } from '@putnami/application';
+
 const dashboard = module('dashboard')
   .path('/dashboard')
   .use(react());          // Pages served at /dashboard, /dashboard/settings, etc.
@@ -365,7 +367,7 @@ export default function AboutPage() {
       <Meta name="description" content="Learn about our company" />
       <Meta property="og:title" content="About Us" />
       <Meta property="og:description" content="Learn about our company" />
-      <Lang value="en" />
+      <Lang lang="en" />
       <Favicon href="/favicon.ico" />
 
       <h1>About Us</h1>
@@ -622,39 +624,30 @@ export default function Page() {
 
 ### Deferred data
 
-Load non-critical data after initial render:
+Load non-critical data after initial render. A loader's result is serialized to JSON before the page renders, so it cannot carry a pending promise: return the critical data from the loader, and fetch the rest from the page with `useFetch`:
 
 ```ts
 // loader.ts
 import { loader } from '@putnami/web';
 
 export default loader(async () => {
-  const criticalData = await fetchCriticalData();
-
-  return {
-    critical: criticalData,
-    deferred: fetchDeferredData(), // Don't await
-  };
+  return { critical: await fetchCriticalData() };
 });
 ```
 
 ```tsx
 // page.tsx
-import { Suspense } from '@putnami/web';
-import { Await, useLoaderData } from '@putnami/web';
+import { useFetch, useLoaderData } from '@putnami/web';
 
 export default function Page() {
-  const { critical, deferred } = useLoaderData();
+  const { critical } = useLoaderData<{ critical: { title: string } }>();
+  const deferred = useFetch<DeferredData>('/api/deferred');
 
   return (
     <div>
       <h1>{critical.title}</h1>
 
-      <Suspense fallback={<p>Loading more...</p>}>
-        <Await resolve={deferred}>
-          {(data) => <DeferredContent data={data} />}
-        </Await>
-      </Suspense>
+      {deferred.loading ? <p>Loading more...</p> : <DeferredContent data={deferred.data} />}
     </div>
   );
 }
