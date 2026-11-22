@@ -112,9 +112,10 @@ func runPackageDocker(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (st
 		}
 	} else {
 		// As with package-npm, surface a git failure instead of discarding it so
-		// the image version is never derived from silently-missing metadata.
+		// the image version is never derived from silently-missing metadata;
+		// only a checkout with no commit yet takes the no-commit suffix.
 		var err error
-		versionInfo, err = git.GetVersionInfo(ctx.WorkspaceRoot)
+		versionInfo, err = git.GetImageVersionInfo(ctx.WorkspaceRoot)
 		if err != nil {
 			return "FAILED", nil, err
 		}
@@ -131,7 +132,7 @@ func runPackageDocker(ctx *pctx.Context, emit *jsonl.Emitter, args []string) (st
 		// carried a value nothing acted on.
 		Tag:                   ctx.Params.String("docker-tag", "dockerTag"),
 		Platform:              ctx.Params.String("platform"),
-		Port:                  ctx.Params.Int("port", 3000),
+		Port:                  pkg.ImagePort(ctx.Params.Int("port", 0), filepath.Join(ctx.WorkspaceRoot, ctx.Project.Path), ctx.Project.Options),
 		WorkspaceBuilderImage: ctx.Params.String("workspace-builder-image", "workspaceBuilderImage"),
 		BaseImage:             ctx.Params.String("docker-base-image", "dockerBaseImage"),
 		Load:                  ctx.Params.Bool("docker-load", false, "dockerLoad"),

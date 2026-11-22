@@ -40,9 +40,24 @@ fails with exit 2 and names `options.package.<channel>` and the flags; a run
 that selects it otherwise (`--all`, `--impacted`, a glob) warns with
 `plan.package_channels_off` and keeps its exit code.
 
-The image sets `PORT` and exposes it: 3000 unless `--port` or
-`options.package.port` names another port. `http()` listens on `PORT` unless
-the code passes a `port` option, so leave that option out.
+The image sets `PORT` and exposes it. The port is the first of:
+
+1. `--port`, or `options.package.port`;
+2. `putnami.port` in the project's `conf/.env.production.yaml`, then in
+   `conf/.env.yaml`: the image runs with `NODE_ENV=production`, so these are
+   the project files its configuration reads, unless `APP_ENV` names another
+   environment at deploy time;
+3. the project's `options.serve.port`;
+4. 3000.
+
+A value that is not an integer between 1 and 65535 is skipped.
+
+`http()` listens on `PORT` unless the code passes a `port` option, so leave
+that option out.
+
+A repository with no commit yet packages an image too: its advisory version
+ends in `nogit`, as the image's identity is its content hash. Any other git
+failure, such as a directory outside a repository, stops the docker channel.
 
 ### Common Patterns
 
@@ -50,8 +65,10 @@ the code passes a `port` option, so leave that option out.
 # Override the npm registry for a one-off publish
 putnami package . --npm --registry https://npm.mycompany.com
 
-# Docker with an extra local tag
+# Docker with an extra local tag: a bare tag tags the project's image
+# (my-api:v1.0.0), a reference with ':' or '/' is used as given
 putnami package . --docker --docker-tag v1.0.0
+putnami package . --docker --docker-tag my-api:local --docker-load
 
 # Docker for a specific platform
 putnami package . --docker --platform linux/arm64
@@ -297,8 +314,10 @@ workspace/git-derived versions remain unchanged.
 
 ### What It Does
 
-1. Locates compiled binary from build output matching the target platform,
-   or on the Node runtime the Node bundle (see [Node Images](#node-images))
+1. Locates the executable compiled for the target platform, in the package
+   command's own compile output first, then in a `build --compile` output, or
+   on the Node runtime the Node bundle (see [Node Images](#node-images)). A
+   missing executable fails, naming the platform and the paths searched
 2. Copies `.gen/public/` assets next to the binary (if present)
 3. Computes the image **content hash** (assembly spec + binary + staged assets)
 4. Stages a content stamp (`putnami-buildinfo.json` with `name` + `contentHash`)
@@ -412,7 +431,9 @@ daemon image that may not exist locally. The pinned base is cached once per
 digest under `.putnami/cache/oci-base` (packaging is offline after first
 use). The key also holds the project's runtime and `.nvmrc` and
 `.node-version`, at the workspace root directly and in the project through
-the compile step's key, which choose a Node image's base.
+the compile step's key, which choose a Node image's base. The compile step's
+key also holds the project's `conf/.env.yaml` and `conf/.env.production.yaml`,
+which the image port reads.
 
 ### Platform Mapping
 
@@ -448,12 +469,12 @@ The image name is derived from the project name:
 |------|------|---------|-------------|
 | `--docker` | `boolean` | `false` | Assemble Docker image |
 | `--docker-registry` | `string` | — | **Override** for one push. The declared target is `registries.oci.publish` in `putnami.workspace.json`; this flag ranks above it, and neither affects local package candidate bytes |
-| `--docker-tag` | `string` | — | Extra alias tag next to the content-addressed tag |
+| `--docker-tag` | `string` | — | Extra alias next to the content-addressed tag: a bare tag tags the project's image, a reference holding `:` or `/` is used as given |
 | `--docker-base-image` | `string` | pinned distroless | Override the digest-pinned base image (must include `@sha256:...`) |
 | `--docker-base-project` | `string` | — | Use a first-class image dependency's typed local OCI candidate as the base |
 | `--docker-load` | `boolean` | `false` | Also load the assembled image into the local docker daemon |
 | `--platform` | `string` | `linux/amd64` | Docker image target platform — and the only bun target the compile step builds |
-| `--port` | `number` | `3000` | Container port to expose |
+| `--port` | `number` | the project's `putnami.port`, else `options.serve.port`, else `3000` | Container port the image sets as `PORT` and exposes |
 | `--workspace-builder-image` | `string` | — | Accepted for compatibility; multi-stage builds are a Go-extension feature |
 
 ## Deployment Channel

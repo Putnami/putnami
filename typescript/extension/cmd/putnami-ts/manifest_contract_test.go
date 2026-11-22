@@ -1304,3 +1304,36 @@ func TestArchivesStepActivatesOnlyOnATypeScriptProject(t *testing.T) {
 	}
 	t.Fatal("package command has no package-archives step")
 }
+
+// TestThePortConfigKeysTheImageThroughTheCompileStep pins where the image
+// port's conf files enter the docker step's key. package-docker keeps the
+// default project-tree hash, which skips hidden files, so the two conf files
+// are config inputs of build-compile, whose key the docker step folds. A files
+// list on package-docker would replace that tree hash for the image step of an
+// image project and make every git-ignored file it selects a required input.
+func TestThePortConfigKeysTheImageThroughTheCompileStep(t *testing.T) {
+	spectest.Proves(t, "typescript/typescript-project-toolchain", "image-on-a-fresh-workspace", "the-image-port-is-the-project-port")
+	m := loadExtensionManifest(t)
+	docker := m.Tasks["package-docker"]
+	if docker.Cache != nil && docker.Cache.Key != nil && len(docker.Cache.Key.Files) > 0 {
+		t.Errorf("package-docker cache key files = %v, want none: the default project-tree hash", docker.Cache.Key.Files)
+	}
+	var dockerStep *proto.PipelineStep
+	for i, step := range m.Commands["package"].Run {
+		if step.ID == "docker" {
+			dockerStep = &m.Commands["package"].Run[i]
+		}
+	}
+	if dockerStep == nil || dockerStep.Task != "package-docker" || !slices.Contains(dockerStep.DependsOn, "compile") {
+		t.Fatalf("package's docker step = %+v, want package-docker after compile, whose key holds the port config", dockerStep)
+	}
+	config, ok := m.Tasks["build-compile"].Inputs["config"]
+	if !ok {
+		t.Fatal("build-compile declares no config input")
+	}
+	for _, want := range []string{"conf/.env.yaml", "conf/.env.production.yaml"} {
+		if !slices.Contains(config.Files, want) {
+			t.Errorf("build-compile config input files = %v, want %q among them", config.Files, want)
+		}
+	}
+}

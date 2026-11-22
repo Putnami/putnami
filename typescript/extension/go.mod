@@ -37,6 +37,7 @@ require (
 	go.putnami.dev/protocol/extension v0.0.0
 	go.putnami.dev/protocol/support v0.0.0
 	go.putnami.dev/protocol/workspace v0.0.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 replace (

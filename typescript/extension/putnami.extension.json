@@ -840,7 +840,7 @@
         },
         "docker-tag": {
           "type": "string",
-          "description": "Override Docker image tag"
+          "description": "Extra local tag of the image: a bare tag (v1.0.0) tags the project's image, a reference holding : or / (tasks-api:local) is used as given"
         },
         "platform": {
           "type": "string",
@@ -866,7 +866,7 @@
         },
         "port": {
           "type": "number",
-          "description": "Container port to expose, 3000 by default"
+          "description": "Container port the image sets as PORT and exposes; without it, putnami.port of the project's conf/.env.production.yaml or conf/.env.yaml, else options.serve.port, else 3000"
         },
         "npm": {
           "type": "boolean",
@@ -1734,7 +1734,7 @@
       }
     },
     "build-compile": {
-      "description": "Compile the project's entrypoint into standalone bun executables. The target set is scoped by PACKAGE CHANNEL: under `package --docker` the compile is bound to the image's `platform` and produces that one bun target, because an image carries one executable and the other three were compiled and discarded; `--compile-target` still names one target and wins; every other invocation keeps the full four-target distribution matrix. Both deciding inputs (`docker`, `platform`) are declared `from: \"params\"`, so the resolved set is a plan-time cache-key participant and a four-target entry can never answer a one-target request. The docker intent is read as a parameter rather than from the project's `publish` declaration because a parameter is what the key can see and what a batched invocation shares across its members; a project that declares the channel without `options.package.docker` still packages an image and simply keeps the full set — extra targets, never a missing one.",
+      "description": "Compile the project's entrypoint into standalone bun executables. The target set is scoped by PACKAGE CHANNEL: under `package --docker` the compile is bound to the image's `platform` and produces that one bun target, because an image carries one executable and the other three were compiled and discarded; `--compile-target` still names one target and wins; every other invocation keeps the full four-target distribution matrix. Both deciding inputs (`docker`, `platform`) are declared `from: \"params\"`, so the resolved set is a plan-time cache-key participant and a four-target entry can never answer a one-target request. The docker intent is read as a parameter rather than from the project's `publish` declaration because a parameter is what the key can see and what a batched invocation shares across its members; a project that declares the channel without `options.package.docker` still packages an image and simply keeps the full set — extra targets, never a missing one. The project's conf/.env.yaml and conf/.env.production.yaml are config inputs too: package-docker, which keys on no hidden file of the project, takes the image port from them and folds this key.",
       "kind": "command",
       "command": "{extensionRuntime}",
       "args": [
@@ -1757,7 +1757,9 @@
             "tsconfig.app.json",
             "package.json",
             ".nvmrc",
-            ".node-version"
+            ".node-version",
+            "conf/.env.yaml",
+            "conf/.env.production.yaml"
           ]
         },
         "generateResult": {

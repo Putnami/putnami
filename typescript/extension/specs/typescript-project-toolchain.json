@@ -306,6 +306,10 @@
       "text": "The base of a Node image is the digest-pinned distroless Node image of the major the project declares: package.json engines.node, else .nvmrc or .node-version in the project, then at the workspace root. A project that declares none fails with typescript.node_version_undeclared, naming those three fields, and a major with no pinned base fails naming the majors that have one."
     },
     {
+      "id": "image-on-a-fresh-workspace",
+      "text": "package --docker gives a runnable image on a fresh workspace: before the first commit its advisory version ends in nogit, other git failures still fail; it runs the executable compiled for --platform, a missing one fails naming the platform and paths searched; a --docker-tag holding ':' or '/' is the whole reference; PORT is --port or options.package.port, else putnami.port of conf/.env.production.yaml then conf/.env.yaml, else options.serve.port, else 3000."
+    },
+    {
       "id": "tsc-compiler-choice",
       "text": "A project's compiler is the compiler parameter of build, test, serve, run and package, set by options[\"@putnami/typescript\"].compiler or --compiler: bun, tsc or auto, the default. Under auto it is tsc when the package.json build script runs tsc alone (tsc, tsc -b or tsc -p with at most one config, plus --pretty or --verbose, and nothing else), else bun. A tsc project runs no Bun transpile or types step; an explicit tsc whose build script is something else fails naming it."
     },

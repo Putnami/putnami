@@ -1117,6 +1117,22 @@
           }
         },
         {
+          "id": "image-on-a-fresh-workspace",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "an-image-packages-before-the-first-commit",
+              "the-image-runs-the-executable-compiled-for-the-platform",
+              "a-docker-tag-with-a-repository-is-the-whole-reference",
+              "the-image-port-is-the-project-port"
+            ]
+          }
+        },
+        {
           "id": "node-docker-base",
           "stage": "coded",
           "evidenceKinds": [
