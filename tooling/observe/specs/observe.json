@@ -126,16 +126,16 @@
       "id": "recent-history",
       "text": [
         "putnami observe --history [<duration>] observes the first-parent commits of the default branch dated in the window, 14 days by default (<n>h, <n>d or <n>w, at most 365 days), ending now or at the last commit when none is newer than the window.",
-        "It observes at most 100 commits sampled evenly, each against its first parent, without reports.",
-        "Once the time budget is spent, the commits left are skipped with the observe.history_budget_spent warning."
+        "It observes at most 100 commits sampled evenly, newest first, each against its first parent, without reports.",
+        "Once the time budget is spent, the oldest commits left are skipped with the observe.history_budget_spent warning."
       ]
     },
     {
       "id": "history-evidence",
       "text": [
-        "Each commit --history observes gives one change evidence document whose run id is history-<commit SHA>, so every upload of a commit carries the same submission id and opens no second run.",
-        "--evidence <directory> writes <directory>/<commit SHA>.json; --upload or --open hands each to the reporter, and the first failure stops the uploads.",
-        "The caller's working tree, index and HEAD stay as they were."
+        "Each commit --history observes gives one change evidence document whose run id is history-<commit SHA>, from which the reporter derives the same submission id on every run, so Putnami Cloud keeps one run per commit.",
+        "--evidence <directory> writes <directory>/<commit SHA>.json; --upload or --open hands each to the reporter once observed, and the first failure stops the uploads.",
+        "The caller's working tree, index and HEAD stay as they were, and no repository hook runs."
       ]
     }
   ],
