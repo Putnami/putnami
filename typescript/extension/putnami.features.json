@@ -746,6 +746,21 @@
           }
         },
         {
+          "id": "test-type-checker-choice",
+          "stage": "coded",
+          "evidenceKinds": [
+            "attestation"
+          ],
+          "verification": {
+            "kind": "acceptance",
+            "checks": [
+              "the-type-checker-is-tsc-unless-the-project-chooses-bun",
+              "bun-check-reports-the-findings-tsc-reports",
+              "an-unknown-type-checker-fails-the-task-naming-the-choices"
+            ]
+          }
+        },
+        {
           "id": "runtime-manifest-parity",
           "stage": "coded",
           "evidenceKinds": [

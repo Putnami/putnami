@@ -202,6 +202,10 @@
       "text": "The test command type-checks every TypeScript file of the project, tests, fixtures, benchmarks and dot-directories such as .gen included, with the project's tsconfig and the compiler options of the types phase, and emits nothing: a type error or an unused @ts-expect-error in any of them fails the command. The types phase still checks only src, bin and .gen. A dot-named file stays out, as in the types phase, and a file under node_modules, dist or a nested project root is left to its owner."
     },
     {
+      "id": "test-type-checker-choice",
+      "text": "The type-check of the test command runs tsc unless the project chooses Bun's checker in the type-checker parameter of the test command: tsc, the default, or bun, set by --type-checker or options[\"@putnami/typescript:test\"][\"type-checker\"]. Nothing infers the choice, from an import or otherwise. With bun it runs bun check on the same scratch tsconfig and compiler options as tsc, one line per error and every error shown, never a check script of the project's package.json, and fails the command on the diagnostics tsc reports. Any other value fails the task and names the choices."
+    },
+    {
       "id": "runtime-manifest-parity",
       "text": "The runtime manifest a locally-prepared extension serves and the one a packaged archive ships describe the same runtime, so an installed extension behaves as the workspace one did."
     },
