@@ -140,7 +140,8 @@ func TestHistoryUploadsEachCommitUnderTheSameRunID(t *testing.T) {
 			t.Fatalf("the summary does not say the commits were uploaded:\n%s", stdout.String())
 		}
 	}
-	once := []string{"history-" + shas[0], "history-" + shas[1]}
+	// The newest commit is uploaded first.
+	once := []string{"history-" + shas[1], "history-" + shas[0]}
 	if got := uploads(t, record); !slices.Equal(got, slices.Concat(once, once)) {
 		t.Fatalf("uploaded run ids %v, want %v twice", got, once)
 	}
@@ -155,8 +156,8 @@ func TestHistoryStopsUploadingAtTheFirstFailure(t *testing.T) {
 	if code := run([]string{"run", "--history", "--upload", "--putnamiContext", jobContext(t, repo, repo, "json")}, func(k string) string { return env[k] }, &stdout, &stderr); code != 0 {
 		t.Fatalf("a refused upload exits %d", code)
 	}
-	if got := uploads(t, record); !slices.Equal(got, []string{"history-" + shas[0]}) {
-		t.Fatalf("uploads %v, want the first commit alone", got)
+	if got := uploads(t, record); !slices.Equal(got, []string{"history-" + shas[1]}) {
+		t.Fatalf("uploads %v, want the newest commit alone", got)
 	}
 	var h observe.History
 	if err := json.Unmarshal(stdout.Bytes(), &h); err != nil {
@@ -176,6 +177,7 @@ func TestHistoryUsageErrorsExitTwo(t *testing.T) {
 		{"run", "--history=30d", "--publish"},
 		{"run", "--history", "0d"},
 		{"run", "--history", "400d"},
+		{"run", "--history", "--fetch"},
 	} {
 		var stdout, stderr bytes.Buffer
 		if code := run(args, func(string) string { return "" }, &stdout, &stderr); code != 2 {

@@ -36,7 +36,7 @@ Next: run `putnami observe --open` to sign in and open the full report
 
 ### A repository whose CI kept nothing
 
-A CI deletes its logs and artifacts after a retention period, so an old repository set aside has no report left to read. Run `putnami observe --history --open` in its checkout instead: it analyzes the last 14 days of the default branch on your laptop, or the last 14 days of activity when the branch has been idle since, one commit at a time, and uploads them. It samples at most 100 commits, reads no test or coverage report, and stops after 10 minutes. Running it again uploads no commit twice. `putnami observe --history 30d` observes a longer window; [The recent history](/docs/tooling-&-workspace/observe/observe#the-recent-history) gives the details.
+A CI deletes its logs and artifacts after a retention period, so an old repository set aside has no report left to read. Run `putnami observe --history --open` in its checkout instead: it analyzes the last 14 days of the default branch on your laptop, or the last 14 days of activity when the branch has been idle since, one commit at a time, and uploads them. It samples at most 100 commits, newest first, reads no test or coverage report, and stops after 10 minutes. Running it again keeps one run per commit in Putnami Cloud. `putnami observe --history 30d` observes a longer window; [The recent history](/docs/tooling-&-workspace/observe/observe#the-recent-history) gives the details.
 
 ## What the step installs
 

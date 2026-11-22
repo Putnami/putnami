@@ -312,24 +312,31 @@ instead and warns with `observe.history_default_branch_missing`; `git remote
 set-head origin --auto` records it. Fetch first to read the latest history:
 `--history` reads the local clone only.
 
-It observes at most 100 commits, sampled evenly from the oldest to the
-newest. Each commit is checked out, detached, in a temporary worktree and
-measured against its first parent: the components, the dependency changes,
+It observes at most 100 commits, sampled evenly over the window and observed
+newest first. Each commit is checked out, detached, in a temporary worktree
+that runs no hook of the repository, fetches no Git LFS file and checks out
+no submodule, and is measured against its first parent: the components, the dependency changes,
 the decisions, the declarations and the specs, without test, coverage, SBOM
 or architecture reports, which a commit's checkout does not hold. A root
 commit, or one on the edge of a shallow clone, has no parent and is skipped.
-The run spends at most 10 minutes; the commits left after that are skipped
-with the `observe.history_budget_spent` warning, which counts them.
+The run spends at most 10 minutes, not counting the wait for a sign-in; the
+oldest commits left after that are skipped with the
+`observe.history_budget_spent` warning, which counts them. An interrupt stops
+the run with `observe.history_interrupted` and keeps what was already
+observed and uploaded.
 
 Each commit gives one evidence document whose run id is
 `history-<commit SHA>`. `--evidence <directory>` writes them to
 `<directory>/<commit SHA>.json`. `--upload` and `--open` hand each to the
-evidence reporter: `--open` signs you in once and opens the report of the
-newest commit. The reporter derives the submission id from the run id, so a
-second run stores no commit twice. The first failed upload stops the others
+evidence reporter as soon as the commit is observed: `--open` signs you in
+once and opens the report of the newest commit. The reporter derives the
+submission id from the run id, so a second run uploads the same commits again
+and Putnami Cloud keeps one run per commit; `@putnami/cloud` also puts in the
+submission id whether it ran on a laptop or in a CI, so the same commit
+uploaded from both is kept twice. The first failed upload stops the others
 and says how many were left. `--history` takes none of the flags that name a
-base, a head, a report or an export of one commit, nor `--publish` or
-`--details`.
+base, a head, a report or an export of one commit, nor `--publish`,
+`--details` or `--fetch`.
 
 The summary names the repository, the branch and the window, then one line
 per commit: its date, its changed files, its changed components and its

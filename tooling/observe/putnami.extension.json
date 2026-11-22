@@ -146,7 +146,7 @@
         },
         "history": {
           "type": "string",
-          "description": "Observe the recent history instead of one change: the first-parent commits of the origin remote's default branch in the last <duration> (<n>h, <n>d or <n>w, at most 365d; 14d when --history comes without one), or in the same span ending at its last commit when the branch has been idle since. At most 100 commits, sampled evenly, each against its parent, in a temporary worktree and without reports, within a 10-minute budget; --evidence names a directory that gets <commit SHA>.json per commit, and --upload or --open uploads each under a submission id derived from the commit, so a second run stores nothing twice."
+          "description": "Observe the recent history instead of one change: the first-parent commits of the origin remote's default branch in the last <duration> (<n>h, <n>d or <n>w, at most 365d; 14d when --history comes without one), or in the same span ending at its last commit when the branch has been idle since. At most 100 commits, sampled evenly and observed newest first, each against its parent in a temporary worktree that runs no hook, without reports and within a 10-minute budget. --evidence names a directory that gets <commit SHA>.json per commit; --upload or --open uploads each as soon as it is observed, under a submission id derived from the commit, so Putnami Cloud keeps one run per commit."
         },
         "decisions": {
           "type": "string",
@@ -225,7 +225,7 @@
         "run"
       ],
       "cache": false,
-      "timeoutMs": 600000
+      "timeoutMs": 1800000
     }
   }
 }

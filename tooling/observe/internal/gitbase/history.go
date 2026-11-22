@@ -3,6 +3,7 @@ package gitbase
 import (
 	"context"
 	"fmt"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -49,10 +50,13 @@ func FirstParentCommits(ctx context.Context, dir, ref string, since, until time.
 	if err != nil {
 		return nil, err
 	}
-	// Git compares dates to the second: the walk asks one second wider and
-	// the exact bounds are applied below.
+	// --since would stop the walk at the first commit dated before the
+	// window, and lose the commits after it on a branch whose dates are out
+	// of order: the walk reads the whole first-parent chain up to until, and
+	// the exact bounds are applied below. Git compares dates to the second,
+	// so --until is one second wider.
 	commits, err := parseLog(g, "log", "--first-parent", logFormat,
-		"--since="+gitDate(since.Add(-time.Second)), "--until="+gitDate(until.Add(time.Second)), "--end-of-options", sha)
+		"--until="+gitDate(until.Add(time.Second)), "--end-of-options", sha)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +101,16 @@ func gitDate(t time.Time) string {
 	return t.UTC().Format("2006-01-02T15:04:05Z")
 }
 
-// worktreeEnv keeps a checkout from fetching large files through Git LFS.
-var worktreeEnv = []string{"GIT_LFS_SKIP_SMUDGE=1"}
+// worktreeEnv keeps a checkout of an old commit from running anything the
+// repository holds: no hook, no submodule checkout, and no large file
+// fetched through Git LFS.
+var worktreeEnv = []string{
+	"GIT_LFS_SKIP_SMUDGE=1",
+	"GIT_CONFIG_COUNT=3",
+	"GIT_CONFIG_KEY_0=core.hooksPath", "GIT_CONFIG_VALUE_0=" + os.DevNull,
+	"GIT_CONFIG_KEY_1=submodule.recurse", "GIT_CONFIG_VALUE_1=false",
+	"GIT_CONFIG_KEY_2=filter.lfs.required", "GIT_CONFIG_VALUE_2=false",
+}
 
 // AddWorktree checks sha out, detached, in a new worktree at path of the
 // repository that holds dir. The caller's working tree, index and HEAD stay

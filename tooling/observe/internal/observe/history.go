@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -37,6 +38,7 @@ const (
 	CodeHistoryDefaultBranchMissing = "observe.history_default_branch_missing"
 	CodeHistoryParentMissing        = "observe.history_parent_missing"
 	CodeHistoryCommitUnobserved     = "observe.history_commit_unobserved"
+	CodeHistoryInterrupted          = "observe.history_interrupted"
 )
 
 // ParseHistoryWindow reads the duration --history takes: <n>h, <n>d or <n>w,
@@ -74,6 +76,10 @@ type HistoryOptions struct {
 	MaxCommits int
 	// Clock reads the time the budget is measured with; nil is time.Now.
 	Clock func() time.Time
+	// Each receives each commit as soon as it is observed, newest first, so
+	// what it keeps survives a run that stops; the time it takes counts in
+	// the budget. Nil does nothing.
+	Each func(HistoryCommit)
 }
 
 // History is what one --history run observed.
@@ -151,6 +157,9 @@ func RunHistory(ctx context.Context, opts HistoryOptions) History {
 	if len(sampled) == 0 {
 		return h
 	}
+	// The newest commits come first: a run the budget or an interrupt stops
+	// keeps the most recent history.
+	slices.Reverse(sampled)
 	tree, cleanup, err := historyWorktree(ctx, root, sampled[0].SHA)
 	if err != nil {
 		h.warn(CodeHistoryUnreadable, "no worktree could check out %s: %v", sampled[0].SHA, err)
@@ -159,18 +168,35 @@ func RunHistory(ctx context.Context, opts HistoryOptions) History {
 	defer cleanup()
 	commitOpts := historyCommitOptions(opts.Options, tree)
 	for i, c := range sampled {
-		if ctx.Err() != nil || clock().Sub(started) >= budget {
-			h.warn(CodeHistoryBudgetSpent, "the run spent its %s budget: %s left unobserved; observe a shorter window with --history <duration>", budget, count(len(sampled)-i, "commit"))
+		if ctx.Err() != nil {
+			h.warn(CodeHistoryInterrupted, "the run was interrupted: %s left unobserved", count(len(sampled)-i, "commit"))
+			break
+		}
+		if clock().Sub(started) >= budget {
+			h.warn(CodeHistoryBudgetSpent, "the run spent its %s budget: %s left unobserved, the oldest ones; observe a shorter window with --history <duration>", budget, count(len(sampled)-i, "commit"))
 			break
 		}
 		if i > 0 {
 			if err := gitbase.CheckoutDetached(ctx, tree, c.SHA); err != nil {
+				if ctx.Err() != nil {
+					continue
+				}
 				h.warn(CodeHistoryCommitUnobserved, "the commit %s cannot be checked out: %v", short(c.SHA), err)
 				continue
 			}
 		}
-		h.Commits = append(h.Commits, HistoryCommit{Commit: c, Observation: observeCommit(ctx, commitOpts, c, branch)})
+		observed := HistoryCommit{Commit: c, Observation: observeCommit(ctx, commitOpts, c, branch)}
+		if ctx.Err() != nil {
+			// An observation the interrupt cut short is not kept.
+			h.warn(CodeHistoryInterrupted, "the run was interrupted: %s left unobserved", count(len(sampled)-i, "commit"))
+			break
+		}
+		h.Commits = append(h.Commits, observed)
+		if opts.Each != nil {
+			opts.Each(observed)
+		}
 	}
+	slices.Reverse(h.Commits)
 	return h
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
@@ -195,17 +196,17 @@ func TestHistoryIsBoundedInTime(t *testing.T) {
 	root, shas := historyClone(t, days(6, 5, 4, 3, 2, 1)...)
 	opts := historyOptions(root)
 	opts.Budget = 150 * time.Second
-	// Each reading of the clock is one minute later: the first two commits
+	// Each reading of the clock is one minute later: the two newest commits
 	// start 1 and 2 minutes in, the third would start 3 minutes in, past the
-	// budget.
+	// budget, and the oldest ones are left.
 	tick := historyNow
 	opts.Clock = func() time.Time {
 		tick = tick.Add(time.Minute)
 		return tick
 	}
 	h := RunHistory(context.Background(), opts)
-	if want := shas[1:3]; !slices.Equal(observedSHAs(h), want) {
-		t.Fatalf("observed %v, want %v", observedSHAs(h), want)
+	if want := shas[4:]; !slices.Equal(observedSHAs(h), want) {
+		t.Fatalf("observed %v, want the newest %v", observedSHAs(h), want)
 	}
 	found := false
 	for _, d := range h.Diagnostics {
@@ -217,11 +218,54 @@ func TestHistoryIsBoundedInTime(t *testing.T) {
 		t.Fatalf("no budget warning counts the 3 commits left: %+v", h.Diagnostics)
 	}
 
+	// An interrupt during the run stops it and says so; the commits observed
+	// before it are kept, oldest first, and the worktree is removed.
+	worktrees := git(t, root, "worktree", "list", "--porcelain")
 	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-	h = RunHistory(ctx, historyOptions(root))
-	if len(h.Commits) != 0 {
-		t.Fatalf("a canceled run observed %v", observedSHAs(h))
+	defer cancel()
+	opts = historyOptions(root)
+	var kept []string
+	opts.Each = func(c HistoryCommit) {
+		kept = append(kept, c.Commit.SHA)
+		if len(kept) == 2 {
+			cancel()
+		}
+	}
+	h = RunHistory(ctx, opts)
+	if want := shas[4:]; !slices.Equal(observedSHAs(h), want) || !slices.Equal(kept, []string{shas[5], shas[4]}) {
+		t.Fatalf("an interrupted run observed %v and handed %v, want %v newest first", observedSHAs(h), kept, want)
+	}
+	if !historyHasCode(h, CodeHistoryInterrupted) || historyHasCode(h, CodeHistoryBudgetSpent) {
+		t.Fatalf("diagnostics %+v", h.Diagnostics)
+	}
+	if after := git(t, root, "worktree", "list", "--porcelain"); after != worktrees {
+		t.Fatalf("the worktree outlived the interrupt:\n%s", after)
+	}
+}
+
+func TestHistoryReadsABranchWhoseDatesAreOutOfOrder(t *testing.T) {
+	// The third commit is dated 40 days ago, before the window, between two
+	// commits in it: the walk goes past it.
+	root, shas := historyClone(t, days(20, 10, 40, 5, 1)...)
+	h := RunHistory(context.Background(), historyOptions(root))
+	if want := []string{shas[1], shas[3], shas[4]}; !slices.Equal(observedSHAs(h), want) || h.InWindow != 3 {
+		t.Fatalf("observed %v of %d, want %v", observedSHAs(h), h.InWindow, want)
+	}
+}
+
+func TestHistoryRunsNoHookOfTheRepository(t *testing.T) {
+	root, _ := historyClone(t, days(3, 2, 1)...)
+	marker := filepath.Join(t.TempDir(), "hook-ran")
+	hook := filepath.Join(root, ".git", "hooks", "post-checkout")
+	if err := os.WriteFile(hook, []byte("#!/bin/sh\ntouch '"+marker+"'\nexit 1\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	h := RunHistory(context.Background(), historyOptions(root))
+	if len(h.Commits) != 2 || historyHasCode(h, CodeHistoryUnreadable) || historyHasCode(h, CodeHistoryCommitUnobserved) {
+		t.Fatalf("observed %v, diagnostics %+v", observedSHAs(h), h.Diagnostics)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("the post-checkout hook ran: %v", err)
 	}
 }
 

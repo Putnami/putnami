@@ -232,6 +232,9 @@ func parseRun(args []string, launch *job.Context) (observe.Options, outputs, err
 		return observe.Options{}, outputs{}, err
 	}
 	if history > 0 {
+		if flags["fetch"] == "true" {
+			return observe.Options{}, outputs{}, fmt.Errorf("--history reads the local clone and fetches nothing: run git fetch first instead of --fetch")
+		}
 		for _, name := range historyConflicts {
 			if _, ok := flags[name]; ok {
 				return observe.Options{}, outputs{}, fmt.Errorf("--history observes each commit against its parent without reports: it does not take --%s", name)
