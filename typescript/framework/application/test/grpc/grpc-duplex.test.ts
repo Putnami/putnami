@@ -524,6 +524,50 @@ describe('Connect client and bidirectional streams', () => {
   );
 
   specTest(
+    'reads a reset as a cancellation however long the turns before its abort run',
+    {
+      feature: 'typescript/grpc-services',
+      requirement: 'duplex-streams-over-http2',
+      check: 'a-connect-client-stream-over-http2-answers-its-declared-result',
+    },
+    async () => {
+      // As Bun does for a reset, the body ends as if the caller had ended it
+      // and the signal aborts in a later turn. The turn in between runs long,
+      // as it does under load or when many resets arrive together: a wait
+      // measured in time would expire before the abort and read the reset as
+      // an end, where a wait counted in turns still sees it. The abort comes
+      // as late as Bun has been observed to send it, then one turn later
+      // still: the wait keeps that turn of margin.
+      for (const extraTurns of [0, 1]) {
+        const reset = new AbortController();
+        const abortAfter = (turns: number) => {
+          if (turns === 0) reset.abort();
+          else setImmediate(() => abortAfter(turns - 1));
+        };
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(envelope({ delta: 1 }));
+          },
+          pull(controller) {
+            controller.close();
+            setImmediate(() => {
+              const until = performance.now() + 50;
+              while (performance.now() < until) {
+                // a turn kept busy past any short grace
+              }
+              abortAfter(1 + extraTurns);
+            });
+          },
+        });
+        const requests = new ConnectRequestStream(body, null, undefined, reset.signal);
+        // biome-ignore lint/performance/noAwaitInLoops: each case runs on its own event-loop turns
+        expect(await requests.next()).toBeDefined();
+        await expect(requests.next()).rejects.toThrow('the caller canceled the stream');
+      }
+    },
+  );
+
+  specTest(
     'carries binary protobuf and gzip-compressed messages',
     {
       feature: 'typescript/grpc-services',

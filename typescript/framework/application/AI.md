@@ -284,9 +284,9 @@ provider is held to it by a corpus transcribed from that text
 - The endpoint's declared `resilience.stream` budgets apply, resolved as for a first-party WebSocket
   stream (floors 30 s idle / 1 MiB without a contract): past `maxFrameBytes` → `resource_exhausted`,
   no message either way for `idleTimeoutMs` → `deadline_exceeded`, 16 MiB of unread answers →
-  `resource_exhausted`. A caller reset makes `ctx.messages()` throw `canceled` (a bounded 10 ms
-  heuristic over Bun). An idle or deadline stop ends the loop with `ctx.signal` aborted: check it
-  before committing.
+  `resource_exhausted`. A caller reset makes `ctx.messages()` throw `canceled` (the server waits three
+  event-loop turns for Bun's late abort before it reads an end as the caller's). An idle or deadline
+  stop ends the loop with `ctx.signal` aborted: check it before committing.
 
 ## File-Based Routing
 

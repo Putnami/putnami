@@ -48,12 +48,16 @@ tell them apart only from their headers.
 - The protocol is inferred, not stated. A Bun release that states it per
   request would replace the header rule in `http-version.ts`.
 - Bun 1.4.5 ends the body of a reset HTTP/2 request exactly as it ends a
-  completed one, and aborts the request signal only one or more event-loop
-  turns later — about 6 ms later when hundreds of resets arrive together on
-  one connection. The server therefore reads the end of a body as the caller's
-  end only after the signal had 10 ms to abort. This is a bounded heuristic
-  over that Bun limitation, not a guarantee: a reset reported later still
-  reads as an end. The limitation is worth reporting to Bun.
+  completed one, and aborts the request signal in a later event-loop turn,
+  observed no later than the turn after the one that ended the body. The
+  server therefore reads the end of a body as the caller's end only after
+  three event-loop turns, counted with `setImmediate`, gave the signal its
+  chance to abort: the two turns observed, and one of margin. The wait counts
+  turns, not time: an earlier 10 ms grace let a reset read as an end whenever
+  the turn that handled a burst of resets ran longer than 10 ms under load.
+  The guarantee rests on that observed Bun scheduling, which a Bun upgrade
+  must keep; the duplex stream tests check it, margin included, and the
+  limitation is worth reporting to Bun.
 - A stream stopped by its idle budget or its deadline ends `ctx.messages()`
   normally with `ctx.signal` aborted, as on WebSocket: a handler that commits
   must check `ctx.signal` after its loop.

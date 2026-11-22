@@ -8,10 +8,11 @@ import {
 import { MAX_GRPC_MESSAGE_BYTES, decompressGzip } from './grpc-protocol';
 
 /**
- * How long the end of a request body waits for the request signal to abort
- * before it is read as the caller's end rather than its reset.
+ * How many event-loop turns the end of a request body waits for the request
+ * signal to abort before it is read as the caller's end rather than its reset:
+ * the two turns Bun has been observed to need, and one turn of margin.
  */
-export const CANCELLATION_GRACE_MS = 10;
+export const CANCELLATION_TURNS = 3;
 
 /**
  * The request side of a Connect client or bidirectional stream, read as it
@@ -95,27 +96,23 @@ export class ConnectRequestStream {
 
   /**
    * A caller that resets its stream ends the body exactly as a caller that
-   * ended its side does, and Bun aborts the request signal only one or more
-   * event-loop turns later — later still when many resets arrive together on
-   * one connection. Reading a cancellation as the end would let a client
-   * stream commit the part it received as if it were whole, so the end is
-   * confirmed only after the signal had {@link CANCELLATION_GRACE_MS} to
-   * abort. This is a bounded heuristic over that Bun limitation, not a
-   * guarantee: a reset the runtime reports later still reads as an end.
+   * ended its side does, and Bun aborts the request signal in a later turn of
+   * the event loop, observed no later than the turn after the one that ended
+   * the body. Reading a cancellation as the end would let a client stream commit
+   * the part it received as if it were whole, so the end is confirmed only
+   * after {@link CANCELLATION_TURNS} turns, counted with `setImmediate`, gave
+   * the signal its chance to abort. The wait counts turns, not time: a turn
+   * slowed by load or by a burst of resets delays the abort and the
+   * confirmation alike, where a wall-clock grace would expire first. The
+   * guarantee rests on that observed Bun scheduling; the duplex stream tests
+   * check it on every Bun the workspace pins.
    */
   private async refuseCancellation(): Promise<void> {
     const signal = this.signal;
     if (!signal) return;
-    if (!signal.aborted) {
-      await new Promise<void>((resolve) => {
-        const timer = setTimeout(done, CANCELLATION_GRACE_MS);
-        function done() {
-          clearTimeout(timer);
-          signal?.removeEventListener('abort', done);
-          resolve();
-        }
-        signal.addEventListener('abort', done, { once: true });
-      });
+    for (let turn = 0; turn < CANCELLATION_TURNS && !signal.aborted; turn++) {
+      // biome-ignore lint/performance/noAwaitInLoops: each turn must follow the previous one
+      await new Promise<void>((resolve) => setImmediate(resolve));
     }
     if (signal.aborted) {
       throw new HttpException('Client Closed Request: the caller canceled the stream', 499);
