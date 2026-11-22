@@ -47,10 +47,12 @@ Default mount is root. Set `prefix` to namespace (`prefix: '/_'` mounts `/_/heal
 The platform plugin discovers two interfaces by walking the module tree from the root and registers each implementation under its `name`.
 
 ```ts
-import type { HealthChecker, ReadinessChecker } from '@putnami/application';
+import type { HealthChecker, Plugin } from '@putnami/application';
 
 class CacheClient implements Plugin, HealthChecker {
   readonly name = 'cache';
+
+  constructor(private readonly ping: (signal: AbortSignal) => Promise<void>) {}
 
   async checkHealth(signal: AbortSignal): Promise<void> {
     await this.ping(signal); // throws on failure
@@ -71,13 +73,13 @@ Implementations must be safe to call concurrently and respect `AbortSignal` canc
 
 For checks that only need DI-managed dependencies, contribute an injected function from the owning module/application:
 
-```ts
+```ts nocheck
 const app = application()
   .provide(Pools)
   .use(http())
   .use(platform());
 
-app.health.contributeReadiness('platform_configs', [Pools], async (pools, signal) => {
+app.health.contributeReadiness('platform_configs', [Pools], async (pools: Pools, signal: AbortSignal) => {
   await pools.for('platform_configs').ping({ signal });
 });
 ```

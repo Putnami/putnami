@@ -48,7 +48,7 @@ The deployment config decides which physical transport handles each channel.
 
 Use dot-separated names to create a natural hierarchy:
 
-```typescript
+```typescript nocheck
 topic('user.created', { ... })
 topic('user.updated', { ... })
 topic('order.placed', { ... })

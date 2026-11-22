@@ -266,7 +266,7 @@ import (
     putnami_http "go.putnami.dev/http"
 )
 
-server := putnami_http.NewServer()
+server := putnami_http.NewServerPlugin(putnami_http.ServerConfig{Port: 8080})
 server.Use(telemetry.HTTPMiddleware("my-service"))
 ```
 

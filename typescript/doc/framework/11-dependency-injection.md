@@ -123,7 +123,7 @@ provide(Database, async (resolve) => {
   const db = new Database(config.url);
   await db.connect();
   return db;
-}, { onClose: (db) => db.disconnect() })
+}, { onClose: (db: Database) => db.disconnect() })
 ```
 
 ### Named token
@@ -392,6 +392,11 @@ export class PaymentService {
       throw error;
     }
   }
+
+  private async chargeCard(orderId: string, amount: number): Promise<{ id: string }> {
+    // Call the payment provider here
+    return { id: `txn-${orderId}-${amount}` };
+  }
 }
 ```
 
@@ -456,7 +461,7 @@ import { ContainerContext, provide } from '@putnami/runtime';
 {
   await using ctx = new ContainerContext('app');
   ctx.register(provide(Database, async () => Database.connect(url), {
-    onClose: (db) => db.disconnect(),
+    onClose: (db: Database) => db.disconnect(),
   }));
 
   await ctx.start();

@@ -37,7 +37,7 @@ import { application, http } from '@putnami/application';
 
 const app = application()
   .use(http({ port: 3000 }))
-  .run(async (app) => {
+  .run(async () => {
     const httpPlugin = app.getPlugin(HttpPlugin);
 
     httpPlugin.get('/hello', () => {
@@ -261,21 +261,22 @@ export function GET(ctx: HttpRequestContext) {
 
 ### WebSocket
 
+A WebSocket endpoint streams its body and its result with `Stream()`:
+
 ```typescript
 // src/api/chat/ws.ts
-import type { WebSocketContext } from '@putnami/application';
+import { endpoint, Stream } from '@putnami/application';
 
-export function OPEN(ctx: WebSocketContext) {
-  console.log('Client connected');
-}
-
-export function MESSAGE(ctx: WebSocketContext) {
-  ctx.ws.send(`Echo: ${ctx.message}`);
-}
-
-export function CLOSE(ctx: WebSocketContext) {
-  console.log('Client disconnected');
-}
+export default endpoint()
+  .body(Stream({ text: String }))
+  .returns(Stream({ text: String }))
+  .handle(async (ctx) => {
+    for await (const message of ctx.messages()) {
+      ctx.send({ text: `Echo: ${message.text}` });
+    }
+    // A bidirectional handler ends with its terminal value
+    return { text: 'bye' };
+  });
 ```
 
 > **📚 More Examples:** See the documentation guides for detailed examples.

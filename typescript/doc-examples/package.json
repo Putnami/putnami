@@ -1,0 +1,31 @@
+{
+  "name": "@putnami/typescript-doc-examples",
+  "version": "0.0.0",
+  "description": "Type-checks the TypeScript code examples of the documentation against the workspace framework",
+  "private": true,
+  "dependencies": {
+    "@putnami/analytics": "workspace:*",
+    "@putnami/application": "workspace:*",
+    "@putnami/cli-protocol": "workspace:*",
+    "@putnami/client": "workspace:*",
+    "@putnami/cloud": "workspace:*",
+    "@putnami/codehost-protocol": "workspace:*",
+    "@putnami/database": "workspace:*",
+    "@putnami/document": "workspace:*",
+    "@putnami/events": "workspace:*",
+    "@putnami/migration": "workspace:*",
+    "@putnami/runtime": "workspace:*",
+    "@putnami/spectest": "workspace:*",
+    "@putnami/storage": "workspace:*",
+    "@putnami/ui": "workspace:*",
+    "@putnami/utils": "workspace:*",
+    "@putnami/web": "workspace:*",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "typescript": "^6.0.2"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.3",
+    "@types/react-dom": "^19.2.3"
+  }
+}

@@ -51,7 +51,8 @@ export default endpoint()
 ### Exception with details
 
 ```ts
-throw new BadRequestException('Validation failed', {
+throw new BadRequestException({
+  message: 'Validation failed',
   fields: {
     email: 'Invalid email format',
     password: 'Password too short',
@@ -67,12 +68,9 @@ Create custom exceptions by extending `HttpException`:
 import { HttpException } from '@putnami/runtime';
 
 export class RateLimitException extends HttpException {
-  constructor(retryAfter: number) {
-    super(429, `Rate limit exceeded. Retry after ${retryAfter} seconds`);
-    this.retryAfter = retryAfter;
+  constructor(readonly retryAfter: number) {
+    super(`Rate limit exceeded. Retry after ${retryAfter} seconds`, 429);
   }
-
-  retryAfter: number;
 }
 
 // Usage
@@ -102,7 +100,7 @@ Use `ctx.throw()` for quick error responses:
 import { endpoint } from '@putnami/application';
 
 export default endpoint((ctx) => {
-  const id = ctx.queryParams().get('id');
+  const id = ctx.queryParams()['id'];
 
   if (!id) {
     ctx.throw(400, 'ID is required');
@@ -191,12 +189,12 @@ export default endpoint(() => {
 import { endpoint, HttpResponse } from '@putnami/application';
 
 export default endpoint(() => {
-  return new HttpResponse(new Response('Plain text', {
+  return new HttpResponse('Plain text', {
     status: 200,
     headers: {
       'Content-Type': 'text/plain',
     },
-  }));
+  });
 });
 ```
 
@@ -209,13 +207,13 @@ export default endpoint(async () => {
   const file = Bun.file('report.pdf');
   const content = await file.arrayBuffer();
 
-  return new HttpResponse(new Response(content, {
+  return new HttpResponse(content, {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': 'attachment; filename="report.pdf"',
       'Content-Length': String(content.byteLength),
     },
-  }));
+  });
 });
 ```
 
@@ -235,12 +233,12 @@ export default endpoint(() => {
     },
   });
 
-  return new HttpResponse(new Response(stream, {
+  return new HttpResponse(stream, {
     headers: {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
     },
-  }));
+  });
 });
 ```
 
@@ -257,19 +255,19 @@ export const errorHandler: HttpMiddleware = async (ctx, next) => {
   try {
     return await next();
   } catch (error) {
-    // Known HTTP exceptions
-    if (error instanceof HttpException) {
+    // Validation errors, checked first: ValidationException is an HttpException
+    if (error instanceof ValidationException) {
       return json(
-        { error: error.message, code: error.status },
-        { status: error.status }
+        { error: 'Validation failed', details: error.getResponse() },
+        { status: 422 }
       );
     }
 
-    // Validation errors
-    if (error instanceof ValidationException) {
+    // Known HTTP exceptions
+    if (error instanceof HttpException) {
       return json(
-        { error: 'Validation failed', details: error.errors },
-        { status: 422 }
+        { error: error.message, code: error.getStatus() },
+        { status: error.getStatus() }
       );
     }
 

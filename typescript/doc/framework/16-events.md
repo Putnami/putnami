@@ -113,7 +113,7 @@ When running via `Application + events()`, each handler invocation gets its own 
 
 ### Attribute Filtering
 
-```typescript
+```typescript nocheck
 handler(OrderPlaced)
   .filter({ attributes: { region: 'eu' } })
   .handle(async (msg) => { ... });
@@ -205,7 +205,7 @@ src/
 
 Multiple handlers can be exported from a single file:
 
-```typescript
+```typescript nocheck
 // events/order.on.ts
 export const onPlaced = handler(OrderPlaced).handle(async (msg) => { ... });
 export const onShipped = handler(OrderShipped).handle(async (msg) => { ... });

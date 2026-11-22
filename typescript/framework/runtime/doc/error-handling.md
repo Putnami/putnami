@@ -288,7 +288,7 @@ try {
   // ...
 } catch (error) {
   if (isHttpException(error)) {
-    console.log(error.statusCode); // TypeScript knows this is HttpException
+    console.log(error.getStatus()); // TypeScript knows this is HttpException
     console.log(error.toJSON());
   } else {
     // Handle non-HTTP errors
@@ -336,7 +336,7 @@ export async function getUser(id: string) {
 
 ### Validation in Services
 
-```typescript
+```typescript nocheck
 import { ValidationException } from '@putnami/runtime';
 import { validate } from 'class-validator';
 
@@ -355,7 +355,7 @@ class UserService {
 
 ### Error Wrapping
 
-```typescript
+```typescript nocheck
 import { HttpException, InternalServerErrorException } from '@putnami/runtime';
 
 @Service()
@@ -418,7 +418,7 @@ Available status codes include all standard HTTP status codes (200-599).
 
 All exceptions serialize to a consistent format:
 
-```typescript
+```typescript nocheck
 {
   statusCode: number;  // HTTP status code
   message: string | object; // Error message or object

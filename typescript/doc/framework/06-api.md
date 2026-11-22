@@ -28,6 +28,8 @@ api({
 When used inside a module with `.path()`, the module path is automatically used as the route prefix (unless an explicit `prefix` is set):
 
 ```ts
+import { module } from '@putnami/application';
+
 const tasksModule = module('tasks')
   .path('/tasks')
   .use(api());          // Routes prefixed with /tasks
@@ -388,6 +390,8 @@ export default endpoint()
     for await (const msg of ctx.messages()) {
       ctx.send({ event: 'echo', payload: msg.content });
     }
+    // A bidirectional handler ends with its terminal value
+    return { event: 'closed', payload: ctx.params.roomId };
   });
 ```
 
@@ -695,51 +699,49 @@ The API plugin can generate an OpenAPI 3.0.3 specification from your routes. HTT
 
 ### Build-time generation
 
-Enable build-time spec generation with the `openapi` config option. An `openapi.json` file is written to `.gen/` during the build step.
+Add the `openapi()` plugin next to `api()`. During the build it writes the spec to `schema/openapi.json`, a committed path reviewers see in diffs (`output: false` keeps it in `.gen/schema/openapi.json` instead):
 
 ```ts
+import { api, application, http, openapi } from '@putnami/application';
+
 export const app = () =>
   application()
     .use(http())
+    .use(api())
     .use(
-      api({
-        openapi: {
-          title: 'My API',
-          version: '1.0.0',
-          description: 'Service description',
-          servers: [{ url: 'https://api.example.com' }],
-        },
+      openapi({
+        title: 'My API',
+        version: '1.0.0',
+        description: 'Service description',
+        servers: [{ url: 'https://api.example.com' }],
       }),
     );
 ```
 
-### Runtime generation
+### Runtime access
 
-You can also generate the spec at runtime from the plugin instance:
+After warmup, the plugin instance holds the generated document, and `exposeRoute: true` serves it at `/_/openapi.json`:
 
 ```ts
-const apiPlugin = api();
+import { openapi } from '@putnami/application';
+
+const openapiPlugin = openapi({ title: 'My API', version: '1.0.0', exposeRoute: true });
 // ... after warmup
-const spec = apiPlugin.openapi({
-  info: { title: 'My API', version: '1.0.0' },
-});
+const spec = openapiPlugin.spec();
 ```
 
 ### OpenAPI configuration options
 
 ```ts
-api({
-  scanFolder: 'api',    // Folder to scan for routes (default: 'api')
-  autoScan: true,       // Auto-discover routes (default: true)
-  prefix: '/api',       // URL prefix for all routes (optional)
-  openapi: {            // OpenAPI spec generation (optional)
-    title: 'My API',        // Required: API title
-    version: '1.0.0',       // Required: API version
-    description: '...',     // Optional: API description
-    servers: [               // Optional: server URLs
-      { url: 'https://api.example.com', description: 'Production' },
-    ],
-  },
+openapi({
+  title: 'My API',          // API title (default: package.json name)
+  version: '1.0.0',         // API version (default: package.json version)
+  description: '...',       // Optional: API description
+  servers: [                // Optional: server URLs
+    { url: 'https://api.example.com', description: 'Production' },
+  ],
+  exposeRoute: false,       // Serve the spec over HTTP (default: false)
+  output: 'schema/openapi.json', // Where the build writes it; false keeps it in .gen/
 })
 ```
 

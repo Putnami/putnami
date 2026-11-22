@@ -6,7 +6,7 @@ Components for presenting text, data, and visual information.
 
 Renders styled text with responsive size, weight, color, alignment, and truncation.
 
-```typescript
+```typescript nocheck
 import { Text } from '@putnami/ui';
 
 <Text size="lg" weight="bold" color="primary">Important text</Text>
@@ -33,7 +33,7 @@ Also inherits all `BoxProps`.
 
 Semantic heading component with level-to-size mapping and responsive support.
 
-```typescript
+```typescript nocheck
 import { Heading } from '@putnami/ui';
 
 <Heading level={1}>Page Title</Heading>
@@ -59,7 +59,7 @@ Level-to-size mapping: 1→`3xl`, 2→`2xl`, 3→`xl`, 4→`lg`, 5→`md`, 6→`
 
 Inline label for status, categories, or counts.
 
-```typescript
+```typescript nocheck
 import { Badge } from '@putnami/ui';
 
 <Badge colorScheme="success">Active</Badge>
@@ -79,7 +79,7 @@ import { Badge } from '@putnami/ui';
 
 Circular user representation with image, initials, or icon fallback.
 
-```typescript
+```typescript nocheck
 import { Avatar, AvatarGroup } from '@putnami/ui';
 
 <Avatar src="/photo.jpg" name="Alice Smith" size="lg" />
@@ -117,7 +117,7 @@ Background color is deterministically generated from `name` using a hash functio
 
 Structured data display with sorting, striping, and selection.
 
-```typescript
+```typescript nocheck
 import { Table, Thead, Tbody, Tr, Th, Td } from '@putnami/ui';
 
 <Table variant="striped" size="md">
@@ -174,7 +174,7 @@ import { Table, Thead, Tbody, Tr, Th, Td } from '@putnami/ui';
 
 Composable card component with header, body, and footer sections.
 
-```typescript
+```typescript nocheck
 import { Card, CardHeader, CardBody, CardFooter } from '@putnami/ui';
 
 <Card variant="outline">
@@ -217,7 +217,7 @@ Inherits all `BoxProps`. Renders a flex row aligned to the end with a top border
 
 Visual separator line, horizontal or vertical.
 
-```typescript
+```typescript nocheck
 import { Divider } from '@putnami/ui';
 
 <Divider />
@@ -238,7 +238,7 @@ import { Divider } from '@putnami/ui';
 
 Code display with syntax highlighting class and copy button.
 
-```typescript
+```typescript nocheck
 import { CodeBlock } from '@putnami/ui';
 
 <CodeBlock code="const x = 42;" language="typescript" />

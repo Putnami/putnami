@@ -106,7 +106,7 @@ Set the service base URL. **Required** — throws `Error` if omitted when callin
 
 Set the client identity string sent as `X-Client-Id` header on every request. Used for service-to-service authentication.
 
-```typescript
+```typescript nocheck
 .clientId('orders-service')
 ```
 
@@ -114,7 +114,7 @@ Set the client identity string sent as `X-Client-Id` header on every request. Us
 
 Override the default request timeout (30,000ms). Applies to every request.
 
-```typescript
+```typescript nocheck
 .timeout(10_000)  // 10 seconds
 ```
 
@@ -122,7 +122,7 @@ Override the default request timeout (30,000ms). Applies to every request.
 
 Override retry behavior. Merged with defaults.
 
-```typescript
+```typescript nocheck
 .retry({ maxRetries: 5, baseDelayMs: 500 })
 ```
 
@@ -130,7 +130,7 @@ Override retry behavior. Merged with defaults.
 
 Add custom interceptors applied before the built-in retry interceptor.
 
-```typescript
+```typescript nocheck
 .interceptors([circuitBreakerInterceptor(), telemetryInterceptor('users')])
 ```
 

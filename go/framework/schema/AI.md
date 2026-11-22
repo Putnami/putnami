@@ -70,7 +70,7 @@ result := schema.Validate(reflect.TypeOf(T{}), values, schema.WithLabel("body"))
 
 ## Result
 
-```go
+```go nocheck
 type Result struct {
     Data   map[string]any  // validated values with defaults applied
     Errors []FieldError    // validation errors

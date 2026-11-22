@@ -14,7 +14,7 @@ The theme system controls colors, spacing, typography, breakpoints, shadows, and
 
 ### Basic Setup
 
-```typescript
+```typescript nocheck
 import { ThemeProvider } from '@putnami/ui';
 
 function App() {
@@ -30,7 +30,7 @@ function App() {
 
 Override specific tokens with a partial theme object:
 
-```typescript
+```typescript nocheck
 <ThemeProvider theme={{
   colors: {
     primary: {
@@ -49,7 +49,7 @@ Override specific tokens with a partial theme object:
 
 Or use a function for full control:
 
-```typescript
+```typescript nocheck
 <ThemeProvider theme={(baseTheme) => ({
   ...baseTheme,
   space: { ...baseTheme.space, md: '1.25rem' },
@@ -58,7 +58,7 @@ Or use a function for full control:
 
 ### Controlling Color Mode
 
-```typescript
+```typescript nocheck
 <ThemeProvider colorMode="dark">
   {/* Forces dark mode */}
 </ThemeProvider>
@@ -80,7 +80,7 @@ Without `colorMode`, the provider defaults to `system` and reads from `localStor
 
 Returns the current Emotion theme, typed as `T`. Use `useTheme<Theme>()` to get the full typed theme object.
 
-```typescript
+```typescript nocheck
 import { useTheme } from '@putnami/ui';
 import type { Theme } from '@putnami/ui';
 
@@ -119,7 +119,7 @@ const darkTheme = createTheme('dark');
 
 A ready-made button that cycles through light, dark, and system modes.
 
-```typescript
+```typescript nocheck
 import { ThemeToggle } from '@putnami/ui';
 
 <ThemeToggle />

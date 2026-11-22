@@ -139,7 +139,7 @@ export default loader(async (ctx) => {
 
   if (!post) {
     // Option 1: Throw HttpException (caught by error boundary)
-    throw new HttpException(404, 'Post not found');
+    throw new HttpException('Post not found', 404);
 
     // Option 2: Return error response
     // return json({ error: 'Not found' }, { status: 404 });
@@ -181,7 +181,7 @@ export default function Page() {
     return <div>Loading...</div>;
   }
 
-  // Render content
+  return <div>Content</div>;
 }
 ```
 
@@ -445,7 +445,7 @@ export default loader(async (ctx) => {
   });
 
   if (!response.ok) {
-    throw new HttpException(response.status, 'API error');
+    throw new HttpException('API error', response.status);
   }
 
   const data = await response.json();

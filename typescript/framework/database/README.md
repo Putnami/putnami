@@ -100,8 +100,6 @@ const UsersTable = Table("users", {
   id:    Key(Uuid),
   email: Column(Email),
   name:  Column(String),
-}, {
-  migrations: [CreateUsersTable],
 });
 
 type User = InferTable<typeof UsersTable>;
@@ -146,14 +144,30 @@ await userRepo.delete({ id: "550e8400-e29b-41d4-a716-446655440000" });
 
 ### 5. Enable Automatic Migrations
 
+A table definition creates no SQL: the migration owns the table. Contribute
+it from a plugin with `sqlSourceInline`, and let the SQL plugin apply it at
+startup:
+
 ```typescript
-import { application, http, api, platform } from "@putnami/application";
-import { sql } from "@putnami/database";
+import { application, http, api, platform, type Plugin } from "@putnami/application";
+import { sql, sqlSourceInline } from "@putnami/database";
+import type { MigrationContributor } from "@putnami/migration";
+
+const migrations: Plugin & MigrationContributor = {
+  migrationSources: () => [
+    sqlSourceInline({
+      namespace: "app",
+      datasource: { name: "default", schema: "public" },
+      definitions: [CreateUsersTable],
+    }),
+  ],
+};
 
 export const app = () =>
   application()
     .use(http())
-    .use(sql())     // Automatically runs migrations on startup
+    .use(sql({ autoApply: true })) // Applies pending migrations on startup
+    .use(migrations)
     .use(platform())
     .use(api());
 ```
@@ -226,7 +240,8 @@ class UserRepository extends Repository<typeof UsersTable> {
 
 ### Migrations
 
-Define schema changes as migrations and attach them to table definitions:
+Define schema changes as migrations; a plugin contributes them with
+`sqlSourceInline`, as step 5 shows, and the table definition stays free of SQL:
 
 ```typescript
 const CreateUsersTable = {
@@ -237,12 +252,10 @@ const CreateUsersTable = {
 const UsersTable = Table("users", {
   id:    Key(Uuid),
   email: Column(Email),
-}, {
-  migrations: [CreateUsersTable],
 });
 ```
 
-Migrations run automatically on application startup when using the SQL plugin.
+Pending migrations run on application startup when the SQL plugin sets `autoApply: true`.
 
 **Learn more:** [Migrations Documentation](./doc/migrations.md)
 
@@ -303,8 +316,6 @@ const UsersTable = Table("users", {
   email:     Column(Email),
   name:      Column(String),
   createdAt: Column(DateIso, { columnName: "created_at" }),
-}, {
-  migrations: [CreateUsersTable],
 });
 
 type User = InferTable<typeof UsersTable>;
@@ -380,10 +391,11 @@ const results = await sql`
   LIMIT ${10}
 `;
 
-// Transactions
-await sql.begin(async (sql) => {
-  await sql`INSERT INTO users (id, email) VALUES (${id}, ${email})`;
-  await sql`INSERT INTO profiles (user_id, name) VALUES (${id}, ${name})`;
+// Transactions: every repository write and `this.conn()` query inside
+// runInTransaction joins one transaction, committed on success
+await runInTransaction(async () => {
+  await users.save({ id, email });
+  await profiles.save({ userId: id, name });
 });
 ```
 

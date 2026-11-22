@@ -256,7 +256,7 @@ route the framework can walk those loaders' injected providers and their
 transitive `deps` and decide whether any of them is request/session-scoped — a
 property of the graph, not of runtime execution:
 
-```ts
+```ts nocheck
 // A request-scoped provider…
 application().provide(SessionContext, { scope: 'scoped' });
 

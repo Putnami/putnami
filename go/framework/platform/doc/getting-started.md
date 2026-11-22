@@ -146,7 +146,7 @@ the endpoint open.
 
 The module takes no OpenTelemetry dependency, so it exposes a callback instead:
 
-```go
+```go nocheck
 type meterBridge struct{ /* … */ }
 
 platform.NewPlugin(platform.Config{ProbeMetrics: &meterBridge{}})

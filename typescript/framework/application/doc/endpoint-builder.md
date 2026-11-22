@@ -494,6 +494,8 @@ export default endpoint()
     for await (const msg of ctx.messages()) {
       ctx.send({ event: 'echo', payload: msg.data });
     }
+    // A bidirectional handler ends with its terminal value
+    return { event: 'closed', payload: ctx.params.roomId };
   });
 ```
 
@@ -665,18 +667,21 @@ Handlers that return a `HttpResponse` or a plain string bypass content negotiati
 
 ## OpenAPI Spec Generation
 
-Routes defined with `route()` are automatically discoverable. Call `openapi()` on the `ApiPlugin` instance to generate a complete OpenAPI 3.0.3 specification with zero extra annotations:
+Routes defined with `endpoint()` are automatically discoverable. Add the `openapi()` plugin next to `api()` to generate a complete OpenAPI 3.0.3 specification with zero extra annotations; after warmup, `spec()` returns it:
 
 ```typescript
-import { api } from '@putnami/application';
+import { api, application, openapi } from '@putnami/application';
 
-const apiPlugin = api();
-
-// After warmup, generate the spec
-const spec = apiPlugin.openapi({
-  info: { title: 'My API', version: '1.0.0' },
+const openapiPlugin = openapi({
+  title: 'My API',
+  version: '1.0.0',
   servers: [{ url: 'https://api.example.com' }],
 });
+
+application().use(api()).use(openapiPlugin);
+
+// After warmup
+const spec = openapiPlugin.spec();
 ```
 
 The generator maps:
@@ -700,20 +705,18 @@ You can also use `generateOpenApiSpec()` directly with an array of `DiscoveredRo
 
 ### Build-Time Generation
 
-Pass the `openapi` config option to generate `openapi.json` during `putnami build`. The spec is written to `.gen/` alongside the route loader, making it available to codegen tools in any language:
+During `putnami build`, the `openapi()` plugin writes the spec to `schema/openapi.json`, a committed path, and registers it as a build asset; `output: false` keeps it in `.gen/schema/openapi.json`. Other tools (Go, Python, Java clients, etc.) can consume it directly:
 
 ```typescript
-app.use(api({
-  openapi: {
+app.use(api()).use(
+  openapi({
     title: 'User Service',
     version: '1.0.0',
     description: 'User management API',
     servers: [{ url: 'https://api.example.com' }],
-  },
-}));
+  }),
+);
 ```
-
-After build, the file is available at `.gen/<scanPath>/openapi.json` and registered as a build asset. Other tools (Go, Python, Java clients, etc.) can consume it directly.
 
 ## Response Validation
 

@@ -89,7 +89,9 @@ func main() {
             return http.JSONStatus(201, createUser(in))
         }))
 
-    app.New("users-api").Use(server).Use(apiPlugin).ListenAndServe()
+    a := app.New("users-api")
+    a.Use(server).Use(apiPlugin)
+    a.ListenAndServe()
 }
 ```
 
@@ -326,7 +328,9 @@ So registering the OpenAPI plugin after the api plugin is all it takes to publis
 
 ```go
 openapiPlugin := openapi.NewPlugin(openapi.PluginOptions{Title: "Users API"}).From(apiPlugin)
-app.New("users-api").Use(server).Use(apiPlugin).Use(openapiPlugin).ListenAndServe()
+a := app.New("users-api")
+a.Use(server).Use(apiPlugin).Use(openapiPlugin)
+a.ListenAndServe()
 ```
 
 ## Documentation-only endpoints

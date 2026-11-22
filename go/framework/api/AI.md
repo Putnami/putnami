@@ -129,7 +129,7 @@ response type; the handler declares that value with `ctx.Result(v)`, and a
 handler that completes without one is refused. `api.BidiStream` may declare an
 optional terminal value the same way.
 
-```go
+```go nocheck
 // Server stream (SSE / WS): push events to the client
 api.Endpoint("GET", "/feed").
     Returns(api.StreamOf[Event]()).
@@ -231,7 +231,7 @@ route itself cannot express. Four fields decide the wire:
   security chain, and the provider owns the cursor's binding, retention and the
   typed refusal of a stale or forged one.
 
-```go
+```go nocheck
 api.Endpoint("GET", "/items/{id}/history").
     Returns(api.StreamOf[Revision]()).
     Client(api.ClientOperationOptions{

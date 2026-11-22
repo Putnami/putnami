@@ -396,7 +396,7 @@ export default function Navigation() {
 
 The `Link` component supports prefetching:
 
-```tsx
+```tsx nocheck
 import { Link } from '@putnami/web';
 
 // Prefetch on hover/focus
@@ -494,7 +494,7 @@ stop();
 
 The event name is `putnami:navigation`, so a plain DOM listener works too:
 
-```ts
+```ts nocheck
 window.addEventListener('putnami:navigation', (event) => {
   const detail = event.detail;
 });
@@ -601,7 +601,7 @@ export default function Page() {
 
 Prefetch critical routes:
 
-```tsx
+```tsx nocheck
 import { Link } from '@putnami/web';
 
 // Prefetch on hover (recommended for most links)
@@ -665,7 +665,7 @@ When a user is authenticated, the SSR renderer serializes a minimal security con
 
 Access the current user's security context inside React components:
 
-```tsx
+```tsx nocheck
 import { useSecurityContext } from '@putnami/web';
 
 function AdminNav() {
@@ -679,7 +679,7 @@ function AdminNav() {
 
 Access the security context outside React components (e.g. in React Router loaders):
 
-```typescript
+```typescript nocheck
 import { getSecurityContext } from '@putnami/web';
 
 export async function loader() {
@@ -696,7 +696,7 @@ Check whether a security context satisfies a declarative requirement. Uses the s
 - `roles` / `scopes` — user must have **all**
 - `rolesAny` / `scopesAny` — user must have **at least one**
 
-```typescript
+```typescript nocheck
 import { checkAccess, useSecurityContext } from '@putnami/web';
 
 function ProtectedSection() {

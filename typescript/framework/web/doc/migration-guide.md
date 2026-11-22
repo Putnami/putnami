@@ -69,7 +69,7 @@ import { Link } from 'react-router';
 ```
 
 **After (v2):**
-```tsx
+```tsx nocheck
 import { Link } from '@putnami/web';
 
 // Prefetch on hover/focus (default: 'none')
@@ -122,7 +122,7 @@ const hydrationData = (window as any).__staticRouterHydrationData;
 ```
 
 **After (v2):**
-```typescript
+```typescript nocheck
 // Type is now properly defined
 const hydrationData = window.__staticRouterHydrationData;
 // hydrationData is typed as StaticRouterHydrationData | undefined

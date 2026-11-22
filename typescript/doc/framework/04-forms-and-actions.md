@@ -58,48 +58,28 @@ export default function ContactPage() {
 
 ```ts
 // src/app/register/action.ts
+import { Email, MinLength } from '@putnami/application';
 import { action } from '@putnami/web';
-import { validateSync, IsEmail, MinLength, IsString } from '@putnami/runtime';
 
-class RegisterDto {
-  @IsString()
-  @MinLength(2)
-  name: string;
+// The body schema is validated before the handler runs: an invalid body is
+// refused with the failing fields, and the handler never sees it.
+export default action()
+  .body({ name: MinLength(2), email: Email, password: MinLength(8) })
+  .handle(async (ctx) => {
+    const body = await ctx.body();
 
-  @IsEmail()
-  email: string;
+    // Check if email exists
+    const existing = await findUserByEmail(body.email);
+    if (existing) {
+      return {
+        ok: false,
+        errors: { email: ['Email already registered'] },
+      };
+    }
 
-  @MinLength(8)
-  password: string;
-}
-
-export default action(async (ctx) => {
-  const body = await ctx.body<RegisterDto>();
-  const dto = Object.assign(new RegisterDto(), body);
-
-  const errors = validateSync(dto);
-  if (errors.length > 0) {
-    return {
-      ok: false,
-      errors: errors.reduce((acc, err) => {
-        acc[err.property] = Object.values(err.constraints || {});
-        return acc;
-      }, {} as Record<string, string[]>),
-    };
-  }
-
-  // Check if email exists
-  const existing = await findUserByEmail(body.email);
-  if (existing) {
-    return {
-      ok: false,
-      errors: { email: ['Email already registered'] },
-    };
-  }
-
-  const user = await createUser(body);
-  return { ok: true, userId: user.id };
-});
+    const user = await createUser(body);
+    return { ok: true, userId: user.id };
+  });
 ```
 
 ### Displaying validation errors
@@ -478,7 +458,7 @@ export default action(async (ctx) => {
 });
 ```
 
-```tsx
+```tsx nocheck
 // page.tsx
 <Form method="post">
   <input type="hidden" name="intent" value="create" />
@@ -538,7 +518,7 @@ const csrfToken = document.cookie
 
 fetch('/api/submit', {
   method: 'POST',
-  headers: { 'X-CSRF-Token': csrfToken },
+  headers: { 'X-CSRF-Token': csrfToken ?? '' },
   body: JSON.stringify(data),
 });
 ```

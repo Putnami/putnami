@@ -88,7 +88,7 @@ export default page().render(function MyPage() {
 ```
 
 With security:
-```tsx
+```tsx nocheck
 export default page()
   .secure({ roles: ['admin'] })
   .render(function AdminPage() { ... });
@@ -302,7 +302,7 @@ Configure `options["@putnami/web:generate"].i18n` (`locales`, `defaultLocale`,
 `siteUrl`, `exclude`) in the project's `putnami.json`. The default locale is
 unprefixed; every other locale is the first path segment.
 
-```ts
+```ts nocheck
 // src/app/home.messages.ts — any src/**/*.messages.ts(x) file
 export default messages('home', { seats: '{count, plural, one {# seat} other {# seats}}' });
 // in a component

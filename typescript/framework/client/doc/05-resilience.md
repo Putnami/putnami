@@ -367,7 +367,7 @@ When the circuit opens, `CircuitOpenError` is thrown — which is not a network 
 A first-party provider declares a response cache on one operation, beside its
 retry and circuit policy:
 
-```typescript
+```typescript nocheck
 endpoint()
   .params({ id: String })
   .client({

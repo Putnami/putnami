@@ -347,7 +347,7 @@ defer c.Close()
 resp, err := c.Do(ctx, &client.Request{
     Method:  "GET",
     Path:    "/api/users/123",
-    Headers: map[string]string{"Accept": "application/json"},
+    Headers: http.Header{"Accept": {"application/json"}},
     Query:   map[string]string{"include": "orders"},
 })
 if err != nil {
@@ -466,9 +466,9 @@ type Interceptor func(req *Request, next func(*Request) (*Response, error)) (*Re
 
 ```go
 // Logging interceptor
-loggingInterceptor := func(req *client.Request, next func(*client.Request) (*client.Response, error)) (*client.Response, error) {
+loggingInterceptor := func(ctx context.Context, req *client.Request, next client.InterceptorFunc) (*client.Response, error) {
     start := time.Now()
-    resp, err := next(req)
+    resp, err := next(ctx, req)
     duration := time.Since(start)
     fmt.Printf("%s %s → %d (%dms)\n", req.Method, req.Path, resp.StatusCode, duration.Milliseconds())
     return resp, err

@@ -17,9 +17,9 @@ func main() {
         Port: 9090,
     })
 
-    app.New("my-app").
-        Use(grpcPlugin).
-        ListenAndServe()
+    a := app.New("my-app")
+    a.Use(grpcPlugin)
+    a.ListenAndServe()
 }
 ```
 
@@ -49,14 +49,14 @@ Use `Register` to attach gRPC service implementations to the server. Each regist
 import (
     "go.putnami.dev/grpc"
     pb "myapp/proto/userpb"
-    "google.golang.org/grpc"
+    grpcgo "google.golang.org/grpc"
 )
 
 grpcPlugin := grpc.NewPlugin(grpc.Config{Port: 9090}).
-    Register(func(s *grpc.Server) {
+    Register(func(s *grpcgo.Server) {
         pb.RegisterUserServiceServer(s, &userServiceImpl{})
     }).
-    Register(func(s *grpc.Server) {
+    Register(func(s *grpcgo.Server) {
         pb.RegisterOrderServiceServer(s, &orderServiceImpl{})
     })
 ```
@@ -133,8 +133,8 @@ A unary interceptor is a function matching the `grpc.UnaryServerInterceptor` sig
 func authInterceptor(
     ctx context.Context,
     req any,
-    info *grpc.UnaryServerInfo,
-    handler grpc.UnaryHandler,
+    info *grpcgo.UnaryServerInfo,
+    handler grpcgo.UnaryHandler,
 ) (any, error) {
     // Extract metadata, validate token, etc.
     token := extractToken(ctx)
@@ -162,8 +162,8 @@ Pass additional `grpc.ServerOption` values for low-level server tuning.
 
 ```go
 grpcPlugin := grpc.NewPlugin(grpc.Config{Port: 9090}).
-    WithServerOption(grpc.MaxRecvMsgSize(4 * 1024 * 1024)).
-    WithServerOption(grpc.MaxSendMsgSize(4 * 1024 * 1024))
+    WithServerOption(grpcgo.MaxRecvMsgSize(4 * 1024 * 1024)).
+    WithServerOption(grpcgo.MaxSendMsgSize(4 * 1024 * 1024))
 ```
 
 ## Reflection

@@ -34,6 +34,8 @@ The rule of thumb: if it touches more than one table or uses SQL features beyond
 **Inside a custom repository method** — use `this.conn()`. It is transaction-aware and abort-checked:
 
 ```ts
+import { Repository } from '@putnami/database';
+
 class OrderRepository extends Repository<typeof OrdersTable> {
   constructor() {
     super(OrdersTable);
@@ -437,7 +439,7 @@ Repository methods already use `abortableQuery` internally — you only need it 
 
 Queries return `SqlResult<SqlRow[]>` by default (putnami's aliases of postgres.js's `RowList`/`Row`). For type safety, define an interface for your result shape:
 
-```ts
+```ts nocheck
 interface UserWithStats {
   id: string;
   name: string;

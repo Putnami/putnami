@@ -10,7 +10,7 @@ import { ThemeProvider } from '@putnami/ui';
 function App() {
   return (
     <ThemeProvider>
-      {/* your app */}
+      <AppRoutes />
     </ThemeProvider>
   );
 }
@@ -20,12 +20,12 @@ function App() {
 
 ### Layout
 
-```tsx
+```tsx nocheck
 import { Box, Flex, Grid, Container, VStack, HStack, Page } from '@putnami/ui';
 
 <Container maxWidth="lg">
-  <VStack gap="md">
-    <HStack gap="sm">...</HStack>
+  <VStack spacing="md">
+    <HStack spacing="sm">...</HStack>
   </VStack>
 </Container>
 
@@ -35,7 +35,7 @@ import { Box, Flex, Grid, Container, VStack, HStack, Page } from '@putnami/ui';
 
 ### Typography
 
-```tsx
+```tsx nocheck
 import { Heading, Text } from '@putnami/ui';
 
 <Heading level={1} size="2xl">Title</Heading>
@@ -56,7 +56,7 @@ import { Card, CardBody, Badge, Table } from '@putnami/ui';
 
 ### Form Controls
 
-```tsx
+```tsx nocheck
 import { Button, Input } from '@putnami/ui';
 
 <Button colorScheme="primary" size="md" onClick={handleClick}>Submit</Button>
@@ -65,7 +65,7 @@ import { Button, Input } from '@putnami/ui';
 
 ### Navigation
 
-```tsx
+```tsx nocheck
 import { Link, Tabs, Breadcrumb } from '@putnami/ui';
 
 // Link forwards @putnami/web LinkProps: use `to` (not `href`), optional `prefetch`
@@ -75,7 +75,7 @@ import { Link, Tabs, Breadcrumb } from '@putnami/ui';
 
 ### Feedback
 
-```tsx
+```tsx nocheck
 import { Alert, Spinner, Progress, useToast } from '@putnami/ui';
 
 <Alert status="error">Something went wrong</Alert>
@@ -90,7 +90,7 @@ import { Modal, Drawer, Tooltip, Popover } from '@putnami/ui';
 
 ### Icons
 
-```tsx
+```tsx nocheck
 import { ClockIcon, ShieldIcon, createIcon, type Icon } from '@putnami/ui';
 
 <ClockIcon size={16} />

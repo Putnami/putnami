@@ -30,6 +30,7 @@ alongside the normal `Plugin` interface. `migrationSources()` is called once,
 between the warmup and migrate phases of the application lifecycle.
 
 ```ts
+import type { Plugin } from '@putnami/application';
 import type { MigrationContributor, MigrationSource } from '@putnami/migration';
 import { sqlSourceInline } from '@putnami/database';
 import { iamMigrations } from './migrations'; // an array of SQLDefinition you write

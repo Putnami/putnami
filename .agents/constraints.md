@@ -34,7 +34,7 @@ The repo is organized by ownership — each language ecosystem is self-contained
 - `rust/`, `java/`, `swift/`, `dart/`, `dotnet/`, `ruby/`, `php/` — language stack roots: each holds its stack extension (`<lang>/extension`, on the shared stack core in `tooling/stacks`) and, for most, its samples.
 - `sites/` — deployed sites: `sites/putnami.dev` (documentation) and `sites/telemetry.putnami.dev` (CLI-usage receiver).
 
-Docs live next to the thing they describe, in each package's `doc/` folder; `sites/putnami.dev` publishes those folders but does not own their content. Most framework modules also ship an `AI.md` API reference (`go/framework/*/AI.md`, `typescript/framework/*/AI.md`).
+Docs live next to the thing they describe, in each package's `doc/` folder; `sites/putnami.dev` publishes those folders but does not own their content. Their Go and TypeScript code blocks, and those of each framework package's `AI.md` and `README.md`, are type-checked by `putnami test` (`go/doc-examples`, `typescript/doc-examples`): fix an example the check reports; mark a fence `nocheck` only for pseudo-code or elisions (see CONTRIBUTING.md, Code examples are tested). Most framework modules also ship an `AI.md` API reference (`go/framework/*/AI.md`, `typescript/framework/*/AI.md`).
 
 ## Code Style and Testing
 

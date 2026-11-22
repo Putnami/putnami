@@ -243,7 +243,7 @@ Custom transformation function to convert the database value when reading from t
 const UsersTable = Table("users", {
   id:   Key(Uuid),
   tags: Column(String, {
-    fromDatabase: (value: string) => JSON.parse(value),
+    fromDatabase: (value) => JSON.parse(String(value)),
     toDatabase: (value: string[]) => JSON.stringify(value),
   }),
 });
@@ -330,7 +330,7 @@ const UsersTable = Table("users", {
   fullName:  Column(String, { columnName: "full_name" }),
   bio:       Column(Optional(String)),
   tags:      Column(String, {
-    fromDatabase: (value: string) => JSON.parse(value),
+    fromDatabase: (value) => JSON.parse(String(value)),
     toDatabase: (value: string[]) => JSON.stringify(value),
   }),
   createdAt: Column(DateIso, { columnName: "created_at" }),

@@ -226,6 +226,8 @@ resp, err := c.Do(ctx, &client.Request{
 ### Custom Headers
 
 ```go
+import "net/http"
+
 resp, err := c.Do(ctx, &client.Request{
     Path: "/api/protected",
     Headers: http.Header{

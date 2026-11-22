@@ -46,7 +46,7 @@ export default messages('home', {
 
 Read it with `useT`:
 
-```tsx
+```tsx nocheck
 import { page, useT } from '@putnami/web';
 import home from './home.messages';
 

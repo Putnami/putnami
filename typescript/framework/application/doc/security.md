@@ -306,21 +306,13 @@ same token count and bypass the limit. Keep the atomicity server-side: Redis `IN
 get → mutate → set.
 
 ```ts
-import { RateLimitMiddleware } from '@putnami/application';
+import { RateLimitMiddleware, type RateLimitStore } from '@putnami/application';
 
-const store = {
+const store: RateLimitStore = {
   async consume(key, limit, windowMs) {
     // Single atomic operation in Redis/DB, e.g. INCR + PEXPIRE NX or an upsert ... RETURNING.
-    // Return { allowed, remaining, resetAt }.
-  },
-  async get(key) {
-    // lookup in Redis/DB (non-atomic fallback; only safe for synchronous stores)
-  },
-  async set(key, entry) {
-    // persist in Redis/DB
-  },
-  async delete(key) {
-    // optional cleanup
+    const { count, resetAt } = await redis.incrementWindow(key, windowMs);
+    return { allowed: count <= limit, remaining: Math.max(0, limit - count), resetAt };
   },
 };
 

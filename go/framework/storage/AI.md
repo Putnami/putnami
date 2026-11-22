@@ -92,13 +92,13 @@ for {
 
 ```go
 // Memory (testing)
-backend := storage.NewMemoryBackend()
+memory := storage.NewMemoryBackend()
 
 // Filesystem. Key segments ending in .meta.json or .putnami-tmp are reserved.
-backend := storage.NewFileBackend("/data/storage")
+files := storage.NewFileBackend("/data/storage")
 
 // S3-compatible
-backend := storage.NewS3Backend(storage.S3Config{
+s3 := storage.NewS3Backend(storage.S3Config{
     Endpoint:  "https://s3.us-east-1.amazonaws.com",
     Region:    "us-east-1",
     AccessKey: "AKIA...",
@@ -111,7 +111,7 @@ backend := storage.NewS3Backend(storage.S3Config{
 // the metadata server on Cloud Run / GKE, needing no static secret. Set
 // CredentialsFile (or GOOGLE_APPLICATION_CREDENTIALS) to use a service-account
 // key instead.
-backend, err := storage.NewGCSBackend(ctx, storage.GCSConfig{})
+gcs, err := storage.NewGCSBackend(ctx, storage.GCSConfig{})
 ```
 
 > Prefer the dedicated GCS backend (keyless under Workload Identity). If you only
@@ -244,7 +244,7 @@ Or just add `storage.NewPlugin()`: it provides a `storage.Backend` into the DI
 container, resolved from the managed bindings document (the `storage` config
 section first, `STORAGE_BINDINGS` as fallback), so an endpoint can inject it:
 
-```go
+```go nocheck
 endpoint().
   inject({ store: storage.Backend }). // pseudo: resolve storage.Backend from DI
   handle(...)

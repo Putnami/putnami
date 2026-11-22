@@ -45,6 +45,9 @@ await stop();
 ### Example with DI and routes
 
 ```typescript
+import { HttpPlugin } from '@putnami/application';
+import { createTestApp } from '@putnami/application/testing';
+
 const { fetch, stop } = await createTestApp({
   plugins: [sql(), events()],
   configure: (app) => {

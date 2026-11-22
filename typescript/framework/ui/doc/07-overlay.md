@@ -6,7 +6,7 @@ Components that render above the page content using portals.
 
 Centered dialog with overlay, keyboard handling, and scroll locking.
 
-```typescript
+```typescript nocheck
 import { Modal, ModalHeader, ModalBody, ModalFooter, ModalCloseButton, Button } from '@putnami/ui';
 
 function ConfirmDialog({ isOpen, onClose }) {
@@ -44,7 +44,7 @@ function ConfirmDialog({ isOpen, onClose }) {
 
 Sliding panel from any edge of the screen.
 
-```typescript
+```typescript nocheck
 import { Drawer, DrawerHeader, DrawerBody, DrawerFooter, DrawerCloseButton } from '@putnami/ui';
 
 <Drawer isOpen={isOpen} onClose={onClose} placement="right" size="md">
@@ -81,7 +81,7 @@ import { Drawer, DrawerHeader, DrawerBody, DrawerFooter, DrawerCloseButton } fro
 
 Contextual menu with trigger, items, and keyboard support.
 
-```typescript
+```typescript nocheck
 import { Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownDivider, Button } from '@putnami/ui';
 
 <Dropdown placement="bottom-start">
@@ -120,7 +120,7 @@ The menu auto-positions to stay within viewport bounds. Closes on outside click 
 
 Rich content popup attached to a trigger element.
 
-```typescript
+```typescript nocheck
 import { Popover, PopoverHeader, PopoverBody, PopoverCloseButton, Button } from '@putnami/ui';
 
 <Popover
@@ -165,7 +165,7 @@ Renders with an arrow pointing to the trigger. Supports controlled and uncontrol
 
 Lightweight text popup on hover/focus.
 
-```typescript
+```typescript nocheck
 import { Tooltip, Button } from '@putnami/ui';
 
 <Tooltip label="Save your changes" placement="top">

@@ -27,27 +27,27 @@ import type {
   ApplyOpts,
   DriftReport,
   Kind,
+  MigrationRecord,
   MigrationRunner,
-  Record,
   RollbackOpts,
 } from '@putnami/migration';
 
 class MyRunner implements MigrationRunner {
   readonly kind: Kind = 'my-kind';
 
-  async apply(opts?: ApplyOpts): Promise<Record[]> {
+  async apply(opts?: ApplyOpts): Promise<MigrationRecord[]> {
     // Run pending migrations across all targets of this kind.
     // When opts.force is false, the runner may no-op per its own
     // auto-apply policy; the migrate CLI passes force on `up`.
     return [];
   }
 
-  async status(): Promise<Record[]> {
+  async status(): Promise<MigrationRecord[]> {
     // Recorded state of every migration of this kind.
     return [];
   }
 
-  async rollback(opts?: RollbackOpts): Promise<Record[]> {
+  async rollback(opts?: RollbackOpts): Promise<MigrationRecord[]> {
     // Empty opts → roll back the most recent applied migration.
     // opts.to → roll back everything applied AFTER the named migration.
     return [];
@@ -66,7 +66,7 @@ expanded its sources into concrete definitions.
 
 ### Records and drift
 
-`apply` / `status` / `rollback` return `Record[]` — the homogeneous, cross-kind
+`apply` / `status` / `rollback` return `MigrationRecord[]` — the homogeneous, cross-kind
 row shape the CLI renders the same way for every kind (`kind`, `namespace`,
 `name`, `status`, `hash`, `executedAt`, `target`, …). Kind-specific extras live
 in `target`.

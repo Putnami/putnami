@@ -125,7 +125,7 @@ export async function requireRole(
   }
 
   if (user.role !== role) {
-    throw new HttpException(403, 'Forbidden');
+    throw new HttpException('Forbidden', 403);
   }
 
   return user;
@@ -358,7 +358,7 @@ export default function LongList({ items }: { items: Item[] }) {
 
 ### Image Optimization
 
-```tsx
+```tsx nocheck
 export default function ImageGallery({ images }: { images: Image[] }) {
   return (
     <div>
@@ -427,7 +427,7 @@ describe('create post action', () => {
 
 ### Testing Components
 
-```tsx
+```tsx nocheck
 // src/app/posts/page.test.tsx
 import { describe, it, expect } from 'bun:test';
 import { render, screen } from '@testing-library/react';
@@ -476,7 +476,7 @@ export default error().render(function ErrorBoundary() {
 
 ### Route-Specific Error Handling
 
-```tsx
+```tsx nocheck
 // src/app/dashboard/error.tsx
 import { error, useRouteError } from '@putnami/web';
 
@@ -604,7 +604,7 @@ Behaviour worth knowing:
 
 ### Error Tracking
 
-```tsx
+```tsx nocheck
 // src/app/error.tsx
 import { error, useRouteError } from '@putnami/web';
 import { useEffect } from 'react';
@@ -633,7 +633,7 @@ export default error().render(function ErrorBoundary() {
 
 ### Performance Monitoring
 
-```tsx
+```tsx nocheck
 import { useEffect } from 'react';
 import { useNavigation } from '@putnami/web';
 

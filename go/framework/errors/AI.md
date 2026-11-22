@@ -4,7 +4,7 @@ Structured errors with typed codes, categories, HTTP mapping, retryable flags, a
 
 ## Quick Start
 
-```go
+```go nocheck
 import "go.putnami.dev/errors"
 
 // Create with a typed Code

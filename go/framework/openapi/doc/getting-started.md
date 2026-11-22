@@ -232,7 +232,7 @@ Every operation includes framework default `400` and `500` JSON error responses.
 Declare framework-known route errors with `ErrorCodes`; each code is mapped through
 `errors.HTTPStatusForCode` and rendered with the standard error envelope:
 
-```go
+```go nocheck
 ErrorCodes: []errors.Code{errors.CodeNotFound, errors.CodeConflict},
 ```
 
@@ -274,7 +274,7 @@ A `Throws` schema documents the response in `responses` only. It never becomes a
 
 Setting `Security` on a route adds a `bearerAuth` security requirement to the operation and appends role/scope information to the operation description:
 
-```go
+```go nocheck
 Security: &openapi.SecurityMeta{
     Roles:  []string{"admin"},
     Scopes: []string{"users:delete"},

@@ -57,7 +57,8 @@ var declaredDomains = []string{
 //
 // An exclusion is an owned decision, exactly like a domain membership. Samples
 // are proofs of the public API, templates are scaffold inputs, template
-// proofs run those inputs against the framework, and protocol proofs hold the
+// proofs run those inputs against the framework, documentation example proofs
+// type-check the documentation's code blocks, and protocol proofs hold the
 // conformance tests of a protocol that cannot bind them itself; none of them
 // owns a fact, and
 // mapping them would inflate the coverage number without authorizing anything
@@ -104,6 +105,7 @@ var excludedProjects = map[string]string{
 	"/go/templates/go-library":                             reasonTemplate,
 	"/go/templates/go-server":                              reasonTemplate,
 	"/go/templates/proof":                                  reasonTemplateProof,
+	"/go/doc-examples":                                     reasonDocExamples,
 	"/intelligence/areas":                                  reasonAreaDetector,
 	"/protocols/capabilities/proof":                        reasonProtocolProof,
 	"/protocols/diagnostic/proof":                          reasonProtocolProof,
@@ -162,6 +164,7 @@ var excludedProjects = map[string]string{
 	"/typescript/samples/13-fullstack-app":                 reasonSample,
 	"/typescript/samples/14-capabilities":                  reasonSample,
 	"/typescript/templates/proof":                          reasonTemplateProof,
+	"/typescript/doc-examples":                             reasonDocExamples,
 	"/typescript/templates/typescript-library":             reasonTemplate,
 	"/typescript/templates/typescript-server":              reasonTemplate,
 	"/typescript/templates/typescript-web":                 reasonTemplate,
@@ -172,6 +175,7 @@ const (
 	reasonTemplate                = "template: scaffold input packaged by @putnami/scaffold, owned by the language vertical"
 	reasonGeneratedClient         = "generated client: produced by @putnami/clientgen inside a sample, owned by the sample"
 	reasonTemplateProof           = "template proof: renders the templates beside it against the workspace framework and runs their tests, owned by the language vertical"
+	reasonDocExamples             = "documentation example proof: type-checks the code blocks of the documentation against the workspace framework, declares no export and nothing depends on it, owned by public-docs"
 	reasonProtocolProof           = "protocol proof: holds the conformance tests of the protocol it sits in, which that protocol cannot bind itself, owned by protocols"
 	reasonAreaDetector            = "standalone Intelligence area detector: no repository project imports it or owns its reading of foreign repository manifests, owned by intelligence"
 	reasonCloudRuntimeDestination = "Cloud runtime destination: a client library of the hosted platform that no repository project links from the workspace, whose wire contracts no existing domain owns, owned by cloud"

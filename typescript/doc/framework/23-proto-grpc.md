@@ -111,7 +111,7 @@ The binary codec supports all proto3 scalar types including `sint32`/`sint64` (Z
 
 Stream endpoints map to gRPC streaming RPCs in the generated proto:
 
-```typescript
+```typescript nocheck
 // Server stream → gRPC server streaming (Connect + WebSocket + SSE)
 endpoint().returns(Stream({ event: String })).handle(...)
 
@@ -259,6 +259,8 @@ export default endpoint()
     for await (const msg of ctx.messages()) {
       ctx.send({ event: 'echo', content: msg.content });
     }
+    // A bidirectional handler ends with its terminal value
+    return { event: 'closed', content: '' };
   });
 ```
 
@@ -341,7 +343,7 @@ Generated `.proto` files are self-contained — no `import "google/protobuf/..."
 The `createGrpcTestClient` helper provides a lightweight client for testing gRPC services in integration tests. It makes real HTTP calls — no mocking.
 
 ```typescript
-import { createGrpcTestClient } from '@putnami/application';
+import { createGrpcTestClient } from '@putnami/application/testing';
 
 // Create a test client
 const client = createGrpcTestClient({

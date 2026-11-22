@@ -45,7 +45,7 @@ every page view in the application.
 
 Records one declared action.
 
-```ts
+```ts nocheck
 import { track } from '@putnami/analytics';
 
 track('signup_click', { plan: 'pro', seats: 3, trial: true });

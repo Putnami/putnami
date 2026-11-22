@@ -6,7 +6,7 @@ Components for user input and interaction.
 
 Multi-variant button with loading state, icons, and forwarded ref.
 
-```typescript
+```typescript nocheck
 import { Button } from '@putnami/ui';
 
 <Button>Default</Button>
@@ -47,7 +47,7 @@ Also inherits `BoxProps`. Supports `ref` forwarding.
 
 Text input with variants, validation state, and element slots.
 
-```typescript
+```typescript nocheck
 import { Input } from '@putnami/ui';
 
 <Input placeholder="Enter email" />
@@ -82,7 +82,7 @@ Also accepts all native `<input>` HTML attributes. Supports `ref` forwarding.
 
 Button that copies text to the clipboard with visual feedback.
 
-```typescript
+```typescript nocheck
 import { CopyButton } from '@putnami/ui';
 
 <CopyButton text="Text to copy" />

@@ -199,10 +199,11 @@ setSessionAll({
 ### Checking Session Existence
 
 ```typescript
-import { hasSession } from '@putnami/application';
+import { useSession } from '@putnami/application';
 
-if (hasSession('userId')) {
-  const userId = useSession<number>('userId');
+const userId = useSession<number>('userId');
+if (userId !== undefined) {
+  // the session holds a user
 }
 ```
 
@@ -312,7 +313,7 @@ class RedisSessionStore implements SessionStore {
   }
 
   setAll<S>(sessionId: string, session: S): void {
-    for (const [key, value] of Object.entries(session)) {
+    for (const [key, value] of Object.entries(session as Record<string, unknown>)) {
       this.redis.set(`${sessionId}:${key}`, JSON.stringify(value));
     }
   }

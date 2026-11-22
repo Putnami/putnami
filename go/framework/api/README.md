@@ -42,7 +42,9 @@ func main() {
         ReturnsStatus(201, "Created", api.Type[User]()).
         Handle(createUser))
 
-    app.New("myapp").Use(httpServer).Use(apiPlugin).ListenAndServe()
+    a := app.New("myapp")
+    a.Use(httpServer).Use(apiPlugin)
+    a.ListenAndServe()
 }
 ```
 

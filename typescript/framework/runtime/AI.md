@@ -26,7 +26,7 @@ provide(Database, async (resolve) => {
   const db = new Database(config.url);
   await db.connect();
   return db;
-}, { onClose: (db) => db.disconnect() })
+}, { onClose: (db: Database) => db.disconnect() })
 
 // Named token (for non-class values)
 const ApiUrl = named<string>('api-url');
@@ -247,6 +247,7 @@ A library that owns a config block publishes it through any workload that
 composes it by implementing `ConfigContributor` on its plugin:
 
 ```ts
+import type { Plugin } from '@putnami/application';
 import type { ConfigContributor, ConfigDefinition } from '@putnami/runtime';
 
 export const CoreConfig = Config('core', { auth: { clientSecret: Sensitive(String) } });
@@ -305,8 +306,8 @@ or `dropped`), which telemetry exports as `log.records`. See
 ```ts
 import { HttpException } from '@putnami/runtime';
 
-throw new HttpException(404, 'User not found');
-throw new HttpException(400, 'Invalid input', { fields: ['email'] });
+throw new HttpException('User not found', 404);
+throw new HttpException({ message: 'Invalid input', fields: ['email'] }, 400);
 ```
 
 ## Detailed Documentation

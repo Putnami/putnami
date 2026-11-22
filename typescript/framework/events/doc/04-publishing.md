@@ -118,6 +118,8 @@ export const IdentityOutbox = outbox('identity', {
 Register the declaration on the events plugin, next to your handlers:
 
 ```typescript
+import { module } from '@putnami/application';
+
 module('identity')
   .feature({ id: 'identity/opaque-tokens', name: 'Opaque token revocation', outcome: '…', owner: 'identity' })
   .use(events({ outboxes: [IdentityOutbox] }));

@@ -50,7 +50,7 @@ export default handler(UserCreated)
 
 ### Multiple Handlers (named exports)
 
-```typescript
+```typescript nocheck
 // events/order.on.ts
 import { handler } from '@putnami/events';
 import { OrderPlaced, OrderShipped } from '../shared/topics';
@@ -75,7 +75,7 @@ const app = application()
 
 ## Configuration
 
-```typescript
+```typescript nocheck
 events({
   transport: undefined,      // Explicit transport instance (overrides endpoint/local)
   eventServer: undefined,    // Managed publisher config + code-owned tokenSource
@@ -283,6 +283,7 @@ import type { DesignDelegate, Plugin } from '@putnami/application';
 import { events, type EventsPlugin } from '@putnami/events';
 
 class RelayController implements Plugin, DesignDelegate {
+  readonly name = 'relay';
   private readonly events: EventsPlugin = events({ outboxes: [IdentityOutbox] });
 
   designDelegates() {

@@ -90,7 +90,7 @@ publisher.Publish(ctx, payload,
 
 ## Transports and Plugin
 
-```go
+```go nocheck
 plugin := events.Events(events.PluginConfig{
     Handlers:  []*events.HandlerDefinition{handler}, // subscribed topics
     Publishes: []string{OrderShippedTopic.Name},     // declared published topics

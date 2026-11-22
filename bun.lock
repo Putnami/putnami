@@ -61,6 +61,35 @@
         "shiki": "^3.21.0",
       },
     },
+    "typescript/doc-examples": {
+      "name": "@putnami/typescript-doc-examples",
+      "version": "0.0.0",
+      "dependencies": {
+        "@putnami/analytics": "workspace:*",
+        "@putnami/application": "workspace:*",
+        "@putnami/cli-protocol": "workspace:*",
+        "@putnami/client": "workspace:*",
+        "@putnami/cloud": "workspace:*",
+        "@putnami/codehost-protocol": "workspace:*",
+        "@putnami/database": "workspace:*",
+        "@putnami/document": "workspace:*",
+        "@putnami/events": "workspace:*",
+        "@putnami/migration": "workspace:*",
+        "@putnami/runtime": "workspace:*",
+        "@putnami/spectest": "workspace:*",
+        "@putnami/storage": "workspace:*",
+        "@putnami/ui": "workspace:*",
+        "@putnami/utils": "workspace:*",
+        "@putnami/web": "workspace:*",
+        "react": "^19.2.3",
+        "react-dom": "^19.2.3",
+        "typescript": "^6.0.2",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.3",
+        "@types/react-dom": "^19.2.3",
+      },
+    },
     "typescript/framework/analytics": {
       "name": "@putnami/analytics",
       "version": "0.0.0",
@@ -540,6 +569,8 @@
     "@putnami/spectest": ["@putnami/spectest@workspace:typescript/framework/spectest"],
 
     "@putnami/storage": ["@putnami/storage@workspace:typescript/framework/storage"],
+
+    "@putnami/typescript-doc-examples": ["@putnami/typescript-doc-examples@workspace:typescript/doc-examples"],
 
     "@putnami/typescript-templates-proof": ["@putnami/typescript-templates-proof@workspace:typescript/templates/proof"],
 

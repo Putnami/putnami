@@ -419,7 +419,7 @@ understand, refactor, or replace.
 
 **Example — a domain package with DI:**
 
-```go
+```go nocheck
 // Package blob manages content-addressed binary storage.
 package blob
 

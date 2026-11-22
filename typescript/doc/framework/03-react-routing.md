@@ -405,17 +405,16 @@ function LoginButton() {
 ### Active links
 
 ```tsx
-import { NavLink } from '@putnami/web';
+import { Link, useLocation } from '@putnami/web';
 
 function Navigation() {
+  const { pathname } = useLocation();
+
   return (
     <nav>
-      <NavLink
-        to="/dashboard"
-        className={({ isActive }) => isActive ? 'active' : ''}
-      >
+      <Link to="/dashboard" className={pathname.startsWith('/dashboard') ? 'active' : ''}>
         Dashboard
-      </NavLink>
+      </Link>
     </nav>
   );
 }

@@ -305,6 +305,32 @@ getting started, concepts, how-to guides, principles — live in
 `sites/putnami.dev/doc/`. Which source produces which published section is
 listed in [`sites/putnami.dev/README.md`](sites/putnami.dev/README.md).
 
+### Code examples are tested
+
+Every Go and TypeScript code block in the published documentation — the
+putnami.dev pages and the tooling pages they publish, each framework package's
+`doc/`, `AI.md` and `README.md`, and `tooling/extension-sdk/doc` — is
+type-checked by `putnami test`: Go blocks by `go/doc-examples` against the workspace modules,
+TypeScript blocks (`ts`, `typescript`, `tsx`) by `typescript/doc-examples`
+against the workspace packages. An example that no longer compiles fails the
+gate, at its document and line.
+
+- A block may be a fragment. An import or a type another block of the same
+  document declares is carried over. A package (Go) or framework export
+  (TypeScript) the block uses without importing it is imported by name when
+  exactly one matches what the block reads from it; a Go framework module that
+  is the only package of its name is imported even when the member the block
+  reads is missing, so a misspelled constructor fails.
+  Other names it does not declare, and unused names, are tolerated. Everything
+  else must type-check.
+- Mark a fence `go nocheck` or `ts nocheck` only for pseudo-code, a block with
+  elisions (`...`), a signature listing, or several files in one block.
+- A new document outside those folders joins the check by a path or glob in
+  the project's `examples.json` and a matching entry in the test
+  `filePatterns` of its `putnami.json`, which decide when the check runs again;
+  the check fails when a checked document, or a Go workspace package the
+  examples import, is not a declared input.
+
 A user-visible change also carries its product intent: a feature declaration in
 `putnami.features.json` or `features/<feature>.json`, one spec under `specs/`,
 and — when the change rests on

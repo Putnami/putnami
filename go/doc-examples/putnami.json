@@ -1,0 +1,40 @@
+{
+  "$schema": "https://putnami.dev/schemas/putnami-project.json",
+  "name": "go.putnami.dev/doc-examples",
+  "tags": [
+    "go"
+  ],
+  "featureAuthority": {
+    "owner": "putnami-dev/public-documentation"
+  },
+  "extensions": [
+    "/go/extension"
+  ],
+  "disable": {
+    "jobs": [
+      "serve"
+    ]
+  },
+  "options": {
+    "test": {
+      "coverage-threshold": 60,
+      "filePatterns": [
+        "examples.json",
+        "../doc/**",
+        "../extension/AI.md",
+        "../extension/doc/**",
+        "../framework/**",
+        "../../sites/putnami.dev/doc/**",
+        "../../tooling/doc/**",
+        "../../tooling/sdd-extension/doc/**",
+        "../../tooling/observe/doc/**",
+        "../../go.work",
+        "../../go.work.sum",
+        "../extension/README.md",
+        "../../protocols/**",
+        "../../cloud/runtime/go/**",
+        "../../tooling/extension-sdk/**"
+      ]
+    }
+  }
+}

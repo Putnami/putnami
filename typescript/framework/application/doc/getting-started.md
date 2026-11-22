@@ -139,7 +139,7 @@ import { application, http, HttpPlugin } from '@putnami/application';
 
 const app = application()
   .use(http({ port: 3000 }))
-  .run(async (app) => {
+  .run(async () => {
     const httpPlugin = app.getPlugin(HttpPlugin);
 
     httpPlugin.get('/hello', () => {
@@ -226,7 +226,7 @@ For production, you should:
 
    export const app = () => application()
      .use(http({
-       port: process.env.PORT || 3000,
+       port: Number(process.env.PORT) || 3000,
      }))
      .run(async () => {
        console.log('Production server ready');

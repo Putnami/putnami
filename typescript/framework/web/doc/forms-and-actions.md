@@ -473,7 +473,7 @@ export default function DeleteButton({ postId }: { postId: string }) {
 
 Client-side validation is for UX, server-side validation is for security:
 
-```typescript
+```typescript nocheck
 import { action } from '@putnami/web';
 import { json } from '@putnami/application';
 
@@ -609,8 +609,8 @@ export default action(async (ctx) => {
     );
   }
 
-  // Set session cookie
-  await setSession(ctx, user);
+  // Store the user in the session
+  setSession('userId', user.id);
 
   return redirect('/dashboard');
 });

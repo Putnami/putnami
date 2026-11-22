@@ -16,6 +16,7 @@ This guide walks through the PostgreSQL path. If your feature is document-shaped
 
 ```bash
 putnami deps add @putnami/database
+putnami deps add @putnami/migration
 ```
 
 Set the connection as one Postgres URL in `DATABASE_URL`, or commit it in
@@ -39,7 +40,7 @@ Create `apps/web/src/db/user.ts`:
 import { Table, Column, Key, Uuid, Email, Repository } from '@putnami/database';
 import type { InferTable } from '@putnami/database';
 
-const CreateUsersTable = {
+export const CreateUsersTable = {
   name: '20250101000000-create-users-table',
   sql: `
     CREATE TABLE IF NOT EXISTS users (
@@ -54,8 +55,6 @@ export const UsersTable = Table('users', {
   id:    Key(Uuid),
   email: Column(Email),
   name:  Column(String),
-}, {
-  migrations: [CreateUsersTable],
 });
 
 export type User = InferTable<typeof UsersTable>;
@@ -71,11 +70,25 @@ export class UserRepository extends Repository<typeof UsersTable> {
 
 Update `apps/web/src/main.ts`:
 
-```ts
-import { application } from '@putnami/application';
-import { sql } from '@putnami/database';
+A table definition creates no SQL: the migration owns the table. Contribute it from a plugin with `sqlSourceInline`, and let the SQL plugin apply it at startup:
 
-export const app = () => application().use(sql());
+```ts
+import { application, type Plugin } from '@putnami/application';
+import { sql, sqlSourceInline } from '@putnami/database';
+import type { MigrationContributor } from '@putnami/migration';
+import { CreateUsersTable } from './db/user';
+
+const migrations: Plugin & MigrationContributor = {
+  migrationSources: () => [
+    sqlSourceInline({
+      namespace: 'app',
+      datasource: { name: 'default', schema: 'public' },
+      definitions: [CreateUsersTable],
+    }),
+  ],
+};
+
+export const app = () => application().use(sql({ autoApply: true })).use(migrations);
 ```
 
 ### 4) Read and write from a route

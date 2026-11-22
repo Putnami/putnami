@@ -19,17 +19,11 @@ export const app = () =>
 ```ts
 http({
   port: 3000,              // Server port
-  hostname: '0.0.0.0',     // Bind address
   originGuard: {           // Cross-origin CSRF protection (enabled by default)
     trustedOrigins: ['https://admin.example.com'],
   },
   securityHeaders: {       // Secure response headers (enabled by default)
     contentSecurityPolicy: "default-src 'self'; script-src 'self' https://cdn.example.com",
-  },
-  // SSL options (optional)
-  tls: {
-    cert: Bun.file('cert.pem'),
-    key: Bun.file('key.pem'),
   },
 })
 ```
@@ -293,19 +287,18 @@ export default endpoint()
   .handle(() => ({ ok: true }));
 ```
 
-Custom store example (Redis/DB). Async stores MUST implement `consume` atomically (e.g. Redis
-`INCR` + Lua, or a DB upsert with `RETURNING`); the `get`/`set` pair is a non-atomic fallback that
-concurrent requests can bypass:
+Custom store example (Redis/DB). A store implements `consume` only, and an async store MUST implement it atomically (e.g. Redis
+`INCR` + Lua, or a DB upsert with `RETURNING`), so concurrent requests cannot bypass the limit:
 
 ```ts
-import { RateLimitMiddleware } from '@putnami/application';
+import { RateLimitMiddleware, type RateLimitStore } from '@putnami/application';
 
-const store = {
+const store: RateLimitStore = {
   async consume(key, limit, windowMs) {
-    /* one atomic server-side op; return { allowed, remaining, resetAt } */
+    // One atomic server-side operation, such as a Redis INCR in a Lua script
+    const { count, resetAt } = await redis.incrementWindow(key, windowMs);
+    return { allowed: count <= limit, remaining: Math.max(0, limit - count), resetAt };
   },
-  async get(key) {},
-  async set(key, entry) {},
 };
 
 http().use(RateLimitMiddleware({ store }));
@@ -527,11 +520,11 @@ internalServerError('Server error');
 ```ts
 import { HttpResponse, json } from '@putnami/application';
 
-// Create from Response
-const response = new HttpResponse(new Response('Hello', {
+// Create from a body and a ResponseInit
+const response = new HttpResponse('Hello', {
   status: 200,
   headers: { 'Content-Type': 'text/plain' },
-}));
+});
 
 // Modify headers
 response.setHeader('X-Custom', 'value');

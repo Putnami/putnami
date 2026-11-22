@@ -152,7 +152,7 @@ The security middleware handles multiple claim formats:
 
 Extracted from `claims["roles"]`:
 
-```go
+```go nocheck
 // Slice of strings
 {"roles": []string{"admin", "user"}}
 
@@ -167,7 +167,7 @@ Extracted from `claims["roles"]`:
 
 Extracted from `claims["scope"]` (OAuth2 convention):
 
-```go
+```go nocheck
 // Slice of strings
 {"scope": []string{"read", "write"}}
 
@@ -179,7 +179,7 @@ Extracted from `claims["scope"]` (OAuth2 convention):
 
 Extracted from `claims["client_id"]`:
 
-```go
+```go nocheck
 {"client_id": "web-app"}
 ```
 

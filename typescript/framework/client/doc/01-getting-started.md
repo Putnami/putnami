@@ -219,8 +219,7 @@ Auth → Telemetry → Context → Retry → Transport
 
 ```typescript
 import { authInterceptor, telemetryInterceptor, contextInterceptor } from '@putnami/client';
-import { OAuthService } from '@putnami/application';
-import { get } from '@putnami/runtime';
+import { clientToken } from '@putnami/application';
 
 const users = new UsersClient({
   baseUrl: 'http://users-api:3000',
@@ -228,7 +227,7 @@ const users = new UsersClient({
   interceptors: [
     authInterceptor({
       clientId: 'orders-service',
-      tokenProvider: () => get(OAuthService).clientToken(),
+      tokenProvider: () => clientToken(),
     }),
     telemetryInterceptor('users'),
     contextInterceptor(),
@@ -254,7 +253,7 @@ When no user JWT is available (background jobs, cron, service-initiated calls), 
 
 ```typescript
 authInterceptor({
-  tokenProvider: () => get(OAuthService).clientToken(), // cached + auto-refreshed
+  tokenProvider: () => clientToken(), // cached + auto-refreshed
 })
 ```
 
@@ -464,14 +463,18 @@ CLIENT_SERVICE_USERS_API_URL=http://localhost:3000
 Register clients as singletons in the DI container:
 
 ```typescript
-import { set, get } from '@putnami/runtime';
+import { application, endpoint } from '@putnami/application';
 
 // Register
-set(UsersClient, new UsersClient({ baseUrl, transport: 'http' }));
+export const app = () =>
+  application().provide(UsersClient, () => new UsersClient({ baseUrl, transport: 'http' }));
 
-// Resolve anywhere
-const users = get(UsersClient);
-const user = await users.getUser({ id: '123' });
+// Resolve it in an endpoint
+export default endpoint()
+  .inject({ users: UsersClient })
+  .handle(async (ctx) => {
+    return ctx.deps.users.getUser({ id: '123' });
+  });
 ```
 
 ## Error Handling

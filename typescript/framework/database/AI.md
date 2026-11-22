@@ -82,7 +82,7 @@ Same as `@putnami/application`: `String`, `Number`, `Boolean`, `Int`, `Uuid`, `E
 
 ### Named Datasources
 
-```ts
+```ts nocheck
 const AuditTable = Table('audit_logs', { ... }, { db: 'audit' });
 // Resolves the 'audit' datasource (binding first, then database.audit config)
 ```
