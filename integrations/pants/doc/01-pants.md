@@ -33,8 +33,8 @@ that use them.
 When two `BUILD` directories share a directory name, such as `src/foo` and
 `tests/foo`, `putnami projects sync` names each of them by its path.
 
-Add `.putnami/` and `.gen/` to the repository's `.gitignore`: `init` writes one
-only when the repository has none.
+`init` adds `.putnami/` and `.gen/` to the repository's `.gitignore`, or
+writes one when the repository has none.
 
 ## What the sync writes
 

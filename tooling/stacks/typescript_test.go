@@ -85,8 +85,9 @@ func TestTheESLintReasonNamesWhatItDrops(t *testing.T) {
 	} {
 		got := TypeScriptUnmappedReason(TaskLint, script, keeps)
 		if strings.Contains(got, "move") || !strings.Contains(got, "unstable_native_nodejs_ts_config") ||
-			!strings.Contains(got, "no ESLint configuration can hold") || !strings.HasSuffix(got, keeps) {
-			t.Errorf("reason for %q = %q: want the flag named, no ESLint configuration able to hold it, and no advice to move it", script, got)
+			!strings.Contains(got, "no ESLint configuration can hold") || !strings.Contains(got, "command line or the ESLINT_FLAGS environment variable") ||
+			!strings.HasSuffix(got, keeps) {
+			t.Errorf("reason for %q = %q: want the flag named, no ESLint configuration able to hold it, the places ESLint reads it from, and no advice to move it", script, got)
 		}
 	}
 }

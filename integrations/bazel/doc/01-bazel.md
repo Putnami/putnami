@@ -34,8 +34,8 @@ directories, `node_modules`, the directories `.bazelignore` names and those an
 no package there, so a `BUILD` file under them, such as a test fixture's, is
 no project.
 
-Add `.putnami/`, `.gen/` and `/bazel-*` to the repository's `.gitignore`:
-`init` writes one only when the repository has none.
+`init` adds `.putnami/` and `.gen/` to the repository's `.gitignore`, or
+writes one when the repository has none. Add `/bazel-*` to it yourself.
 
 ## What the sync writes
 

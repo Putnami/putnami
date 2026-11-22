@@ -907,3 +907,50 @@ func TestNamedExtensionsResolvesAPathEntryByItsManifest(t *testing.T) {
 		t.Errorf("named = %v, %v; want the path entry's name and nothing under a hidden directory", named, err)
 	}
 }
+
+// TestInitFromCompletesTheRepositorysGitignore: an adopted repository has its
+// own .gitignore, and init --from adds the directories every Putnami run
+// writes to it, once, and says so. A rerun with --apply adds nothing more.
+func TestInitFromCompletesTheRepositorysGitignore(t *testing.T) {
+	dir := nxRepository(t)
+	gitignorePath := filepath.Join(dir, ".gitignore")
+	if err := os.WriteFile(gitignorePath, []byte("node_modules\ndist\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	want := "node_modules\ndist\n\n# Putnami\n.putnami/\n.gen/\n"
+
+	stubInitFrom(t, false, "")
+	out, err := captureStdout(t, func() error {
+		return WorkspaceInit(context.Background(), "", []string{"--from", "nx", "--mode", "delegate", "--workspace", "shop"}, LifecycleEnv{})
+	})
+	if err != nil {
+		t.Fatalf("WorkspaceInit: %v\n%s", err, out)
+	}
+	if data, _ := os.ReadFile(gitignorePath); string(data) != want {
+		t.Errorf(".gitignore = %q, want %q", data, want)
+	}
+	if !strings.Contains(out, ".gitignore lists .putnami/ and .gen/") {
+		t.Errorf("init does not say what it added to .gitignore:\n%s", out)
+	}
+
+	// A rerun with --apply on the adopted workspace completes the file too,
+	// and a further one adds nothing.
+	if err := os.WriteFile(gitignorePath, []byte("node_modules\ndist\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for i, says := range []bool{true, false} {
+		stubInitFrom(t, false, "")
+		out, err = captureStdout(t, func() error {
+			return WorkspaceInit(context.Background(), dir, []string{"--from", "nx", "--mode", "delegate", "--apply"}, LifecycleEnv{})
+		})
+		if err != nil {
+			t.Fatalf("rerun %d: %v\n%s", i+1, err, out)
+		}
+		if data, _ := os.ReadFile(gitignorePath); string(data) != want {
+			t.Errorf("after rerun %d, .gitignore = %q, want %q", i+1, data, want)
+		}
+		if got := strings.Contains(out, ".gitignore lists .putnami/ and .gen/"); got != says {
+			t.Errorf("rerun %d reports the .gitignore change: %v, want %v\n%s", i+1, got, says, out)
+		}
+	}
+}

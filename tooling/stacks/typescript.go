@@ -182,11 +182,12 @@ func ESLintDroppedArguments(script string) (holdable, commandLineOnly []string) 
 // ESLintArgumentsReason says why an ESLint lint script keeps running through
 // the tool, ending with keeps: it names the arguments the TypeScript lint
 // would drop, and advises moving them to the ESLint configuration only when
-// that configuration can hold every one of them.
+// that configuration can hold every one of them; otherwise it names the only
+// places ESLint reads them from.
 func ESLintArgumentsReason(script, keeps string) string {
 	holdable, commandLineOnly := ESLintDroppedArguments(script)
 	if len(commandLineOnly) > 0 {
-		return fmt.Sprintf("its ESLint takes %q, which %s would drop and no ESLint configuration can hold: %s",
+		return fmt.Sprintf("its ESLint takes %q, which %s would drop and no ESLint configuration can hold: ESLint reads a --flag from its command line or the ESLINT_FLAGS environment variable only; %s",
 			strings.Join(commandLineOnly, " "), TypeScriptExtension, keeps)
 	}
 	return fmt.Sprintf("its ESLint takes arguments (%q) that %s would drop: move them to the ESLint configuration; %s",

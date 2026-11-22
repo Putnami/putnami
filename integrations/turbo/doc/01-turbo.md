@@ -55,8 +55,11 @@ describes. A bare `eslint` lint script moves: `@putnami/typescript` lints the
 package with ESLint because its lint script runs it, from the package's own
 configuration. An ESLint script with arguments, such as `--max-warnings 0`,
 stays: the TypeScript lint passes ESLint no argument, so move them to the
-ESLint configuration first. A `build` script that runs `tsc` alone (`tsc`,
-`tsc -b` or `tsc -p` with one config) moves with that `tsc`, which Putnami
+ESLint configuration first. A `--flag`, such as
+`--flag unstable_native_nodejs_ts_config`, has no place in that configuration:
+ESLint reads it from its command line or the `ESLINT_FLAGS` environment
+variable only, so its script keeps running through Turborepo. A `build`
+script that runs `tsc` alone (`tsc`, `tsc -b` or `tsc -p` with one config) moves with that `tsc`, which Putnami
 runs into the package's `outDir`, as
 [A library built with tsc](https://github.com/Putnami/putnami/blob/main/typescript/extension/doc/02-build.md#a-library-built-with-tsc)
 describes. Each task that stays on Turborepo is listed with the reason. One

@@ -44,8 +44,8 @@ it prints the diff of each file the sync would change. `--apply` writes them.
 replaces the other mode's extension in each project's `putnami.json`, with the
 `test` and `lint` entries and the file patterns delegate mode wrote.
 
-Add `.putnami/` and `.gen/` to the repository's `.gitignore`: `init` writes
-one only when the repository has none.
+`init` adds `.putnami/` and `.gen/` to the repository's `.gitignore`, or
+writes one when the repository has none.
 
 ## What the sync writes
 
