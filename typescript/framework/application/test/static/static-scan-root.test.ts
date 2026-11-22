@@ -1,6 +1,15 @@
 import { afterEach, beforeEach, describe, expect } from 'bun:test';
 import { specTest } from '@putnami/runtime/spectest';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { StaticPlugin } from '../../src/static/static.plugin';
@@ -129,6 +138,13 @@ describe('static scan roots', () => {
       );
       await expect(generate(join(workspace, 'shared', 'public'))).rejects.toThrow(
         "the scan root '../shared/public' lies outside",
+      );
+      // A workspace package linked into node_modules is the library itself,
+      // which no lockfile pins: its real path decides.
+      mkdirSync(join(workload, 'node_modules', '@acme'), { recursive: true });
+      symlinkSync(library, join(workload, 'node_modules', '@acme', 'linked-fonts'), 'dir');
+      await expect(generate(join(workload, 'node_modules', '@acme', 'linked-fonts', 'fonts'))).rejects.toThrow(
+        "the scan root '../libs/fonts/fonts' lies outside every project's public/ folder",
       );
       // A scope's public/ belongs to no project.
       writeFile(join(workspace, 'libs', 'public', 'shared.css'), 'body{}');

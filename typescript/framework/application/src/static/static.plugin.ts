@@ -1,5 +1,5 @@
 import { file, Glob, gzipSync, write } from 'bun';
-import { copyFileSync, mkdirSync, readdirSync, statSync } from 'node:fs';
+import { copyFileSync, mkdirSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { useConfig, useLogger, type InferConfig } from '@putnami/runtime';
 import {
@@ -447,12 +447,15 @@ const KEYED_PUBLIC_FOLDER = 'public';
  * that the workload's own code computes lies in a project it imports.
  */
 function assertKeyedScanRoot(scanRoot: string, projectRoot: string, workspaceRoot: string | undefined): void {
-  const root = resolve(scanRoot);
-  const workloadRoot = resolve(projectRoot);
-  if (isWithin(root, resolve(workloadRoot, '.gen', 'public'))) return;
+  // Every test reads real paths: a workspace package that the package manager
+  // links into node_modules is a project the lockfile does not pin, and its
+  // real path is the project's own.
+  const root = realPath(scanRoot);
+  const workloadRoot = realPath(projectRoot);
+  if (isWithin(root, realPath(resolve(workloadRoot, '.gen', 'public')))) return;
   if (root.split(/[\\/]/).includes('node_modules')) return;
   const relativeToWorkload = (path: string) => toPosixPath(relativePath(workloadRoot, path)) || '.';
-  const workspace = workspaceRoot ? resolve(workspaceRoot) : undefined;
+  const workspace = workspaceRoot ? realPath(workspaceRoot) : undefined;
   if (workspace && !isWithin(root, workspace)) {
     throw new Error(
       `StaticPlugin: the scan root '${relativeToWorkload(root)}' lies outside the workspace, whose files the build-generate cache key reads; ` +
@@ -473,6 +476,15 @@ function assertKeyedScanRoot(scanRoot: string, projectRoot: string, workspaceRoo
       `so the build-generate cache key does not read it, and a change to its files would not rebuild the workload. ` +
       `Move it under '${relativeToWorkload(target)}'.`,
   );
+}
+
+/** The real path of `path`, symbolic links resolved, or its resolved form when it does not exist. */
+function realPath(path: string): string {
+  try {
+    return realpathSync(path);
+  } catch {
+    return resolve(path);
+  }
 }
 
 /** Whether `path` is `dir` or lies under it; both are resolved. */

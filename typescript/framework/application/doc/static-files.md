@@ -51,7 +51,9 @@ these places:
 - under the `public/` folder of the workload, or of a library whose root holds a
   project `putnami.json` (not a scope's). A change to any file there rebuilds
   every workload that depends on the library and stages it;
-- inside an installed package under `node_modules/`, which the lockfiles pin;
+- inside an installed package under `node_modules/`, which the lockfiles pin.
+  The plugin judges the real path: a workspace package the package manager
+  links into `node_modules/` is its library, and follows the first rule;
 - under the workload's `.gen/public/`, where `options.generate.assets` or an
   earlier build step put it.
 
